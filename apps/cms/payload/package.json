@@ -1,0 +1,25 @@
+{
+  "name": "@belucha/cms",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.js",
+    "build": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.js payload build",
+    "start": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.js NODE_ENV=production payload start",
+    "generate:types": "payload generate:types"
+  },
+  "dependencies": {
+    "@payloadcms/db-mongodb": "^3.64.0",
+    "@payloadcms/plugin-stripe": "^3.64.0",
+    "@payloadcms/richtext-lexical": "^3.64.0",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "payload": "^3.64.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
+
