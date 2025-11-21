@@ -8,9 +8,22 @@ import { fileURLToPath } from 'url'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-// Load .env.local file
-dotenv.config({ path: path.resolve(dirname, '../.env.local') })
+// Load .env.local file (try multiple paths)
+const envPaths = [
+  path.resolve(dirname, '../.env.local'),
+  path.resolve(dirname, '../../.env.local'),
+  path.resolve(process.cwd(), '.env.local'),
+]
+
+for (const envPath of envPaths) {
+  dotenv.config({ path: envPath, override: false })
+}
 dotenv.config() // Also load .env if exists
+
+// Debug: Log if secret is loaded
+if (!process.env.PAYLOAD_SECRET) {
+  console.error('⚠️  PAYLOAD_SECRET not found! Checked paths:', envPaths)
+}
 
 const app = express()
 
