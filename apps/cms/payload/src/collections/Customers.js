@@ -65,10 +65,10 @@ export default {
       ],
     },
     {
-      name: 'supabaseUserId',
+      name: 'userId',
       type: 'text',
       admin: {
-        description: 'Supabase user ID for authentication',
+        description: 'User ID for authentication',
       },
     },
   ],
