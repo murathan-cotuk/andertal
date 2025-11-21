@@ -1,41 +1,43 @@
-const { buildConfig } = require("payload/config");
-const { postgresAdapter } = require("@payloadcms/db-postgres");
-const { webpackBundler } = require("@payloadcms/bundler-webpack");
-const { slateEditor } = require("@payloadcms/richtext-slate");
-const path = require("path");
+import { buildConfig } from 'payload'
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-const Products = require("./collections/Products");
-const Categories = require("./collections/Categories");
-const Brands = require("./collections/Brands");
-const Sellers = require("./collections/Sellers");
-const Customers = require("./collections/Customers");
-const Orders = require("./collections/Orders");
-const Media = require("./collections/Media");
+const filename = fileURLToPath(import.meta.url)
+const dirname = path.dirname(filename)
 
-module.exports = buildConfig({
+import Products from './collections/Products.js'
+import Categories from './collections/Categories.js'
+import Brands from './collections/Brands.js'
+import Sellers from './collections/Sellers.js'
+import Customers from './collections/Customers.js'
+import Orders from './collections/Orders.js'
+import Media from './collections/Media.js'
+
+export default buildConfig({
   admin: {
-    user: Sellers.Sellers,
-    bundler: webpackBundler(),
+    user: 'sellers',
   },
-  editor: slateEditor({}),
   collections: [
-    Products.Products,
-    Categories.Categories,
-    Brands.Brands,
-    Sellers.Sellers,
-    Customers.Customers,
-    Orders.Orders,
-    Media.Media,
+    Products,
+    Categories,
+    Brands,
+    Sellers,
+    Customers,
+    Orders,
+    Media,
   ],
+  editor: lexicalEditor({}),
+  db: mongooseAdapter({
+    url: process.env.PAYLOAD_MONGO_URL || process.env.DATABASE_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/belucha',
+  }),
   graphQL: {
-    schemaOutputFile: path.resolve(__dirname, "generated-schema.graphql"),
+    schemaOutputFile: path.resolve(dirname, 'generated-schema.graphql'),
   },
   plugins: [],
-  db: postgresAdapter({
-    pool: {
-      connectionString: process.env.DATABASE_URI || "",
-    },
-  }),
-  serverURL: process.env.PAYLOAD_PUBLIC_SERVER_URL || "http://localhost:3001",
-});
-
+  serverURL: process.env.PAYLOAD_PUBLIC_SERVER_URL || 'http://localhost:3001',
+  typescript: {
+    outputFile: path.resolve(dirname, 'payload-types.ts'),
+  },
+})

@@ -9,16 +9,33 @@
     "format": "prettier --write \"**/*.{js,jsx,md}\"",
     "clean": "turbo run clean && rm -rf node_modules"
   },
+  "dependencies": {
+    "cross-env": "^7.0.3",
+    "next": "^16.0.3"
+  },
   "devDependencies": {
-    "@turbo/gen": "^1.10.12",
+    "@turbo/gen": "^2.6.1",
     "prettier": "^3.0.0",
-    "turbo": "^1.10.12"
+    "turbo": "^2.6.1"
   },
   "packageManager": "npm@9.5.0",
   "workspaces": [
     "apps/*",
     "packages/*",
     "apps/cms/*"
-  ]
+  ],
+  "overrides": {
+    "esbuild": "^0.25.0",
+    "tmp": "^0.2.3",
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.0"
+    },
+    "drizzle-kit": {
+      "@esbuild-kit/esm-loader": {
+        "@esbuild-kit/core-utils": {
+          "esbuild": "^0.25.0"
+        }
+      }
+    }
+  }
 }
-
