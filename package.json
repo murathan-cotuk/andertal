@@ -1,0 +1,24 @@
+{
+  "name": "belucha",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{js,jsx,md}\"",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@turbo/gen": "^1.10.12",
+    "prettier": "^3.0.0",
+    "turbo": "^1.10.12"
+  },
+  "packageManager": "npm@9.5.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "apps/cms/*"
+  ]
+}
+

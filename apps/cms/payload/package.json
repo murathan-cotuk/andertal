@@ -1,0 +1,25 @@
+{
+  "name": "@belucha/cms",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.js payload dev",
+    "build": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.js payload build",
+    "start": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.js NODE_ENV=production payload start"
+  },
+  "dependencies": {
+    "@payloadcms/bundler-webpack": "^1.0.7",
+    "@payloadcms/db-postgres": "^1.7.2",
+    "@payloadcms/plugin-graphql": "^1.0.7",
+    "@payloadcms/plugin-stripe": "^1.0.0",
+    "@payloadcms/richtext-slate": "^1.5.2",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "payload": "^2.8.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
+

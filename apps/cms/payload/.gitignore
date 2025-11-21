@@ -1,0 +1,9 @@
+node_modules
+dist
+build
+.media
+payload-types.ts
+generated-schema.graphql
+.env
+.env.local
+

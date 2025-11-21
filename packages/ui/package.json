@@ -1,0 +1,23 @@
+{
+  "name": "@belucha/ui",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./index.jsx",
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "styled-components": "^6.1.6"
+  },
+  "devDependencies": {
+    "@belucha/config": "*"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
+
