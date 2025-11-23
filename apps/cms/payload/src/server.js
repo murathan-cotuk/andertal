@@ -15,14 +15,24 @@ const envPaths = [
   path.resolve(process.cwd(), '.env.local'),
 ]
 
+// Load environment variables
+let envLoaded = false
 for (const envPath of envPaths) {
-  dotenv.config({ path: envPath, override: false })
+  const result = dotenv.config({ path: envPath, override: false })
+  if (!result.error) {
+    envLoaded = true
+    console.log(`✅ Loaded .env from: ${envPath}`)
+  }
 }
 dotenv.config() // Also load .env if exists
 
-// Debug: Log if secret is loaded
+// Ensure PAYLOAD_SECRET is set
+const secret = process.env.PAYLOAD_SECRET || 'beluchaSecret123'
 if (!process.env.PAYLOAD_SECRET) {
-  console.error('⚠️  PAYLOAD_SECRET not found! Checked paths:', envPaths)
+  console.warn('⚠️  PAYLOAD_SECRET not found in env, using default')
+  process.env.PAYLOAD_SECRET = secret
+} else {
+  console.log('✅ PAYLOAD_SECRET loaded:', process.env.PAYLOAD_SECRET.substring(0, 10) + '...')
 }
 
 const app = express()
@@ -33,9 +43,18 @@ app.get('/', (_, res) => {
 })
 
 const start = async () => {
-  // Initialize Payload
+  // Ensure secret is set - PayloadCMS v3 requires secret in both config and init
+  const secretKey = process.env.PAYLOAD_SECRET || 'beluchaSecret123'
+  
+  // Set it in process.env to ensure config can read it
+  process.env.PAYLOAD_SECRET = secretKey
+  
+  console.log('🔑 Secret key set:', secretKey ? secretKey.substring(0, 15) + '...' : 'NOT FOUND!')
+  console.log('🔑 Process.env.PAYLOAD_SECRET:', process.env.PAYLOAD_SECRET ? 'SET' : 'NOT SET')
+  
+  // Initialize Payload - secret is also in config
   await payload.init({
-    secret: process.env.PAYLOAD_SECRET || 'your-secret-key',
+    secret: secretKey,
     express: app,
     config,
     onInit: async () => {
