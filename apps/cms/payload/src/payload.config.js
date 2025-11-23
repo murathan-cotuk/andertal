@@ -3,6 +3,11 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import dotenv from 'dotenv'
+
+// Load env before config
+dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env.local') })
+dotenv.config()
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -16,6 +21,7 @@ import Orders from './collections/Orders.js'
 import Media from './collections/Media.js'
 
 export default buildConfig({
+  secret: process.env.PAYLOAD_SECRET || 'beluchaSecret123',
   admin: {
     user: 'sellers',
   },
