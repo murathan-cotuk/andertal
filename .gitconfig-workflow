@@ -13,7 +13,8 @@
 
 [alias]
     # Hızlı workflow komutları
-    wf = "!f() { git checkout dev && git add . && git commit -m \"${1:-update}\" && git push origin dev && git checkout main && git merge dev --no-edit && git push origin main; }; f"
+    wf = "!f() { git checkout dev && git add . && git commit -m \"${1:-update}\" && git push origin dev && git checkout main && git merge dev --no-edit && git push origin main && git checkout dev; }; f"
     wf-dev = "!f() { git checkout dev && git add . && git commit -m \"${1:-update}\" && git push origin dev; }; f"
-    wf-merge = "!f() { git checkout main && git merge dev --no-edit && git push origin main; }; f"
+    wf-merge = "!f() { git checkout main && git merge dev --no-edit && git push origin main && git checkout dev; }; f"
+    wf-skip = "!f() { git checkout dev && git add . && git commit -m \"${1:-update} [skip ci]\" && git push origin dev && git checkout main && git merge dev --no-edit && git commit --amend -m \"Merge dev into main [skip ci]\" --no-edit && git push origin main && git checkout dev; }; f"
 
