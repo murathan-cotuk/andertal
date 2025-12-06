@@ -102,7 +102,7 @@ export default function Footer() {
           </Column>
         </Grid>
         <Bottom>
-          <Copyright>© 2024 Belucha. All rights reserved.</Copyright>
+          <Copyright>© 2025 Belucha. All rights reserved.</Copyright>
         </Bottom>
       </Container>
     </FooterContainer>

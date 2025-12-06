@@ -64,7 +64,6 @@ belucha/
 │   ├── lib/                     # Shared utilities
 │   │   ├── src/
 │   │   │   ├── apollo/         # Apollo Client config
-│   │   │   ├── supabase/       # Supabase client
 │   │   │   ├── stripe/         # Stripe helpers
 │   │   │   └── seo/            # SEO helpers
 │   │   └── package.json
@@ -102,7 +101,7 @@ belucha/
 
 **Payload CMS** (`apps/cms/payload`)
 - Headless CMS with GraphQL API
-- PostgreSQL database (Supabase)
+- MongoDB database
 - Admin panel at `/admin`
 - Collections for all data models
 
@@ -115,7 +114,6 @@ belucha/
 
 **@belucha/lib**
 - Apollo Client configuration
-- Supabase client setup
 - Stripe payment helpers
 - SEO utilities
 
@@ -126,10 +124,11 @@ belucha/
 
 ## 🔌 Integrations
 
-### Supabase
-- Authentication (customers & sellers)
-- PostgreSQL database
-- File storage (media uploads)
+### MongoDB
+- Primary database for all data
+- Products, orders, sellers, customers storage
+- Media metadata storage
+- Local or cloud (MongoDB Atlas) deployment
 
 ### Stripe
 - Payment processing
@@ -145,9 +144,7 @@ belucha/
 ## 📊 Data Flow
 
 ```
-Customer/Seller → Next.js App → Apollo Client → Payload CMS GraphQL → PostgreSQL
-                                                      ↓
-                                              Supabase Storage (Media)
+Customer/Seller → Next.js App → Apollo Client → Payload CMS GraphQL → MongoDB
                                                       ↓
                                               Stripe (Payments)
 ```
@@ -164,9 +161,8 @@ All apps can be deployed independently while sharing the same backend.
 
 Each app requires specific environment variables (see README.md for details):
 - Payload CMS GraphQL URL
-- Supabase credentials
+- MongoDB connection string
 - Stripe keys
-- Database connection string
 
 ## 📝 Key Features
 
@@ -215,4 +211,3 @@ Each app requires specific environment variables (see README.md for details):
 - `npm run format` - Format code
 
 Each app can be built and deployed independently.
-

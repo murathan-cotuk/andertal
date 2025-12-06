@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useQuery, gql } from "@apollo/client";
 import styled from "styled-components";
@@ -30,7 +30,8 @@ const NavContainer = styled.div`
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 24px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 32px;
 `;
@@ -39,12 +40,14 @@ const Logo = styled(Link)`
   font-size: 24px;
   font-weight: 700;
   color: #0ea5e9;
-  font-family: "Aeonik", sans-serif;
+  font-family: "Manrope", sans-serif;
+  letter-spacing: 0.05em;
 `;
 
 const SearchBar = styled.div`
-  flex: 1;
   max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
   position: relative;
 `;
 
@@ -87,32 +90,123 @@ const CategoryLink = styled(Link)`
   }
 `;
 
-const ProfileMenu = styled.div`
-  position: relative;
+const RightMenu = styled.div`
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  justify-content: flex-end;
 `;
 
-const ProfileButton = styled.button`
+const CartButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
+  justify-content: center;
+  padding: 8px;
   border: none;
   background: transparent;
   cursor: pointer;
   border-radius: 8px;
   transition: background-color 0.2s ease;
+  width: 40px;
+  height: 40px;
+  position: relative;
 
   &:hover {
     background-color: #f3f4f6;
   }
 `;
 
+const CartBadge = styled.span`
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background-color: #ef4444;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+`;
+
+const ProfileMenu = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+`;
+
+const ProfileButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+  width: 40px;
+  height: 40px;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+`;
+
+const DropdownMenu = styled.div`
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  min-width: 200px;
+  z-index: 1000;
+  overflow: hidden;
+  display: ${props => props.$isOpen ? 'block' : 'none'};
+`;
+
+const DropdownItem = styled(Link)`
+  display: block;
+  padding: 12px 16px;
+  color: #374151;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+
+  &:hover {
+    background-color: #f3f4f6;
+    color: #0ea5e9;
+  }
+
+  &:not(:last-child) {
+    border-bottom: 1px solid #f3f4f6;
+  }
+`;
+
 export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { data, loading } = useQuery(GET_CATEGORIES);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isDropdownOpen && !event.target.closest('[data-dropdown]')) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   return (
     <Nav>
@@ -127,20 +221,39 @@ export default function Navbar() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </SearchBar>
-        <CategoriesMenu>
-          {!loading &&
-            data?.Categories?.docs?.slice(0, 5).map((category) => (
-              <CategoryLink key={category.id} href={`/category/${category.slug}`}>
-                {category.name}
-              </CategoryLink>
-            ))}
-        </CategoriesMenu>
-        <ProfileMenu>
-          <ProfileButton>
-            <i className="fas fa-user-circle" style={{ fontSize: "24px" }} />
-            <span>Account</span>
-          </ProfileButton>
-        </ProfileMenu>
+        <RightMenu>
+          <ProfileMenu data-dropdown>
+            <ProfileButton onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
+              <i className="fas fa-user-circle" style={{ fontSize: "24px", color: "#374151" }} />
+            </ProfileButton>
+            <DropdownMenu $isOpen={isDropdownOpen}>
+              <DropdownItem href="/account" onClick={() => setIsDropdownOpen(false)}>
+                Konto
+              </DropdownItem>
+              <DropdownItem href="/favorites" onClick={() => setIsDropdownOpen(false)}>
+                Merkzettel
+              </DropdownItem>
+              <DropdownItem href="/orders" onClick={() => setIsDropdownOpen(false)}>
+                Bestellungen
+              </DropdownItem>
+              <DropdownItem href="/invoices" onClick={() => setIsDropdownOpen(false)}>
+                Rechnungen
+              </DropdownItem>
+              <DropdownItem href="/help" onClick={() => setIsDropdownOpen(false)}>
+                Hilfe
+              </DropdownItem>
+              <DropdownItem href="/login" onClick={() => setIsDropdownOpen(false)}>
+                Anmelden
+              </DropdownItem>
+            </DropdownMenu>
+          </ProfileMenu>
+          <Link href="/cart">
+            <CartButton>
+              <i className="fas fa-shopping-cart" style={{ fontSize: "20px", color: "#374151" }} />
+              <CartBadge>0</CartBadge>
+            </CartButton>
+          </Link>
+        </RightMenu>
       </NavContainer>
     </Nav>
   );

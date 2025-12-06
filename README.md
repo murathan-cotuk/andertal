@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# belucha
-=======
 # Belucha - E-commerce Marketplace Monorepo
 
 A complete e-commerce marketplace platform built with Turborepo, featuring a customer-facing shop, seller dashboard, and Payload CMS backend.
@@ -16,7 +13,7 @@ belucha/
 │       └── payload/       # Payload CMS backend
 ├── packages/
 │   ├── ui/                # Shared design system components
-│   ├── lib/               # Shared utilities (Apollo, Supabase, Stripe, SEO)
+│   ├── lib/               # Shared utilities (Apollo, Stripe, SEO)
 │   └── config/            # Shared configs (Tailwind, ESLint, TypeScript)
 └── turbo.json             # Turborepo configuration
 ```
@@ -26,8 +23,7 @@ belucha/
 ### Prerequisites
 
 - Node.js 18+ and npm 9+
-- PostgreSQL database (Supabase recommended)
-- Supabase account for authentication and storage
+- MongoDB database (local or cloud)
 - Stripe account for payments
 
 ### Installation
@@ -57,38 +53,34 @@ belucha/
    PAYLOAD_SECRET=your-secret-key-here
    PAYLOAD_PUBLIC_SERVER_URL=http://localhost:3001
    PORT=3001
-   DATABASE_URI=postgresql://user:password@host:port/database
+   PAYLOAD_MONGO_URL=mongodb://localhost:27017/belucha
+   # Or use MONGODB_URI for cloud MongoDB (MongoDB Atlas, etc.)
+   # MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/belucha
    ```
 
    **`apps/shop/.env.local`**
    ```env
    NEXT_PUBLIC_PAYLOAD_GRAPHQL_URL=http://localhost:3001/api/graphql
-   NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
    ```
 
    **`apps/sellercentral/.env.local`**
    ```env
    NEXT_PUBLIC_PAYLOAD_GRAPHQL_URL=http://localhost:3001/api/graphql
-   NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
    ```
 
    **Root `.env` (for Stripe server-side)**
    ```env
    STRIPE_SECRET_KEY=your-stripe-secret-key
-   SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
    ```
 
-4. **Set up Supabase**
+4. **Set up MongoDB**
 
-   - Create a new Supabase project
-   - Get your project URL and anon key
-   - Set up PostgreSQL database
-   - Configure authentication providers
-   - Set up storage buckets for media
+   - Install MongoDB locally or use MongoDB Atlas (cloud)
+   - For local: MongoDB should be running on `mongodb://localhost:27017`
+   - For cloud: Get your connection string from MongoDB Atlas
+   - Update `PAYLOAD_MONGO_URL` or `MONGODB_URI` in `apps/cms/payload/.env`
 
 5. **Set up Stripe**
 
@@ -163,7 +155,6 @@ Customer-facing e-commerce store built with Next.js 14 App Router.
 - Product detail pages
 - Shopping cart (to be implemented)
 - Checkout with Stripe (to be implemented)
-- User authentication via Supabase
 
 **Tech Stack:**
 - Next.js 14 (App Router)
@@ -201,15 +192,15 @@ Headless CMS backend with GraphQL API.
 - **Categories**: Product categories with hierarchy
 - **Brands**: Brand information
 - **Sellers**: Seller accounts with Stripe Connect integration
-- **Customers**: Customer profiles linked to Supabase auth
+- **Customers**: Customer profiles
 - **Orders**: Order management with commission tracking
 - **Media**: Media library for images and files
 
 **Features:**
 - GraphQL API enabled
-- PostgreSQL database (Supabase)
+- MongoDB database
 - Admin panel at `/admin`
-- File uploads to Supabase storage
+- File uploads to local storage or cloud storage
 
 ## 📚 Shared Packages
 
@@ -225,7 +216,6 @@ Shared design system components:
 
 Shared utilities and configurations:
 - **Apollo Client**: GraphQL client setup
-- **Supabase**: Client and server-side clients
 - **Stripe**: Payment processing and commission calculations
 - **SEO**: Meta tag generation helpers
 
@@ -238,13 +228,12 @@ Shared configurations:
 
 ## 🔌 Integrations
 
-### Supabase
+### MongoDB
 
 Used for:
-- User authentication (customers and sellers)
-- PostgreSQL database
-- File storage (media uploads)
-- Real-time subscriptions (optional)
+- Primary database (via Payload CMS)
+- All data storage (products, orders, sellers, customers, etc.)
+- Media metadata storage
 
 ### Stripe
 
@@ -279,7 +268,7 @@ Both Next.js apps can be deployed separately on Vercel:
 3. **Payload CMS**
    - Deploy to a Node.js hosting service (Railway, Render, etc.)
    - Or use Vercel Serverless Functions
-   - Set up PostgreSQL database
+   - Set up MongoDB database (MongoDB Atlas recommended)
    - Configure environment variables
 
 ### Environment Variables for Production
@@ -288,28 +277,25 @@ Make sure to set all required environment variables in your hosting platform:
 
 **Shop & Sellercentral:**
 - `NEXT_PUBLIC_PAYLOAD_GRAPHQL_URL` - Your Payload CMS GraphQL endpoint
-- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anon key
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` - Stripe publishable key
 
 **Payload CMS:**
 - `PAYLOAD_SECRET` - Secret key for Payload
 - `PAYLOAD_PUBLIC_SERVER_URL` - Public URL of your CMS
-- `DATABASE_URI` - PostgreSQL connection string
+- `PAYLOAD_MONGO_URL` or `MONGODB_URI` - MongoDB connection string
 - `PORT` - Server port (default: 3001)
 
 **Server-side (API routes):**
 - `STRIPE_SECRET_KEY` - Stripe secret key
-- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
 
 ## 🔐 Security
 
 - Never commit `.env` files
 - Use environment variables for all secrets
 - Enable CORS properly in production
-- Use Supabase Row Level Security (RLS) for database access
 - Validate all user inputs
 - Use HTTPS in production
+- Secure MongoDB connection with authentication
 
 ## 📝 Database Schema
 
@@ -318,7 +304,7 @@ The Payload CMS collections define the database schema. Key relationships:
 - Products belong to Sellers and Categories
 - Orders contain Products and belong to Customers
 - Sellers have Stripe Connect accounts for payouts
-- Customers are linked to Supabase user IDs
+- Customers are managed through Payload CMS
 
 ## 🧪 Testing
 
@@ -354,6 +340,4 @@ For issues and questions:
 
 ---
 
-**Built with ❤️ using Turborepo, Next.js, Payload CMS, Supabase, and Stripe**
-
->>>>>>> dev
+**Built with ❤️ using Turborepo, Next.js, Payload CMS, MongoDB, and Stripe**

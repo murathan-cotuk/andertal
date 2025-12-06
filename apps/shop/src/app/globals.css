@@ -1,14 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Aeonik font - Ücretli font. Font dosyalarınızı projeye eklemek için:
+   1. apps/shop/public/fonts/ klasörü oluşturun
+   2. Aeonik font dosyalarınızı (woff2, woff) oraya koyun
+   3. Aşağıdaki @font-face tanımlarını güncelleyin:
+   
 @font-face {
   font-family: "Aeonik";
-  src: url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-solid-900.woff2")
-    format("woff2");
-  font-weight: normal;
+  src: url("/fonts/Aeonik-Regular.woff2") format("woff2"),
+       url("/fonts/Aeonik-Regular.woff") format("woff");
+  font-weight: 400;
   font-style: normal;
+  font-display: swap;
 }
+
+@font-face {
+  font-family: "Aeonik";
+  src: url("/fonts/Aeonik-Medium.woff2") format("woff2"),
+       url("/fonts/Aeonik-Medium.woff") format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Aeonik";
+  src: url("/fonts/Aeonik-Bold.woff2") format("woff2"),
+       url("/fonts/Aeonik-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+*/
 
 :root {
   --foreground-rgb: 0, 0, 0;
@@ -36,6 +63,12 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
+  letter-spacing: 0.01em;
+  font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  letter-spacing: inherit;
 }
 
 a {

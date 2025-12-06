@@ -1,18 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, gql } from "@apollo/client";
 import Link from "next/link";
 import styled from "styled-components";
 import { Card } from "@belucha/ui";
 
 const GET_PRODUCTS = gql`
-  query GetProducts($search: String, $category: String, $seller: String) {
-    Products(limit: 12, where: {
-      ...(($search) ? { title: { contains: $search } } : {}),
-      ...(($category) ? { category: { equals: $category } } : {}),
-      ...(($seller) ? { seller: { equals: $seller } } : {})
-    }) {
+  query GetProducts($where: JSON) {
+    Products(limit: 12, where: $where) {
       docs {
         id
         title
@@ -137,8 +133,25 @@ export default function ProductGrid() {
   const [category, setCategory] = useState("");
   const [seller, setSeller] = useState("");
 
-  const { data, loading, error, refetch } = useQuery(GET_PRODUCTS, {
-    variables: { search, category, seller },
+  // Build where clause conditionally with useMemo
+  const whereClause = useMemo(() => {
+    const conditions = [];
+    
+    if (search) {
+      conditions.push({ title: { contains: search } });
+    }
+    if (category) {
+      conditions.push({ category: { equals: category } });
+    }
+    if (seller) {
+      conditions.push({ seller: { equals: seller } });
+    }
+    
+    return conditions.length > 0 ? { _and: conditions } : {};
+  }, [search, category, seller]);
+
+  const { data, loading, error } = useQuery(GET_PRODUCTS, {
+    variables: { where: whereClause },
   });
 
   // Kategori ve satıcı seçenekleri için veriler
