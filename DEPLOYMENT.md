@@ -2,7 +2,7 @@
 
 ## Vercel Deployment
 
-Bu monorepo projesi için Vercel'de 3 ayrı proje oluşturmanızz gerekiyor:
+Bu monorepo projesi için Vercel'de 3 ayrı proje oluşturmanız gerekiyor:
 
 ### 1. Shop App (Customer-facing)
 
