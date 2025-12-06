@@ -1,4 +1,4 @@
-# Deployment Guide
+# Deployment Guide - 1
 
 ## Vercel Deployment
 
@@ -9,8 +9,8 @@ Bu monorepo projesi için Vercel'de 3 ayrı proje oluşturmanız gerekiyor:
 **Vercel Project Settings:**
 - **Root Directory**: `apps/shop`
 - **Framework Preset**: Next.js
-- **Build Command**: `cd ../.. && npm install && npm run build --filter=@belucha/shop`
-- **Output Directory**: `apps/shop/.next`
+- **Build Command**: `cd ../.. && npm install && turbo run build --filter=@belucha/shop --no-deps`
+- **Output Directory**: `.next` (ÖNEMLİ: Root directory `apps/shop` olduğu için sadece `.next`)
 - **Install Command**: `cd ../.. && npm install`
 
 **Environment Variables:**
@@ -24,8 +24,8 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 **Vercel Project Settings:**
 - **Root Directory**: `apps/sellercentral`
 - **Framework Preset**: Next.js
-- **Build Command**: `cd ../.. && npm install && npm run build --filter=@belucha/sellercentral`
-- **Output Directory**: `apps/sellercentral/.next`
+- **Build Command**: `cd ../.. && npm install && turbo run build --filter=@belucha/sellercentral --no-deps`
+- **Output Directory**: `.next` (ÖNEMLİ: Root directory `apps/sellercentral` olduğu için sadece `.next`)
 - **Install Command**: `cd ../.. && npm install`
 
 **Environment Variables:**
