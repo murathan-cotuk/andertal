@@ -1,0 +1,19 @@
+# Git Workflow için önerilen ayarlar
+# Bu dosyayı kullanmak için: git config --global include.path .gitconfig-workflow
+
+[core]
+    editor = code --wait
+    autocrlf = true
+
+[merge]
+    ff = false
+
+[push]
+    default = simple
+
+[alias]
+    # Hızlı workflow komutları
+    wf = "!f() { git checkout dev && git add . && git commit -m \"${1:-update}\" && git push origin dev && git checkout main && git merge dev --no-edit && git push origin main; }; f"
+    wf-dev = "!f() { git checkout dev && git add . && git commit -m \"${1:-update}\" && git push origin dev; }; f"
+    wf-merge = "!f() { git checkout main && git merge dev --no-edit && git push origin main; }; f"
+
