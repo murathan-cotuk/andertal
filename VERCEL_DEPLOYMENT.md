@@ -30,8 +30,8 @@ Belucha projesi 3 ayrı uygulamadan oluşur:
 
 **Build Settings** (otomatik algılanmalı, yoksa manuel ekleyin):
 - Framework Preset: **Next.js**
-- Build Command: `cd ../.. && npm install && npm run build --filter=@belucha/shop`
-- Output Directory: `apps/shop/.next`
+- Build Command: `cd ../.. && npm install && turbo run build --filter=@belucha/shop`
+- Output Directory: `.next` (ÖNEMLİ: Root directory `apps/shop` olduğu için sadece `.next`)
 - Install Command: `cd ../.. && npm install`
 
 ### 1.3 Environment Variables
@@ -72,8 +72,8 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_... (veya pk_test_...)
 
 **Build Settings**:
 - Framework Preset: **Next.js**
-- Build Command: `cd ../.. && npm install && npm run build --filter=@belucha/sellercentral`
-- Output Directory: `apps/sellercentral/.next`
+- Build Command: `cd ../.. && npm install && turbo run build --filter=@belucha/sellercentral`
+- Output Directory: `.next` (ÖNEMLİ: Root directory `apps/sellercentral` olduğu için sadece `.next`)
 - Install Command: `cd ../.. && npm install`
 
 ### 2.3 Environment Variables

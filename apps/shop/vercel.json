@@ -1,6 +1,6 @@
 {
   "buildCommand": "cd ../.. && npm install && turbo run build --filter=@belucha/shop",
-  "outputDirectory": "apps/shop/.next",
+  "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "cd ../.. && npm install"
 }
