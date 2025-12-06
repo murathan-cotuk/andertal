@@ -10,8 +10,8 @@ const StyledCard = styled.div`
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   transition: all 0.2s ease;
 
-  ${({ hover }) =>
-    hover &&
+  ${({ $hover }) =>
+    $hover &&
     `
     cursor: pointer;
     &:hover {
@@ -23,7 +23,7 @@ const StyledCard = styled.div`
 
 export const Card = ({ children, hover, ...props }) => {
   return (
-    <StyledCard hover={hover} {...props}>
+    <StyledCard $hover={hover} {...props}>
       {children}
     </StyledCard>
   );

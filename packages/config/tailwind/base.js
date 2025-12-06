@@ -4,7 +4,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        aeonik: ["Aeonik", "sans-serif"],
+        manrope: ["Manrope", "sans-serif"],
       },
       colors: {
         primary: {

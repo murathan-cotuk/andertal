@@ -19,50 +19,69 @@ export default {
     {
       name: 'firstName',
       type: 'text',
+      required: true,
     },
     {
       name: 'lastName',
       type: 'text',
+      required: true,
+    },
+    {
+      name: 'gender',
+      type: 'select',
+      options: [
+        { label: 'Male', value: 'male' },
+        { label: 'Female', value: 'female' },
+        { label: 'Other', value: 'other' },
+      ],
+    },
+    {
+      name: 'birthDate',
+      type: 'date',
     },
     {
       name: 'phone',
       type: 'text',
+      required: true,
     },
     {
-      name: 'addresses',
-      type: 'array',
-      fields: [
-        {
-          name: 'street',
-          type: 'text',
-          required: true,
-        },
-        {
-          name: 'city',
-          type: 'text',
-          required: true,
-        },
-        {
-          name: 'state',
-          type: 'text',
-          required: true,
-        },
-        {
-          name: 'zipCode',
-          type: 'text',
-          required: true,
-        },
-        {
-          name: 'country',
-          type: 'text',
-          required: true,
-        },
-        {
-          name: 'isDefault',
-          type: 'checkbox',
-          defaultValue: false,
-        },
-      ],
+      name: 'address',
+      type: 'text',
+      required: true,
+      admin: {
+        description: 'Street address',
+      },
+    },
+    {
+      name: 'addressLine2',
+      type: 'text',
+      admin: {
+        description: 'Address additional info (Adresszusatz)',
+      },
+    },
+    {
+      name: 'zipCode',
+      type: 'text',
+      required: true,
+      admin: {
+        description: 'PLZ (Postal code)',
+      },
+    },
+    {
+      name: 'city',
+      type: 'text',
+      required: true,
+      admin: {
+        description: 'Ort (City)',
+      },
+    },
+    {
+      name: 'country',
+      type: 'text',
+      required: true,
+      admin: {
+        description: 'Land (Country)',
+      },
     },
     {
       name: 'userId',

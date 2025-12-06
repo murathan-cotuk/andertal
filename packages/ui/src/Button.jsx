@@ -4,7 +4,7 @@ import React from "react";
 import styled from "styled-components";
 
 const StyledButton = styled.button`
-  font-family: "Aeonik", sans-serif;
+  font-family: "Manrope", sans-serif;
   font-weight: 500;
   border-radius: 8px;
   border: none;
@@ -15,8 +15,8 @@ const StyledButton = styled.button`
   justify-content: center;
   gap: 8px;
 
-  ${({ size }) => {
-    switch (size) {
+  ${({ $size }) => {
+    switch ($size) {
       case "sm":
         return `
           padding: 8px 16px;
@@ -35,8 +35,8 @@ const StyledButton = styled.button`
     }
   }}
 
-  ${({ variant }) => {
-    switch (variant) {
+  ${({ $variant }) => {
+    switch ($variant) {
       case "secondary":
         return `
           background-color: #6b7280;
@@ -73,8 +73,8 @@ const StyledButton = styled.button`
     }
   }}
 
-  ${({ fullWidth }) =>
-    fullWidth &&
+  ${({ $fullWidth }) =>
+    $fullWidth &&
     `
     width: 100%;
   `}
@@ -93,7 +93,7 @@ export const Button = ({
   ...props
 }) => {
   return (
-    <StyledButton variant={variant} size={size} fullWidth={fullWidth} {...props}>
+    <StyledButton $variant={variant} $size={size} $fullWidth={fullWidth} {...props}>
       {children}
     </StyledButton>
   );

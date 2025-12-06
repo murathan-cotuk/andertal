@@ -11,20 +11,22 @@ const InputWrapper = styled.div`
 `;
 
 const Label = styled.label`
-  font-family: "Aeonik", sans-serif;
+  font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 500;
   color: #374151;
 `;
 
 const StyledInput = styled.input`
-  font-family: "Aeonik", sans-serif;
+  font-family: "Manrope", sans-serif;
   padding: 12px 16px;
   border: 2px solid #e5e7eb;
   border-radius: 8px;
   font-size: 16px;
   transition: all 0.2s ease;
   width: 100%;
+  text-transform: none;
+  letter-spacing: 0.01em;
 
   &:focus {
     outline: none;
@@ -43,7 +45,7 @@ const StyledInput = styled.input`
 `;
 
 const ErrorText = styled.span`
-  font-family: "Aeonik", sans-serif;
+  font-family: "Manrope", sans-serif;
   font-size: 14px;
   color: #ef4444;
 `;
@@ -56,7 +58,13 @@ export const Input = ({
   return (
     <InputWrapper>
       {label && <Label>{label}</Label>}
-      <StyledInput {...props} />
+      <StyledInput 
+        autoCapitalize="off"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck="false"
+        {...props} 
+      />
       {error && <ErrorText>{error}</ErrorText>}
     </InputWrapper>
   );

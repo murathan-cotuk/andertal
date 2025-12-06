@@ -34,9 +34,9 @@ export default function SlimBar() {
   return (
     <Bar>
       <Container>
-        <LinkItem href="/?filter=bestsellers">Bestsellers</LinkItem>
-        <LinkItem href="/?filter=sale">On Sale</LinkItem>
-        <LinkItem href="/?filter=recommended">Products for You</LinkItem>
+        <LinkItem href="/bestsellers">Bestsellers</LinkItem>
+        <LinkItem href="/sale">Angebote</LinkItem>
+        <LinkItem href="/recommended">Für Sie empfohlen</LinkItem>
       </Container>
     </Bar>
   );

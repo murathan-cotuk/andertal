@@ -6,9 +6,8 @@ Get Belucha up and running in minutes!
 
 - [ ] Node.js 18+ installed
 - [ ] npm 9+ installed
-- [ ] Supabase account created
+- [ ] MongoDB installed locally or MongoDB Atlas account
 - [ ] Stripe account created
-- [ ] PostgreSQL database ready (Supabase provides this)
 
 ## Step-by-Step Setup
 
@@ -20,12 +19,18 @@ cd belucha
 npm install
 ```
 
-### 2. Set Up Supabase
+### 2. Set Up MongoDB
 
-1. Go to [supabase.com](https://supabase.com) and create a project
-2. Note your project URL and anon key
-3. Get your database connection string from Settings > Database
-4. Create a storage bucket named `media` for file uploads
+**Option A: Local MongoDB**
+1. Install MongoDB locally
+2. Start MongoDB service: `mongod` (or use your system's service manager)
+3. MongoDB will run on `mongodb://localhost:27017`
+
+**Option B: MongoDB Atlas (Cloud)**
+1. Go to [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas) and create a free account
+2. Create a new cluster
+3. Get your connection string from "Connect" > "Connect your application"
+4. Replace `<password>` with your database user password
 
 ### 3. Set Up Stripe
 
@@ -40,23 +45,27 @@ npm install
 PAYLOAD_SECRET=your-random-secret-key-here
 PAYLOAD_PUBLIC_SERVER_URL=http://localhost:3001
 PORT=3001
-DATABASE_URI=postgresql://postgres:[password]@[host]:5432/postgres
+# For local MongoDB:
+PAYLOAD_MONGO_URL=mongodb://localhost:27017/belucha
+# For MongoDB Atlas (replace with your connection string):
+# MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/belucha?retryWrites=true&w=majority
 ```
 
 **Create `apps/shop/.env.local`:**
 ```env
 NEXT_PUBLIC_PAYLOAD_GRAPHQL_URL=http://localhost:3001/api/graphql
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
 **Create `apps/sellercentral/.env.local`:**
 ```env
 NEXT_PUBLIC_PAYLOAD_GRAPHQL_URL=http://localhost:3001/api/graphql
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+```
+
+**Create root `.env` (for Stripe server-side):**
+```env
+STRIPE_SECRET_KEY=sk_test_...
 ```
 
 ### 5. Initialize Payload CMS
@@ -109,9 +118,10 @@ If ports 3000, 3001, or 3002 are in use, you can change them in:
 
 ### Database Connection Error
 
-- Verify your `DATABASE_URI` is correct
-- Check Supabase database is running
-- Ensure your IP is whitelisted in Supabase
+- Verify your `PAYLOAD_MONGO_URL` or `MONGODB_URI` is correct
+- Check MongoDB is running (if using local)
+- For MongoDB Atlas: Ensure your IP is whitelisted in Network Access
+- Check your MongoDB connection string format
 
 ### GraphQL Errors
 
@@ -134,4 +144,3 @@ If ports 3000, 3001, or 3002 are in use, you can change them in:
 - Review the Payload CMS documentation
 
 Happy building! 🚀
-

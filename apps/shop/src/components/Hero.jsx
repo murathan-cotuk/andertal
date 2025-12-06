@@ -19,13 +19,15 @@ const Title = styled.h1`
   font-size: 48px;
   font-weight: 700;
   margin-bottom: 24px;
-  font-family: "Aeonik", sans-serif;
+  font-family: "Manrope", sans-serif;
+  letter-spacing: 0.05em;
 `;
 
 const Subtitle = styled.p`
   font-size: 20px;
   margin-bottom: 32px;
   opacity: 0.9;
+  letter-spacing: 0.02em;
 `;
 
 export default function Hero() {
