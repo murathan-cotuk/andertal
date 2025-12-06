@@ -1,7 +1,8 @@
 {
-  "buildCommand": "cd ../.. && npm run build --filter=@belucha/shop",
-  "outputDirectory": ".next",
+  "buildCommand": "cd ../.. && npm install && npm run build --filter=@belucha/shop",
+  "outputDirectory": "apps/shop/.next",
   "framework": "nextjs",
-  "installCommand": "cd ../.. && npm install"
+  "installCommand": "cd ../.. && npm install",
+  "rootDirectory": "apps/shop"
 }
 

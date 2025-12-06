@@ -1,8 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styled from "styled-components";
+import { useMutation, gql } from "@apollo/client";
+import { ApolloProvider } from "@apollo/client";
+import { apolloClient } from "@belucha/lib";
 import { Button, Input, Card } from "@belucha/ui";
 
 const Container = styled.div`
@@ -56,17 +60,75 @@ const LoginLink = styled(Link)`
   display: block;
 `;
 
-export default function Register() {
+const ErrorMessage = styled.p`
+  color: #ef4444;
+  font-size: 14px;
+  margin-top: -8px;
+`;
+
+const SuccessMessage = styled.p`
+  color: #10b981;
+  font-size: 14px;
+  margin-top: -8px;
+`;
+
+const CREATE_SELLER = gql`
+  mutation CreateSeller($data: JSON!) {
+    createSellers(data: $data) {
+      id
+      storeName
+      slug
+    }
+  }
+`;
+
+function RegisterForm() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     storeName: "",
     email: "",
     password: "",
   });
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [createSeller, { loading }] = useMutation(CREATE_SELLER);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle registration
-    console.log("Register:", formData);
+    setError("");
+    setSuccess("");
+
+    try {
+      // Slug oluştur
+      const slug = formData.storeName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+
+      const sellerData = {
+        storeName: formData.storeName,
+        slug: slug,
+        status: "pending",
+      };
+
+      const result = await createSeller({
+        variables: {
+          data: sellerData,
+        },
+      });
+
+      if (result.data?.createSellers) {
+        setSuccess("Seller account created successfully! Redirecting to login...");
+        // localStorage'a kaydet
+        localStorage.setItem("sellerEmail", formData.email);
+        localStorage.setItem("sellerId", result.data.createSellers.id);
+        
+        // 2 saniye sonra login sayfasına yönlendir
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
+      }
+    } catch (err) {
+      console.error("Registration error:", err);
+      setError(err.message || "Registration failed. Please try again.");
+    }
   };
 
   return (
@@ -85,7 +147,7 @@ export default function Register() {
         </InfoBox>
         <Form onSubmit={handleSubmit}>
           <Input
-            label="Store Name"
+            label="Store Name *"
             type="text"
             value={formData.storeName}
             onChange={(e) =>
@@ -94,7 +156,7 @@ export default function Register() {
             required
           />
           <Input
-            label="Email"
+            label="Email *"
             type="email"
             value={formData.email}
             onChange={(e) =>
@@ -103,7 +165,7 @@ export default function Register() {
             required
           />
           <Input
-            label="Password"
+            label="Password *"
             type="password"
             value={formData.password}
             onChange={(e) =>
@@ -111,13 +173,23 @@ export default function Register() {
             }
             required
           />
-          <Button type="submit" fullWidth size="lg">
-            Create Seller Account
+          {error && <ErrorMessage>{error}</ErrorMessage>}
+          {success && <SuccessMessage>{success}</SuccessMessage>}
+          <Button type="submit" fullWidth size="lg" disabled={loading}>
+            {loading ? "Creating Account..." : "Create Seller Account"}
           </Button>
         </Form>
         <LoginLink href="/login">Already have an account? Sign in</LoginLink>
       </FormCard>
     </Container>
+  );
+}
+
+export default function Register() {
+  return (
+    <ApolloProvider client={apolloClient}>
+      <RegisterForm />
+    </ApolloProvider>
   );
 }
 
