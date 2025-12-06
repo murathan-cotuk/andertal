@@ -1,7 +1,8 @@
 {
-  "buildCommand": "cd ../.. && npm run build --filter=@belucha/sellercentral",
-  "outputDirectory": ".next",
+  "buildCommand": "cd ../.. && npm install && npm run build --filter=@belucha/sellercentral",
+  "outputDirectory": "apps/sellercentral/.next",
   "framework": "nextjs",
-  "installCommand": "cd ../.. && npm install"
+  "installCommand": "cd ../.. && npm install",
+  "rootDirectory": "apps/sellercentral"
 }
 

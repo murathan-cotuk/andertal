@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import styled from "styled-components";
 
 const Container = styled.div`
@@ -120,7 +120,34 @@ const menuItems = [
 
 export default function DashboardLayout({ children }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    // Login sayfalarında authentication kontrolü yapma
+    if (pathname === "/login" || pathname === "/register") {
+      return;
+    }
+
+    // Authentication kontrolü
+    const loggedIn = localStorage.getItem("sellerLoggedIn");
+    if (!loggedIn) {
+      router.push("/login");
+    } else {
+      setIsAuthenticated(true);
+    }
+  }, [pathname, router]);
+
+  // Login/register sayfalarında layout gösterme
+  if (pathname === "/login" || pathname === "/register") {
+    return <>{children}</>;
+  }
+
+  // Henüz authentication kontrolü yapılmadıysa loading göster
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <Container>
