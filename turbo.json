@@ -16,5 +16,11 @@
     "clean": {
       "cache": false
     }
+  },
+  "pipeline": {
+    "@belucha/cms#build": {
+      "cache": false,
+      "outputs": []
+    }
   }
 }
