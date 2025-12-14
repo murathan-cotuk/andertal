@@ -146,6 +146,30 @@ cd ../.. && npm install && turbo run build --filter=@belucha/shop
 - `turbo.json` dosyasında shop ve sellercentral için `dependsOn: []` ayarlandı
 - Böylece bağımlılıklar build edilmez
 
+### Sorun 7: "Vulnerable version of Next.js detected" (CVE-2025-66478)
+
+**Hata:**
+```
+Error: Vulnerable version of Next.js detected, please update immediately.
+```
+
+**Çözüm:** ✅ **Düzeltildi!**
+- Next.js 16.0.3 → 16.0.10'a güncellendi (CVE-2025-66478 ve diğer güvenlik açıkları düzeltildi)
+- `package.json` (root), `apps/shop/package.json`, `apps/sellercentral/package.json` dosyalarında
+- `eslint-config-next` da 16.0.10'a güncellendi
+- Vercel'in `npx fix-react2shell-next --fix` aracı kullanıldı
+
+**Yapılacaklar:**
+1. ✅ Next.js güncellendi (16.0.10)
+2. Değişiklikleri commit edip push edin:
+   ```bash
+   git add .
+   git commit -m "Fix: Update Next.js to 16.0.10 to fix CVE-2025-66478"
+   git push origin dev
+   ```
+3. Vercel otomatik olarak yeni deploy başlatacak
+4. Build başarılı olmalı
+
 ---
 
 ## 🔐 Environment Variables
