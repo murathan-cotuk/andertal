@@ -4,31 +4,59 @@ import payload from 'payload'
 import config from './payload.config.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { existsSync } from 'fs'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-// Load .env.local file (try multiple paths - root first, then payload directory)
+// Load .env.local file (try multiple paths - mutlak path kullanarak Cursor'un globalignore sorununu aşıyoruz)
 const envPaths = [
+  path.resolve(dirname, '../.env.local'),          // Payload directory: apps/cms/payload/.env.local (ÖNCELİK)
   path.resolve(dirname, '../../../../.env.local'), // Root: belucha/.env.local
-  path.resolve(dirname, '../../../.env.local'),  // Root: belucha/.env.local (alternative)
-  path.resolve(process.cwd(), '.env.local'),      // Current working directory
-  path.resolve(dirname, '../.env.local'),          // Payload directory: apps/cms/payload/.env.local
+  path.resolve(dirname, '../../../.env.local'),    // Root: belucha/.env.local (alternative)
+  path.resolve(process.cwd(), '.env.local'),       // Current working directory
 ]
 
-// Load environment variables
+// Load environment variables with explicit path resolution
 let envLoaded = false
+let loadedPath = null
+
 for (const envPath of envPaths) {
-  const result = dotenv.config({ path: envPath, override: false })
-  if (!result.error) {
-    envLoaded = true
-    console.log(`✅ Loaded .env from: ${envPath}`)
+  try {
+    // Dosyanın gerçekten var olup olmadığını kontrol et
+    if (existsSync(envPath)) {
+      const result = dotenv.config({ path: envPath, override: false })
+      if (!result.error) {
+        envLoaded = true
+        loadedPath = envPath
+        console.log(`✅ Loaded .env from: ${envPath}`)
+        break // İlk başarılı yüklemede dur
+      }
+    }
+  } catch (error) {
+    // Devam et, diğer path'leri dene
+    continue
   }
 }
-dotenv.config() // Also load .env if exists
+
+// Eğer hiçbir path'ten yüklenemediyse, .env dosyasını dene
+if (!envLoaded) {
+  dotenv.config() // Also load .env if exists
+  if (process.env.PAYLOAD_SECRET) {
+    console.log(`✅ Loaded .env from default location`)
+    envLoaded = true
+  }
+}
+
+// Eğer hala yüklenemediyse uyarı ver
+if (!envLoaded) {
+  console.warn('⚠️  No .env.local file found in any of the expected locations')
+  console.warn('   Expected locations:')
+  envPaths.forEach(p => console.warn(`   - ${p}`))
+}
 
 // Ensure PAYLOAD_SECRET is set
-const secret = process.env.PAYLOAD_SECRET || 'beluchaSecret123'
+const secret = process.env.PAYLOAD_SECRET || 'beluchaSecret123456789012345678901234567890'
 if (!process.env.PAYLOAD_SECRET) {
   console.warn('⚠️  PAYLOAD_SECRET not found in env, using default')
   process.env.PAYLOAD_SECRET = secret
@@ -44,7 +72,7 @@ app.use(express.urlencoded({ extended: true }))
 
 const start = async () => {
   // Ensure secret is set - PayloadCMS v3 requires secret in both config and init
-  const secretKey = process.env.PAYLOAD_SECRET || 'beluchaSecret123'
+  const secretKey = process.env.PAYLOAD_SECRET || 'beluchaSecret123456789012345678901234567890'
   
   // Set it in process.env to ensure config can read it
   process.env.PAYLOAD_SECRET = secretKey

@@ -4,7 +4,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
-
+ 
 // Load env before config - try root first, then payload directory
 const configDirname = path.dirname(fileURLToPath(import.meta.url))
 const envPaths = [
@@ -37,7 +37,7 @@ import Orders from './collections/Orders.js'
 import Media from './collections/Media.js'
 
 export default buildConfig({
-  secret: process.env.PAYLOAD_SECRET || 'beluchaSecret123',
+  secret: process.env.PAYLOAD_SECRET || 'beluchaSecret123456789012345678901234567890',
   admin: {
     user: 'sellers',
   },
