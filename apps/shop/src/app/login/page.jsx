@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styled from "styled-components";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Container = styled.div`
   min-height: 100vh;
@@ -372,13 +374,33 @@ export default function LoginPage() {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+  const router = useRouter();
   
   // Maymun fonksiyonu: Şifre gizliyken gözler kapalı (blind)
   const isBlind = !showPassword;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Login:", formData);
+    setError("");
+    setLoading(true);
+
+    try {
+      const result = await login(formData.email, formData.password);
+      
+      if (result.success) {
+        router.push("/");
+        router.refresh();
+      } else {
+        setError(result.error || "Login failed. Please try again.");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = () => {
@@ -396,6 +418,20 @@ export default function LoginPage() {
         </Avatar>
         
         <Title>Anmelden</Title>
+        
+        {error && (
+          <div style={{
+            width: "100%",
+            padding: "12px",
+            backgroundColor: "#fee2e2",
+            border: "1px solid #ef4444",
+            borderRadius: "8px",
+            color: "#991b1b",
+            fontSize: "14px",
+          }}>
+            {error}
+          </div>
+        )}
         
         <Form onSubmit={handleSubmit}>
           <FormGroup>
@@ -436,7 +472,9 @@ export default function LoginPage() {
             </ForgotPassword>
           </FormGroup>
 
-          <SubmitButton type="submit">Anmelden</SubmitButton>
+          <SubmitButton type="submit" disabled={loading}>
+            {loading ? "Anmeldung..." : "Anmelden"}
+          </SubmitButton>
 
           <Divider>
             <span>oder</span>

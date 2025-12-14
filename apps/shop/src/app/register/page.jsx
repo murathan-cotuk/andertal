@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styled from "styled-components";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Container = styled.div`
   min-height: 100vh;
@@ -400,13 +402,33 @@ export default function RegisterPage() {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { register } = useAuth();
+  const router = useRouter();
   
   // Maymun fonksiyonu: Şifre gizliyken gözler kapalı (blind)
   const isBlind = !showPassword;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Register:", formData);
+    setError("");
+    setLoading(true);
+
+    try {
+      const result = await register(formData);
+      
+      if (result.success) {
+        router.push("/");
+        router.refresh();
+      } else {
+        setError(result.error || "Registration failed. Please try again.");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = () => {
@@ -424,6 +446,20 @@ export default function RegisterPage() {
         </Avatar>
         
         <Title>Registrieren</Title>
+        
+        {error && (
+          <div style={{
+            width: "100%",
+            padding: "12px",
+            backgroundColor: "#fee2e2",
+            border: "1px solid #ef4444",
+            borderRadius: "8px",
+            color: "#991b1b",
+            fontSize: "14px",
+          }}>
+            {error}
+          </div>
+        )}
         
         <Form onSubmit={handleSubmit}>
           <FormGroup>
@@ -594,7 +630,9 @@ export default function RegisterPage() {
             </PasswordWrapper>
           </FormGroup>
 
-          <SubmitButton type="submit">Registrieren</SubmitButton>
+          <SubmitButton type="submit" disabled={loading}>
+            {loading ? "Registrierung..." : "Registrieren"}
+          </SubmitButton>
 
           <Divider>
             <span>oder</span>

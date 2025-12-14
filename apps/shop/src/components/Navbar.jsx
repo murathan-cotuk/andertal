@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useQuery, gql } from "@apollo/client";
 import styled from "styled-components";
+import { useAuth } from "@/contexts/AuthContext";
 
 const GET_CATEGORIES = gql`
   query GetCategories {
@@ -189,10 +190,43 @@ const DropdownItem = styled(Link)`
   }
 `;
 
+const DropdownButton = styled.button`
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  color: #374151;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #f3f4f6;
+    color: #0ea5e9;
+  }
+
+  &:not(:last-child) {
+    border-bottom: 1px solid #f3f4f6;
+  }
+`;
+
+const UserName = styled.div`
+  padding: 12px 16px;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid #f3f4f6;
+`;
+
 export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { data, loading } = useQuery(GET_CATEGORIES);
+  const { isAuthenticated, user, logout } = useAuth();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -227,24 +261,50 @@ export default function Navbar() {
               <i className="fas fa-user-circle" style={{ fontSize: "24px", color: "#374151" }} />
             </ProfileButton>
             <DropdownMenu $isOpen={isDropdownOpen}>
-              <DropdownItem href="/account" onClick={() => setIsDropdownOpen(false)}>
-                Konto
-              </DropdownItem>
-              <DropdownItem href="/favorites" onClick={() => setIsDropdownOpen(false)}>
-                Merkzettel
-              </DropdownItem>
-              <DropdownItem href="/orders" onClick={() => setIsDropdownOpen(false)}>
-                Bestellungen
-              </DropdownItem>
-              <DropdownItem href="/invoices" onClick={() => setIsDropdownOpen(false)}>
-                Rechnungen
-              </DropdownItem>
-              <DropdownItem href="/help" onClick={() => setIsDropdownOpen(false)}>
-                Hilfe
-              </DropdownItem>
-              <DropdownItem href="/login" onClick={() => setIsDropdownOpen(false)}>
-                Anmelden
-              </DropdownItem>
+              {isAuthenticated ? (
+                <>
+                  {user && (
+                    <UserName>
+                      {user.firstName} {user.lastName}
+                    </UserName>
+                  )}
+                  <DropdownItem href="/account" onClick={() => setIsDropdownOpen(false)}>
+                    Konto
+                  </DropdownItem>
+                  <DropdownItem href="/favorites" onClick={() => setIsDropdownOpen(false)}>
+                    Merkzettel
+                  </DropdownItem>
+                  <DropdownItem href="/orders" onClick={() => setIsDropdownOpen(false)}>
+                    Bestellungen
+                  </DropdownItem>
+                  <DropdownItem href="/invoices" onClick={() => setIsDropdownOpen(false)}>
+                    Rechnungen
+                  </DropdownItem>
+                  <DropdownItem href="/help" onClick={() => setIsDropdownOpen(false)}>
+                    Hilfe
+                  </DropdownItem>
+                  <DropdownButton
+                    onClick={() => {
+                      logout();
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    Abmelden
+                  </DropdownButton>
+                </>
+              ) : (
+                <>
+                  <DropdownItem href="/login" onClick={() => setIsDropdownOpen(false)}>
+                    Anmelden
+                  </DropdownItem>
+                  <DropdownItem href="/register" onClick={() => setIsDropdownOpen(false)}>
+                    Registrieren
+                  </DropdownItem>
+                  <DropdownItem href="/help" onClick={() => setIsDropdownOpen(false)}>
+                    Hilfe
+                  </DropdownItem>
+                </>
+              )}
             </DropdownMenu>
           </ProfileMenu>
           <Link href="/cart">

@@ -1,4 +1,5 @@
 import StyledComponentsRegistry from "./registry";
+import Providers from "@/components/Providers";
 import "./globals.css";
 
 export const metadata = {
@@ -18,7 +19,9 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body>
-        <StyledComponentsRegistry>{children}</StyledComponentsRegistry>
+        <StyledComponentsRegistry>
+          <Providers>{children}</Providers>
+        </StyledComponentsRegistry>
       </body>
     </html>
   );
