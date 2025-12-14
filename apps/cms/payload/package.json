@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node src/server.js",
     "build": "echo 'Payload CMS build skipped - deploy to Railway/Render instead'",
-    "start": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.js NODE_ENV=production payload start",
+    "start": "node src/server.js",
     "generate:types": "payload generate:types"
   },
   "dependencies": {

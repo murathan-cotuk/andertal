@@ -64,6 +64,13 @@ export default buildConfig({
   },
   plugins: [],
   serverURL: process.env.PAYLOAD_PUBLIC_SERVER_URL || 'http://localhost:3001',
+  cors: [
+    'http://localhost:3000',
+    'http://localhost:3002',
+    'https://belucha-shop.vercel.app',
+    'https://belucha-sellercentral.vercel.app',
+    'https://sellercentral.vercel.app',
+  ],
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },

@@ -95,7 +95,7 @@ export default function Footer() {
           </Column>
           <Column>
             <Title>Sell on Belucha</Title>
-            <SellerLink href={process.env.NEXT_PUBLIC_SELLERCENTRAL_URL || "http://localhost:3002"}>
+            <SellerLink href={process.env.NEXT_PUBLIC_SELLERCENTRAL_URL || "https://belucha-sellercentral.vercel.app"}>
               Sellercentral
             </SellerLink>
           </Column>
