@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && npm install && turbo run build --filter=@belucha/shop --no-deps",
+  "buildCommand": "cd ../.. && npm install && turbo run build --filter=@belucha/shop",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "cd ../.. && npm install"

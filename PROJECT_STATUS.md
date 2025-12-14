@@ -121,25 +121,28 @@ belucha/
 
 ## 📝 Yapılacaklar (TODO)
 
+> **Detaylı task listesi için `PROJECT_ROADMAP.md` dosyasına bakın.**
+
 ### Yüksek Öncelik
-- [ ] Payload CMS'i production'a deploy et
+- [ ] Vercel build sorunlarını tamamen çöz
+- [ ] Payload CMS'i production'a deploy et (Railway/Render)
 - [ ] MongoDB Atlas bağlantısını yapılandır
-- [ ] Vercel'de her iki app'i ayrı projeler olarak deploy et
 - [ ] Environment variables'ları production'da ayarla
-- [ ] Gerçek authentication sistemi kur (şu an localStorage tabanlı)
+- [ ] Gerçek authentication sistemi kur (Payload CMS Users collection)
 
 ### Orta Öncelik
+- [ ] Sepet (Shopping Cart) implementasyonu
+- [ ] Checkout sayfası ve Stripe entegrasyonu
 - [ ] Ürün görselleri yükleme fonksiyonu
-- [ ] Stripe Connect entegrasyonu (seller payouts)
-- [ ] Sipariş yönetimi
-- [ ] Email bildirimleri
-- [ ] SEO optimizasyonu
+- [ ] Sipariş yönetimi (sellercentral)
+- [ ] Müşteri profil sayfası ve sipariş geçmişi
 
 ### Düşük Öncelik
-- [ ] Analytics dashboard'u doldur
+- [ ] Analytics dashboard'u gerçek verilerle doldur
 - [ ] Reports sayfasını implement et
-- [ ] Media library'yi tamamla
+- [ ] Media library'yi tamamla (cloud storage)
 - [ ] Brand management
+- [ ] SEO optimizasyonu
 
 ## 🔐 Güvenlik Notları
 
@@ -153,8 +156,9 @@ belucha/
 - ✅ `README.md` - Genel proje bilgisi
 - ✅ `QUICKSTART.md` - Hızlı başlangıç rehberi
 - ✅ `PROJECT_STRUCTURE.md` - Proje yapısı
-- ✅ `DEPLOYMENT.md` - Deployment rehberi (YENİ)
-- ✅ `PROJECT_STATUS.md` - Bu dosya (YENİ)
+- ✅ `DEPLOYMENT.md` - **Tüm deployment işlemleri için tek kaynak rehber (sürekli güncellenir)**
+- ✅ `PROJECT_STATUS.md` - Mevcut durum raporu
+- ✅ `PROJECT_ROADMAP.md` - Proje yol haritası ve task listesi
 
 ## 🎯 Sonraki Adımlar
 

@@ -11,6 +11,14 @@
       "outputs": [],
       "dependsOn": []
     },
+    "@belucha/shop#build": {
+      "dependsOn": [],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "@belucha/sellercentral#build": {
+      "dependsOn": [],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
