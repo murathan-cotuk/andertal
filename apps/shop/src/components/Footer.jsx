@@ -95,10 +95,9 @@ export default function Footer() {
           </Column>
           <Column>
             <Title>Sell on Belucha</Title>
-            <SellerLink href="http://localhost:3002/register">
-              Become a Seller
+            <SellerLink href={process.env.NEXT_PUBLIC_SELLERCENTRAL_URL || "http://localhost:3002"}>
+              Sellercentral
             </SellerLink>
-            <FooterLink href="http://localhost:3002">Seller Central</FooterLink>
           </Column>
         </Grid>
         <Bottom>
