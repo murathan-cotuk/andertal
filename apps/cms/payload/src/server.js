@@ -115,16 +115,18 @@ const start = async () => {
       console.log('')
     }
 
+    // Railway ve diğer platformlar PORT environment variable'ını otomatik set eder
     const port = process.env.PORT || 3001
 
     // Try to start server, if port is in use, provide clear instructions
     let server
     try {
-      server = app.listen(port, () => {
+      // 0.0.0.0 kullanarak tüm network interface'lerde dinle
+      server = app.listen(port, '0.0.0.0', () => {
         payload.logger.info(`Server listening on port ${port}`)
-        console.log(`✅ Server running at http://localhost:${port}`)
-        console.log(`✅ Admin Panel: http://localhost:${port}/admin`)
-        console.log(`✅ GraphQL API: http://localhost:${port}/api/graphql`)
+        console.log(`✅ Server running on port ${port}`)
+        console.log(`✅ Admin Panel: ${process.env.PAYLOAD_PUBLIC_SERVER_URL || `http://localhost:${port}`}/admin`)
+        console.log(`✅ GraphQL API: ${process.env.PAYLOAD_PUBLIC_SERVER_URL || `http://localhost:${port}`}/api/graphql`)
       })
 
       server.on('error', (error) => {
