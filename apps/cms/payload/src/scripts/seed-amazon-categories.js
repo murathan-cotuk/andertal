@@ -5,8 +5,6 @@
  * Usage: node apps/cms/payload/src/scripts/seed-amazon-categories.js
  */
 
-import { getPayload } from 'payload'
-import config from '../payload.config.js'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -15,14 +13,25 @@ import fs from 'fs'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load .env.local file if it exists
+// Load .env.local file BEFORE importing config
 const envPath = path.resolve(__dirname, '../.env.local')
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath })
-  console.log('✅ Loaded .env.local')
+  console.log('✅ Loaded .env.local from:', envPath)
 } else {
-  console.log('⚠️  .env.local not found, using environment variables')
+  // Try root .env.local
+  const rootEnvPath = path.resolve(__dirname, '../../../.env.local')
+  if (fs.existsSync(rootEnvPath)) {
+    dotenv.config({ path: rootEnvPath })
+    console.log('✅ Loaded .env.local from root:', rootEnvPath)
+  } else {
+    console.log('⚠️  .env.local not found, using environment variables')
+  }
 }
+
+// Now import config and payload after env vars are loaded
+import { getPayload } from 'payload'
+import config from '../payload.config.js'
 
 const amazonCategories = [
   // 1. Electronics
@@ -186,9 +195,11 @@ const amazonCategories = [
 ]
 
 async function seedCategories() {
-  const payload = await getPayload({ config })
+  try {
+    const payload = await getPayload({ config })
+    console.log('✅ Payload initialized')
 
-  const categoryMap = new Map()
+    const categoryMap = new Map()
 
   // First pass: Create all categories without parents
   for (const cat of amazonCategories) {
@@ -259,8 +270,17 @@ async function seedCategories() {
     }
   }
 
-  console.log('\n✅ Category seeding completed!')
-  process.exit(0)
+    console.log('\n✅ Category seeding completed!')
+    await payload.db.destroy()
+    process.exit(0)
+  } catch (error) {
+    console.error('❌ Seeding failed:', error)
+    console.error('\n💡 Make sure:')
+    console.error('   1. Payload CMS server is running (npm run dev)')
+    console.error('   2. .env.local file exists with DATABASE_URI and PAYLOAD_SECRET')
+    console.error('   3. Or set environment variables: DATABASE_URI and PAYLOAD_SECRET')
+    process.exit(1)
+  }
 }
 
 seedCategories().catch((error) => {
