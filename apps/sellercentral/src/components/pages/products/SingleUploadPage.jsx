@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useMutation, useQuery, gql } from "@apollo/client";
 import styled from "styled-components";
 import { Card, Button, Input } from "@belucha/ui";
@@ -129,7 +129,7 @@ const ErrorMessage = styled.div`
 export default function SingleUploadPage() {
   const [formData, setFormData] = useState({
     title: "",
-    slug: "",
+    SKU: "",
     description: "",
     price: "",
     inventory: "",
@@ -138,29 +138,60 @@ export default function SingleUploadPage() {
   });
   const [message, setMessage] = useState({ type: "", text: "" });
 
-  const { data: sellersData } = useQuery(GET_SELLERS);
+  const { data: sellersData, loading: sellersLoading } = useQuery(GET_SELLERS);
   const [createProduct, { loading: creating }] = useMutation(CREATE_PRODUCT);
+
+  // Get seller ID from localStorage (set during login)
+  useEffect(() => {
+    const sellerId = localStorage.getItem("sellerId");
+    if (sellerId && sellersData?.Sellers?.docs) {
+      // Check if seller exists in the list
+      const seller = sellersData.Sellers.docs.find((s) => s.id === sellerId);
+      if (seller) {
+        setFormData((prev) => ({ ...prev, seller: sellerId }));
+      } else if (sellersData.Sellers.docs.length > 0) {
+        // Fallback to first seller if logged-in seller not found
+        setFormData((prev) => ({ ...prev, seller: sellersData.Sellers.docs[0].id }));
+      }
+    } else if (sellersData?.Sellers?.docs?.length > 0) {
+      // If no sellerId in localStorage, use first seller
+      setFormData((prev) => ({ ...prev, seller: sellersData.Sellers.docs[0].id }));
+    }
+  }, [sellersData]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ type: "", text: "" });
 
     try {
-      const slug = formData.slug || formData.title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      // SKU oluştur (eğer boşsa title'dan)
+      const SKU = formData.SKU || formData.title.toUpperCase().replace(/\s+/g, "-").replace(/[^A-Z0-9-]/g, "");
+      
+      // Slug oluştur (backend için - SKU'dan otomatik)
+      const slug = SKU.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
       let sellerId = formData.seller;
-      if (!sellerId && sellersData?.Sellers?.docs?.length > 0) {
-        sellerId = sellersData.Sellers.docs[0].id;
+      
+      // If no seller selected, try to get from localStorage or use first available
+      if (!sellerId) {
+        sellerId = localStorage.getItem("sellerId");
+        if (!sellerId && sellersData?.Sellers?.docs?.length > 0) {
+          sellerId = sellersData.Sellers.docs[0].id;
+        }
       }
 
       if (!sellerId) {
-        setMessage({ type: "error", text: "Please create a seller account first" });
+        setMessage({
+          type: "error",
+          text: "Unable to determine seller account. Please log out and log in again.",
+        });
         return;
       }
 
       const productData = {
         title: formData.title,
         slug: slug,
+        sku: SKU,
         description: formData.description || "",
         price: parseFloat(formData.price),
         inventory: parseInt(formData.inventory) || 0,
@@ -177,7 +208,7 @@ export default function SingleUploadPage() {
       setMessage({ type: "success", text: "Product created successfully!" });
       setFormData({
         title: "",
-        slug: "",
+        SKU: "",
         description: "",
         price: "",
         inventory: "",
@@ -194,6 +225,20 @@ export default function SingleUploadPage() {
   };
 
   const sellers = sellersData?.Sellers?.docs || [];
+
+  // Show loading state
+  if (sellersLoading) {
+    return (
+      <Container>
+        <Title>Single Product Upload</Title>
+        <Section>
+          <div style={{ textAlign: "center", padding: "40px" }}>
+            <i className="fas fa-spinner fa-spin" style={{ fontSize: "32px", color: "#0ea5e9" }} />
+          </div>
+        </Section>
+      </Container>
+    );
+  }
 
   return (
     <Container>
@@ -224,11 +269,11 @@ export default function SingleUploadPage() {
           />
 
           <Input
-            label="Slug (auto-generated if empty)"
+            label="SKU (auto-generated if empty)"
             type="text"
-            value={formData.slug}
-            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-            placeholder="product-slug"
+            value={formData.SKU}
+            onChange={(e) => setFormData({ ...formData, SKU: e.target.value })}
+            placeholder="PRODUCT-SKU-001"
           />
 
           <div>
@@ -292,7 +337,7 @@ export default function SingleUploadPage() {
             )}
           </FormRow>
 
-          <Button type="submit" fullWidth disabled={creating}>
+          <Button type="submit" fullWidth disabled={creating || !formData.seller}>
             {creating ? "Creating..." : "Create Product"}
           </Button>
         </Form>
@@ -300,4 +345,3 @@ export default function SingleUploadPage() {
     </Container>
   );
 }
-

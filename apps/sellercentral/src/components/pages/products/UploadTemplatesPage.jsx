@@ -63,23 +63,22 @@ const downloadTemplate = (type) => {
     products: {
       headers: [
         "Title",
-        "Slug",
+        "SKU",
         "Description",
         "Price",
         "Inventory",
         "Status",
         "Category",
         "Brand",
-        "SKU",
       ],
       filename: "product-upload-template.csv",
     },
     images: {
-      headers: ["Product Slug", "Image URL 1", "Image URL 2", "Image URL 3"],
+      headers: ["Product SKU", "Image URL 1", "Image URL 2", "Image URL 3"],
       filename: "bulk-images-template.csv",
     },
     videos: {
-      headers: ["Product Slug", "Video URL", "Thumbnail URL"],
+      headers: ["Product SKU", "Video URL", "Thumbnail URL"],
       filename: "bulk-videos-template.csv",
     },
   };
@@ -131,7 +130,7 @@ export default function UploadTemplatesPage() {
             </TemplateIcon>
             <TemplateTitle>Bulk Images Template</TemplateTitle>
             <TemplateDescription>
-              Template for uploading multiple product images at once. Link images to products by slug.
+              Template for uploading multiple product images at once. Link images to products by SKU.
             </TemplateDescription>
             <Button onClick={() => downloadTemplate("images")} fullWidth>
               <i className="fas fa-download" style={{ marginRight: "8px" }} />

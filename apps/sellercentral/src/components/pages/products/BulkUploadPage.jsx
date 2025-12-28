@@ -100,14 +100,13 @@ const downloadTemplate = () => {
   const templateData = {
     headers: [
       "Title",
-      "Slug",
+      "SKU",
       "Description",
       "Price",
       "Inventory",
       "Status",
       "Category",
       "Brand",
-      "SKU",
       "Weight",
       "Dimensions",
       "Image URL 1",

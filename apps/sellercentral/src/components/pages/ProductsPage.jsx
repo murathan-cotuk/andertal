@@ -187,7 +187,7 @@ export default function ProductsPage() {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
-    slug: "",
+    SKU: "",
     description: "",
     price: "",
     inventory: "",
@@ -205,23 +205,33 @@ export default function ProductsPage() {
     setMessage({ type: "", text: "" });
 
     try {
-      // Slug oluştur (eğer boşsa title'dan)
-      const slug = formData.slug || formData.title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      // SKU oluştur (eğer boşsa title'dan)
+      const SKU = formData.SKU || formData.title.toUpperCase().replace(/\s+/g, "-").replace(/[^A-Z0-9-]/g, "");
+      
+      // Slug oluştur (backend için - SKU'dan otomatik)
+      const slug = SKU.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
-      // Seller ID kontrolü - eğer yoksa ilk seller'ı kullan
+      // Seller ID kontrolü - önce localStorage'dan, sonra form'dan, sonra ilk seller'dan
       let sellerId = formData.seller;
+      if (!sellerId) {
+        sellerId = localStorage.getItem("sellerId");
+      }
       if (!sellerId && sellersData?.Sellers?.docs?.length > 0) {
         sellerId = sellersData.Sellers.docs[0].id;
       }
 
       if (!sellerId) {
-        setMessage({ type: "error", text: "Lütfen önce bir seller oluşturun" });
+        setMessage({
+          type: "error",
+          text: "Unable to determine seller account. Please log out and log in again.",
+        });
         return;
       }
 
       const productData = {
         title: formData.title,
         slug: slug,
+        sku: SKU,
         description: formData.description || "",
         price: parseFloat(formData.price),
         inventory: parseInt(formData.inventory) || 0,
@@ -235,10 +245,10 @@ export default function ProductsPage() {
         },
       });
 
-      setMessage({ type: "success", text: "Ürün başarıyla eklendi!" });
+      setMessage({ type: "success", text: "Product created successfully!" });
       setFormData({
         title: "",
-        slug: "",
+        SKU: "",
         description: "",
         price: "",
         inventory: "",
@@ -292,11 +302,11 @@ export default function ProductsPage() {
             />
 
             <Input
-              label="Slug (auto-generated if empty)"
+              label="SKU (auto-generated if empty)"
               type="text"
-              value={formData.slug}
-              onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-              placeholder="product-slug"
+              value={formData.SKU}
+              onChange={(e) => setFormData({ ...formData, SKU: e.target.value })}
+              placeholder="PRODUCT-SKU-001"
             />
 
             <div>

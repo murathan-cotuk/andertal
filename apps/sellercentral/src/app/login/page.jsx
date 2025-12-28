@@ -36,10 +36,13 @@ const Form = styled.form`
   gap: 20px;
 `;
 
-const ErrorMessage = styled.p`
-  color: #ef4444;
+const ErrorMessage = styled.div`
+  background-color: #fee2e2;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  padding: 16px;
+  color: #991b1b;
   font-size: 14px;
-  margin-top: -8px;
 `;
 
 const RegisterLink = styled(Link)`
@@ -64,20 +67,23 @@ export default function Login() {
     setLoading(true);
 
     try {
+      if (!formData.email || !formData.password) {
+        setError("Email and password are required");
+        setLoading(false);
+        return;
+      }
+
       // Basit authentication - production'da gerçek auth kullanılmalı
       // Şimdilik herhangi bir email/password ile giriş yapılabilir
-      if (formData.email && formData.password) {
-        // localStorage'a seller bilgisi kaydet
-        localStorage.setItem("sellerEmail", formData.email);
-        localStorage.setItem("sellerLoggedIn", "true");
-        
-        // Dashboard'a yönlendir
-        router.push("/");
-      } else {
-        setError("Email ve şifre gereklidir");
-      }
+      // Seller kontrolü giriş yapıldıktan sonra yapılacak
+      localStorage.setItem("sellerEmail", formData.email);
+      localStorage.setItem("sellerLoggedIn", "true");
+      
+      // Dashboard'a yönlendir
+      router.push("/inventory");
     } catch (err) {
-      setError("Giriş yapılırken bir hata oluştu");
+      console.error("Login error:", err);
+      setError("An error occurred during login");
     } finally {
       setLoading(false);
     }
@@ -88,6 +94,7 @@ export default function Login() {
       <FormCard>
         <Title>Seller Login</Title>
         <Subtitle>Sign in to your seller account</Subtitle>
+        
         <Form onSubmit={handleSubmit}>
           <Input
             label="Email"
@@ -112,9 +119,10 @@ export default function Login() {
             {loading ? "Signing in..." : "Sign In"}
           </Button>
         </Form>
-        <RegisterLink href="/register">Don't have an account? Register</RegisterLink>
+        <RegisterLink href="/register">
+          Don't have a seller account? Register here
+        </RegisterLink>
       </FormCard>
     </Container>
   );
 }
-
