@@ -28,6 +28,22 @@ const GET_SELLERS = gql`
   }
 `;
 
+const GET_CATEGORIES = gql`
+  query GetCategories {
+    Categories(limit: 500, sort: "name") {
+      docs {
+        id
+        name
+        slug
+        parent {
+          id
+          name
+        }
+      }
+    }
+  }
+`;
+
 const Container = styled.div`
   max-width: 1200px;
   margin: 0 auto;
@@ -126,6 +142,68 @@ const ErrorMessage = styled.div`
   color: #991b1b;
 `;
 
+const MultiSelect = styled.select`
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #1f2937;
+  background: white;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  min-height: 120px;
+
+  &:focus {
+    outline: none;
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  }
+`;
+
+const VariantSection = styled.div`
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+`;
+
+const VariantHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+`;
+
+const VariantOption = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 8px;
+  background-color: #f9fafb;
+  border-radius: 6px;
+`;
+
+// Common variant types
+const VARIANT_TYPES = [
+  { name: "Color", commonOptions: ["Black", "White", "Red", "Blue", "Green", "Yellow", "Pink", "Purple", "Orange", "Gray", "Brown", "Silver", "Gold"] },
+  { name: "Size", commonOptions: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"] },
+  { name: "Material", commonOptions: ["Cotton", "Polyester", "Leather", "Metal", "Plastic", "Wood", "Glass", "Ceramic", "Silk", "Wool"] },
+  { name: "Pattern", commonOptions: ["Solid", "Striped", "Polka Dot", "Floral", "Geometric", "Abstract", "Plaid", "Checkered"] },
+  { name: "Style", commonOptions: ["Classic", "Modern", "Vintage", "Contemporary", "Minimalist", "Bohemian", "Industrial"] },
+  { name: "Finish", commonOptions: ["Matte", "Glossy", "Satin", "Brushed", "Polished", "Textured"] },
+  { name: "Capacity", commonOptions: ["16GB", "32GB", "64GB", "128GB", "256GB", "512GB", "1TB"] },
+  { name: "Weight", commonOptions: ["Light", "Medium", "Heavy"] },
+  { name: "Length", commonOptions: ["Short", "Medium", "Long", "Extra Long"] },
+  { name: "Width", commonOptions: ["Narrow", "Medium", "Wide"] },
+  { name: "Fit", commonOptions: ["Slim", "Regular", "Relaxed", "Loose"] },
+  { name: "Sleeve Length", commonOptions: ["Sleeveless", "Short Sleeve", "Long Sleeve", "3/4 Sleeve"] },
+  { name: "Neck Type", commonOptions: ["Round Neck", "V-Neck", "Collar", "Hood", "Turtleneck"] },
+  { name: "Waist Type", commonOptions: ["Low Rise", "Mid Rise", "High Rise"] },
+  { name: "Leg Style", commonOptions: ["Straight", "Slim", "Wide", "Skinny", "Bootcut", "Flared"] },
+];
+
 export default function SingleUploadPage() {
   const [formData, setFormData] = useState({
     title: "",
@@ -135,11 +213,24 @@ export default function SingleUploadPage() {
     inventory: "",
     status: "draft",
     seller: "",
+    categories: [],
+    variants: [],
   });
   const [message, setMessage] = useState({ type: "", text: "" });
 
   const { data: sellersData, loading: sellersLoading } = useQuery(GET_SELLERS);
+  const { data: categoriesData } = useQuery(GET_CATEGORIES);
   const [createProduct, { loading: creating }] = useMutation(CREATE_PRODUCT);
+
+  const categories = categoriesData?.Categories?.docs || [];
+
+  // Group categories by parent
+  const groupedCategories = categories.reduce((acc, cat) => {
+    const parentName = cat.parent?.name || "Main Categories";
+    if (!acc[parentName]) acc[parentName] = [];
+    acc[parentName].push(cat);
+    return acc;
+  }, {});
 
   // Get seller ID from localStorage (set during login)
   useEffect(() => {
@@ -158,6 +249,65 @@ export default function SingleUploadPage() {
       setFormData((prev) => ({ ...prev, seller: sellersData.Sellers.docs[0].id }));
     }
   }, [sellersData]);
+
+  const addVariant = () => {
+    setFormData({
+      ...formData,
+      variants: [
+        ...formData.variants,
+        {
+          name: "",
+          options: [{ value: "", sku: "", price: "", inventory: 0 }],
+        },
+      ],
+    });
+  };
+
+  const removeVariant = (index) => {
+    setFormData({
+      ...formData,
+      variants: formData.variants.filter((_, i) => i !== index),
+    });
+  };
+
+  const updateVariant = (index, field, value) => {
+    const newVariants = [...formData.variants];
+    newVariants[index] = { ...newVariants[index], [field]: value };
+    setFormData({ ...formData, variants: newVariants });
+  };
+
+  const addVariantOption = (variantIndex) => {
+    const newVariants = [...formData.variants];
+    newVariants[variantIndex].options.push({ value: "", sku: "", price: "", inventory: 0 });
+    setFormData({ ...formData, variants: newVariants });
+  };
+
+  const removeVariantOption = (variantIndex, optionIndex) => {
+    const newVariants = [...formData.variants];
+    newVariants[variantIndex].options = newVariants[variantIndex].options.filter((_, i) => i !== optionIndex);
+    setFormData({ ...formData, variants: newVariants });
+  };
+
+  const updateVariantOption = (variantIndex, optionIndex, field, value) => {
+    const newVariants = [...formData.variants];
+    newVariants[variantIndex].options[optionIndex] = {
+      ...newVariants[variantIndex].options[optionIndex],
+      [field]: value,
+    };
+    setFormData({ ...formData, variants: newVariants });
+  };
+
+  const useCommonVariantOptions = (variantIndex, variantType) => {
+    const variantTypeData = VARIANT_TYPES.find((v) => v.name === variantType.name);
+    if (variantTypeData) {
+      updateVariant(variantIndex, "name", variantTypeData.name);
+      updateVariant(
+        variantIndex,
+        "options",
+        variantTypeData.commonOptions.map((opt) => ({ value: opt, sku: "", price: "", inventory: 0 }))
+      );
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -188,6 +338,19 @@ export default function SingleUploadPage() {
         return;
       }
 
+      // Filter out empty variants and options
+      const validVariants = formData.variants
+        .filter((v) => v.name && v.options && v.options.length > 0)
+        .map((v) => ({
+          name: v.name,
+          options: v.options.filter((opt) => opt.value).map((opt) => ({
+            value: opt.value,
+            sku: opt.sku || "",
+            price: opt.price ? parseFloat(opt.price) : undefined,
+            inventory: opt.inventory ? parseInt(opt.inventory) : 0,
+          })),
+        }));
+
       const productData = {
         title: formData.title,
         slug: slug,
@@ -197,6 +360,8 @@ export default function SingleUploadPage() {
         inventory: parseInt(formData.inventory) || 0,
         status: formData.status,
         seller: sellerId,
+        category: formData.categories.length > 0 ? formData.categories : undefined,
+        variants: validVariants.length > 0 ? validVariants : undefined,
       };
 
       await createProduct({
@@ -214,6 +379,8 @@ export default function SingleUploadPage() {
         inventory: "",
         status: "draft",
         seller: sellerId,
+        categories: [],
+        variants: [],
       });
     } catch (error) {
       console.error("Error creating product:", error);
@@ -285,6 +452,31 @@ export default function SingleUploadPage() {
             />
           </div>
 
+          <div>
+            <Label>Categories *</Label>
+            <MultiSelect
+              multiple
+              value={formData.categories}
+              onChange={(e) => {
+                const selected = Array.from(e.target.selectedOptions, (option) => option.value);
+                setFormData({ ...formData, categories: selected });
+              }}
+            >
+              {Object.entries(groupedCategories).map(([parentName, cats]) => (
+                <optgroup key={parentName} label={parentName}>
+                  {cats.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </MultiSelect>
+            <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
+              Hold Ctrl (Windows) or Cmd (Mac) to select multiple categories
+            </p>
+          </div>
+
           <FormRow>
             <Input
               label="Price (€) *"
@@ -336,6 +528,106 @@ export default function SingleUploadPage() {
               </div>
             )}
           </FormRow>
+
+          {/* Product Variants Section */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <Label>Product Variants (Color, Size, Material, etc.)</Label>
+              <Button type="button" onClick={addVariant} style={{ padding: "8px 16px", fontSize: "14px" }}>
+                <i className="fas fa-plus" style={{ marginRight: "4px" }} />
+                Add Variant
+              </Button>
+            </div>
+
+            {formData.variants.map((variant, variantIndex) => (
+              <VariantSection key={variantIndex}>
+                <VariantHeader>
+                  <div style={{ flex: 1, display: "flex", gap: "8px", alignItems: "center" }}>
+                    <Input
+                      type="text"
+                      placeholder="Variant name (e.g., Color, Size)"
+                      value={variant.name}
+                      onChange={(e) => updateVariant(variantIndex, "name", e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <Select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          useCommonVariantOptions(variantIndex, VARIANT_TYPES.find((v) => v.name === e.target.value));
+                        }
+                      }}
+                      style={{ width: "200px" }}
+                    >
+                      <option value="">Use common options...</option>
+                      {VARIANT_TYPES.map((vt) => (
+                        <option key={vt.name} value={vt.name}>
+                          {vt.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => removeVariant(variantIndex)}
+                    style={{ padding: "8px 12px", backgroundColor: "#ef4444", color: "white" }}
+                  >
+                    <i className="fas fa-trash" />
+                  </Button>
+                </VariantHeader>
+
+                {variant.options.map((option, optionIndex) => (
+                  <VariantOption key={optionIndex}>
+                    <Input
+                      type="text"
+                      placeholder="Option value"
+                      value={option.value}
+                      onChange={(e) => updateVariantOption(variantIndex, optionIndex, "value", e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <Input
+                      type="text"
+                      placeholder="SKU"
+                      value={option.sku}
+                      onChange={(e) => updateVariantOption(variantIndex, optionIndex, "sku", e.target.value)}
+                      style={{ width: "120px" }}
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Price"
+                      step="0.01"
+                      value={option.price}
+                      onChange={(e) => updateVariantOption(variantIndex, optionIndex, "price", e.target.value)}
+                      style={{ width: "100px" }}
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Inventory"
+                      value={option.inventory}
+                      onChange={(e) => updateVariantOption(variantIndex, optionIndex, "inventory", parseInt(e.target.value) || 0)}
+                      style={{ width: "100px" }}
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => removeVariantOption(variantIndex, optionIndex)}
+                      style={{ padding: "8px 12px", backgroundColor: "#ef4444", color: "white" }}
+                    >
+                      <i className="fas fa-times" />
+                    </Button>
+                  </VariantOption>
+                ))}
+
+                <Button
+                  type="button"
+                  onClick={() => addVariantOption(variantIndex)}
+                  style={{ marginTop: "8px", padding: "6px 12px", fontSize: "12px" }}
+                >
+                  <i className="fas fa-plus" style={{ marginRight: "4px" }} />
+                  Add Option
+                </Button>
+              </VariantSection>
+            ))}
+          </div>
 
           <Button type="submit" fullWidth disabled={creating || !formData.seller}>
             {creating ? "Creating..." : "Create Product"}

@@ -78,6 +78,100 @@ export default {
       min: 0,
     },
     {
+      name: 'variants',
+      type: 'array',
+      label: 'Product Variants',
+      admin: {
+        description: 'Add product variants like color, size, material, etc.',
+      },
+      fields: [
+        {
+          name: 'name',
+          type: 'text',
+          required: true,
+          admin: {
+            description: 'Variant name (e.g., Color, Size, Material)',
+          },
+        },
+        {
+          name: 'options',
+          type: 'array',
+          required: true,
+          fields: [
+            {
+              name: 'value',
+              type: 'text',
+              required: true,
+            },
+            {
+              name: 'sku',
+              type: 'text',
+              admin: {
+                description: 'Optional SKU for this variant option',
+              },
+            },
+            {
+              name: 'price',
+              type: 'number',
+              admin: {
+                description: 'Optional price override for this variant option',
+              },
+            },
+            {
+              name: 'inventory',
+              type: 'number',
+              defaultValue: 0,
+              admin: {
+                description: 'Inventory for this specific variant option',
+              },
+            },
+            {
+              name: 'image',
+              type: 'upload',
+              relationTo: 'media',
+              admin: {
+                description: 'Optional image for this variant option (e.g., color swatch)',
+              },
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'weight',
+      type: 'number',
+      admin: {
+        description: 'Product weight in kg',
+      },
+    },
+    {
+      name: 'dimensions',
+      type: 'group',
+      fields: [
+        {
+          name: 'length',
+          type: 'number',
+          admin: {
+            description: 'Length in cm',
+          },
+        },
+        {
+          name: 'width',
+          type: 'number',
+          admin: {
+            description: 'Width in cm',
+          },
+        },
+        {
+          name: 'height',
+          type: 'number',
+          admin: {
+            description: 'Height in cm',
+          },
+        },
+      ],
+    },
+    {
       name: 'status',
       type: 'select',
       options: [
