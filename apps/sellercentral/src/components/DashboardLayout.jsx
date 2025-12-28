@@ -3,7 +3,20 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery, gql, ApolloProvider } from "@apollo/client";
+import { apolloClient } from "@belucha/lib";
 import styled from "styled-components";
+
+const GET_SELLER = gql`
+  query GetSeller($id: String!) {
+    Sellers(where: { id: { equals: $id } }, limit: 1) {
+      docs {
+        id
+        storeName
+      }
+    }
+  }
+`;
 
 const Container = styled.div`
   display: flex;
@@ -12,40 +25,50 @@ const Container = styled.div`
 `;
 
 const Sidebar = styled.aside`
-  width: 260px;
+  width: ${({ $collapsed }) => ($collapsed ? "80px" : "260px")};
   background-color: #1f2937;
   color: white;
   padding: 24px 0;
   position: fixed;
   height: 100vh;
   overflow-y: auto;
-  transition: transform 0.3s ease;
+  transition: width 0.3s ease;
   z-index: 100;
+  display: flex;
+  flex-direction: column;
 
   @media (max-width: 768px) {
     transform: ${({ isOpen }) => (isOpen ? "translateX(0)" : "translateX(-100%)")};
+    width: 260px;
   }
 `;
 
 const SidebarHeader = styled.div`
-  padding: 0 24px 24px;
+  padding: 0 ${({ $collapsed }) => ($collapsed ? "16px" : "24px")} 24px;
   border-bottom: 1px solid #374151;
   margin-bottom: 24px;
+  display: flex;
+  justify-content: ${({ $collapsed }) => ($collapsed ? "center" : "flex-start")};
+  align-items: center;
 `;
 
 const Logo = styled(Link)`
-  font-size: 24px;
+  font-size: ${({ $collapsed }) => ($collapsed ? "20px" : "24px")};
   font-weight: 700;
   color: #0ea5e9;
   font-family: "Manrope", sans-serif;
   text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;
 
 const Menu = styled.nav`
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 0 16px;
+  padding: 0 ${({ $collapsed }) => ($collapsed ? "8px" : "16px")};
+  flex: 1;
 `;
 
 const MenuItem = styled.div`
@@ -55,48 +78,105 @@ const MenuItem = styled.div`
 const MenuItemLink = styled(Link)`
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: ${({ $collapsed }) => ($collapsed ? "center" : "space-between")};
   gap: 12px;
-  padding: 12px 16px;
+  padding: 12px ${({ $collapsed }) => ($collapsed ? "8px" : "16px")};
   border-radius: 8px;
   color: ${({ $active }) => ($active ? "#0ea5e9" : "#9ca3af")};
   background-color: ${({ $active }) => ($active ? "#1e3a5f" : "transparent")};
   transition: all 0.2s ease;
   font-weight: ${({ $active }) => ($active ? "600" : "400")};
   text-decoration: none;
+  position: relative;
 
   &:hover {
     background-color: #374151;
     color: white;
   }
+
+  span {
+    ${({ $collapsed }) => ($collapsed ? "display: none;" : "display: block;")}
+  }
+`;
+
+const MenuItemTooltip = styled.div`
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #1f2937;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  white-space: nowrap;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 `;
 
 const DropdownIcon = styled.i`
   font-size: 12px;
   transition: transform 0.2s ease;
   transform: ${({ $isOpen }) => ($isOpen ? "rotate(180deg)" : "rotate(0deg)")};
+  ${({ $collapsed }) => ($collapsed ? "display: none;" : "display: block;")}
 `;
 
 const SubMenu = styled.div`
   max-height: ${({ $isOpen }) => ($isOpen ? "500px" : "0")};
   overflow: hidden;
   transition: max-height 0.3s ease;
-  margin-left: 16px;
-  border-left: 2px solid #374151;
-  padding-left: 8px;
+  margin-left: ${({ $collapsed }) => ($collapsed ? "0" : "16px")};
+  border-left: ${({ $collapsed }) => ($collapsed ? "none" : "2px solid #374151")};
+  padding-left: ${({ $collapsed }) => ($collapsed ? "0" : "8px")};
 `;
 
 const SubMenuItemLink = styled(Link)`
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 16px;
+  padding: 10px ${({ $collapsed }) => ($collapsed ? "8px" : "16px")};
   border-radius: 6px;
   color: ${({ $active }) => ($active ? "#0ea5e9" : "#9ca3af")};
   background-color: ${({ $active }) => ($active ? "#1e3a5f" : "transparent")};
   transition: all 0.2s ease;
   font-size: 14px;
   text-decoration: none;
+  justify-content: ${({ $collapsed }) => ($collapsed ? "center" : "flex-start")};
+
+  &:hover {
+    background-color: #374151;
+    color: white;
+  }
+
+  i {
+    ${({ $collapsed }) => ($collapsed ? "display: block;" : "display: block;")}
+  }
+
+  span {
+    ${({ $collapsed }) => ($collapsed ? "display: none;" : "display: block;")}
+  }
+`;
+
+const SidebarFooter = styled.div`
+  padding: 16px;
+  border-top: 1px solid #374151;
+  margin-top: auto;
+  display: flex;
+  justify-content: center;
+`;
+
+const CollapseButton = styled.button`
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
 
   &:hover {
     background-color: #374151;
@@ -106,8 +186,9 @@ const SubMenuItemLink = styled(Link)`
 
 const Main = styled.main`
   flex: 1;
-  margin-left: 260px;
-  padding: 24px;
+  margin-left: ${({ $sidebarCollapsed }) => ($sidebarCollapsed ? "80px" : "260px")};
+  padding: 0;
+  transition: margin-left 0.3s ease;
 
   @media (max-width: 768px) {
     margin-left: 0;
@@ -118,26 +199,49 @@ const TopBar = styled.div`
   background-color: white;
   padding: 16px 24px;
   border-bottom: 1px solid #e5e7eb;
-  margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   position: sticky;
   top: 0;
   z-index: 50;
+  gap: 24px;
 `;
 
-const MenuToggle = styled.button`
-  display: none;
-  background: none;
-  border: none;
-  color: #374151;
-  font-size: 24px;
-  cursor: pointer;
+const SearchBar = styled.div`
+  flex: 1;
+  max-width: 600px;
+  position: relative;
+`;
 
-  @media (max-width: 768px) {
-    display: block;
+const SearchInput = styled.input`
+  width: 100%;
+  padding: 10px 16px 10px 44px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1f2937;
+  background: white;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
   }
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+`;
+
+const SearchIcon = styled.i`
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  font-size: 16px;
 `;
 
 const UserMenuWrapper = styled.div`
@@ -171,28 +275,14 @@ const UserAvatar = styled.div`
   color: white;
   font-weight: 600;
   font-size: 16px;
-`;
-
-const UserInfo = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-
-  @media (max-width: 768px) {
-    display: none;
-  }
+  flex-shrink: 0;
 `;
 
 const UserName = styled.span`
   font-size: 14px;
   font-weight: 600;
   color: #1f2937;
-`;
-
-const UserEmail = styled.span`
-  font-size: 12px;
-  color: #6b7280;
+  white-space: nowrap;
 `;
 
 const DropdownMenu = styled.div`
@@ -244,6 +334,10 @@ const DropdownDivider = styled.div`
   height: 1px;
   background-color: #e5e7eb;
   margin: 4px 0;
+`;
+
+const ContentArea = styled.div`
+  padding: 24px;
 `;
 
 const menuItems = [
@@ -302,15 +396,24 @@ const menuItems = [
   },
 ];
 
-export default function DashboardLayout({ children }) {
+function DashboardLayoutContent({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState({});
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const userMenuRef = useRef(null);
-  const [sellerEmail, setSellerEmail] = useState("");
+  const sellerId = typeof window !== "undefined" ? localStorage.getItem("sellerId") : null;
+
+  const { data: sellerData } = useQuery(GET_SELLER, {
+    variables: { id: sellerId },
+    skip: !sellerId,
+  });
+
+  const storeName = sellerData?.Sellers?.docs?.[0]?.storeName || "Seller Account";
 
   useEffect(() => {
     // Login sayfalarında authentication kontrolü yapma
@@ -324,8 +427,6 @@ export default function DashboardLayout({ children }) {
       router.push("/login");
     } else {
       setIsAuthenticated(true);
-      const email = localStorage.getItem("sellerEmail") || "Seller";
-      setSellerEmail(email);
     }
   }, [pathname, router]);
 
@@ -401,19 +502,26 @@ export default function DashboardLayout({ children }) {
   };
 
   const getUserInitials = () => {
-    if (sellerEmail) {
-      return sellerEmail.charAt(0).toUpperCase();
+    if (storeName && storeName !== "Seller Account") {
+      return storeName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .substring(0, 2);
     }
     return "S";
   };
 
   return (
     <Container>
-      <Sidebar isOpen={sidebarOpen}>
-        <SidebarHeader>
-          <Logo href="/inventory">Seller Central</Logo>
+      <Sidebar isOpen={sidebarOpen} $collapsed={sidebarCollapsed}>
+        <SidebarHeader $collapsed={sidebarCollapsed}>
+          <Logo href="/inventory" $collapsed={sidebarCollapsed}>
+            {sidebarCollapsed ? "SC" : "Seller Central"}
+          </Logo>
         </SidebarHeader>
-        <Menu>
+        <Menu $collapsed={sidebarCollapsed}>
           {menuItems.map((item) => {
             const hasSubmenu = item.submenu && item.submenu.length > 0;
             const isItemActive = isActive(item.href);
@@ -424,24 +532,58 @@ export default function DashboardLayout({ children }) {
                 <MenuItemLink
                   href={item.href}
                   $active={isItemActive}
+                  $collapsed={sidebarCollapsed}
                   onClick={(e) => handleMenuItemClick(e, item)}
+                  onMouseEnter={(e) => {
+                    if (sidebarCollapsed) {
+                      const tooltip = e.currentTarget.querySelector('[data-tooltip]');
+                      if (tooltip) tooltip.style.opacity = '1';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sidebarCollapsed) {
+                      const tooltip = e.currentTarget.querySelector('[data-tooltip]');
+                      if (tooltip) tooltip.style.opacity = '0';
+                    }
+                  }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <i className={item.icon} />
+                    <i className={item.icon} style={{ fontSize: "18px", minWidth: "18px" }} />
                     <span>{item.label}</span>
                   </div>
-                  {hasSubmenu && <DropdownIcon className="fas fa-chevron-down" $isOpen={isDropdownOpen} />}
+                  {hasSubmenu && !sidebarCollapsed && (
+                    <DropdownIcon className="fas fa-chevron-down" $isOpen={isDropdownOpen} />
+                  )}
+                  {sidebarCollapsed && (
+                    <MenuItemTooltip data-tooltip>{item.label}</MenuItemTooltip>
+                  )}
                 </MenuItemLink>
                 {hasSubmenu && (
-                  <SubMenu $isOpen={isDropdownOpen}>
+                  <SubMenu $isOpen={isDropdownOpen} $collapsed={sidebarCollapsed}>
                     {item.submenu.map((subItem) => (
                       <SubMenuItemLink
                         key={subItem.href}
                         href={subItem.href}
                         $active={pathname === subItem.href}
+                        $collapsed={sidebarCollapsed}
+                        onMouseEnter={(e) => {
+                          if (sidebarCollapsed) {
+                            const tooltip = e.currentTarget.querySelector('[data-tooltip]');
+                            if (tooltip) tooltip.style.opacity = '1';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (sidebarCollapsed) {
+                            const tooltip = e.currentTarget.querySelector('[data-tooltip]');
+                            if (tooltip) tooltip.style.opacity = '0';
+                          }
+                        }}
                       >
                         <i className="fas fa-circle" style={{ fontSize: "6px" }} />
                         <span>{subItem.label}</span>
+                        {sidebarCollapsed && (
+                          <MenuItemTooltip data-tooltip>{subItem.label}</MenuItemTooltip>
+                        )}
                       </SubMenuItemLink>
                     ))}
                   </SubMenu>
@@ -450,19 +592,30 @@ export default function DashboardLayout({ children }) {
             );
           })}
         </Menu>
+        <SidebarFooter>
+          <CollapseButton
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <i className={`fas fa-chevron-${sidebarCollapsed ? "right" : "left"}`} />
+          </CollapseButton>
+        </SidebarFooter>
       </Sidebar>
-      <Main>
+      <Main $sidebarCollapsed={sidebarCollapsed}>
         <TopBar>
-          <MenuToggle onClick={() => setSidebarOpen(!sidebarOpen)}>
-            <i className="fas fa-bars" />
-          </MenuToggle>
+          <SearchBar>
+            <SearchIcon className="fas fa-search" />
+            <SearchInput
+              type="text"
+              placeholder="Search products, orders, customers..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </SearchBar>
           <UserMenuWrapper ref={userMenuRef}>
             <UserMenuButton onClick={() => setUserMenuOpen(!userMenuOpen)}>
               <UserAvatar>{getUserInitials()}</UserAvatar>
-              <UserInfo>
-                <UserName>Seller Account</UserName>
-                <UserEmail>{sellerEmail || "seller@example.com"}</UserEmail>
-              </UserInfo>
+              <UserName>{storeName}</UserName>
               <i className="fas fa-chevron-down" style={{ fontSize: "12px", color: "#6b7280" }} />
             </UserMenuButton>
             {userMenuOpen && (
@@ -505,8 +658,16 @@ export default function DashboardLayout({ children }) {
             )}
           </UserMenuWrapper>
         </TopBar>
-        {children}
+        <ContentArea>{children}</ContentArea>
       </Main>
     </Container>
+  );
+}
+
+export default function DashboardLayout({ children }) {
+  return (
+    <ApolloProvider client={apolloClient}>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </ApolloProvider>
   );
 }

@@ -646,21 +646,37 @@ export default function ProductsPage() {
                 </CategoryButton>
                 {categoryDropdownOpen && (
                   <CategoryDropdownMenu>
-                    {Object.entries(groupedCategories).map(([parentName, cats]) => (
-                      <CategoryGroup key={parentName}>
-                        <CategoryGroupTitle>{parentName}</CategoryGroupTitle>
-                        {cats.map((cat) => (
-                          <CategoryOption key={cat.id}>
-                            <input
-                              type="checkbox"
-                              checked={formData.categories.includes(cat.id)}
-                              onChange={() => toggleCategory(cat.id)}
-                            />
-                            <span>{cat.name}</span>
-                          </CategoryOption>
-                        ))}
-                      </CategoryGroup>
-                    ))}
+                    {categories.length === 0 ? (
+                      <div style={{ padding: "16px", textAlign: "center", color: "#6b7280" }}>
+                        <i className="fas fa-info-circle" style={{ marginRight: "8px" }} />
+                        No categories found. Please run the seed script:
+                        <br />
+                        <code style={{ marginTop: "8px", display: "block", fontSize: "12px", color: "#374151" }}>
+                          cd apps/cms/payload && npm run seed:categories
+                        </code>
+                      </div>
+                    ) : Object.keys(groupedCategories).length === 0 ? (
+                      <div style={{ padding: "16px", textAlign: "center", color: "#6b7280" }}>
+                        <i className="fas fa-info-circle" style={{ marginRight: "8px" }} />
+                        Loading categories...
+                      </div>
+                    ) : (
+                      Object.entries(groupedCategories).map(([parentName, cats]) => (
+                        <CategoryGroup key={parentName}>
+                          <CategoryGroupTitle>{parentName}</CategoryGroupTitle>
+                          {cats.map((cat) => (
+                            <CategoryOption key={cat.id}>
+                              <input
+                                type="checkbox"
+                                checked={formData.categories.includes(cat.id)}
+                                onChange={() => toggleCategory(cat.id)}
+                              />
+                              <span>{cat.name}</span>
+                            </CategoryOption>
+                          ))}
+                        </CategoryGroup>
+                      ))
+                    )}
                   </CategoryDropdownMenu>
                 )}
               </CategoryDropdown>
