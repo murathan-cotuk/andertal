@@ -1,17 +1,14 @@
 "use client";
 
-import { ApolloProvider } from "@apollo/client";
-import { apolloClient } from "@belucha/lib";
-import DashboardLayout from "@/components/DashboardLayout";
-import DashboardHome from "@/components/DashboardHome";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  return (
-    <ApolloProvider client={apolloClient}>
-      <DashboardLayout>
-        <DashboardHome />
-      </DashboardLayout>
-    </ApolloProvider>
-  );
-}
+  const router = useRouter();
 
+  useEffect(() => {
+    router.replace("/inventory");
+  }, [router]);
+
+  return null;
+}
