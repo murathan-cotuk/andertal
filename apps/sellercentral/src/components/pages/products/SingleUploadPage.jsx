@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, gql } from "@apollo/client";
 import styled from "styled-components";
 import { Card, Button, Input } from "@belucha/ui";
@@ -142,7 +142,12 @@ const ErrorMessage = styled.div`
   color: #991b1b;
 `;
 
-const MultiSelect = styled.select`
+const CategoryDropdown = styled.div`
+  position: relative;
+  width: 100%;
+`;
+
+const CategoryButton = styled.button`
   width: 100%;
   padding: 12px 16px;
   border: 2px solid #e5e7eb;
@@ -152,12 +157,107 @@ const MultiSelect = styled.select`
   background: white;
   transition: all 0.2s ease;
   box-sizing: border-box;
-  min-height: 120px;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
 
   &:focus {
     outline: none;
     border-color: #0ea5e9;
     box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  }
+
+  &:hover {
+    border-color: #0ea5e9;
+  }
+`;
+
+const CategoryDropdownMenu = styled.div`
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+`;
+
+const CategoryGroup = styled.div`
+  padding: 8px 0;
+`;
+
+const CategoryGroupTitle = styled.div`
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #374151;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+`;
+
+const CategoryOption = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+
+  input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #0ea5e9;
+  }
+
+  span {
+    font-size: 14px;
+    color: #1f2937;
+  }
+`;
+
+const SelectedCategories = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+`;
+
+const SelectedCategoryTag = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background-color: #f0f9ff;
+  border: 1px solid #0ea5e9;
+  border-radius: 16px;
+  font-size: 12px;
+  color: #0ea5e9;
+  font-weight: 500;
+`;
+
+const CategoryCloseButton = styled.button`
+  background: none;
+  border: none;
+  color: #0ea5e9;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+
+  &:hover {
+    color: #0284c7;
   }
 `;
 
@@ -223,6 +323,8 @@ export default function SingleUploadPage() {
   const [createProduct, { loading: creating }] = useMutation(CREATE_PRODUCT);
 
   const categories = categoriesData?.Categories?.docs || [];
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const categoryDropdownRef = useRef(null);
 
   // Group categories by parent
   const groupedCategories = categories.reduce((acc, cat) => {
@@ -231,6 +333,50 @@ export default function SingleUploadPage() {
     acc[parentName].push(cat);
     return acc;
   }, {});
+
+  // Close category dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+        setCategoryDropdownOpen(false);
+      }
+    };
+
+    if (categoryDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [categoryDropdownOpen]);
+
+  const toggleCategory = (categoryId) => {
+    const isSelected = formData.categories.includes(categoryId);
+    if (isSelected) {
+      setFormData({
+        ...formData,
+        categories: formData.categories.filter((id) => id !== categoryId),
+      });
+    } else {
+      setFormData({
+        ...formData,
+        categories: [...formData.categories, categoryId],
+      });
+    }
+  };
+
+  const removeCategory = (categoryId) => {
+    setFormData({
+      ...formData,
+      categories: formData.categories.filter((id) => id !== categoryId),
+    });
+  };
+
+  const getCategoryName = (categoryId) => {
+    const category = categories.find((cat) => cat.id === categoryId);
+    return category?.name || "";
+  };
 
   // Get seller ID from localStorage (set during login)
   useEffect(() => {
@@ -454,27 +600,57 @@ export default function SingleUploadPage() {
 
           <div>
             <Label>Categories *</Label>
-            <MultiSelect
-              multiple
-              value={formData.categories}
-              onChange={(e) => {
-                const selected = Array.from(e.target.selectedOptions, (option) => option.value);
-                setFormData({ ...formData, categories: selected });
-              }}
-            >
-              {Object.entries(groupedCategories).map(([parentName, cats]) => (
-                <optgroup key={parentName} label={parentName}>
-                  {cats.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
+            <CategoryDropdown ref={categoryDropdownRef}>
+              <CategoryButton
+                type="button"
+                onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
+              >
+                <span>
+                  {formData.categories.length > 0
+                    ? `${formData.categories.length} category selected`
+                    : "Select categories"}
+                </span>
+                <i
+                  className={`fas fa-chevron-${categoryDropdownOpen ? "up" : "down"}`}
+                  style={{ fontSize: "12px", color: "#6b7280" }}
+                />
+              </CategoryButton>
+              {categoryDropdownOpen && (
+                <CategoryDropdownMenu>
+                  {Object.entries(groupedCategories).map(([parentName, cats]) => (
+                    <CategoryGroup key={parentName}>
+                      <CategoryGroupTitle>{parentName}</CategoryGroupTitle>
+                      {cats.map((cat) => (
+                        <CategoryOption key={cat.id}>
+                          <input
+                            type="checkbox"
+                            checked={formData.categories.includes(cat.id)}
+                            onChange={() => toggleCategory(cat.id)}
+                          />
+                          <span>{cat.name}</span>
+                        </CategoryOption>
+                      ))}
+                    </CategoryGroup>
                   ))}
-                </optgroup>
-              ))}
-            </MultiSelect>
-            <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
-              Hold Ctrl (Windows) or Cmd (Mac) to select multiple categories
-            </p>
+                </CategoryDropdownMenu>
+              )}
+            </CategoryDropdown>
+            {formData.categories.length > 0 && (
+              <SelectedCategories>
+                {formData.categories.map((catId) => (
+                  <SelectedCategoryTag key={catId}>
+                    {getCategoryName(catId)}
+                    <CategoryCloseButton
+                      type="button"
+                      onClick={() => removeCategory(catId)}
+                      title="Remove category"
+                    >
+                      <i className="fas fa-times" />
+                    </CategoryCloseButton>
+                  </SelectedCategoryTag>
+                ))}
+              </SelectedCategories>
+            )}
           </div>
 
           <FormRow>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import styled from "styled-components";
@@ -140,10 +140,110 @@ const MenuToggle = styled.button`
   }
 `;
 
-const UserMenu = styled.div`
+const UserMenuWrapper = styled.div`
+  position: relative;
+`;
+
+const UserMenuButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+`;
+
+const UserAvatar = styled.div`
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+`;
+
+const UserInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+`;
+
+const UserName = styled.span`
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+`;
+
+const UserEmail = styled.span`
+  font-size: 12px;
+  color: #6b7280;
+`;
+
+const DropdownMenu = styled.div`
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  min-width: 220px;
+  z-index: 1000;
+  overflow: hidden;
+`;
+
+const DropdownMenuItem = styled(Link)`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: #1f2937;
+  text-decoration: none;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+
+  i {
+    width: 20px;
+    color: #6b7280;
+  }
+
+  ${({ $danger }) =>
+    $danger &&
+    `
+    color: #ef4444;
+    i {
+      color: #ef4444;
+    }
+    &:hover {
+      background-color: #fee2e2;
+    }
+  `}
+`;
+
+const DropdownDivider = styled.div`
+  height: 1px;
+  background-color: #e5e7eb;
+  margin: 4px 0;
 `;
 
 const menuItems = [
@@ -208,6 +308,9 @@ export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState({});
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+  const [sellerEmail, setSellerEmail] = useState("");
 
   useEffect(() => {
     // Login sayfalarında authentication kontrolü yapma
@@ -221,8 +324,27 @@ export default function DashboardLayout({ children }) {
       router.push("/login");
     } else {
       setIsAuthenticated(true);
+      const email = localStorage.getItem("sellerEmail") || "Seller";
+      setSellerEmail(email);
     }
   }, [pathname, router]);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    if (userMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [userMenuOpen]);
 
   // Auto-open dropdown if current path matches submenu
   useEffect(() => {
@@ -256,6 +378,13 @@ export default function DashboardLayout({ children }) {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("sellerLoggedIn");
+    localStorage.removeItem("sellerEmail");
+    localStorage.removeItem("sellerId");
+    router.push("/login");
+  };
+
   // Login/register sayfalarında layout gösterme
   if (pathname === "/login" || pathname === "/register") {
     return <>{children}</>;
@@ -269,6 +398,13 @@ export default function DashboardLayout({ children }) {
   const isActive = (href) => {
     if (href === "/inventory" && pathname === "/products") return true;
     return pathname === href || pathname.startsWith(href + "/");
+  };
+
+  const getUserInitials = () => {
+    if (sellerEmail) {
+      return sellerEmail.charAt(0).toUpperCase();
+    }
+    return "S";
   };
 
   return (
@@ -320,10 +456,54 @@ export default function DashboardLayout({ children }) {
           <MenuToggle onClick={() => setSidebarOpen(!sidebarOpen)}>
             <i className="fas fa-bars" />
           </MenuToggle>
-          <UserMenu>
-            <span>Seller Account</span>
-            <i className="fas fa-user-circle" style={{ fontSize: "24px" }} />
-          </UserMenu>
+          <UserMenuWrapper ref={userMenuRef}>
+            <UserMenuButton onClick={() => setUserMenuOpen(!userMenuOpen)}>
+              <UserAvatar>{getUserInitials()}</UserAvatar>
+              <UserInfo>
+                <UserName>Seller Account</UserName>
+                <UserEmail>{sellerEmail || "seller@example.com"}</UserEmail>
+              </UserInfo>
+              <i className="fas fa-chevron-down" style={{ fontSize: "12px", color: "#6b7280" }} />
+            </UserMenuButton>
+            {userMenuOpen && (
+              <DropdownMenu>
+                <DropdownMenuItem href="/profile">
+                  <i className="fas fa-user" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem href="/settings">
+                  <i className="fas fa-cog" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem href="/settings/account">
+                  <i className="fas fa-user-cog" />
+                  <span>Account Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem href="/settings/payment">
+                  <i className="fas fa-credit-card" />
+                  <span>Payment Methods</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem href="/settings/notifications">
+                  <i className="fas fa-bell" />
+                  <span>Notifications</span>
+                </DropdownMenuItem>
+                <DropdownDivider />
+                <DropdownMenuItem href="/settings/security">
+                  <i className="fas fa-shield-alt" />
+                  <span>Security</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem href="/settings/billing">
+                  <i className="fas fa-file-invoice-dollar" />
+                  <span>Billing</span>
+                </DropdownMenuItem>
+                <DropdownDivider />
+                <DropdownMenuItem href="#" $danger onClick={(e) => { e.preventDefault(); handleLogout(); }}>
+                  <i className="fas fa-sign-out-alt" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenu>
+            )}
+          </UserMenuWrapper>
         </TopBar>
         {children}
       </Main>
