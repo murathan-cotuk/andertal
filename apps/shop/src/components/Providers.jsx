@@ -2,12 +2,12 @@
 
 import { ApolloProvider } from "@apollo/client";
 import { apolloClient } from "@/lib/apollo-client";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { CustomerAuthProvider } from "@belucha/lib";
 
 export default function Providers({ children }) {
   return (
     <ApolloProvider client={apolloClient}>
-      <AuthProvider>{children}</AuthProvider>
+      <CustomerAuthProvider>{children}</CustomerAuthProvider>
     </ApolloProvider>
   );
 }

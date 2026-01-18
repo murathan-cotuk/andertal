@@ -4,7 +4,22 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styled from "styled-components";
-import { useAuth } from "@/contexts/AuthContext";
+import { useMutation, gql } from "@apollo/client";
+import { useCustomerAuth as useAuth, useAuthGuard } from "@belucha/lib";
+
+const LOGIN_CUSTOMER = gql`
+  mutation LoginCustomer($email: String!, $password: String!) {
+    loginCustomers(email: $email, password: $password) {
+      token
+      user {
+        id
+        email
+        firstName
+        lastName
+      }
+    }
+  }
+`;
 
 const Container = styled.div`
   min-height: 100vh;
@@ -369,6 +384,13 @@ const MonkeySVG = ({ isBlind }) => (
 );
 
 export default function LoginPage() {
+  // Redirect if already authenticated
+  useAuthGuard({
+    requiredRole: 'customer',
+    redirectTo: '/',
+    redirectIfAuthenticated: true
+  });
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -378,6 +400,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const [loginMutation] = useMutation(LOGIN_CUSTOMER);
   
   // Maymun fonksiyonu: Şifre gizliyken gözler kapalı (blind)
   const isBlind = !showPassword;
@@ -388,16 +411,21 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await login(formData.email, formData.password);
-      
-      if (result.success) {
+      const { data } = await loginMutation({
+        variables: { email: formData.email, password: formData.password },
+      });
+
+      if (data?.loginCustomers?.token) {
+        const { token, user } = data.loginCustomers;
+        login(token, user.id);
         router.push("/");
         router.refresh();
       } else {
-        setError(result.error || "Login failed. Please try again.");
+        setError("Login failed. Please check your credentials.");
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.");
+      console.error("Login error:", err);
+      setError(err.graphQLErrors?.[0]?.message || err.message || "An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }

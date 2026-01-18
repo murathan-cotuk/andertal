@@ -1,8 +1,7 @@
 "use client";
 
 import { useQuery, gql } from "@apollo/client";
-import { useAuth } from "@/contexts/AuthContext";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import { useCustomerAuth as useAuth, useAuthGuard } from "@belucha/lib";
 import styled from "styled-components";
 import { Card, Button } from "@belucha/ui";
 import Link from "next/link";
@@ -97,6 +96,9 @@ const Error = styled.div`
 `;
 
 export default function AccountPage() {
+  // Protect route
+  useAuthGuard({ requiredRole: 'customer', redirectTo: '/login' });
+
   const { user, logout } = useAuth();
 
   const { data, loading, error } = useQuery(GET_CUSTOMER, {
@@ -108,27 +110,22 @@ export default function AccountPage() {
 
   if (loading) {
     return (
-      <ProtectedRoute>
-        <Container>
-          <Loading>Loading...</Loading>
-        </Container>
-      </ProtectedRoute>
+      <Container>
+        <Loading>Loading...</Loading>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <ProtectedRoute>
-        <Container>
-          <Error>Error loading profile: {error.message}</Error>
-        </Container>
-      </ProtectedRoute>
+      <Container>
+        <Error>Error loading profile: {error.message}</Error>
+      </Container>
     );
   }
 
   return (
-    <ProtectedRoute>
-      <Container>
+    <Container>
         <Title>Mein Konto</Title>
 
         <Section>
@@ -213,7 +210,6 @@ export default function AccountPage() {
           </ButtonGroup>
         </Section>
       </Container>
-    </ProtectedRoute>
   );
 }
 

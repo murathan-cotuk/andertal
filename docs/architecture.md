@@ -5,7 +5,7 @@ Projeni inceledim. Amazon benzeri bir marketplace için güzel bir başlangıç 
 1. Authentication & Authorization Domain
 Sorumluluk:
 
-User authentication (Customer, Seller)
+User authentuication (Customer, Seller)
 JWT token yönetimi
 Session management
 Role-based access control

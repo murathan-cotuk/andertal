@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useQuery, gql } from "@apollo/client";
 import styled from "styled-components";
-import { useAuth } from "@/contexts/AuthContext";
+import { useCustomerAuth as useAuth } from "@belucha/lib";
 
 const GET_CATEGORIES = gql`
   query GetCategories {

@@ -15,27 +15,55 @@
 import { jwtDecode } from 'jwt-decode';
 
 /**
- * User type definitions
  * @typedef {'customer' | 'seller'} UserType
  */
 
 /**
- * Token storage key prefixes
- * @constant
+ * @typedef {Object} TokenClaims
+ * @property {number} [exp] - Expiration timestamp (Unix)
+ * @property {number} [iat] - Issued at timestamp (Unix)
+ * @property {string} [sub] - Subject (user ID)
+ * @property {string} [role] - User role
+ * @property {string} [email] - User email
  */
-const STORAGE_PREFIX = 'belucha_';
-const TOKEN_KEY = {
-  customer: `${STORAGE_PREFIX}customer_token`,
-  seller: `${STORAGE_PREFIX}seller_token`,
+
+/**
+ * @typedef {Object} MigrationResult
+ * @property {boolean} migrated - Whether migration occurred
+ * @property {string[]} keys - Migrated key names
+ */
+
+/**
+ * Storage key constants to prevent typos
+ * @private
+ */
+const STORAGE_KEYS = {
+  customer: {
+    token: "belucha_customer_token",
+    id: "belucha_customer_id",
+    loggedIn: "belucha_customer_logged_in",
+  },
+  seller: {
+    token: "belucha_seller_token",
+    id: "belucha_seller_id",
+    loggedIn: "belucha_seller_logged_in",
+  },
 };
-const USER_ID_KEY = {
-  customer: `${STORAGE_PREFIX}customer_id`,
-  seller: `${STORAGE_PREFIX}seller_id`,
-};
-const LOGGED_IN_KEY = {
-  customer: `${STORAGE_PREFIX}customer_logged_in`,
-  seller: `${STORAGE_PREFIX}seller_logged_in`,
-};
+
+/**
+ * Get storage keys for user type
+ * @private
+ * @param {UserType} userType
+ * @returns {Object} Storage keys
+ * @throws {Error} If invalid userType
+ */
+function getStorageKeys(userType) {
+  const keys = STORAGE_KEYS[userType];
+  if (!keys) {
+    throw new Error(`[TokenService] Invalid userType: ${userType}. Must be 'customer' or 'seller'`);
+  }
+  return keys;
+}
 
 /**
  * Check if running in browser environment (SSR safety)
@@ -140,43 +168,83 @@ const decodeToken = (token) => {
 /**
  * Check if token is expired
  * @param {string} token - JWT token string
- * @returns {boolean} - True if expired or invalid
+ * @returns {boolean} - True if expired, invalid, or missing expiry
  */
 const isTokenExpired = (token) => {
-  const claims = decodeToken(token);
-  if (!claims) {
-    return true; // Invalid token considered expired
+  try {
+    if (!token || typeof token !== "string") {
+      return true; // Invalid token = treat as expired
+    }
+
+    const claims = decodeToken(token);
+    if (!claims) {
+      return true; // Parse failed = treat as expired
+    }
+
+    // ✅ CRITICAL: If no exp claim, treat as expired (security)
+    if (!claims.exp || typeof claims.exp !== "number") {
+      console.warn("[TokenService] Token missing valid exp claim - treating as expired");
+      return true;
+    }
+
+    // ✅ Use <= instead of < (if exp === now, it's expired)
+    const now = Math.floor(Date.now() / 1000);
+    const isExpired = claims.exp <= now;
+
+    if (isExpired) {
+      console.info(
+        `[TokenService] Token expired at ${new Date(claims.exp * 1000).toISOString()}`
+      );
+    }
+
+    return isExpired;
+  } catch (error) {
+    console.error("[TokenService] Error checking token expiry:", error);
+    return true; // Error = treat as expired
   }
-  
-  // Check exp claim (expiration time in seconds since epoch)
-  if (claims.exp) {
-    const expirationTime = claims.exp * 1000; // Convert to milliseconds
-    const currentTime = Date.now();
-    return currentTime >= expirationTime;
-  }
-  
-  // If no exp claim, assume token is valid (but warn)
-  console.warn('[tokenService] Token has no expiration claim (exp)');
-  return false;
 };
 
 /**
- * Check if token should be refreshed (expires within X minutes)
- * @param {string} token - JWT token string
- * @param {number} minutesBeforeExpiry - Minutes before expiry to trigger refresh (default: 5)
- * @returns {boolean}
+ * Check if token should be refreshed
+ * Refreshes at 80% of token lifetime to prevent expiry during requests
+ * 
+ * @param {string} token - JWT token
+ * @returns {boolean} - True if refresh needed
+ * 
+ * @example
+ * // Token issued at 10:00, expires at 11:00 (1 hour lifetime)
+ * // At 10:48 (80% elapsed) → returns true
  */
-const shouldRefreshToken = (token, minutesBeforeExpiry = 5) => {
-  const claims = decodeToken(token);
-  if (!claims || !claims.exp) {
-    return false;
+const shouldRefreshToken = (token) => {
+  try {
+    if (!token || !isValidTokenFormat(token)) {
+      return true; // Invalid/expired = refresh needed
+    }
+
+    const claims = decodeToken(token);
+    if (!claims || !claims.exp || !claims.iat) {
+      return true; // Missing claims = refresh needed
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const totalLifetime = claims.exp - claims.iat; // Token lifetime in seconds
+    const elapsed = now - claims.iat; // Time elapsed since issuance
+
+    // Refresh at 80% of token lifetime
+    // Example: 1 hour token → refresh after 48 minutes
+    const shouldRefresh = elapsed >= totalLifetime * 0.8;
+
+    if (shouldRefresh) {
+      console.info(
+        `[TokenService] Token refresh recommended (${Math.floor(elapsed / 60)}m/${Math.floor(totalLifetime / 60)}m elapsed)`
+      );
+    }
+
+    return shouldRefresh;
+  } catch (error) {
+    console.error("[TokenService] Error checking refresh status:", error);
+    return true; // Error = refresh needed
   }
-  
-  const expirationTime = claims.exp * 1000; // Convert to milliseconds
-  const currentTime = Date.now();
-  const refreshThreshold = minutesBeforeExpiry * 60 * 1000; // Convert minutes to milliseconds
-  
-  return (expirationTime - currentTime) <= refreshThreshold;
 };
 
 // ============================================================================
@@ -215,12 +283,12 @@ export const setToken = (token, userType) => {
     console.warn('[tokenService] setToken: Token is expired, storing anyway (backend should handle refresh)');
   }
   
-  const key = TOKEN_KEY[userType];
-  const success = safeSetItem(key, token);
+  const keys = getStorageKeys(userType);
+  const success = safeSetItem(keys.token, token);
   
   if (success) {
     // Also set logged_in flag
-    safeSetItem(LOGGED_IN_KEY[userType], 'true');
+    safeSetItem(keys.loggedIn, 'true');
   }
   
   return success;
@@ -242,8 +310,8 @@ export const getToken = (userType) => {
     return null;
   }
   
-  const key = TOKEN_KEY[userType];
-  const token = safeGetItem(key);
+  const keys = getStorageKeys(userType);
+  const token = safeGetItem(keys.token);
   
   if (!token) {
     return null;
@@ -282,13 +350,11 @@ export const removeToken = (userType) => {
     return false;
   }
   
-  const tokenKey = TOKEN_KEY[userType];
-  const userIdKey = USER_ID_KEY[userType];
-  const loggedInKey = LOGGED_IN_KEY[userType];
+  const keys = getStorageKeys(userType);
   
-  safeRemoveItem(tokenKey);
-  safeRemoveItem(userIdKey);
-  safeRemoveItem(loggedInKey);
+  safeRemoveItem(keys.token);
+  safeRemoveItem(keys.id);
+  safeRemoveItem(keys.loggedIn);
   
   return true;
 };
@@ -314,8 +380,8 @@ export const setUser = (userId, userType) => {
     return false;
   }
   
-  const key = USER_ID_KEY[userType];
-  return safeSetItem(key, String(userId));
+  const keys = getStorageKeys(userType);
+  return safeSetItem(keys.id, String(userId));
 };
 
 /**
@@ -334,8 +400,8 @@ export const getUser = (userType) => {
     return null;
   }
   
-  const key = USER_ID_KEY[userType];
-  return safeGetItem(key);
+  const keys = getStorageKeys(userType);
+  return safeGetItem(keys.id);
 };
 
 /**
@@ -354,8 +420,8 @@ export const removeUser = (userType) => {
     return false;
   }
   
-  const key = USER_ID_KEY[userType];
-  return safeRemoveItem(key);
+  const keys = getStorageKeys(userType);
+  return safeRemoveItem(keys.id);
 };
 
 /**
@@ -435,9 +501,11 @@ export const clearAuth = (userType) => {
  * @returns {object} - Object with customer and seller tokens
  */
 export const getAllTokens = () => {
+  const customerKeys = getStorageKeys('customer');
+  const sellerKeys = getStorageKeys('seller');
   return {
-    customer: safeGetItem(TOKEN_KEY.customer),
-    seller: safeGetItem(TOKEN_KEY.seller),
+    customer: safeGetItem(customerKeys.token),
+    seller: safeGetItem(sellerKeys.token),
   };
 };
 
@@ -451,4 +519,85 @@ export const clearAllAuth = () => {
   return customerCleared && sellerCleared;
 };
 
+/**
+ * Migrate old localStorage keys to new format
+ * Should be called once on app initialization (AuthContext mount)
+ * 
+ * Old keys:
+ * - Customer: 'token', 'customerId', 'customerLoggedIn'
+ * - Seller: 'token', 'sellerId', 'sellerLoggedIn'
+ * 
+ * @returns {Object} Migration summary
+ */
+export function migrateOldTokens() {
+  if (typeof window === "undefined") {
+    return { migrated: false, reason: "SSR - no window" };
+  }
+
+  const migrations = {
+    customer: { migrated: false, keys: [] },
+    seller: { migrated: false, keys: [] },
+  };
+
+  try {
+    // ===== Customer Migration =====
+    const oldCustomerToken = localStorage.getItem("token");
+    const oldCustomerId = localStorage.getItem("customerId");
+    const oldCustomerLoggedIn = localStorage.getItem("customerLoggedIn");
+
+    if (oldCustomerToken || oldCustomerId || oldCustomerLoggedIn) {
+      console.info("[TokenService] 🔄 Migrating old customer tokens...");
+
+      if (oldCustomerToken && isTokenValid(oldCustomerToken)) {
+        setToken(oldCustomerToken, "customer");
+        migrations.customer.keys.push("token");
+      }
+
+      if (oldCustomerId) {
+        setUser(oldCustomerId, "customer");
+        migrations.customer.keys.push("customerId");
+      }
+
+      // Clean up old keys
+      localStorage.removeItem("token");
+      localStorage.removeItem("customerId");
+      localStorage.removeItem("customerLoggedIn");
+
+      migrations.customer.migrated = true;
+      console.info("[TokenService] ✅ Customer migration completed");
+    }
+
+    // ===== Seller Migration =====
+    const oldSellerToken = localStorage.getItem("sellerToken"); // If exists
+    const oldSellerId = localStorage.getItem("sellerId");
+    const oldSellerLoggedIn = localStorage.getItem("sellerLoggedIn");
+
+    if (oldSellerToken || oldSellerId || oldSellerLoggedIn) {
+      console.info("[TokenService] 🔄 Migrating old seller tokens...");
+
+      if (oldSellerToken && isTokenValid(oldSellerToken)) {
+        setToken(oldSellerToken, "seller");
+        migrations.seller.keys.push("sellerToken");
+      }
+
+      if (oldSellerId) {
+        setUser(oldSellerId, "seller");
+        migrations.seller.keys.push("sellerId");
+      }
+
+      // Clean up old keys
+      localStorage.removeItem("sellerToken");
+      localStorage.removeItem("sellerId");
+      localStorage.removeItem("sellerLoggedIn");
+
+      migrations.seller.migrated = true;
+      console.info("[TokenService] ✅ Seller migration completed");
+    }
+
+    return migrations;
+  } catch (error) {
+    console.error("[TokenService] ❌ Migration failed:", error);
+    return migrations;
+  }
+}
 
