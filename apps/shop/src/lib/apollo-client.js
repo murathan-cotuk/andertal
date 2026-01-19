@@ -1,13 +1,14 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
+import { getToken } from "@belucha/lib";
 
 const httpLink = createHttpLink({
-  uri: process.env.NEXT_PUBLIC_PAYLOAD_GRAPHQL_URL || "http://localhost:3001/api/graphql",
+  uri: '/api/graphql', // Use local Next.js proxy instead
 });
 
 const authLink = setContext((_, { headers }) => {
-  // Use customerToken for shop app
-  const token = typeof window !== "undefined" ? localStorage.getItem("customerToken") : null;
+  // Use new token service for customer token
+  const token = typeof window !== "undefined" ? getToken('customer') : null;
   
   return {
     headers: {
