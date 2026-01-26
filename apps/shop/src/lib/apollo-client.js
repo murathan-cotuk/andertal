@@ -3,7 +3,7 @@ import { setContext } from "@apollo/client/link/context";
 import { getToken } from "@belucha/lib";
 
 const httpLink = createHttpLink({
-  uri: '/api/graphql', // Use local Next.js proxy instead
+  uri: '/api/graphql', // Payload CMS GraphQL endpoint (Next.js plugin)
 });
 
 const authLink = setContext((_, { headers }) => {

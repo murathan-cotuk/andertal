@@ -1,5 +1,6 @@
 const path = require('path');
 const { withSentryConfig } = require("@sentry/nextjs");
+const { withPayload } = require("@payloadcms/next/withPayload");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -20,20 +21,25 @@ const nextConfig = {
       },
     ],
   },
+  // Vercel deployment için optimize
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   // Fix Turbopack panic with Turkish characters in path
   experimental: {
-    turbo: {
+    turbopack: {
       root: path.resolve(__dirname, '../../..'), // Set root to monorepo root
     },
   },
 };
 
-module.exports = withSentryConfig(nextConfig, {
+// withPayload wrapper'ı geri eklendi - PageConfigProvider sorunu için gerekli
+const payloadConfig = withPayload(nextConfig);
+
+module.exports = withSentryConfig(payloadConfig, {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
-  org: "ecommezzo-6n",
-  project: "javascript-nextjs",
+  org: "murathan-cotuk",
+  project: "belucha-shop",
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
@@ -50,18 +56,27 @@ module.exports = withSentryConfig(nextConfig, {
   // side errors will fail.
   tunnelRoute: "/monitoring",
 
-  webpack: {
-    // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
-    // See the following for more information:
-    // https://docs.sentry.io/product/crons/
-    // https://vercel.com/docs/cron-jobs
-    automaticVercelMonitors: true,
-
-    // Tree-shaking options for reducing bundle size
-    treeshake: {
-      // Automatically tree-shake Sentry logger statements to reduce bundle size
-      removeDebugLogging: true,
-    },
+  webpack: (config, { isServer }) => {
+    // Path alias support
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname, './src'),
+      '@payload-config': path.resolve(__dirname, './src/payload.config.ts'),
+    };
+    
+    // Node.js modüllerini client-side'da exclude et
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        'child_process': false,
+        'fs': false,
+        'net': false,
+        'tls': false,
+        'crypto': false,
+      };
+    }
+    
+    return config;
   },
 });
 

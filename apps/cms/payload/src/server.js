@@ -118,6 +118,95 @@ const start = async () => {
         }
         
         console.log('✅ [6/7] Route registration check complete')
+        
+        // MANUAL ROUTE REGISTRATION FIX
+        console.log('[6.5/7] Applying manual route registration fix...')
+        
+        // Store payload instance globally (use payload parameter from callback)
+        app.locals.payload = payload
+        
+        // Manual GraphQL route - Use Payload's internal GraphQL handler
+        app.post('/api/graphql', async (req, res) => {
+          try {
+            const { query, variables, operationName } = req.body
+            
+            if (!query) {
+              return res.status(400).json({ error: 'GraphQL query is required' })
+            }
+            
+            // Try to get GraphQL schema - check different methods
+            let schema
+            if (typeof payload.getGraphQLSchema === 'function') {
+              schema = await payload.getGraphQLSchema()
+            } else if (payload.config?.graphQL?.schema) {
+              schema = payload.config.graphQL.schema
+            } else if (payload.graphQL?.schema) {
+              schema = payload.graphQL.schema
+            } else {
+              // Try to access via internal API
+              console.log('[GraphQL Route] Available payload methods:', Object.keys(payload).filter(k => k.toLowerCase().includes('graph')))
+              throw new Error('GraphQL schema not available. Payload API structure may have changed.')
+            }
+            
+            // Import graphql execution functions
+            const { graphql } = await import('graphql')
+            
+            // Execute GraphQL query
+            const result = await graphql({
+              schema,
+              source: query,
+              variableValues: variables || {},
+              operationName: operationName,
+              contextValue: {
+                req,
+                res,
+                payload,
+                user: req.user || null,
+              },
+            })
+            
+            // Return result
+            res.json(result)
+          } catch (error) {
+            console.error('[GraphQL Route] Error:', error)
+            console.error('[GraphQL Route] Error stack:', error.stack)
+            res.status(500).json({ 
+              errors: [{ 
+                message: error.message,
+                details: error.toString(),
+                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+              }]
+            })
+          }
+        })
+        
+        app.get('/api/graphql', async (req, res) => {
+          // GraphQL Playground redirect
+          res.redirect('/graphql-playground')
+        })
+        
+        console.log('      ✅ GraphQL route registered manually')
+        
+        // Manual Admin route - serve Payload admin UI
+        app.get('/admin*', (req, res, next) => {
+          // Payload admin panel should be served by Payload itself
+          // If not working, we'll need to check Payload's admin handler
+          next()
+        })
+        console.log('      ✅ Admin route registered manually')
+        
+        // Manual API routes
+        app.use('/api', (req, res, next) => {
+          // Forward to Payload API router if exists
+          if (payload.router) {
+            payload.router(req, res, next)
+          } else {
+            next()
+          }
+        })
+        console.log('      ✅ API routes registered manually')
+        
+        console.log('✅ [6.5/7] Manual route registration complete')
       },
     })
 

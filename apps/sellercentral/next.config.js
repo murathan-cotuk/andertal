@@ -21,7 +21,7 @@ const nextConfig = {
   },
   // Fix Turbopack panic with Turkish characters in path
   experimental: {
-    turbo: {
+    turbopack: {
       root: path.resolve(__dirname, '../../..'), // Set root to monorepo root
     },
   },

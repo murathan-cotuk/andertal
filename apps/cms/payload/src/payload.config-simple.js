@@ -3,13 +3,9 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import dotenv from 'dotenv'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
-
-// Load environment
-dotenv.config({ path: path.resolve(dirname, '../.env.local') })
 
 // Check required env vars
 const mongoUrl = process.env.PAYLOAD_MONGO_URL || process.env.DATABASE_URI

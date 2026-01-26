@@ -10,8 +10,13 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "dependencies": {
+    "@medusajs/admin": "^7.1.18",
+    "@medusajs/admin-ui": "^2.1.18",
     "@sentry/nextjs": "^10.35.0",
+    "better-sqlite3": "^12.6.2",
     "cross-env": "^7.0.3",
+    "dotenv": "^17.2.3",
+    "medusa": "^0.0.3",
     "next": "16.0.10",
     "scheduler": "^0.27.0"
   },
@@ -24,7 +29,8 @@
   "workspaces": [
     "apps/*",
     "packages/*",
-    "apps/cms/*"
+    "apps/cms/*",
+    "apps/medusa-backend"
   ],
   "overrides": {
     "esbuild": "^0.25.0",
