@@ -1,48 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useMutation, useQuery, gql } from "@apollo/client";
 import styled from "styled-components";
 import { Card, Button, Input } from "@belucha/ui";
-
-const CREATE_PRODUCT = gql`
-  mutation CreateProduct($data: JSON!) {
-    createProducts(data: $data) {
-      id
-      title
-      price
-      inventory
-      status
-    }
-  }
-`;
-
-const GET_SELLERS = gql`
-  query GetSellers {
-    Sellers(limit: 10) {
-      docs {
-        id
-        storeName
-      }
-    }
-  }
-`;
-
-const GET_CATEGORIES = gql`
-  query GetCategories {
-    Categories(limit: 500, sort: "name") {
-      docs {
-        id
-        name
-        slug
-        parent {
-          id
-          name
-        }
-      }
-    }
-  }
-`;
+import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const Container = styled.div`
   max-width: 1200px;
@@ -314,31 +275,53 @@ export default function SingleUploadPage() {
     status: "draft",
     seller: "",
     categories: [],
+    collection_id: "", // Collection slug (from Admin Hub category with has_collection=true)
     variants: [],
   });
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesError, setCategoriesError] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const medusaClient = getMedusaAdminClient();
 
-  const { data: sellersData, loading: sellersLoading } = useQuery(GET_SELLERS);
-  const { data: categoriesData, loading: categoriesLoading, error: categoriesError } = useQuery(GET_CATEGORIES);
-  const [createProduct, { loading: creating }] = useMutation(CREATE_PRODUCT);
-
-  const categories = categoriesData?.Categories?.docs || [];
+  // Fetch categories from Admin Hub (platform owner managed)
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        // Admin Hub kategorilerini çek (read-only)
+        const data = await medusaClient.getAdminHubCategories();
+        setCategories(data.categories || []);
+      } catch (error) {
+        console.error('Error fetching Admin Hub categories:', error);
+        setCategoriesError(error);
+        setCategories([]);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   // Debug: Log categories data
   useEffect(() => {
-    if (categoriesData) {
+    if (categories.length > 0) {
       console.log('Categories loaded:', categories.length, categories);
     }
     if (categoriesError) {
       console.error('Categories error:', categoriesError);
     }
-  }, [categoriesData, categoriesError, categories.length]);
+  }, [categories, categoriesError]);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const categoryDropdownRef = useRef(null);
 
-  // Group categories by parent
+  // Group categories by parent (Admin Hub categories have parent_id)
   const groupedCategories = categories.reduce((acc, cat) => {
-    const parentName = cat.parent?.name || "Main Categories";
+    // Admin Hub categories: parent_id field, not parent object
+    const parentName = cat.parent_id 
+      ? (categories.find(p => p.id === cat.parent_id)?.name || "Subcategories")
+      : "Main Categories";
     if (!acc[parentName]) acc[parentName] = [];
     acc[parentName].push(cat);
     return acc;
@@ -391,20 +374,10 @@ export default function SingleUploadPage() {
   // Get seller ID from localStorage (set during login)
   useEffect(() => {
     const sellerId = localStorage.getItem("sellerId");
-    if (sellerId && sellersData?.Sellers?.docs) {
-      // Check if seller exists in the list
-      const seller = sellersData.Sellers.docs.find((s) => s.id === sellerId);
-      if (seller) {
-        setFormData((prev) => ({ ...prev, seller: sellerId }));
-      } else if (sellersData.Sellers.docs.length > 0) {
-        // Fallback to first seller if logged-in seller not found
-        setFormData((prev) => ({ ...prev, seller: sellersData.Sellers.docs[0].id }));
-      }
-    } else if (sellersData?.Sellers?.docs?.length > 0) {
-      // If no sellerId in localStorage, use first seller
-      setFormData((prev) => ({ ...prev, seller: sellersData.Sellers.docs[0].id }));
+    if (sellerId) {
+      setFormData((prev) => ({ ...prev, seller: sellerId }));
     }
-  }, [sellersData]);
+  }, []);
 
   const addVariant = () => {
     setFormData({
@@ -476,20 +449,12 @@ export default function SingleUploadPage() {
       // Slug oluştur (backend için - SKU'dan otomatik)
       const slug = SKU.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
-      let sellerId = formData.seller;
-      
-      // If no seller selected, try to get from localStorage or use first available
-      if (!sellerId) {
-        sellerId = localStorage.getItem("sellerId");
-        if (!sellerId && sellersData?.Sellers?.docs?.length > 0) {
-          sellerId = sellersData.Sellers.docs[0].id;
-        }
-      }
+      let sellerId = formData.seller || localStorage.getItem("sellerId");
 
       if (!sellerId) {
         setMessage({
           type: "error",
-          text: "Unable to determine seller account. Please log out and log in again.",
+          text: "Seller ID is required. Please log in again.",
         });
         return;
       }
@@ -507,6 +472,18 @@ export default function SingleUploadPage() {
           })),
         }));
 
+      // Admin Hub category ID'sini metadata'ya ekle
+      const metadata = {}
+      if (formData.categories.length > 0) {
+        // İlk kategori ID'sini metadata'ya ekle (Admin Hub category ID)
+        const selectedCategory = categories.find((cat) => 
+          formData.categories.includes(cat.id) || formData.categories.includes(cat.slug)
+        )
+        if (selectedCategory) {
+          metadata.admin_category_id = selectedCategory.id
+        }
+      }
+
       const productData = {
         title: formData.title,
         slug: slug,
@@ -516,15 +493,13 @@ export default function SingleUploadPage() {
         inventory: parseInt(formData.inventory) || 0,
         status: formData.status,
         seller: sellerId,
-        category: formData.categories.length > 0 ? formData.categories : undefined,
+        collection_id: formData.collection_id || undefined, // Medusa collection handle (category slug)
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         variants: validVariants.length > 0 ? validVariants : undefined,
       };
 
-      await createProduct({
-        variables: {
-          data: productData,
-        },
-      });
+      setCreating(true);
+      const result = await medusaClient.createProduct(productData);
 
       setMessage({ type: "success", text: "Product created successfully!" });
       setFormData({
@@ -536,6 +511,7 @@ export default function SingleUploadPage() {
         status: "draft",
         seller: sellerId,
         categories: [],
+        collection_id: "",
         variants: [],
       });
     } catch (error) {
@@ -544,13 +520,13 @@ export default function SingleUploadPage() {
         type: "error",
         text: error.message || "An error occurred while creating the product",
       });
+    } finally {
+      setCreating(false);
     }
   };
 
-  const sellers = sellersData?.Sellers?.docs || [];
-
-  // Show loading state
-  if (sellersLoading) {
+  // Show loading state while categories are loading
+  if (categoriesLoading) {
     return (
       <Container>
         <Title>Single Product Upload</Title>
@@ -638,17 +614,29 @@ export default function SingleUploadPage() {
                       Error loading categories: {categoriesError.message}
                       <br />
                       <small style={{ marginTop: "8px", display: "block", fontSize: "12px" }}>
-                        Check GraphQL API connection
+                        Check Medusa backend connection (http://localhost:9000)
                       </small>
                     </div>
                   ) : categories.length === 0 ? (
                     <div style={{ padding: "16px", textAlign: "center", color: "#6b7280" }}>
                       <i className="fas fa-info-circle" style={{ marginRight: "8px" }} />
-                      No categories found. Please run the seed script:
-                      <br />
-                      <code style={{ marginTop: "8px", display: "block", fontSize: "12px", color: "#374151" }}>
-                        cd apps/cms/payload && npm run seed:categories
-                      </code>
+                      {categoriesError ? (
+                        <>
+                          Error loading categories: {categoriesError.message}
+                          <br />
+                          <small style={{ marginTop: "8px", display: "block", fontSize: "12px" }}>
+                            Check if Medusa backend is running on http://localhost:9000
+                          </small>
+                        </>
+                      ) : (
+                        <>
+                          No categories found. Önce Admin Panel'den kategori ekleyin (has_collection açık).
+                          <br />
+                          <small style={{ marginTop: "8px", display: "block", fontSize: "12px" }}>
+                            Backend is running. Categories will appear here once created.
+                          </small>
+                        </>
+                      )}
                     </div>
                   ) : Object.keys(groupedCategories).length === 0 ? (
                     <div style={{ padding: "16px", textAlign: "center", color: "#6b7280" }}>
@@ -728,21 +716,16 @@ export default function SingleUploadPage() {
               </Select>
             </div>
 
-            {sellers.length > 0 && (
-              <div>
-                <Label>Seller</Label>
-                <Select
-                  value={formData.seller || sellers[0]?.id || ""}
-                  onChange={(e) => setFormData({ ...formData, seller: e.target.value })}
-                >
-                  {sellers.map((seller) => (
-                    <option key={seller.id} value={seller.id}>
-                      {seller.storeName}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            )}
+            <div>
+              <Label>Seller ID</Label>
+              <Input
+                type="text"
+                value={formData.seller || localStorage.getItem("sellerId") || ""}
+                onChange={(e) => setFormData({ ...formData, seller: e.target.value })}
+                placeholder="Seller ID (auto-filled from login)"
+                readOnly={!!localStorage.getItem("sellerId")}
+              />
+            </div>
           </FormRow>
 
           {/* Product Variants Section */}

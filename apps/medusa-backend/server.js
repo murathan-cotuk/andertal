@@ -1,140 +1,152 @@
 /**
- * Medusa v2 Production Server for Render
+ * Medusa v2 Backend Server
  * 
- * Medusa v2 API'lerini Express ile entegre eder
+ * GERÇEK Medusa v2 framework kullanıyor
  */
 
-require('dotenv').config({ path: '.env.local' })
+// Environment variables yükle (en üstte)
+require('dotenv').config()
+try {
+  require('dotenv').config({ path: '.env.local' })
+} catch (e) {
+  // .env.local yoksa sorun değil
+}
 
-const express = require('express')
-const cors = require('cors')
-const medusaConfig = require('./medusa-config.js')
+const { MedusaAppLoader } = require('@medusajs/framework')
+const path = require('path')
 
-// Render'da PORT environment variable'ı otomatik olarak set edilir
 const PORT = process.env.PORT || 9000
 const HOST = process.env.HOST || '0.0.0.0'
 
-const app = express()
-
-// CORS configuration
-const storeCors = process.env.STORE_CORS || 'http://localhost:3000'
-const adminCors = process.env.ADMIN_CORS || 'http://localhost:7001'
-
-app.use(cors({
-  origin: [storeCors, adminCors],
-  credentials: true,
-}))
-
-// Body parser middleware
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
-    message: 'Medusa backend is running',
-    port: PORT,
-    timestamp: new Date().toISOString()
-  })
-})
-
-// Medusa v2 API'lerini başlat
-async function startMedusa() {
+async function start() {
   try {
-    console.log('Initializing Medusa v2...')
-    
-    // Medusa v2'yi yükle
-    const { loadMedusaApp } = require('@medusajs/framework')
-    
-    // Medusa app'i yükle
-    const medusaApp = await loadMedusaApp({
-      projectConfig: medusaConfig.projectConfig,
+    console.log('\n🚀 Medusa v2 backend başlatılıyor...\n')
+
+    // Config ve PostgreSQL bağlantısını yükle (MedusaAppLoader'dan önce)
+    try {
+      // Medusa v2 config loader'ını dene
+      let configLoader
+      try {
+        configLoader = require('@medusajs/framework/dist/config/loader').configLoader
+      } catch (e1) {
+        try {
+          configLoader = require('@medusajs/framework/config/loader').configLoader
+        } catch (e2) {
+          // Config loader bulunamadı, MedusaAppLoader kendi yükler
+          console.log('ℹ️  Config loader bulunamadı, MedusaAppLoader kendi yükleyecek')
+        }
+      }
+
+      if (configLoader) {
+        console.log('📋 Config yükleniyor...')
+        await configLoader(path.resolve(__dirname), 'medusa-config')
+        console.log('✅ Config yüklendi')
+      }
+
+      // PostgreSQL connection loader'ını dene
+      let pgConnectionLoader
+      try {
+        pgConnectionLoader = require('@medusajs/framework/dist/database/pg-connection-loader').pgConnectionLoader
+      } catch (e1) {
+        try {
+          pgConnectionLoader = require('@medusajs/framework/database/pg-connection-loader').pgConnectionLoader
+        } catch (e2) {
+          // PG connection loader bulunamadı, MedusaAppLoader kendi yükler
+          console.log('ℹ️  PG connection loader bulunamadı, MedusaAppLoader kendi yükleyecek')
+        }
+      }
+
+      if (pgConnectionLoader) {
+        console.log('🗄️  PostgreSQL bağlantısı yükleniyor...')
+        await pgConnectionLoader()
+        console.log('✅ PostgreSQL bağlantısı yüklendi')
+      }
+    } catch (configError) {
+      console.warn('⚠️  Config/PG loader hatası (MedusaAppLoader kendi yükleyecek):', configError.message)
+    }
+
+    // MedusaAppLoader'ı başlat
+    const app = new MedusaAppLoader({
+      directory: path.resolve(__dirname),
+      // Alternatif: medusaConfigPath ve cwd kullanılabilir
+      // medusaConfigPath: path.join(__dirname, 'medusa-config.js'),
+      // cwd: __dirname,
     })
 
-    // Medusa API routes'larını Express app'e ekle
-    // Medusa v2'de API routes'ları otomatik olarak yüklenir
-    app.use('/store', medusaApp.storeRoutes)
-    app.use('/admin', medusaApp.adminRoutes)
+    const { app: expressApp, container } = await app.load()
 
-    console.log('Medusa v2 initialized successfully')
-    console.log(`Store API: http://${HOST}:${PORT}/store`)
-    console.log(`Admin API: http://${HOST}:${PORT}/admin`)
-    
-  } catch (error) {
-    console.error('Error initializing Medusa:', error)
-    
-    // Medusa başlatılamazsa, placeholder API'ler ekle
-    console.log('Falling back to placeholder APIs...')
-    
-    // Placeholder store API endpoints
-    app.get('/store/products', (req, res) => {
-      res.json({ products: [], count: 0 })
-    })
-    
-    app.get('/store/products/:id', (req, res) => {
-      res.status(404).json({ message: 'Product not found' })
-    })
-    
-    app.post('/store/carts', (req, res) => {
-      res.json({ cart: { id: 'placeholder', items: [] } })
-    })
-    
-    app.get('/store/carts/:id', (req, res) => {
-      res.status(404).json({ message: 'Cart not found' })
-    })
-    
-    app.get('/store/regions', (req, res) => {
-      res.json({ regions: [] })
-    })
-    
-    app.post('/store/customers', (req, res) => {
-      res.status(201).json({ customer: { id: 'placeholder' } })
-    })
-    
-    app.post('/store/auth/token', (req, res) => {
-      res.status(401).json({ message: 'Authentication not available' })
-    })
-  }
-}
+    // RegionService'in register edildiğini kontrol et
+    try {
+      const regionService = container.resolve("regionService")
+      console.log("✅ RegionService container'da mevcut")
+    } catch (e) {
+      console.warn("⚠️  RegionService container'da bulunamadı, loader çalıştırılıyor...")
+      const regionServiceLoader = require("./loaders/region-service-loader").default
+      await regionServiceLoader(container)
+    }
 
-// Server'ı başlat
-async function startServer() {
-  try {
-    // Medusa'yı başlat
-    await startMedusa()
-    
-    // Express server'ı başlat
-    const server = app.listen(PORT, HOST, () => {
-      console.log(`\n🚀 Medusa backend server started`)
+    // AdminHubService'in register edildiğini kontrol et
+    try {
+      const adminHubService = container.resolve("adminHubService")
+      console.log("✅ AdminHubService container'da mevcut")
+    } catch (e) {
+      console.warn("⚠️  AdminHubService container'da bulunamadı, loader çalıştırılıyor...")
+      const adminHubServiceLoader = require("./loaders/admin-hub-service-loader").default
+      await adminHubServiceLoader(container)
+    }
+
+    // Server'ı başlat
+    expressApp.listen(PORT, HOST, () => {
+      console.log(`\n✅ GERÇEK Medusa v2 backend başarıyla başlatıldı!`)
       console.log(`📍 Listening on ${HOST}:${PORT}`)
-      console.log(`🌐 Health check: http://${HOST}:${PORT}/health`)
-      console.log(`🛍️  Store API: http://${HOST}:${PORT}/store`)
-      console.log(`⚙️  Admin API: http://${HOST}:${PORT}/admin\n`)
+      console.log(`🌐 Health check: http://localhost:${PORT}/health`)
+      console.log(`🛍️  Store API: http://localhost:${PORT}/store`)
+      console.log(`⚙️  Admin API: http://localhost:${PORT}/admin`)
+      console.log(`\n📝 Mode: GERÇEK Medusa v2 (Production-ready)`)
+      console.log(`🗄️  Database: ${process.env.DATABASE_TYPE || 'PostgreSQL'}`)
+      console.log(`\n✅ Sellercentral → Medusa ProductService → PostgreSQL → Shop app`)
+      console.log(`🌍 Region/Market desteği aktif`)
+      console.log(`\n📋 Custom Endpoints (Medusa v2 native):`)
+      console.log(`   POST /admin/regions - Yeni region oluştur`)
+      console.log(`   GET /admin/regions - Region'ları listele`)
+      console.log(`   POST /admin/regions/:id/products - Ürünü region'a bağla`)
+      console.log(`   DELETE /admin/regions/:id/products/:productId - Ürünü region'dan ayır`)
+      console.log(`   GET /admin/product-categories - Kategorileri listele`)
+      console.log(`   POST /admin/product-categories - Yeni kategori oluştur`)
+      console.log(`   GET /store/products?region=DE - Medusa ProductService + RegionService filtre`)
+      console.log(`\n🎯 Admin Hub Endpoints (Super Admin):`)
+      console.log(`   GET /admin-hub/categories - Kategorileri listele`)
+      console.log(`   POST /admin-hub/categories - Yeni kategori oluştur`)
+      console.log(`   PUT /admin-hub/categories/:id - Kategori güncelle`)
+      console.log(`   DELETE /admin-hub/categories/:id - Kategori sil`)
+      console.log(`   GET /admin-hub/banners - Banner'ları listele`)
+      console.log(`   POST /admin-hub/banners - Yeni banner oluştur`)
+      console.log(`   PUT /admin-hub/banners/:id - Banner güncelle`)
+      console.log(`   DELETE /admin-hub/banners/:id - Banner sil\n`)
     })
 
     // Graceful shutdown
     process.on('SIGTERM', () => {
-      console.log('SIGTERM received, shutting down gracefully')
-      server.close(() => {
+      console.log('\nSIGTERM received, shutting down gracefully')
+      expressApp.close(() => {
         console.log('Server closed')
         process.exit(0)
       })
     })
 
     process.on('SIGINT', () => {
-      console.log('SIGINT received, shutting down gracefully')
-      server.close(() => {
+      console.log('\nSIGINT received, shutting down gracefully')
+      expressApp.close(() => {
         console.log('Server closed')
         process.exit(0)
       })
     })
-    
+
   } catch (error) {
-    console.error('Error starting server:', error)
+    console.error('\n❌ Medusa v2 başlatma hatası:')
+    console.error(error)
     process.exit(1)
   }
 }
 
-// Server'ı başlat
-startServer()
+start()

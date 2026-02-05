@@ -193,7 +193,7 @@ export default function BulkUploadPage() {
     }
 
     setUploadStatus("Uploading...");
-    // TODO: Implement actual upload logic with GraphQL mutation
+    // TODO: Implement actual upload logic with Medusa REST API
     setTimeout(() => {
       setUploadStatus("Upload successful! Processing products...");
     }, 2000);

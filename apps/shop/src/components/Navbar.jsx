@@ -67,14 +67,62 @@ const CategoriesMenu = styled.div`
   display: flex;
   gap: 24px;
   align-items: center;
+  flex-wrap: wrap;
 `;
 
 const CategoryLink = styled(Link)`
   color: #374151;
   font-weight: 500;
   transition: color 0.2s ease;
+  text-decoration: none;
 
   &:hover {
+    color: #0ea5e9;
+  }
+`;
+
+const CategoryDropdown = styled.div`
+  position: relative;
+  display: inline-block;
+`;
+
+const CategoryButton = styled.button`
+  color: #374151;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: #0ea5e9;
+  }
+`;
+
+const SubcategoryMenu = styled.div`
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  min-width: 200px;
+  padding: 8px 0;
+  z-index: 1000;
+  display: ${props => props.$isOpen ? 'block' : 'none'};
+`;
+
+const SubcategoryLink = styled(Link)`
+  display: block;
+  padding: 8px 16px;
+  color: #374151;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
     color: #0ea5e9;
   }
 `;
@@ -215,19 +263,23 @@ export default function Navbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [openCategoryId, setOpenCategoryId] = useState(null);
   const { isAuthenticated, user, logout } = useAuth();
 
-  // Fetch categories from Medusa
+  // Fetch category tree from Admin Hub
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         setLoading(true);
-        const client = getMedusaClient();
-        // Medusa doesn't have categories endpoint by default, using products with grouping
-        // For now, we'll use a simple static list or fetch from products
-        setCategories([]);
+        const MEDUSA_BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'http://localhost:9000';
+        const response = await fetch(`${MEDUSA_BACKEND_URL}/admin-hub/categories?tree=true&is_visible=true`);
+        if (!response.ok) throw new Error("Failed to fetch categories");
+        
+        const data = await response.json();
+        setCategories(data.tree || []);
       } catch (error) {
         console.error('Failed to fetch categories:', error);
+        setCategories([]);
       } finally {
         setLoading(false);
       }
@@ -262,6 +314,50 @@ export default function Navbar() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </SearchBar>
+        <CategoriesMenu>
+          {loading ? (
+            <span style={{ color: "#6b7280" }}>Loading...</span>
+          ) : categories.length > 0 ? (
+            categories.map((category: any) => {
+              const hasChildren = category.children && category.children.length > 0;
+              const hasCollection = category.has_collection;
+              
+              if (hasChildren) {
+                return (
+                  <CategoryDropdown
+                    key={category.id}
+                    onMouseEnter={() => setOpenCategoryId(category.id)}
+                    onMouseLeave={() => setOpenCategoryId(null)}
+                  >
+                    <CategoryButton>{category.name}</CategoryButton>
+                    <SubcategoryMenu $isOpen={openCategoryId === category.id}>
+                      {hasCollection && (
+                        <SubcategoryLink href={`/collections/${category.slug}`}>
+                          {category.name} (All)
+                        </SubcategoryLink>
+                      )}
+                      {category.children.map((child: any) => (
+                        <SubcategoryLink
+                          key={child.id}
+                          href={child.has_collection ? `/collections/${child.slug}` : '#'}
+                        >
+                          {child.name}
+                        </SubcategoryLink>
+                      ))}
+                    </SubcategoryMenu>
+                  </CategoryDropdown>
+                );
+              } else if (hasCollection) {
+                return (
+                  <CategoryLink key={category.id} href={`/collections/${category.slug}`}>
+                    {category.name}
+                  </CategoryLink>
+                );
+              }
+              return null;
+            })
+          ) : null}
+        </CategoriesMenu>
         <RightMenu>
           <ProfileMenu data-dropdown>
             <ProfileButton onClick={() => setIsDropdownOpen(!isDropdownOpen)}>

@@ -1,6 +1,6 @@
 # Belucha - E-commerce Marketplace Monorepo
 
-A complete e-commerce marketplace platform built with Turborepo, featuring a customer-facing shop, seller dashboard, and Payload CMS backend.
+A complete e-commerce marketplace platform built with Turborepo, featuring a customer-facing shop, seller dashboard, and Medusa v2 backend.
 
 ## 🏗️ Project Structure
 
@@ -9,11 +9,11 @@ belucha/
 ├── apps/
 │   ├── shop/              # Customer-facing Next.js 14 store
 │   ├── sellercentral/     # Seller dashboard Next.js 14 app
-│   └── cms/
-│       └── payload/       # Payload CMS backend
+│   ├── admin/             # Super Admin Panel (Next.js 14)
+│   └── medusa-backend/    # Medusa v2 backend (REST API)
 ├── packages/
 │   ├── ui/                # Shared design system components
-│   ├── lib/               # Shared utilities (Apollo, Stripe, SEO)
+│   ├── lib/               # Shared utilities (Stripe, SEO)
 │   └── config/            # Shared configs (Tailwind, ESLint, TypeScript)
 └── turbo.json             # Turborepo configuration
 ```
@@ -23,8 +23,8 @@ belucha/
 ### Prerequisites
 
 - Node.js 18+ and npm 9+
-- MongoDB database (local or cloud)
-- Stripe account for payments
+- PostgreSQL database (local or cloud) or SQLite for development
+- Stripe account for payments (optional)
 
 ### Installation
 
@@ -41,60 +41,91 @@ belucha/
 
 3. **Set up environment variables**
 
-   Create `.env` files in each app directory:
-
-   **Root `.env` (optional for local development)**
+   **`apps/medusa-backend/.env.local`**
    ```env
-   # Shared environment variables
-   ```
-
-   **`apps/cms/payload/.env`**
-   ```env
-   PAYLOAD_SECRET=your-secret-key-here
-   PAYLOAD_PUBLIC_SERVER_URL=http://localhost:3001
-   PORT=3001
-   PAYLOAD_MONGO_URL=mongodb://localhost:27017/belucha
-   # Or use MONGODB_URI for cloud MongoDB (MongoDB Atlas, etc.)
-   # MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/belucha
+   DATABASE_URL=postgres://user:password@localhost:5432/medusa-db
+   # Or for SQLite (development):
+   # DATABASE_URL=file:./medusa.db
+   # DATABASE_TYPE=sqlite
+   
+   PORT=9000
+   STORE_CORS=http://localhost:3000
+   ADMIN_CORS=http://localhost:3002,http://localhost:7001
+   REDIS_URL=redis://localhost:6379
+   JWT_SECRET=your-jwt-secret
+   COOKIE_SECRET=your-cookie-secret
    ```
 
    **`apps/shop/.env.local`**
    ```env
-   NEXT_PUBLIC_PAYLOAD_GRAPHQL_URL=http://localhost:3001/api/graphql
-   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
+   NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://localhost:9000
    ```
 
    **`apps/sellercentral/.env.local`**
    ```env
-   NEXT_PUBLIC_PAYLOAD_GRAPHQL_URL=http://localhost:3001/api/graphql
-   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
+   NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://localhost:9000
    ```
 
-   **Root `.env` (for Stripe server-side)**
+   **`apps/admin/.env.local`**
    ```env
-   STRIPE_SECRET_KEY=your-stripe-secret-key
+   NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://localhost:9000
    ```
 
-4. **Set up MongoDB**
+4. **Set up database**
 
-   - Install MongoDB locally or use MongoDB Atlas (cloud)
-   - For local: MongoDB should be running on `mongodb://localhost:27017`
-   - For cloud: Get your connection string from MongoDB Atlas
-   - Update `PAYLOAD_MONGO_URL` or `MONGODB_URI` in `apps/cms/payload/.env`
+   - For PostgreSQL: Create a database and update `DATABASE_URL`
+   - For SQLite: Database file will be created automatically
 
-5. **Set up Stripe**
+5. **Run migrations**
 
-   - Create a Stripe account
-   - Get your API keys (publishable and secret)
-   - Configure webhooks for order processing
-   - Set up Stripe Connect for seller payouts
-
-6. **Initialize Payload CMS**
-
+   **Linux/Mac:**
    ```bash
-   cd apps/cms/payload
-   npm run generate:types
+   cd apps/medusa-backend
+   npx medusa migrations run
    ```
+
+   **Windows PowerShell:**
+   ```powershell
+   cd apps/medusa-backend
+   npx medusa migrations run
+   ```
+
+   **⚠️ Migration Hatası Durumunda:**
+   
+   Eğer `npx medusa migrations run` hata verirse (ör. `ERR_INVALID_ARG_TYPE`), migration'ları manuel çalıştırın:
+   
+   **Alternatif 1: Script ile (TypeORM)**
+   ```bash
+   cd apps/medusa-backend
+   npm run run-migrations
+   ```
+   
+   **Alternatif 2: SQL ile (PostgreSQL)**
+   ```sql
+   ALTER TABLE admin_hub_categories
+   ADD COLUMN IF NOT EXISTS is_visible boolean DEFAULT true,
+   ADD COLUMN IF NOT EXISTS has_collection boolean DEFAULT false;
+   ```
+   
+   **Not:** Medusa v2 bazen kendi ORM'ini kullandığı için TypeORM migration script'i uyumlu olmayabilir. O durumda SQL ile manuel ekleme yapın.
+
+6. **Start the backend**
+
+   **Linux/Mac:**
+   ```bash
+   cd apps/medusa-backend
+   node server.js
+   # Or: npx medusa develop
+   ```
+
+   **Windows PowerShell:**
+   ```powershell
+   cd apps/medusa-backend
+   node server.js
+   # Or: npx medusa develop
+   ```
+   
+   **Not:** PowerShell'de `&&` çalışmaz, komutları ayrı satırlarda çalıştırın veya `;` kullanın.
 
 ## 🛠️ Development
 
@@ -105,23 +136,28 @@ npm run dev
 ```
 
 This will start:
+- **Medusa Backend**: http://localhost:9000
 - **Shop app**: http://localhost:3000
 - **Sellercentral app**: http://localhost:3002
-- **Payload CMS**: http://localhost:3001
+- **Admin Panel**: http://localhost:7001 (or configured port)
 
 ### Run individual apps
 
+**IMPORTANT:** Always start the backend first:
+
 ```bash
-# Shop app only
+# 1. Start Medusa backend first
+cd apps/medusa-backend
+node server.js
+
+# 2. Then start frontend apps (in separate terminals)
 cd apps/shop
 npm run dev
 
-# Sellercentral app only
 cd apps/sellercentral
 npm run dev
 
-# Payload CMS only
-cd apps/cms/payload
+cd apps/admin
 npm run dev
 ```
 
@@ -151,7 +187,8 @@ Customer-facing e-commerce store built with Next.js 14 App Router.
 
 **Features:**
 - Product browsing and search
-- Category navigation
+- Category navigation (from Admin Hub)
+- Collection pages (`/collections/:slug`)
 - Product detail pages
 - Shopping cart (to be implemented)
 - Checkout with Stripe (to be implemented)
@@ -159,7 +196,7 @@ Customer-facing e-commerce store built with Next.js 14 App Router.
 **Tech Stack:**
 - Next.js 14 (App Router)
 - Tailwind CSS + Styled Components
-- Apollo Client (GraphQL)
+- Medusa REST API client
 - Aeonik font family
 
 ### 📦 Sellercentral App (`apps/sellercentral`)
@@ -169,38 +206,49 @@ Complete seller dashboard for managing products, orders, and analytics.
 **Features:**
 - Dashboard with statistics
 - Inventory management
-- Media library
-- Analytics and reports
-- Product management
-- Brand management
+- Product management (create, update, delete)
+- Collection assignment for products
+- Categories view (read-only, from Admin Hub)
 - Store settings
-- Apps marketplace
-- Seller registration (free, 10% commission)
+- Seller registration
 
 **Tech Stack:**
 - Next.js 14 (App Router)
 - Tailwind CSS + Styled Components
-- Apollo Client (GraphQL)
+- Medusa REST API client
 - Shared UI components
 
-### 🗄️ Payload CMS (`apps/cms/payload`)
+### 🎛️ Admin Panel (`apps/admin`)
 
-Headless CMS backend with GraphQL API.
-
-**Collections:**
-- **Products**: Product catalog with images, pricing, inventory
-- **Categories**: Product categories with hierarchy
-- **Brands**: Brand information
-- **Sellers**: Seller accounts with Stripe Connect integration
-- **Customers**: Customer profiles
-- **Orders**: Order management with commission tracking
-- **Media**: Media library for images and files
+Super Admin Panel for platform owners to manage global data.
 
 **Features:**
-- GraphQL API enabled
-- MongoDB database
-- Admin panel at `/admin`
-- File uploads to local storage or cloud storage
+- Category management (create, update, delete)
+- Collection sync (categories with `has_collection=true`)
+- Banner management (to be implemented)
+- Platform settings (to be implemented)
+
+**Tech Stack:**
+- Next.js 14 (App Router)
+- Tailwind CSS + Styled Components
+- Medusa REST API client
+
+### 🔧 Medusa Backend (`apps/medusa-backend`)
+
+Medusa v2 backend with REST API.
+
+**Features:**
+- Product management (Medusa core)
+- Custom Admin Hub entities (Categories, Banners)
+- Region/Market support
+- Collection management
+- Store and Admin API endpoints
+
+**Tech Stack:**
+- Medusa v2
+- TypeORM
+- PostgreSQL or SQLite
+- Express.js
 
 ## 📚 Shared Packages
 
@@ -215,7 +263,6 @@ Shared design system components:
 ### `@belucha/lib`
 
 Shared utilities and configurations:
-- **Apollo Client**: GraphQL client setup
 - **Stripe**: Payment processing and commission calculations
 - **SEO**: Meta tag generation helpers
 
@@ -228,65 +275,73 @@ Shared configurations:
 
 ## 🔌 Integrations
 
-### MongoDB
+### PostgreSQL / SQLite
 
 Used for:
-- Primary database (via Payload CMS)
-- All data storage (products, orders, sellers, customers, etc.)
-- Media metadata storage
+- Primary database (via Medusa v2)
+- All data storage (products, orders, categories, regions, etc.)
+- Medusa core entities + custom Admin Hub entities
+
+### Medusa v2 REST API
+
+All apps use Medusa REST API client to consume the backend:
+- Store API (`/store/*`) - Public endpoints for shop
+- Admin API (`/admin/*`) - Admin endpoints for sellercentral
+- Admin Hub API (`/admin-hub/*`) - Super admin endpoints
 
 ### Stripe
 
 Used for:
-- Payment processing
-- Checkout sessions
-- Seller payouts (10% commission deducted)
-- Stripe Connect for seller accounts
-
-### Apollo GraphQL
-
-All apps use Apollo Client to consume the Payload CMS GraphQL API.
+- Payment processing (to be implemented)
+- Checkout sessions (to be implemented)
+- Seller payouts (to be implemented)
 
 ## 🚢 Deployment
 
-### Vercel Deployment
+### Backend (Medusa)
 
-Both Next.js apps can be deployed separately on Vercel:
+Deploy to Render, Railway, or any Node.js hosting:
+
+1. **Render Deployment**
+   - Connect your GitHub repo
+   - Set root directory to `apps/medusa-backend`
+   - Build command: `npm install`
+   - Start command: `node server.js`
+   - Add environment variables (see below)
+
+2. **Database**
+   - Set up PostgreSQL (Render, Railway, or cloud provider)
+   - Update `DATABASE_URL` in environment variables
+
+### Frontend Apps (Vercel)
+
+All Next.js apps can be deployed separately on Vercel:
 
 1. **Shop App**
-   - Connect your GitHub repo to Vercel
-   - Set root directory to `apps/shop`
-   - Add environment variables
-   - Deploy
+   - Root directory: `apps/shop`
+   - Add `NEXT_PUBLIC_MEDUSA_BACKEND_URL`
 
 2. **Sellercentral App**
-   - Create a new Vercel project
-   - Set root directory to `apps/sellercentral`
-   - Add environment variables
-   - Deploy
+   - Root directory: `apps/sellercentral`
+   - Add `NEXT_PUBLIC_MEDUSA_BACKEND_URL`
 
-3. **Payload CMS**
-   - Deploy to a Node.js hosting service (Railway, Render, etc.)
-   - Or use Vercel Serverless Functions
-   - Set up MongoDB database (MongoDB Atlas recommended)
-   - Configure environment variables
+3. **Admin Panel**
+   - Root directory: `apps/admin`
+   - Add `NEXT_PUBLIC_MEDUSA_BACKEND_URL`
 
 ### Environment Variables for Production
 
-Make sure to set all required environment variables in your hosting platform:
+**Medusa Backend:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `PORT` - Server port (default: 9000)
+- `STORE_CORS` - Shop app URL
+- `ADMIN_CORS` - Sellercentral and Admin app URLs
+- `REDIS_URL` - Redis connection string (optional)
+- `JWT_SECRET` - JWT secret key
+- `COOKIE_SECRET` - Cookie secret key
 
-**Shop & Sellercentral:**
-- `NEXT_PUBLIC_PAYLOAD_GRAPHQL_URL` - Your Payload CMS GraphQL endpoint
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` - Stripe publishable key
-
-**Payload CMS:**
-- `PAYLOAD_SECRET` - Secret key for Payload
-- `PAYLOAD_PUBLIC_SERVER_URL` - Public URL of your CMS
-- `PAYLOAD_MONGO_URL` or `MONGODB_URI` - MongoDB connection string
-- `PORT` - Server port (default: 3001)
-
-**Server-side (API routes):**
-- `STRIPE_SECRET_KEY` - Stripe secret key
+**Frontend Apps:**
+- `NEXT_PUBLIC_MEDUSA_BACKEND_URL` - Medusa backend URL (e.g., `https://your-backend.onrender.com`)
 
 ## 🔐 Security
 
@@ -299,12 +354,17 @@ Make sure to set all required environment variables in your hosting platform:
 
 ## 📝 Database Schema
 
-The Payload CMS collections define the database schema. Key relationships:
+Medusa v2 uses TypeORM for database management. Key entities:
 
-- Products belong to Sellers and Categories
-- Orders contain Products and belong to Customers
-- Sellers have Stripe Connect accounts for payouts
-- Customers are managed through Payload CMS
+**Medusa Core:**
+- Products, Variants, Collections, Categories
+- Orders, Customers, Regions
+
+**Custom Entities (Admin Hub):**
+- `admin_hub_categories` - Platform categories (with `has_collection`, `is_visible`)
+- `admin_hub_banners` - Platform banners
+- `regions` - Custom market regions
+- `product_regions` - Product-region junction table
 
 ## 🧪 Testing
 
@@ -340,4 +400,4 @@ For issues and questions:
 
 ---
 
-**Built with ❤️ using Turborepo, Next.js, Payload CMS, MongoDB, and Stripe**
+**Built with ❤️ using Turborepo, Next.js, Medusa v2, PostgreSQL, and Stripe**

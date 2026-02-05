@@ -5,18 +5,23 @@
     "lib": ["ES2020"],
     "outDir": "./dist",
     "rootDir": "./",
+    "baseUrl": ".",
     "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./*"]
-    },
-    "allowJs": true
+    "allowJs": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "types": ["node"]
   },
-  "include": ["medusa-config.js"],
+  "include": [
+    "medusa-config.js",
+    "models/**/*",
+    "services/**/*",
+    "api/**/*"
+  ],
   "exclude": ["node_modules", "dist"]
 }

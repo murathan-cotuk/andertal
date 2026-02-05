@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useQuery, gql } from "@apollo/client";
+// GraphQL removed - will migrate to Medusa REST API
 import styled from "styled-components";
 import { Card, Button } from "@belucha/ui";
 import Link from "next/link";

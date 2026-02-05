@@ -1,63 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation, gql } from "@apollo/client";
 import styled from "styled-components";
 import { Card, Button, Input } from "@belucha/ui";
-
-const GET_PRODUCTS = gql`
-  query GetProducts {
-    Products(limit: 50) {
-      docs {
-        id
-        title
-        price
-        inventory
-        status
-        slug
-      }
-    }
-  }
-`;
-
-const CREATE_PRODUCT = gql`
-  mutation CreateProduct($data: JSON!) {
-    createProducts(data: $data) {
-      id
-      title
-      price
-      inventory
-      status
-    }
-  }
-`;
-
-const GET_SELLERS = gql`
-  query GetSellers {
-    Sellers(limit: 10) {
-      docs {
-        id
-        storeName
-      }
-    }
-  }
-`;
-
-const GET_CATEGORIES = gql`
-  query GetCategories {
-    Categories(limit: 500, sort: "name") {
-      docs {
-        id
-        name
-        slug
-        parent {
-          id
-          name
-        }
-      }
-    }
-  }
-`;
+import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const Container = styled.div`
   max-width: 1200px;
@@ -376,12 +322,48 @@ export default function ProductsPage() {
   });
   const [message, setMessage] = useState({ type: "", text: "" });
 
-  const { data: productsData, loading: productsLoading, refetch } = useQuery(GET_PRODUCTS);
-  const { data: sellersData } = useQuery(GET_SELLERS);
-  const { data: categoriesData, loading: categoriesLoading, error: categoriesError } = useQuery(GET_CATEGORIES);
-  const [createProduct, { loading: creating }] = useMutation(CREATE_PRODUCT);
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesError, setCategoriesError] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const medusaClient = getMedusaAdminClient();
 
-  const categories = categoriesData?.Categories?.docs || [];
+  // Fetch products
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setProductsLoading(true);
+        const data = await medusaClient.getProducts();
+        setProducts(data.products || []);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        setProducts([]);
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const data = await medusaClient.getCategories();
+        setCategories(data.product_categories || []);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        setCategoriesError(error);
+        setCategories([]);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   // Debug: Log categories data
   useEffect(() => {
@@ -556,11 +538,12 @@ export default function ProductsPage() {
         variants: validVariants.length > 0 ? validVariants : undefined,
       };
 
-      await createProduct({
-        variables: {
-          data: productData,
-        },
-      });
+      setCreating(true);
+      const result = await medusaClient.createProduct(productData);
+      
+      // Refresh products list
+      const data = await medusaClient.getProducts();
+      setProducts(data.products || []);
 
       setMessage({ type: "success", text: "Product created successfully!" });
       setFormData({
@@ -575,7 +558,7 @@ export default function ProductsPage() {
         variants: [],
       });
       setShowForm(false);
-      refetch();
+      setCreating(false);
     } catch (error) {
       console.error("Error creating product:", error);
       setMessage({
@@ -585,8 +568,8 @@ export default function ProductsPage() {
     }
   };
 
-  const products = productsData?.Products?.docs || [];
-  const sellers = sellersData?.Sellers?.docs || [];
+  // Sellers - şimdilik boş (sellercentral'da seller yönetimi yok)
+  const sellers = [];
 
   return (
     <Container>
@@ -667,7 +650,7 @@ export default function ProductsPage() {
                         Error loading categories: {categoriesError.message}
                         <br />
                         <small style={{ marginTop: "8px", display: "block", fontSize: "12px" }}>
-                          Check GraphQL API connection
+                          Veriler Medusa backend'den yükleniyor
                         </small>
                       </div>
                     ) : categories.length === 0 ? (

@@ -341,6 +341,7 @@ const menuItems = [
       { href: "/products/upload-templates", label: "Upload Templates" },
       { href: "/products/bulk-images", label: "Upload Images Bulk" },
       { href: "/products/bulk-videos", label: "Upload Videos Bulk" },
+      { href: "/categories", label: "Categories" },
     ],
   },
   {
