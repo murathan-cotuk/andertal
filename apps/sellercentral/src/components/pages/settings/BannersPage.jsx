@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { Card, Button, Input } from "@belucha/ui";
+import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const Container = styled.div`
   max-width: 1400px;
@@ -35,9 +36,6 @@ const Section = styled(Card)`
   margin-bottom: 24px;
 `;
 
-const MEDUSA_BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'http://localhost:9000';
-const ADMIN_HUB_API_URL = `${MEDUSA_BACKEND_URL}/admin-hub/v1`;
-
 export default function AdminBannersPage() {
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -49,8 +47,8 @@ export default function AdminBannersPage() {
   const fetchBanners = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${ADMIN_HUB_API_URL}/banners`);
-      const data = await response.json();
+      const client = getMedusaAdminClient();
+      const data = await client.getBanners();
       setBanners(data.banners || []);
     } catch (error) {
       console.error("Error fetching banners:", error);

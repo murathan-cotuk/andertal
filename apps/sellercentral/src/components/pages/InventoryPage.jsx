@@ -5,6 +5,7 @@ import { gql, useQuery } from "@apollo/client";
 import styled from "styled-components";
 import { Card, Button } from "@belucha/ui";
 import Link from "next/link";
+import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const GET_PRODUCTS = gql`
   query GetProducts {

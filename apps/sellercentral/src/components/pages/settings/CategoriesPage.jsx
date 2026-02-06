@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { Card, Button, Input } from "@belucha/ui";
+import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const Container = styled.div`
   max-width: 1400px;
@@ -111,9 +112,6 @@ const CategoryHandle = styled.div`
   font-family: 'Courier New', monospace;
 `;
 
-const MEDUSA_BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'http://localhost:9000';
-const ADMIN_HUB_API_URL = `${MEDUSA_BACKEND_URL}/admin-hub/v1`;
-
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -136,8 +134,8 @@ export default function AdminCategoriesPage() {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${ADMIN_HUB_API_URL}/categories`);
-      const data = await response.json();
+      const client = getMedusaAdminClient();
+      const data = await client.getAdminHubCategories();
       setCategories(data.categories || []);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -157,24 +155,16 @@ export default function AdminCategoriesPage() {
         throw new Error("Name ve slug zorunludur");
       }
 
-      const response = await fetch(`${ADMIN_HUB_API_URL}/categories`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: singleCategory.name,
-          slug: singleCategory.slug,
-          description: singleCategory.description || '',
-          active: true,
-          is_visible: singleCategory.is_visible,
-          has_collection: singleCategory.has_collection,
-          sort_order: 0,
-        }),
+      const client = getMedusaAdminClient();
+      await client.createAdminHubCategory({
+        name: singleCategory.name,
+        slug: singleCategory.slug,
+        description: singleCategory.description || '',
+        active: true,
+        is_visible: singleCategory.is_visible,
+        has_collection: singleCategory.has_collection,
+        sort_order: 0,
       });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(error.message || `HTTP ${response.status}`);
-      }
 
       setMessage({
         type: "success",
@@ -206,26 +196,20 @@ export default function AdminCategoriesPage() {
       const results = [];
       const errors = [];
 
+      const client = getMedusaAdminClient();
       for (const category of categoriesToAdd) {
         try {
-          const response = await fetch(`${ADMIN_HUB_API_URL}/categories`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: category.name,
-              slug: category.slug || category.name.toLowerCase().replace(/\s+/g, '-'),
-              description: category.description || '',
-              parent_id: category.parent_id || null,
-              active: category.active !== undefined ? category.active : true,
-              is_visible: category.is_visible !== undefined ? category.is_visible : true,
-              has_collection: category.has_collection !== undefined ? category.has_collection : true,
-              sort_order: category.sort_order || 0,
-              metadata: category.metadata || null,
-            }),
+          const result = await client.createAdminHubCategory({
+            name: category.name,
+            slug: category.slug || category.name.toLowerCase().replace(/\s+/g, '-'),
+            description: category.description || '',
+            parent_id: category.parent_id || null,
+            active: category.active !== undefined ? category.active : true,
+            is_visible: category.is_visible !== undefined ? category.is_visible : true,
+            has_collection: category.has_collection !== undefined ? category.has_collection : true,
+            sort_order: category.sort_order || 0,
+            metadata: category.metadata || null,
           });
-
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const result = await response.json();
           results.push(result.category);
         } catch (error) {
           errors.push({ category: category.name, error: error.message });

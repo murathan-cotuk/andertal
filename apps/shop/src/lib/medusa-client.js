@@ -49,9 +49,12 @@ class MedusaClient {
 
       return await response.json()
     } catch (error) {
-      // Only log errors in development
       if (process.env.NODE_ENV === 'development') {
         console.error(`Medusa API Error (${endpoint}):`, error)
+      }
+      const isFetchFailure = error.name === 'TypeError' || (error.message && String(error.message).includes('Failed to fetch'))
+      if (isFetchFailure) {
+        throw new Error('Medusa backend is not reachable. Ensure it is running and NEXT_PUBLIC_MEDUSA_BACKEND_URL is correct.')
       }
       throw error
     }
@@ -122,12 +125,23 @@ class MedusaClient {
   }
 
   /**
-   * Categories (via products grouping or custom endpoint)
+   * Categories (storefront public). Options: { tree: true, is_visible: true }
    */
-  async getCategories() {
-    // Medusa doesn't have categories by default, but we can group products
-    // For now, return empty array - will be handled by custom Medusa plugin
-    return this.request('/store/categories').catch(() => ({ categories: [] }))
+  async getCategories(options = {}) {
+    const params = new URLSearchParams()
+    if (options.tree === true) params.set('tree', 'true')
+    if (options.is_visible !== undefined) params.set('is_visible', String(options.is_visible))
+    const qs = params.toString()
+    return this.request(`/store/categories${qs ? `?${qs}` : ''}`).catch(() => ({ categories: [], tree: [] }))
+  }
+
+  /**
+   * Single category by slug (for collection page)
+   */
+  async getCategoryBySlug(slug) {
+    if (!slug) return null
+    const data = await this.request(`/store/categories?slug=${encodeURIComponent(slug)}`)
+    return data.category || (data.categories && data.categories[0]) || null
   }
 
   /**

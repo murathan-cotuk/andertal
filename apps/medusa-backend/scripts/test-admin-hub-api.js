@@ -28,7 +28,7 @@ async function testAdminHubAPI() {
   try {
     // 1. API'ye kategori ekle
     console.log('1️⃣  Kategori ekleniyor...')
-    const createResponse = await fetch(`${MEDUSA_BACKEND_URL}/admin-hub/categories`, {
+    const createResponse = await fetch(`${MEDUSA_BACKEND_URL}/admin-hub/v1/categories`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

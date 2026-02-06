@@ -23,9 +23,9 @@ export default function Home() {
             <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
               <p>⚠️ Products temporarily unavailable</p>
               <p className="text-sm mt-2">
-                {typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-                  ? 'The product catalog is being set up. Please check back soon.'
-                  : 'Medusa backend not available. Please start Medusa backend to see products.'}
+                {typeof window !== 'undefined' && window.location.hostname === 'localhost'
+                  ? 'Start the backend from the repo root: npm run dev --workspace=medusa-backend (or cd apps/medusa-backend && npm run dev). Ensure apps/shop/.env.local has NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://localhost:9000.'
+                  : 'The product catalog is being set up. Please check back soon.'}
               </p>
             </div>
           )}

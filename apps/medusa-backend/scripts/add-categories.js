@@ -93,7 +93,7 @@ async function addCategories() {
     try {
       console.log(`[${categoryNum}/${mainCategories.length}] Ana kategori ekleniyor: ${category.name}...`)
 
-      const response = await fetch(`${MEDUSA_BACKEND_URL}/admin-hub/categories`, {
+      const response = await fetch(`${MEDUSA_BACKEND_URL}/admin-hub/v1/categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -145,7 +145,7 @@ async function addCategories() {
 
       console.log(`[${categoryNum}/${subCategories.length}] Subcategory ekleniyor: ${category.name} (Parent: ${category.parent_slug || 'N/A'})...`)
 
-      const response = await fetch(`${MEDUSA_BACKEND_URL}/admin-hub/categories`, {
+      const response = await fetch(`${MEDUSA_BACKEND_URL}/admin-hub/v1/categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

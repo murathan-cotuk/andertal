@@ -1,12 +1,10 @@
 /**
  * Region Service (Medusa v2 Native)
- * 
- * BaseService extend ediyor
- * Repository pattern kullanıyor
- * Raw SQL yok
+ *
+ * Repository pattern kullanıyor, TypeORM manager ile çalışır.
+ * Raw SQL yok.
  */
 
-import { BaseService } from "@medusajs/framework"
 import { EntityManager, Repository } from "typeorm"
 import { Region } from "../models/region"
 import { ProductRegion } from "../models/product-region"
@@ -15,13 +13,12 @@ type InjectedDependencies = {
   manager: EntityManager
 }
 
-export default class RegionService extends BaseService {
+export default class RegionService {
   protected readonly manager_: EntityManager
   protected readonly regionRepository_: Repository<Region>
   protected readonly productRegionRepository_: Repository<ProductRegion>
 
   constructor(container: InjectedDependencies) {
-    super(container)
     this.manager_ = container.manager
     this.regionRepository_ = this.manager_.getRepository(Region)
     this.productRegionRepository_ = this.manager_.getRepository(ProductRegion)

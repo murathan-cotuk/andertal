@@ -4,9 +4,9 @@
   "main": "medusa-config.js",
   "scripts": {
     "dev": "medusa develop",
-    "start": "node server.js",
-    "build": "medusa build || echo 'Build skipped (TypeScript files compiled at runtime)'",
-    "migrate": "medusa migrations run",
+    "start": "npx --package=@medusajs/cli medusa start -H 0.0.0.0 -p ${PORT:-9000}",
+    "build": "npx --package=@medusajs/cli medusa build || echo 'Build skipped (TypeScript files compiled at runtime)'",
+    "migrate": "npx --package=@medusajs/cli medusa migrations run",
     "run-migrations": "node scripts/run-migrations.js"
   },
   "keywords": [

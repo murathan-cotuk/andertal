@@ -9,17 +9,12 @@ $killedCount = 0
 
 foreach ($port in $ports) {
     Write-Host "Port $port kontrol ediliyor..." -ForegroundColor Cyan
-    
-    # Windows'ta "ABHÖREN" (LISTENING) durumundaki bağlantıları bul
-    $connections = netstat -ano | Select-String ":$port" | Select-String "ABH"
-    
+
+    # Get-NetTCPConnection dil bağımsız (LISTEN = dinlemede)
+    $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+
     if ($connections) {
-        $pids = $connections | ForEach-Object {
-            $line = $_.Line
-            $parts = $line -split '\s+'
-            $parts[-1]
-        } | Where-Object { $_ -match '^\d+$' } | Select-Object -Unique
-        
+        $pids = $connections | Select-Object -ExpandProperty OwningProcess -Unique
         foreach ($processId in $pids) {
             try {
                 $process = Get-Process -Id $processId -ErrorAction SilentlyContinue

@@ -6,14 +6,12 @@ import Footer from "@/components/Footer";
 import { ProductGrid } from "@/components/ProductGrid";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-
-const MEDUSA_BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'http://localhost:9000';
-const ADMIN_HUB_API_URL = `${MEDUSA_BACKEND_URL}/admin-hub/v1`;
+import { getMedusaClient } from "@/lib/medusa-client";
 
 export default function CollectionPage() {
   const params = useParams();
   const slug = params?.slug != null ? String(params.slug) : undefined;
-  
+
   const [category, setCategory] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,27 +23,16 @@ export default function CollectionPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
-        // 1. Fetch category by slug
-        const categoryRes = await fetch(`${ADMIN_HUB_API_URL}/categories?slug=${slug}`);
-        if (!categoryRes.ok) throw new Error("Category not found");
-        
-        const categoryData = await categoryRes.json();
-        const categoryItem = categoryData.categories?.find((c) => c.slug === slug);
-        
+        const client = getMedusaClient();
+
+        const categoryItem = await client.getCategoryBySlug(slug);
         if (!categoryItem || !categoryItem.has_collection) {
           throw new Error("Collection not found");
         }
-        
         setCategory(categoryItem);
 
-        // 2. Fetch products from Medusa collection (handle = slug)
-        const productsRes = await fetch(`${MEDUSA_BACKEND_URL}/store/products?collection_id=${slug}`);
-        if (!productsRes.ok) throw new Error("Failed to fetch products");
-        
-        const productsData = await productsRes.json();
+        const productsData = await client.getProducts({ collection_id: slug });
         setProducts(productsData.products || []);
-        
       } catch (err) {
         setError(err?.message ?? "Error");
       } finally {

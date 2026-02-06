@@ -97,13 +97,73 @@ class MedusaAdminClient {
   }
 
   /**
+   * Create Admin Hub category (POST)
+   */
+  async createAdminHubCategory(data) {
+    return this.request('/admin-hub/v1/categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  /**
+   * Update Admin Hub category (PUT)
+   */
+  async updateAdminHubCategory(id, data) {
+    return this.request(`/admin-hub/v1/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  /**
+   * Delete Admin Hub category (DELETE)
+   */
+  async deleteAdminHubCategory(id) {
+    return this.request(`/admin-hub/v1/categories/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  /**
    * Get collections with collection pages (has_collection = true)
    */
   async getCollections() {
     const data = await this.request('/admin-hub/v1/categories?active=true')
-    // Filter only categories that have collection pages
     const collections = (data.categories || []).filter(cat => cat.has_collection === true)
     return { collections, count: collections.length }
+  }
+
+  /**
+   * Admin Hub Banners
+   */
+  async getBanners(params = {}) {
+    const queryParams = new URLSearchParams(params).toString()
+    return this.request(`/admin-hub/v1/banners${queryParams ? `?${queryParams}` : ''}`)
+  }
+
+  async getBanner(id) {
+    return this.request(`/admin-hub/v1/banners/${id}`)
+  }
+
+  async createBanner(data) {
+    return this.request('/admin-hub/v1/banners', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateBanner(id, data) {
+    return this.request(`/admin-hub/v1/banners/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteBanner(id) {
+    return this.request(`/admin-hub/v1/banners/${id}`, {
+      method: 'DELETE',
+    })
   }
 
   /**

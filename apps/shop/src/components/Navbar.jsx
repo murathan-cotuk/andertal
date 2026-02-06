@@ -266,17 +266,14 @@ export default function Navbar() {
   const [openCategoryId, setOpenCategoryId] = useState(null);
   const { isAuthenticated, user, logout } = useAuth();
 
-  // Fetch category tree from Admin Hub
+  // Fetch category tree via client only
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         setLoading(true);
-        const MEDUSA_BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'http://localhost:9000';
-        const response = await fetch(`${MEDUSA_BACKEND_URL}/admin-hub/v1/categories?tree=true&is_visible=true`);
-        if (!response.ok) throw new Error("Failed to fetch categories");
-        
-        const data = await response.json();
-        setCategories(data.tree || []);
+        const client = getMedusaClient();
+        const data = await client.getCategories({ tree: true, is_visible: true });
+        setCategories(data.tree || data.categories || []);
       } catch (error) {
         console.error('Failed to fetch categories:', error);
         setCategories([]);

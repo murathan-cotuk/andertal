@@ -1,28 +1,26 @@
 /**
  * Admin Hub Service
- * 
- * Kategoriler, bannerlar ve admin-only verileri yönetir
- * Medusa core'dan bağımsız, platform sahibi için özel
+ *
+ * Kategoriler, bannerlar ve admin-only verileri yönetir.
+ * Medusa core'dan bağımsız, platform sahibi için özel.
  */
 
-import { BaseService } from "@medusajs/framework"
-import { DataSource, Repository } from "typeorm"
+import { EntityManager, Repository } from "typeorm"
 import { AdminHubCategory } from "../models/admin-hub-category"
 import { AdminHubBanner } from "../models/admin-hub-banner"
 
 type InjectedDependencies = {
-  manager: DataSource
+  manager: EntityManager
   productCollectionService?: any // Medusa ProductCollectionService (optional)
 }
 
-export default class AdminHubService extends BaseService {
-  protected readonly manager_: DataSource
+export default class AdminHubService {
+  protected readonly manager_: EntityManager
   protected readonly categoryRepository_: Repository<AdminHubCategory>
   protected readonly bannerRepository_: Repository<AdminHubBanner>
   protected readonly productCollectionService_?: any
 
   constructor(container: InjectedDependencies) {
-    super(container)
     this.manager_ = container.manager
     this.categoryRepository_ = this.manager_.getRepository(AdminHubCategory)
     this.bannerRepository_ = this.manager_.getRepository(AdminHubBanner)
