@@ -1,6 +1,10 @@
 # Render deployment configuration
-# Bu dosya Render'de otomatik deploy için kullanılabilir
-# Ama manuel olarak Render Dashboard'dan ayarlamak daha kolay
+# Manuel ayar: Dashboard → Service → Build & Deploy
+#
+# Build Command (Root Directory: apps/medusa-backend):
+#   npm install && npm run build && (npm run db:setup || npm run db:migrate)
+# Parantez şart; && kullan (noktalı virgül değil).
+# DATABASE_URL environment variable tanımlı olmalı.
 
 # services:
 #   - type: web
@@ -8,7 +12,7 @@
 #     env: node
 #     region: frankfurt
 #     rootDir: apps/medusa-backend
-#     buildCommand: npm install && npm run build
+#     buildCommand: npm install && npm run build && (npm run db:setup || npm run db:migrate)
 #     startCommand: npm start
 #     healthCheckPath: /health
 #

@@ -4,9 +4,10 @@
   "main": "medusa-config.js",
   "scripts": {
     "dev": "medusa develop",
-    "start": "npx --package=@medusajs/cli medusa start -H 0.0.0.0 -p ${PORT:-9000}",
-    "build": "npx --package=@medusajs/cli medusa build || echo 'Build skipped (TypeScript files compiled at runtime)'",
-    "migrate": "npx --package=@medusajs/cli medusa migrations run",
+    "start": "medusa start -H 0.0.0.0 -p ${PORT:-9000}",
+    "build": "medusa build || echo 'Build skipped (TypeScript files compiled at runtime)'",
+    "db:setup": "medusa db:setup --no-interactive",
+    "db:migrate": "medusa db:migrate",
     "run-migrations": "node scripts/run-migrations.js"
   },
   "keywords": [
@@ -22,6 +23,7 @@
     "@medusajs/admin": "^7.1.18",
     "@medusajs/admin-ui": "^2.1.18",
     "@medusajs/cli": "^2.13.1",
+    "@medusajs/file-local": "^2.0.0",
     "@medusajs/framework": "^2.13.1",
     "@medusajs/medusa": "^2.13.1",
     "ajv": "^8.17.1",
