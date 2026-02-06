@@ -7,7 +7,7 @@
     "start": "medusa start -H 0.0.0.0 -p ${PORT:-9000}",
     "build": "medusa build || echo 'Build skipped (TypeScript files compiled at runtime)'",
     "db:setup": "node scripts/write-env-from-process.js && medusa db:setup --no-interactive",
-    "db:migrate": "node scripts/write-env-from-process.js && medusa db:migrate",
+    "db:migrate": "node scripts/write-env-from-process.js && medusa db:migrate --skip-links",
     "run-migrations": "node scripts/run-migrations.js"
   },
   "keywords": [
