@@ -3,6 +3,7 @@
 #
 # Build Command (Root Directory: apps/medusa-backend):
 #   npm install && npm run build && (npm run db:setup || npm run db:migrate)
+# ÖNEMLİ: Fallback "npm run migrate" DEĞİL, "npm run db:migrate" olmalı (projede "migrate" script'i yok).
 # Parantez şart; && kullan (noktalı virgül değil).
 # DATABASE_URL environment variable tanımlı olmalı.
 
