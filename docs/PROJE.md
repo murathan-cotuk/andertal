@@ -212,6 +212,35 @@ belucha/
 - **Frontend env (shop, sellercentral, admin):** NEXT_PUBLIC_MEDUSA_BACKEND_URL (zorunlu). Shop’ta NEXT_PUBLIC_SELLERCENTRAL_URL da kullanılıyor.
 - **Deploy:** Backend → Render (Node, server.js). Shop, SellerCentral, Admin → Vercel (ayrı projeler; root directory ve turbo filter ile build).
 
+**Render ortam değişkenleri (Medusa backend):**
+
+| Değişken | Açıklama |
+|----------|----------|
+| `DATABASE_URL` | Render PostgreSQL bağlantı URL'i (SSL'li). Render DB uygun. |
+| `PORT` | Render'ın verdiği port (genelde otomatik; `medusa start -p ${PORT:-9000}` kullanılıyor) |
+| `NODE_ENV` | `production` (Render'da doğru) |
+| `STORE_CORS` | Shop frontend origin (production URL; Shop Vercel) |
+| `ADMIN_CORS` | Admin frontend origin (SellerCentral Vercel) |
+| `AUTH_CORS` | Auth origin'leri (login/token Shop veya SellerCentral'dan kullanılacaksa tanımla) |
+| `JWT_SECRET` | Güçlü, rastgele değer (production'da mutlaka güçlü kullan) |
+| `COOKIE_SECRET` | Güçlü, rastgele değer (production'da mutlaka güçlü kullan) |
+| `REDIS_URL` | Opsiyonel. Medusa v2 event/job için; boşsa in-memory (tek instance için genelde yeterli) |
+| `DATABASE_TYPE` | Opsiyonel (URL zaten `postgresql://` ise gerekmez) |
+
+**Öneriler:**
+
+- **AUTH_CORS:** Medusa auth (login/token) Shop veya SellerCentral'dan kullanılacaksa bu origin'leri ekle. Medusa virgülle ayrılmış kabul eder; örnek:  
+  `AUTH_CORS=https://belucha-shop.vercel.app,https://belucha-sellercentral.vercel.app`
+- **REDIS_URL:** Production'da event/job için Redis kullanılacaksa doldur; yoksa boş bırakıp in-memory ile devam edilebilir (tek instance için genelde yeterli).
+- **JWT_SECRET / COOKIE_SECRET:** Production'da güçlü, rastgele değerler kullan.
+
+Build/Start: Root Directory boş (repo kökü) veya `apps/medusa-backend`; kökte `npm install` çalışıyorsa workspace'ler yükleneceği için backend bağımlılıkları da dahil edilir.
+
+**Vercel (Shop / SellerCentral):**
+
+- **SellerCentral:** `NEXT_PUBLIC_MEDUSA_BACKEND_URL` = Render backend (doğru). Medusa için REST kullanıldığından `NEXT_PUBLIC_GRAPHQL_ENDPOINT` boş olabilir. `NEXT_PUBLIC_SHOP_URL` ve Payload değişkenleri tutarlı tutulmalı.
+- **Shop:** `NEXT_PUBLIC_MEDUSA_BACKEND_URL` = Render; `NEXT_PUBLIC_SELLERCENTRAL_URL` = SellerCentral. Payload URL'leri tutarlı tutulmalı.
+
 ---
 
 ## 8. Bilinen Karmaşıklıklar / Kalıntılar
