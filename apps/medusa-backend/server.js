@@ -30,7 +30,10 @@ async function start() {
       cwd: path.resolve(__dirname),
     })
     const { app: expressApp } = await app.load()
-
+    if (!expressApp) {
+      console.error('\n❌ MedusaAppLoader did not return Express app (e.g. link-modules failed)')
+      process.exit(1)
+    }
     expressApp.listen(PORT, HOST, () => {
       console.log(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)
       console.log(`📍 Listening on ${HOST}:${PORT}\n`)

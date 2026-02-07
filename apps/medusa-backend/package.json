@@ -8,7 +8,7 @@
     "build": "medusa build || echo 'Build skipped (TypeScript files compiled at runtime)'",
     "db:setup": "node scripts/write-env-from-process.js && medusa db:setup --no-interactive",
     "db:migrate": "node scripts/write-env-from-process.js && medusa db:migrate --skip-links",
-    "run-migrations": "node scripts/run-migrations.js","postinstall": "node scripts/patch-link-modules.js"
+    "run-migrations": "node scripts/run-migrations.js","postinstall": "node scripts/patch-link-modules.js","patch": "node scripts/patch-link-modules.js"
   },
   "keywords": ["medusa", "ecommerce", "api", "mock"],
   "author": "",

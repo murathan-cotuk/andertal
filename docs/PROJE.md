@@ -236,7 +236,7 @@ belucha/
 
 **Render deploy:**
 
-- **Build Command:** `npm install`
+- **Build Command:** `npm install && npm run patch` (postinstall bazen atlanabildiği için patch'i açıkça çalıştırmak link-modules yamasını garanti eder).
 - **Start Command:** `node server.js`
 - **Root Directory:** `apps/medusa-backend`
 - **Migration:** Tek seferlik yapıldı; schema değişince lokal veya Render Shell'den manuel: `npm run db:migrate` (medusa-backend dizininde, DATABASE_URL set).
