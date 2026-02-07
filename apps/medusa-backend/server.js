@@ -9,7 +9,10 @@ try {
   require('dotenv').config({ path: '.env.local' })
 } catch (e) {}
 
-const { MedusaAppLoader, configLoader, pgConnectionLoader } = require('@medusajs/framework')
+const { MedusaAppLoader, configLoader, pgConnectionLoader, container } = require('@medusajs/framework')
+const { logger } = require('@medusajs/framework/logger')
+const { asValue } = require('@medusajs/framework/awilix')
+const { ContainerRegistrationKeys } = require('@medusajs/utils')
 const path = require('path')
 
 const PORT = process.env.PORT || 9000
@@ -20,6 +23,9 @@ async function start() {
     console.log('\n🚀 Medusa v2 backend başlatılıyor...\n')
     await configLoader(path.resolve(__dirname), 'medusa-config')
     await pgConnectionLoader()
+    if (!container.hasRegistration(ContainerRegistrationKeys.LOGGER)) {
+      container.register(ContainerRegistrationKeys.LOGGER, asValue(logger))
+    }
     const app = new MedusaAppLoader({
       cwd: path.resolve(__dirname),
     })
