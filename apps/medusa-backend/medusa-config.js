@@ -49,6 +49,40 @@ let config = {
     },
   },
   plugins: [],
+  modules: [
+    {
+      resolve: "@medusajs/medusa/auth",
+      options: {
+        providers: [
+          { resolve: "@medusajs/auth-emailpass", id: "emailpass" },
+        ],
+      },
+    },
+    {
+      resolve: "@medusajs/medusa/file",
+      options: {
+        providers: [
+          { resolve: "@medusajs/file-local", id: "local" },
+        ],
+      },
+    },
+    {
+      resolve: "@medusajs/medusa/notification",
+      options: {
+        providers: [
+          { resolve: "@medusajs/notification-local", id: "local" },
+        ],
+      },
+    },
+    {
+      resolve: "@medusajs/medusa/fulfillment",
+      options: {
+        providers: [
+          { resolve: "@medusajs/fulfillment-manual", id: "manual" },
+        ],
+      },
+    },
+  ],
 }
 
 try {

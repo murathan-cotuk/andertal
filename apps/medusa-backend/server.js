@@ -13,7 +13,10 @@ try {
   // .env.local yoksa sorun değil
 }
 
-const { MedusaAppLoader } = require('@medusajs/framework')
+const { MedusaAppLoader, configLoader, pgConnectionLoader, container } = require('@medusajs/framework')
+const { logger } = require('@medusajs/framework/logger')
+const { asValue } = require('@medusajs/framework/awilix')
+const { ContainerRegistrationKeys } = require('@medusajs/utils')
 const path = require('path')
 
 const PORT = process.env.PORT || 9000
@@ -23,10 +26,17 @@ async function start() {
   try {
     console.log('\n🚀 Medusa v2 backend başlatılıyor...\n')
 
+    // Config loader'ın proje dizininden medusa-config.js okuması için önce yükle
+    await configLoader(path.resolve(__dirname), 'medusa-config')
+    // Logger container'a kaydedilsin (MedusaAppLoader buna ihtiyaç duyar)
+    if (!container.hasRegistration(ContainerRegistrationKeys.LOGGER)) {
+      container.register(ContainerRegistrationKeys.LOGGER, asValue(logger))
+    }
+    // PG bağlantısı container'a kaydedilsin (MedusaAppLoader buna ihtiyaç duyar)
+    await pgConnectionLoader()
     // MedusaAppLoader - framework kendi lifecycle'ını yönetir
-    // Loader'lar (loaders/*.ts) otomatik keşfedilip yüklenir
     const app = new MedusaAppLoader({
-      directory: path.resolve(__dirname),
+      cwd: path.resolve(__dirname),
     })
 
     const { app: expressApp } = await app.load()

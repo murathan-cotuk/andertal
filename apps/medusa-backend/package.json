@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "medusa-config.js",
   "scripts": {
-    "dev": "medusa develop",
-    "start": "medusa start -H 0.0.0.0 -p ${PORT:-9000}",
+    "dev": "node server.js",
+    "start": "node server.js",
     "build": "medusa build || echo 'Build skipped (TypeScript files compiled at runtime)'",
     "db:setup": "node scripts/write-env-from-process.js && medusa db:setup --no-interactive",
     "db:migrate": "node scripts/write-env-from-process.js && medusa db:migrate --skip-links",
