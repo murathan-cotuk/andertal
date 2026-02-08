@@ -9,11 +9,29 @@ try {
   require('dotenv').config({ path: '.env.local' })
 } catch (e) {}
 
+// Runtime patch: @medusajs/medusa/link-modules yok; node_modules/@medusajs/medusa/link-modules.js oluştur (require öncesi)
+const path = require('path')
+const fs = require('fs')
+const linkModulesContent = "module.exports = require('@medusajs/link-modules')\n"
+let dir = __dirname
+for (let d = 0; d < 10; d++) {
+  const medusaDir = path.join(dir, 'node_modules', '@medusajs', 'medusa')
+  if (fs.existsSync(medusaDir)) {
+    const filePath = path.join(medusaDir, 'link-modules.js')
+    try {
+      fs.writeFileSync(filePath, linkModulesContent)
+      break
+    } catch (_) {}
+  }
+  const parent = path.dirname(dir)
+  if (parent === dir) break
+  dir = parent
+}
+
 const { MedusaAppLoader, configLoader, pgConnectionLoader, container } = require('@medusajs/framework')
 const { logger } = require('@medusajs/framework/logger')
 const { asValue } = require('@medusajs/framework/awilix')
 const { ContainerRegistrationKeys } = require('@medusajs/utils')
-const path = require('path')
 
 const PORT = process.env.PORT || 9000
 const HOST = process.env.HOST || '0.0.0.0'
