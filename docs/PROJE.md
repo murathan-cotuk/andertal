@@ -2,18 +2,17 @@
 
 ## Render (Medusa backend)
 
-**Önerilen ayar (Root = apps/medusa-backend):**
+Repo'da `workspaces` kullanıldığı için Node modülleri **repo root** (`/opt/render/project/src/node_modules`) üzerinden yüklenir. Root Directory = `apps/medusa-backend` olsa bile bu böyledir. Bu yüzden patch'in **repo root**'taki `node_modules` üzerinde, **build sırasında** uygulanması gerekir.
 
-- **Root Directory:** `apps/medusa-backend` (mutlaka dolu; boş bırakma).
-- **Build Command:** `npm install`
-- **Start Command:** `npm run start`
+**Render ayarları (bunları kullan):**
 
-Böylece `npm run start`, `apps/medusa-backend` içinde çalışır ve bu package.json'daki `start` script'i (`node server.js`) kullanılır. Patch, `postinstall` ile install sonrası uygulanır; karmaşık build gerekmez.
-
-**Alternatif (repo kökünden deploy):**
-
-- **Root Directory:** boş (repo kökü)
+- **Root Directory:** *boş bırak* (repo kökü; alanı sil veya boş bırak).
 - **Build Command:** `npm install && node apps/medusa-backend/scripts/patch-link-modules.js`
 - **Start Command:** `node apps/medusa-backend/server.js`
 
-server.js runtime'da `__dirname` ve `process.cwd()`'den yukarı çıkıp her bulduğu `node_modules/@medusajs/medusa` kopyasına patch uygular.
+Bu ayarla:
+- Build repo root'ta çalışır, tek `node_modules` root'ta oluşur.
+- Patch script root (ve varsa backend) içindeki her `@medusajs/medusa` kopyasına uygulanır.
+- Start doğrudan `node apps/medusa-backend/server.js` ile yapılır; root package.json'da "start" script'i aranmaz.
+
+**Eski ayar (Root = apps/medusa-backend)** bu monorepo'da MODULE_NOT_FOUND verebilir; çünkü yükleme root'taki node_modules üzerinden olur ve orası build sırasında patch'lenmiyor.

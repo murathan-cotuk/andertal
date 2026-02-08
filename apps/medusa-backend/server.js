@@ -48,12 +48,19 @@ for (const medusaDir of allMedusaDirs) {
     console.log('link-modules patch applied at:', medusaDir)
     patchApplied = true
   } catch (e) {
-    console.error('link-modules runtime patch failed:', medusaDir, e.message)
-    process.exit(1)
+    // Read-only FS (e.g. Render): build-time patch may have already run
+    console.warn('link-modules runtime patch skipped (read-only?):', medusaDir, e.message)
   }
 }
+// Build-time patch might have run; verify resolution before failing
 if (!patchApplied) {
-  console.error('link-modules patch: @medusajs/medusa not found (walked from __dirname and process.cwd())')
+  try {
+    require.resolve('@medusajs/medusa/link-modules')
+    patchApplied = true
+  } catch (_) {}
+}
+if (!patchApplied) {
+  console.error('link-modules: @medusajs/medusa not found or unpatched. Render: Root Directory = empty, Build = npm install && node apps/medusa-backend/scripts/patch-link-modules.js, Start = node apps/medusa-backend/server.js')
   process.exit(1)
 }
 
