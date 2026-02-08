@@ -9,11 +9,35 @@ try {
   require('dotenv').config({ path: '.env.local' })
 } catch (e) {}
 
+// Runtime patch: @medusajs/medusa/link-modules (dosya + package.json exports) — @medusajs require öncesi
+const path = require('path')
+const fs = require('fs')
+const linkContent = "module.exports = require('@medusajs/link-modules')\n"
+let dir = __dirname
+for (let d = 0; d < 10; d++) {
+  const medusaDir = path.join(dir, 'node_modules', '@medusajs', 'medusa')
+  if (fs.existsSync(medusaDir)) {
+    try {
+      fs.writeFileSync(path.join(medusaDir, 'link-modules.js'), linkContent)
+      const pkgPath = path.join(medusaDir, 'package.json')
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+      if (!pkg.exports) pkg.exports = {}
+      if (typeof pkg.exports === 'object' && !Array.isArray(pkg.exports)) {
+        pkg.exports['./link-modules'] = './link-modules.js'
+        fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2))
+      }
+    } catch (_) {}
+    break
+  }
+  const parent = path.dirname(dir)
+  if (parent === dir) break
+  dir = parent
+}
+
 const { MedusaAppLoader, configLoader, pgConnectionLoader, container } = require('@medusajs/framework')
 const { logger } = require('@medusajs/framework/logger')
 const { asValue } = require('@medusajs/framework/awilix')
 const { ContainerRegistrationKeys } = require('@medusajs/utils')
-const path = require('path')
 
 const PORT = process.env.PORT || 9000
 const HOST = process.env.HOST || '0.0.0.0'
