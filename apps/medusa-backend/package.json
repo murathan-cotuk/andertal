@@ -1,14 +1,17 @@
 {
   "name": "medusa-backend",
   "version": "1.0.0",
+  "private": true,
   "main": "medusa-config.js",
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "build": "node scripts/patch-link-modules.js && (medusa build || echo 'Build skipped')",
+    "build": "echo 'Medusa backend build skipped'",
     "db:setup": "node scripts/write-env-from-process.js && medusa db:setup --no-interactive",
     "db:migrate": "node scripts/write-env-from-process.js && medusa db:migrate --skip-links",
-    "run-migrations": "node scripts/run-migrations.js","postinstall": "node scripts/patch-link-modules.js","patch": "node scripts/patch-link-modules.js"
+    "run-migrations": "node scripts/run-migrations.js",
+    "postinstall": "node scripts/patch-link-modules.js",
+    "patch": "node scripts/patch-link-modules.js"
   },
   "keywords": ["medusa", "ecommerce", "api", "mock"],
   "author": "",
