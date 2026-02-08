@@ -9,35 +9,56 @@ try {
   require('dotenv').config({ path: '.env.local' })
 } catch (e) {}
 
-// Runtime patch: @medusajs/medusa/link-modules — __dirname ve process.cwd()'den yukarı çık, her bulunan kopyaya uygula
+// Runtime patch: @medusajs/medusa/link-modules — tüm kopyaları bul (üst + nested) ve hepsine uygula
 const path = require('path')
 const fs = require('fs')
 const linkContent = "module.exports = require('@medusajs/link-modules')\n"
 
-function collectMedusaDirs(startDir, maxDepth = 15) {
-  const found = new Set()
-  let dir = startDir
+function collectNodeModulesRoots(startDir, maxDepth = 15) {
+  const roots = new Set()
+  let dir = path.resolve(startDir)
   let depth = 0
   while (dir && depth < maxDepth) {
-    const medusaDir = path.join(dir, 'node_modules', '@medusajs', 'medusa')
-    if (fs.existsSync(medusaDir)) found.add(medusaDir)
+    const nm = path.join(dir, 'node_modules')
+    if (fs.existsSync(nm)) roots.add(dir)
     const parent = path.dirname(dir)
     if (parent === dir) break
     dir = parent
     depth++
   }
-  return found
+  return roots
 }
 
-// Repo root (server.js is always under apps/medusa-backend): Node resolves from root node_modules
-const repoRoot = path.resolve(__dirname, '..', '..')
-const rootMedusa = path.join(repoRoot, 'node_modules', '@medusajs', 'medusa')
+function findMedusaInNodeModules(nodeModulesPath, found, depth = 0) {
+  if (depth > 8) return
+  try {
+    const names = fs.readdirSync(nodeModulesPath, { withFileTypes: true })
+    const atMedusa = path.join(nodeModulesPath, '@medusajs', 'medusa')
+    if (fs.existsSync(atMedusa)) found.add(atMedusa)
+    for (const e of names) {
+      if (e.isDirectory() && e.name === 'node_modules') {
+        findMedusaInNodeModules(path.join(nodeModulesPath, e.name), found, depth + 1)
+      } else if (e.isDirectory() && !e.name.startsWith('.')) {
+        const sub = path.join(nodeModulesPath, e.name)
+        const subNm = path.join(sub, 'node_modules')
+        if (fs.existsSync(subNm)) findMedusaInNodeModules(subNm, found, depth + 1)
+      }
+    }
+  } catch (_) {}
+}
 
-const allMedusaDirs = new Set([
-  ...collectMedusaDirs(__dirname),
-  ...collectMedusaDirs(process.cwd()),
-  ...(fs.existsSync(rootMedusa) ? [rootMedusa] : [])
+const roots = new Set([
+  ...collectNodeModulesRoots(__dirname),
+  ...collectNodeModulesRoots(process.cwd())
 ])
+const repoRoot = path.resolve(__dirname, '..', '..')
+if (fs.existsSync(path.join(repoRoot, 'node_modules'))) roots.add(repoRoot)
+
+const allMedusaDirs = new Set()
+for (const root of roots) {
+  const nm = path.join(root, 'node_modules')
+  findMedusaInNodeModules(nm, allMedusaDirs)
+}
 
 let patchApplied = false
 for (const medusaDir of allMedusaDirs) {
@@ -53,11 +74,9 @@ for (const medusaDir of allMedusaDirs) {
     console.log('link-modules patch applied at:', medusaDir)
     patchApplied = true
   } catch (e) {
-    // Read-only FS (e.g. Render): build-time patch may have already run
-    console.warn('link-modules runtime patch skipped (read-only?):', medusaDir, e.message)
+    console.warn('link-modules runtime patch skipped:', medusaDir, e.message)
   }
 }
-// Build-time patch might have run; verify resolution before failing
 if (!patchApplied) {
   try {
     require.resolve('@medusajs/medusa/link-modules')
@@ -65,7 +84,7 @@ if (!patchApplied) {
   } catch (_) {}
 }
 if (!patchApplied) {
-  console.error('link-modules: @medusajs/medusa not found or unpatched. Render: Root Directory = empty, Build = npm install && node apps/medusa-backend/scripts/patch-link-modules.js, Start = node apps/medusa-backend/server.js')
+  console.error('link-modules: no @medusajs/medusa found or all patches failed. Render: Root Directory = apps/medusa-backend, Build = npm install, Start = npm run start')
   process.exit(1)
 }
 
