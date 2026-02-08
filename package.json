@@ -9,7 +9,8 @@
     "format": "prettier --write \"**/*.{js,jsx,md}\"",
     "clean": "turbo run clean && rm -rf node_modules",
     "postinstall": "patch-package || true",
-    "patch:backend": "node apps/medusa-backend/scripts/patch-link-modules.js"
+    "patch:backend": "node apps/medusa-backend/scripts/patch-link-modules.js",
+    "start": "node apps/medusa-backend/server.js"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.35.0",
