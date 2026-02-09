@@ -37,6 +37,11 @@ Kategoriler **Admin Hub** tarafında: veritabanı tablosu `admin_hub_categories`
 **Ürün ekleme ve bağlantılar:**  
 Seller Central’dan eklenen ürün `POST /admin/products` ile Medusa’ya gider. Ürün oluşturulurken seçilen Admin Hub kategori ID’si `metadata.admin_category_id` olarak saklanır. Shop’ta ürün listesi `GET /store/products?category=<slug>` ile kategoriye göre filtrelenebilir (backend’de kategori slug ↔ Admin Hub eşlemesi yapılıyor). Yani: kategori ve ürün verisi backend’de; ID’ler API üzerinden birbirine bağlı.
 
+**Kategori landing sayfası ve uygulamalar arası bağ:**  
+- **Kategori nerede yazılı:** Sadece **Admin Hub** (Super Admin). Veritabanı: `admin_hub_categories`. API: `GET/POST/PUT/DELETE /admin-hub/v1/categories`. Kategori adı, slug, SEO (seo_title, seo_description), banner (banner_image_url), uzun metin (long_content) hep bu tabloda.  
+- **Landing sayfası:** Shop’ta her kategori için bir “landing” sayfası var: **`/category/[slug]`** (CategoryTemplate). Bu sayfa aynı Admin Hub kaydını kullanır: `GET /store/categories?slug=...` ile kategori çekilir; başlık, banner, long_content, ürün listesi (`GET /store/products?category=<slug>`) bu tek kaynaktan gelir. Ayrı bir “kategori landing” uygulaması yok; tek sayfa hem liste hem içerik.  
+- **Birbirine ve uygulamalara bağlı mı:** Evet. Tek kaynak Admin Hub. Seller Central’daki kategori dropdown’u `GET /admin-hub/v1/categories` ile aynı listeyi gösterir (isim, id). Shop’taki kategori sayfası ve navbar aynı kategorileri `GET /store/categories` ile kullanır. Yani kategori isimleri ve landing içeriği (SEO, banner, metin) tüm uygulamalarda aynı API/veritabanına bağlı; bir yerde güncellenince her yerde güncel görünür.
+
 **Shop (storefront)** kullandığı endpoint'ler:
 - `GET /store/products` — liste (query: `category`, `collection_id`, `region`).
 - `GET /store/products/:idOrHandle` — tek ürün (id veya handle).
