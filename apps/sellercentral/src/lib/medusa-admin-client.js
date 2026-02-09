@@ -76,15 +76,23 @@ class MedusaAdminClient {
 
   /**
    * Admin Hub Categories (Platform owner managed - SINGLE SOURCE OF TRUTH)
-   * 
-   * ⚠️ Product Categories (Medusa Core) deprecated - use Admin Hub instead
+   * Backend: GET /admin-hub/v1/categories veya GET /admin-hub/categories
    */
   async getAdminHubCategories(filters = {}) {
     const queryParams = new URLSearchParams({
       active: 'true',
       ...filters,
     }).toString()
-    return this.request(`/admin-hub/v1/categories?${queryParams}`)
+    const pathV1 = `/admin-hub/v1/categories?${queryParams}`
+    const pathLegacy = `/admin-hub/categories?${queryParams}`
+    try {
+      return await this.request(pathV1)
+    } catch (err) {
+      if (err.message && err.message.includes('404') && pathV1 !== pathLegacy) {
+        return await this.request(pathLegacy)
+      }
+      throw err
+    }
   }
 
   /**

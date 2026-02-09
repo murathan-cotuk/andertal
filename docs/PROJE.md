@@ -31,6 +31,12 @@ Kategori sayfaları hem ürün listesi hem içerik sayfası (landing) olacak; ay
 - **Sales Channel:** Medusa core; storefront hangi kanalda yayında ise ona göre filtre.
 - **Admin Hub (Categories, Banners):** Platform sahibi (Super Admin) yönetimi; store'da `/store/categories` (tree, slug). Kategoride seo_title, seo_description, long_content, banner_image_url alanları var. Admin'de `/admin-hub/v1/categories`, `/admin-hub/v1/banners`.
 
+**Kategoriler nerede, hangi API?**  
+Kategoriler **Admin Hub** tarafında: veritabanı tablosu `admin_hub_categories`, servis `AdminHubService`. API: `GET /admin-hub/v1/categories` (liste; query: `active`, `tree`, `slug`). Seller Central ürün eklerken bu API ile kategorileri çeker; dropdown’da seçilen kategori ID’si ürünün `metadata.admin_category_id` alanına yazılır. Shop, `GET /store/categories` ile aynı kategorileri kullanır (slug ile sayfa açar). Yani tek kaynak Admin Hub; Seller Central ve Shop aynı backend API’ye bağlı.
+
+**Ürün ekleme ve bağlantılar:**  
+Seller Central’dan eklenen ürün `POST /admin/products` ile Medusa’ya gider. Ürün oluşturulurken seçilen Admin Hub kategori ID’si `metadata.admin_category_id` olarak saklanır. Shop’ta ürün listesi `GET /store/products?category=<slug>` ile kategoriye göre filtrelenebilir (backend’de kategori slug ↔ Admin Hub eşlemesi yapılıyor). Yani: kategori ve ürün verisi backend’de; ID’ler API üzerinden birbirine bağlı.
+
 **Shop (storefront)** kullandığı endpoint'ler:
 - `GET /store/products` — liste (query: `category`, `collection_id`, `region`).
 - `GET /store/products/:idOrHandle` — tek ürün (id veya handle).

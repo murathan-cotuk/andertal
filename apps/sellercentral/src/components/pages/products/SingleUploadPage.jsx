@@ -614,7 +614,7 @@ export default function SingleUploadPage() {
                       Error loading categories: {categoriesError.message}
                       <br />
                       <small style={{ marginTop: "8px", display: "block", fontSize: "12px" }}>
-                        Check Medusa backend connection (http://localhost:9000)
+                        Backend: {typeof window !== "undefined" && (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000")}. Vercel’da NEXT_PUBLIC_MEDUSA_BACKEND_URL Render URL’ine ayarlı olmalı.
                       </small>
                     </div>
                   ) : categories.length === 0 ? (
@@ -625,7 +625,7 @@ export default function SingleUploadPage() {
                           Error loading categories: {categoriesError.message}
                           <br />
                           <small style={{ marginTop: "8px", display: "block", fontSize: "12px" }}>
-                            Check if Medusa backend is running on http://localhost:9000
+                            Backend: {typeof window !== "undefined" && (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000")}. Production’da bu env Render URL’i olmalı.
                           </small>
                         </>
                       ) : (
