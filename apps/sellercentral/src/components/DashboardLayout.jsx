@@ -18,7 +18,7 @@ const Container = styled.div`
 const TopBar = styled.div`
   width: 100%;
   flex-shrink: 0;
-  background-color: #2c2c2c;
+  background-color: #1a1a1a;
   padding: 8px 20px;
   border-bottom: 1px solid #1a1a1a;
   display: flex;
@@ -42,7 +42,7 @@ const TopBarLogo = styled(Link)`
   gap: 8px;
 
   &:hover {
-    color: #e5e5e5;
+    color: #f8f8f8;
   }
 `;
 
@@ -56,11 +56,12 @@ const BodyRow = styled.div`
 const Sidebar = styled.aside`
   width: 260px;
   flex-shrink: 0;
-  background-color: #c8c9ca;
+  background-color: #ebebeb;
   color: #000000;
-  padding: 24px 0;
+  padding: 0;
   height: 100%;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 
@@ -76,9 +77,9 @@ const Sidebar = styled.aside`
 `;
 
 const SidebarHeader = styled.div`
-  padding: 0 24px 20px;
+  padding: 0 16px 12px;
   border-bottom: 1px solid #a0a1a2;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
   display: flex;
   justify-content: flex-start;
   align-items: center;
@@ -97,9 +98,21 @@ const SidebarTitle = styled.span`
 const Menu = styled.nav`
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 0 16px;
+  gap: 2px;
+  padding: 0 12px;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+`;
+
+const MenuBottom = styled.nav`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 12px 16px 12px;
+  margin-top: auto;
+  flex-shrink: 0;
+  border-top: 1px solid #a0a1a2;
 `;
 
 const MenuItem = styled.div`
@@ -110,11 +123,11 @@ const MenuItemLink = styled(Link)`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 8px;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
   color: ${({ $active }) => ($active ? "#0f172a" : "#000000")};
-  background-color: ${({ $active }) => ($active ? "#a8a9aa" : "transparent")};
+  background-color: ${({ $active }) => ($active ? "#ffffff" : "transparent")};
   transition: all 0.2s ease;
   font-weight: ${({ $active }) => ($active ? "600" : "400")};
   font-size: 13px;
@@ -123,7 +136,7 @@ const MenuItemLink = styled(Link)`
   position: relative;
 
   &:hover {
-    background-color: #b0b1b2;
+    background-color: #ffffff;
     color: #000000;
   }
 
@@ -161,19 +174,19 @@ const SubMenu = styled.div`
   max-height: ${({ $isOpen }) => ($isOpen ? "500px" : "0")};
   overflow: hidden;
   transition: max-height 0.3s ease;
-  margin-left: 16px;
+  margin-left: 12px;
   border-left: 2px solid #a0a1a2;
-  padding-left: 8px;
+  padding-left: 6px;
 `;
 
 const SubMenuItemLink = styled(Link)`
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 10px;
+  padding: 6px 12px;
   border-radius: 6px;
   color: ${({ $active }) => ($active ? "#0f172a" : "#000000")};
-  background-color: ${({ $active }) => ($active ? "#a8a9aa" : "transparent")};
+  background-color: ${({ $active }) => ($active ? "#ffffff" : "transparent")};
   transition: all 0.2s ease;
   font-size: 13px;
   line-height: 1.5;
@@ -181,7 +194,7 @@ const SubMenuItemLink = styled(Link)`
   justify-content: flex-start;
 
   &:hover {
-    background-color: #b0b1b2;
+    background-color: #ffffff;
     color: #000000;
   }
 
@@ -309,7 +322,7 @@ const DropdownMenuItem = styled(Link)`
 
   i {
     width: 20px;
-    color: #6b7280;
+    color:rgb(57, 108, 209);
   }
 
   ${({ $danger }) =>
@@ -585,11 +598,10 @@ function DashboardLayoutContent({ children }) {
       </TopBar>
       <BodyRow>
         <Sidebar $isOpen={sidebarOpen}>
-          <SidebarHeader>
-            <SidebarTitle>Seller Central</SidebarTitle>
-          </SidebarHeader>
           <Menu>
-          {menuItems.map((item) => {
+          {menuItems
+            .filter((item) => item.href !== "/settings")
+            .map((item) => {
             const hasSubmenu = item.submenu && item.submenu.length > 0;
             const isItemActive = isActive(item.href);
             const isDropdownOpen = openDropdowns[item.href];
@@ -601,8 +613,8 @@ function DashboardLayoutContent({ children }) {
                   $active={isItemActive}
                   onClick={(e) => handleMenuItemClick(e, item)}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <i className={item.icon} style={{ fontSize: "18px", minWidth: "18px" }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <i className={item.icon} style={{ fontSize: "14px", minWidth: "14px" }} />
                     <span>{item.label}</span>
                   </div>
                   {hasSubmenu && (
@@ -617,7 +629,7 @@ function DashboardLayoutContent({ children }) {
                         href={subItem.href}
                         $active={pathname === subItem.href}
                       >
-                        <i className="fas fa-circle" style={{ fontSize: "6px" }} />
+                        <i className="fas fa-circle" style={{ fontSize: "5px" }} />
                         <span>{subItem.label}</span>
                       </SubMenuItemLink>
                     ))}
@@ -626,7 +638,47 @@ function DashboardLayoutContent({ children }) {
               </MenuItem>
             );
           })}
-        </Menu>
+          </Menu>
+          <MenuBottom>
+          {(() => {
+            const item = menuItems.find((i) => i.href === "/settings");
+            if (!item) return null;
+            const hasSubmenu = item.submenu && item.submenu.length > 0;
+            const isItemActive = isActive(item.href);
+            const isDropdownOpen = openDropdowns[item.href];
+            return (
+              <MenuItem key={item.href}>
+                <MenuItemLink
+                  href={item.href}
+                  $active={isItemActive}
+                  onClick={(e) => handleMenuItemClick(e, item)}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <i className={item.icon} style={{ fontSize: "14px", minWidth: "14px" }} />
+                    <span>{item.label}</span>
+                  </div>
+                  {hasSubmenu && (
+                    <DropdownIcon className="fas fa-chevron-down" $isOpen={isDropdownOpen} />
+                  )}
+                </MenuItemLink>
+                {hasSubmenu && (
+                  <SubMenu $isOpen={isDropdownOpen}>
+                    {item.submenu.map((subItem) => (
+                      <SubMenuItemLink
+                        key={subItem.href}
+                        href={subItem.href}
+                        $active={pathname === subItem.href}
+                      >
+                        <i className="fas fa-circle" style={{ fontSize: "5px" }} />
+                        <span>{subItem.label}</span>
+                      </SubMenuItemLink>
+                    ))}
+                  </SubMenu>
+                )}
+              </MenuItem>
+            );
+          })()}
+          </MenuBottom>
       </Sidebar>
         <Main>
           <ContentArea>{children}</ContentArea>
