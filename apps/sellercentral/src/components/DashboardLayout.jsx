@@ -10,44 +10,85 @@ import styled from "styled-components";
 
 const Container = styled.div`
   display: flex;
-  min-h-screen;
+  flex-direction: column;
+  min-height: 100vh;
   background-color: #f9fafb;
 `;
 
+const TopBar = styled.div`
+  width: 100%;
+  flex-shrink: 0;
+  background-color: #2c2c2c;
+  padding: 8px 20px;
+  border-bottom: 1px solid #1a1a1a;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  min-height: 48px;
+  z-index: 50;
+`;
+
+const TopBarLogo = styled(Link)`
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  font-family: "Manrope", sans-serif;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &:hover {
+    color: #e5e5e5;
+  }
+`;
+
+const BodyRow = styled.div`
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+`;
+
 const Sidebar = styled.aside`
-  width: ${({ $collapsed }) => ($collapsed ? "80px" : "260px")};
-  background-color: #1f2937;
-  color: white;
+  width: 260px;
+  flex-shrink: 0;
+  background-color: #c8c9ca;
+  color: #000000;
   padding: 24px 0;
-  position: fixed;
-  height: 100vh;
+  height: 100%;
   overflow-y: auto;
-  transition: width 0.3s ease;
-  z-index: 100;
   display: flex;
   flex-direction: column;
 
   @media (max-width: 768px) {
     transform: ${({ $isOpen }) => ($isOpen ? "translateX(0)" : "translateX(-100%)")};
-    width: 260px;
+    position: fixed;
+    left: 0;
+    top: 48px;
+    bottom: 0;
+    height: auto;
+    z-index: 100;
   }
 `;
 
 const SidebarHeader = styled.div`
-  padding: 0 ${({ $collapsed }) => ($collapsed ? "16px" : "24px")} 24px;
-  border-bottom: 1px solid #374151;
+  padding: 0 24px 20px;
+  border-bottom: 1px solid #a0a1a2;
   margin-bottom: 24px;
   display: flex;
-  justify-content: ${({ $collapsed }) => ($collapsed ? "center" : "flex-start")};
+  justify-content: flex-start;
   align-items: center;
 `;
 
-const Logo = styled(Link)`
-  font-size: ${({ $collapsed }) => ($collapsed ? "20px" : "24px")};
-  font-weight: 700;
-  color: #0ea5e9;
-  font-family: "Manrope", sans-serif;
-  text-decoration: none;
+const SidebarTitle = styled.span`
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #000000;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -57,7 +98,7 @@ const Menu = styled.nav`
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 0 ${({ $collapsed }) => ($collapsed ? "8px" : "16px")};
+  padding: 0 16px;
   flex: 1;
 `;
 
@@ -68,24 +109,26 @@ const MenuItem = styled.div`
 const MenuItemLink = styled(Link)`
   display: flex;
   align-items: center;
-  justify-content: ${({ $collapsed }) => ($collapsed ? "center" : "space-between")};
+  justify-content: space-between;
   gap: 12px;
-  padding: 12px ${({ $collapsed }) => ($collapsed ? "8px" : "16px")};
+  padding: 12px 16px;
   border-radius: 8px;
-  color: ${({ $active }) => ($active ? "#0ea5e9" : "#9ca3af")};
-  background-color: ${({ $active }) => ($active ? "#1e3a5f" : "transparent")};
+  color: ${({ $active }) => ($active ? "#0f172a" : "#000000")};
+  background-color: ${({ $active }) => ($active ? "#a8a9aa" : "transparent")};
   transition: all 0.2s ease;
   font-weight: ${({ $active }) => ($active ? "600" : "400")};
+  font-size: 13px;
+  line-height: 1.5;
   text-decoration: none;
   position: relative;
 
   &:hover {
-    background-color: #374151;
-    color: white;
+    background-color: #b0b1b2;
+    color: #000000;
   }
 
   span {
-    ${({ $collapsed }) => ($collapsed ? "display: none;" : "display: block;")}
+    display: block;
   }
 `;
 
@@ -94,11 +137,12 @@ const MenuItemTooltip = styled.div`
   left: calc(100% + 12px);
   top: 50%;
   transform: translateY(-50%);
-  background-color: #1f2937;
-  color: white;
+  background-color: #2c2c2c;
+  color: #ffffff;
   padding: 8px 12px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.5;
   white-space: nowrap;
   z-index: 1000;
   opacity: 0;
@@ -111,91 +155,50 @@ const DropdownIcon = styled.i`
   font-size: 12px;
   transition: transform 0.2s ease;
   transform: ${({ $isOpen }) => ($isOpen ? "rotate(180deg)" : "rotate(0deg)")};
-  ${({ $collapsed }) => ($collapsed ? "display: none;" : "display: block;")}
 `;
 
 const SubMenu = styled.div`
   max-height: ${({ $isOpen }) => ($isOpen ? "500px" : "0")};
   overflow: hidden;
   transition: max-height 0.3s ease;
-  margin-left: ${({ $collapsed }) => ($collapsed ? "0" : "16px")};
-  border-left: ${({ $collapsed }) => ($collapsed ? "none" : "2px solid #374151")};
-  padding-left: ${({ $collapsed }) => ($collapsed ? "0" : "8px")};
+  margin-left: 16px;
+  border-left: 2px solid #a0a1a2;
+  padding-left: 8px;
 `;
 
 const SubMenuItemLink = styled(Link)`
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px ${({ $collapsed }) => ($collapsed ? "8px" : "16px")};
+  padding: 10px 16px;
   border-radius: 6px;
-  color: ${({ $active }) => ($active ? "#0ea5e9" : "#9ca3af")};
-  background-color: ${({ $active }) => ($active ? "#1e3a5f" : "transparent")};
+  color: ${({ $active }) => ($active ? "#0f172a" : "#000000")};
+  background-color: ${({ $active }) => ($active ? "#a8a9aa" : "transparent")};
   transition: all 0.2s ease;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.5;
   text-decoration: none;
-  justify-content: ${({ $collapsed }) => ($collapsed ? "center" : "flex-start")};
+  justify-content: flex-start;
 
   &:hover {
-    background-color: #374151;
-    color: white;
+    background-color: #b0b1b2;
+    color: #000000;
   }
 
   i {
-    ${({ $collapsed }) => ($collapsed ? "display: block;" : "display: block;")}
+    display: block;
   }
 
   span {
-    ${({ $collapsed }) => ($collapsed ? "display: none;" : "display: block;")}
-  }
-`;
-
-const SidebarFooter = styled.div`
-  padding: 16px;
-  border-top: 1px solid #374151;
-  margin-top: auto;
-  display: flex;
-  justify-content: center;
-`;
-
-const CollapseButton = styled.button`
-  background: none;
-  border: none;
-  color: #9ca3af;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background-color: #374151;
-    color: white;
+    display: block;
   }
 `;
 
 const Main = styled.main`
   flex: 1;
-  margin-left: ${({ $sidebarCollapsed }) => ($sidebarCollapsed ? "80px" : "260px")};
+  min-width: 0;
   padding: 0;
-  transition: margin-left 0.3s ease;
-
-  @media (max-width: 768px) {
-    margin-left: 0;
-  }
-`;
-
-const TopBar = styled.div`
-  background-color: white;
-  padding: 16px 24px;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  gap: 24px;
+  overflow: auto;
 `;
 
 const SearchBar = styled.div`
@@ -206,32 +209,32 @@ const SearchBar = styled.div`
 
 const SearchInput = styled.input`
   width: 100%;
-  padding: 10px 16px 10px 44px;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
+  padding: 6px 12px 6px 40px;
+  border: 1px solid #404040;
+  border-radius: 6px;
   font-size: 14px;
-  color: #1f2937;
-  background: white;
+  color: #ffffff;
+  background: #1a1a1a;
   transition: all 0.2s ease;
 
   &:focus {
     outline: none;
-    border-color: #0ea5e9;
-    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    border-color: #505050;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
   }
 
   &::placeholder {
-    color: #9ca3af;
+    color: #a0a0a0;
   }
 `;
 
 const SearchIcon = styled.i`
   position: absolute;
-  left: 16px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #9ca3af;
-  font-size: 16px;
+  color: #ffffff;
+  font-size: 14px;
 `;
 
 const UserMenuWrapper = styled.div`
@@ -241,37 +244,39 @@ const UserMenuWrapper = styled.div`
 const UserMenuButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 4px 10px;
   background: none;
   border: none;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 6px;
   transition: background-color 0.2s ease;
+  color: #ffffff;
 
   &:hover {
-    background-color: #f3f4f6;
+    background-color: #3d3d3d;
+    color: #ffffff;
   }
 `;
 
 const UserAvatar = styled.div`
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  background: linear-gradient(135deg, #505050 0%, #3d3d3d 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: #ffffff;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 14px;
   flex-shrink: 0;
 `;
 
 const UserName = styled.span`
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #1f2937;
+  color: #ffffff;
   white-space: nowrap;
 `;
 
@@ -411,7 +416,6 @@ function DashboardLayoutContent({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState({});
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -522,13 +526,69 @@ function DashboardLayoutContent({ children }) {
 
   return (
     <Container>
-      <Sidebar $isOpen={sidebarOpen} $collapsed={sidebarCollapsed}>
-        <SidebarHeader $collapsed={sidebarCollapsed}>
-          <Logo href="/" $collapsed={sidebarCollapsed}>
-            {sidebarCollapsed ? "SC" : "Seller Central"}
-          </Logo>
-        </SidebarHeader>
-        <Menu $collapsed={sidebarCollapsed}>
+      <TopBar>
+        <TopBarLogo href="/">Belucha</TopBarLogo>
+        <SearchBar>
+          <SearchIcon className="fas fa-search" />
+          <SearchInput
+            type="text"
+            placeholder="Search products, orders, customers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </SearchBar>
+        <UserMenuWrapper ref={userMenuRef}>
+          <UserMenuButton onClick={() => setUserMenuOpen(!userMenuOpen)}>
+            <UserAvatar>{getUserInitials()}</UserAvatar>
+            <UserName>{storeName}</UserName>
+            <i className="fas fa-chevron-down" style={{ fontSize: "12px", color: "#ffffff" }} />
+          </UserMenuButton>
+          {userMenuOpen && (
+            <DropdownMenu>
+              <DropdownMenuItem href="/profile">
+                <i className="fas fa-user" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem href="/settings">
+                <i className="fas fa-cog" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem href="/settings/account">
+                <i className="fas fa-user-cog" />
+                <span>Account Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem href="/settings/payment">
+                <i className="fas fa-credit-card" />
+                <span>Payment Methods</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem href="/settings/notifications">
+                <i className="fas fa-bell" />
+                <span>Notifications</span>
+              </DropdownMenuItem>
+              <DropdownDivider />
+              <DropdownMenuItem href="/settings/security">
+                <i className="fas fa-shield-alt" />
+                <span>Security</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem href="/settings/billing">
+                <i className="fas fa-file-invoice-dollar" />
+                <span>Billing</span>
+              </DropdownMenuItem>
+              <DropdownDivider />
+              <DropdownMenuItem href="#" $danger onClick={(e) => { e.preventDefault(); handleLogout(); }}>
+                <i className="fas fa-sign-out-alt" />
+                <span>Logout</span>
+              </DropdownMenuItem>
+            </DropdownMenu>
+          )}
+        </UserMenuWrapper>
+      </TopBar>
+      <BodyRow>
+        <Sidebar $isOpen={sidebarOpen}>
+          <SidebarHeader>
+            <SidebarTitle>Seller Central</SidebarTitle>
+          </SidebarHeader>
+          <Menu>
           {menuItems.map((item) => {
             const hasSubmenu = item.submenu && item.submenu.length > 0;
             const isItemActive = isActive(item.href);
@@ -539,58 +599,26 @@ function DashboardLayoutContent({ children }) {
                 <MenuItemLink
                   href={item.href}
                   $active={isItemActive}
-                  $collapsed={sidebarCollapsed}
                   onClick={(e) => handleMenuItemClick(e, item)}
-                  onMouseEnter={(e) => {
-                    if (sidebarCollapsed) {
-                      const tooltip = e.currentTarget.querySelector('[data-tooltip]');
-                      if (tooltip) tooltip.style.opacity = '1';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sidebarCollapsed) {
-                      const tooltip = e.currentTarget.querySelector('[data-tooltip]');
-                      if (tooltip) tooltip.style.opacity = '0';
-                    }
-                  }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <i className={item.icon} style={{ fontSize: "18px", minWidth: "18px" }} />
                     <span>{item.label}</span>
                   </div>
-                  {hasSubmenu && !sidebarCollapsed && (
+                  {hasSubmenu && (
                     <DropdownIcon className="fas fa-chevron-down" $isOpen={isDropdownOpen} />
-                  )}
-                  {sidebarCollapsed && (
-                    <MenuItemTooltip data-tooltip>{item.label}</MenuItemTooltip>
                   )}
                 </MenuItemLink>
                 {hasSubmenu && (
-                  <SubMenu $isOpen={isDropdownOpen} $collapsed={sidebarCollapsed}>
+                  <SubMenu $isOpen={isDropdownOpen}>
                     {item.submenu.map((subItem) => (
                       <SubMenuItemLink
                         key={subItem.href}
                         href={subItem.href}
                         $active={pathname === subItem.href}
-                        $collapsed={sidebarCollapsed}
-                        onMouseEnter={(e) => {
-                          if (sidebarCollapsed) {
-                            const tooltip = e.currentTarget.querySelector('[data-tooltip]');
-                            if (tooltip) tooltip.style.opacity = '1';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (sidebarCollapsed) {
-                            const tooltip = e.currentTarget.querySelector('[data-tooltip]');
-                            if (tooltip) tooltip.style.opacity = '0';
-                          }
-                        }}
                       >
                         <i className="fas fa-circle" style={{ fontSize: "6px" }} />
                         <span>{subItem.label}</span>
-                        {sidebarCollapsed && (
-                          <MenuItemTooltip data-tooltip>{subItem.label}</MenuItemTooltip>
-                        )}
                       </SubMenuItemLink>
                     ))}
                   </SubMenu>
@@ -599,74 +627,11 @@ function DashboardLayoutContent({ children }) {
             );
           })}
         </Menu>
-        <SidebarFooter>
-          <CollapseButton
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <i className={`fas fa-chevron-${sidebarCollapsed ? "right" : "left"}`} />
-          </CollapseButton>
-        </SidebarFooter>
       </Sidebar>
-      <Main $sidebarCollapsed={sidebarCollapsed}>
-        <TopBar>
-          <SearchBar>
-            <SearchIcon className="fas fa-search" />
-            <SearchInput
-              type="text"
-              placeholder="Search products, orders, customers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </SearchBar>
-          <UserMenuWrapper ref={userMenuRef}>
-            <UserMenuButton onClick={() => setUserMenuOpen(!userMenuOpen)}>
-              <UserAvatar>{getUserInitials()}</UserAvatar>
-              <UserName>{storeName}</UserName>
-              <i className="fas fa-chevron-down" style={{ fontSize: "12px", color: "#6b7280" }} />
-            </UserMenuButton>
-            {userMenuOpen && (
-              <DropdownMenu>
-                <DropdownMenuItem href="/profile">
-                  <i className="fas fa-user" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem href="/settings">
-                  <i className="fas fa-cog" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem href="/settings/account">
-                  <i className="fas fa-user-cog" />
-                  <span>Account Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem href="/settings/payment">
-                  <i className="fas fa-credit-card" />
-                  <span>Payment Methods</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem href="/settings/notifications">
-                  <i className="fas fa-bell" />
-                  <span>Notifications</span>
-                </DropdownMenuItem>
-                <DropdownDivider />
-                <DropdownMenuItem href="/settings/security">
-                  <i className="fas fa-shield-alt" />
-                  <span>Security</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem href="/settings/billing">
-                  <i className="fas fa-file-invoice-dollar" />
-                  <span>Billing</span>
-                </DropdownMenuItem>
-                <DropdownDivider />
-                <DropdownMenuItem href="#" $danger onClick={(e) => { e.preventDefault(); handleLogout(); }}>
-                  <i className="fas fa-sign-out-alt" />
-                  <span>Logout</span>
-                </DropdownMenuItem>
-              </DropdownMenu>
-            )}
-          </UserMenuWrapper>
-        </TopBar>
-        <ContentArea>{children}</ContentArea>
-      </Main>
+        <Main>
+          <ContentArea>{children}</ContentArea>
+        </Main>
+      </BodyRow>
     </Container>
   );
 }
