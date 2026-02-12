@@ -5,6 +5,7 @@ import Link from "next/link";
 import styled from "styled-components";
 import { useCustomerAuth as useAuth } from "@belucha/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
+import DropdownSearch from "@/components/DropdownSearch";
 
 const Nav = styled.nav`
   background-color: white;
@@ -259,7 +260,6 @@ const UserName = styled.div`
 `;
 
 export default function Navbar() {
-  const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -303,12 +303,15 @@ export default function Navbar() {
       <NavContainer>
         <Logo href="/">Belucha</Logo>
         <SearchBar>
-          <SearchIcon className="fas fa-search" />
-          <SearchInput
-            type="text"
+          <DropdownSearch
             placeholder="Search products..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            hitsPerPage={5}
+            attributes={{
+              primaryText: "title",
+              secondaryText: "description",
+              url: "handle",
+              image: "thumbnail",
+            }}
           />
         </SearchBar>
         <CategoriesMenu>

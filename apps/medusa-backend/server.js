@@ -208,6 +208,13 @@ async function start() {
   } catch (error) {
     console.error('\n❌ Medusa v2 başlatma hatası:', error.code || error.name, error.message)
     if (error.stack) console.error(error.stack)
+    if (error.name === 'KnexTimeoutError' || (error.message && error.message.includes('acquiring a connection'))) {
+      console.error('\n💡 PostgreSQL bağlantı hatası. Kontrol edin:')
+      console.error('   - PostgreSQL servisi çalışıyor mu? (Windows: Servisler)')
+      console.error('   - .env.local içinde DATABASE_URL doğru mu? (postgres://user:pass@localhost:5432/medusa)')
+      console.error('   - "medusa" veritabanı oluşturuldu mu? (psql -U postgres -c "CREATE DATABASE medusa;")')
+      console.error('   - Backend olmadan çalıştırmak için: npm run dev:web\n')
+    }
     process.exit(1)
   }
 }

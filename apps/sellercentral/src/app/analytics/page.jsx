@@ -1,14 +1,12 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
-import AnalyticsPage from "@/components/pages/AnalyticsPage";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function Analytics() {
-  return (
-    <DashboardLayout>
-        <AnalyticsPage />
-      </DashboardLayout>
-    
-  );
+export default function AnalyticsIndex() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/analytics/reports");
+  }, [router]);
+  return null;
 }
-

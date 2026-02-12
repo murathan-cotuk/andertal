@@ -1,14 +1,7 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
-import NotificationSettingsPage from "@/components/pages/settings/NotificationSettingsPage";
+import SettingsSubpage from "@/components/SettingsSubpage";
 
-export default function NotificationSettings() {
-  return (
-    <DashboardLayout>
-        <NotificationSettingsPage />
-      </DashboardLayout>
-    
-  );
+export default function SettingsNotifications() {
+  return <SettingsSubpage title="Notifications" description="Email and notification preferences." />;
 }
-

@@ -1,14 +1,12 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
-import SettingsPage from "@/components/pages/SettingsPage";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function Settings() {
-  return (
-    <DashboardLayout>
-        <SettingsPage />
-      </DashboardLayout>
-    
-  );
+export default function SettingsIndex() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/settings/general");
+  }, [router]);
+  return null;
 }
-

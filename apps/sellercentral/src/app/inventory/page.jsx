@@ -1,14 +1,12 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
-import InventoryPage from "@/components/pages/InventoryPage";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function Inventory() {
-  return (
-    <DashboardLayout>
-        <InventoryPage />
-      </DashboardLayout>
-    
-  );
+export default function InventoryRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/products/inventory");
+  }, [router]);
+  return null;
 }
-

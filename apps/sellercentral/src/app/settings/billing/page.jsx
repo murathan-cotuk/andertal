@@ -1,14 +1,7 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
-import BillingSettingsPage from "@/components/pages/settings/BillingSettingsPage";
+import SettingsSubpage from "@/components/SettingsSubpage";
 
-export default function BillingSettings() {
-  return (
-    <DashboardLayout>
-        <BillingSettingsPage />
-      </DashboardLayout>
-    
-  );
+export default function SettingsBilling() {
+  return <SettingsSubpage title="Billing" description="Invoices and billing history." />;
 }
-

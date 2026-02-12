@@ -25,15 +25,26 @@ const databaseUrl = process.env.DATABASE_URL || "postgres://postgres:postgres@lo
 const isPostgres = databaseUrl.startsWith("postgres")
 const isRender = databaseUrl.includes("render.com")
 
+// Knex pool: local'de bağlantı zaman aşımı ve pool ayarları (KnexTimeoutError önlemi)
+function getDatabaseDriverOptions() {
+  if (!isPostgres) return undefined
+  const opts = {}
+  if (isRender) {
+    opts.connection = { ssl: { rejectUnauthorized: false } }
+  } else {
+    // Lokal geliştirme: daha uzun acquire timeout, sınırlı pool
+    opts.acquireConnectionTimeout = 60000
+    opts.pool = { min: 0, max: 10 }
+  }
+  return Object.keys(opts).length ? opts : undefined
+}
+
 // defineConfig yoksa (eski sürüm) düz export
 let config = {
   linkModules: { enabled: false },
   projectConfig: {
     databaseUrl,
-    databaseDriverOptions:
-      isPostgres && isRender
-        ? { connection: { ssl: { rejectUnauthorized: false } } }
-        : undefined,
+    databaseDriverOptions: getDatabaseDriverOptions(),
     redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
     http: {
       storeCors: process.env.STORE_CORS || "http://localhost:3000",

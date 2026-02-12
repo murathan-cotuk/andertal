@@ -3,12 +3,10 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export default function Products() {
+export default function ProductsIndex() {
   const router = useRouter();
-
   useEffect(() => {
-    router.replace("/inventory");
+    router.replace("/products/inventory");
   }, [router]);
-
   return null;
 }

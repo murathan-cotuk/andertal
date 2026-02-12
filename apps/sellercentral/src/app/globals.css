@@ -14,6 +14,19 @@
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
+  /* Top bar yüksekliği (Polaris varsayılanı 3.5rem) – istersen 48px, 56px vb. yapabilirsin */
+  --pg-top-bar-height: 3.5rem;
+}
+
+/* Top bar arama: odakta mavi çerçeve olmasın */
+#AppFrameTopBar input[type="search"]:focus,
+#AppFrameTopBar .Polaris-TopBar-SearchField input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+#AppFrameTopBar [data-polaris-top-bar-search-field] input:focus {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 * {
@@ -42,5 +55,182 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* Zemin top bar ile aynı siyah; sadece sidebar paneli ve içerik kutusu üstte */
+.Polaris-Frame {
+  background-color: var(--p-color-bg-inverse) !important;
+}
+#AppFrameNav {
+  position: fixed !important;
+  z-index: 60;
+  width: var(--pg-layout-width-nav-base) !important;
+  max-width: var(--pg-layout-width-nav-base) !important;
+  flex: 0 0 var(--pg-layout-width-nav-base) !important;
+  overflow: hidden;
+  box-sizing: border-box;
+  /* Shopify: sidebar sol üst köşe yuvarlak – wrapper’a uygula, kesin görünsün */
+  border-top-left-radius: 16px;
+  /* Yuvarlak köşede görünen alan top bar ile aynı renk */
+  background-color: var(--p-color-bg-inverse);
+}
+#AppFrameNav > nav,
+#AppFrameNav .Polaris-Navigation {
+  border-top-left-radius: 16px;
+  overflow: hidden;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+/* Dismiss butonu masaüstünde alan kaplamasın (Polaris zaten gizliyor, ek güvence) */
+#AppFrameNav .Polaris-Frame__NavigationDismiss {
+  display: none !important;
+}
+/* Nav wrapper flex'te yer kaplamasın; içerik sola kaymasın (ikinci sidebar olmaz) */
+.Polaris-Frame:has(#AppFrameNav) > div:has(#AppFrameNav) {
+  flex: 0 0 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+#AppFrameMain {
+  position: relative;
+  z-index: 50;
+  padding-left: var(--pg-layout-width-nav-base) !important;
+  padding-right: 0 !important;
+  max-width: none !important;
+  background-color: var(--p-color-bg-inverse) !important;
+}
+#AppFrameMain .Polaris-Frame__Content {
+  min-width: 0;
+}
+
+/* Shopify tarzı sayfa: top bar altından yukarı kayan; sadece sağ üst köşe yuvarlak (sol köşe sidebar'da) */
+@keyframes belucha-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Shopify admin: içerik alanı – sağ üst köşe yuvarlak, ekranın sağına yapışık */
+.belucha-page-content {
+  min-height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--p-color-bg-surface-secondary, #f6f6f7);
+  border-top-right-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.08);
+  animation: belucha-slide-up 0.3s ease-out;
+  padding-top: 52px;
+  padding-left: var(--p-space-400, 16px);
+  padding-right: var(--p-space-400, 16px);
+  padding-bottom: var(--p-space-400, 16px);
+}
+@media (min-width: 48em) {
+  .belucha-page-content {
+    padding-left: var(--p-space-500, 20px);
+    padding-right: var(--p-space-500, 20px);
+    padding-bottom: var(--p-space-500, 20px);
+  }
+}
+
+/* Settings sol menüde en alta sabit */
+.Polaris-Navigation__PrimaryNavigation {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.Polaris-Navigation__Section--fill {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* Top bar arama dropdown (styled-components yok, className) */
+.belucha-search-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+}
+.belucha-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a0a0a0;
+  pointer-events: none;
+}
+.belucha-search-input {
+  width: 100%;
+  padding: 6px 12px 6px 40px;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #fff;
+  background: #1a1a1a;
+  transition: border-color 0.2s ease;
+}
+.belucha-search-input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #505050;
+}
+.belucha-search-input::placeholder {
+  color: #a0a0a0;
+}
+.belucha-search-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+.belucha-search-category {
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+.belucha-search-category-count {
+  margin-left: 6px;
+  font-weight: 700;
+  color: #374151;
+}
+.belucha-search-hit {
+  display: block;
+  padding: 10px 16px;
+  color: #374151;
+  text-decoration: none;
+  font-size: 14px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.belucha-search-hit:hover {
+  background-color: #f3f4f6;
+  color: #0ea5e9;
+}
+.belucha-search-hit:last-child {
+  border-bottom: none;
+}
+.belucha-search-empty {
+  padding: 24px 16px;
+  color: #6b7280;
+  font-size: 14px;
+  text-align: center;
 }
 

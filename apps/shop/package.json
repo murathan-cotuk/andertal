@@ -11,7 +11,9 @@
   "dependencies": {
     "@belucha/lib": "*",
     "@belucha/ui": "*",
+    "algoliasearch": "^5.17.2",
     "autoprefixer": "^10.4.16",
+    "react-instantsearch": "^7.23.0",
     "next": "16.0.10",
     "postcss": "^8.4.32",
     "react": "^19.2.3",
