@@ -69,6 +69,7 @@ const menuItemsMain = [
     label: "Content",
     icon: ListBulletedIcon,
     subNavigationItems: [
+      { url: "/content/categories", label: "Categories" },
       { url: "/content/metaobjects", label: "Metaobjects" },
       { url: "/content/files", label: "Files" },
       { url: "/content/menus", label: "Menus" },

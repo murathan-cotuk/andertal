@@ -134,10 +134,15 @@ class MedusaAdminClient {
    * Create Admin Hub category (POST)
    */
   async createAdminHubCategory(data) {
-    return this.request('/admin-hub/v1/categories', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+    const opts = { method: 'POST', body: JSON.stringify(data) }
+    try {
+      return await this.request('/admin-hub/v1/categories', opts)
+    } catch (err) {
+      if (err?.message?.includes('404')) {
+        return await this.request('/admin-hub/categories', opts)
+      }
+      throw err
+    }
   }
 
   /**

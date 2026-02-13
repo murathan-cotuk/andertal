@@ -21,7 +21,8 @@
     "medusa-config.js",
     "models/**/*",
     "services/**/*",
-    "api/**/*"
+    "api/**/*",
+    "src/api/**/*"
   ],
   "exclude": ["node_modules", "dist"]
 }

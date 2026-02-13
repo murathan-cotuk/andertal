@@ -2,12 +2,17 @@
  * Medusa v2 Backend Server
  * dotenv + MedusaAppLoader + app.load() + listen + graceful shutdown.
  * Render: Start Command = node server.js
+ * Custom API routes: src/api (Medusa v2 discovers them from here when ts-node is registered).
  */
-
 require('dotenv').config()
 try {
   require('dotenv').config({ path: '.env.local' })
 } catch (e) {}
+
+// TypeScript API routes (src/api) yüklenebilsin
+try {
+  require('ts-node/register')
+} catch (_) {}
 
 const path = require('path')
 const fs = require('fs')
