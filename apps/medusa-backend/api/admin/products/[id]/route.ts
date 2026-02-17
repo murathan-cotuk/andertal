@@ -8,6 +8,14 @@
 
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 
+function getProductService(scope: { resolve: (key: string) => unknown }) {
+  try {
+    return scope.resolve("productModuleService")
+  } catch {
+    return scope.resolve("productService")
+  }
+}
+
 export async function GET(
   req: MedusaRequest,
   res: MedusaResponse
@@ -18,7 +26,7 @@ export async function GET(
     return
   }
   try {
-    const productService = req.scope.resolve("productService") as {
+    const productService = getProductService(req.scope) as {
       listAndCount: (filter: object, options?: object) => Promise<[unknown[], number]>
     }
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
@@ -51,7 +59,7 @@ export async function PUT(
     return
   }
   try {
-    const productService = req.scope.resolve("productService") as {
+    const productService = getProductService(req.scope) as {
       update: (id: string, data: unknown) => Promise<unknown[]>
       updateProducts: (args: { id: string; data: unknown }[]) => Promise<unknown[]>
     }
@@ -97,7 +105,7 @@ export async function DELETE(
     return
   }
   try {
-    const productService = req.scope.resolve("productService") as {
+    const productService = getProductService(req.scope) as {
       delete: (ids: string[]) => Promise<void>
       deleteProducts: (ids: string[]) => Promise<void>
     }

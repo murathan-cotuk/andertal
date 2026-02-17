@@ -215,8 +215,22 @@ async function start() {
     const { expressLoader } = require('@medusajs/framework/http')
     const { app: httpApp } = await expressLoader({ app, container })
 
-    // Custom route'lar için scope (container kullan; adminHubService burada kayıtlı)
-    httpApp.use(['/admin-hub', '/admin'], (req, res, next) => {
+    // Proje loader'ları: adminHubService ve regionService container'a register edilir
+    try {
+      const adminHubServiceLoader = require(path.join(__dirname, 'loaders', 'admin-hub-service-loader.ts')).default
+      await adminHubServiceLoader(container)
+    } catch (e) {
+      console.warn('adminHubServiceLoader failed:', e.message)
+    }
+    try {
+      const regionServiceLoader = require(path.join(__dirname, 'loaders', 'region-service-loader.ts')).default
+      await regionServiceLoader(container)
+    } catch (e) {
+      console.warn('regionServiceLoader failed:', e.message)
+    }
+
+    // Custom route'lar için scope (container kullan; adminHubService, regionService, productService)
+    httpApp.use(['/admin-hub', '/admin', '/store'], (req, res, next) => {
       if (!req.scope) req.scope = container
       next()
     })
@@ -304,6 +318,13 @@ async function start() {
       httpApp.get('/admin/products/:id', (req, res) => runHandler(adminProductsId.GET, req, res))
     } catch (e) {
       console.error('Load admin/products/[id] route:', e.message)
+    }
+    try {
+      const storeProducts = require(path.join(__dirname, 'api', 'store', 'products', 'route.ts'))
+      httpApp.get('/store/products', (req, res) => runHandler(storeProducts.GET, req, res))
+      console.log('Store route: GET /store/products')
+    } catch (e) {
+      console.error('Load store/products route:', e.message)
     }
     // /admin/orders route yok; Dashboard sipariş sayısı 0 görünür.
 

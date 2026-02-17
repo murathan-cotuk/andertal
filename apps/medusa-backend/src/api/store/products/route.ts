@@ -14,6 +14,14 @@ import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import RegionService from "../../../../services/region-service"
 import AdminHubService from "../../../../services/admin-hub-service"
 
+function getProductService(scope: { resolve: (key: string) => unknown }) {
+  try {
+    return scope.resolve("productModuleService") as { listAndCount: (f: object, o?: object) => Promise<[unknown[], number]> }
+  } catch {
+    return scope.resolve("productService") as { listAndCount: (f: object, o?: object) => Promise<[unknown[], number]> }
+  }
+}
+
 export async function GET(
   req: MedusaRequest,
   res: MedusaResponse
@@ -21,8 +29,12 @@ export async function GET(
   const { region, category, collection_id } = req.query
 
   try {
-    // Medusa ProductService'i container'dan al
-    const productService = req.scope.resolve("productService")
+    let productService: { listAndCount: (f: object, o?: object) => Promise<[unknown[], number]> }
+    try {
+      productService = getProductService(req.scope)
+    } catch {
+      return res.json({ products: [], count: 0 })
+    }
 
     // Önce Medusa'dan TÜM ürünleri al
     const allProducts = await productService.listAndCount({})
@@ -57,31 +69,34 @@ export async function GET(
       }
     }
 
-    // Region filtresi
+    // Region filtresi (regionService yoksa atla)
     if (region && typeof region === "string") {
-      const regionService: RegionService = req.scope.resolve("regionService")
-      const regionProductIds = await regionService.listProductsByRegion(region.toUpperCase())
-      filteredProducts = filteredProducts.filter((product: any) =>
-        regionProductIds.includes(product.id)
-      )
+      try {
+        const regionService: RegionService = req.scope.resolve("regionService")
+        const regionProductIds = await regionService.listProductsByRegion(region.toUpperCase())
+        filteredProducts = filteredProducts.filter((product: any) =>
+          regionProductIds.includes(product.id)
+        )
+      } catch (e) {
+        console.warn("Region filter skipped:", (e as Error).message)
+      }
     }
 
-    // Category filtresi (Admin Hub kategorisi - metadata.admin_category_id)
+    // Category filtresi (Admin Hub kategorisi - metadata.admin_category_id; adminHubService yoksa atla)
     if (category && typeof category === "string") {
-      const adminHubService: AdminHubService = req.scope.resolve("adminHubService")
-      
-      // Category slug'dan ID'yi bul
-      const categoryEntity = await adminHubService.getCategoryBySlug(category)
-      
-      if (categoryEntity) {
-        // metadata.admin_category_id ile eşleşen ürünleri filtrele
-        filteredProducts = filteredProducts.filter((product: any) => {
-          const productMetadata = product.metadata || {}
-          return productMetadata.admin_category_id === categoryEntity.id
-        })
-      } else {
-        // Kategori bulunamadı, boş array döndür
-        filteredProducts = []
+      try {
+        const adminHubService: AdminHubService = req.scope.resolve("adminHubService")
+        const categoryEntity = await adminHubService.getCategoryBySlug(category)
+        if (categoryEntity) {
+          filteredProducts = filteredProducts.filter((product: any) => {
+            const productMetadata = product.metadata || {}
+            return productMetadata.admin_category_id === categoryEntity.id
+          })
+        } else {
+          filteredProducts = []
+        }
+      } catch (e) {
+        console.warn("Category filter skipped:", (e as Error).message)
       }
     }
 
