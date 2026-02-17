@@ -4,18 +4,25 @@
  * GET /admin/products - List products
  * POST /admin/products - Create product
  *
- * Medusa core does not mount these by default when using custom server.js;
- * we expose them here using productService from the container.
+ * Medusa v2: productModuleService veya productService ile çözülür.
  */
 
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+
+function getProductService(scope: { resolve: (key: string) => unknown }) {
+  try {
+    return scope.resolve("productModuleService") as { listAndCount: (f: object, o?: object) => Promise<[unknown[], number]>; create?: (d: unknown) => Promise<unknown[]>; createProducts?: (d: unknown[]) => Promise<unknown[]> }
+  } catch {
+    return scope.resolve("productService") as { listAndCount: (f: object, o?: object) => Promise<[unknown[], number]>; create?: (d: unknown) => Promise<unknown[]>; createProducts?: (d: unknown[]) => Promise<unknown[]> }
+  }
+}
 
 export async function GET(
   req: MedusaRequest,
   res: MedusaResponse
 ): Promise<void> {
   try {
-    const productService = req.scope.resolve("productService") as {
+    const productService = getProductService(req.scope) as {
       listAndCount: (filter: object, options?: object) => Promise<[unknown[], number]>
     }
     const { limit, offset, ...rest } = req.query as Record<string, string>
@@ -41,7 +48,7 @@ export async function POST(
 ): Promise<void> {
   try {
     const body = req.body as Record<string, unknown>
-    const productService = req.scope.resolve("productService") as {
+    const productService = getProductService(req.scope) as {
       create: (data: unknown) => Promise<unknown[]>
       createProducts: (data: unknown[]) => Promise<unknown[]>
     }

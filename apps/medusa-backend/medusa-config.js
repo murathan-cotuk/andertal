@@ -41,7 +41,8 @@ function getDatabaseDriverOptions() {
 
 // defineConfig yoksa (eski sürüm) düz export
 let config = {
-  linkModules: { enabled: false },
+  // true = Product, Order vb. commerce modülleri yüklensin (productService resolve edilebilsin)
+  linkModules: { enabled: true },
   projectConfig: {
     databaseUrl,
     databaseDriverOptions: getDatabaseDriverOptions(),

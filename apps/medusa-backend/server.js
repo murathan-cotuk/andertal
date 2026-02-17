@@ -215,33 +215,82 @@ async function start() {
     const { expressLoader } = require('@medusajs/framework/http')
     const { app: httpApp } = await expressLoader({ app, container })
 
-    // Custom route'lar için scope gerekli; yoksa container kullan (expressLoader bazı path'lerde scope set etmeyebilir)
+    // Custom route'lar için scope (container kullan; adminHubService burada kayıtlı)
     httpApp.use(['/admin-hub', '/admin'], (req, res, next) => {
-      if (!req.scope && typeof container.createScope === 'function') req.scope = container.createScope()
       if (!req.scope) req.scope = container
       next()
     })
 
-    // Custom API routes: Medusa custom server bunları otomatik yüklemiyor, elle mount ediyoruz (root api/ klasörü)
+    // --- Kategoriler: .ts yüklemeden doğrudan JS ile (Render'da güvenilir çalışır) ---
+    const adminHubCategoriesHandlers = () => {
+      const adminHubService = container.resolve('adminHubService')
+      return {
+        GET: async (req, res) => {
+          try {
+            const { active, parent_id, tree, is_visible, slug } = req.query
+            if (slug && typeof slug === 'string') {
+              const category = await adminHubService.getCategoryBySlug(slug)
+              if (!category) return res.status(404).json({ message: 'Category not found' })
+              return res.json({ category, categories: [category], count: 1 })
+            }
+            if (tree === 'true') {
+              const filters = {}
+              if (is_visible !== undefined) filters.is_visible = is_visible === 'true'
+              const categoryTree = await adminHubService.getCategoryTree(filters)
+              return res.json({ tree: categoryTree, categories: categoryTree, count: categoryTree.length })
+            }
+            const filters = {}
+            if (active !== undefined) filters.active = active === 'true'
+            if (parent_id !== undefined) filters.parent_id = parent_id === 'null' ? null : parent_id
+            const categories = await adminHubService.listCategories(filters)
+            res.json({ categories, count: categories.length })
+          } catch (err) {
+            console.error('Admin Hub Categories GET error:', err)
+            res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+          }
+        },
+        POST: async (req, res) => {
+          try {
+            const b = req.body || {}
+            const name = b.name
+            const slug = b.slug
+            if (!name || !slug) return res.status(400).json({ message: 'name ve slug zorunludur' })
+            const category = await adminHubService.createCategory({
+              name,
+              slug,
+              description: b.description || undefined,
+              parent_id: b.parent_id || null,
+              active: b.active !== undefined ? b.active : true,
+              is_visible: b.is_visible !== undefined ? b.is_visible : true,
+              has_collection: b.has_collection !== undefined ? b.has_collection : false,
+              sort_order: b.sort_order || 0,
+              metadata: b.metadata,
+            })
+            res.status(201).json({ category })
+          } catch (err) {
+            console.error('Admin Hub Categories POST error:', err)
+            res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+          }
+        },
+      }
+    }
+    try {
+      const cat = adminHubCategoriesHandlers()
+      httpApp.get('/admin-hub/categories', (req, res) => cat.GET(req, res))
+      httpApp.post('/admin-hub/categories', (req, res) => cat.POST(req, res))
+      httpApp.get('/admin-hub/v1/categories', (req, res) => cat.GET(req, res))
+      httpApp.post('/admin-hub/v1/categories', (req, res) => cat.POST(req, res))
+      console.log('Admin Hub categories routes: GET/POST /admin-hub/categories ve /admin-hub/v1/categories')
+    } catch (e) {
+      console.error('Admin Hub categories routes failed:', e.message)
+    }
+
+    // --- Ürünler: .ts route yükle (productService/productModuleService aşağıda düzeltildi) ---
     const runHandler = (handler, req, res) => {
       Promise.resolve(handler(req, res)).catch((err) => {
         console.error('Route handler error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
       })
-    }
-    try {
-      const adminHubCategories = require(path.join(__dirname, 'api', 'admin-hub', 'categories', 'route.ts'))
-      httpApp.get('/admin-hub/categories', (req, res) => runHandler(adminHubCategories.GET, req, res))
-      httpApp.post('/admin-hub/categories', (req, res) => runHandler(adminHubCategories.POST, req, res))
-    } catch (e) {
-      console.error('Load admin-hub/categories route:', e.message)
-    }
-    try {
-      const adminHubV1Categories = require(path.join(__dirname, 'api', 'admin-hub', 'v1', 'categories', 'route.ts'))
-      httpApp.get('/admin-hub/v1/categories', (req, res) => runHandler(adminHubV1Categories.GET, req, res))
-      httpApp.post('/admin-hub/v1/categories', (req, res) => runHandler(adminHubV1Categories.POST, req, res))
-    } catch (e) {
-      console.error('Load admin-hub/v1/categories route:', e.message)
     }
     try {
       const adminProducts = require(path.join(__dirname, 'api', 'admin', 'products', 'route.ts'))
@@ -256,7 +305,7 @@ async function start() {
     } catch (e) {
       console.error('Load admin/products/[id] route:', e.message)
     }
-    // Not: /admin/orders için route yoksa Dashboard sipariş sayısı 0 görünür; ileride eklenebilir.
+    // /admin/orders route yok; Dashboard sipariş sayısı 0 görünür.
 
     httpApp.listen(PORT, HOST, () => {
       console.log(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)
