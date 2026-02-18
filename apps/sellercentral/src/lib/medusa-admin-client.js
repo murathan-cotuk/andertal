@@ -98,10 +98,9 @@ class MedusaAdminClient {
    * Vercel'da NEXT_PUBLIC_MEDUSA_BACKEND_URL = https://belucha-medusa-backend.onrender.com olmalı.
    */
   async getAdminHubCategories(filters = {}) {
-    const queryParams = new URLSearchParams({
-      active: 'true',
-      ...filters,
-    }).toString()
+    const { all, ...rest } = filters
+    const params = all ? rest : { active: 'true', ...rest }
+    const queryParams = new URLSearchParams(params).toString()
     const paths = [
       `/admin-hub/categories?${queryParams}`,
       `/admin-hub/v1/categories?${queryParams}`,
@@ -171,6 +170,60 @@ class MedusaAdminClient {
     const data = await this.request('/admin-hub/v1/categories?active=true')
     const collections = (data.categories || []).filter(cat => cat.has_collection === true)
     return { collections, count: collections.length }
+  }
+
+  /**
+   * List Medusa collections (for linking category to existing collection)
+   */
+  async getMedusaCollections() {
+    const data = await this.request('/admin/collections')
+    return { collections: data.collections || [], count: data.count || 0 }
+  }
+
+  /**
+   * Admin Hub Menus
+   */
+  async getMenus() {
+    const data = await this.request('/admin-hub/menus')
+    return { menus: data.menus || [], count: data.count || 0 }
+  }
+
+  async getMenu(id) {
+    const data = await this.request(`/admin-hub/menus/${id}`)
+    return data.menu
+  }
+
+  async createMenu(body) {
+    const data = await this.request('/admin-hub/menus', { method: 'POST', body: JSON.stringify(body) })
+    return data.menu
+  }
+
+  async updateMenu(id, body) {
+    const data = await this.request(`/admin-hub/menus/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+    return data.menu
+  }
+
+  async deleteMenu(id) {
+    return this.request(`/admin-hub/menus/${id}`, { method: 'DELETE' })
+  }
+
+  async getMenuItems(menuId) {
+    const data = await this.request(`/admin-hub/menus/${menuId}/items`)
+    return { items: data.items || [], count: data.count || 0 }
+  }
+
+  async createMenuItem(menuId, body) {
+    const data = await this.request(`/admin-hub/menus/${menuId}/items`, { method: 'POST', body: JSON.stringify(body) })
+    return data.item
+  }
+
+  async updateMenuItem(menuId, itemId, body) {
+    const data = await this.request(`/admin-hub/menus/${menuId}/items/${itemId}`, { method: 'PUT', body: JSON.stringify(body) })
+    return data.item
+  }
+
+  async deleteMenuItem(menuId, itemId) {
+    return this.request(`/admin-hub/menus/${menuId}/items/${itemId}`, { method: 'DELETE' })
   }
 
   /**

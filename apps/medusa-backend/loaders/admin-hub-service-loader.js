@@ -21,9 +21,13 @@ async function adminHubServiceLoader(container) {
     const AdminHubService = AdminHubServiceModule.default || AdminHubServiceModule
     const catMod = require(path.join(__dirname, '..', 'models', 'admin-hub-category.ts'))
     const banMod = require(path.join(__dirname, '..', 'models', 'admin-hub-banner.ts'))
+    const menuMod = require(path.join(__dirname, '..', 'models', 'admin-hub-menu.ts'))
+    const menuItemMod = require(path.join(__dirname, '..', 'models', 'admin-hub-menu-item.ts'))
     const AdminHubCategory = catMod.AdminHubCategory || catMod.default || catMod
     const AdminHubBanner = banMod.AdminHubBanner || banMod.default || banMod
-    const entities = [AdminHubCategory, AdminHubBanner].filter(Boolean)
+    const AdminHubMenu = menuMod.AdminHubMenu || menuMod.default || menuMod
+    const AdminHubMenuItem = menuItemMod.AdminHubMenuItem || menuItemMod.default || menuItemMod
+    const entities = [AdminHubCategory, AdminHubBanner, AdminHubMenu, AdminHubMenuItem].filter(Boolean)
 
     if (!AdminHubService) {
       throw new Error('AdminHubService could not be loaded from admin-hub-service.ts')
@@ -67,6 +71,9 @@ async function adminHubServiceLoader(container) {
       console.warn('⚠️  ProductCollectionService not available, collection sync will be disabled')
     }
 
+    const MenuServiceModule = require(path.join(__dirname, '..', 'services', 'menu-service.ts'))
+    const MenuService = MenuServiceModule.default || MenuServiceModule
+
     container.register({
       adminHubService: {
         resolve: () => {
@@ -76,9 +83,13 @@ async function adminHubServiceLoader(container) {
           })
         },
       },
+      menuService: {
+        resolve: () => new MenuService(manager),
+      },
     })
 
     console.log('✅ AdminHubService container\'a register edildi')
+    if (MenuService) console.log('✅ MenuService container\'a register edildi')
   } catch (err) {
     console.error('❌ adminHubServiceLoader failed:', err && err.message)
     if (err && err.stack) console.error(err.stack)

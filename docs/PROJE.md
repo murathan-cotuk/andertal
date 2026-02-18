@@ -23,6 +23,13 @@ Kategori sayfaları hem ürün listesi hem içerik sayfası (landing) olacak; ay
 - **Sales Channel:** Medusa core; storefront hangi kanalda yayında ise ona göre filtre.
 - **Admin Hub (Categories, Banners):** Platform sahibi (Super Admin) yönetimi; store'da `/store/categories` (tree, slug). Kategoride seo_title, seo_description, long_content, banner_image_url alanları var. Admin'de `/admin-hub/v1/categories`, `/admin-hub/v1/banners`.
 
+**Kategori akışı (kodda nasıl sağlanıyor)**  
+- **Depolama:** Kategoriler Render PostgreSQL’de **`admin_hub_categories`** tablosunda (DB: medusa_seoj).  
+- **Kategori ID:** Sen ayarlamazsın. PostgreSQL her INSERT’te **UUID** üretir (`uuid_generate_v4()`). Model: `apps/medusa-backend/models/admin-hub-category.ts` (`@PrimaryGeneratedColumn("uuid")`).  
+- **Oluşturma:** Seller Central **Content → Categories** sayfasında “Add category” → `createAdminHubCategory()` → POST `/admin-hub/v1/categories` → backend `adminHubService.createCategory()` → TypeORM `save()` → INSERT; ID DB’de atanır.  
+- **Listeleme:** Aynı sayfa ve **/categories** → `getAdminHubCategories()` → GET `/admin-hub/v1/categories?active=true` → `adminHubService.listCategories()` → SELECT → JSON’da `categories` döner.  
+- Sonuç: API’de `categories` dönüyorsa akış doğrudur; ID hep veritabanından gelir.
+
 **Kategoriler nerede, hangi API?**  
 Kategoriler **Admin Hub** tarafında: veritabanı tablosu `admin_hub_categories`, servis `AdminHubService`. API: `GET /admin-hub/v1/categories` (liste; query: `active`, `tree`, `slug`). Seller Central ürün eklerken bu API ile kategorileri çeker; dropdown’da seçilen kategori ID’si ürünün `metadata.admin_category_id` alanına yazılır. Shop, `GET /store/categories` ile aynı kategorileri kullanır (slug ile sayfa açar). Yani tek kaynak Admin Hub; Seller Central ve Shop aynı backend API’ye bağlı.
 

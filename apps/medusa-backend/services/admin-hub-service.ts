@@ -202,8 +202,9 @@ export default class AdminHubService {
   }
 
   /**
-   * Sync Medusa collection for category
-   * Creates or updates Medusa collection with handle = category.slug
+   * Sync Medusa collection for category.
+   * - If metadata.collection_id is set: update that collection's title (manual link).
+   * - Else: create or update by title "Parent > Child" (or "Name" for root), handle = parentSlug-childSlug or slug.
    */
   private async syncCollectionForCategory(category: AdminHubCategory): Promise<void> {
     if (!this.productCollectionService_) {
@@ -212,31 +213,63 @@ export default class AdminHubService {
     }
 
     try {
-      // Check if collection exists
-      const existingCollections = await this.productCollectionService_.list({
-        handle: category.slug,
-      })
+      const collectionTitle = category.parent_id
+        ? await this.getCollectionTitleForCategory(category)
+        : category.name
+      const handle = category.parent_id
+        ? await this.getCollectionHandleForCategory(category)
+        : category.slug
 
+      const existingId = category.metadata?.collection_id as string | undefined
+      if (existingId) {
+        await this.productCollectionService_.update(existingId, {
+          title: collectionTitle,
+          handle,
+        })
+        console.log(`✅ Collection updated (linked) for category: ${category.name}`)
+        return
+      }
+
+      const existingCollections = await this.productCollectionService_.list({ handle })
       if (existingCollections && existingCollections.length > 0) {
-        // Update existing collection
         const collection = existingCollections[0]
         await this.productCollectionService_.update(collection.id, {
-          title: category.name,
-          handle: category.slug,
+          title: collectionTitle,
+          handle,
         })
+        if (!category.metadata) (category as any).metadata = {}
+        ;(category as any).metadata.collection_id = collection.id
+        await this.categoryRepository_.save(category)
         console.log(`✅ Collection updated for category: ${category.name}`)
       } else {
-        // Create new collection
-        await this.productCollectionService_.create({
-          title: category.name,
-          handle: category.slug,
+        const created = await this.productCollectionService_.create({
+          title: collectionTitle,
+          handle,
         })
-        console.log(`✅ Collection created for category: ${category.name}`)
+        const createdId = Array.isArray(created) ? created[0]?.id : (created as any)?.id
+        if (createdId) {
+          if (!category.metadata) (category as any).metadata = {}
+          ;(category as any).metadata.collection_id = createdId
+          await this.categoryRepository_.save(category)
+        }
+        console.log(`✅ Collection created for category: ${category.name} (${collectionTitle})`)
       }
     } catch (error) {
-      console.error(`❌ Failed to sync collection for category ${category.name}:`, error.message)
-      // Don't throw - collection sync is optional
+      console.error(`❌ Failed to sync collection for category ${category.name}:`, (error as Error).message)
     }
+  }
+
+  private async getCollectionTitleForCategory(category: AdminHubCategory): Promise<string> {
+    if (!category.parent_id) return category.name
+    const parent = await this.categoryRepository_.findOne({ where: { id: category.parent_id } })
+    return parent ? `${parent.name} > ${category.name}` : category.name
+  }
+
+  private async getCollectionHandleForCategory(category: AdminHubCategory): Promise<string> {
+    if (!category.parent_id) return category.slug
+    const parent = await this.categoryRepository_.findOne({ where: { id: category.parent_id } })
+    const parentSlug = parent?.slug || "parent"
+    return `${parentSlug}-${category.slug}`
   }
 
   async deleteCategory(id: string): Promise<void> {

@@ -57,6 +57,39 @@ const SQL_STEPS = [
       CREATE INDEX IF NOT EXISTS idx_admin_hub_banners_active ON admin_hub_banners(active);
     `,
   },
+  {
+    name: 'admin_hub_menus',
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_hub_menus (
+        id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name varchar(100) NOT NULL,
+        slug varchar(100) NOT NULL UNIQUE,
+        location varchar(50) DEFAULT 'main',
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_menus_slug ON admin_hub_menus(slug);
+      CREATE INDEX IF NOT EXISTS idx_admin_hub_menus_location ON admin_hub_menus(location);
+    `,
+  },
+  {
+    name: 'admin_hub_menu_items',
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_hub_menu_items (
+        id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        menu_id uuid NOT NULL REFERENCES admin_hub_menus(id) ON DELETE CASCADE,
+        label varchar(255) NOT NULL,
+        link_type varchar(50) DEFAULT 'url',
+        link_value text,
+        parent_id uuid REFERENCES admin_hub_menu_items(id) ON DELETE CASCADE,
+        sort_order integer DEFAULT 0,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_admin_hub_menu_items_menu_id ON admin_hub_menu_items(menu_id);
+      CREATE INDEX IF NOT EXISTS idx_admin_hub_menu_items_parent_id ON admin_hub_menu_items(parent_id);
+    `,
+  },
 ]
 
 async function main() {
@@ -76,7 +109,7 @@ async function main() {
       await client.query(step.sql)
       console.log('OK:', step.name)
     }
-    console.log('\nBitti. admin_hub_categories ve admin_hub_banners hazir.\n')
+    console.log('\nBitti. admin_hub_categories, admin_hub_banners, admin_hub_menus, admin_hub_menu_items hazir.\n')
   } catch (err) {
     console.error('\nHata:', err.message)
     process.exit(1)

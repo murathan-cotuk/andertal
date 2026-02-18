@@ -413,6 +413,158 @@ async function start() {
     httpApp.get('/admin/orders', (req, res) => adminOrdersGET(req, res))
     console.log('Admin route: GET /admin/orders')
 
+    // GET /admin/collections – Medusa koleksiyon listesi (kategori formunda manuel bağlama için)
+    const adminCollectionsGET = async (req, res) => {
+      try {
+        const scope = req.scope || container
+        let list = []
+        try {
+          const svc = scope.resolve('productCollectionService')
+          if (svc && typeof svc.list === 'function') {
+            const raw = await svc.list({}, { take: 200 })
+            list = Array.isArray(raw) ? raw : (raw?.data || [])
+          }
+        } catch (_) {}
+        res.json({ collections: list, count: list.length })
+      } catch (err) {
+        console.error('Admin collections GET error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    httpApp.get('/admin/collections', (req, res) => adminCollectionsGET(req, res))
+    console.log('Admin route: GET /admin/collections')
+
+    // --- Admin Hub Menus ---
+    const resolveMenuService = () => {
+      try {
+        return container.resolve('menuService')
+      } catch (e) {
+        return null
+      }
+    }
+    const menusListGET = async (req, res) => {
+      const svc = resolveMenuService()
+      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
+      try {
+        const menus = await svc.listMenus()
+        res.json({ menus, count: menus.length })
+      } catch (err) {
+        console.error('Menus GET error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    const menusCreatePOST = async (req, res) => {
+      const svc = resolveMenuService()
+      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
+      try {
+        const b = req.body || {}
+        if (!b.name || !b.slug) return res.status(400).json({ message: 'name and slug required' })
+        const menu = await svc.createMenu({ name: b.name, slug: b.slug, location: b.location })
+        res.status(201).json({ menu })
+      } catch (err) {
+        console.error('Menus POST error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    const menuByIdGET = async (req, res) => {
+      const svc = resolveMenuService()
+      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
+      try {
+        const menu = await svc.getMenuById(req.params.id)
+        if (!menu) return res.status(404).json({ message: 'Menu not found' })
+        res.json({ menu })
+      } catch (err) {
+        console.error('Menu GET error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    const menuByIdPUT = async (req, res) => {
+      const svc = resolveMenuService()
+      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
+      try {
+        const menu = await svc.updateMenu(req.params.id, req.body || {})
+        res.json({ menu })
+      } catch (err) {
+        console.error('Menu PUT error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    const menuByIdDELETE = async (req, res) => {
+      const svc = resolveMenuService()
+      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
+      try {
+        await svc.deleteMenu(req.params.id)
+        res.status(200).json({ deleted: true })
+      } catch (err) {
+        console.error('Menu DELETE error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    const menuItemsGET = async (req, res) => {
+      const svc = resolveMenuService()
+      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
+      try {
+        const items = await svc.listMenuItems(req.params.menuId)
+        res.json({ items, count: items.length })
+      } catch (err) {
+        console.error('Menu items GET error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    const menuItemsPOST = async (req, res) => {
+      const svc = resolveMenuService()
+      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
+      try {
+        const b = req.body || {}
+        const menuId = req.params.menuId
+        if (!b.label) return res.status(400).json({ message: 'label required' })
+        const item = await svc.createMenuItem({
+          menu_id: menuId,
+          label: b.label,
+          link_type: b.link_type || 'url',
+          link_value: b.link_value || null,
+          parent_id: b.parent_id || null,
+          sort_order: b.sort_order || 0,
+        })
+        res.status(201).json({ item })
+      } catch (err) {
+        console.error('Menu items POST error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    const menuItemByIdPUT = async (req, res) => {
+      const svc = resolveMenuService()
+      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
+      try {
+        const item = await svc.updateMenuItem(req.params.itemId, req.body || {})
+        res.json({ item })
+      } catch (err) {
+        console.error('Menu item PUT error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    const menuItemByIdDELETE = async (req, res) => {
+      const svc = resolveMenuService()
+      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
+      try {
+        await svc.deleteMenuItem(req.params.itemId)
+        res.status(200).json({ deleted: true })
+      } catch (err) {
+        console.error('Menu item DELETE error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    httpApp.get('/admin-hub/menus', menusListGET)
+    httpApp.post('/admin-hub/menus', menusCreatePOST)
+    httpApp.get('/admin-hub/menus/:id', menuByIdGET)
+    httpApp.put('/admin-hub/menus/:id', menuByIdPUT)
+    httpApp.delete('/admin-hub/menus/:id', menuByIdDELETE)
+    httpApp.get('/admin-hub/menus/:menuId/items', menuItemsGET)
+    httpApp.post('/admin-hub/menus/:menuId/items', menuItemsPOST)
+    httpApp.put('/admin-hub/menus/:menuId/items/:itemId', menuItemByIdPUT)
+    httpApp.delete('/admin-hub/menus/:menuId/items/:itemId', menuItemByIdDELETE)
+    console.log('Admin Hub routes: /admin-hub/menus (+ :id, :menuId/items, :itemId)')
+
     httpApp.listen(PORT, HOST, () => {
       console.log(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)
       console.log(`📍 Listening on ${HOST}:${PORT}\n`)

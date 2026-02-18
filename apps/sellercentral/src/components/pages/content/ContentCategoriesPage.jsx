@@ -15,6 +15,10 @@ import {
   Divider,
   Checkbox,
   Modal,
+  Select,
+  IndexTable,
+  useIndexResourceState,
+  Badge,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
@@ -27,27 +31,62 @@ function slugFromName(name) {
     .replace(/[^a-z0-9-]/g, "");
 }
 
+function buildTree(flatList) {
+  const byId = new Map(flatList.map((c) => [c.id, { ...c, children: [] }]));
+  const roots = [];
+  for (const c of flatList) {
+    const node = byId.get(c.id);
+    if (!c.parent_id) {
+      roots.push(node);
+    } else {
+      const parent = byId.get(c.parent_id);
+      if (parent) parent.children.push(node);
+      else roots.push(node);
+    }
+  }
+  const sort = (arr) => arr.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || (a.name || "").localeCompare(b.name || ""));
+  sort(roots);
+  roots.forEach((r) => sort(r.children));
+  return roots;
+}
+
+function flattenTree(tree, level = 0) {
+  let out = [];
+  for (const node of tree) {
+    out.push({ ...node, _level: level });
+    if (node.children?.length) out = out.concat(flattenTree(node.children, level + 1));
+  }
+  return out;
+}
+
+const emptyForm = {
+  name: "",
+  slug: "",
+  description: "",
+  parent_id: "",
+  has_collection: false,
+  active: true,
+  is_visible: true,
+  collection_id: "",
+};
+
 export default function ContentCategoriesPage() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    slug: "",
-    description: "",
-    has_collection: false,
-    active: true,
-    is_visible: true,
-  });
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [medusaCollections, setMedusaCollections] = useState([]);
   const client = getMedusaAdminClient();
 
   const fetchCategories = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await client.getAdminHubCategories();
+      const data = await client.getAdminHubCategories({ all: true });
       setCategories(data.categories || []);
     } catch (err) {
       setError(err?.message || "Failed to load categories");
@@ -61,12 +100,37 @@ export default function ContentCategoriesPage() {
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    client.getMedusaCollections().then((r) => setMedusaCollections(r.collections || [])).catch(() => setMedusaCollections([]));
+  }, []);
+
   const handleNameChange = (value) => {
     setForm((prev) => ({
       ...prev,
       name: value,
-      slug: prev.slug || slugFromName(value),
+      slug: prev.slug || (editId ? prev.slug : slugFromName(value)),
     }));
+  };
+
+  const openCreate = () => {
+    setEditId(null);
+    setForm({ ...emptyForm, parent_id: "" });
+    setModalOpen(true);
+  };
+
+  const openEdit = (cat) => {
+    setEditId(cat.id);
+    setForm({
+      name: cat.name || "",
+      slug: cat.slug || "",
+      description: cat.description || "",
+      parent_id: cat.parent_id || "",
+      has_collection: !!cat.has_collection,
+      active: !!cat.active,
+      is_visible: !!cat.is_visible,
+      collection_id: (cat.metadata && cat.metadata.collection_id) || "",
+    });
+    setModalOpen(true);
   };
 
   const handleSubmit = async () => {
@@ -76,33 +140,53 @@ export default function ContentCategoriesPage() {
       setError("Name and slug are required.");
       return;
     }
+    const payload = {
+      name,
+      slug,
+      description: (form.description || "").trim() || undefined,
+      parent_id: form.parent_id || null,
+      has_collection: !!form.has_collection,
+      active: !!form.active,
+      is_visible: !!form.is_visible,
+      metadata: form.collection_id ? { collection_id: form.collection_id } : undefined,
+    };
+
     try {
-      setCreating(true);
-      setError(null);
-      await client.createAdminHubCategory({
-        name,
-        slug,
-        description: (form.description || "").trim() || undefined,
-        has_collection: !!form.has_collection,
-        active: !!form.active,
-        is_visible: !!form.is_visible,
-      });
-      setModalOpen(false);
-      setForm({ name: "", slug: "", description: "", has_collection: false, active: true, is_visible: true });
-      await fetchCategories();
+      if (editId) {
+        setSaving(true);
+        setError(null);
+        await client.updateAdminHubCategory(editId, payload);
+        setModalOpen(false);
+        await fetchCategories();
+      } else {
+        setCreating(true);
+        setError(null);
+        await client.createAdminHubCategory(payload);
+        setModalOpen(false);
+        setForm(emptyForm);
+        await fetchCategories();
+      }
     } catch (err) {
-      setError(err?.message || "Failed to create category");
+      setError(err?.message || (editId ? "Failed to update category" : "Failed to create category"));
     } finally {
       setCreating(false);
+      setSaving(false);
     }
   };
+
+  const tree = buildTree(categories);
+  const flatRows = flattenTree(tree);
+  const parentOptions = [{ label: "— None (top level) —", value: "" }, ...categories.filter((c) => !editId || c.id !== editId).map((c) => ({ label: c.name, value: c.id }))];
+
+  const resourceName = { singular: "category", plural: "categories" };
+  const { selectedResources, allResourcesSelected, handleSelectionChange } = useIndexResourceState(flatRows);
 
   return (
     <Page
       title="Categories"
       primaryAction={{
         content: "Add category",
-        onAction: () => setModalOpen(true),
+        onAction: openCreate,
       }}
     >
       <Layout>
@@ -139,37 +223,74 @@ export default function ContentCategoriesPage() {
                     <Text as="p" tone="subdued">
                       No categories yet. Add one to use in products and collections.
                     </Text>
-                    <Button variant="primary" onClick={() => setModalOpen(true)}>
+                    <Button variant="primary" onClick={openCreate}>
                       Add category
                     </Button>
                   </BlockStack>
                 </Box>
               ) : (
-                <BlockStack gap="200">
-                  {categories.map((cat) => (
-                    <Box
-                      key={cat.id}
-                      padding="300"
-                      background="bg-surface-secondary"
-                      borderRadius="200"
-                    >
-                      <InlineStack align="space-between" blockAlign="center" gap="400">
-                        <BlockStack gap="100">
-                          <Text as="p" variant="bodyMd" fontWeight="medium">
-                            {cat.name}
+                <IndexTable
+                  resourceName={resourceName}
+                  itemCount={flatRows.length}
+                  selectable={false}
+                  headings={[
+                    { title: "Name" },
+                    { title: "Slug" },
+                    { title: "Parent" },
+                    { title: "Collection" },
+                    { title: "Status" },
+                    { title: "" },
+                  ]}
+                >
+                  {flatRows.map((row, index) => (
+                    <IndexTable.Row id={row.id} key={row.id} position={index}>
+                      <IndexTable.Cell>
+                        <Box paddingInlineStart={row._level ? `${row._level * 24 + 8}px` : "0"}>
+                          <Text as="span" variant="bodyMd" fontWeight="medium">
+                            {row._level ? `↳ ${row.name}` : row.name}
                           </Text>
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            /{cat.slug || "-"}
-                            {cat.has_collection ? " · Collection" : ""}
-                          </Text>
-                        </BlockStack>
+                        </Box>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
                         <Text as="span" variant="bodySm" tone="subdued">
-                          {cat.active ? "Active" : "Inactive"}
+                          /{row.slug || "—"}
                         </Text>
-                      </InlineStack>
-                    </Box>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        <Text as="span" variant="bodySm">
+                          {row.parent_id ? categories.find((c) => c.id === row.parent_id)?.name || "—" : "—"}
+                        </Text>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        {row.has_collection ? (
+                          <Badge tone="success">Yes</Badge>
+                        ) : (
+                          <Text as="span" tone="subdued">
+                            —
+                          </Text>
+                        )}
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        <InlineStack gap="200">
+                          {row.active && (
+                            <Badge tone="success">Active</Badge>
+                          )}
+                          {!row.active && (
+                            <Badge tone="critical">Inactive</Badge>
+                          )}
+                          {row.is_visible && (
+                            <Badge>Visible</Badge>
+                          )}
+                        </InlineStack>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        <Button size="slim" onClick={() => openEdit(row)}>
+                          Edit
+                        </Button>
+                      </IndexTable.Cell>
+                    </IndexTable.Row>
                   ))}
-                </BlockStack>
+                </IndexTable>
               )}
             </BlockStack>
           </Card>
@@ -179,17 +300,23 @@ export default function ContentCategoriesPage() {
       <Modal
         open={modalOpen}
         onClose={() => {
-          if (!creating) setModalOpen(false);
+          if (!creating && !saving) setModalOpen(false);
         }}
-        title="Add category"
+        title={editId ? "Edit category" : "Add category"}
         primaryAction={{
-          content: creating ? "Creating…" : "Create",
+          content: creating || saving ? (editId ? "Saving…" : "Creating…") : editId ? "Save" : "Create",
           onAction: handleSubmit,
-          loading: creating,
+          loading: creating || saving,
         }}
       >
         <Modal.Section>
           <BlockStack gap="400">
+            <Select
+              label="Parent category (subcategory)"
+              options={parentOptions}
+              value={form.parent_id}
+              onChange={(value) => setForm((prev) => ({ ...prev, parent_id: value }))}
+            />
             <TextField
               label="Name"
               value={form.name}
@@ -213,10 +340,22 @@ export default function ContentCategoriesPage() {
               autoComplete="off"
             />
             <Checkbox
-              label="Has collection (show as collection page)"
+              label="Has collection (create or link collection page)"
               checked={form.has_collection}
               onChange={(value) => setForm((prev) => ({ ...prev, has_collection: value }))}
             />
+            {form.has_collection && (
+              <Select
+                label="Link to existing collection (optional)"
+                options={[
+                  { label: "— Auto-create new collection —", value: "" },
+                  ...medusaCollections.map((c) => ({ label: c.title || c.handle || c.id, value: c.id })),
+                ]}
+                value={form.collection_id}
+                onChange={(value) => setForm((prev) => ({ ...prev, collection_id: value }))}
+                helpText="Leave as 'Auto-create' for 'Parent > Child' or category name collection."
+              />
+            )}
             <Checkbox
               label="Active"
               checked={form.active}
