@@ -215,6 +215,49 @@ async function start() {
     const { expressLoader } = require('@medusajs/framework/http')
     const { app: httpApp } = await expressLoader({ app, container })
 
+    // Admin Hub tabloları yoksa oluştur (menüs/categories deploy sonrası çalışsın diye)
+    const DATABASE_URL = process.env.DATABASE_URL || ''
+    if (DATABASE_URL && DATABASE_URL.startsWith('postgres')) {
+      try {
+        const { Client } = require('pg')
+        const dbUrl = DATABASE_URL.replace(/^postgresql:\/\//, 'postgres://')
+        const isRender = dbUrl.includes('render.com')
+        const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        await client.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_menus (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            name varchar(100) NOT NULL,
+            slug varchar(100) NOT NULL UNIQUE,
+            location varchar(50) DEFAULT 'main',
+            created_at timestamp DEFAULT now(),
+            updated_at timestamp DEFAULT now()
+          );
+        `)
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_menu_items (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            menu_id uuid NOT NULL REFERENCES admin_hub_menus(id) ON DELETE CASCADE,
+            label varchar(255) NOT NULL,
+            link_type varchar(50) DEFAULT 'url',
+            link_value text,
+            parent_id uuid REFERENCES admin_hub_menu_items(id) ON DELETE CASCADE,
+            sort_order integer DEFAULT 0,
+            created_at timestamp DEFAULT now(),
+            updated_at timestamp DEFAULT now()
+          );
+        `)
+        await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_menus_slug ON admin_hub_menus(slug);')
+        await client.query('CREATE INDEX IF NOT EXISTS idx_admin_hub_menu_items_menu_id ON admin_hub_menu_items(menu_id);')
+        await client.query('CREATE INDEX IF NOT EXISTS idx_admin_hub_menu_items_parent_id ON admin_hub_menu_items(parent_id);')
+        await client.end()
+        console.log('Admin Hub: admin_hub_menus / admin_hub_menu_items tabloları hazır')
+      } catch (migErr) {
+        console.warn('Admin Hub migration (menus) skipped or failed:', migErr && migErr.message)
+      }
+    }
+
     // Proje loader'ları: adminHubService ve regionService container'a register edilir (.js = Render'da güvenilir)
     try {
       const adminHubServiceLoader = require(path.join(__dirname, 'loaders', 'admin-hub-service-loader.js'))

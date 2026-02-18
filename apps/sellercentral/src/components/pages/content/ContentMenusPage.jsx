@@ -21,13 +21,6 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
-const LOCATIONS = [
-  { label: "Navbar", value: "navbar" },
-  { label: "Main menu", value: "main" },
-  { label: "Footer", value: "footer" },
-  { label: "Sidebar", value: "sidebar" },
-];
-
 const LINK_TYPES = [
   { label: "Collection", value: "collection" },
   { label: "Product", value: "product" },
@@ -55,7 +48,8 @@ export default function ContentMenusPage() {
   const [editingItemId, setEditingItemId] = useState(null);
   const [collections, setCollections] = useState([]);
   const [products, setProducts] = useState([]);
-  const [menuForm, setMenuForm] = useState({ name: "", slug: "", location: "main" });
+  const [menuForm, setMenuForm] = useState({ name: "", slug: "" });
+  const [menuSlugManuallyEdited, setMenuSlugManuallyEdited] = useState(false);
   const [itemForm, setItemForm] = useState({
     label: "",
     link_type: "url",
@@ -112,18 +106,27 @@ export default function ContentMenusPage() {
 
   const openAddMenu = () => {
     setEditingMenuId(null);
-    setMenuForm({ name: "", slug: "", location: "main" });
+    setMenuSlugManuallyEdited(false);
+    setMenuForm({ name: "", slug: "" });
     setMenuModalOpen(true);
   };
 
   const openEditMenu = (menu) => {
     setEditingMenuId(menu.id);
+    setMenuSlugManuallyEdited(false);
     setMenuForm({
       name: menu.name || "",
-      slug: menu.slug || "",
-      location: menu.location || "main",
+      slug: menu.slug || slugFromName(menu.name || ""),
     });
     setMenuModalOpen(true);
+  };
+
+  const handleMenuNameChange = (value) => {
+    setMenuForm((prev) => ({
+      ...prev,
+      name: value,
+      slug: menuSlugManuallyEdited ? prev.slug : slugFromName(value),
+    }));
   };
 
   const handleSaveMenu = async () => {
@@ -137,9 +140,9 @@ export default function ContentMenusPage() {
       setSaving(true);
       setError(null);
       if (editingMenuId) {
-        await client.updateMenu(editingMenuId, { name, slug, location: menuForm.location || "main" });
+        await client.updateMenu(editingMenuId, { name, slug, location: slug });
       } else {
-        await client.createMenu({ name, slug, location: menuForm.location || "main" });
+        await client.createMenu({ name, slug, location: slug });
       }
       setMenuModalOpen(false);
       setEditingMenuId(null);
@@ -340,7 +343,7 @@ export default function ContentMenusPage() {
                           <Text as="h3" variant="headingMd">
                             {selectedMenu.name}
                           </Text>
-                          <Badge>{selectedMenu.location}</Badge>
+                          <Badge>{selectedMenu.slug || selectedMenu.location}</Badge>
                           <Button size="slim" onClick={openAddItem}>
                             Add item
                           </Button>
@@ -412,31 +415,23 @@ export default function ContentMenusPage() {
       >
         <Modal.Section>
           <BlockStack gap="400">
-            <Select
-              label="Location"
-              options={LOCATIONS}
-              value={menuForm.location}
-              onChange={(value) => setMenuForm((prev) => ({ ...prev, location: value }))}
-            />
             <TextField
-              label="Name"
+              label="Menu name"
               value={menuForm.name}
-              onChange={(value) =>
-                setMenuForm((prev) => ({
-                  ...prev,
-                  name: value,
-                  slug: prev.slug || slugFromName(value),
-                }))
-              }
+              onChange={handleMenuNameChange}
               placeholder="e.g. Main menu"
               autoComplete="off"
             />
             <TextField
               label="Slug"
               value={menuForm.slug}
-              onChange={(value) => setMenuForm((prev) => ({ ...prev, slug: value }))}
+              onChange={(value) => {
+                setMenuSlugManuallyEdited(true);
+                setMenuForm((prev) => ({ ...prev, slug: value }));
+              }}
               placeholder="e.g. main-menu"
               autoComplete="off"
+              helpText="Used in the store to show this menu (e.g. enter main-menu in navbar slot to display this menu). Auto-filled from name."
             />
           </BlockStack>
         </Modal.Section>

@@ -69,6 +69,7 @@ const emptyForm = {
   is_visible: true,
   collection_id: "",
 };
+const initialSlugTouched = false;
 
 export default function ContentCategoriesPage() {
   const [categories, setCategories] = useState([]);
@@ -79,6 +80,7 @@ export default function ContentCategoriesPage() {
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(initialSlugTouched);
   const [medusaCollections, setMedusaCollections] = useState([]);
   const client = getMedusaAdminClient();
 
@@ -108,21 +110,23 @@ export default function ContentCategoriesPage() {
     setForm((prev) => ({
       ...prev,
       name: value,
-      slug: prev.slug || (editId ? prev.slug : slugFromName(value)),
+      slug: slugManuallyEdited ? prev.slug : slugFromName(value),
     }));
   };
 
   const openCreate = () => {
     setEditId(null);
+    setSlugManuallyEdited(false);
     setForm({ ...emptyForm, parent_id: "" });
     setModalOpen(true);
   };
 
   const openEdit = (cat) => {
     setEditId(cat.id);
+    setSlugManuallyEdited(false);
     setForm({
       name: cat.name || "",
-      slug: cat.slug || "",
+      slug: cat.slug || slugFromName(cat.name || ""),
       description: cat.description || "",
       parent_id: cat.parent_id || "",
       has_collection: !!cat.has_collection,
@@ -327,10 +331,13 @@ export default function ContentCategoriesPage() {
             <TextField
               label="Slug"
               value={form.slug}
-              onChange={(value) => setForm((prev) => ({ ...prev, slug: value }))}
+              onChange={(value) => {
+                setSlugManuallyEdited(true);
+                setForm((prev) => ({ ...prev, slug: value }));
+              }}
               autoComplete="off"
-              placeholder="e.g. electronics"
-              helpText="URL-friendly; auto-filled from name if empty."
+              placeholder="e.g. sports-outdoors"
+              helpText="Auto-filled from name (e.g. Sports & Outdoors → sports-outdoors). You can change it."
             />
             <TextField
               label="Description"

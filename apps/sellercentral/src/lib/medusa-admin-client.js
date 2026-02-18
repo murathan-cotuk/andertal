@@ -259,13 +259,6 @@ class MedusaAdminClient {
   }
 
   /**
-   * Medusa Collections (native)
-   */
-  async getMedusaCollections() {
-    return this.request('/admin/collections')
-  }
-
-  /**
    * Orders (admin)
    */
   async getOrders(params = {}) {

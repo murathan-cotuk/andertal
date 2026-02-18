@@ -1,12 +1,12 @@
 "use client";
 
 import DashboardLayout from "@/components/DashboardLayout";
-import MinimalPage from "@/components/MinimalPage";
+import ProductCollectionsPage from "@/components/pages/products/ProductCollectionsPage";
 
 export default function Collections() {
   return (
     <DashboardLayout>
-      <MinimalPage title="Collections" subtitle="Product collections" />
+      <ProductCollectionsPage />
     </DashboardLayout>
   );
 }

@@ -48,8 +48,16 @@ export async function GET(
   res: MedusaResponse
 ): Promise<void> {
   try {
-    const productService = getProductService(req.scope) as {
-      listAndCount: (filter: object, options?: object) => Promise<[unknown[], number]>
+    const scope = req.scope
+    if (!scope) {
+      return res.json({ products: [], count: 0 })
+    }
+    let productService: { listAndCount: (filter: object, options?: object) => Promise<[unknown[], number]> }
+    try {
+      productService = getProductService(scope) as typeof productService
+    } catch (e) {
+      console.warn("Admin products GET: product service not available", (e as Error)?.message)
+      return res.json({ products: [], count: 0 })
     }
     const { limit, offset, ...rest } = req.query as Record<string, string>
     const filter = rest && Object.keys(rest).length ? rest : {}
@@ -59,11 +67,16 @@ export async function GET(
     options.relations = ["variants", "variants.prices", "images"]
 
     const [products, count] = await productService.listAndCount(filter, options)
-    res.json({ products, count })
+    res.json({ products: products ?? [], count: typeof count === "number" ? count : (products?.length ?? 0) })
   } catch (error) {
+    const msg = (error as Error)?.message || ""
+    if (msg.includes("strategy") || msg.includes("undefined")) {
+      console.warn("Admin products GET: service unavailable", msg)
+      return res.json({ products: [], count: 0 })
+    }
     console.error("Admin products GET error:", error)
     res.status(500).json({
-      message: (error as Error).message || "Internal server error",
+      message: msg || "Internal server error",
     })
   }
 }
