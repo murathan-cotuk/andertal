@@ -50,14 +50,16 @@ export async function GET(
   try {
     const scope = req.scope
     if (!scope) {
-      return res.json({ products: [], count: 0 })
+      res.json({ products: [], count: 0 })
+      return
     }
     let productService: { listAndCount: (filter: object, options?: object) => Promise<[unknown[], number]> }
     try {
       productService = getProductService(scope) as typeof productService
     } catch (e) {
       console.warn("Admin products GET: product service not available", (e as Error)?.message)
-      return res.json({ products: [], count: 0 })
+      res.json({ products: [], count: 0 })
+      return
     }
     const { limit, offset, ...rest } = req.query as Record<string, string>
     const filter = rest && Object.keys(rest).length ? rest : {}
@@ -153,6 +155,7 @@ export async function POST(
       return
     }
     res.status(201).json({ product })
+    return
   } catch (error) {
     console.error("Admin products POST error:", error)
     res.status(500).json({

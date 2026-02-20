@@ -504,7 +504,30 @@ async function start() {
       }
     }
     httpApp.get('/admin/collections', (req, res) => adminCollectionsGET(req, res))
-    console.log('Admin route: GET /admin/collections')
+
+    const adminCollectionsPOST = async (req, res) => {
+      try {
+        const scope = req.scope || container
+        const b = req.body || {}
+        const title = (b.title || '').trim()
+        if (!title) return res.status(400).json({ message: 'title is required' })
+        const handle = (b.handle || '').trim() || title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        let svc = null
+        try { svc = scope.resolve('productModuleService') } catch (_) {}
+        if (!svc) try { svc = scope.resolve('productCollectionService') } catch (_) {}
+        if (!svc || typeof svc.createProductCollections !== 'function') {
+          return res.status(503).json({ message: 'Collection service not available' })
+        }
+        const created = await svc.createProductCollections([{ title, handle }])
+        const collection = Array.isArray(created) ? created[0] : created
+        res.status(201).json({ collection })
+      } catch (err) {
+        console.error('Admin collections POST error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    httpApp.post('/admin/collections', (req, res) => adminCollectionsPOST(req, res))
+    console.log('Admin route: GET/POST /admin/collections')
 
     // --- Admin Hub Menus ---
     const resolveMenuService = () => {
