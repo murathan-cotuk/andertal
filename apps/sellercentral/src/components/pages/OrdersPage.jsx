@@ -2,66 +2,18 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import styled from "styled-components";
-import { Card } from "@belucha/ui";
+import {
+  Page,
+  Layout,
+  Card,
+  Text,
+  BlockStack,
+  Box,
+  Banner,
+  IndexTable,
+  Badge,
+} from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-
-const Container = styled.div`
-  max-width: 1400px;
-  margin: 0 auto;
-`;
-
-const Title = styled.h1`
-  font-size: 32px;
-  font-weight: 700;
-  margin-bottom: 32px;
-  color: #1f2937;
-`;
-
-const Section = styled(Card)`
-  padding: 24px;
-  margin-bottom: 24px;
-`;
-
-const OrdersTable = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 16px;
-`;
-
-const TableHeader = styled.th`
-  text-align: left;
-  padding: 12px;
-  font-weight: 600;
-  color: #374151;
-  border-bottom: 2px solid #e5e7eb;
-`;
-
-const TableCell = styled.td`
-  padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #1f2937;
-`;
-
-const StatusBadge = styled.span`
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  background-color: ${({ status }) => {
-    if (status === "completed") return "#d1fae5";
-    if (status === "pending") return "#fef3c7";
-    if (status === "cancelled") return "#fee2e2";
-    return "#e5e7eb";
-  }};
-  color: ${({ status }) => {
-    if (status === "completed") return "#065f46";
-    if (status === "pending") return "#92400e";
-    if (status === "cancelled") return "#991b1b";
-    return "#6b7280";
-  }};
-`;
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -86,66 +38,85 @@ export default function OrdersPage() {
     fetchOrders();
   }, []);
 
+  const statusTone = (status) => {
+    if (status === "completed") return "success";
+    if (status === "pending") return "attention";
+    if (status === "cancelled") return "critical";
+    return "subdued";
+  };
+
   return (
-    <Container>
-      <Title>Orders Dashboard</Title>
-
-      <Section>
-        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
-          Recent Orders
-        </h2>
-
-        {loading && (
-          <div style={{ textAlign: "center", padding: "40px" }}>
-            <i className="fas fa-spinner fa-spin" style={{ fontSize: "32px", color: "#0ea5e9" }} />
-          </div>
-        )}
-
+    <Page title="Orders" subtitle="Recent orders from your store">
+      <Layout>
         {error && (
-          <div style={{ padding: "16px", backgroundColor: "#fee2e2", borderRadius: "8px", color: "#991b1b" }}>
-            Error loading orders: {error}
-          </div>
+          <Layout.Section>
+            <Banner tone="critical" onDismiss={() => setError(null)}>
+              {error}
+            </Banner>
+          </Layout.Section>
         )}
-
-        {!loading && !error && orders.length === 0 && (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "#6b7280" }}>
-            <i className="fas fa-shopping-cart" style={{ fontSize: "48px", marginBottom: "16px", color: "#d1d5db" }} />
-            <p>No orders yet</p>
-          </div>
-        )}
-
-        {!loading && !error && orders.length > 0 && (
-          <OrdersTable>
-            <thead>
-              <tr>
-                <TableHeader>Order Number</TableHeader>
-                <TableHeader>Customer</TableHeader>
-                <TableHeader>Total</TableHeader>
-                <TableHeader>Status</TableHeader>
-                <TableHeader>Date</TableHeader>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => (
-                <tr key={order.id}>
-                  <TableCell>
-                    <Link href={`/orders/${order.id}`} style={{ color: "#0ea5e9", textDecoration: "none" }}>
-                      {order.display_id ?? order.id}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{order.email ?? order.customer?.email ?? "N/A"}</TableCell>
-                  <TableCell>€{typeof order.total === "number" ? order.total.toFixed(2) : (order.total ?? "0.00")}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={order.status}>{order.status || "pending"}</StatusBadge>
-                  </TableCell>
-                  <TableCell>{order.created_at ? new Date(order.created_at).toLocaleDateString() : (order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "—")}</TableCell>
-                </tr>
-              ))}
-            </tbody>
-          </OrdersTable>
-        )}
-      </Section>
-    </Container>
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingSm">
+                Recent orders
+              </Text>
+              {loading ? (
+                <Box paddingBlock="400">
+                  <Text as="p" tone="subdued">
+                    Loading…
+                  </Text>
+                </Box>
+              ) : orders.length === 0 ? (
+                <Box paddingBlock="600">
+                  <Text as="p" tone="subdued">
+                    No orders yet. Orders will appear here when customers place orders.
+                  </Text>
+                </Box>
+              ) : (
+                <IndexTable
+                  resourceName={{ singular: "order", plural: "orders" }}
+                  itemCount={orders.length}
+                  selectable={false}
+                  headings={[
+                    { title: "Order" },
+                    { title: "Customer" },
+                    { title: "Total" },
+                    { title: "Status" },
+                    { title: "Date" },
+                  ]}
+                >
+                  {orders.map((order, index) => (
+                    <IndexTable.Row id={order.id} key={order.id} position={index}>
+                      <IndexTable.Cell>
+                        <Link href={`/orders/${order.id}`} style={{ color: "var(--p-color-text-link)", fontWeight: 500 }}>
+                          {order.display_id ?? order.id}
+                        </Link>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        {order.email ?? order.customer?.email ?? "—"}
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        €{typeof order.total === "number" ? order.total.toFixed(2) : (order.total ?? "0.00")}
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        <Badge tone={statusTone(order.status)}>{order.status || "pending"}</Badge>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        {order.created_at
+                          ? new Date(order.created_at).toLocaleDateString()
+                          : order.createdAt
+                            ? new Date(order.createdAt).toLocaleDateString()
+                            : "—"}
+                      </IndexTable.Cell>
+                    </IndexTable.Row>
+                  ))}
+                </IndexTable>
+              )}
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+      </Layout>
+    </Page>
   );
 }
-

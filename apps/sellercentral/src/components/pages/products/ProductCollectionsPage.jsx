@@ -6,43 +6,91 @@ import {
   Layout,
   Card,
   Text,
+  TextField,
   BlockStack,
   Box,
   Banner,
   IndexTable,
   EmptyState,
+  Modal,
+  Button,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+
+function slugFromTitle(title) {
+  if (!title || typeof title !== "string") return "";
+  return title.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
 
 export default function ProductCollectionsPage() {
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ title: "", handle: "" });
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const client = getMedusaAdminClient();
 
+  const fetchCollections = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await client.getMedusaCollections();
+      const list = data?.collections || [];
+      setCollections(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setError(err?.message || "Failed to load collections");
+      setCollections([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await client.getMedusaCollections();
-        const list = data?.collections || [];
-        if (!cancelled) setCollections(Array.isArray(list) ? list : []);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err?.message || "Failed to load collections");
-          setCollections([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+    fetchCollections();
   }, []);
 
+  const openAdd = () => {
+    setForm({ title: "", handle: "" });
+    setSlugManuallyEdited(false);
+    setModalOpen(true);
+  };
+
+  const handleTitleChange = (value) => {
+    setForm((prev) => ({
+      ...prev,
+      title: value,
+      handle: slugManuallyEdited ? prev.handle : slugFromTitle(value),
+    }));
+  };
+
+  const handleSubmit = async () => {
+    const title = (form.title || "").trim();
+    const handle = (form.handle || "").trim() || slugFromTitle(title);
+    if (!title) {
+      setError("Title is required.");
+      return;
+    }
+    try {
+      setSaving(true);
+      setError(null);
+      await client.createCollection({ title, handle: handle || undefined });
+      setModalOpen(false);
+      await fetchCollections();
+    } catch (err) {
+      setError(err?.message || "Failed to create collection");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <Page title="Collections" subtitle="Product collections (including those created from categories)">
+    <Page
+      title="Collections"
+      subtitle="Product collections (create here or from Content → Categories with Has collection)"
+      primaryAction={{ content: "Add collection", onAction: openAdd }}
+    >
       <Layout>
         {error && (
           <Layout.Section>
@@ -66,9 +114,10 @@ export default function ProductCollectionsPage() {
               ) : collections.length === 0 ? (
                 <EmptyState
                   heading="No collections yet"
+                  action={{ content: "Add collection", onAction: openAdd }}
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                 >
-                  <p>Collections appear here when you create them from Content → Categories by enabling &quot;Has collection&quot;, or when created in Medusa.</p>
+                  <p>Create a collection here or from Content → Categories by enabling &quot;Has collection&quot;.</p>
                 </EmptyState>
               ) : (
                 <IndexTable
@@ -102,6 +151,40 @@ export default function ProductCollectionsPage() {
           </Card>
         </Layout.Section>
       </Layout>
+
+      <Modal
+        open={modalOpen}
+        onClose={() => !saving && setModalOpen(false)}
+        title="Add collection"
+        primaryAction={{
+          content: saving ? "Creating…" : "Create",
+          onAction: handleSubmit,
+          loading: saving,
+        }}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <TextField
+              label="Title"
+              value={form.title}
+              onChange={handleTitleChange}
+              placeholder="e.g. Summer Sale"
+              autoComplete="off"
+            />
+            <TextField
+              label="Handle"
+              value={form.handle}
+              onChange={(value) => {
+                setSlugManuallyEdited(true);
+                setForm((prev) => ({ ...prev, handle: value }));
+              }}
+              placeholder="e.g. summer-sale"
+              autoComplete="off"
+              helpText="URL-friendly; auto-filled from title if empty."
+            />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }

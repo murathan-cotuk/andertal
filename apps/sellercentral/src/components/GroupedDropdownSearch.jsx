@@ -20,6 +20,8 @@ const SEARCHABLE_ITEMS = [
   { category: "Marketing", label: "Automations", url: "/marketing/automations", keywords: "automations" },
   { category: "Navigation", label: "Discounts", url: "/discounts", keywords: "discounts" },
   { category: "Content", label: "Categories", url: "/content/categories", keywords: "categories" },
+  { category: "Content", label: "Media", url: "/content/media", keywords: "media library upload" },
+  { category: "Content", label: "Pages", url: "/content/pages", keywords: "pages cms" },
   { category: "Content", label: "Metaobjects", url: "/content/metaobjects", keywords: "metaobjects" },
   { category: "Content", label: "Files", url: "/content/files", keywords: "files media" },
   { category: "Content", label: "Menus", url: "/content/menus", keywords: "menus" },

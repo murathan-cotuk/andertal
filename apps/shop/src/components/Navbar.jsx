@@ -259,29 +259,49 @@ const UserName = styled.div`
   border-bottom: 1px solid #f3f4f6;
 `;
 
+// link_type: 'url' | 'category' | ... → href
+function menuItemHref(item) {
+  if (!item) return "#";
+  if (item.link_type === "url" && item.link_value) return item.link_value.startsWith("http") ? item.link_value : `/${item.link_value.replace(/^\//, "")}`;
+  if (item.link_type === "category" && item.link_value) return `/collections/${item.link_value}`;
+  return item.link_value ? `/${String(item.link_value).replace(/^\//, "")}` : "#";
+}
+
 export default function Navbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [menuItems, setMenuItems] = useState([]); // { menu, items } from backend
   const [loading, setLoading] = useState(true);
   const [openCategoryId, setOpenCategoryId] = useState(null);
   const { isAuthenticated, user, logout } = useAuth();
 
-  // Fetch category tree via client only
+  // Fetch store menus (main location) then fallback to categories
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchMenusAndCategories = async () => {
       try {
         setLoading(true);
         const client = getMedusaClient();
+        const menuData = await client.getMenus({ location: "main" });
+        const menus = menuData.menus || [];
+        const mainMenu = menus.find((m) => (m.location || "main") === "main") || menus[0];
+        if (mainMenu && mainMenu.items && mainMenu.items.length > 0) {
+          setMenuItems(mainMenu.items);
+          setCategories([]);
+          setLoading(false);
+          return;
+        }
         const data = await client.getCategories({ tree: true, is_visible: true });
         setCategories(data.tree || data.categories || []);
+        setMenuItems([]);
       } catch (error) {
-        console.error('Failed to fetch categories:', error);
+        console.error("Failed to fetch menus/categories:", error);
+        setMenuItems([]);
         setCategories([]);
       } finally {
         setLoading(false);
       }
     };
-    fetchCategories();
+    fetchMenusAndCategories();
   }, []);
 
   // Close dropdown when clicking outside
@@ -317,11 +337,17 @@ export default function Navbar() {
         <CategoriesMenu>
           {loading ? (
             <span style={{ color: "#6b7280" }}>Loading...</span>
+          ) : menuItems.length > 0 ? (
+            menuItems.map((item) => (
+              <CategoryLink key={item.id} href={menuItemHref(item)}>
+                {item.label}
+              </CategoryLink>
+            ))
           ) : categories.length > 0 ? (
             categories.map((category) => {
               const hasChildren = category.children && category.children.length > 0;
               const hasCollection = category.has_collection;
-              
+
               if (hasChildren) {
                 return (
                   <CategoryDropdown
@@ -339,7 +365,7 @@ export default function Navbar() {
                       {category.children.map((child) => (
                         <SubcategoryLink
                           key={child.id}
-                          href={child.has_collection ? `/collections/${child.slug}` : '#'}
+                          href={child.has_collection ? `/collections/${child.slug}` : "#"}
                         >
                           {child.name}
                         </SubcategoryLink>

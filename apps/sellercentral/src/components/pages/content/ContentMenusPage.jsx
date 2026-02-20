@@ -12,7 +12,6 @@ import {
   InlineStack,
   Box,
   Banner,
-  Divider,
   Modal,
   Select,
   IndexTable,
@@ -294,67 +293,73 @@ export default function ContentMenusPage() {
 
         <Layout.Section>
           <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingSm">
-                Menus
-              </Text>
-              <Divider />
+            <BlockStack gap="300">
               {loading ? (
                 <Box paddingBlock="400">
-                  <Text as="p" tone="subdued">
-                    Loading…
-                  </Text>
+                  <Text as="p" tone="subdued">Loading…</Text>
                 </Box>
               ) : menus.length === 0 ? (
                 <EmptyState
                   heading="Create your first menu"
                   action={{ content: "Add menu", onAction: openAddMenu }}
-                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                 >
-                  <p>Navbar, main menu, footer, or sidebar. Add a menu then add items with labels and links (collections, products, URL).</p>
+                  <p>Add a menu (e.g. Main menu), then add items with labels and links.</p>
                 </EmptyState>
               ) : (
-                <InlineStack gap="400" blockAlign="start">
-                  <Box minWidth="280px">
-                    <BlockStack gap="200">
-                      {menus.map((m) => (
-                        <InlineStack key={m.id} gap="200" blockAlign="center" wrap={false}>
-                          <Button
-                            fullWidth
-                            tone={selectedMenuId === m.id ? "primary" : "secondary"}
+                <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "24px", minHeight: "320px" }}>
+                  <BlockStack gap="100">
+                    <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Menus</Text>
+                    {menus.map((m) => (
+                      <div
+                        key={m.id}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "8px",
+                          background: selectedMenuId === m.id ? "var(--p-color-bg-surface-selected, #e3f1df)" : "transparent",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <InlineStack gap="200" blockAlign="center" wrap={false}>
+                          <button
+                            type="button"
                             onClick={() => setSelectedMenuId(m.id)}
+                            style={{
+                              flex: 1,
+                              textAlign: "left",
+                              border: "none",
+                              background: "none",
+                              cursor: "pointer",
+                              fontSize: "14px",
+                              fontWeight: selectedMenuId === m.id ? 600 : 400,
+                            }}
                           >
                             {m.name}
-                          </Button>
-                          <Button size="slim" onClick={() => openEditMenu(m)}>
+                          </button>
+                          <Button size="slim" variant="plain" onClick={() => openEditMenu(m)} accessibilityLabel="Edit menu">
                             Edit
                           </Button>
-                          <Button size="slim" tone="critical" onClick={() => handleDeleteMenu(m)}>
+                          <Button size="slim" variant="plain" tone="critical" onClick={() => handleDeleteMenu(m)} accessibilityLabel="Delete menu">
                             Delete
                           </Button>
                         </InlineStack>
-                      ))}
-                    </BlockStack>
-                  </Box>
-                  <Box paddingBlockStart="200" minWidth="400px">
+                      </div>
+                    ))}
+                  </BlockStack>
+                  <Box>
                     {selectedMenu && (
-                      <BlockStack gap="400">
-                        <InlineStack align="space-between" blockAlign="center">
-                          <Text as="h3" variant="headingMd">
-                            {selectedMenu.name}
-                          </Text>
-                          <Badge>{selectedMenu.slug || selectedMenu.location}</Badge>
-                          <Button size="slim" onClick={openAddItem}>
-                            Add item
-                          </Button>
+                      <BlockStack gap="300">
+                        <InlineStack align="space-between" blockAlign="center" gap="200">
+                          <InlineStack gap="200" blockAlign="center">
+                            <Text as="h3" variant="headingSm">{selectedMenu.name}</Text>
+                            <Badge tone="info">{selectedMenu.slug || selectedMenu.location}</Badge>
+                          </InlineStack>
+                          <Button size="slim" onClick={openAddItem}>Add item</Button>
                         </InlineStack>
                         {items.length === 0 ? (
-                          <Box paddingBlock="400">
-                            <Text as="p" tone="subdued">
-                              No items. Add an item to show in this menu.
-                            </Text>
+                          <Box paddingBlock="300" paddingInline="200" background="bg-surface-secondary" borderRadius="200">
+                            <Text as="p" variant="bodySm" tone="subdued">No items. Click &quot;Add item&quot; to add links to this menu.</Text>
                             <Box paddingBlockStart="200">
-                              <Button onClick={openAddItem}>Add item</Button>
+                              <Button size="slim" onClick={openAddItem}>Add item</Button>
                             </Box>
                           </Box>
                         ) : (
@@ -366,27 +371,17 @@ export default function ContentMenusPage() {
                           >
                             {items.map((item, index) => (
                               <IndexTable.Row id={item.id} key={item.id} position={index}>
+                                <IndexTable.Cell>{item.label}</IndexTable.Cell>
                                 <IndexTable.Cell>
-                                  <Text as="span" fontWeight="medium">
-                                    {item.label}
-                                  </Text>
-                                </IndexTable.Cell>
-                                <IndexTable.Cell>
-                                  <Text as="span" tone="subdued">
-                                    {getLinkDisplay(item)}
-                                  </Text>
+                                  <Text as="span" tone="subdued">{getLinkDisplay(item)}</Text>
                                 </IndexTable.Cell>
                                 <IndexTable.Cell>
                                   <Badge tone="info">{item.link_type || "url"}</Badge>
                                 </IndexTable.Cell>
                                 <IndexTable.Cell>
-                                  <InlineStack gap="200">
-                                    <Button size="slim" onClick={() => openEditItem(item)}>
-                                      Edit
-                                    </Button>
-                                    <Button size="slim" tone="critical" onClick={() => handleDeleteItem(item)}>
-                                      Delete
-                                    </Button>
+                                  <InlineStack gap="100">
+                                    <Button size="slim" variant="plain" onClick={() => openEditItem(item)}>Edit</Button>
+                                    <Button size="slim" variant="plain" tone="critical" onClick={() => handleDeleteItem(item)}>Delete</Button>
                                   </InlineStack>
                                 </IndexTable.Cell>
                               </IndexTable.Row>
@@ -396,7 +391,7 @@ export default function ContentMenusPage() {
                       </BlockStack>
                     )}
                   </Box>
-                </InlineStack>
+                </div>
               )}
             </BlockStack>
           </Card>

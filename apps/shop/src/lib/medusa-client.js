@@ -125,6 +125,16 @@ class MedusaClient {
   }
 
   /**
+   * Store menüler (Navbar). GET /store/menus. Options: { location: 'main' }
+   */
+  async getMenus(options = {}) {
+    const params = new URLSearchParams()
+    if (options.location) params.set('location', options.location)
+    const qs = params.toString()
+    return this.request(`/store/menus${qs ? `?${qs}` : ''}`).catch(() => ({ menus: [], count: 0 }))
+  }
+
+  /**
    * Categories (storefront public). Options: { tree: true, is_visible: true }
    */
   async getCategories(options = {}) {
@@ -175,6 +185,18 @@ class MedusaClient {
         Authorization: `Bearer ${token}`,
       },
     })
+  }
+
+  /**
+   * Store pages (CMS, published only)
+   */
+  async getPages() {
+    return this.request('/store/pages').catch(() => ({ pages: [], count: 0 }))
+  }
+
+  async getPageBySlug(slug) {
+    if (!slug) return null
+    return this.request(`/store/pages/${encodeURIComponent(slug)}`)
   }
 
   /**

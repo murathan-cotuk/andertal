@@ -71,6 +71,8 @@ const menuItemsMain = [
     subNavigationItems: [
       { url: "/content/metaobjects", label: "Metaobjects" },
       { url: "/content/categories", label: "Categories" },
+      { url: "/content/media", label: "Media" },
+      { url: "/content/pages", label: "Pages" },
       { url: "/content/files", label: "Files" },
       { url: "/content/menus", label: "Menus" },
       { url: "/content/blog-posts", label: "Blog Posts" },
@@ -121,6 +123,15 @@ export default function PolarisLayout({ children }) {
       setIsAuthenticated(true);
     }
   }, [pathname, router]);
+
+  // Nav seçili öğe: sadece mevcut path vurgulansın (Home "/" başka sayfadayken vurgulu kalmasın)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.setAttribute("data-pathname", pathname || "/");
+    return () => {
+      document.body.removeAttribute("data-pathname");
+    };
+  }, [pathname]);
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("sellerLoggedIn");
@@ -180,8 +191,9 @@ export default function PolarisLayout({ children }) {
     />
   );
 
+  const navLocation = pathname && pathname !== "" ? pathname : "/";
   const navMarkup = (
-    <Navigation location={pathname || "/"} onDismiss={() => setShowMobileNav(false)}>
+    <Navigation location={navLocation} onDismiss={() => setShowMobileNav(false)}>
       <Navigation.Section
         items={menuItemsMain.map((item) => ({
           url: item.url,
@@ -211,7 +223,7 @@ export default function PolarisLayout({ children }) {
         showMobileNavigation={showMobileNav}
         onNavigationDismiss={() => setShowMobileNav(false)}
       >
-        <div key={pathname} className="belucha-page-content">
+        <div className="belucha-page-content belucha-page-content-transition">
           {children}
         </div>
       </Frame>

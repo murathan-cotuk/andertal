@@ -22,6 +22,9 @@ dist
 .DS_Store
 *.pem
 
+# Media uploads (Medusa backend)
+apps/medusa-backend/uploads/
+
 # SQLite (Medusa backend)
 medusa.db
 *.db

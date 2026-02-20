@@ -180,6 +180,14 @@ class MedusaAdminClient {
     return { collections: data.collections || [], count: data.count || 0 }
   }
 
+  async createCollection(data) {
+    const res = await this.request('/admin/collections', {
+      method: 'POST',
+      body: JSON.stringify({ title: data.title, handle: data.handle }),
+    })
+    return res.collection
+  }
+
   /**
    * Admin Hub Menus
    */
@@ -256,6 +264,67 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/banners/${id}`, {
       method: 'DELETE',
     })
+  }
+
+  /**
+   * Admin Hub Media (v1)
+   */
+  async getMedia(params = {}) {
+    const queryParams = new URLSearchParams(params).toString()
+    return this.request(`/admin-hub/v1/media${queryParams ? `?${queryParams}` : ''}`)
+  }
+
+  async getMediaItem(id) {
+    return this.request(`/admin-hub/v1/media/${id}`)
+  }
+
+  async uploadMedia(formData) {
+    const base = this.baseURL || getDefaultBaseUrl()
+    const url = `${base}/admin-hub/v1/media`
+    const res = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      headers: {},
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }))
+      throw new Error(err.message || `HTTP ${res.status}`)
+    }
+    return res.json()
+  }
+
+  async deleteMedia(id) {
+    return this.request(`/admin-hub/v1/media/${id}`, { method: 'DELETE' })
+  }
+
+  /**
+   * Admin Hub Pages (v1)
+   */
+  async getPages(params = {}) {
+    const queryParams = new URLSearchParams(params).toString()
+    return this.request(`/admin-hub/v1/pages${queryParams ? `?${queryParams}` : ''}`)
+  }
+
+  async getPage(id) {
+    return this.request(`/admin-hub/v1/pages/${id}`)
+  }
+
+  async createPage(data) {
+    return this.request('/admin-hub/v1/pages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updatePage(id, data) {
+    return this.request(`/admin-hub/v1/pages/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deletePage(id) {
+    return this.request(`/admin-hub/v1/pages/${id}`, { method: 'DELETE' })
   }
 
   /**

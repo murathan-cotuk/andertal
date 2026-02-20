@@ -117,6 +117,20 @@ a {
 }
 
 /* İçerik alanı: sidebar’a ve top bar’a az boşluk, sayfayı kaplasın */
+/* Nav: Sadece mevcut path seçili; Home (ilk öğe) başka sayfadayken vurgulu kalmasın */
+body[data-pathname]:not([data-pathname="/"]) #AppFrameNav .Polaris-Navigation__Section:first-child .Polaris-Navigation__Item:first-child .Polaris-Navigation__Link,
+body[data-pathname]:not([data-pathname="/"]) .Polaris-Frame .Polaris-Navigation .Polaris-Navigation__Section:first-child .Polaris-Navigation__Item:first-child .Polaris-Navigation__Link {
+  background: transparent !important;
+}
+body[data-pathname]:not([data-pathname="/"]) #AppFrameNav .Polaris-Navigation__Section:first-child .Polaris-Navigation__Item:first-child .Polaris-Navigation__Link:hover,
+body[data-pathname]:not([data-pathname="/"]) .Polaris-Frame .Polaris-Navigation .Polaris-Navigation__Section:first-child .Polaris-Navigation__Item:first-child .Polaris-Navigation__Link:hover {
+  background: var(--p-color-bg-surface-hover, rgba(0, 0, 0, 0.05)) !important;
+}
+
+.belucha-page-content-transition {
+  animation: belucha-slide-up 0.25s ease-out;
+}
+
 .belucha-page-content {
   min-height: 100%;
   width: 100%;
@@ -125,7 +139,6 @@ a {
   border-top-right-radius: 16px;
   overflow: hidden;
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.08);
-  animation: belucha-slide-up 0.3s ease-out;
   padding-top: 2px;
   padding-left: 12px;
   padding-right: 12px;
