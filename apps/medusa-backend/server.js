@@ -201,6 +201,11 @@ async function start() {
     app.get('/health', (req, res) => {
       res.json({ status: 'ok', timestamp: new Date().toISOString() })
     })
+    const uploadDir = path.join(__dirname, 'uploads')
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+    }
+    app.use('/uploads', express.static(uploadDir))
     const appLoader = new MedusaAppLoader({ cwd: path.resolve(__dirname) })
 
     let medusaApp
@@ -251,8 +256,32 @@ async function start() {
         await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_menus_slug ON admin_hub_menus(slug);')
         await client.query('CREATE INDEX IF NOT EXISTS idx_admin_hub_menu_items_menu_id ON admin_hub_menu_items(menu_id);')
         await client.query('CREATE INDEX IF NOT EXISTS idx_admin_hub_menu_items_parent_id ON admin_hub_menu_items(parent_id);')
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_media (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            filename varchar(255) NOT NULL,
+            url text NOT NULL,
+            mime_type varchar(100),
+            size integer DEFAULT 0,
+            alt varchar(255),
+            created_at timestamp DEFAULT now(),
+            updated_at timestamp DEFAULT now()
+          );
+        `)
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_pages (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            title varchar(255) NOT NULL,
+            slug varchar(255) NOT NULL UNIQUE,
+            body text,
+            status varchar(50) DEFAULT 'draft',
+            created_at timestamp DEFAULT now(),
+            updated_at timestamp DEFAULT now()
+          );
+        `)
+        await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_pages_slug ON admin_hub_pages(slug);')
         await client.end()
-        console.log('Admin Hub: admin_hub_menus / admin_hub_menu_items tabloları hazır')
+        console.log('Admin Hub: admin_hub_menus, admin_hub_media, admin_hub_pages tabloları hazır')
       } catch (migErr) {
         console.warn('Admin Hub migration (menus) skipped or failed:', migErr && migErr.message)
       }
@@ -607,6 +636,299 @@ async function start() {
     httpApp.put('/admin-hub/menus/:menuId/items/:itemId', menuItemByIdPUT)
     httpApp.delete('/admin-hub/menus/:menuId/items/:itemId', menuItemByIdDELETE)
     console.log('Admin Hub routes: /admin-hub/menus (+ :id, :menuId/items, :itemId)')
+
+    // GET /store/menus – Public menüler (Shop Navbar). location=main vb. query ile filtrelenebilir.
+    const storeMenusGET = async (req, res) => {
+      const svc = resolveMenuService()
+      if (!svc) return res.status(200).json({ menus: [], count: 0 })
+      try {
+        let menus = await svc.listMenus()
+        const location = (req.query.location || '').trim()
+        if (location) menus = menus.filter((m) => (m.location || 'main') === location)
+        const menusWithItems = await Promise.all(
+          menus.map(async (menu) => {
+            const items = await svc.listMenuItems(menu.id).catch(() => [])
+            return { ...menu, items: items || [] }
+          })
+        )
+        res.json({ menus: menusWithItems, count: menusWithItems.length })
+      } catch (err) {
+        console.error('Store menus GET error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
+    httpApp.get('/store/menus', storeMenusGET)
+    console.log('Store route: GET /store/menus')
+
+    // --- Admin Hub Media (GET list, POST upload, GET :id, DELETE :id) ---
+    const getDbClient = () => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl || !dbUrl.startsWith('postgres')) return null
+      const { Client } = require('pg')
+      const isRender = dbUrl.includes('render.com')
+      return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
+    }
+    const multer = require('multer')
+    const storage = multer.diskStorage({
+      destination: (req, file, cb) => cb(null, uploadDir),
+      filename: (req, file, cb) => {
+        const safe = (file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_')
+        cb(null, `${Date.now()}-${safe}`)
+      },
+    })
+    const upload = multer({ storage })
+
+    const mediaListGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100)
+        const offset = parseInt(req.query.offset, 10) || 0
+        const r = await client.query(
+          'SELECT id, filename, url, mime_type, size, alt, created_at FROM admin_hub_media ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+          [limit, offset]
+        )
+        const countRes = await client.query('SELECT COUNT(*)::int AS c FROM admin_hub_media')
+        res.json({ media: r.rows, count: countRes.rows[0].c })
+      } catch (err) {
+        console.error('Media list error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const mediaUploadPOST = async (req, res) => {
+      if (!req.file) return res.status(400).json({ message: 'No file uploaded' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      const fileUrl = `/uploads/${req.file.filename}`
+      const alt = (req.body && req.body.alt) || null
+      try {
+        await client.connect()
+        const r = await client.query(
+          `INSERT INTO admin_hub_media (filename, url, mime_type, size, alt) VALUES ($1, $2, $3, $4, $5)
+           RETURNING id, filename, url, mime_type, size, alt, created_at`,
+          [req.file.originalname || req.file.filename, fileUrl, req.file.mimetype || null, req.file.size || 0, alt]
+        )
+        const row = r.rows[0]
+        res.status(201).json({ id: row.id, url: row.url, filename: row.filename, mime_type: row.mime_type, size: row.size, created_at: row.created_at })
+      } catch (err) {
+        console.error('Media upload error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const mediaByIdGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          'SELECT id, filename, url, mime_type, size, alt, created_at, updated_at FROM admin_hub_media WHERE id = $1',
+          [req.params.id]
+        )
+        if (r.rows.length === 0) return res.status(404).json({ message: 'Media not found' })
+        res.json(r.rows[0])
+      } catch (err) {
+        console.error('Media get error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const mediaByIdDELETE = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query('SELECT url FROM admin_hub_media WHERE id = $1', [req.params.id])
+        if (r.rows.length === 0) return res.status(404).json({ message: 'Media not found' })
+        const urlPath = r.rows[0].url
+        await client.query('DELETE FROM admin_hub_media WHERE id = $1', [req.params.id])
+        if (urlPath && urlPath.startsWith('/uploads/')) {
+          const filePath = path.join(__dirname, urlPath)
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+        }
+        res.status(200).json({ deleted: true })
+      } catch (err) {
+        console.error('Media delete error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+
+    httpApp.get('/admin-hub/v1/media', mediaListGET)
+    httpApp.post('/admin-hub/v1/media', upload.single('file'), mediaUploadPOST)
+    httpApp.get('/admin-hub/v1/media/:id', mediaByIdGET)
+    httpApp.delete('/admin-hub/v1/media/:id', mediaByIdDELETE)
+    console.log('Admin Hub routes: GET/POST /admin-hub/v1/media, GET/DELETE /admin-hub/v1/media/:id')
+
+    // --- Admin Hub Pages (CRUD) + Store pages (published only) ---
+    const pagesListGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const status = (req.query.status || '').trim() || null
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100)
+        const offset = parseInt(req.query.offset, 10) || 0
+        let q = 'SELECT id, title, slug, body, status, created_at, updated_at FROM admin_hub_pages WHERE 1=1'
+        const params = []
+        if (status) { params.push(status); q += ` AND status = $${params.length}` }
+        q += ' ORDER BY updated_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2)
+        params.push(limit, offset)
+        const r = await client.query(q, params)
+        const countRes = await client.query(
+          status ? 'SELECT COUNT(*)::int AS c FROM admin_hub_pages WHERE status = $1' : 'SELECT COUNT(*)::int AS c FROM admin_hub_pages',
+          status ? [status] : []
+        )
+        res.json({ pages: r.rows, count: countRes.rows[0].c })
+      } catch (err) {
+        console.error('Pages list error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const pagesCreatePOST = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      const b = req.body || {}
+      let title = (b.title || '').trim()
+      let slug = (b.slug || '').trim()
+      if (!title) return res.status(400).json({ message: 'title is required' })
+      if (!slug) slug = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+      const body = (b.body != null ? b.body : '')
+      const status = (b.status === 'published' ? 'published' : 'draft')
+      try {
+        await client.connect()
+        const r = await client.query(
+          `INSERT INTO admin_hub_pages (title, slug, body, status) VALUES ($1, $2, $3, $4)
+           RETURNING id, title, slug, body, status, created_at, updated_at`,
+          [title, slug, body, status]
+        )
+        res.status(201).json(r.rows[0])
+      } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ message: 'Slug already exists' })
+        console.error('Pages create error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const pageByIdGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          'SELECT id, title, slug, body, status, created_at, updated_at FROM admin_hub_pages WHERE id = $1',
+          [req.params.id]
+        )
+        if (r.rows.length === 0) return res.status(404).json({ message: 'Page not found' })
+        res.json(r.rows[0])
+      } catch (err) {
+        console.error('Page get error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const pageByIdPUT = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      const b = req.body || {}
+      const updates = []
+      const values = []
+      let i = 1
+      if (b.title !== undefined) { updates.push(`title = $${i++}`); values.push(b.title) }
+      if (b.slug !== undefined) { updates.push(`slug = $${i++}`); values.push(b.slug) }
+      if (b.body !== undefined) { updates.push(`body = $${i++}`); values.push(b.body) }
+      if (b.status !== undefined) { updates.push(`status = $${i++}`); values.push(b.status === 'published' ? 'published' : 'draft') }
+      if (updates.length === 0) return res.status(400).json({ message: 'No fields to update' })
+      updates.push(`updated_at = now()`)
+      values.push(req.params.id)
+      try {
+        await client.connect()
+        const r = await client.query(
+          `UPDATE admin_hub_pages SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, title, slug, body, status, created_at, updated_at`,
+          values
+        )
+        if (r.rows.length === 0) return res.status(404).json({ message: 'Page not found' })
+        res.json(r.rows[0])
+      } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ message: 'Slug already exists' })
+        console.error('Page update error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const pageByIdDELETE = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query('DELETE FROM admin_hub_pages WHERE id = $1 RETURNING id', [req.params.id])
+        if (r.rows.length === 0) return res.status(404).json({ message: 'Page not found' })
+        res.status(200).json({ deleted: true })
+      } catch (err) {
+        console.error('Page delete error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+
+    httpApp.get('/admin-hub/v1/pages', pagesListGET)
+    httpApp.post('/admin-hub/v1/pages', pagesCreatePOST)
+    httpApp.get('/admin-hub/v1/pages/:id', pageByIdGET)
+    httpApp.put('/admin-hub/v1/pages/:id', pageByIdPUT)
+    httpApp.delete('/admin-hub/v1/pages/:id', pageByIdDELETE)
+    console.log('Admin Hub routes: GET/POST /admin-hub/v1/pages, GET/PUT/DELETE /admin-hub/v1/pages/:id')
+
+    const storePagesListGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          'SELECT id, title, slug, body, updated_at FROM admin_hub_pages WHERE status = $1 ORDER BY updated_at DESC',
+          ['published']
+        )
+        res.json({ pages: r.rows, count: r.rows.length })
+      } catch (err) {
+        console.error('Store pages list error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const storePageBySlugGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          'SELECT id, title, slug, body, updated_at FROM admin_hub_pages WHERE slug = $1 AND status = $2',
+          [req.params.slug, 'published']
+        )
+        if (r.rows.length === 0) return res.status(404).json({ message: 'Page not found' })
+        res.json(r.rows[0])
+      } catch (err) {
+        console.error('Store page by slug error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+
+    httpApp.get('/store/pages', storePagesListGET)
+    httpApp.get('/store/pages/:slug', storePageBySlugGET)
+    console.log('Store routes: GET /store/pages, GET /store/pages/:slug')
 
     httpApp.listen(PORT, HOST, () => {
       console.log(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)
