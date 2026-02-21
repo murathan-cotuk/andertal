@@ -79,7 +79,11 @@ export default function ProductCollectionsPage() {
       setModalOpen(false);
       await fetchCollections();
     } catch (err) {
-      setError(err?.message || "Failed to create collection");
+      const msg = err?.message || "Failed to create collection";
+      const useCategories = msg.includes("Collection service not available") || msg.includes("COLLECTION_SERVICE");
+      setError(useCategories
+        ? "Collections cannot be created from here when the product service is unavailable. Create them from Content → Categories by enabling \"Has collection\"."
+        : msg);
     } finally {
       setSaving(false);
     }

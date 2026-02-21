@@ -513,13 +513,27 @@ async function start() {
         if (!title) return res.status(400).json({ message: 'title is required' })
         const handle = (b.handle || '').trim() || title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
         let svc = null
-        try { svc = scope.resolve('productModuleService') } catch (_) {}
-        if (!svc) try { svc = scope.resolve('productCollectionService') } catch (_) {}
-        if (!svc || typeof svc.createProductCollections !== 'function') {
-          return res.status(503).json({ message: 'Collection service not available' })
+        try { svc = scope.resolve('productCollectionService') } catch (_) {}
+        if (!svc) try { svc = scope.resolve('productModuleService') } catch (_) {}
+        if (!svc) {
+          return res.status(503).json({
+            message: 'Collection service not available. Create collections from Content → Categories by enabling "Has collection".',
+            code: 'COLLECTION_SERVICE_UNAVAILABLE'
+          })
         }
-        const created = await svc.createProductCollections([{ title, handle }])
-        const collection = Array.isArray(created) ? created[0] : created
+        let collection = null
+        if (typeof svc.create === 'function') {
+          collection = await svc.create({ title, handle })
+        } else if (typeof svc.createProductCollections === 'function') {
+          const created = await svc.createProductCollections([{ title, handle }])
+          collection = Array.isArray(created) ? created[0] : created
+        }
+        if (!collection) {
+          return res.status(503).json({
+            message: 'Collection service not available. Create collections from Content → Categories by enabling "Has collection".',
+            code: 'COLLECTION_SERVICE_UNAVAILABLE'
+          })
+        }
         res.status(201).json({ collection })
       } catch (err) {
         console.error('Admin collections POST error:', err)
