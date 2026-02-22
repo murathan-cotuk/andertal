@@ -1,12 +1,12 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
-import DashboardHome from "@/components/DashboardHome";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function Home() {
-  return (
-    <DashboardLayout>
-      <DashboardHome />
-    </DashboardLayout>
-  );
+export default function RootPage() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/dashboard");
+  }, [router]);
+  return null;
 }

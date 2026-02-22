@@ -31,7 +31,7 @@ const GroupedDropdownSearch = dynamic(
 );
 
 const menuItemsMain = [
-  { url: "/", label: "Home", icon: HomeIcon },
+  { url: "/dashboard", label: "Home", icon: HomeIcon },
   {
     url: "/orders",
     label: "Orders",

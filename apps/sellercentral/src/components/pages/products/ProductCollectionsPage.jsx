@@ -15,7 +15,9 @@ import {
   IndexTable,
   EmptyState,
   Modal,
+  Select,
 } from "@shopify/polaris";
+import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 function slugFromTitle(title) {
@@ -23,17 +25,57 @@ function slugFromTitle(title) {
   return title.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
+function buildTree(flatList) {
+  if (!Array.isArray(flatList)) return [];
+  const byId = new Map(flatList.map((c) => [c.id, { ...c, children: [] }]));
+  const roots = [];
+  for (const c of flatList) {
+    const node = byId.get(c.id);
+    if (!c.parent_id) roots.push(node);
+    else {
+      const parent = byId.get(c.parent_id);
+      if (parent) parent.children.push(node);
+      else roots.push(node);
+    }
+  }
+  return roots;
+}
+
+function flattenTree(tree, level = 0) {
+  if (!Array.isArray(tree)) return [];
+  let out = [];
+  for (const node of tree) {
+    out.push({ ...node, _level: level });
+    if (node.children?.length) out = out.concat(flattenTree(node.children, level + 1));
+  }
+  return out;
+}
+
 export default function ProductCollectionsPage() {
   const [collections, setCollections] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [form, setForm] = useState({ title: "", handle: "" });
+  const [form, setForm] = useState({ title: "", handle: "", category_id: "" });
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const client = getMedusaAdminClient();
+
+  const loadCategories = async () => {
+    try {
+      const data = await client.getAdminHubCategories({ all: true });
+      const list = data?.categories || [];
+      setCategories(Array.isArray(list) ? list : []);
+      return Array.isArray(list) ? list : [];
+    } catch {
+      setCategories([]);
+      return [];
+    }
+  };
 
   const fetchCollections = async () => {
     try {
@@ -53,6 +95,7 @@ export default function ProductCollectionsPage() {
               title: c.title ?? c.name,
               handle: c.handle ?? c.slug,
               _standalone: !!c._standalone,
+              _fromCategory: !!c._fromCategory,
             });
           }
         }
@@ -71,8 +114,25 @@ export default function ProductCollectionsPage() {
     fetchCollections();
   }, []);
 
+  useEffect(() => {
+    if (modalOpen || editId) loadCategories();
+  }, [modalOpen, editId]);
+
   const openAdd = () => {
-    setForm({ title: "", handle: "" });
+    setEditId(null);
+    setForm({ title: "", handle: "", category_id: "" });
+    setSlugManuallyEdited(false);
+    setError(null);
+    setModalOpen(true);
+  };
+
+  const openEdit = (col) => {
+    setEditId(col.id);
+    setForm({
+      title: col.title ?? "",
+      handle: col.handle ?? "",
+      category_id: "",
+    });
     setSlugManuallyEdited(false);
     setError(null);
     setModalOpen(true);
@@ -89,6 +149,7 @@ export default function ProductCollectionsPage() {
   const handleSubmit = async () => {
     const title = (form.title || "").trim();
     const handle = (form.handle || "").trim() || slugFromTitle(title);
+    const categoryId = (form.category_id || "").trim() || undefined;
     if (!title) {
       setError("Title is required.");
       return;
@@ -96,11 +157,25 @@ export default function ProductCollectionsPage() {
     try {
       setSaving(true);
       setError(null);
-      await client.createCollection({ title, handle: handle || slugFromTitle(title), standalone: true });
+      if (editId) {
+        await client.updateCollection(editId, {
+          title,
+          handle: handle || slugFromTitle(title),
+          ...(categoryId && { category_id: categoryId }),
+        });
+      } else {
+        await client.createCollection({
+          title,
+          handle: handle || slugFromTitle(title),
+          standalone: true,
+          ...(categoryId && { category_id: categoryId }),
+        });
+      }
       setModalOpen(false);
+      setEditId(null);
       await fetchCollections();
     } catch (err) {
-      setError(err?.message || "Failed to create collection");
+      setError(err?.message || (editId ? "Failed to update collection" : "Failed to create collection"));
     } finally {
       setSaving(false);
     }
@@ -180,15 +255,12 @@ export default function ProductCollectionsPage() {
                         </Text>
                       </IndexTable.Cell>
                       <IndexTable.Cell>
-                        {col._standalone ? (
-                          <Button size="slim" tone="critical" onClick={() => setDeleteId(col.id)}>
-                            Delete
-                          </Button>
-                        ) : (
-                          <Text as="span" variant="bodySm" tone="subdued">
-                            —
-                          </Text>
-                        )}
+                        <InlineStack gap="200">
+                          {col._standalone && (
+                            <Button size="slim" variant="plain" tone="subdued" accessibilityLabel="Edit" icon={EditIcon} onClick={() => openEdit(col)} />
+                          )}
+                          <Button size="slim" variant="plain" tone="critical" accessibilityLabel="Delete" icon={DeleteIcon} onClick={() => setDeleteId(col.id)} />
+                        </InlineStack>
                       </IndexTable.Cell>
                     </IndexTable.Row>
                   ))}
@@ -220,10 +292,10 @@ export default function ProductCollectionsPage() {
 
       <Modal
         open={modalOpen}
-        onClose={() => !saving && setModalOpen(false)}
-        title="Add collection"
+        onClose={() => !saving && (setModalOpen(false), setEditId(null))}
+        title={editId ? "Edit collection" : "Add collection"}
         primaryAction={{
-          content: saving ? "Creating…" : "Create",
+          content: saving ? (editId ? "Saving…" : "Creating…") : editId ? "Save" : "Create",
           onAction: handleSubmit,
           loading: saving,
         }}
@@ -247,6 +319,19 @@ export default function ProductCollectionsPage() {
               placeholder="e.g. summer-sale"
               autoComplete="off"
               helpText="URL-friendly; auto-filled from title."
+            />
+            <Select
+              label="Link to category (optional)"
+              options={[
+                { label: "— None —", value: "" },
+                ...flattenTree(buildTree(categories)).map((c) => ({
+                  label: (c._level ? "  ".repeat(c._level) + "↳ " : "") + (c.name || c.slug || c.id),
+                  value: c.id,
+                })),
+              ]}
+              value={form.category_id}
+              onChange={(value) => setForm((prev) => ({ ...prev, category_id: value }))}
+              helpText={editId ? "Link this collection to a category." : "Optionally link the new collection to a category."}
             />
           </BlockStack>
         </Modal.Section>

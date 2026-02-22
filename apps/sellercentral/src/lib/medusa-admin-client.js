@@ -204,9 +204,22 @@ class MedusaAdminClient {
   async createCollection(data) {
     const body = { title: data.title, handle: data.handle }
     if (data.standalone === true) body.standalone = true
+    if (data.category_id) body.category_id = data.category_id
     const endpoint = '/admin-hub/collections'
     const res = await this.request(endpoint, {
       method: 'POST',
+      body: JSON.stringify(body),
+    })
+    return res.collection
+  }
+
+  async updateCollection(id, data) {
+    const body = {}
+    if (data.title !== undefined) body.title = data.title
+    if (data.handle !== undefined) body.handle = data.handle
+    if (data.category_id !== undefined) body.category_id = data.category_id
+    const res = await this.request(`/admin-hub/collections/${id}`, {
+      method: 'PATCH',
       body: JSON.stringify(body),
     })
     return res.collection

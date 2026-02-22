@@ -20,6 +20,7 @@ import {
   useIndexResourceState,
   Badge,
 } from "@shopify/polaris";
+import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 function slugFromName(name) {
@@ -105,7 +106,7 @@ export default function ContentCategoriesPage() {
   }, []);
 
   useEffect(() => {
-    client.getMedusaCollections({ medusa_only: true }).then((r) => setMedusaCollections(r.collections || [])).catch(() => setMedusaCollections([]));
+    client.getMedusaCollections({ adminHub: true }).then((r) => setMedusaCollections(r.collections || [])).catch(() => setMedusaCollections([]));
   }, []);
 
   const handleNameChange = (value) => {
@@ -306,12 +307,8 @@ export default function ContentCategoriesPage() {
                       </IndexTable.Cell>
                       <IndexTable.Cell>
                         <InlineStack gap="200">
-                          <Button size="slim" onClick={() => openEdit(row)}>
-                            Edit
-                          </Button>
-                          <Button size="slim" tone="critical" onClick={() => setDeleteId(row.id)}>
-                            Delete
-                          </Button>
+                          <Button size="slim" variant="plain" tone="subdued" accessibilityLabel="Edit" icon={EditIcon} onClick={() => openEdit(row)} />
+                          <Button size="slim" variant="plain" tone="critical" accessibilityLabel="Delete" icon={DeleteIcon} onClick={() => setDeleteId(row.id)} />
                         </InlineStack>
                       </IndexTable.Cell>
                     </IndexTable.Row>

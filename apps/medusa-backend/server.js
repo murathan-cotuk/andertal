@@ -565,6 +565,25 @@ async function start() {
         return null
       }
     }
+    const updateAdminHubCollectionDb = async (id, title, handle) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl || !dbUrl.startsWith('postgres')) return null
+      try {
+        const { Client } = require('pg')
+        const isRender = dbUrl.includes('render.com')
+        const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const res = await client.query(
+          'UPDATE admin_hub_collections SET title = COALESCE(NULLIF($2, \'\'), title), handle = COALESCE(NULLIF($3, \'\'), handle), updated_at = now() WHERE id = $1 RETURNING id, title, handle',
+          [id, title || '', handle || '']
+        )
+        await client.end()
+        return res.rows && res.rows[0] ? res.rows[0] : null
+      } catch (e) {
+        console.warn('updateAdminHubCollectionDb:', e && e.message)
+        return null
+      }
+    }
     const deleteAdminHubCollectionDb = async (id) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       if (!dbUrl || !dbUrl.startsWith('postgres')) return false
@@ -631,9 +650,18 @@ async function start() {
         if (!title) return res.status(400).json({ message: 'title is required' })
         const handle = (b.handle || '').trim() || title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
         const standalone = b.standalone === true || b.standalone === 'true'
+        const categoryId = (b.category_id || '').trim() || null
         if (standalone) {
           const row = await createAdminHubCollectionDb(title, handle)
-          if (row) return res.status(201).json({ collection: { id: row.id, title: row.title, handle: row.handle } })
+          if (row) {
+            if (categoryId) {
+              try {
+                const adminHub = resolveAdminHub()
+                if (adminHub) await adminHub.updateCategory(categoryId, { has_collection: true, metadata: { collection_id: row.id } })
+              } catch (_) {}
+            }
+            return res.status(201).json({ collection: { id: row.id, title: row.title, handle: row.handle } })
+          }
           return res.status(500).json({ message: 'Failed to create standalone collection' })
         }
         let svc = null
@@ -674,13 +702,42 @@ async function start() {
       }
     }
     httpApp.post('/admin/collections', (req, res) => adminCollectionsPOST(req, res))
+    const adminCollectionByIdPATCH = async (req, res) => {
+      try {
+        const id = req.params.id
+        if (!id) return res.status(400).json({ message: 'id is required' })
+        const b = req.body || {}
+        const title = (b.title || '').trim()
+        const handle = (b.handle || '').trim()
+        const categoryId = (b.category_id || '').trim() || null
+        const updated = await updateAdminHubCollectionDb(id, title || undefined, handle || undefined)
+        if (!updated) return res.status(404).json({ message: 'Collection not found (only standalone collections can be updated here)' })
+        if (categoryId) {
+          try {
+            const adminHub = resolveAdminHub()
+            if (adminHub) await adminHub.updateCategory(categoryId, { has_collection: true, metadata: { collection_id: id } })
+          } catch (_) {}
+        }
+        res.json({ collection: { id: updated.id, title: updated.title, handle: updated.handle } })
+      } catch (err) {
+        console.error('Admin collection PATCH error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
     const adminCollectionByIdDELETE = async (req, res) => {
       try {
         const id = req.params.id
         if (!id) return res.status(400).json({ message: 'id is required' })
         const deleted = await deleteAdminHubCollectionDb(id)
         if (deleted) return res.status(200).json({ deleted: true })
-        return res.status(404).json({ message: 'Collection not found or cannot be deleted (only standalone collections can be removed here)' })
+        try {
+          const adminHub = resolveAdminHub()
+          if (adminHub) {
+            await adminHub.updateCategory(id, { has_collection: false, metadata: {} })
+            return res.status(200).json({ deleted: true, unlinked: true })
+          }
+        } catch (_) {}
+        return res.status(404).json({ message: 'Collection not found' })
       } catch (err) {
         console.error('Admin collection DELETE error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -688,8 +745,9 @@ async function start() {
     }
     httpApp.get('/admin-hub/collections', (req, res) => adminCollectionsGET(req, res))
     httpApp.post('/admin-hub/collections', (req, res) => adminCollectionsPOST(req, res))
+    httpApp.patch('/admin-hub/collections/:id', (req, res) => adminCollectionByIdPATCH(req, res))
     httpApp.delete('/admin-hub/collections/:id', (req, res) => adminCollectionByIdDELETE(req, res))
-    console.log('Admin route: GET/POST/DELETE /admin-hub/collections')
+    console.log('Admin route: GET/POST/PATCH/DELETE /admin-hub/collections')
 
     // --- Admin Hub Menus ---
     const resolveMenuService = () => {

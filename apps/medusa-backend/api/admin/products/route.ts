@@ -74,7 +74,8 @@ export async function GET(
     const msg = (error as Error)?.message || ""
     if (msg.includes("strategy") || msg.includes("undefined")) {
       console.warn("Admin products GET: service unavailable", msg)
-      return res.json({ products: [], count: 0 })
+      res.json({ products: [], count: 0 })
+      return
     }
     console.error("Admin products GET error:", error)
     res.status(500).json({
