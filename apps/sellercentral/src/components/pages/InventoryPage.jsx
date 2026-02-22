@@ -110,7 +110,7 @@ export default function InventoryPage() {
                   {products.map((product) => (
                     <Link
                       key={product.id}
-                      href={`/products/${product.id}`}
+                      href={`/products/${product.handle || product.id}`}
                       style={{ textDecoration: "none", color: "inherit" }}
                     >
                       <Box

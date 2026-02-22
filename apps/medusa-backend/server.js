@@ -1028,9 +1028,69 @@ async function start() {
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
       }
     }
+    const getAdminHubProductByIdOrHandleDb = async (idOrHandle) => {
+      const client = getProductsDbClient()
+      if (!client) return null
+      try {
+        await client.connect()
+        const val = String(idOrHandle || '').trim()
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+        let res
+        if (isUuid) {
+          res = await client.query(
+            'SELECT id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, created_at, updated_at FROM admin_hub_products WHERE id = $1',
+            [val]
+          )
+        } else {
+          res = await client.query(
+            'SELECT id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, created_at, updated_at FROM admin_hub_products WHERE LOWER(handle) = LOWER($1)',
+            [val]
+          )
+        }
+        await client.end()
+        const r = res.rows && res.rows[0]
+        if (!r) return null
+        return {
+          id: r.id,
+          title: r.title,
+          handle: r.handle,
+          slug: r.handle,
+          sku: r.sku,
+          description: r.description,
+          status: r.status,
+          seller_id: r.seller_id,
+          seller: r.seller_id,
+          collection_id: r.collection_id,
+          price: r.price_cents != null ? r.price_cents / 100 : 0,
+          inventory: r.inventory != null ? r.inventory : 0,
+          metadata: r.metadata,
+          variants: r.variants,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+        }
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        console.warn('getAdminHubProductByIdOrHandleDb:', e && e.message)
+        return null
+      }
+    }
+    const adminHubProductByIdGET = async (req, res) => {
+      try {
+        const product = await getAdminHubProductByIdOrHandleDb(req.params.id)
+        if (!product) {
+          res.status(404).json({ message: 'Product not found' })
+          return
+        }
+        res.json({ product })
+      } catch (err) {
+        console.error('Admin Hub product GET error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
     httpApp.get('/admin-hub/products', adminHubProductsGET)
     httpApp.post('/admin-hub/products', adminHubProductsPOST)
-    console.log('Admin Hub routes: GET/POST /admin-hub/products')
+    httpApp.get('/admin-hub/products/:id', adminHubProductByIdGET)
+    console.log('Admin Hub routes: GET/POST /admin-hub/products, GET /admin-hub/products/:id')
 
     // GET /store/menus – Public menüler (Shop Navbar). location=main vb. query ile filtrelenebilir.
     const storeMenusGET = async (req, res) => {

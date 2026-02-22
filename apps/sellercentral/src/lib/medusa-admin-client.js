@@ -126,6 +126,12 @@ class MedusaAdminClient {
     return res?.product ?? res;
   }
 
+  /** GET /admin-hub/products/:id – id (UUID) veya handle ile tek ürün (kısa URL için handle kullan) */
+  async getAdminHubProduct(idOrHandle) {
+    const res = await this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}`);
+    return res?.product ?? res;
+  }
+
   async updateProduct(id, data) {
     return this.request(`/admin/products/${id}`, {
       method: 'PUT',
