@@ -318,6 +318,9 @@ function MenuEditorPanel(props) {
                 value={localMenuLocation || "main"}
                 onChange={setLocalMenuLocation}
               />
+              <span style={{ display: "block", marginTop: 4, fontSize: 12, color: "var(--p-color-text-subdued)" }}>
+                {localMenuLocation === "second" ? "→ Shown in shop navbar (grey bar under main nav)" : localMenuLocation === "main" ? "→ Shown in shop as Kategorien dropdown" : "→ Other locations (e.g. footer)"}
+              </span>
             </div>
             <InlineStack gap="200">
               {hasMenuId && (
@@ -872,12 +875,12 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
 
   const handleDeleteItem = async (item) => {
     if (!confirm(`Remove "${item.label}" from menu?`)) return;
-    if (!selectedMenuId) return;
-    const menuId = panelMenuId ?? selectedMenuId;
+    const menuId = effectiveMenuId ?? selectedMenuId;
+    if (!menuId) return;
     setError(null);
     setItems((prev) => prev.filter((i) => i.id !== item.id));
     try {
-      await client.deleteMenuItem(selectedMenuId, item.id);
+      await client.deleteMenuItem(menuId, item.id);
       currentMenuIdRef.current = menuId;
       await fetchItems(menuId);
     } catch (err) {
@@ -905,7 +908,8 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       setError("Label required");
       return;
     }
-    if (!selectedMenuId) return;
+    const menuId = effectiveMenuId ?? selectedMenuId;
+    if (!menuId) return;
     let link_value = itemForm.link_value;
     if (itemForm.link_type === "collection" && itemForm.collection_id) {
       const c = collections.find((x) => x.id === itemForm.collection_id);
@@ -920,14 +924,14 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       setSaving(true);
       setError(null);
       if (editingItemId) {
-        await client.updateMenuItem(selectedMenuId, editingItemId, {
+        await client.updateMenuItem(menuId, editingItemId, {
           label: itemForm.label,
           link_type: itemForm.link_type || "url",
           link_value: link_value || null,
           parent_id: itemForm.parent_id || null,
         });
       } else {
-        await client.createMenuItem(selectedMenuId, {
+        await client.createMenuItem(menuId, {
           label: itemForm.label,
           link_type: itemForm.link_type || "url",
           link_value: link_value || null,
@@ -937,7 +941,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       setItemModalOpen(false);
       setEditingItemId(null);
       setAddUnderParentId(null);
-      await fetchItems(panelMenuId ?? selectedMenuId);
+      await fetchItems(menuId);
     } catch (err) {
       setError(err?.message || (editingItemId ? "Failed to update item" : "Failed to add item"));
     } finally {
@@ -962,24 +966,26 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   }, [items]);
 
   const handleMoveItem = useCallback(async (itemId, newParentId, newSortOrder) => {
-    if (!selectedMenuId) return;
+    const menuId = effectiveMenuId ?? selectedMenuId;
+    if (!menuId) return;
     try {
       setError(null);
-      await client.updateMenuItem(selectedMenuId, itemId, {
+      await client.updateMenuItem(menuId, itemId, {
         parent_id: newParentId || null,
         sort_order: newSortOrder,
       });
-      await fetchItems(panelMenuId ?? selectedMenuId);
+      await fetchItems(menuId);
     } catch (err) {
       setError(err?.message || "Failed to move item");
     } finally {
       setDraggedItemId(null);
       setDropTarget({ type: null, id: null });
     }
-  }, [selectedMenuId, client]);
+  }, [effectiveMenuId, selectedMenuId, client]);
 
   const handleMoveItemBetween = useCallback(async (draggedId, targetRow, zone) => {
-    if (!selectedMenuId) return;
+    const menuId = effectiveMenuId ?? selectedMenuId;
+    if (!menuId) return;
     try {
       setError(null);
       const newParentId = targetRow.parent_id || null;
@@ -990,18 +996,18 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       const insertIndex = zone === "above" ? targetIndex : targetIndex + 1;
       const orderedIds = [...siblings.map((r) => r.id)];
       orderedIds.splice(insertIndex, 0, draggedId);
-      await client.updateMenuItem(selectedMenuId, draggedId, { parent_id: newParentId, sort_order: 0 });
+      await client.updateMenuItem(menuId, draggedId, { parent_id: newParentId, sort_order: 0 });
       for (let i = 0; i < orderedIds.length; i++) {
-        await client.updateMenuItem(selectedMenuId, orderedIds[i], { sort_order: i });
+        await client.updateMenuItem(menuId, orderedIds[i], { sort_order: i });
       }
-      await fetchItems(panelMenuId ?? selectedMenuId);
+      await fetchItems(menuId);
     } catch (err) {
       setError(err?.message || "Failed to move item");
     } finally {
       setDraggedItemId(null);
       setDropTarget({ type: null, id: null });
     }
-  }, [selectedMenuId, client, items]);
+  }, [effectiveMenuId, selectedMenuId, client, items]);
 
   const onDragStart = (e, itemId) => {
     setDraggedItemId(itemId);
@@ -1021,7 +1027,8 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   };
 
   const runImportCsv = async () => {
-    if (!selectedMenuId || !importCsvFile) return;
+    const menuId = effectiveMenuId ?? selectedMenuId;
+    if (!menuId || !importCsvFile) return;
     const file = importCsvFile;
     let text;
     try {
@@ -1042,7 +1049,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       for (let i = 0; i < list.length; i++) {
         const item = list[i];
         const parentId = item.parentKey === "" ? rootParentId : (createdIds.get(item.parentKey) ?? null);
-        const created = await client.createMenuItem(selectedMenuId, {
+        const created = await client.createMenuItem(menuId, {
           label: item.label,
           link_type: "url",
           link_value: null,
@@ -1052,7 +1059,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
         if (created?.id) createdIds.set(item.key, created.id);
         setImportProgress((prev) => prev ? { ...prev, done: i + 1 } : { total: list.length, done: i + 1, error: null });
       }
-      await fetchItems(panelMenuId ?? selectedMenuId);
+      await fetchItems(menuId);
       setImportCsvOpen(false);
       setImportCsvFile(null);
       setImportUnderParentId("");

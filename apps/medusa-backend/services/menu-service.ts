@@ -79,7 +79,10 @@ export default class MenuService {
   ): Promise<AdminHubMenuItem> {
     const item = await this.menuItemRepository_.findOne({ where: { id } })
     if (!item) throw new Error(`Menu item ${id} not found`)
-    Object.assign(item, data)
+    const allowed = ["label", "link_type", "link_value", "parent_id", "sort_order"] as const
+    for (const key of allowed) {
+      if (data[key] !== undefined) (item as Record<string, unknown>)[key] = data[key]
+    }
     return await this.menuItemRepository_.save(item)
   }
 

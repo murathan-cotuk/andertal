@@ -11,6 +11,7 @@ import Link from "next/link";
 import styled from "styled-components";
 import { motion } from "framer-motion";
 import { useCustomerAuth as useAuth } from "@belucha/lib";
+import { getMedusaClient } from "@/lib/medusa-client";
 import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
 import TopBar from "@/components/TopBar";
@@ -330,21 +331,33 @@ export default function ShopHeader() {
 
   useEffect(() => {
     const norm = (s) => String(s || "").toLowerCase().trim();
+    const applyMenus = (locData, menuData) => {
+      const locs = locData?.locations || [];
+      const menus = Array.isArray(menuData?.menus) ? menuData.menus : [];
+      const subnavLoc = locs.find((l) => norm(l?.html_id) === "subnav");
+      const subnavSlug = norm(subnavLoc?.slug || "second");
+      const main = menus.find((m) => norm(m?.location) === "main") || menus[0];
+      const second =
+        menus.find((m) => norm(m?.location) === subnavSlug) ||
+        menus.find((m) => norm(m?.slug) === "second-menu");
+      const rootItems = (arr) => (arr || []).filter((i) => !i?.parent_id);
+      setMainMenuItems(main ? rootItems(main.items) : []);
+      setSecondMenuItems(second ? rootItems(second.items) : []);
+    };
     Promise.all([
       fetch("/api/store-menu-locations").then((r) => r.json()).catch(() => ({ locations: [] })),
       fetch("/api/store-menus").then((r) => r.json()).catch(() => ({ menus: [] })),
     ]).then(([locData, menuData]) => {
-      const locs = locData.locations || [];
-      const menus = Array.isArray(menuData?.menus) ? menuData.menus : [];
-      const subnavLoc = locs.find((l) => norm(l.html_id) === "subnav");
-      const subnavSlug = norm(subnavLoc?.slug || "second");
-      const main = menus.find((m) => norm(m.location) === "main") || menus[0];
-      const second =
-        menus.find((m) => norm(m.location) === subnavSlug) ||
-        menus.find((m) => norm(m.slug) === "second-menu");
-      const rootItems = (arr) => (arr || []).filter((i) => !i.parent_id);
-      setMainMenuItems(main ? rootItems(main.items) : []);
-      setSecondMenuItems(second ? rootItems(second.items) : []);
+      const hasMenus = Array.isArray(menuData?.menus) && menuData.menus.length > 0;
+      if (hasMenus) {
+        applyMenus(locData, menuData);
+        return;
+      }
+      const client = getMedusaClient();
+      Promise.all([
+        client.getMenuLocations().catch(() => ({ locations: [] })),
+        client.getMenus().catch(() => ({ menus: [] })),
+      ]).then(([locData2, menuData2]) => applyMenus(locData2, menuData2));
     });
   }, []);
 
