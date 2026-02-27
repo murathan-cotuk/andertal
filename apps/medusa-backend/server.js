@@ -1030,7 +1030,7 @@ async function start() {
     httpApp.delete('/admin-hub/brands/:id', (req, res) => adminBrandsPatchDelete(req, res, false))
     console.log('Admin route: GET/POST /admin-hub/brands, PATCH/DELETE /admin-hub/brands/:id')
 
-    // --- Admin Hub Menus ---
+    // --- Admin Hub Menus (service or raw DB fallback when loader fails) ---
     const resolveMenuService = () => {
       try {
         return container.resolve('menuService')
@@ -1038,117 +1038,245 @@ async function start() {
         return null
       }
     }
-    const menusListGET = async (req, res) => {
-      const svc = resolveMenuService()
-      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
+    const getMenuDbClient = () => {
+      const raw = process.env.DATABASE_URL || process.env.POSTGRES_URL || ''
+      const dbUrl = raw.replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl || !dbUrl.startsWith('postgres')) return null
       try {
-        const menus = await svc.listMenus()
-        res.json({ menus, count: menus.length })
-      } catch (err) {
-        console.error('Menus GET error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+        const { Client } = require('pg')
+        const isRender = dbUrl.includes('render.com')
+        return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
+      } catch (e) {
+        console.warn('Menu DB: pg client create failed', e && e.message)
+        return null
       }
+    }
+    const runWithMenuDb = async (fn) => {
+      const client = getMenuDbClient()
+      if (!client) return null
+      try {
+        await client.connect()
+        return await fn(client)
+      } catch (err) {
+        console.warn('Menu DB fallback error:', err && err.message)
+        return null
+      } finally {
+        try { await client.end() } catch (_) {}
+      }
+    }
+    const menusListGET = async (req, res) => {
+      try {
+        const menusFromDb = await runWithMenuDb(async (client) => {
+          const r = await client.query('SELECT id, name, slug, location FROM admin_hub_menus ORDER BY name')
+          return (r.rows || []).map((row) => ({ id: row.id, name: row.name, slug: row.slug, location: row.location || 'main' }))
+        })
+        if (menusFromDb && Array.isArray(menusFromDb)) return res.status(200).json({ menus: menusFromDb, count: menusFromDb.length })
+        const svc = resolveMenuService()
+        if (svc) {
+          try {
+            const menus = await svc.listMenus()
+            return res.status(200).json({ menus: menus || [], count: (menus || []).length })
+          } catch (err) {
+            console.error('Menus GET service error:', err && err.message)
+          }
+        }
+      } catch (err) {
+        console.warn('Menus GET error:', err && err.message)
+      }
+      return res.status(200).json({ menus: [], count: 0 })
     }
     const menusCreatePOST = async (req, res) => {
+      const b = req.body || {}
+      if (!b.name || !b.slug) return res.status(400).json({ message: 'name and slug required' })
+      let menu = await runWithMenuDb(async (client) => {
+        const r = await client.query(
+          'INSERT INTO admin_hub_menus (name, slug, location) VALUES ($1, $2, $3) RETURNING id, name, slug, location',
+          [b.name, b.slug, b.location || 'main']
+        )
+        return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: r.rows[0].location || 'main' } : null
+      })
+      if (menu) return res.status(201).json({ menu })
       const svc = resolveMenuService()
-      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
-      try {
-        const b = req.body || {}
-        if (!b.name || !b.slug) return res.status(400).json({ message: 'name and slug required' })
-        const menu = await svc.createMenu({ name: b.name, slug: b.slug, location: b.location })
-        res.status(201).json({ menu })
-      } catch (err) {
-        console.error('Menus POST error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      if (svc) {
+        try {
+          menu = await svc.createMenu({ name: b.name, slug: b.slug, location: b.location })
+          return res.status(201).json({ menu })
+        } catch (err) {
+          console.error('Menus POST error:', err)
+          return res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+        }
       }
+      console.warn('Menus create: DB and menuService both unavailable')
+      return res.status(500).json({ message: 'Database unavailable. Check DATABASE_URL.' })
     }
     const menuByIdGET = async (req, res) => {
+      let menu = await runWithMenuDb(async (client) => {
+        const r = await client.query('SELECT id, name, slug, location FROM admin_hub_menus WHERE id = $1', [req.params.id])
+        return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: r.rows[0].location || 'main' } : null
+      })
+      if (menu) return res.json({ menu })
       const svc = resolveMenuService()
-      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
-      try {
-        const menu = await svc.getMenuById(req.params.id)
-        if (!menu) return res.status(404).json({ message: 'Menu not found' })
-        res.json({ menu })
-      } catch (err) {
-        console.error('Menu GET error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      if (svc) {
+        try {
+          menu = await svc.getMenuById(req.params.id)
+          if (menu) return res.json({ menu })
+        } catch (err) {
+          console.error('Menu GET error:', err)
+          return res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+        }
       }
+      return res.status(404).json({ message: 'Menu not found' })
     }
     const menuByIdPUT = async (req, res) => {
-      const svc = resolveMenuService()
-      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
-      try {
-        const menu = await svc.updateMenu(req.params.id, req.body || {})
-        res.json({ menu })
-      } catch (err) {
-        console.error('Menu PUT error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
-      }
+      const body = req.body || {}
+      const menu = await runWithMenuDb(async (client) => {
+        const updates = []
+        const vals = []
+        let n = 1
+        if (body.name !== undefined) { updates.push(`name = $${n++}`); vals.push(body.name) }
+        if (body.slug !== undefined) { updates.push(`slug = $${n++}`); vals.push(body.slug) }
+        if (body.location !== undefined) { updates.push(`location = $${n++}`); vals.push(body.location) }
+        if (updates.length === 0) {
+          const r = await client.query('SELECT id, name, slug, location FROM admin_hub_menus WHERE id = $1', [req.params.id])
+          return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: r.rows[0].location || 'main' } : null
+        }
+        vals.push(req.params.id)
+        const r = await client.query(`UPDATE admin_hub_menus SET ${updates.join(', ')}, updated_at = now() WHERE id = $${n} RETURNING id, name, slug, location`, vals)
+        return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: r.rows[0].location || 'main' } : null
+      })
+      if (!menu) return res.status(404).json({ message: 'Menu not found' })
+      return res.json({ menu })
     }
     const menuByIdDELETE = async (req, res) => {
       const svc = resolveMenuService()
-      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
-      try {
-        await svc.deleteMenu(req.params.id)
-        res.status(200).json({ deleted: true })
-      } catch (err) {
-        console.error('Menu DELETE error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      if (svc) {
+        try {
+          await svc.deleteMenu(req.params.id)
+          return res.status(200).json({ deleted: true })
+        } catch (err) {
+          console.error('Menu DELETE error:', err)
+          return res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+        }
       }
+      const ok = await runWithMenuDb(async (client) => {
+        const r = await client.query('DELETE FROM admin_hub_menus WHERE id = $1', [req.params.id])
+        return (r.rowCount || 0) > 0
+      })
+      if (ok) return res.status(200).json({ deleted: true })
+      return res.status(404).json({ message: 'Menu not found' })
     }
     const menuItemsGET = async (req, res) => {
+      const itemsFromDb = await runWithMenuDb(async (client) => {
+        const r = await client.query(
+          'SELECT id, menu_id, label, link_type, link_value, parent_id, sort_order FROM admin_hub_menu_items WHERE menu_id = $1 ORDER BY sort_order ASC, label ASC',
+          [req.params.menuId]
+        )
+        return (r.rows || []).map((row) => ({
+          id: row.id,
+          menu_id: row.menu_id,
+          label: row.label,
+          link_type: row.link_type || 'url',
+          link_value: row.link_value,
+          parent_id: row.parent_id,
+          sort_order: row.sort_order != null ? row.sort_order : 0,
+        }))
+      })
+      if (itemsFromDb) return res.json({ items: itemsFromDb, count: itemsFromDb.length })
       const svc = resolveMenuService()
-      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
-      try {
-        const items = await svc.listMenuItems(req.params.menuId)
-        res.json({ items, count: items.length })
-      } catch (err) {
-        console.error('Menu items GET error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      if (svc) {
+        try {
+          const items = await svc.listMenuItems(req.params.menuId)
+          return res.json({ items: items || [], count: (items || []).length })
+        } catch (err) {
+          console.error('Menu items GET error:', err)
+          return res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+        }
       }
+      return res.json({ items: [], count: 0 })
     }
     const menuItemsPOST = async (req, res) => {
+      const b = req.body || {}
+      if (!b.label) return res.status(400).json({ message: 'label required' })
+      const menuId = req.params.menuId
+      let item = await runWithMenuDb(async (client) => {
+        const r = await client.query(
+          'INSERT INTO admin_hub_menu_items (menu_id, label, link_type, link_value, parent_id, sort_order) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, menu_id, label, link_type, link_value, parent_id, sort_order',
+          [menuId, b.label, b.link_type || 'url', b.link_value || null, b.parent_id || null, b.sort_order != null ? b.sort_order : 0]
+        )
+        const row = r.rows && r.rows[0]
+        return row ? { id: row.id, menu_id: row.menu_id, label: row.label, link_type: row.link_type || 'url', link_value: row.link_value, parent_id: row.parent_id, sort_order: row.sort_order != null ? row.sort_order : 0 } : null
+      })
+      if (item) return res.status(201).json({ item })
       const svc = resolveMenuService()
-      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
-      try {
-        const b = req.body || {}
-        const menuId = req.params.menuId
-        if (!b.label) return res.status(400).json({ message: 'label required' })
-        const item = await svc.createMenuItem({
-          menu_id: menuId,
-          label: b.label,
-          link_type: b.link_type || 'url',
-          link_value: b.link_value || null,
-          parent_id: b.parent_id || null,
-          sort_order: b.sort_order || 0,
-        })
-        res.status(201).json({ item })
-      } catch (err) {
-        console.error('Menu items POST error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      if (svc) {
+        try {
+          item = await svc.createMenuItem({
+            menu_id: menuId,
+            label: b.label,
+            link_type: b.link_type || 'url',
+            link_value: b.link_value || null,
+            parent_id: b.parent_id || null,
+            sort_order: b.sort_order || 0,
+          })
+          return res.status(201).json({ item })
+        } catch (err) {
+          console.error('Menu items POST error:', err)
+          return res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+        }
       }
+      return res.status(500).json({ message: 'Database unavailable. Check DATABASE_URL.' })
     }
     const menuItemByIdPUT = async (req, res) => {
+      const body = req.body || {}
       const svc = resolveMenuService()
-      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
-      try {
-        const item = await svc.updateMenuItem(req.params.itemId, req.body || {})
-        res.json({ item })
-      } catch (err) {
-        console.error('Menu item PUT error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      if (svc) {
+        try {
+          const item = await svc.updateMenuItem(req.params.itemId, body)
+          return res.json({ item })
+        } catch (err) {
+          console.error('Menu item PUT error:', err)
+          return res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+        }
       }
+      const item = await runWithMenuDb(async (client) => {
+        const updates = []
+        const vals = []
+        let n = 1
+        if (body.label !== undefined) { updates.push(`label = $${n++}`); vals.push(body.label) }
+        if (body.link_type !== undefined) { updates.push(`link_type = $${n++}`); vals.push(body.link_type) }
+        if (body.link_value !== undefined) { updates.push(`link_value = $${n++}`); vals.push(body.link_value) }
+        if (body.parent_id !== undefined) { updates.push(`parent_id = $${n++}`); vals.push(body.parent_id) }
+        if (body.sort_order !== undefined) { updates.push(`sort_order = $${n++}`); vals.push(body.sort_order) }
+        if (updates.length === 0) {
+          const r = await client.query('SELECT id, menu_id, label, link_type, link_value, parent_id, sort_order FROM admin_hub_menu_items WHERE id = $1', [req.params.itemId])
+          const row = r.rows && r.rows[0]
+          return row ? { id: row.id, menu_id: row.menu_id, label: row.label, link_type: row.link_type || 'url', link_value: row.link_value, parent_id: row.parent_id, sort_order: row.sort_order != null ? row.sort_order : 0 } : null
+        }
+        vals.push(req.params.itemId)
+        const r = await client.query(`UPDATE admin_hub_menu_items SET ${updates.join(', ')}, updated_at = now() WHERE id = $${n} RETURNING id, menu_id, label, link_type, link_value, parent_id, sort_order`, vals)
+        const row = r.rows && r.rows[0]
+        return row ? { id: row.id, menu_id: row.menu_id, label: row.label, link_type: row.link_type || 'url', link_value: row.link_value, parent_id: row.parent_id, sort_order: row.sort_order != null ? row.sort_order : 0 } : null
+      })
+      if (!item) return res.status(404).json({ message: 'Menu item not found' })
+      return res.json({ item })
     }
     const menuItemByIdDELETE = async (req, res) => {
       const svc = resolveMenuService()
-      if (!svc) return res.status(503).json({ message: 'Menu service not available' })
-      try {
-        await svc.deleteMenuItem(req.params.itemId)
-        res.status(200).json({ deleted: true })
-      } catch (err) {
-        console.error('Menu item DELETE error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      if (svc) {
+        try {
+          await svc.deleteMenuItem(req.params.itemId)
+          return res.status(200).json({ deleted: true })
+        } catch (err) {
+          console.error('Menu item DELETE error:', err)
+          return res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+        }
       }
+      const ok = await runWithMenuDb(async (client) => {
+        const r = await client.query('DELETE FROM admin_hub_menu_items WHERE id = $1', [req.params.itemId])
+        return (r.rowCount || 0) > 0
+      })
+      if (ok) return res.status(200).json({ deleted: true })
+      return res.status(404).json({ message: 'Menu item not found' })
     }
     httpApp.get('/admin-hub/menus', menusListGET)
     httpApp.post('/admin-hub/menus', menusCreatePOST)
@@ -1160,7 +1288,8 @@ async function start() {
     httpApp.put('/admin-hub/menus/:menuId/items/:itemId', menuItemByIdPUT)
     httpApp.delete('/admin-hub/menus/:menuId/items/:itemId', menuItemByIdDELETE)
     const getMenuLocationsFromDb = async () => {
-      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const raw = process.env.DATABASE_URL || process.env.POSTGRES_URL || ''
+      const dbUrl = raw.replace(/^postgresql:\/\//, 'postgres://')
       if (!dbUrl || !dbUrl.startsWith('postgres')) return null
       try {
         const { Client } = require('pg')

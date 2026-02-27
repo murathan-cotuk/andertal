@@ -351,11 +351,15 @@ class MedusaAdminClient {
   }
 
   /**
-   * Admin Hub Menus
+   * Admin Hub Menus – on 503 or any error returns empty list so menu page always loads.
    */
   async getMenus() {
-    const data = await this.request('/admin-hub/menus')
-    return { menus: data.menus || [], count: data.count || 0 }
+    try {
+      const data = await this.request('/admin-hub/menus')
+      return { menus: data.menus || [], count: data.count ?? (data.menus || []).length }
+    } catch (_) {
+      return { menus: [], count: 0 }
+    }
   }
 
   async getMenu(id) {
@@ -378,8 +382,12 @@ class MedusaAdminClient {
   }
 
   async getMenuItems(menuId) {
-    const data = await this.request(`/admin-hub/menus/${menuId}/items`)
-    return { items: data.items || [], count: data.count || 0 }
+    try {
+      const data = await this.request(`/admin-hub/menus/${menuId}/items`)
+      return { items: data.items || [], count: data.count ?? (data.items || []).length }
+    } catch (_) {
+      return { items: [], count: 0 }
+    }
   }
 
   async createMenuItem(menuId, body) {
