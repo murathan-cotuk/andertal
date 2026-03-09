@@ -417,7 +417,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         fileList.map((file) => {
           const fd = new FormData();
           fd.append("file", file);
-          return client.uploadMedia(fd).then((r) => (r.url ? resolveMediaUrl(r.url) : null));
+          // Store relative path; resolveMediaUrl is used only for display in admin.
+          return client.uploadMedia(fd).then((r) => (r.url ? r.url : null));
         })
       )
         .then((urls) => {
@@ -494,6 +495,19 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .product-description-toolbar .product-desc-html-btn.active { background: var(--p-color-bg-surface-selected); color: var(--p-color-text); }
         .product-description-toolbar .product-desc-html-btn svg { width: 16px; height: 16px; }
         .product-description-editor { min-height: 200px; padding: 16px; outline: none; font-size: 14px; line-height: 1.6; color: var(--p-color-text); }
+        .product-description-editor h1 { font-size: 1.75rem; font-weight: 700; margin: 0.75em 0 0.35em; line-height: 1.3; }
+        .product-description-editor h2 { font-size: 1.5rem; font-weight: 700; margin: 0.75em 0 0.35em; line-height: 1.3; }
+        .product-description-editor h3 { font-size: 1.25rem; font-weight: 600; margin: 0.6em 0 0.3em; line-height: 1.35; }
+        .product-description-editor h4, .product-description-editor h5, .product-description-editor h6 { font-size: 1.1rem; font-weight: 600; margin: 0.5em 0 0.25em; line-height: 1.4; }
+        .product-description-editor h1:first-child, .product-description-editor h2:first-child, .product-description-editor h3:first-child { margin-top: 0; }
+        .product-description-editor p { margin: 0 0 0.6em; }
+        .product-description-editor p:last-child { margin-bottom: 0; }
+        .product-description-editor ul, .product-description-editor ol { margin: 0.4em 0 0.8em 1.5em; padding-left: 1.5em; }
+        .product-description-editor ul { list-style-type: disc; }
+        .product-description-editor ol { list-style-type: decimal; }
+        .product-description-editor li { margin-bottom: 0.25em; }
+        .product-description-editor strong { font-weight: 600; }
+        .product-description-editor blockquote { margin: 0.75em 0; padding-left: 1em; border-left: 4px solid var(--p-color-border); color: var(--p-color-text-subdued); }
         .product-description-html { min-height: 200px; width: 100%; padding: 16px; font-family: ui-monospace, "SF Mono", Monaco, monospace; font-size: 13px; line-height: 1.5; color: var(--p-color-text); background: var(--p-color-bg-surface-secondary); border: none; border-radius: 0; resize: vertical; box-sizing: border-box; }
         .product-description-html:focus { outline: none; }
         .product-description-html::placeholder { color: var(--p-color-text-subdued); }

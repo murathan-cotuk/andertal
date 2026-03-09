@@ -8,7 +8,7 @@ export default function CategoryPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <ShopHeader />
-      <main className="flex-grow">
+      <main className="flex-grow pt-[72px]">
         <CategoryTemplate />
       </main>
       <Footer />

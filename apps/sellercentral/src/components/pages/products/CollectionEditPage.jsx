@@ -130,7 +130,8 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
       client
         .uploadMedia(fd)
         .then((r) => {
-          const url = r?.url ? `${baseUrl}${r.url}` : null;
+          // Store relative path so the URL works across different backend deployments.
+          const url = r?.url || null;
           if (url) setForm((prev) => ({ ...prev, image_url: url }));
         })
         .catch(() => setError("Upload failed"))
@@ -148,7 +149,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
       client
         .uploadMedia(fd)
         .then((r) => {
-          const url = r?.url ? `${baseUrl}${r.url}` : null;
+          const url = r?.url || null;
           if (url) setForm((prev) => ({ ...prev, banner_image_url: url }));
         })
         .catch(() => setError("Upload failed"))
@@ -292,6 +293,22 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
         loading: saving,
       }}
     >
+      <style>{`
+        .collection-richtext-editor { color: var(--p-color-text); }
+        .collection-richtext-editor h1 { font-size: 1.75rem; font-weight: 700; margin: 0.75em 0 0.35em; line-height: 1.3; }
+        .collection-richtext-editor h2 { font-size: 1.5rem; font-weight: 700; margin: 0.75em 0 0.35em; line-height: 1.3; }
+        .collection-richtext-editor h3 { font-size: 1.25rem; font-weight: 600; margin: 0.6em 0 0.3em; line-height: 1.35; }
+        .collection-richtext-editor h4, .collection-richtext-editor h5, .collection-richtext-editor h6 { font-size: 1.1rem; font-weight: 600; margin: 0.5em 0 0.25em; line-height: 1.4; }
+        .collection-richtext-editor h1:first-child, .collection-richtext-editor h2:first-child, .collection-richtext-editor h3:first-child { margin-top: 0; }
+        .collection-richtext-editor p { margin: 0 0 0.6em; }
+        .collection-richtext-editor p:last-child { margin-bottom: 0; }
+        .collection-richtext-editor ul, .collection-richtext-editor ol { margin: 0.4em 0 0.8em 1.5em; padding-left: 1.5em; }
+        .collection-richtext-editor ul { list-style-type: disc; }
+        .collection-richtext-editor ol { list-style-type: decimal; }
+        .collection-richtext-editor li { margin-bottom: 0.25em; }
+        .collection-richtext-editor strong { font-weight: 600; }
+        .collection-richtext-editor blockquote { margin: 0.75em 0; padding-left: 1em; border-left: 4px solid var(--p-color-border); color: var(--p-color-text-subdued); }
+      `}</style>
       <Layout>
         {error && (
           <Layout.Section>
@@ -467,7 +484,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                   {richtextMode === "html" ? (
                     <textarea style={{ minHeight: 160, width: "100%", padding: 16, fontFamily: "ui-monospace, monospace", fontSize: 13, border: "none", resize: "vertical", boxSizing: "border-box" }} value={form.richtext || ""} onChange={(e) => setForm((prev) => ({ ...prev, richtext: e.target.value }))} placeholder="<h2>Heading</h2><p>…</p>" />
                   ) : (
-                    <div ref={richtextEditorRef} contentEditable suppressContentEditableWarning style={{ minHeight: 160, padding: 16, outline: "none", fontSize: 14, lineHeight: 1.6 }} onBlur={() => { if (richtextEditorRef.current) setForm((prev) => ({ ...prev, richtext: descriptionVisualToHtml(richtextEditorRef.current.innerHTML || "") })); }} />
+                    <div ref={richtextEditorRef} className="collection-richtext-editor" contentEditable suppressContentEditableWarning style={{ minHeight: 160, padding: 16, outline: "none", fontSize: 14, lineHeight: 1.6 }} onBlur={() => { if (richtextEditorRef.current) setForm((prev) => ({ ...prev, richtext: descriptionVisualToHtml(richtextEditorRef.current.innerHTML || "") })); }} />
                   )}
                 </div>
               </BlockStack>

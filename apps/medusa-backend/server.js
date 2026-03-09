@@ -192,7 +192,7 @@ async function start() {
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'sentry-trace', 'sentry-baggage'],
     }))
     // Root ve health: "Cannot GET /" yerine JSON döner
     app.get('/', (req, res) => {
@@ -226,6 +226,32 @@ async function start() {
 
     const { expressLoader } = require('@medusajs/framework/http')
     const { app: httpApp } = await expressLoader({ app, container })
+
+    // Helper: resolve relative upload URLs to absolute using the current server URL.
+    // Old uploads stored as absolute localhost URLs are returned as-is; new uploads
+    // stored as relative paths (/uploads/...) get the current SERVER_URL prepended.
+    const CURRENT_SERVER_URL = (process.env.SERVER_URL || `http://localhost:${PORT}`).replace(/\/$/, '')
+    const resolveUploadUrl = (url) => {
+      if (!url) return null
+      if (url.startsWith('http') || url.startsWith('//')) return url
+      return `${CURRENT_SERVER_URL}${url.startsWith('/') ? '' : '/'}${url}`
+    }
+
+    // Explicit OPTIONS preflight handler on httpApp so Medusa's own CORS does not
+    // override the custom allowed headers (sentry-trace, baggage etc.) for all routes.
+    const ALLOWED_HEADERS = 'Content-Type,Authorization,sentry-trace,baggage,sentry-baggage'
+    httpApp.options('*', (req, res) => {
+      const origin = req.headers.origin
+      const allowAllOrigins = getAllowedOrigins() === null
+      const allowed = allowAllOrigins || !origin || /^https?:\/\/localhost(:\d+)?$/.test(origin) || (getAllowedOrigins() || []).includes(origin)
+      if (origin && allowed) res.setHeader('Access-Control-Allow-Origin', origin)
+      else if (!origin) res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+      res.setHeader('Access-Control-Allow-Headers', ALLOWED_HEADERS)
+      res.setHeader('Access-Control-Allow-Credentials', 'true')
+      res.setHeader('Access-Control-Max-Age', '86400')
+      res.status(204).end()
+    })
 
     // Admin Hub tabloları yoksa oluştur (menüs/categories deploy sonrası çalışsın diye)
     const DATABASE_URL = process.env.DATABASE_URL || ''
@@ -1683,7 +1709,8 @@ async function start() {
     const mapAdminHubToStoreProduct = (p) => {
       const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
       const media = meta.media
-      const thumb = Array.isArray(media) && media[0] ? media[0] : (typeof media === 'string' && media ? media : null)
+      const rawThumb = Array.isArray(media) && media[0] ? media[0] : (typeof media === 'string' && media ? media : null)
+      const thumb = resolveUploadUrl(rawThumb)
       const priceCents = p.price != null ? Math.round(Number(p.price) * 100) : 0
       const rawVariants = Array.isArray(p.variants) && p.variants.length > 0 ? p.variants : []
       const variants = rawVariants.length > 0
@@ -1719,7 +1746,7 @@ async function start() {
         description: p.description,
         status: p.status,
         thumbnail: thumb || null,
-        images: thumb ? [{ url: thumb, alt: p.title }] : [],
+        images: thumb ? [{ url: thumb, alt: p.title || '' }] : [],
         metadata: meta,
         variants,
       }
@@ -2031,7 +2058,7 @@ async function start() {
             display_title: meta.display_title || row.title,
             meta_title: meta.meta_title || null,
             meta_description: meta.meta_description || null,
-            banner: meta.banner_image_url || meta.image_url || null,
+            banner: resolveUploadUrl(meta.banner_image_url || meta.image_url || null),
             description: meta.richtext || meta.description_html || null,
           }
           try { await client.end() } catch (_) {}
@@ -2045,7 +2072,7 @@ async function start() {
             title: row.title,
             handle: row.handle,
             display_title: meta.display_title || row.title,
-            banner: meta.banner_image_url || meta.image_url || null,
+            banner: resolveUploadUrl(meta.banner_image_url || meta.image_url || null),
             description: meta.richtext || meta.description_html || null,
           }
         })

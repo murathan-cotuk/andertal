@@ -1,7 +1,7 @@
 const createNextIntlPlugin = require("next-intl/plugin");
 
 // Must be relative to app root so Turbopack alias resolves correctly at runtime
-const withNextIntl = createNextIntlPlugin("./i18n/request.js");
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.js");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
