@@ -70,6 +70,8 @@ Bucket’a yazma için bir **Access Key** ve **Secret Key** oluştur (AWS IAM ve
 
 ### 3. Environment variable’ları ekle
 
+**Bu değişkenlerin ne olduğu, değer olarak ne yazacağın ve değeri nereden alacağın:** `docs/S3-ENV-ACIKLAMALAR.md` dosyasında adım adım anlatılıyor.
+
 **Environment Variables** bölümünde **Add Environment Variable** ile aşağıdakileri tek tek ekle.
 
 **AWS S3 için örnek:**
