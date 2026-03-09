@@ -1,0 +1,47 @@
+{
+  "common": {
+    "search": "Cerca prodotti...",
+    "categories": "Categorie",
+    "login": "Accedi",
+    "register": "Registrati",
+    "account": "Account",
+    "cart": "Carrello",
+    "logout": "Esci"
+  },
+  "nav": {
+    "collection": "Collezione",
+    "product": "Prodotto",
+    "bestsellers": "I più venduti",
+    "sale": "Offerte",
+    "recommended": "Consigliati"
+  },
+  "home": {
+    "title": "Belucha - Il tuo marketplace",
+    "description": "Scopri prodotti da venditori indipendenti",
+    "loading": "Caricamento…",
+    "error": "Prodotti temporaneamente non disponibili."
+  },
+  "locale": {
+    "label": "Lingua e valuta",
+    "en": "English",
+    "de": "Deutsch",
+    "tr": "Türkçe",
+    "fr": "Français",
+    "it": "Italiano",
+    "es": "Español",
+    "currency": "Valuta",
+    "eur": "EUR",
+    "try": "TRY",
+    "usd": "USD"
+  },
+  "footer": {
+    "shop": "Negozio",
+    "about": "Chi siamo",
+    "legal": "Legale",
+    "allProducts": "Tutti i prodotti",
+    "contact": "Contatti",
+    "privacy": "Privacy",
+    "terms": "Termini e condizioni",
+    "returns": "Resi"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "common": {
+    "dashboard": "Dashboard",
+    "products": "Produkte",
+    "orders": "Bestellungen",
+    "settings": "Einstellungen",
+    "logout": "Abmelden"
+  },
+  "nav": {
+    "home": "Start",
+    "dashboard": "Dashboard",
+    "products": "Produkte",
+    "orders": "Bestellungen",
+    "content": "Inhalte",
+    "marketing": "Marketing",
+    "settings": "Einstellungen",
+    "language": "Sprache",
+    "drafts": "Entwürfe",
+    "abandonedCheckouts": "Verlassene Warenkörbe",
+    "returns": "Retouren",
+    "inventory": "Bestand",
+    "collections": "Kollektionen",
+    "giftCards": "Geschenkgutscheine",
+    "customers": "Kunden",
+    "campaigns": "Kampagnen",
+    "attribution": "Attribution",
+    "automations": "Automationen",
+    "discounts": "Rabatte",
+    "metaobjects": "Metaobjekte",
+    "categories": "Kategorien",
+    "media": "Medien",
+    "pages": "Seiten",
+    "files": "Dateien",
+    "menus": "Menüs",
+    "blogPosts": "Blogbeiträge",
+    "brands": "Marken",
+    "analytics": "Analysen",
+    "reports": "Berichte",
+    "liveView": "Live-Ansicht",
+    "importExport": "Import/Export"
+  },
+  "locale": {
+    "en": "English",
+    "de": "Deutsch",
+    "tr": "Türkçe",
+    "fr": "Français",
+    "it": "Italiano",
+    "es": "Español"
+  }
+}

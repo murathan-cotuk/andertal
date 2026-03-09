@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { tokens } from "@/design-system/tokens";
 

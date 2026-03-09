@@ -7,7 +7,9 @@
  */
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import { useRouter as useNextRouter } from "next/navigation";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import styled from "styled-components";
 import { motion } from "framer-motion";
 import { useCustomerAuth as useAuth } from "@belucha/lib";
@@ -16,6 +18,7 @@ import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
 import TopBar from "@/components/TopBar";
 import { tokens } from "@/design-system/tokens";
+import { routing } from "@/i18n/routing";
 
 const SCROLL_THRESHOLD = 80;
 
@@ -317,17 +320,82 @@ const HeaderSpacer = styled.div`
   flex-shrink: 0;
 `;
 
+const LocaleCurrencyWrap = styled.div`
+  position: relative;
+  flex-shrink: 0;
+`;
+
+const LocaleCurrencyBtn = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: ${tokens.spacing.sm} ${tokens.spacing.md};
+  background: transparent;
+  border: 1px solid ${tokens.border.light};
+  border-radius: ${tokens.radius.button};
+  font-size: ${tokens.fontSize.small};
+  font-weight: 500;
+  color: ${tokens.dark[700]};
+  cursor: pointer;
+  font-family: ${tokens.fontFamily.sans};
+  transition: border-color ${tokens.transition.base}, background ${tokens.transition.base};
+
+  &:hover {
+    background: ${tokens.background.soft};
+    border-color: ${tokens.dark[500]};
+  }
+`;
+
+const LocaleDropdown = styled(motion.div)`
+  position: absolute;
+  top: calc(100% + ${tokens.spacing.xs});
+  right: 0;
+  min-width: 180px;
+  background: ${tokens.background.card};
+  border: 1px solid ${tokens.border.light};
+  border-radius: ${tokens.radius.button};
+  box-shadow: ${tokens.shadow.card};
+  padding: ${tokens.spacing.xs} 0;
+  z-index: 1001;
+  display: ${(p) => (p.$open ? "block" : "none")};
+`;
+
+const LocaleOption = styled.button`
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: ${tokens.spacing.sm} ${tokens.spacing.md};
+  font-size: ${tokens.fontSize.small};
+  color: ${tokens.dark[700]};
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: ${tokens.fontFamily.sans};
+  transition: background ${tokens.transition.base}, color ${tokens.transition.base};
+
+  &:hover {
+    background: ${tokens.background.soft};
+    color: ${tokens.primary.DEFAULT};
+  }
+`;
+
 export default function ShopHeader() {
+  const pathname = usePathname() || "/";
+  const nextRouter = useNextRouter();
   const [scrollY, setScrollY] = useState(0);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [visible, setVisible] = useState(true);
   const [compact, setCompact] = useState(false);
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
   const [mainMenuItems, setMainMenuItems] = useState([]);
   const [secondMenuItems, setSecondMenuItems] = useState([]);
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount } = useCart();
+  const tLocale = useTranslations("locale");
+  const locale = useLocale();
 
   useEffect(() => {
     const norm = (s) => String(s || "").toLowerCase().trim();
@@ -393,9 +461,10 @@ export default function ShopHeader() {
     const close = () => {
       setMainMenuOpen(false);
       setUserMenuOpen(false);
+      setLocaleDropdownOpen(false);
     };
     document.addEventListener("mousedown", (e) => {
-      if (!e.target.closest("[data-categories-dropdown]") && !e.target.closest("[data-user-menu]")) close();
+      if (!e.target.closest("[data-categories-dropdown]") && !e.target.closest("[data-user-menu]") && !e.target.closest("[data-locale-dropdown]")) close();
     });
     return () => document.removeEventListener("mousedown", close);
   }, []);
@@ -450,6 +519,27 @@ export default function ShopHeader() {
               </SearchWrap>
             </Center>
             <Right>
+              <LocaleCurrencyWrap data-locale-dropdown>
+                <LocaleCurrencyBtn type="button" onClick={() => setLocaleDropdownOpen((v) => !v)} title={tLocale("label")} aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
+                  <span style={{ textTransform: "uppercase", fontWeight: 600 }}>{locale}</span>
+                  <i className="fas fa-chevron-down" style={{ fontSize: 10 }} />
+                </LocaleCurrencyBtn>
+                <LocaleDropdown $open={localeDropdownOpen} initial={false}>
+                  {routing.locales.map((loc) => (
+                    <LocaleOption
+                      key={loc}
+                      type="button"
+                      onClick={() => {
+                        setLocaleDropdownOpen(false);
+                        const base = pathname === "/" ? "" : pathname;
+                        nextRouter.push(`/${loc}${base}`);
+                      }}
+                    >
+                      {tLocale(loc)}
+                    </LocaleOption>
+                  ))}
+                </LocaleDropdown>
+              </LocaleCurrencyWrap>
               <UserMenu data-user-menu>
                 <UserBtn type="button" onClick={() => setUserMenuOpen((v) => !v)} title="Konto">
                   <i className="fas fa-user" style={{ fontSize: 18 }} />

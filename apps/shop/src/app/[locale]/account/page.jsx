@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@belucha/lib";
 import styled from "styled-components";
 import { Card, Button } from "@belucha/ui";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 const Container = styled.div`

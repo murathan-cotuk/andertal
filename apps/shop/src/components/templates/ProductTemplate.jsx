@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useContext } from "react";
 import { useParams } from "next/navigation";
+import { useLocale } from "next-intl";
 import styled from "styled-components";
 import { Button } from "@belucha/ui";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { CartContext } from "@/context/CartContext";
-import { formatPriceCents } from "@/lib/format";
+import { formatPriceCents, getLocalizedProduct } from "@/lib/format";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { StarRating } from "@/components/ProductCard";
 import { ProductCard } from "@/components/ProductCard";
@@ -285,6 +286,7 @@ function buildMetaRows(meta) {
 
 export default function ProductTemplate() {
   const params = useParams();
+  const locale = useLocale();
   const slug = params?.slug ?? params?.handle;
   const [selectedImage, setSelectedImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -342,6 +344,7 @@ export default function ProductTemplate() {
   if (error) return <Container>Fehler: {error}</Container>;
   if (!product) return <Container>Produkt nicht gefunden.</Container>;
 
+  const { title: displayTitle, description: displayDescription } = getLocalizedProduct(product, locale);
   const images = product.images?.length
     ? product.images
     : product.thumbnail
@@ -379,7 +382,7 @@ export default function ProductTemplate() {
   const sellerName = product?.metadata?.seller_name || product?.metadata?.shop_name || "Shop";
   const returnDays = meta.return_days != null ? meta.return_days : 14;
   const returnCost = meta.return_cost === false || meta.return_kostenlos === true ? "kostenlos" : (meta.return_cost || "kostenlos");
-  const titleDisplay = (product.title || "").slice(0, 120);
+  const titleDisplay = (displayTitle || "").slice(0, 120);
 
   const goPrev = () => setSelectedImage((i) => (i <= 0 ? images.length - 1 : i - 1));
   const goNext = () => setSelectedImage((i) => (i >= images.length - 1 ? 0 : i + 1));
@@ -395,7 +398,7 @@ export default function ProductTemplate() {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     ...(product.collection ? [{ label: product.collection.title, href: `/${product.collection.handle}` }] : []),
-    { label: product.title, href: null },
+    { label: displayTitle, href: null },
   ];
 
   return (
@@ -406,7 +409,7 @@ export default function ProductTemplate() {
         {/* Left: Gallery */}
         <GalleryCol>
           <MainImageWrap onClick={() => images.length > 0 && setLightboxOpen(true)}>
-            <MainImage src={mainImage} alt={product.title} />
+            <MainImage src={mainImage} alt={displayTitle} />
           </MainImageWrap>
           {images.length > 1 && (
             <Thumbnails>
@@ -414,7 +417,7 @@ export default function ProductTemplate() {
                 <Thumbnail
                   key={index}
                   src={img.url || ""}
-                  alt={img.alt || product.title}
+                  alt={img.alt || displayTitle}
                   $active={index === selectedImage}
                   onClick={() => setSelectedImage(index)}
                 />
@@ -571,11 +574,11 @@ export default function ProductTemplate() {
         </CarouselSection>
       )}
 
-      {(product.description || product.subtitle) && (
+      {(displayDescription || product.subtitle) && (
         <DescriptionSection
           id="description"
           dangerouslySetInnerHTML={{
-            __html: sanitizeHtml(product.description || product.subtitle || "") || "",
+            __html: sanitizeHtml(displayDescription || product.subtitle || "") || "",
           }}
         />
       )}

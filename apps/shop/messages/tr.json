@@ -1,0 +1,47 @@
+{
+  "common": {
+    "search": "Ürün ara...",
+    "categories": "Kategoriler",
+    "login": "Giriş yap",
+    "register": "Kayıt ol",
+    "account": "Hesabım",
+    "cart": "Sepet",
+    "logout": "Çıkış"
+  },
+  "nav": {
+    "collection": "Koleksiyon",
+    "product": "Ürün",
+    "bestsellers": "Çok Satanlar",
+    "sale": "İndirimler",
+    "recommended": "Önerilenler"
+  },
+  "home": {
+    "title": "Belucha - Pazar Yeriniz",
+    "description": "Bağımsız satıcılardan ürünler keşfedin",
+    "loading": "Yükleniyor…",
+    "error": "Ürünler şu an kullanılamıyor."
+  },
+  "locale": {
+    "label": "Dil ve para birimi",
+    "en": "English",
+    "de": "Deutsch",
+    "tr": "Türkçe",
+    "fr": "Français",
+    "it": "Italiano",
+    "es": "Español",
+    "currency": "Para birimi",
+    "eur": "EUR",
+    "try": "TRY",
+    "usd": "USD"
+  },
+  "footer": {
+    "shop": "Mağaza",
+    "about": "Hakkımızda",
+    "legal": "Yasal",
+    "allProducts": "Tüm Ürünler",
+    "contact": "İletişim",
+    "privacy": "Gizlilik",
+    "terms": "Kullanım Koşulları",
+    "returns": "İade"
+  }
+}

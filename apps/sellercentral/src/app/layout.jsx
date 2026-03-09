@@ -1,7 +1,5 @@
 import { Inter } from "next/font/google";
-import StyledComponentsRegistry from "./registry";
 import "./globals.css";
-import Providers from "@/components/Providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,13 +23,7 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body className={inter.className}>
-        <StyledComponentsRegistry>
-          <Providers>
-            {children}
-          </Providers>
-        </StyledComponentsRegistry>
-      </body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }

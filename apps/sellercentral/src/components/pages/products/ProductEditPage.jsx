@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useRouter, Link } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
 import {
   Page,
   Layout,
@@ -84,9 +84,15 @@ function descriptionVisualToHtml(html) {
 
 export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload }) {
   const router = useRouter();
+  const locale = useLocale();
   const client = getMedusaAdminClient();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
-  const [product, setProduct] = useState(() => initialProduct ?? (isNew ? getEmptyProduct() : null));
+  const [product, setProduct] = useState(() => {
+    const p = initialProduct ?? (isNew ? getEmptyProduct() : null);
+    if (!p || !p.metadata?.translations) return p;
+    const tr = p.metadata.translations[locale];
+    return tr ? { ...p, title: tr.title ?? p.title, description: tr.description ?? p.description } : p;
+  });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -112,21 +118,38 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     return () => document.body.classList.remove("belucha-collections-dropdown-open");
   }, [collectionPopoverOpen]);
 
+  // Sync from server when we switch product (id/handle) or locale. Merge translations[locale] into title/description.
+  const initialProductId = initialProduct?.id ?? initialProduct?.handle ?? "";
   useEffect(() => {
     const next = initialProduct ?? (isNew ? getEmptyProduct() : null);
-    setProduct((prev) => next ?? prev);
+    setProduct((prev) => {
+      if (!next) return prev ?? null;
+      const prevKey = prev?.id ?? prev?.handle ?? "";
+      const tr = next.metadata?.translations;
+      const localized = tr?.[locale] ? { ...next, title: tr[locale].title ?? next.title, description: tr[locale].description ?? next.description } : next;
+      if (prevKey && initialProductId && prevKey === initialProductId) {
+        return { ...prev, title: localized.title, description: localized.description };
+      }
+      return localized;
+    });
     if (next) initialSnapshotRef.current = JSON.stringify(normalizeForCompare(next));
-  }, [initialProduct, isNew]);
+  }, [initialProductId, isNew, locale]);
 
+  // Load categories, collections, brands in parallel so the page feels faster
   useEffect(() => {
-    client.getAdminHubCategories({ all: true }).then((r) => setCategories(r.categories || [])).catch(() => setCategories([]));
-  }, [client]);
-
-  useEffect(() => {
-    client.getMedusaCollections({ adminHub: true }).then((r) => setCollections(r.collections || [])).catch(() => setCollections([]));
-  }, [client]);
-  useEffect(() => {
-    client.getBrands().then((r) => setBrands(r.brands || [])).catch(() => setBrands([]));
+    let cancelled = false;
+    Promise.all([
+      client.getAdminHubCategories({ all: true }).then((r) => r.categories || []).catch(() => []),
+      client.getMedusaCollections({ adminHub: true }).then((r) => r.collections || []).catch(() => []),
+      client.getBrands().then((r) => r.brands || []).catch(() => []),
+    ]).then(([categoriesList, collectionsList, brandsList]) => {
+      if (!cancelled) {
+        setCategories(categoriesList);
+        setCollections(collectionsList);
+        setBrands(brandsList);
+      }
+    });
+    return () => { cancelled = true; };
   }, [client]);
 
   useEffect(() => {
@@ -190,6 +213,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         metadata.seller_name = storeName;
         metadata.shop_name = storeName;
       }
+      metadata.translations = { ...(metadata.translations || {}), [locale]: { title: product.title || "Untitled", description: descriptionToSave } };
       const collectionId = (metadata.collection_ids && metadata.collection_ids[0]) || product.collection_id || null;
       const payload = {
         title: product.title || "Untitled",
@@ -282,6 +306,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const collectionIds = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id != null ? [meta.collection_id] : (product?.collection_id != null ? [product.collection_id] : []));
 
   // Variant groups: each group has a name (e.g. Color, Size) and options (value, sku, inventory). No auto-append.
+  // Support both price/compare_at_price and price_cents/compare_at_price_cents from API/DB.
   const variantGroups = (() => {
     const v = product?.variants;
     if (!Array.isArray(v) || v.length === 0) return [];
@@ -293,8 +318,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       const sku = String(item.sku ?? item.sku_number ?? "").trim();
       const ean = String(item.ean ?? "").trim();
       const inventory = item.inventory != null ? String(item.inventory) : "";
-      const price = item.price != null ? String(item.price) : "";
-      const compare_at_price = item.compare_at_price != null ? String(item.compare_at_price) : (item.compare_at_price_cents != null ? String((item.compare_at_price_cents / 100).toFixed(2)) : "");
+      const price = item.price != null ? String(item.price) : (item.price_cents != null ? String((Number(item.price_cents) / 100).toFixed(2)) : "");
+      const compare_at_price = item.compare_at_price != null ? String(item.compare_at_price) : (item.compare_at_price_cents != null ? String((Number(item.compare_at_price_cents) / 100).toFixed(2)) : "");
       const image_url = String(item.image_url ?? item.image ?? "").trim();
       if (!byTitle.has(title)) byTitle.set(title, { name: title, options: [] });
       byTitle.get(title).options.push({ value: String(value), sku, ean, inventory, price, compare_at_price, image_url });

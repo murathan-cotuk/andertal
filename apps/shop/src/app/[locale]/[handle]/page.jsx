@@ -117,6 +117,7 @@ const PER_PAGE = 24;
 
 export default function CollectionByHandlePage() {
   const params = useParams();
+  const locale = params?.locale ?? "en";
   const handle = params?.handle != null ? String(params.handle) : undefined;
 
   const [collection, setCollection] = useState(null);
@@ -169,7 +170,7 @@ export default function CollectionByHandlePage() {
 
   useEffect(() => {
     if (typeof document === "undefined" || !collection?.handle) return;
-    const href = `${window.location.origin}/${collection.handle}`;
+    const href = `${window.location.origin}/${locale}/${collection.handle}`;
     let link = document.querySelector('link[rel="canonical"]');
     if (!link) {
       link = document.createElement("link");
@@ -177,7 +178,7 @@ export default function CollectionByHandlePage() {
       document.head.appendChild(link);
     }
     link.href = href;
-  }, [collection?.handle]);
+  }, [locale, collection?.handle]);
 
   const sortedProducts = [...(products || [])];
   if (sort === "price_asc") sortedProducts.sort((a, b) => (a.variants?.[0]?.prices?.[0]?.amount ?? 0) - (b.variants?.[0]?.prices?.[0]?.amount ?? 0));
@@ -223,7 +224,7 @@ export default function CollectionByHandlePage() {
     <PageWrap>
       <ShopHeader />
       <Main>
-        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: displayTitle || handle, href: null }]} />
+        <Breadcrumbs items={[{ label: "Home", href: `/${locale}` }, { label: displayTitle || handle, href: null }]} />
         {collection.banner && (
           <Banner>
             <img src={collection.banner} alt="" />

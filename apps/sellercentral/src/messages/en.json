@@ -1,0 +1,50 @@
+{
+  "common": {
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "orders": "Orders",
+    "settings": "Settings",
+    "logout": "Log out"
+  },
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "orders": "Orders",
+    "content": "Content",
+    "marketing": "Marketing",
+    "settings": "Settings",
+    "language": "Language",
+    "drafts": "Drafts",
+    "abandonedCheckouts": "Abandoned checkouts",
+    "returns": "Returns",
+    "inventory": "Inventory",
+    "collections": "Collections",
+    "giftCards": "Gift Cards",
+    "customers": "Customers",
+    "campaigns": "Campaigns",
+    "attribution": "Attribution",
+    "automations": "Automations",
+    "discounts": "Discounts",
+    "metaobjects": "Metaobjects",
+    "categories": "Categories",
+    "media": "Media",
+    "pages": "Pages",
+    "files": "Files",
+    "menus": "Menus",
+    "blogPosts": "Blog Posts",
+    "brands": "Brands",
+    "analytics": "Analytics",
+    "reports": "Reports",
+    "liveView": "Live View",
+    "importExport": "Import/Export"
+  },
+  "locale": {
+    "en": "English",
+    "de": "Deutsch",
+    "tr": "Türkçe",
+    "fr": "Français",
+    "it": "Italiano",
+    "es": "Español"
+  }
+}

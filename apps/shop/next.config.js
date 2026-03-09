@@ -1,5 +1,9 @@
 const path = require('path');
+const createNextIntlPlugin = require("next-intl/plugin");
 const { withSentryConfig } = require("@sentry/nextjs");
+
+// Must be relative to app root so Turbopack alias resolves correctly at runtime
+const withNextIntl = createNextIntlPlugin("./i18n/request.js");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -25,7 +29,7 @@ const nextConfig = {
   // Turbopack root configuration removed - Next.js 16 handles this automatically
 };
 
-module.exports = withSentryConfig(nextConfig, {
+module.exports = withSentryConfig(withNextIntl(nextConfig), {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 

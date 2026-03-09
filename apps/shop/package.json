@@ -3,13 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "next dev -p 3000 --webpack",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint"
   },
   "dependencies": {
     "@belucha/lib": "*",
+    "next-intl": "^3.25.0",
     "@belucha/ui": "*",
     "algoliasearch": "^5.17.2",
     "autoprefixer": "^10.4.16",

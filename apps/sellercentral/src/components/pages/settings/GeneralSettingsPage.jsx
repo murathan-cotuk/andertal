@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { usePathname } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Card,
   Text,
@@ -11,11 +14,18 @@ import {
   Box,
   Divider,
   Banner,
+  Select,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { routing } from "@/i18n/routing";
 
 export default function GeneralSettingsPage() {
   const client = getMedusaAdminClient();
+  const router = useRouter();
+  const locale = useLocale();
+  const pathname = usePathname() || "/";
+  const pathWithoutLocale = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  const t = useTranslations("locale");
   const [formData, setFormData] = useState({
     storeName: "",
     email: "",
@@ -89,6 +99,11 @@ export default function GeneralSettingsPage() {
     );
   }
 
+  const handleLanguageChange = (value) => {
+    const base = pathWithoutLocale === "/" || !pathWithoutLocale ? "" : pathWithoutLocale.startsWith("/") ? pathWithoutLocale : `/${pathWithoutLocale}`;
+    router.push(`/${value}${base}`);
+  };
+
   return (
     <BlockStack gap="400">
       <Text as="p" tone="subdued">
@@ -99,6 +114,21 @@ export default function GeneralSettingsPage() {
           Settings saved successfully.
         </Banner>
       )}
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h2" variant="headingMd">Language</Text>
+          <Text as="p" tone="subdued">Interface language for Sellercentral. Product data can be entered in any language.</Text>
+          <Box maxWidth="320px">
+            <Select
+              label="Language"
+              labelHidden
+              options={routing.locales.map((loc) => ({ label: t(loc), value: loc }))}
+              value={locale}
+              onChange={handleLanguageChange}
+            />
+          </Box>
+        </BlockStack>
+      </Card>
       <form onSubmit={handleSubmit}>
         <Card>
           <BlockStack gap="400">

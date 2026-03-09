@@ -1,0 +1,50 @@
+{
+  "common": {
+    "dashboard": "Panel",
+    "products": "Ürünler",
+    "orders": "Siparişler",
+    "settings": "Ayarlar",
+    "logout": "Çıkış"
+  },
+  "nav": {
+    "home": "Ana Sayfa",
+    "dashboard": "Panel",
+    "products": "Ürünler",
+    "orders": "Siparişler",
+    "content": "İçerik",
+    "marketing": "Pazarlama",
+    "settings": "Ayarlar",
+    "language": "Dil",
+    "drafts": "Taslaklar",
+    "abandonedCheckouts": "Terk edilen sepetler",
+    "returns": "İadeler",
+    "inventory": "Envanter",
+    "collections": "Koleksiyonlar",
+    "giftCards": "Hediye Kartları",
+    "customers": "Müşteriler",
+    "campaigns": "Kampanyalar",
+    "attribution": "Atıf",
+    "automations": "Otomasyonlar",
+    "discounts": "İndirimler",
+    "metaobjects": "Meta nesneler",
+    "categories": "Kategoriler",
+    "media": "Medya",
+    "pages": "Sayfalar",
+    "files": "Dosyalar",
+    "menus": "Menüler",
+    "blogPosts": "Blog Yazıları",
+    "brands": "Markalar",
+    "analytics": "Analitik",
+    "reports": "Raporlar",
+    "liveView": "Canlı Görünüm",
+    "importExport": "İçe/Dışa Aktar"
+  },
+  "locale": {
+    "en": "English",
+    "de": "Deutsch",
+    "tr": "Türkçe",
+    "fr": "Français",
+    "it": "Italiano",
+    "es": "Español"
+  }
+}

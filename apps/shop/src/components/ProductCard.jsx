@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useContext } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
 import { CartContext } from "@/context/CartContext";
-import { formatPriceCents, htmlToText } from "@/lib/format";
+import { formatPriceCents, htmlToText, getLocalizedProduct } from "@/lib/format";
 
 export function StarRating({ average = 0, count = 0 }) {
   const full = Math.floor(average);
@@ -30,6 +31,8 @@ export function StarRating({ average = 0, count = 0 }) {
 }
 
 export function ProductCard({ product, compact = false }) {
+  const locale = useLocale();
+  const { title: displayTitle, description: displayDescription } = getLocalizedProduct(product, locale);
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
   const cartLoading = cartState?.loading ?? false;
@@ -56,7 +59,7 @@ export function ProductCard({ product, compact = false }) {
     ? Math.round(((priceCents - saleCents) / priceCents) * 100)
     : null;
   const formattedPrice = formatPriceCents(displayCents);
-  const descriptionText = htmlToText(product.description || product.subtitle || "");
+  const descriptionText = htmlToText(displayDescription || product.subtitle || "");
   const reviewCount = product.metadata?.review_count != null ? Number(product.metadata.review_count) : 0;
   const reviewAvg = product.metadata?.review_avg != null ? Number(product.metadata.review_avg) : 0;
   const soldLastMonth = product.metadata?.sold_last_month != null ? Number(product.metadata.sold_last_month) : null;
@@ -98,7 +101,7 @@ export function ProductCard({ product, compact = false }) {
       <div className="p-4 flex flex-col flex-1">
         <Link href={productUrl}>
           <h3 className="font-semibold text-h4 mb-1 hover:text-primary line-clamp-2 text-dark-800">
-            {product.title}
+            {displayTitle}
           </h3>
         </Link>
         {descriptionText && (

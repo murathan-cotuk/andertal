@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
 import { liteClient as algoliasearch } from "algoliasearch/lite";
 import { InstantSearch, useSearchBox, useHits, useInstantSearch, Configure } from "react-instantsearch";
 import styled from "styled-components";
 import { getMedusaClient } from "@/lib/medusa-client";
-import { stripHtmlForSearch } from "@/lib/format";
+import { stripHtmlForSearch, getLocalizedProduct } from "@/lib/format";
 import { tokens } from "@/design-system/tokens";
 
 const Wrap = styled.div`
@@ -147,6 +147,7 @@ function formatPriceCents(cents) {
 
 function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px" }) {
   const router = useRouter();
+  const locale = useLocale();
   const [q, setQ] = useState("");
   const [hits, setHits] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -222,6 +223,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px" }) {
           {loading && hits.length === 0 && <Empty>Suche...</Empty>}
           {!loading && hits.length === 0 && <Empty>Keine Ergebnisse für &quot;{q.trim()}&quot;</Empty>}
           {hits.map((product, i) => {
+            const { title: hitTitle, description: hitDesc } = getLocalizedProduct(product, locale);
             const priceCents = product.variants?.[0]?.prices?.[0]?.amount ?? product.metadata?.price_cents ?? null;
             return (
               <HitLink
@@ -231,8 +233,8 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px" }) {
               >
                 {product.thumbnail && <HitImage src={product.thumbnail} alt="" />}
                 <HitText>
-                  <Primary><HighlightText text={product.title || "(No title)"} query={q.trim()} /></Primary>
-                  {product.description && <Secondary>{stripHtmlForSearch(product.description, 120)}</Secondary>}
+                  <Primary><HighlightText text={hitTitle || "(No title)"} query={q.trim()} /></Primary>
+                  {hitDesc && <Secondary>{stripHtmlForSearch(hitDesc, 120)}</Secondary>}
                   {priceCents != null && <Tertiary>{formatPriceCents(priceCents)}</Tertiary>}
                 </HitText>
               </HitLink>

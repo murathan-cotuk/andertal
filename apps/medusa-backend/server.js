@@ -201,11 +201,18 @@ async function start() {
     app.get('/health', (req, res) => {
       res.json({ status: 'ok', timestamp: new Date().toISOString() })
     })
-    const uploadDir = path.join(__dirname, 'uploads')
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true })
+    // Uploads: use UPLOAD_DIR for a persistent volume path, or S3 when S3_UPLOAD_* env is set.
+    // Otherwise __dirname/uploads (ephemeral on many hosts). See docs/UPLOADS.md.
+    const uploadDir = process.env.UPLOAD_DIR
+      ? path.resolve(process.env.UPLOAD_DIR)
+      : path.join(__dirname, 'uploads')
+    const useS3 = !!(process.env.S3_UPLOAD_BUCKET && process.env.S3_UPLOAD_REGION)
+    if (!useS3) {
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true })
+      }
+      app.use('/uploads', express.static(uploadDir))
     }
-    app.use('/uploads', express.static(uploadDir))
     const appLoader = new MedusaAppLoader({ cwd: path.resolve(__dirname) })
 
     let medusaApp
@@ -2149,13 +2156,15 @@ async function start() {
       return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
     }
     const multer = require('multer')
-    const storage = multer.diskStorage({
-      destination: (req, file, cb) => cb(null, uploadDir),
-      filename: (req, file, cb) => {
-        const safe = (file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_')
-        cb(null, `${Date.now()}-${safe}`)
-      },
-    })
+    const storage = useS3
+      ? multer.memoryStorage()
+      : multer.diskStorage({
+          destination: (req, file, cb) => cb(null, uploadDir),
+          filename: (req, file, cb) => {
+            const safe = (file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_')
+            cb(null, `${Date.now()}-${safe}`)
+          },
+        })
     const upload = multer({ storage })
 
     const mediaListGET = async (req, res) => {
@@ -2182,7 +2191,36 @@ async function start() {
       if (!req.file) return res.status(400).json({ message: 'No file uploaded' })
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
-      const fileUrl = `/uploads/${req.file.filename}`
+      let fileUrl
+      if (useS3 && req.file.buffer && process.env.S3_UPLOAD_BUCKET) {
+        try {
+          const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
+          const bucket = process.env.S3_UPLOAD_BUCKET
+          const region = process.env.S3_UPLOAD_REGION || 'eu-central-1'
+          const key = `uploads/${Date.now()}-${(req.file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_')}`
+          const s3 = new S3Client({
+            region,
+            ...(process.env.S3_UPLOAD_ENDPOINT && { endpoint: process.env.S3_UPLOAD_ENDPOINT }),
+            ...(process.env.S3_UPLOAD_ACCESS_KEY_ID && process.env.S3_UPLOAD_SECRET_ACCESS_KEY
+              ? { credentials: { accessKeyId: process.env.S3_UPLOAD_ACCESS_KEY_ID, secretAccessKey: process.env.S3_UPLOAD_SECRET_ACCESS_KEY } }
+              : {})
+          })
+          await s3.send(new PutObjectCommand({
+            Bucket: bucket,
+            Key: key,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype || 'application/octet-stream',
+            ...(process.env.S3_UPLOAD_ACL && { ACL: process.env.S3_UPLOAD_ACL })
+          }))
+          const baseUrl = process.env.S3_UPLOAD_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`
+          fileUrl = `${baseUrl.replace(/\/$/, '')}/${key}`
+        } catch (s3Err) {
+          console.error('S3 upload error:', s3Err)
+          return res.status(500).json({ message: 'Upload to storage failed' })
+        }
+      } else {
+        fileUrl = `/uploads/${req.file.filename}`
+      }
       const alt = (req.body && req.body.alt) || null
       try {
         await client.connect()
@@ -2228,9 +2266,10 @@ async function start() {
         const urlPath = r.rows[0].url
         await client.query('DELETE FROM admin_hub_media WHERE id = $1', [req.params.id])
         if (urlPath && urlPath.startsWith('/uploads/')) {
-          const filePath = path.join(__dirname, urlPath)
+          const filePath = path.join(uploadDir, urlPath.replace(/^\/uploads\//, ''))
           if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
         }
+        // S3 URLs are not deleted here; optionally add S3 DeleteObject if needed
         res.status(200).json({ deleted: true })
       } catch (err) {
         console.error('Media delete error:', err)

@@ -18,6 +18,25 @@ export function formatPriceCents(cents) {
 }
 
 /**
+ * Get title and description for a product in the given locale (from metadata.translations).
+ * Falls back to product.title / product.description when no translation exists.
+ */
+export function getLocalizedProduct(product, locale) {
+  if (!product) return { title: "", description: "" };
+  const tr = product.metadata?.translations;
+  if (tr && tr[locale]) {
+    return {
+      title: tr[locale].title ?? product.title ?? "",
+      description: tr[locale].description ?? product.description ?? "",
+    };
+  }
+  return {
+    title: product.title ?? "",
+    description: product.description ?? "",
+  };
+}
+
+/**
  * Strip HTML tags and return plain text (for product description preview)
  */
 export function htmlToText(html) {

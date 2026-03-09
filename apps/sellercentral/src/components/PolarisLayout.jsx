@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, forwardRef } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import {
   AppProvider,
   Frame,
@@ -30,70 +30,72 @@ const GroupedDropdownSearch = dynamic(
   { ssr: false, loading: () => <div style={{ width: "100%", maxWidth: 400, height: 36 }} /> }
 );
 
-const menuItemsMain = [
-  { url: "/dashboard", label: "Home", icon: HomeIcon },
-  {
-    url: "/orders",
-    label: "Orders",
-    icon: OrderIcon,
-    subNavigationItems: [
-      { url: "/orders/drafts", label: "Drafts" },
-      { url: "/orders/abandoned-checkouts", label: "Abandoned checkouts" },
-      { url: "/orders/returns", label: "Returns" },
-    ],
-  },
-  {
-    url: "/products",
-    label: "Products",
-    icon: ProductIcon,
-    subNavigationItems: [
-      { url: "/products/inventory", label: "Inventory" },
-      { url: "/products/collections", label: "Collections" },
-      { url: "/products/gift-cards", label: "Gift Cards" },
-    ],
-  },
-  { url: "/customers", label: "Customers", icon: ProfileIcon },
-  {
-    url: "/marketing",
-    label: "Marketing",
-    icon: MegaphoneIcon,
-    subNavigationItems: [
-      { url: "/marketing/campaigns", label: "Campaigns" },
-      { url: "/marketing/attribution", label: "Attribution" },
-      { url: "/marketing/automations", label: "Automations" },
-    ],
-  },
-  { url: "/discounts", label: "Discounts", icon: DiscountIcon },
-  {
-    url: "/content",
-    label: "Content",
-    icon: ListBulletedIcon,
-    subNavigationItems: [
-      { url: "/content/metaobjects", label: "Metaobjects" },
-      { url: "/content/categories", label: "Categories" },
-      { url: "/content/media", label: "Media" },
-      { url: "/content/pages", label: "Pages" },
-      { url: "/content/files", label: "Files" },
-      { url: "/content/menus", label: "Menus" },
-      { url: "/content/blog-posts", label: "Blog Posts" },
-      { url: "/content/brands", label: "Brands" },
-    ],
-  },
-  {
-    url: "/analytics",
-    label: "Analytics",
-    icon: ChartVerticalIcon,
-    subNavigationItems: [
-      { url: "/analytics/reports", label: "Reports" },
-      { url: "/analytics/live-view", label: "Live View" },
-    ],
-  },
-  { url: "/import-export", label: "Import/Export", icon: ImportIcon },
-];
+function getMenuItemsMain(t) {
+  return [
+    { url: "/dashboard", label: t("home"), icon: HomeIcon },
+    {
+      url: "/orders",
+      label: t("orders"),
+      icon: OrderIcon,
+      subNavigationItems: [
+        { url: "/orders/drafts", label: t("drafts") },
+        { url: "/orders/abandoned-checkouts", label: t("abandonedCheckouts") },
+        { url: "/orders/returns", label: t("returns") },
+      ],
+    },
+    {
+      url: "/products",
+      label: t("products"),
+      icon: ProductIcon,
+      subNavigationItems: [
+        { url: "/products/inventory", label: t("inventory") },
+        { url: "/products/collections", label: t("collections") },
+        { url: "/products/gift-cards", label: t("giftCards") },
+      ],
+    },
+    { url: "/customers", label: t("customers"), icon: ProfileIcon },
+    {
+      url: "/marketing",
+      label: t("marketing"),
+      icon: MegaphoneIcon,
+      subNavigationItems: [
+        { url: "/marketing/campaigns", label: t("campaigns") },
+        { url: "/marketing/attribution", label: t("attribution") },
+        { url: "/marketing/automations", label: t("automations") },
+      ],
+    },
+    { url: "/discounts", label: t("discounts"), icon: DiscountIcon },
+    {
+      url: "/content",
+      label: t("content"),
+      icon: ListBulletedIcon,
+      subNavigationItems: [
+        { url: "/content/metaobjects", label: t("metaobjects") },
+        { url: "/content/categories", label: t("categories") },
+        { url: "/content/media", label: t("media") },
+        { url: "/content/pages", label: t("pages") },
+        { url: "/content/files", label: t("files") },
+        { url: "/content/menus", label: t("menus") },
+        { url: "/content/blog-posts", label: t("blogPosts") },
+        { url: "/content/brands", label: t("brands") },
+      ],
+    },
+    {
+      url: "/analytics",
+      label: t("analytics"),
+      icon: ChartVerticalIcon,
+      subNavigationItems: [
+        { url: "/analytics/reports", label: t("reports") },
+        { url: "/analytics/live-view", label: t("liveView") },
+      ],
+    },
+    { url: "/import-export", label: t("importExport"), icon: ImportIcon },
+  ];
+}
 
-const menuItemsSettings = [
-  { url: "/settings", label: "Settings", icon: SettingsIcon },
-];
+function getMenuItemsSettings(t) {
+  return [{ url: "/settings", label: t("settings"), icon: SettingsIcon }];
+}
 
 const NextLink = forwardRef(function NextLink({ url, children, ...rest }, ref) {
   return (
@@ -106,6 +108,7 @@ const NextLink = forwardRef(function NextLink({ url, children, ...rest }, ref) {
 export default function PolarisLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useTranslations("nav");
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -191,10 +194,13 @@ export default function PolarisLayout({ children }) {
   );
 
   const navLocation = pathname && pathname !== "" ? pathname : "/";
+  const menuMain = getMenuItemsMain(t);
+  const menuSettings = getMenuItemsSettings(t);
+
   const navMarkup = (
     <Navigation location={navLocation} onDismiss={() => setShowMobileNav(false)}>
       <Navigation.Section
-        items={menuItemsMain.map((item) => ({
+        items={menuMain.map((item) => ({
           url: item.url,
           label: item.label,
           icon: item.icon,
@@ -204,7 +210,7 @@ export default function PolarisLayout({ children }) {
       <Navigation.Section
         fill
         separator
-        items={menuItemsSettings.map((item) => ({
+        items={menuSettings.map((item) => ({
           url: item.url,
           label: item.label,
           icon: item.icon,

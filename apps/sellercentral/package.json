@@ -3,13 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3002",
+    "dev": "next dev -p 3002 --webpack",
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "next lint"
   },
   "dependencies": {
     "@belucha/lib": "*",
+    "next-intl": "^3.25.0",
     "@belucha/ui": "*",
     "@shopify/polaris": "^13.0.0",
     "@shopify/polaris-icons": "^9.0.0",

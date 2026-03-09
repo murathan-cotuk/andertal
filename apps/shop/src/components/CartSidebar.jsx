@@ -2,7 +2,7 @@
 
 import React from "react";
 import styled from "styled-components";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useCart } from "@/context/CartContext";
 import { formatPriceCents } from "@/lib/format";
 

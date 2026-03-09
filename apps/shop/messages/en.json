@@ -1,0 +1,47 @@
+{
+  "common": {
+    "search": "Search products...",
+    "categories": "Categories",
+    "login": "Log in",
+    "register": "Register",
+    "account": "Account",
+    "cart": "Cart",
+    "logout": "Log out"
+  },
+  "nav": {
+    "collection": "Collection",
+    "product": "Product",
+    "bestsellers": "Bestsellers",
+    "sale": "Sale",
+    "recommended": "Recommended"
+  },
+  "home": {
+    "title": "Belucha - Your Marketplace",
+    "description": "Discover amazing products from independent sellers",
+    "loading": "Loading…",
+    "error": "Products temporarily unavailable."
+  },
+  "locale": {
+    "label": "Language & currency",
+    "en": "English",
+    "de": "Deutsch",
+    "tr": "Türkçe",
+    "fr": "Français",
+    "it": "Italiano",
+    "es": "Español",
+    "currency": "Currency",
+    "eur": "EUR",
+    "try": "TRY",
+    "usd": "USD"
+  },
+  "footer": {
+    "shop": "Shop",
+    "about": "About",
+    "legal": "Legal",
+    "allProducts": "All Products",
+    "contact": "Contact",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "returns": "Returns"
+  }
+}
