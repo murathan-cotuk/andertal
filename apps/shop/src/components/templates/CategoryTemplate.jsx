@@ -87,13 +87,6 @@ const FilterLink = styled(Link)`
   }
 `;
 
-const ContentColumn = styled.div`
-  flex: 1;
-  min-width: 0;
-  padding: 20px 24px 48px 32px;
-  margin-left: 260px;
-`;
-
 const BreadcrumbWrap = styled.div`
   text-align: left;
   margin-bottom: 12px;
