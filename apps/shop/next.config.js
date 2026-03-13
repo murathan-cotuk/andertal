@@ -28,6 +28,12 @@ const nextConfig = {
   },
   // Vercel deployment için optimize
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  // next-intl: Turbopack must resolve 'next-intl/config' to our request.js (required for SSG/build)
+  turbopack: {
+    resolveAlias: {
+      'next-intl/config': path.resolve(__dirname, 'src/i18n/request.js'),
+    },
+  },
 };
 
 module.exports = withSentryConfig(withNextIntl(nextConfig), {
@@ -53,10 +59,11 @@ module.exports = withSentryConfig(withNextIntl(nextConfig), {
   tunnelRoute: "/monitoring",
 
   webpack: (config, { isServer }) => {
-    // Path alias support
+    // Path alias support + next-intl config (when webpack is used)
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname, './src'),
+      'next-intl/config': path.resolve(__dirname, 'src/i18n/request.js'),
     };
     
     // Node.js modüllerini client-side'da exclude et
