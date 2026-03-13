@@ -31,7 +31,7 @@ const nextConfig = {
   // next-intl: Turbopack must resolve 'next-intl/config' to our request.js (required for SSG/build)
   turbopack: {
     resolveAlias: {
-      'next-intl/config': path.resolve(__dirname, 'src/i18n/request.js'),
+      'next-intl/config': './src/i18n/request.js',
     },
   },
 };
