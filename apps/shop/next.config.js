@@ -28,12 +28,6 @@ const nextConfig = {
   },
   // Vercel deployment için optimize
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
-  // Explicitly set turbopack resolveAlias for next-intl (Next.js 16 default bundler)
-  turbopack: {
-    resolveAlias: {
-      'next-intl/config': './src/i18n/request.js',
-    },
-  },
 };
 
 module.exports = withSentryConfig(withNextIntl(nextConfig), {
