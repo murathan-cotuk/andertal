@@ -6,170 +6,311 @@ import { useLocale } from "next-intl";
 import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, htmlToText, getLocalizedProduct } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
+import styled, { keyframes } from "styled-components";
 
-export function StarRating({ average = 0, count = 0 }) {
-  const full = Math.floor(average);
-  const half = average - full >= 0.5 ? 1 : 0;
-  const empty = 5 - full - half;
-  return (
-    <div className="flex items-center gap-1 flex-wrap">
-      <span className="flex items-center" aria-hidden>
-        {[...Array(full)].map((_, i) => (
-          <span key={i} className="text-amber-400">★</span>
-        ))}
-        {half ? <span className="text-amber-400">★</span> : null}
-        {[...Array(empty)].map((_, i) => (
-          <span key={i} className="text-gray-300">★</span>
-        ))}
-      </span>
-      {count !== undefined && (
-        <span className="text-gray-500 text-sm ml-1">
-          ({count} {count === 1 ? "Bewertung" : "Bewertungen"})
-        </span>
-      )}
-    </div>
-  );
-}
+/* ─── Animations ─────────────────────────────────────────── */
+const fadeIn = keyframes`from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); }`;
 
-export function ProductCard({ product, compact = false }) {
+/* ─── Card shell ─────────────────────────────────────────── */
+const Card = styled.article`
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  cursor: pointer;
+
+  &:hover .card-image img {
+    transform: scale(1.04);
+  }
+  &:hover .card-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+`;
+
+/* ─── Image area ─────────────────────────────────────────── */
+const ImageWrap = styled.div`
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: #f5f5f3;
+  width: 100%;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+`;
+
+const NoImage = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #bbb;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+`;
+
+/* ─── Overlay quick-add ─────────────────────────────────── */
+const Overlay = styled.div.attrs({ className: "card-overlay" })`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  animation: ${fadeIn} 0.2s ease;
+`;
+
+const QuickAddBtn = styled.button`
+  width: 100%;
+  background: rgba(17, 17, 17, 0.88);
+  color: #fff;
+  border: none;
+  padding: 11px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s;
+  backdrop-filter: blur(4px);
+
+  &:hover { background: rgba(17, 17, 17, 1); }
+  &:disabled { opacity: 0.55; cursor: not-allowed; }
+`;
+
+/* ─── Badges ─────────────────────────────────────────────── */
+const BadgeWrap = styled.div`
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+`;
+
+const Badge = styled.span`
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: ${(p) => (p.$sale ? "#ef4444" : "#111")};
+  color: #fff;
+`;
+
+/* ─── Info area ──────────────────────────────────────────── */
+const Info = styled.div`
+  padding: 12px 4px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const ProductName = styled.h3`
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #111;
+  line-height: 1.35;
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+`;
+
+const PriceRow = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+`;
+
+const Price = styled.span`
+  font-size: 14px;
+  font-weight: 600;
+  color: ${(p) => (p.$sale ? "#ef4444" : "#111")};
+`;
+
+const OldPrice = styled.span`
+  font-size: 13px;
+  color: #aaa;
+  text-decoration: line-through;
+`;
+
+/* ─── Variant pills ──────────────────────────────────────── */
+const PillRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+`;
+
+const Pill = styled.button`
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid ${(p) => (p.$active ? "#111" : "#ddd")};
+  background: ${(p) => (p.$active ? "#111" : "#fff")};
+  color: ${(p) => (p.$active ? "#fff" : "#444")};
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1.4;
+
+  &:hover {
+    border-color: #111;
+    color: #111;
+    background: ${(p) => (p.$active ? "#111" : "#f5f5f5")};
+  }
+`;
+
+/* ─── Component ──────────────────────────────────────────── */
+export function ProductCard({ product }) {
   const locale = useLocale();
-  const { title: displayTitle, description: displayDescription } = getLocalizedProduct(product, locale);
+  const { title: displayTitle } = getLocalizedProduct(product, locale);
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
   const cartLoading = cartState?.loading ?? false;
-  const [quantity, setQuantity] = useState(1);
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+  const [adding, setAdding] = useState(false);
 
   const variants = product.variants || [];
   const variant = variants[selectedVariantIndex] || variants[0];
+
   const image =
     variant?.image_url ||
     product.images?.[0]?.url ||
     product.thumbnail ||
-    (Array.isArray(product.metadata?.media) && product.metadata.media?.[0]);
+    (Array.isArray(product.metadata?.media) ? product.metadata.media[0] : null);
+
+  const resolvedImage = image
+    ? typeof image === "string" && (image.startsWith("http") || image.startsWith("//"))
+      ? image
+      : resolveImageUrl(image)
+    : null;
+
   const priceCents =
     variant?.prices?.[0]?.amount != null
       ? Number(variant.prices[0].amount)
       : product.price != null
         ? Math.round(Number(product.price) * 100)
         : 0;
-  const saleCents = product.metadata?.rabattpreis_cents != null ? Number(product.metadata.rabattpreis_cents) : null;
-  const hasSale = saleCents != null && saleCents > 0 && priceCents > 0;
-  const displayCents = hasSale ? saleCents : priceCents;
-  const discountPercent = hasSale && priceCents > 0 && saleCents < priceCents
-    ? Math.round(((priceCents - saleCents) / priceCents) * 100)
-    : null;
-  const formattedPrice = formatPriceCents(displayCents);
-  const descriptionText = htmlToText(displayDescription || product.subtitle || "");
-  const reviewCount = product.metadata?.review_count != null ? Number(product.metadata.review_count) : 0;
-  const reviewAvg = product.metadata?.review_avg != null ? Number(product.metadata.review_avg) : 0;
-  const soldLastMonth = product.metadata?.sold_last_month != null ? Number(product.metadata.sold_last_month) : null;
-  const inventory = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity ?? 0;
-  const maxQty = Math.min(inventory || 10, 10);
+  const saleCents =
+    product.metadata?.rabattpreis_cents != null
+      ? Number(product.metadata.rabattpreis_cents)
+      : null;
+  const hasSale = saleCents != null && saleCents > 0 && saleCents < priceCents;
+  const discountPercent =
+    hasSale ? Math.round(((priceCents - saleCents) / priceCents) * 100) : null;
 
-  const handleAddToCart = async () => {
-    const variantId = variant?.id;
-    if (!variantId) {
-      alert("Variant nicht verfügbar");
-      return;
-    }
-    const result = await addToCart(variantId, quantity);
-    if (result) alert("In den Einkaufswagen gelegt");
-    else alert("Hinzufügen fehlgeschlagen");
-  };
+  const isNew =
+    product.metadata?.is_new === true ||
+    product.metadata?.is_new === "true" ||
+    product.metadata?.badge === "new";
+
+  const inventory = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity ?? 10;
+  const outOfStock = inventory !== undefined && inventory <= 0;
 
   const productUrl = `/produkt/${product.handle || product.id}`;
 
+  const handleQuickAdd = async (e) => {
+    e.preventDefault();
+    const variantId = variant?.id;
+    if (!variantId || outOfStock) return;
+    setAdding(true);
+    await addToCart(variantId, 1);
+    setAdding(false);
+  };
+
+  /* show max 6 variant pills to keep card compact */
+  const showPills = variants.length > 1 && variants.length <= 12;
+
   return (
-    <div
-      className={`border border-border-light rounded-card overflow-hidden bg-background-card shadow-card hover:shadow-card-hover transition-all duration-base flex flex-col ${
-        compact ? "max-w-[280px] flex-shrink-0 hover:scale-[1.02]" : "hover:scale-[1.02]"
-      }`}
-    >
-      <Link href={productUrl}>
-        <div className="aspect-square bg-background-soft flex items-center justify-center min-w-0 overflow-hidden">
-          {image ? (
-            <img
-              src={image || ""}
-              alt={product.title}
-              className="w-full h-full object-cover"
-            />
+    <Card>
+      <Link href={productUrl} style={{ textDecoration: "none" }}>
+        <ImageWrap className="card-image">
+          {resolvedImage ? (
+            <img src={resolvedImage} alt={displayTitle} loading="lazy" />
           ) : (
-            <span className="text-dark-500 text-small">Kein Bild</span>
+            <NoImage>No image</NoImage>
           )}
-        </div>
+
+          <BadgeWrap>
+            {hasSale && discountPercent && (
+              <Badge $sale>-{discountPercent}%</Badge>
+            )}
+            {isNew && !hasSale && <Badge>New</Badge>}
+            {outOfStock && <Badge style={{ background: "#888" }}>Sold out</Badge>}
+          </BadgeWrap>
+        </ImageWrap>
       </Link>
-      <div className="p-4 flex flex-col flex-1">
-        <Link href={productUrl}>
-          <h3 className="font-semibold text-h4 mb-1 hover:text-primary line-clamp-2 text-dark-800">
-            {displayTitle}
-          </h3>
-        </Link>
-        {descriptionText && (
-          <p className="text-dark-600 text-small mb-2 line-clamp-2">
-            {descriptionText}
-          </p>
-        )}
-        <div className="mb-2">
-          <StarRating average={reviewAvg} count={reviewCount} />
-        </div>
-        {soldLastMonth != null && soldLastMonth > 0 && (
-          <p className="text-gray-500 text-xs mb-2">
-            {soldLastMonth} im letzten Monat verkauft
-          </p>
-        )}
-        <p className="text-xl font-bold mb-3">
-          {hasSale && (
-            <span className="text-sm font-normal text-gray-500 line-through mr-2">
-              {formatPriceCents(priceCents)} €
-            </span>
-          )}
-          {formattedPrice} €
-          {discountPercent != null && discountPercent > 0 && (
-            <span className="text-sm font-semibold text-red-600 ml-1">–{discountPercent}%</span>
-          )}
-        </p>
 
-        {variants.length > 1 && (
-          <div className="mb-2">
-            <label className="text-xs text-gray-500 block mb-1">Variante</label>
-            <select
-              value={selectedVariantIndex}
-              onChange={(e) => setSelectedVariantIndex(Number(e.target.value))}
-              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
-            >
-              {variants.map((v, i) => (
-                <option key={i} value={i}>
-                  {v.title || v.value || `Option ${i + 1}`}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 mb-3">
-          <label className="text-xs text-gray-500 whitespace-nowrap">Anzahl:</label>
-          <select
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-            className="border border-gray-300 rounded px-2 py-1.5 text-sm w-20"
-          >
-            {Array.from({ length: maxQty }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button
-          onClick={handleAddToCart}
-          disabled={cartLoading || (inventory !== undefined && inventory <= 0)}
-          className="mt-auto w-full bg-blue-600 text-white py-2.5 rounded font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+      <Overlay>
+        <QuickAddBtn
+          onClick={handleQuickAdd}
+          disabled={cartLoading || adding || outOfStock}
         >
-          {cartLoading ? "Wird hinzugefügt…" : "In den Einkaufswagen"}
-        </button>
-      </div>
+          {adding ? "Adding…" : outOfStock ? "Sold out" : "Quick add"}
+        </QuickAddBtn>
+      </Overlay>
+
+      <Info>
+        <Link href={productUrl} style={{ textDecoration: "none" }}>
+          <ProductName>{displayTitle}</ProductName>
+        </Link>
+
+        <PriceRow>
+          {hasSale && <OldPrice>{formatPriceCents(priceCents)} €</OldPrice>}
+          <Price $sale={hasSale}>{formatPriceCents(hasSale ? saleCents : priceCents)} €</Price>
+        </PriceRow>
+
+        {showPills && (
+          <PillRow>
+            {variants.slice(0, 6).map((v, i) => (
+              <Pill
+                key={i}
+                $active={i === selectedVariantIndex}
+                onClick={(e) => { e.preventDefault(); setSelectedVariantIndex(i); }}
+              >
+                {v.title || v.value || `${i + 1}`}
+              </Pill>
+            ))}
+            {variants.length > 6 && (
+              <Pill as="span" style={{ cursor: "default", borderColor: "#ddd", color: "#999" }}>
+                +{variants.length - 6}
+              </Pill>
+            )}
+          </PillRow>
+        )}
+      </Info>
+    </Card>
+  );
+}
+
+export function StarRating({ average = 0, count = 0 }) {
+  const full = Math.floor(average);
+  const half = average - full >= 0.5 ? 1 : 0;
+  const empty = 5 - full - half;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <span aria-hidden style={{ display: "flex" }}>
+        {[...Array(full)].map((_, i) => <span key={i} style={{ color: "#f59e0b" }}>★</span>)}
+        {half ? <span style={{ color: "#f59e0b" }}>★</span> : null}
+        {[...Array(empty)].map((_, i) => <span key={i} style={{ color: "#d1d5db" }}>★</span>)}
+      </span>
+      {count > 0 && (
+        <span style={{ fontSize: 12, color: "#9ca3af" }}>({count})</span>
+      )}
     </div>
   );
 }

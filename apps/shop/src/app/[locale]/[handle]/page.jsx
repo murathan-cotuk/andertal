@@ -3,15 +3,16 @@
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import { ProductGrid } from "@/components/ProductGrid";
-import Breadcrumbs from "@/components/Breadcrumbs";
 import { Link } from "@/i18n/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, notFound } from "next/navigation";
-import { tokens } from "@/design-system/tokens";
 import { resolveImageUrl } from "@/lib/image-url";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
 
-const RESERVED_HANDLES = ["search", "login", "register", "account", "bestsellers", "recommended", "category", "pages", "collections", "produkt", "kollektion", "product"];
+const RESERVED_HANDLES = [
+  "search", "login", "register", "account", "bestsellers", "recommended",
+  "category", "pages", "collections", "produkt", "kollektion", "product",
+];
 
 function sanitizeHtml(html) {
   if (!html || typeof html !== "string") return "";
@@ -21,190 +22,313 @@ function sanitizeHtml(html) {
     .replace(/\s*on\w+=["'][^"']*["']/gi, "");
 }
 
+const fadeUp = keyframes`
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+`;
+
+/* ─── Layout shells ──────────────────────────────────────── */
 const PageWrap = styled.div`
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: ${tokens.background.main};
+  background: #fff;
 `;
 
 const Main = styled.main`
   flex: 1;
-  width: 100%;
-  padding: 0;
   padding-top: 72px;
-  display: flex;
-  flex-direction: column;
 `;
 
-const ContentRow = styled.div`
-  display: flex;
+/* ─── Hero banner ────────────────────────────────────────── */
+const HeroBanner = styled.div`
   width: 100%;
-  margin: 0;
-  flex: 1;
-`;
-
-const FilterSidebar = styled.aside`
-  width: 260px;
-  flex-shrink: 0;
-  position: fixed;
-  left: 0;
-  top: 72px;
-  bottom: 0;
-  padding: 20px 16px 48px 20px;
-  border-right: 2px solid #000;
-  background: #fff;
-  overflow-y: auto;
-  z-index: 10;
-`;
-
-const ContentColumn = styled.div`
-  flex: 1;
-  min-width: 0;
-  padding: 20px 24px 48px 32px;
-  margin-left: 260px;
-  max-width: 1280px;
-`;
-
-const FilterTitle = styled.div`
-  font-size: 13px;
-  font-weight: 700;
-  color: #111827;
-  letter-spacing: 0.02em;
-  margin-bottom: 10px;
-  margin-top: 20px;
-`;
-
-const FilterList = styled.ul`
-  list-style: none;
-  margin: 0;
-  padding: 0;
-`;
-
-const FilterItem = styled.li`
-  margin: 0;
-  padding: 0;
-`;
-
-const FilterLink = styled(Link)`
-  display: block;
-  padding: 10px 12px;
-  font-size: 15px;
-  color: ${(p) => (p.$active ? "#111827" : "#4b5563")};
-  font-weight: ${(p) => (p.$active ? 600 : 400)};
-  text-decoration: none;
-  border-radius: 8px;
-  background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
-  margin-bottom: 2px;
-  &:hover {
-    background: #e5e7eb;
-    color: #111827;
-  }
-`;
-
-const BannerWrap = styled.div`
-  width: 100%;
-  margin-bottom: 0;
-  flex-shrink: 0;
-`;
-
-const Banner = styled.div`
-  width: 100%;
-  margin-bottom: ${tokens.spacing.lg};
-  border-radius: ${tokens.radius.card};
+  height: 260px;
   overflow: hidden;
-  background: ${tokens.background.soft};
+  position: relative;
+
   img {
     width: 100%;
-    height: auto;
-    max-height: 200px;
+    height: 100%;
     object-fit: cover;
     display: block;
   }
+
+  @media (max-width: 640px) { height: 180px; }
 `;
 
-const HEADING_ORANGE = "#c2410c";
+const HeroOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.35) 100%);
+  display: flex;
+  align-items: flex-end;
+  padding: 28px 40px;
 
-const Title = styled.h1`
-  font-size: ${tokens.fontSize.h2};
-  font-weight: 700;
-  color: ${HEADING_ORANGE};
-  margin: 0 0 ${tokens.spacing.md};
-  font-family: ${tokens.fontFamily.sans};
+  h1 {
+    color: #fff;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.3);
+  }
 `;
 
-const Description = styled.div`
-  font-size: ${tokens.fontSize.body};
-  line-height: ${tokens.lineHeight.relaxed};
-  color: ${tokens.dark[600]};
-  margin-top: ${tokens.spacing["2xl"]};
-  margin-bottom: ${tokens.spacing.xl};
+/* ─── Breadcrumb ─────────────────────────────────────────── */
+const Breadcrumb = styled.nav`
+  padding: 12px 40px;
+  border-bottom: 1px solid #f0f0ee;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #888;
+
+  a { color: #888; text-decoration: none; &:hover { color: #111; } }
+  span { color: #111; font-weight: 500; }
+
+  @media (max-width: 768px) { padding: 12px 20px; }
+`;
+
+const Sep = styled.span`
+  color: #ccc;
+  font-size: 11px;
+`;
+
+/* ─── Two-column layout ──────────────────────────────────── */
+const BodyRow = styled.div`
+  display: flex;
+  align-items: flex-start;
+  max-width: 1440px;
+  margin: 0 auto;
   width: 100%;
-  max-width: 100%;
-  border-radius: ${tokens.radius.card};
-  padding: ${tokens.spacing.lg} 0;
-  & h1 { font-size: 1.75rem; font-weight: 700; margin: 1.25em 0 0.5em; color: ${HEADING_ORANGE}; line-height: 1.3; }
-  & h2 { font-size: 1.5rem; font-weight: 700; margin: 1.25em 0 0.5em; color: ${HEADING_ORANGE}; line-height: 1.3; }
-  & h3 { font-size: 1.25rem; font-weight: 600; margin: 1em 0 0.4em; color: ${HEADING_ORANGE}; line-height: 1.35; }
-  & h4, & h5, & h6 { font-size: 1.125rem; font-weight: 600; margin: 0.85em 0 0.35em; color: ${HEADING_ORANGE}; line-height: 1.4; }
-  & h1:first-child, & h2:first-child, & h3:first-child { margin-top: 0; }
-  & p { margin: 0 0 0.75em; }
-  & p:last-child { margin-bottom: 0; }
-  & ul, & ol { margin: 0.5em 0 1em 1.5em; padding-left: 1.5em; }
-  & ul { list-style-type: disc; }
-  & ol { list-style-type: decimal; }
-  & li { margin-bottom: 0.35em; }
-  & strong { font-weight: 600; }
-  & a { color: #0ea5e9; text-decoration: underline; }
-  & blockquote { margin: 1em 0; padding-left: 1em; border-left: 4px solid #e5e7eb; color: #6b7280; }
 `;
 
+/* ─── Sidebar ────────────────────────────────────────────── */
+const Sidebar = styled.aside`
+  width: 240px;
+  flex-shrink: 0;
+  padding: 28px 24px 48px;
+  position: sticky;
+  top: 72px;
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+  border-right: 1px solid #f0f0ee;
+
+  @media (max-width: 900px) { display: none; }
+`;
+
+const SideTitle = styled.div`
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #111;
+  margin: 0 0 12px;
+  padding-top: 8px;
+
+  &:not(:first-child) { margin-top: 28px; border-top: 1px solid #f0f0ee; padding-top: 20px; }
+`;
+
+const FilterCheckRow = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  cursor: pointer;
+  font-size: 13px;
+  color: ${(p) => (p.$active ? "#111" : "#555")};
+  font-weight: ${(p) => (p.$active ? "600" : "400")};
+
+  input[type="checkbox"] { accent-color: #111; width: 14px; height: 14px; cursor: pointer; }
+  &:hover { color: #111; }
+`;
+
+const SortRadio = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 13px;
+  color: ${(p) => (p.$active ? "#111" : "#555")};
+  font-weight: ${(p) => (p.$active ? "600" : "400")};
+
+  input[type="radio"] { accent-color: #111; width: 14px; height: 14px; cursor: pointer; }
+  &:hover { color: #111; }
+`;
+
+const ClearBtn = styled.button`
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: #888;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 4px;
+  text-decoration: underline;
+  &:hover { color: #111; }
+`;
+
+/* ─── Content area ───────────────────────────────────────── */
+const Content = styled.div`
+  flex: 1;
+  min-width: 0;
+  padding: 0 40px 64px;
+
+  @media (max-width: 768px) { padding: 0 16px 48px; }
+`;
+
+/* ─── Toolbar (above grid) ───────────────────────────────── */
 const Toolbar = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 20px 0 16px;
+  border-bottom: 1px solid #f0f0ee;
+  margin-bottom: 24px;
+  gap: 12px;
+`;
+
+const ResultCount = styled.span`
+  font-size: 13px;
+  color: #888;
+`;
+
+const SortDropdown = styled.select`
+  appearance: none;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+  border: 1px solid #ddd;
+  padding: 7px 30px 7px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: #111;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+
+  &:hover, &:focus { border-color: #111; }
+`;
+
+const ActiveFiltersBar = styled.div`
+  display: flex;
   flex-wrap: wrap;
-  gap: ${tokens.spacing.md};
-  margin-bottom: ${tokens.spacing.lg};
+  gap: 6px;
+  margin-bottom: 16px;
 `;
 
-const SortSelect = styled.select`
-  padding: ${tokens.spacing.sm} ${tokens.spacing.md};
-  border: 1px solid ${tokens.border.light};
-  border-radius: ${tokens.radius.input};
-  font-size: ${tokens.fontSize.small};
-  font-family: ${tokens.fontFamily.sans};
-  background: ${tokens.background.card};
-  color: ${tokens.dark[800]};
+const FilterChip = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: #111;
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+
+  &:hover { background: #333; }
 `;
 
-const EmptyState = styled.p`
-  text-align: center;
-  color: ${tokens.dark[500]};
-  font-size: ${tokens.fontSize.body};
-  padding: ${tokens.spacing["2xl"]} ${tokens.spacing.md};
+/* ─── Pagination ─────────────────────────────────────────── */
+const Pagination = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 48px;
+`;
+
+const PageBtn = styled.button`
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid ${(p) => (p.$active ? "#111" : "#e5e5e5")};
+  background: ${(p) => (p.$active ? "#111" : "#fff")};
+  color: ${(p) => (p.$active ? "#fff" : "#555")};
+  font-size: 13px;
+  font-weight: ${(p) => (p.$active ? "700" : "400")};
+  cursor: ${(p) => (p.disabled ? "not-allowed" : "pointer")};
+  opacity: ${(p) => (p.disabled ? "0.35" : "1")};
+  transition: all 0.15s;
+
+  &:not([disabled]):hover {
+    border-color: #111;
+    color: ${(p) => (p.$active ? "#fff" : "#111")};
+  }
+`;
+
+/* ─── Loading skeleton ───────────────────────────────────── */
+const shimmer = keyframes`
+  0% { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+`;
+
+const SkeletonGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin-top: 32px;
+
+  @media (max-width: 640px) { grid-template-columns: repeat(2, 1fr); }
+`;
+
+const SkeletonCard = styled.div`
+  aspect-ratio: 3 / 4;
+  background: linear-gradient(90deg, #f5f5f3 25%, #ebebeb 50%, #f5f5f3 75%);
+  background-size: 600px 100%;
+  animation: ${shimmer} 1.4s infinite;
+`;
+
+/* ─── Description section ────────────────────────────────── */
+const DescSection = styled.div`
+  margin-top: 64px;
+  padding-top: 32px;
+  border-top: 1px solid #f0f0ee;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #555;
+  max-width: 680px;
+
+  h1, h2, h3 { font-size: 16px; font-weight: 700; color: #111; margin: 1.25em 0 0.5em; }
+  p { margin: 0 0 0.75em; }
+  a { color: #111; text-decoration: underline; }
+`;
+
+/* ─── Collection title (no banner case) ─────────────────── */
+const CollectionHeader = styled.div`
+  padding: 32px 40px 0;
+
+  @media (max-width: 768px) { padding: 24px 20px 0; }
+`;
+
+const CollectionTitle = styled.h1`
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #111;
   margin: 0;
 `;
 
-const ErrorBox = styled.div`
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
-  padding: ${tokens.spacing.md};
-  border-radius: ${tokens.radius.input};
-  margin: ${tokens.spacing.xl} 0;
-`;
-
+/* ─── Sort options ────────────────────────────────────────── */
 const SORT_OPTIONS = [
-  { value: "default", label: "Standard" },
-  { value: "price_asc", label: "Preis aufsteigend" },
-  { value: "price_desc", label: "Preis absteigend" },
+  { value: "default", label: "Featured" },
+  { value: "price_asc", label: "Price: Low to High" },
+  { value: "price_desc", label: "Price: High to Low" },
   { value: "title_asc", label: "Name A–Z" },
   { value: "title_desc", label: "Name Z–A" },
 ];
 
 const PER_PAGE = 24;
 
+/* ─── Page component ─────────────────────────────────────── */
 export default function CollectionByHandlePage() {
   const params = useParams();
   const locale = params?.locale ?? "en";
@@ -212,13 +336,13 @@ export default function CollectionByHandlePage() {
 
   const [collection, setCollection] = useState(null);
   const [products, setProducts] = useState([]);
-  const [allCollections, setAllCollections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState("default");
   const [page, setPage] = useState(1);
   const [notFoundState, setNotFoundState] = useState(false);
   const [metadataFilters, setMetadataFilters] = useState({});
+  const contentRef = useRef(null);
 
   useEffect(() => {
     if (!handle) return;
@@ -234,40 +358,22 @@ export default function CollectionByHandlePage() {
         setError(null);
 
         const colRes = await fetch(`/api/store-collections?handle=${encodeURIComponent(handle)}`);
-        if (colRes.status === 404) {
-          setNotFoundState(true);
-          setCollection(null);
-          setProducts([]);
-          setLoading(false);
-          return;
-        }
-        if (!colRes.ok) {
-          throw new Error(`HTTP ${colRes.status}`);
-        }
+        if (colRes.status === 404) { setNotFoundState(true); setLoading(false); return; }
+        if (!colRes.ok) throw new Error(`HTTP ${colRes.status}`);
+
         const colData = await colRes.json();
         const col = colData?.collection ?? null;
-        if (!col) {
-          setNotFoundState(true);
-          setCollection(null);
-          setProducts([]);
-          setLoading(false);
-          return;
-        }
+        if (!col) { setNotFoundState(true); setLoading(false); return; }
         setCollection(col);
 
-        const params = new URLSearchParams({ limit: "200" });
-        if (col.id) params.set("collection_id", String(col.id));
-        if (col.handle) params.set("collection_handle", String(col.handle));
-        const [productsRes, listRes] = await Promise.all([
-          fetch(`/api/store-products?${params.toString()}`).then((r) => r.json()).catch(() => ({ products: [] })),
-          fetch("/api/store-collections").then((r) => r.json()).catch(() => ({ collections: [] })),
-        ]);
-        setProducts(productsRes?.products ?? []);
-        setAllCollections(listRes?.collections ?? []);
+        const qs = new URLSearchParams({ limit: "200" });
+        if (col.id) qs.set("collection_id", String(col.id));
+        if (col.handle) qs.set("collection_handle", String(col.handle));
+
+        const prodRes = await fetch(`/api/store-products?${qs.toString()}`).then((r) => r.json()).catch(() => ({ products: [] }));
+        setProducts(prodRes?.products ?? []);
       } catch (err) {
-        setError(err?.message ?? "Fehler beim Laden");
-        setCollection(null);
-        setProducts([]);
+        setError(err?.message ?? "Loading error");
       } finally {
         setLoading(false);
       }
@@ -278,70 +384,69 @@ export default function CollectionByHandlePage() {
 
   useEffect(() => {
     if (typeof document === "undefined" || !collection?.handle) return;
-    const href = `${window.location.origin}/${locale}/${collection.handle}`;
     let link = document.querySelector('link[rel="canonical"]');
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "canonical";
-      document.head.appendChild(link);
-    }
-    link.href = href;
+    if (!link) { link = document.createElement("link"); link.rel = "canonical"; document.head.appendChild(link); }
+    link.href = `${window.location.origin}/${locale}/${collection.handle}`;
   }, [locale, collection?.handle]);
 
+  /* ── Build facets ── */
   const metadataFacets = (() => {
     const facets = {};
     (products || []).forEach((p) => {
       const meta = p.metadata && typeof p.metadata === "object" ? p.metadata : {};
       Object.entries(meta).forEach(([key, value]) => {
-        if (key === "media" || key === "image_url" || key === "image") return;
+        if (["media", "image_url", "image", "review_count", "review_avg", "sold_last_month",
+             "rabattpreis_cents", "is_new", "badge"].includes(key)) return;
         if (!facets[key]) facets[key] = new Set();
-        if (Array.isArray(value)) value.forEach((x) => { const s = String(x).trim(); if (s) facets[key].add(s); });
-        else if (value != null) { const v = String(value).trim(); if (v) facets[key].add(v); }
+        const vals = Array.isArray(value) ? value : [value];
+        vals.forEach((v) => { const s = String(v).trim(); if (s) facets[key].add(s); });
       });
     });
-    return Object.fromEntries(Object.entries(facets).map(([k, s]) => [k, [...s].filter(Boolean).sort()]));
+    return Object.fromEntries(
+      Object.entries(facets)
+        .map(([k, s]) => [k, [...s].filter(Boolean).sort()])
+        .filter(([, v]) => v.length > 0 && v.length <= 30)
+    );
   })();
 
-  let filteredProducts = [...(products || [])];
-  Object.entries(metadataFilters).forEach(([key, selectedValues]) => {
-    if (!selectedValues?.length) return;
-    filteredProducts = filteredProducts.filter((p) => {
+  /* ── Filter + sort ── */
+  let filtered = [...(products || [])];
+  Object.entries(metadataFilters).forEach(([key, vals]) => {
+    if (!vals?.length) return;
+    filtered = filtered.filter((p) => {
       const meta = p.metadata && typeof p.metadata === "object" ? p.metadata : {};
-      const val = meta[key];
-      if (val == null) return false;
-      const arr = Array.isArray(val) ? val : [val];
-      return arr.some((v) => selectedValues.includes(String(v).trim()));
+      const v = meta[key];
+      if (v == null) return false;
+      const arr = Array.isArray(v) ? v : [v];
+      return arr.some((x) => vals.includes(String(x).trim()));
     });
   });
 
-  const sortedProducts = [...filteredProducts];
-  if (sort === "price_asc") sortedProducts.sort((a, b) => (a.variants?.[0]?.prices?.[0]?.amount ?? 0) - (b.variants?.[0]?.prices?.[0]?.amount ?? 0));
-  if (sort === "price_desc") sortedProducts.sort((a, b) => (b.variants?.[0]?.prices?.[0]?.amount ?? 0) - (a.variants?.[0]?.prices?.[0]?.amount ?? 0));
-  if (sort === "title_asc") sortedProducts.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-  if (sort === "title_desc") sortedProducts.sort((a, b) => (b.title || "").localeCompare(a.title || ""));
+  const sorted = [...filtered];
+  if (sort === "price_asc") sorted.sort((a, b) => (a.variants?.[0]?.prices?.[0]?.amount ?? 0) - (b.variants?.[0]?.prices?.[0]?.amount ?? 0));
+  if (sort === "price_desc") sorted.sort((a, b) => (b.variants?.[0]?.prices?.[0]?.amount ?? 0) - (a.variants?.[0]?.prices?.[0]?.amount ?? 0));
+  if (sort === "title_asc") sorted.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+  if (sort === "title_desc") sorted.sort((a, b) => (b.title || "").localeCompare(a.title || ""));
 
-  const total = sortedProducts.length;
+  const total = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = sorted.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
-  const toggleMetadataFilter = (key, value) => {
+  const toggleFilter = (key, value) => {
     setMetadataFilters((prev) => {
-      const current = prev[key] || [];
-      const next = current.includes(value) ? current.filter((x) => x !== value) : [...current, value];
-      return next.length ? { ...prev, [key]: next } : (() => { const u = { ...prev }; delete u[key]; return u; })();
+      const cur = prev[key] || [];
+      const next = cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value];
+      if (!next.length) { const u = { ...prev }; delete u[key]; return u; }
+      return { ...prev, [key]: next };
     });
     setPage(1);
   };
-  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
-  const currentPage = Math.min(page, totalPages);
-  const start = (currentPage - 1) * PER_PAGE;
-  const paginatedProducts = sortedProducts.slice(start, start + PER_PAGE);
 
-  const displayTitle = collection?.display_title || collection?.title || "";
-  // Banner: backend may send "banner" (resolved) and/or raw banner_image_url / image_url from collection metadata
-  const rawBanner =
-    collection?.banner ||
-    collection?.banner_image_url ||
-    collection?.image_url ||
-    "";
+  const activeFilterCount = Object.values(metadataFilters).reduce((acc, v) => acc + (v?.length || 0), 0);
+
+  const displayTitle = collection?.display_title || collection?.title || handle || "";
+  const rawBanner = collection?.banner || collection?.banner_image_url || collection?.image_url || "";
   const bannerUrl = rawBanner
     ? typeof rawBanner === "string" && (rawBanner.startsWith("http") || rawBanner.startsWith("//"))
       ? rawBanner
@@ -350,12 +455,27 @@ export default function CollectionByHandlePage() {
 
   if (notFoundState) notFound();
 
+  /* ─── Early render states ───────────────────────────────── */
   if (loading) {
     return (
       <PageWrap>
         <ShopHeader />
         <Main>
-          <p>Laden…</p>
+          <CollectionHeader>
+            <div style={{ width: 200, height: 28, background: "#f0f0ee", marginBottom: 8 }} />
+          </CollectionHeader>
+          <BodyRow>
+            <Sidebar />
+            <Content>
+              <Toolbar>
+                <div style={{ width: 80, height: 16, background: "#f0f0ee" }} />
+                <div style={{ width: 120, height: 32, background: "#f0f0ee" }} />
+              </Toolbar>
+              <SkeletonGrid>
+                {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+              </SkeletonGrid>
+            </Content>
+          </BodyRow>
         </Main>
         <Footer />
       </PageWrap>
@@ -367,134 +487,169 @@ export default function CollectionByHandlePage() {
       <PageWrap>
         <ShopHeader />
         <Main>
-          <ErrorBox>{error || "Kollektion nicht gefunden"}</ErrorBox>
+          <div style={{ padding: "40px", color: "#b91c1c", fontSize: 14 }}>
+            {error || "Collection not found"}
+          </div>
         </Main>
         <Footer />
       </PageWrap>
     );
   }
 
+  /* ─── Main render ───────────────────────────────────────── */
   return (
     <PageWrap>
       <ShopHeader />
       <Main>
-        {bannerUrl && (
-          <BannerWrap>
-            <Banner>
-              <img src={bannerUrl} alt="" />
-            </Banner>
-          </BannerWrap>
+
+        {/* Banner hero */}
+        {bannerUrl ? (
+          <HeroBanner>
+            <img src={bannerUrl} alt={displayTitle} />
+            <HeroOverlay><h1>{displayTitle}</h1></HeroOverlay>
+          </HeroBanner>
+        ) : (
+          <CollectionHeader>
+            <CollectionTitle>{displayTitle}</CollectionTitle>
+          </CollectionHeader>
         )}
-        <ContentRow>
-          <FilterSidebar>
-            <FilterTitle>Sortierung</FilterTitle>
-            <SortSelect
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              aria-label="Sortierung"
-              style={{ width: "100%", marginBottom: 24 }}
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </SortSelect>
-            {Object.entries(metadataFacets).map(([key, values]) =>
-              values.length > 0 ? (
-                <div key={key}>
-                  <FilterTitle>{key.replace(/_/g, " ")}</FilterTitle>
-                  <FilterList>
-                    {values.map((value) => {
-                      const selected = (metadataFilters[key] || []).includes(value);
-                      return (
-                        <FilterItem key={value}>
-                          <button
-                            type="button"
-                            onClick={() => toggleMetadataFilter(key, value)}
-                            style={{
-                              display: "block",
-                              width: "100%",
-                              textAlign: "left",
-                              padding: "8px 12px",
-                              fontSize: 14,
-                              color: selected ? "#111827" : "#4b5563",
-                              fontWeight: selected ? 600 : 400,
-                              background: selected ? "#e5e7eb" : "transparent",
-                              border: "none",
-                              borderRadius: 6,
-                              cursor: "pointer",
-                            }}
-                          >
-                            {value}
-                          </button>
-                        </FilterItem>
-                      );
-                    })}
-                  </FilterList>
-                </div>
-              ) : null
-            )}
-          </FilterSidebar>
-          <ContentColumn>
-            <Breadcrumbs items={[{ label: "Home", href: `/${locale}` }, { label: displayTitle || handle, href: null }]} />
-            <Title>{displayTitle}</Title>
-            <div style={{ fontSize: tokens.fontSize.small, color: tokens.dark[500], marginBottom: tokens.spacing.lg }}>
-              {total} {total === 1 ? "Produkt" : "Produkte"}
-            </div>
 
-            {paginatedProducts.length === 0 ? (
-              <EmptyState>Noch keine Produkte in dieser Kollektion.</EmptyState>
-            ) : (
-              <>
-                <ProductGrid products={paginatedProducts} maxColumns={3} />
-                {totalPages > 1 && (
-                  <div style={{ marginTop: tokens.spacing.xl, display: "flex", justifyContent: "center", gap: tokens.spacing.sm, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      disabled={currentPage <= 1}
-                      onClick={() => setPage((p) => p - 1)}
-                      style={{
-                        padding: `${tokens.spacing.sm} ${tokens.spacing.md}`,
-                        border: `1px solid ${tokens.border.light}`,
-                        borderRadius: tokens.radius.button,
-                        background: tokens.background.card,
-                        cursor: currentPage <= 1 ? "not-allowed" : "pointer",
-                        opacity: currentPage <= 1 ? 0.6 : 1,
-                      }}
-                    >
-                      Zurück
-                    </button>
-                    <span style={{ alignSelf: "center", fontSize: tokens.fontSize.small, color: tokens.dark[500] }}>
-                      Seite {currentPage} von {totalPages}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={currentPage >= totalPages}
-                      onClick={() => setPage((p) => p + 1)}
-                      style={{
-                        padding: `${tokens.spacing.sm} ${tokens.spacing.md}`,
-                        border: `1px solid ${tokens.border.light}`,
-                        borderRadius: tokens.radius.button,
-                        background: tokens.background.card,
-                        cursor: currentPage >= totalPages ? "not-allowed" : "pointer",
-                        opacity: currentPage >= totalPages ? 0.6 : 1,
-                      }}
-                    >
-                      Weiter
-                    </button>
-                  </div>
+        {/* Breadcrumb */}
+        <Breadcrumb aria-label="Breadcrumb">
+          <Link href={`/${locale}`}>Home</Link>
+          <Sep>/</Sep>
+          <span>{displayTitle}</span>
+        </Breadcrumb>
+
+        <BodyRow>
+          {/* ── Sidebar ── */}
+          <Sidebar>
+            {/* Sort */}
+            <SideTitle>Sort</SideTitle>
+            {SORT_OPTIONS.map((opt) => (
+              <SortRadio key={opt.value} $active={sort === opt.value}>
+                <input
+                  type="radio"
+                  name="sort"
+                  value={opt.value}
+                  checked={sort === opt.value}
+                  onChange={() => { setSort(opt.value); setPage(1); }}
+                />
+                {opt.label}
+              </SortRadio>
+            ))}
+
+            {/* Metadata filters */}
+            {Object.entries(metadataFacets).map(([key, values]) => (
+              <div key={key}>
+                <SideTitle>{key.replace(/_/g, " ")}</SideTitle>
+                {values.map((value) => {
+                  const active = (metadataFilters[key] || []).includes(value);
+                  return (
+                    <FilterCheckRow key={value} $active={active}>
+                      <input
+                        type="checkbox"
+                        checked={active}
+                        onChange={() => toggleFilter(key, value)}
+                      />
+                      {value}
+                    </FilterCheckRow>
+                  );
+                })}
+              </div>
+            ))}
+
+            {activeFilterCount > 0 && (
+              <ClearBtn onClick={() => { setMetadataFilters({}); setPage(1); }}>
+                Clear all filters
+              </ClearBtn>
+            )}
+          </Sidebar>
+
+          {/* ── Content ── */}
+          <Content ref={contentRef}>
+            <Toolbar>
+              <ResultCount>{total} {total === 1 ? "product" : "products"}</ResultCount>
+              <SortDropdown
+                value={sort}
+                onChange={(e) => { setSort(e.target.value); setPage(1); }}
+                aria-label="Sort"
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </SortDropdown>
+            </Toolbar>
+
+            {/* Active filter chips */}
+            {activeFilterCount > 0 && (
+              <ActiveFiltersBar>
+                {Object.entries(metadataFilters).flatMap(([key, vals]) =>
+                  (vals || []).map((val) => (
+                    <FilterChip key={`${key}:${val}`} onClick={() => toggleFilter(key, val)}>
+                      {val} ×
+                    </FilterChip>
+                  ))
                 )}
-              </>
+              </ActiveFiltersBar>
             )}
 
+            {paginated.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "64px 0", color: "#aaa", fontSize: 14 }}>
+                No products found.
+              </div>
+            ) : (
+              <ProductGrid products={paginated} maxColumns={3} />
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Pagination>
+                <PageBtn
+                  disabled={currentPage <= 1}
+                  onClick={() => { setPage((p) => p - 1); contentRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                  aria-label="Previous page"
+                >
+                  ‹
+                </PageBtn>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => Math.abs(p - currentPage) <= 2 || p === 1 || p === totalPages)
+                  .reduce((acc, p, idx, arr) => {
+                    if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, idx) =>
+                    p === "…" ? (
+                      <span key={`dots-${idx}`} style={{ width: 38, textAlign: "center", color: "#aaa", fontSize: 13 }}>…</span>
+                    ) : (
+                      <PageBtn
+                        key={p}
+                        $active={p === currentPage}
+                        onClick={() => { setPage(p); contentRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                      >
+                        {p}
+                      </PageBtn>
+                    )
+                  )}
+                <PageBtn
+                  disabled={currentPage >= totalPages}
+                  onClick={() => { setPage((p) => p + 1); contentRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                  aria-label="Next page"
+                >
+                  ›
+                </PageBtn>
+              </Pagination>
+            )}
+
+            {/* Description */}
             {collection.description && (
-              <Description
-                dangerouslySetInnerHTML={{
-                  __html: sanitizeHtml(collection.description),
-                }}
+              <DescSection
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(collection.description) }}
               />
             )}
-          </ContentColumn>
-        </ContentRow>
+          </Content>
+        </BodyRow>
       </Main>
       <Footer />
     </PageWrap>
