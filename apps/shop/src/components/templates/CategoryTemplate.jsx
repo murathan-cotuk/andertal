@@ -273,7 +273,7 @@ export default function CategoryTemplate() {
             <CategoryTitle>{title}</CategoryTitle>
             {category?.description && <CategoryDescription>{category.description}</CategoryDescription>}
           </CategoryHeader>
-          <ProductGrid products={products} />
+          <ProductGrid products={products} maxColumns={4} />
           {richtextHtml && (
             <LongContent dangerouslySetInnerHTML={{ __html: richtextHtml }} />
           )}

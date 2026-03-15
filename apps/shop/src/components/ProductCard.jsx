@@ -13,7 +13,6 @@ import styled from "styled-components";
  * ─────────────────────────────────────────────────────────── */
 function resolveImg(src) {
   if (!src) return null;
-  if (typeof src === "string" && (src.startsWith("http") || src.startsWith("//"))) return src;
   return resolveImageUrl(src);
 }
 
@@ -25,13 +24,15 @@ const Card = styled.article`
   display: flex;
   flex-direction: column;
   background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
 `;
 
 /* Image block */
 const ImgBlock = styled.div`
   position: relative;
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   background: #f4f4f2;
 
@@ -230,9 +231,9 @@ export function ProductCard({ product }) {
     product.metadata?.is_new === true ||
     product.metadata?.is_new === "true" ||
     product.metadata?.badge === "new";
-  const inventory =
-    variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity ?? 10;
-  const outOfStock = typeof inventory === "number" && inventory <= 0;
+  const managesInventory = variant?.manage_inventory === true;
+  const inventoryQty = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity;
+  const outOfStock = managesInventory && typeof inventoryQty === "number" && inventoryQty <= 0;
 
   const productUrl = `/produkt/${product.handle || product.id}`;
 

@@ -675,7 +675,7 @@ export default function CollectionPage() {
               No products match your filters.
             </div>
           ) : (
-            <ProductGrid products={paginated} maxColumns={3} />
+            <ProductGrid products={paginated} maxColumns={4} />
           )}
 
           {/* Pagination */}

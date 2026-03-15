@@ -5,19 +5,16 @@ import styled from "styled-components";
 
 const Grid = styled.div`
   display: grid;
-  gap: 1px;
-  background: #e8e8e6;          /* gap colour — creates tile effect */
+  gap: 16px;
+  background: transparent;
 
   grid-template-columns: repeat(2, 1fr);
 
   @media (min-width: 640px)  { grid-template-columns: repeat(3, 1fr); }
-  @media (min-width: 1200px) {
+  @media (min-width: 1024px) {
     grid-template-columns: ${(p) =>
       p.$cols === 4 ? "repeat(4, 1fr)" : "repeat(3, 1fr)"};
   }
-
-  /* Each cell has a white bg so the grid bg creates visible lines */
-  & > * { background: #fff; }
 `;
 
 const Empty = styled.div`
