@@ -44,7 +44,8 @@ export default function DashboardHome() {
           medusaClient.getAdminHubProducts(),
           medusaClient.getOrders().catch(() => ({ orders: [] })),
         ]);
-        const products = productsData.products || [];
+        const allProducts = productsData.products || [];
+        const products = allProducts.filter((p) => (p.status || "").toLowerCase() !== "draft");
         const orders = ordersData.orders || [];
         const totalOrders = orders.length;
         const pendingOrders = orders.filter(

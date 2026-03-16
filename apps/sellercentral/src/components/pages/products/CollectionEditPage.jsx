@@ -188,12 +188,18 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
       setCollectionProducts([]);
       return;
     }
-    client.getAdminHubProducts({ collection_id: collection.id }).then((r) => setCollectionProducts(r.products || [])).catch(() => setCollectionProducts([]));
+    client.getAdminHubProducts({ collection_id: collection.id }).then((r) => {
+      const list = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
+      setCollectionProducts(list);
+    }).catch(() => setCollectionProducts([]));
   }, [collection?.id, client]);
 
   useEffect(() => {
     if (!collection?.id) return;
-    client.getAdminHubProducts({ limit: 200 }).then((r) => setAllProducts(r.products || [])).catch(() => setAllProducts([]));
+    client.getAdminHubProducts({ limit: 200 }).then((r) => {
+      const list = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
+      setAllProducts(list);
+    }).catch(() => setAllProducts([]));
   }, [collection?.id, client]);
 
   const addProductToCollection = async (productId) => {
@@ -202,9 +208,9 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
     try {
       await client.updateAdminHubProduct(productId, { collection_id: collection.id });
       const r = await client.getAdminHubProducts({ collection_id: collection.id });
-      setCollectionProducts(r.products || []);
+      setCollectionProducts((r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft"));
       const all = await client.getAdminHubProducts({ limit: 200 });
-      setAllProducts(all.products || []);
+      setAllProducts((all.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft"));
       setAddProductSelectValue("");
     } catch (e) {
       setError(e?.message || "Failed to add product to collection");
@@ -219,9 +225,9 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
     try {
       await client.updateAdminHubProduct(productId, { collection_id: null });
       const r = await client.getAdminHubProducts({ collection_id: collection?.id });
-      setCollectionProducts(r.products || []);
+      setCollectionProducts((r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft"));
       const all = await client.getAdminHubProducts({ limit: 200 });
-      setAllProducts(all.products || []);
+      setAllProducts((all.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft"));
     } catch (e) {
       setError(e?.message || "Failed to remove product from collection");
     } finally {

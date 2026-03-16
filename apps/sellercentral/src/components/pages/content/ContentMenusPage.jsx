@@ -284,15 +284,6 @@ function MenuEditorPanel(props) {
         @keyframes slideUp { from { transform: translateX(-50%) translateY(100%); } to { transform: translateX(-50%) translateY(0); } }
         .menu-items-card .menu-add-row:hover { background: var(--p-color-bg-surface-secondary) !important; }
       `}</style>
-      {menuFormDirty && (
-        <div style={{ position: "sticky", top: 0, zIndex: 10, marginBottom: 12, padding: "10px 16px", background: "var(--p-color-bg-surface-secondary)", borderRadius: 8, border: "1px solid var(--p-color-border)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-          <span style={{ fontSize: 14, color: "var(--p-color-text)", fontWeight: 500 }}>Unsaved changes</span>
-          {hasMenuId && (
-            <Button size="slim" variant="secondary" onClick={handleDiscardMenuForm}>Discard</Button>
-          )}
-          <Button size="slim" variant="primary" onClick={handleSaveMenuFromPanel} loading={saving}>{saving ? "Saving…" : "Save"}</Button>
-        </div>
-      )}
       <div style={{ padding: "28px 32px", borderBottom: "1px solid var(--p-color-border-subdued)", flexShrink: 0, background: "var(--p-color-bg-surface)" }}>
 <BlockStack gap="400">
             <InlineStack align="space-between" blockAlign="center" gap="400">
@@ -763,7 +754,10 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
 
   useEffect(() => {
     client.getMedusaCollections({ adminHub: true }).then((r) => setCollections(r.collections || [])).catch(() => setCollections([]));
-    client.getAdminHubProducts().then((r) => setProducts(r.products || [])).catch(() => setProducts([]));
+    client.getAdminHubProducts().then((r) => {
+      const list = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
+      setProducts(list);
+    }).catch(() => setProducts([]));
   }, []);
 
   const selectedMenu = menus.find((m) => m.id === selectedMenuId);

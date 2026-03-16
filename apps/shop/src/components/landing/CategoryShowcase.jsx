@@ -46,8 +46,8 @@ const Card = styled(motion(Link))`
 const Overlay = styled.div`
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent 50%);
-  opacity: 0.6;
+  background: transparent;
+  opacity: 0;
   transition: opacity ${tokens.transition.base};
 `;
 
@@ -63,7 +63,7 @@ const Label = styled.span`
 const PlaceholderBg = styled.div`
   position: absolute;
   inset: 0;
-  background: ${tokens.dark[600]};
+  background: transparent;
 `;
 
 export default function CategoryShowcase({

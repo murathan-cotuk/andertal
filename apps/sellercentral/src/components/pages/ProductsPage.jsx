@@ -336,7 +336,8 @@ export default function ProductsPage() {
       try {
         setProductsLoading(true);
         const data = await medusaClient.getAdminHubProducts();
-        setProducts(data.products || []);
+        const list = (data.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
+        setProducts(list);
       } catch (error) {
         console.error('Error fetching products:', error);
         setProducts([]);
@@ -543,7 +544,8 @@ export default function ProductsPage() {
       
       // Refresh products list
       const data = await medusaClient.getAdminHubProducts();
-      setProducts(data.products || []);
+      const list = (data.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
+      setProducts(list);
 
       setMessage({ type: "success", text: "Product created successfully!" });
       setFormData({

@@ -23,8 +23,9 @@ import {
   ActionList,
   Modal,
   Thumbnail,
+  Checkbox,
 } from "@shopify/polaris";
-import { ProductIcon, SearchIcon, MenuHorizontalIcon } from "@shopify/polaris-icons";
+import { ProductIcon, MenuHorizontalIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
@@ -40,6 +41,35 @@ const STATUS_OPTIONS = [
   { label: "Draft", value: "draft" },
   { label: "Inactive", value: "archived" },
 ];
+
+const DEFAULT_DUPLICATE_OPTIONS = {
+  title: true,
+  description: true,
+  price: true,
+  inventory: false,
+  categories: true,
+  media: true,
+  variants: true,
+};
+
+function stripSkuEanFromVariants(variants) {
+  if (!Array.isArray(variants)) return [];
+  return variants.map((v) => {
+    const { sku, ean, ...rest } = typeof v === "object" && v ? v : {};
+    const out = { ...rest };
+    out.sku = "";
+    out.ean = undefined;
+    if (Array.isArray(out.options)) {
+      out.options = out.options.map((o) => {
+        const opt = typeof o === "object" && o ? { ...o } : {};
+        opt.sku = "";
+        opt.ean = undefined;
+        return opt;
+      });
+    }
+    return out;
+  });
+}
 
 const UNIT_TYPE_OPTIONS = [
   { label: "— None —", value: "" },
@@ -105,12 +135,16 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [mediaLibraryList, setMediaLibraryList] = useState([]);
   const [mediaPickerSelected, setMediaPickerSelected] = useState(() => new Set());
+  const [mediaUrlInput, setMediaUrlInput] = useState("");
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionPopoverOpen, setCollectionPopoverOpen] = useState(false);
   const [descriptionMode, setDescriptionMode] = useState("visual");
   const descEditorRef = useRef(null);
   const initialSnapshotRef = useRef(null);
   const [expandedVariantIndex, setExpandedVariantIndex] = useState(null);
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [duplicateOptions, setDuplicateOptions] = useState(DEFAULT_DUPLICATE_OPTIONS);
+  const [duplicateSaving, setDuplicateSaving] = useState(false);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -270,32 +304,46 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   saveRef.current = save;
   discardRef.current = handleDiscard;
 
-  const duplicateProduct = async () => {
+  const openDuplicateModal = () => {
+    setDuplicateOptions({ ...DEFAULT_DUPLICATE_OPTIONS });
+    setDuplicateModalOpen(true);
+  };
+
+  const runDuplicate = async () => {
     if (!product) return;
+    setDuplicateSaving(true);
     try {
-      setSaving(true);
-      const metadata = { ...(product.metadata || {}) };
-      const storeName = (typeof window !== "undefined" ? (localStorage.getItem("storeName") || "").trim() : "") || "";
-      if (storeName) {
-        metadata.seller_name = storeName;
-        metadata.shop_name = storeName;
+      const opt = duplicateOptions;
+      const meta = (product.metadata && typeof product.metadata === "object") ? { ...product.metadata } : {};
+      delete meta.ean;
+      if (!opt.media) meta.media = undefined;
+      if (!opt.categories) {
+        meta.collection_ids = undefined;
+        meta.collection_id = undefined;
       }
-      const created = await client.createAdminHubProduct({
-        title: (product.title || "") + " (Copy)",
-        handle: (product.handle || "") + "-kopie-" + Date.now(),
-        sku: product.sku || "",
-        description: product.description || "",
+      const variants = opt.variants ? stripSkuEanFromVariants(product.variants) : [];
+      const payload = {
+        title: opt.title ? (product.title || "").trim() + " (Copy)" : "Untitled",
+        handle: (product.handle || "product").replace(/-kopie-\d+$/, "") + "-kopie-" + Date.now(),
+        sku: "",
+        description: opt.description ? (product.description || "") : "",
         status: "draft",
-        price: product.price,
-        inventory: product.inventory ?? 0,
-        metadata,
-        variants: product.variants,
-      });
+        price: opt.price && (product.price != null) ? Number(product.price) : 0,
+        inventory: opt.inventory && (product.inventory != null) ? Number(product.inventory) : 0,
+        metadata: meta,
+        variants,
+        ...(opt.categories && (product.collection_id != null) ? { collection_id: product.collection_id } : {}),
+      };
+      if (opt.categories && meta.collection_ids && Array.isArray(meta.collection_ids)) {
+        payload.metadata = { ...payload.metadata, collection_ids: meta.collection_ids };
+      }
+      const created = await client.createAdminHubProduct(payload);
+      setDuplicateModalOpen(false);
       if (created?.id) router.push(`/products/${created.handle || created.id}`);
     } catch (err) {
       setMessage({ type: "error", text: err?.message || "Duplicate failed" });
     } finally {
-      setSaving(false);
+      setDuplicateSaving(false);
     }
   };
 
@@ -408,6 +456,21 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const removeMedia = (index) => {
     const next = mediaUrls.filter((_, i) => i !== index);
     updateMeta("media", next);
+  };
+  const addMediaByUrl = () => {
+    const url = (mediaUrlInput || "").trim();
+    if (!url) return;
+    const valid = url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:");
+    if (!valid) {
+      setMessage({ type: "error", text: "Please enter a valid URL (http:// or https://)" });
+      return;
+    }
+    if (mediaUrls.length >= 6) {
+      setMessage({ type: "error", text: "Maximum 6 images allowed." });
+      return;
+    }
+    updateMeta("media", [...mediaUrls, url].slice(0, 6));
+    setMediaUrlInput("");
   };
   const resolveMediaUrl = (url) => {
     if (!url) return "";
@@ -550,31 +613,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         </Box>
       )}
 
-      {isDirty && (
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 100,
-            marginBottom: 16,
-            paddingTop: 8,
-            paddingBottom: 8,
-            background: "var(--p-color-bg-surface)",
-            borderBottom: "1px solid var(--p-color-border)",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 12px", background: "var(--p-color-bg-surface-secondary)", borderRadius: 8, border: "1px solid var(--p-color-border)" }}>
-            <span style={{ display: "inline-flex", transform: "rotate(180deg)", transition: "transform 0.25s ease" }} aria-hidden>
-              <SearchIcon />
-            </span>
-            <span style={{ fontSize: 14, color: "var(--p-color-text)", fontWeight: 500 }}>Unsaved changes</span>
-            <Button variant="secondary" size="slim" onClick={handleDiscard}>Discard</Button>
-            <Button variant="primary" size="slim" onClick={save} loading={saving}>{saving ? "Saving…" : "Save"}</Button>
-          </div>
-        </div>
-      )}
-
       <div className="product-edit-header">
         <Link href="/products/inventory" className="product-edit-title-link" style={{ marginRight: 4 }}>
           <span style={{ display: "flex", alignItems: "center", width: 20, height: 20 }}><ProductIcon /></span>
@@ -585,7 +623,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           <Popover active={moreActionsOpen} onClose={() => setMoreActionsOpen(false)} activator={<Button size="slim" icon={MenuHorizontalIcon} onClick={() => setMoreActionsOpen(true)} accessibilityLabel="More actions" style={{ background: "#1f2937", color: "#fff", border: "none" }}>More actions</Button>} autofocusTarget="first-node">
             <ActionList
               items={[
-                { content: "Duplicate", onAction: () => { setMoreActionsOpen(false); duplicateProduct(); } },
+                { content: "Duplicate", onAction: () => { setMoreActionsOpen(false); openDuplicateModal(); } },
                 { content: "Delete", destructive: true, onAction: () => { setMoreActionsOpen(false); setDeleteConfirmOpen(true); } },
               ]}
             />
@@ -715,6 +753,27 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   </div>
                 )}
               </div>
+              {mediaUrls.length < 6 && (
+                <Box paddingBlockStart="300">
+                  <InlineStack gap="200" blockAlign="center" wrap>
+                    <Text as="span" variant="bodySm" fontWeight="medium">Add by URL:</Text>
+                  <Box minWidth="280px" flex="1">
+                    <TextField
+                      label="Image URL"
+                      labelHidden
+                      value={mediaUrlInput}
+                      onChange={setMediaUrlInput}
+                      placeholder="https://example.com/image.jpg"
+                      autoComplete="off"
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMediaByUrl(); } }}
+                    />
+                  </Box>
+                    <Button size="slim" variant="secondary" onClick={addMediaByUrl} disabled={!mediaUrlInput.trim()}>
+                      Add
+                    </Button>
+                  </InlineStack>
+                </Box>
+              )}
               {mediaUploading && <Text as="p" variant="bodySm" tone="subdued">Uploading…</Text>}
               <Modal
                 open={mediaPickerOpen}
@@ -1040,6 +1099,63 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           </div>
         </div>
       )}
+
+      <Modal
+        open={duplicateModalOpen}
+        onClose={() => setDuplicateModalOpen(false)}
+        title="Duplicate product"
+        primaryAction={{
+          content: "Create duplicate",
+          onAction: runDuplicate,
+          loading: duplicateSaving,
+        }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setDuplicateModalOpen(false) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" tone="subdued">
+              Choose what to copy into the new product. <strong>SKU and EAN are never copied</strong> and must be set for the new product.
+            </Text>
+            <BlockStack gap="300">
+              <Checkbox
+                label="Title (with “(Copy)” suffix)"
+                checked={duplicateOptions.title}
+                onChange={(v) => setDuplicateOptions((o) => ({ ...o, title: v }))}
+              />
+              <Checkbox
+                label="Description"
+                checked={duplicateOptions.description}
+                onChange={(v) => setDuplicateOptions((o) => ({ ...o, description: v }))}
+              />
+              <Checkbox
+                label="Price"
+                checked={duplicateOptions.price}
+                onChange={(v) => setDuplicateOptions((o) => ({ ...o, price: v }))}
+              />
+              <Checkbox
+                label="Inventory quantity"
+                checked={duplicateOptions.inventory}
+                onChange={(v) => setDuplicateOptions((o) => ({ ...o, inventory: v }))}
+              />
+              <Checkbox
+                label="Categories / collection"
+                checked={duplicateOptions.categories}
+                onChange={(v) => setDuplicateOptions((o) => ({ ...o, categories: v }))}
+              />
+              <Checkbox
+                label="Images / media"
+                checked={duplicateOptions.media}
+                onChange={(v) => setDuplicateOptions((o) => ({ ...o, media: v }))}
+              />
+              <Checkbox
+                label="Variants (option names and values; SKU/EAN never copied)"
+                checked={duplicateOptions.variants}
+                onChange={(v) => setDuplicateOptions((o) => ({ ...o, variants: v }))}
+              />
+            </BlockStack>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }

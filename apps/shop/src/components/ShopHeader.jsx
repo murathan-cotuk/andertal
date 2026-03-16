@@ -62,10 +62,10 @@ const HeaderWrap = styled(motion.header)`
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: ${tokens.navbar.borderBottom};
-  box-shadow: 0 1px 0 ${tokens.border.light};
-  transition: transform 0.25s ease-out, box-shadow ${tokens.transition.base};
-  overflow: ${(p) => (p.$atTop ? "visible" : "hidden")};
+  transition: transform 0.25s ease-out;
+  overflow: hidden;
+  visibility: ${(p) => (p.$visible ? "visible" : "hidden")};
+  pointer-events: ${(p) => (p.$visible ? "auto" : "none")};
 `;
 
 /* —— Middle bar: zooplus-style (full-width colored bar) —— */
@@ -287,7 +287,7 @@ const CategoryItemBanner = styled.div`
   padding: 0;
   overflow: hidden;
   border-radius: 12px 12px 0 0;
-  background: ${tokens.background.soft};
+  background: transparent;
   img {
     width: 100%;
     height: 100%;
@@ -425,7 +425,7 @@ const SubNavWrap = styled.div`
   max-height: ${(p) => (p.$hide ? "0" : "36px")};
   background: ${(p) => (p.$hide ? "transparent" : "#f0f0f0")};
   border-top: ${(p) => (p.$hide ? "none" : "1px solid rgba(0, 0, 0, 0.06)")};
-  border-bottom: ${(p) => (p.$hide ? "none" : "1px solid rgba(0, 0, 0, 0.06)")};
+  border-bottom: ${(p) => (p.$hide ? "none" : "1px solid rgba(0, 0, 0, 0.08)")};
   overflow: hidden;
   opacity: ${(p) => (p.$hide ? 0 : 1)};
   visibility: ${(p) => (p.$hide ? "hidden" : "visible")};
@@ -628,7 +628,7 @@ export default function ShopHeader() {
 
   return (
     <>
-      <HeaderWrap $atTop={atTop} style={{ transform: showHeader ? undefined : "translateY(-100%)" }}>
+      <HeaderWrap $atTop={atTop} $visible={showHeader} style={{ transform: showHeader ? undefined : "translateY(-100%)" }}>
         {atTop && <TopBar />}
         <MiddleBarWrap>
           <MiddleBarInner>
