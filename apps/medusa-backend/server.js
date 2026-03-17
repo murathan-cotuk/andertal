@@ -771,6 +771,7 @@ async function start() {
           description_html: meta.richtext,
           image_url: meta.image_url,
           banner_image_url: meta.banner_image_url,
+          recommended_product_ids: Array.isArray(meta.recommended_product_ids) ? meta.recommended_product_ids : [],
         }
       } catch (_) { return null }
     }
@@ -925,6 +926,7 @@ async function start() {
         if (b.richtext !== undefined) metadata.richtext = b.richtext
         if (b.image_url !== undefined) metadata.image_url = b.image_url
         if (b.banner_image_url !== undefined) metadata.banner_image_url = b.banner_image_url
+        if (b.recommended_product_ids !== undefined) metadata.recommended_product_ids = Array.isArray(b.recommended_product_ids) ? b.recommended_product_ids : []
         const metaObj = Object.keys(metadata).length ? metadata : undefined
         let collectionId = id
         let updated = isUuid(id) ? await updateAdminHubCollectionDb(uuidLower, title || undefined, handle || undefined, metaObj) : null
@@ -1848,21 +1850,26 @@ async function start() {
       const imagesResolved = rawMediaList.map((m) => resolveUploadUrl(typeof m === 'string' ? m : (m && m.url) || null)).filter(Boolean)
       const priceCents = p.price != null ? Math.round(Number(p.price) * 100) : 0
       const rawVariants = Array.isArray(p.variants) && p.variants.length > 0 ? p.variants : []
+      const variationGroups = Array.isArray(meta.variation_groups) ? meta.variation_groups : null
       const variants = rawVariants.length > 0
         ? rawVariants.map((v, i) => {
             const vPriceCents = v.price_cents != null ? Number(v.price_cents) : (v.price != null ? Math.round(Number(v.price) * 100) : priceCents)
             const vCompareCents = v.compare_at_price_cents != null ? Number(v.compare_at_price_cents) : null
+            const optionValues = Array.isArray(v.option_values) ? v.option_values : (v.value != null ? [v.value] : null)
             return {
               id: p.id + '-v-' + i,
               product_id: p.id,
-              title: v.title || v.value || 'Option ' + (i + 1),
+              title: v.title || (optionValues && optionValues.length > 0 ? optionValues.join(' / ') : v.value) || 'Option ' + (i + 1),
               value: v.value,
+              option_values: optionValues,
               sku: v.sku || null,
               ean: v.ean || null,
               prices: [{ amount: vPriceCents, currency_code: 'eur' }],
               compare_at_price_cents: vCompareCents,
               inventory_quantity: v.inventory != null ? v.inventory : 0,
+              manage_inventory: true,
               image_url: resolveUploadUrl(v.image_url || v.image || null) || null,
+              swatch_image_url: resolveUploadUrl(v.swatch_image_url || v.swatch_image || null) || null,
             }
           })
         : [{
@@ -1883,6 +1890,7 @@ async function start() {
         thumbnail: thumb || null,
         images: imagesResolved.length > 0 ? imagesResolved.map((url) => ({ url, alt: p.title || '' })) : (thumb ? [{ url: thumb, alt: p.title || '' }] : []),
         metadata: meta,
+        variation_groups: variationGroups,
         variants,
       }
       if (p.collection) {
@@ -2116,12 +2124,22 @@ async function start() {
         const rawVariants = Array.isArray(product.variants) && product.variants.length > 0 ? product.variants : []
         let unitPriceCents = priceCents
         const variantIndex = variantId.includes('-v-') ? parseInt(variantId.split('-v-')[1], 10) : null
+        let variantLabel = ''
         if (rawVariants.length && variantIndex >= 0 && rawVariants[variantIndex]) {
           const v = rawVariants[variantIndex]
           if (v.price_cents != null) unitPriceCents = Number(v.price_cents)
           else if (v.price != null) unitPriceCents = Math.round(Number(v.price) * 100)
+          const optVals = Array.isArray(v.option_values) && v.option_values.length > 0 ? v.option_values : null
+          const variationGroups = Array.isArray(meta.variation_groups) ? meta.variation_groups : null
+          if (optVals && variationGroups && variationGroups.length === optVals.length) {
+            variantLabel = variationGroups.map((g, i) => `${g.name}: ${optVals[i]}`).join(' / ')
+          } else if (optVals) {
+            variantLabel = optVals.join(' / ')
+          } else {
+            variantLabel = v.title || v.value || ''
+          }
         }
-        const title = product.title || 'Product'
+        const title = (product.title || 'Product') + (variantLabel ? ` (${variantLabel})` : '')
         const handle = product.handle || product.id
         const cartExists = await client.query('SELECT id FROM store_carts WHERE id = $1', [cartId])
         if (!cartExists.rows || !cartExists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
@@ -2233,6 +2251,7 @@ async function start() {
             banner_image_url: meta.banner_image_url || null,
             image_url: meta.image_url || null,
             description: meta.richtext || meta.description_html || null,
+            recommended_product_ids: Array.isArray(meta.recommended_product_ids) ? meta.recommended_product_ids : [],
           }
           try { await client.end() } catch (_) {}
           return res.json({ collection })
@@ -2249,6 +2268,7 @@ async function start() {
             banner_image_url: meta.banner_image_url || null,
             image_url: meta.image_url || null,
             description: meta.richtext || meta.description_html || null,
+            recommended_product_ids: Array.isArray(meta.recommended_product_ids) ? meta.recommended_product_ids : [],
           }
         })
         res.json({ collections })

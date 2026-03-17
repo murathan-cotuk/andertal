@@ -331,6 +331,7 @@ class MedusaAdminClient {
     if (data.richtext !== undefined) body.richtext = data.richtext
     if (data.image_url !== undefined) body.image_url = data.image_url
     if (data.banner_image_url !== undefined) body.banner_image_url = data.banner_image_url
+    if (data.recommended_product_ids !== undefined) body.recommended_product_ids = data.recommended_product_ids
     const res = await this.request(`/admin-hub/collections/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),

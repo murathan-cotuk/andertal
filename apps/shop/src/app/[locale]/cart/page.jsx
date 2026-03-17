@@ -247,9 +247,18 @@ export default function CartPage() {
                         href={item.product_handle ? `/produkt/${item.product_handle}` : "/"}
                         style={{ color: "inherit", textDecoration: "none" }}
                       >
-                        {item.title || t("item")}
+                        {(() => {
+                          const raw = item.title || "";
+                          const m = raw.match(/^(.*)\s+\((.+)\)$/);
+                          return m ? m[1] : raw;
+                        })()}
                       </Link>
                     </ItemTitle>
+                    {(() => {
+                      const raw = item.title || "";
+                      const m = raw.match(/^(.*)\s+\((.+)\)$/);
+                      return m ? <span style={{ fontSize: 12, color: "#6b7280", display: "block", marginTop: 2 }}>{m[2]}</span> : null;
+                    })()}
                     <ItemPrice>{formatPriceCents(item.unit_price_cents || 0)} €</ItemPrice>
                     <QtyRow>
                       <QtyBtn

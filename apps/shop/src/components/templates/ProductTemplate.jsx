@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { useParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import styled from "styled-components";
@@ -22,7 +22,7 @@ const Container = styled.div`
 
 const ThreeCol = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr 340px;
+  grid-template-columns: 1.65fr 1fr 290px;
   gap: 32px;
   margin-bottom: 48px;
   align-items: start;
@@ -39,9 +39,10 @@ const GalleryCol = styled.div`
   flex-direction: column;
   gap: 12px;
   position: sticky;
-  top: 24px;
+  top: 116px;
   @media (max-width: 1024px) {
     position: static;
+    top: auto;
   }
 `;
 
@@ -89,7 +90,7 @@ const CenterCol = styled.div`
 const Title = styled.h1`
   font-size: clamp(1.25rem, 2.5vw, 1.75rem);
   font-weight: 700;
-  color: #c2410c;
+  color: #111827;
   line-height: 1.3;
 `;
 
@@ -106,48 +107,88 @@ const PriceBlock = styled.div`
 `;
 
 const VariantSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   margin-top: 4px;
 `;
 
-const VariantGroupLabel = styled.div`
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 8px;
+const VarGroup = styled.div``;
+
+const VarLabel = styled.div`
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #6b7280;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
 `;
 
-const VariantOptions = styled.div`
+const VarLabelSelected = styled.span`
+  font-weight: 400;
+  color: #374151;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 4px;
+`;
+
+const VarRow = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 6px;
 `;
 
-const VariantBox = styled.button`
-  min-width: 44px;
-  min-height: 44px;
-  padding: 8px 14px;
-  font-size: 0.875rem;
+/* Text chip — sizes, materials, etc */
+const VarChip = styled.button`
+  padding: 5px 11px;
+  font-size: 0.8125rem;
   font-weight: 500;
-  color: ${(p) => (p.$selected ? "#fff" : "#374151")};
-  background: ${(p) => (p.$selected ? "#0ea5e9" : "#f3f4f6")};
-  border: 2px solid ${(p) => (p.$selected ? "#0ea5e9" : "#e5e7eb")};
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  line-height: 1.35;
+  border: 1.5px solid ${(p) => (p.$selected ? "#111" : "#e0e0e0")};
+  background: ${(p) => (p.$selected ? "#111" : "#fff")};
+  color: ${(p) => (p.$selected ? "#fff" : p.$oos ? "#bbb" : "#374151")};
+  border-radius: 4px;
+  cursor: ${(p) => (p.$oos ? "default" : "pointer")};
+  text-decoration: ${(p) => (p.$oos && !p.$selected ? "line-through" : "none")};
+  opacity: ${(p) => (p.$oos && !p.$selected ? 0.5 : 1)};
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  &:hover:not(:disabled) {
+    border-color: ${(p) => (p.$selected ? "#111" : "#999")};
+    color: ${(p) => (p.$selected ? "#fff" : "#111")};
+  }
+`;
 
-  &:hover {
-    background: ${(p) => (p.$selected ? "#0c8ac7" : "#e5e7eb")};
-    border-color: ${(p) => (p.$selected ? "#0c8ac7" : "#d1d5db")};
+/* Swatch circle — color / image options */
+const VarSwatch = styled.button`
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid ${(p) => (p.$selected ? "#111" : "transparent")};
+  outline: ${(p) => (p.$selected ? "none" : "1.5px solid #e0e0e0")};
+  outline-offset: 1px;
+  padding: 2px;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: border-color 0.12s, transform 0.12s;
+  transform: ${(p) => (p.$selected ? "scale(1.12)" : "scale(1)")};
+  opacity: ${(p) => (p.$oos && !p.$selected ? 0.4 : 1)};
+  position: relative;
+  &::after {
+    content: "";
+    display: ${(p) => (p.$oos && !p.$selected ? "block" : "none")};
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 45%, #999 45%, #999 55%, transparent 55%);
+    border-radius: 50%;
   }
 `;
 
 const Price = styled.span`
   font-size: 1.5rem;
   font-weight: 700;
-  color: #0ea5e9;
+  color: #c2410c;
 `;
 
 const ComparePrice = styled.span`
@@ -177,11 +218,8 @@ const RightCol = styled.div`
   display: flex;
   flex-direction: column;
   gap: 16px;
-  position: sticky;
-  top: 24px;
   @media (max-width: 1024px) {
     grid-column: 1 / -1;
-    position: static;
   }
 `;
 
@@ -246,9 +284,7 @@ const DescriptionSection = styled.section`
   & li { margin-bottom: 0.35em; }
   & strong { font-weight: 600; color: #374151; }
   & em { font-style: italic; }
-  & a { color: #0ea5e9; text-decoration: underline; }
   & a:hover { text-decoration: none; }
-  & blockquote { margin: 1em 0; padding-left: 1em; border-left: 4px solid #e5e7eb; color: #6b7280; }
   & hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.25em 0; }
 `;
 
@@ -264,19 +300,18 @@ function sanitizeHtml(html) {
     .replace(/\s*on\w+=["'][^"']*["']/gi, "");
 }
 
-// Metadata keys to show as attributes (Eigenschaften) – exclude internal ones
 const META_ATTR_KEYS = ["material", "farbe", "colour", "color", "size", "gewicht", "dimensions", "cart", "curt", "stoff", "typ"];
 
-// Internal keys that must never be shown on the product page (no IDs, no SEO/backend fields)
 const META_HIDDEN_KEYS = [
   "category_id", "admin_category_id", "collection_id", "collection_ids",
   "seller_id", "product_id", "media", "bullet_points", "uvp_cents", "rabattpreis_cents",
   "ean", "brand", "seller_name", "shop_name", "return_days", "return_cost", "return_kostenlos",
-  "review_count", "review_avg", "sold_last_month", "metafields",
+  "review_count", "review_avg", "sold_last_month", "metafields", "publish_date",
   "brand_id", "hersteller", "seo_keywords", "seo_meta_title", "seo_meta_description",
   "hersteller_information", "verantwortliche_person_information", "brand_name", "brand_logo",
 ];
 
+/* Legacy: group flat variants by title for products without variation_groups */
 function groupVariantsByTitle(variants) {
   if (!Array.isArray(variants) || variants.length === 0) return [];
   const groups = [];
@@ -290,6 +325,59 @@ function groupVariantsByTitle(variants) {
     byTitle.get(title).push({ variant: v, index });
   });
   return groups.map((g) => ({ title: g.title, options: g.options }));
+}
+
+function normalizeVariants(variants, variationGroups) {
+  if (!Array.isArray(variationGroups) || !variationGroups.length) return variants;
+  const numGroups = variationGroups.length;
+  return (variants || []).map((v) => {
+    const ov = Array.isArray(v.option_values) ? v.option_values : [];
+    if (ov.length === numGroups) return v;
+    const titleStr = v.title || v.value || "";
+    const parts = titleStr.split(" / ").map((s) => s.trim()).filter(Boolean);
+    if (parts.length === numGroups) return { ...v, option_values: parts };
+    if (numGroups === 1 && (v.value || titleStr)) return { ...v, option_values: [v.value || titleStr] };
+    return v;
+  });
+}
+
+/**
+ * Find the best-matching variant index given selectedOptions = { groupName: value }.
+ * Returns the index of the first variant where every selected option matches.
+ */
+function findVariantIndexByMap(variants, variationGroups, selectedOptions) {
+  if (!Array.isArray(variants) || !Array.isArray(variationGroups)) return 0;
+  const idx = variants.findIndex((v) => {
+    const ov = Array.isArray(v.option_values) ? v.option_values : [];
+    return variationGroups.every((g, i) => {
+      const sel = selectedOptions[g.name];
+      if (!sel) return true;
+      return String(ov[i] ?? "").trim().toLowerCase() === sel.trim().toLowerCase();
+    });
+  });
+  return idx >= 0 ? idx : 0;
+}
+
+/**
+ * Does any in-stock variant exist that has `optionValue` for `groupName`
+ * and is compatible with the rest of selectedOptions?
+ */
+function hasStockForOption(variants, variationGroups, groupName, optionValue, selectedOptions) {
+  const gIdx = (variationGroups || []).findIndex((g) => g.name === groupName);
+  if (gIdx < 0) return true;
+  return variants.some((v) => {
+    const ov = Array.isArray(v.option_values) ? v.option_values : [];
+    if (String(ov[gIdx] ?? "").trim().toLowerCase() !== optionValue.trim().toLowerCase()) return false;
+    const othersMatch = (variationGroups || []).every((g, i) => {
+      if (i === gIdx) return true;
+      const sel = selectedOptions[g.name];
+      if (!sel) return true;
+      return String(ov[i] ?? "").trim().toLowerCase() === sel.trim().toLowerCase();
+    });
+    if (!othersMatch) return false;
+    const qty = v.inventory_quantity ?? v.inventory ?? 0;
+    return Number(qty) > 0;
+  });
 }
 
 function buildMetaRows(meta) {
@@ -318,8 +406,12 @@ export default function ProductTemplate() {
   const [error, setError] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+  // Object map: { [groupName]: selectedValue } — each group is independent
+  const [selectedOptions, setSelectedOptions] = useState({});
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
+  const [gallerySticky, setGallerySticky] = useState(true);
+  const kundenSectionRef = useRef(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -359,7 +451,34 @@ export default function ProductTemplate() {
   }, [product?.handle]);
 
   useEffect(() => {
+    if (!product?.variation_groups?.length || !product?.variants?.length) return;
+    const normalized = normalizeVariants(product.variants, product.variation_groups);
+    const first = normalized[0];
+    const ov = Array.isArray(first?.option_values) ? first.option_values : [];
+    const init = {};
+    product.variation_groups.forEach((g, i) => {
+      if (ov[i] != null) init[g.name] = String(ov[i]);
+    });
+    setSelectedOptions(init);
+  }, [product?.id]);
+
+  useEffect(() => {
     if (!product) return;
+    const ids = product.metadata?.related_product_ids || product.metadata?.also_bought_ids;
+    const idList = Array.isArray(ids) ? ids.filter((id) => id && String(id).trim()) : [];
+    if (idList.length > 0) {
+      Promise.all(idList.slice(0, 12).map((id) => fetch(`/api/store-products/${encodeURIComponent(id)}`).then((r) => r.json()).then((d) => d.product).catch(() => null)))
+        .then((products) => {
+          const valid = (products || []).filter(Boolean);
+          setRecommended(valid.slice(0, 8));
+          setAlsoBought(valid.slice(0, 8));
+        })
+        .catch(() => {
+          setRecommended([]);
+          setAlsoBought([]);
+        });
+      return;
+    }
     const client = getMedusaClient();
     client.getProducts({ limit: 20 }).then((r) => {
       const list = r.products || [];
@@ -367,6 +486,17 @@ export default function ProductTemplate() {
       setRecommended(others.slice(0, 8));
       setAlsoBought(others.slice(0, 8));
     }).catch(() => {});
+  }, [product]);
+
+  useEffect(() => {
+    const el = kundenSectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setGallerySticky(!entry.isIntersecting),
+      { rootMargin: "-116px 0px 0px 0px", threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [product]);
 
   if (loading) return <Container>Laden…</Container>;
@@ -383,8 +513,15 @@ export default function ProductTemplate() {
         : [];
   const images = rawImages.map((img) => ({ ...img, url: resolveImageUrl(img?.url || img) || img?.url || img }));
   const meta = product.metadata || {};
-  const variants = product.variants || [];
-  const variant = variants[selectedVariantIndex] || variants[0];
+  const rawVariants = product.variants || [];
+  const variationGroups = product.variation_groups || null;
+  const variants = normalizeVariants(rawVariants, variationGroups);
+  const useLinkedVariations = Array.isArray(variationGroups) && variationGroups.length > 0 &&
+    variants.some((v) => Array.isArray(v.option_values) && v.option_values.length === variationGroups.length);
+  const effectiveVariantIndex = useLinkedVariations
+    ? findVariantIndexByMap(variants, variationGroups, selectedOptions)
+    : selectedVariantIndex;
+  const variant = variants[effectiveVariantIndex] ?? variants[selectedVariantIndex] ?? variants[0];
   const variantImageUrl = variant?.image_url ? resolveImageUrl(variant.image_url) : null;
   const mainImage = variantImageUrl || images[selectedImage]?.url || (product.thumbnail ? resolveImageUrl(product.thumbnail) : null) || "https://via.placeholder.com/600";
   const priceCents =
@@ -407,8 +544,9 @@ export default function ProductTemplate() {
   const inventory = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity ?? 0;
   const inStock = inventory > 0;
   const maxQty = Math.min(inventory || 10, 10);
+  const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
+  const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
   const metaRows = buildMetaRows(meta);
-  // Verkäufer: reactive from API (product.metadata). Priority: seller_name → shop_name → fallback "Shop"
   const sellerName = product?.metadata?.seller_name || product?.metadata?.shop_name || "Shop";
   const returnDays = meta.return_days != null ? meta.return_days : 14;
   const returnCost = meta.return_cost === false || meta.return_kostenlos === true ? "kostenlos" : (meta.return_cost || "kostenlos");
@@ -431,13 +569,14 @@ export default function ProductTemplate() {
     { label: displayTitle, href: null },
   ];
 
+
   return (
     <Container>
       <Breadcrumbs items={breadcrumbItems} />
 
       <ThreeCol>
-        {/* Left: Gallery */}
-        <GalleryCol>
+        {/* Left: Gallery — sticky until Kunden section */}
+        <GalleryCol style={gallerySticky ? { position: "sticky", top: 116 } : { position: "relative" }}>
           <MainImageWrap onClick={() => images.length > 0 && setLightboxOpen(true)}>
             <MainImage src={mainImage} alt={displayTitle} />
           </MainImageWrap>
@@ -462,7 +601,7 @@ export default function ProductTemplate() {
           )}
         </GalleryCol>
 
-        {/* Center: Title, brand (from Brand module only), reviews, sold, price, bullets, meta */}
+        {/* Center: Title, brand, reviews, price, variants, bullets, meta */}
         <CenterCol>
           <Title>{titleDisplay}</Title>
           {(meta.brand_name || meta.brand) && (
@@ -479,53 +618,99 @@ export default function ProductTemplate() {
               {soldLastMonth} im letzten Monat verkauft
             </p>
           )}
-          <PriceBlock>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {uvpCents != null && uvpCents > 0 && (
-                <span style={{ fontSize: "0.875rem", color: "#6b7280", textDecoration: "line-through" }}>
-                  UVP {formatPriceCents(uvpCents)} €
-                </span>
-              )}
-              {hasSale && (
-                <span style={{ fontSize: "0.875rem", color: "#9ca3af", textDecoration: "line-through" }}>
-                  {formatPriceCents(priceCents)} €
-                </span>
-              )}
-              <Price>
-                {formatPriceCents(displayCents)} €
-                {discountPercent != null && discountPercent > 0 && (
-                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#dc2626", marginLeft: 8 }}>
-                    –{discountPercent}%
-                  </span>
-                )}
-              </Price>
-              <span style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 4 }}>
-                Preise inkl. MwSt. zzgl. Versandkosten
-              </span>
-            </div>
-          </PriceBlock>
 
-          {(() => {
-            const variantGroups = groupVariantsByTitle(variants);
-            if (variantGroups.length === 0) return null;
+          {/* ── Variant selector ── */}
+          {useLinkedVariations && variationGroups?.length ? (
+            <VariantSection>
+              {variationGroups.map((group) => {
+                const groupName = group.name || "";
+                const selected = selectedOptions[groupName] ?? "";
+                const isSwatch = (group.options || []).some(
+                  (o) => (typeof o === "object" && o.swatch_image)
+                );
+                return (
+                  <VarGroup key={groupName}>
+                    <VarLabel>
+                      {groupName}
+                      {selected && <VarLabelSelected>: {selected}</VarLabelSelected>}
+                    </VarLabel>
+                    <VarRow>
+                      {(group.options || []).map((opt, oIdx) => {
+                        const valueStr = (typeof opt === "object" ? (opt.value ?? "") : String(opt ?? "")).toString().trim();
+                        const swatchUrl = typeof opt === "object" && opt.swatch_image
+                          ? resolveImageUrl(opt.swatch_image)
+                          : null;
+                        const isSelected = selected.trim().toLowerCase() === valueStr.toLowerCase();
+                        const inStock = hasStockForOption(variants, variationGroups, groupName, valueStr, selectedOptions);
+                        const handleClick = () => {
+                          if (isSelected || !inStock) return;
+                          setSelectedOptions((prev) => ({ ...prev, [groupName]: valueStr }));
+                        };
+                        if (isSwatch || swatchUrl) {
+                          return (
+                            <VarSwatch
+                              key={oIdx}
+                              type="button"
+                              title={valueStr}
+                              $selected={isSelected}
+                              $oos={!inStock}
+                              onClick={handleClick}
+                              aria-label={valueStr}
+                              aria-pressed={isSelected}
+                            >
+                              {swatchUrl ? (
+                                <img src={swatchUrl} alt={valueStr} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }} />
+                              ) : (
+                                <span style={{ display: "block", width: "100%", height: "100%", borderRadius: "50%", background: valueStr.toLowerCase() }} />
+                              )}
+                            </VarSwatch>
+                          );
+                        }
+                        return (
+                          <VarChip
+                            key={oIdx}
+                            type="button"
+                            $selected={isSelected}
+                            $oos={!inStock}
+                            onClick={handleClick}
+                            aria-pressed={isSelected}
+                          >
+                            {valueStr || `Option ${oIdx + 1}`}
+                          </VarChip>
+                        );
+                      })}
+                    </VarRow>
+                  </VarGroup>
+                );
+              })}
+            </VariantSection>
+          ) : (() => {
+            const legacyGroups = groupVariantsByTitle(variants);
+            if (legacyGroups.length === 0) return null;
             return (
               <VariantSection>
-                {variantGroups.map((group) => (
-                  <div key={group.title}>
-                    <VariantGroupLabel>{group.title}</VariantGroupLabel>
-                    <VariantOptions>
-                      {group.options.map(({ variant: v, index: idx }) => (
-                        <VariantBox
-                          key={idx}
-                          type="button"
-                          $selected={selectedVariantIndex === idx}
-                          onClick={() => setSelectedVariantIndex(idx)}
-                        >
-                          {v.value || v.title || `Option ${idx + 1}`}
-                        </VariantBox>
-                      ))}
-                    </VariantOptions>
-                  </div>
+                {legacyGroups.map((group) => (
+                  <VarGroup key={group.title}>
+                    <VarLabel>{group.title}</VarLabel>
+                    <VarRow>
+                      {group.options.map(({ variant: v, index: idx }) => {
+                        const qty = v.inventory_quantity ?? v.inventory ?? 0;
+                        const oos = Number(qty) <= 0;
+                        return (
+                          <VarChip
+                            key={idx}
+                            type="button"
+                            $selected={selectedVariantIndex === idx}
+                            $oos={oos}
+                            onClick={() => !oos && setSelectedVariantIndex(idx)}
+                            aria-pressed={selectedVariantIndex === idx}
+                          >
+                            {v.value || v.title || `Option ${idx + 1}`}
+                          </VarChip>
+                        );
+                      })}
+                    </VarRow>
+                  </VarGroup>
                 ))}
               </VariantSection>
             );
@@ -538,7 +723,7 @@ export default function ProductTemplate() {
               ))}
             </BulletList>
           )}
-          {metaRows.length > 0 && (
+          {(metaRows.length > 0 || (Array.isArray(meta.metafields) && meta.metafields.some((f) => f?.key && f?.value))) && (
             <MetaTable>
               <tbody>
                 {metaRows.map(({ key, value }) => (
@@ -547,57 +732,101 @@ export default function ProductTemplate() {
                     <td>{value}</td>
                   </tr>
                 ))}
+                {Array.isArray(meta.metafields) && meta.metafields.filter((f) => f?.key && f?.value).map((f, i) => (
+                  <tr key={`mf-${i}`}>
+                    <th>{f.key}</th>
+                    <td>{f.value}</td>
+                  </tr>
+                ))}
               </tbody>
             </MetaTable>
           )}
         </CenterCol>
 
-        {/* Right: Shipping, address, stock, qty, buttons, seller, return */}
+        {/* Right: Buybox — sticky */}
         <RightCol>
           <Card>
-            <p className="text-sm text-gray-600 mb-2">Versand: Standardversand</p>
-            <a href="/account" className="text-sm text-gray-600 mb-2 block hover:text-blue-600 hover:underline focus:outline-none focus:underline">Adresse: Bitte auswählen</a>
+            {/* Price at top of buybox */}
+            <div style={{ marginBottom: 12 }}>
+              {uvpCents != null && uvpCents > 0 && (
+                <div style={{ fontSize: "0.8125rem", color: "#9ca3af", textDecoration: "line-through", marginBottom: 2 }}>
+                  UVP {formatPriceCents(uvpCents)} €
+                </div>
+              )}
+              {hasSale && (
+                <div style={{ fontSize: "0.875rem", color: "#9ca3af", textDecoration: "line-through", marginBottom: 2 }}>
+                  {formatPriceCents(priceCents)} €
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontSize: "1.875rem", fontWeight: 700, color: "#16a34a" }}>
+                  {formatPriceCents(displayCents)} €
+                </span>
+                {discountPercent != null && discountPercent > 0 && (
+                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#dc2626" }}>
+                    –{discountPercent}%
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 2 }}>
+                Preise inkl. MwSt. zzgl. Versandkosten
+              </div>
+            </div>
             <StockBadge className={inStock ? "in-stock" : "out-of-stock"}>
               {inStock ? "Auf Lager" : "Ausverkauft"}
             </StockBadge>
-          </Card>
-          <Card>
-            <div className="mb-3">
-              <label className="text-xs text-gray-500 block mb-1">Anzahl</label>
+            <div style={{ marginTop: 12 }}>
+              <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Anzahl</label>
               <select
                 value={quantity}
                 onChange={(e) => setQuantity(Number(e.target.value))}
-                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm max-w-[100px]"
+                style={{ width: "100%", maxWidth: 100, border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px", fontSize: 14 }}
               >
                 {Array.from({ length: maxQty }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </select>
             </div>
-            <Button size="lg" fullWidth onClick={handleAddToCart} disabled={!inStock} style={{ marginBottom: 8 }}>
-              In den Einkaufswagen
+            <Button size="lg" fullWidth onClick={handleAddToCart} disabled={!inStock || isComingSoon} style={{ marginTop: 16, marginBottom: 8, background: "#c2410c", color: "#fff", border: "none" }}>
+              {isComingSoon ? "Bald verfügbar" : "In den Einkaufswagen"}
             </Button>
-            <Button size="lg" variant="outline" fullWidth disabled={!inStock}>
+            <Button size="lg" variant="outline" fullWidth disabled={!inStock || isComingSoon} style={{ borderColor: "#c2410c", color: "#c2410c" }}>
               Jetzt kaufen
             </Button>
+            {isComingSoon && publishDate && (
+              <p style={{ margin: "8px 0 0", fontSize: 13, color: "#6b7280", textAlign: "center" }}>
+                Verfügbar ab {publishDate.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" })}
+              </p>
+            )}
+            <div style={{ marginTop: 16, borderTop: "1px solid #f3f4f6", paddingTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", gap: 8, fontSize: 13 }}>
+                <span style={{ fontWeight: 600, color: "#374151", minWidth: 72, flexShrink: 0 }}>Versand</span>
+                <span style={{ color: "#6b7280" }}>{meta.shipping_info || meta.versand || "Standardversand"}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, fontSize: 13 }}>
+                <span style={{ fontWeight: 600, color: "#374151", minWidth: 72, flexShrink: 0 }}>Rückgabe</span>
+                <span style={{ color: "#6b7280" }}>{returnDays} Tage, {returnCost}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, fontSize: 13 }}>
+                <span style={{ fontWeight: 600, color: "#374151", minWidth: 72, flexShrink: 0 }}>Verkäufer</span>
+                <span style={{ color: "#6b7280" }} data-seller-source="metadata">{sellerName}</span>
+              </div>
+            </div>
           </Card>
-          <Card>
-            <p className="text-sm font-medium text-gray-700">Verkäufer</p>
-            <p className="text-sm text-gray-600" data-seller-source="metadata">{sellerName}</p>
-          </Card>
-          <Card>
-            <p className="text-sm font-medium text-gray-700">Rückgaberichtlinie</p>
-            <p className="text-sm text-gray-600">{returnDays} Tage Rückgabe, {returnCost}</p>
-          </Card>
+          {isComingSoon && (
+            <p style={{ margin: "8px 0 0", padding: "10px 14px", background: "#FFF2E6", color: "#c2410c", borderRadius: 8, fontSize: 14, fontWeight: 600, textAlign: "center" }}>
+              Bald verfügbar
+            </p>
+          )}
         </RightCol>
       </ThreeCol>
 
       {/* Full width below */}
-      {recommended.length > 0 && (
-        <CarouselSection>
-          <CarouselTitle>Sizin için önerilenler</CarouselTitle>
+      {alsoBought.length > 0 && (
+        <CarouselSection ref={kundenSectionRef}>
+          <CarouselTitle>Kunden, die diesen Artikel gekauft haben, kauften auch</CarouselTitle>
           <CarouselScroll>
-            {recommended.map((p) => (
+            {alsoBought.map((p) => (
               <ProductCard key={p.id} product={p} compact />
             ))}
           </CarouselScroll>
@@ -622,6 +851,17 @@ export default function ProductTemplate() {
         </DescriptionSection>
       )}
 
+      {recommended.length > 0 && (
+        <CarouselSection>
+          <CarouselTitle>Sizin için önerilenler</CarouselTitle>
+          <CarouselScroll>
+            {recommended.map((p) => (
+              <ProductCard key={p.id} product={p} compact />
+            ))}
+          </CarouselScroll>
+        </CarouselSection>
+      )}
+
       <ReviewsSection id="reviews">
         <CarouselTitle>
           Kundenbewertungen {reviewCount > 0 && `(${reviewCount})`}
@@ -629,17 +869,6 @@ export default function ProductTemplate() {
         <StarRating average={reviewAvg} count={reviewCount} />
         <p className="text-gray-500 text-sm mt-2">Hier können später die vollständigen Bewertungen angezeigt werden.</p>
       </ReviewsSection>
-
-      {alsoBought.length > 0 && (
-        <CarouselSection>
-          <CarouselTitle>Kunden, die diesen Artikel gekauft haben, kauften auch</CarouselTitle>
-          <CarouselScroll>
-            {alsoBought.map((p) => (
-              <ProductCard key={p.id} product={p} compact />
-            ))}
-          </CarouselScroll>
-        </CarouselSection>
-      )}
 
       {lightboxOpen && images.length > 0 && (
         <Lightbox

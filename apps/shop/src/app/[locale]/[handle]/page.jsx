@@ -48,7 +48,7 @@ const Main = styled.main`
   flex: 1;
 `;
 
-/* ─── Hero banner ────────────────────────────────────────── */
+/* ─── Hero banner (no overlay/shadow) ───────────────────── */
 const HeroBanner = styled.div`
   width: 100%;
   aspect-ratio: 21 / 6;
@@ -56,14 +56,14 @@ const HeroBanner = styled.div`
   max-height: 320px;
   overflow: hidden;
   position: relative;
-  background: #111;
+  background: #f4f4f2;
 
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    opacity: 0.82;
+    opacity: 1;
   }
 `;
 
@@ -371,11 +371,12 @@ const Desc = styled.div`
 
 /* ─────────────────────────────────────────────────────────── */
 const SORT_OPTIONS = [
-  { value: "default",    label: "Featured"          },
-  { value: "price_asc",  label: "Price: Low → High"  },
-  { value: "price_desc", label: "Price: High → Low"  },
-  { value: "title_asc",  label: "Name A–Z"           },
-  { value: "title_desc", label: "Name Z–A"           },
+  { value: "default",      label: "Featured"          },
+  { value: "newest",       label: "Newest"            },
+  { value: "price_asc",    label: "Price: Low → High"  },
+  { value: "price_desc",   label: "Price: High → Low"  },
+  { value: "title_asc",    label: "Name A–Z"           },
+  { value: "title_desc",   label: "Name Z–A"           },
 ];
 
 const PER_PAGE = 24;
@@ -397,6 +398,7 @@ export default function CollectionPage() {
   const [page,        setPage]        = useState(1);
   const [filters,     setFilters]     = useState({});
   const [panelOpen,   setPanelOpen]   = useState(false);
+  const [recommendedProducts, setRecommendedProducts] = useState([]);
 
   const bodyRef = useRef(null);
 
@@ -419,7 +421,6 @@ export default function CollectionPage() {
 
         const colData = await colRes.json();
         const col = colData?.collection ?? null;
-        console.log("[CollectionPage] colData:", JSON.stringify({ banner: col?.banner, banner_image_url: col?.banner_image_url, title: col?.title }));
         if (!col) { setNotFoundSt(true); setLoading(false); return; }
         setCollection(col);
 
@@ -436,6 +437,20 @@ export default function CollectionPage() {
       }
     })();
   }, [handle]);
+
+  /* ── Recommended products (from collection.recommended_product_ids) ── */
+  useEffect(() => {
+    const ids = collection?.recommended_product_ids;
+    if (!Array.isArray(ids) || ids.length === 0) { setRecommendedProducts([]); return; }
+    (async () => {
+      const list = await Promise.all(
+        ids.slice(0, 12).map((id) =>
+          fetch(`/api/store-products/${encodeURIComponent(id)}`).then((r) => r.json()).then((d) => d?.product).catch(() => null)
+        )
+      );
+      setRecommendedProducts(list.filter(Boolean));
+    })();
+  }, [collection?.recommended_product_ids]);
 
   /* ── Canonical ── */
   useEffect(() => {
@@ -490,6 +505,11 @@ export default function CollectionPage() {
 
   /* ── Sort ── */
   const sorted = [...filtered];
+  if (sort === "newest")     sorted.sort((a,b) => {
+    const da = a.metadata?.publish_date ? new Date(a.metadata.publish_date).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+    const db = b.metadata?.publish_date ? new Date(b.metadata.publish_date).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+    return db - da;
+  });
   if (sort === "price_asc")  sorted.sort((a,b) => (a.variants?.[0]?.prices?.[0]?.amount ?? 0) - (b.variants?.[0]?.prices?.[0]?.amount ?? 0));
   if (sort === "price_desc") sorted.sort((a,b) => (b.variants?.[0]?.prices?.[0]?.amount ?? 0) - (a.variants?.[0]?.prices?.[0]?.amount ?? 0));
   if (sort === "title_asc")  sorted.sort((a,b) => (a.title||"").localeCompare(b.title||""));
@@ -676,6 +696,14 @@ export default function CollectionPage() {
             </div>
           ) : (
             <ProductGrid products={paginated} maxColumns={4} />
+          )}
+
+          {/* Önerilen ürünler (collection.recommended_product_ids) */}
+          {recommendedProducts.length > 0 && (
+            <section style={{ marginTop: 48, marginBottom: 24 }}>
+              <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 16, color: "#111" }}>Önerilen ürünler</h2>
+              <ProductGrid products={recommendedProducts} maxColumns={4} />
+            </section>
           )}
 
           {/* Pagination */}

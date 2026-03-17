@@ -15,13 +15,9 @@ import {
   SkeletonDisplayText,
   Banner,
   Box,
+  DataTable,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-
-const MEDUSA_BACKEND_DISPLAY_URL =
-  typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "https://belucha-medusa-backend.onrender.com")
-    : "https://belucha-medusa-backend.onrender.com";
 
 export default function DashboardHome() {
   const router = useRouter();
@@ -31,6 +27,7 @@ export default function DashboardHome() {
     totalRevenue: 0,
     pendingOrders: 0,
   });
+  const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const medusaClient = getMedusaAdminClient();
@@ -62,6 +59,7 @@ export default function DashboardHome() {
           totalRevenue,
           pendingOrders,
         });
+        setRecentOrders((orders || []).slice(0, 5));
       } catch (err) {
         console.error("Error fetching dashboard stats:", err);
         setError(err?.message || "Failed to load dashboard data");
@@ -75,12 +73,12 @@ export default function DashboardHome() {
 
   if (loading) {
     return (
-      <Page title="Home">
+      <Page title="Dashboard">
         <Layout>
           <Layout.Section>
             <BlockStack gap="400">
               <InlineStack gap="400" blockAlign="center" wrap>
-                {[1, 2, 3, 4].map((i) => (
+                {[1, 2, 3, 4, 5, 6].map((i) => (
                   <Card key={i} padding="400">
                     <BlockStack gap="200">
                       <SkeletonDisplayText size="small" />
@@ -92,7 +90,7 @@ export default function DashboardHome() {
               <Card>
                 <BlockStack gap="200">
                   <SkeletonDisplayText size="small" />
-                  <SkeletonBodyText lines={3} />
+                  <SkeletonBodyText lines={5} />
                 </BlockStack>
               </Card>
             </BlockStack>
@@ -104,7 +102,7 @@ export default function DashboardHome() {
 
   if (error) {
     return (
-      <Page title="Home">
+      <Page title="Dashboard">
         <Layout>
           <Layout.Section>
             <Banner tone="critical" onDismiss={() => setError(null)}>
@@ -123,9 +121,25 @@ export default function DashboardHome() {
     { value: stats.pendingOrders, label: "Pending orders" },
   ];
 
+  const performanceCards = [
+    { value: "—", label: "Impressions", sub: "Last 30 days" },
+    { value: "—", label: "Clicks", sub: "Last 30 days" },
+    { value: "—", label: "CTR", sub: "Click-through rate" },
+    { value: "—", label: "ACoS", sub: "Advertising cost of sales" },
+  ];
+
+  const orderRows = recentOrders.length
+    ? recentOrders.map((o) => [
+        (o.id || o.display_id || "").toString().slice(-8),
+        `€${typeof (o.total ?? o.total_amount) === "number" ? ((o.total ?? o.total_amount) / 100).toFixed(2) : "0.00"}`,
+        (o.status || "—") + (o.created_at ? ` · ${new Date(o.created_at).toLocaleDateString()}` : ""),
+        <Button key={o.id} variant="plain" size="slim" onClick={() => router.push(`/orders`)}>View</Button>,
+      ])
+    : [["No orders yet", "—", "—", ""]];
+
   return (
     <Page
-      title="Home"
+      title="Dashboard"
       primaryAction={{
         content: "Add product",
         onAction: () => router.push("/products/single-upload"),
@@ -134,6 +148,7 @@ export default function DashboardHome() {
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
+            <Text as="h1" variant="headingLg">Overview</Text>
             <InlineStack gap="400" blockAlign="center" wrap>
               {statCards.map(({ value, label }) => (
                 <Card key={label} padding="400">
@@ -154,67 +169,56 @@ export default function DashboardHome() {
         <Layout.Section>
           <Card>
             <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Medusa API
-              </Text>
-              <Divider />
-              <InlineStack gap="300" blockAlign="center" wrap>
-                <Box
-                  padding="200"
-                  background="bg-fill-success-secondary"
-                  borderRadius="200"
-                >
-                  <Text as="span" variant="bodySm" fontWeight="semibold" tone="success">
-                    Connected
-                  </Text>
-                </Box>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Backend verileri bu panelde kullanılıyor (ürünler, siparişler).
-                </Text>
-              </InlineStack>
+              <Text as="h2" variant="headingMd">Performance (Shop / Ads)</Text>
               <Text as="p" variant="bodySm" tone="subdued">
-                API adresi:{" "}
-                <a
-                  href={MEDUSA_BACKEND_DISPLAY_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ textDecoration: "underline" }}
-                >
-                  {MEDUSA_BACKEND_DISPLAY_URL}
-                </a>
-                {" "}(yeni sekmede açılır; backend durum sayfasını gösterir)
-              </Text>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Recent activity
+                Impressions, clicks, CTR and ACoS can be connected once analytics are set up.
               </Text>
               <Divider />
-              <Text as="p" tone="subdued">
-                Recent activity will appear here.
-              </Text>
+              <InlineStack gap="400" wrap>
+                {performanceCards.map(({ value, label, sub }) => (
+                  <Box key={label} minWidth="120px">
+                    <BlockStack gap="100">
+                      <Text as="p" variant="headingMd" fontWeight="bold">{value}</Text>
+                      <Text as="p" variant="bodySm" fontWeight="medium">{label}</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">{sub}</Text>
+                    </BlockStack>
+                  </Box>
+                ))}
+              </InlineStack>
             </BlockStack>
           </Card>
         </Layout.Section>
 
         <Layout.Section>
           <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Quick actions
-              </Text>
+            <BlockStack gap="300">
+              <InlineStack blockAlign="center" align="space-between" wrap>
+                <Text as="h2" variant="headingMd">Recent orders</Text>
+                <Button variant="plain" onClick={() => router.push("/orders")}>View all</Button>
+              </InlineStack>
+              <Divider />
+              <DataTable
+                columnContentTypes={["text", "numeric", "text", "text"]}
+                headings={["Order", "Total", "Status", ""]}
+                rows={orderRows}
+              />
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingMd">Quick actions</Text>
               <Divider />
               <InlineStack gap="300" wrap>
                 <Button variant="primary" onClick={() => router.push("/products/single-upload")}>
                   Add product
                 </Button>
-                <Button onClick={() => router.push("/orders")}>View orders</Button>
-                <Button onClick={() => router.push("/analytics")}>View analytics</Button>
+                <Button onClick={() => router.push("/orders")}>Orders</Button>
+                <Button onClick={() => router.push("/products")}>Products</Button>
+                <Button onClick={() => router.push("/analytics")}>Analytics</Button>
+                <Button onClick={() => router.push("/content/menus")}>Menus</Button>
               </InlineStack>
             </BlockStack>
           </Card>

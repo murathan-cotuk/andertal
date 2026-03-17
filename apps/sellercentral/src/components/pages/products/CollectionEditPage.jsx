@@ -16,6 +16,7 @@ import {
   Select,
   DropZone,
   Button,
+  Divider,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
@@ -91,6 +92,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
     richtext: "",
     image_url: "",
     banner_image_url: "",
+    recommended_product_ids: [],
   });
   const [collectionProducts, setCollectionProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
@@ -114,11 +116,12 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
         richtext: initialCollection.richtext ?? initialCollection.description_html ?? "",
         image_url: initialCollection.image_url ?? "",
         banner_image_url: initialCollection.banner_image_url ?? "",
+        recommended_product_ids: Array.isArray(initialCollection.recommended_product_ids) ? initialCollection.recommended_product_ids : [],
       };
       setForm((prev) => ({ ...prev, ...nextForm }));
       initialFormRef.current = nextForm;
     } else if (isNew) {
-      const empty = { title: "", handle: "", category_id: "", display_title: "", meta_title: "", meta_description: "", keywords: "", richtext: "", image_url: "", banner_image_url: "" };
+      const empty = { title: "", handle: "", category_id: "", display_title: "", meta_title: "", meta_description: "", keywords: "", richtext: "", image_url: "", banner_image_url: "", recommended_product_ids: [] };
       initialFormRef.current = empty;
     }
   }, [initialCollection, isNew]);
@@ -275,6 +278,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
             richtext: form.richtext,
             image_url: form.image_url,
             banner_image_url: form.banner_image_url,
+            recommended_product_ids: form.recommended_product_ids || [],
           });
           router.replace(`/products/collections/${created.id}`);
         } else {
@@ -292,6 +296,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
           richtext: form.richtext,
           image_url: form.image_url,
           banner_image_url: form.banner_image_url,
+          recommended_product_ids: form.recommended_product_ids,
         });
         const updated = await client.getCollection(collection.id);
         if (updated) {
@@ -307,6 +312,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
             richtext: updated.richtext ?? updated.description_html ?? form.richtext,
             image_url: updated.image_url ?? form.image_url,
             banner_image_url: updated.banner_image_url ?? form.banner_image_url,
+            recommended_product_ids: Array.isArray(updated.recommended_product_ids) ? updated.recommended_product_ids : form.recommended_product_ids,
           };
           setForm((prev) => ({ ...prev, ...nextForm }));
           initialFormRef.current = nextForm;
@@ -483,6 +489,40 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                     }}
                   />
                 </div>
+                <Divider />
+                <BlockStack gap="200">
+                  <Text as="h2" variant="headingSm">Önerilen ürünler (shop sayfasında gösterilir)</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">Koleksiyon sayfasında &quot;Önerilen ürünler&quot; olarak gösterilecek ürünleri seçin.</Text>
+                  <Select
+                    label=""
+                    labelHidden
+                    options={[
+                      { label: "— Ürün ekle —", value: "" },
+                      ...(allProducts || []).filter((p) => !(form.recommended_product_ids || []).includes(p.id)).map((p) => ({ label: p.title || p.handle || p.sku || p.id, value: p.id })),
+                    ]}
+                    value=""
+                    onChange={(value) => {
+                      if (value) setForm((prev) => ({ ...prev, recommended_product_ids: [...(prev.recommended_product_ids || []), value] }));
+                    }}
+                  />
+                  {(form.recommended_product_ids || []).length > 0 && (
+                    <InlineStack gap="100" wrap>
+                      {(form.recommended_product_ids || []).map((id) => {
+                        const p = (allProducts || []).find((x) => x.id === id);
+                        const label = p ? (p.title || p.handle || id) : id;
+                        return (
+                          <span
+                            key={id}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--p-color-bg-fill-secondary)", borderRadius: 6, fontSize: 12, color: "var(--p-color-text-subdued)" }}
+                          >
+                            {String(label).slice(0, 35)}{String(label).length > 35 ? "…" : ""}
+                            <button type="button" onClick={() => setForm((prev) => ({ ...prev, recommended_product_ids: (prev.recommended_product_ids || []).filter((x) => x !== id) }))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Kaldır">×</button>
+                          </span>
+                        );
+                      })}
+                    </InlineStack>
+                  )}
+                </BlockStack>
               </BlockStack>
             </Card>
           </Layout.Section>

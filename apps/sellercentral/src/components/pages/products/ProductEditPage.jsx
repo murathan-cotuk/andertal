@@ -138,10 +138,20 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [mediaUrlInput, setMediaUrlInput] = useState("");
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionPopoverOpen, setCollectionPopoverOpen] = useState(false);
+  const [relatedProductsList, setRelatedProductsList] = useState([]);
+  const [relatedProductSearch, setRelatedProductSearch] = useState("");
+  const [relatedProductPopoverOpen, setRelatedProductPopoverOpen] = useState(false);
   const [descriptionMode, setDescriptionMode] = useState("visual");
   const descEditorRef = useRef(null);
   const initialSnapshotRef = useRef(null);
   const [expandedVariantIndex, setExpandedVariantIndex] = useState(null);
+  const dragGroupIdx = useRef(null);
+  // Variant image picker: null = closed, option_values[] = target variant being edited
+  const [variantImgPickerTarget, setVariantImgPickerTarget] = useState(null);
+  const [variantImgPickerSelected, setVariantImgPickerSelected] = useState(null);
+  // Swatch image picker: null = closed, {gi, oi} = target group/option
+  const [swatchPickerTarget, setSwatchPickerTarget] = useState(null);
+  const [swatchPickerSelected, setSwatchPickerSelected] = useState(null);
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [duplicateOptions, setDuplicateOptions] = useState(DEFAULT_DUPLICATE_OPTIONS);
   const [duplicateSaving, setDuplicateSaving] = useState(false);
@@ -186,6 +196,16 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     });
     return () => { cancelled = true; };
   }, [client]);
+
+  // Load products for "Related products" when dropdown is opened
+  useEffect(() => {
+    if (!relatedProductPopoverOpen) return;
+    let cancelled = false;
+    client.getAdminHubProducts({ limit: 200 }).then((r) => {
+      if (!cancelled && r?.products) setRelatedProductsList(r.products);
+    }).catch(() => { if (!cancelled) setRelatedProductsList([]); });
+    return () => { cancelled = true; };
+  }, [client, relatedProductPopoverOpen]);
 
   useEffect(() => {
     if (descriptionMode === "visual" && descEditorRef.current) descEditorRef.current.innerHTML = product?.description || "";
@@ -268,6 +288,16 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         metadata.shop_name = storeName;
       }
       metadata.translations = { ...(metadata.translations || {}), [locale]: { title: product.title || "Untitled", description: descriptionToSave } };
+      // variation_groups already in metadata (kept in sync by applyVariantGroups); re-serialize for safety
+      if (variantGroups.length > 0) {
+        metadata.variation_groups = variantGroups.map((g) => ({
+          name: (g.name || "Option").trim() || "Option",
+          options: (g.options || []).map((o) => ({
+            value: String(o.value ?? "").trim(),
+            ...(o.swatch_image ? { swatch_image: String(o.swatch_image).trim() } : {}),
+          })),
+        }));
+      }
       const collectionId = (metadata.collection_ids && metadata.collection_ids[0]) || product.collection_id || null;
       const payload = {
         title: product.title || "Untitled",
@@ -322,9 +352,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         meta.collection_id = undefined;
       }
       const variants = opt.variants ? stripSkuEanFromVariants(product.variants) : [];
+      const newTitle = opt.title ? (product.title || "").trim() + " (Copy)" : "Untitled";
       const payload = {
-        title: opt.title ? (product.title || "").trim() + " (Copy)" : "Untitled",
-        handle: (product.handle || "product").replace(/-kopie-\d+$/, "") + "-kopie-" + Date.now(),
+        title: newTitle,
+        handle: titleToHandle(newTitle) + "-" + Date.now().toString(36),
         sku: "",
         description: opt.description ? (product.description || "") : "",
         status: "draft",
@@ -377,81 +408,221 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     return [];
   })();
   const collectionIds = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id != null ? [meta.collection_id] : (product?.collection_id != null ? [product.collection_id] : []));
+  const relatedProductIds = Array.isArray(meta.related_product_ids) ? meta.related_product_ids : [];
 
-  // Variant groups: each group has a name (e.g. Color, Size) and options (value, sku, inventory). No auto-append.
-  // Support both price/compare_at_price and price_cents/compare_at_price_cents from API/DB.
+  // ─── Variation Engine ────────────────────────────────────────────────────────
+
+  /** Cartesian product of arrays: [["Red","Black"],["S","M"]] → [["Red","S"],["Red","M"],...] */
+  const cartesian = (arrs) => {
+    if (!arrs.length) return [[]];
+    const [first, ...rest] = arrs;
+    const tail = cartesian(rest);
+    return (first || []).flatMap((v) => tail.map((r) => [v, ...r]));
+  };
+
+  /** Single source of truth: always read from metadata.variation_groups */
   const variantGroups = (() => {
-    const v = product?.variants;
-    if (!Array.isArray(v) || v.length === 0) return [];
-    const byTitle = new Map();
-    for (const item of v) {
-      if (!item || typeof item !== "object") continue;
-      const title = String(item.title ?? item.name ?? "Variant").trim() || "Variant";
-      const value = item.value ?? (Array.isArray(item.options) ? item.options.map((o) => (o && o.value) || o).filter(Boolean).join(", ") : "");
-      const sku = String(item.sku ?? item.sku_number ?? "").trim();
-      const ean = String(item.ean ?? "").trim();
-      const inventory = item.inventory != null ? String(item.inventory) : "";
-      const price = item.price != null ? String(item.price) : (item.price_cents != null ? String((Number(item.price_cents) / 100).toFixed(2)) : "");
-      const compare_at_price = item.compare_at_price != null ? String(item.compare_at_price) : (item.compare_at_price_cents != null ? String((Number(item.compare_at_price_cents) / 100).toFixed(2)) : "");
-      const image_url = String(item.image_url ?? item.image ?? "").trim();
-      if (!byTitle.has(title)) byTitle.set(title, { name: title, options: [] });
-      byTitle.get(title).options.push({ value: String(value), sku, ean, inventory, price, compare_at_price, image_url });
-    }
-    return Array.from(byTitle.values());
+    const mg = meta.variation_groups;
+    if (!Array.isArray(mg) || mg.length === 0) return [];
+    return mg.map((g) => ({
+      name: g.name || "",
+      options: (g.options || []).map((opt) => ({
+        value: typeof opt === "object" ? String(opt.value ?? "") : String(opt ?? ""),
+        swatch_image: typeof opt === "object" ? String(opt.swatch_image ?? opt.swatch_image_url ?? "") : "",
+      })),
+    }));
   })();
 
-  const setVariantGroups = (next) => {
-    const flat = next.flatMap((g) =>
-      (g.options || []).map((o) => {
-        const priceNum = o.price !== "" && o.price != null && !Number.isNaN(parseFloat(o.price)) ? parseFloat(o.price) : null;
-        const compareNum = o.compare_at_price !== "" && o.compare_at_price != null && !Number.isNaN(parseFloat(o.compare_at_price)) ? parseFloat(o.compare_at_price) : null;
-        return {
-          title: (g.name || "Variant").trim() || "Variant",
-          value: (o.value ?? "").toString().trim(),
-          sku: (o.sku ?? "").toString().trim(),
-          ean: (o.ean ?? "").toString().trim() || undefined,
-          inventory: o.inventory !== "" && o.inventory != null ? parseInt(String(o.inventory), 10) : 0,
-          ...(priceNum != null && { price_cents: Math.round(priceNum * 100) }),
-          ...(compareNum != null && { compare_at_price_cents: Math.round(compareNum * 100) }),
-          image_url: (o.image_url ?? "").toString().trim() || undefined,
-        };
-      })
+  /**
+   * Apply new groups config: regenerates variant matrix while preserving existing
+   * variant data (sku, ean, stock, prices, image) for unchanged combinations.
+   * Atomically writes both metadata.variation_groups and variants.
+   */
+  const applyVariantGroups = (nextGroups) => {
+    const valueArrs = nextGroups.map((g) =>
+      (g.options || []).map((o) => String(o.value ?? "").trim()).filter(Boolean)
     );
-    update({ variants: flat });
+    const allFilled = valueArrs.length > 0 && valueArrs.every((a) => a.length > 0);
+    const combos = allFilled ? cartesian(valueArrs) : [];
+
+    setProduct((prev) => {
+      const existing = prev?.variants || [];
+      const flat = combos.map((optionValues) => {
+        const key = optionValues.join("\u0000");
+        const ex = existing.find(
+          (v) => Array.isArray(v.option_values) && v.option_values.join("\u0000") === key
+        );
+        if (ex) return { ...ex, option_values: optionValues };
+        return {
+          option_values: optionValues,
+          title: optionValues.join(" / "),
+          value: optionValues.join(" / "),
+          sku: "",
+          ean: undefined,
+          inventory: 0,
+          price_cents: undefined,
+          compare_at_price_cents: undefined,
+          sale_price_cents: undefined,
+          image_url: undefined,
+        };
+      });
+      const metaGroups = nextGroups.map((g) => ({
+        name: g.name || "Option",
+        options: (g.options || []).map((o) => ({
+          value: String(o.value ?? "").trim(),
+          ...(o.swatch_image ? { swatch_image: o.swatch_image } : {}),
+        })),
+      }));
+      return {
+        ...prev,
+        variants: flat,
+        metadata: {
+          ...(prev?.metadata && typeof prev.metadata === "object" ? prev.metadata : {}),
+          variation_groups: metaGroups,
+        },
+      };
+    });
   };
 
-  const updateVariantGroupName = (groupIndex, name) => {
-    const next = variantGroups.map((g, i) => (i === groupIndex ? { ...g, name: name || g.name } : g));
-    setVariantGroups(next);
+  /** Update a single field on one variant in the matrix */
+  const updateMatrixVariant = (optionValues, field, value) => {
+    const key = Array.isArray(optionValues) ? optionValues.join("\u0000") : "";
+    setProduct((prev) => {
+      const variants = [...(prev?.variants || [])];
+      const idx = variants.findIndex(
+        (v) => Array.isArray(v.option_values) && v.option_values.join("\u0000") === key
+      );
+      if (idx < 0) return prev;
+      const v = { ...variants[idx] };
+      if (field === "price") {
+        const n = parseFloat(value);
+        v.price_cents = !isNaN(n) && value !== "" ? Math.round(n * 100) : undefined;
+      } else if (field === "compare_at_price") {
+        const n = parseFloat(value);
+        v.compare_at_price_cents = !isNaN(n) && value !== "" ? Math.round(n * 100) : undefined;
+      } else if (field === "sale_price") {
+        const n = parseFloat(value);
+        v.sale_price_cents = !isNaN(n) && value !== "" ? Math.round(n * 100) : undefined;
+      } else if (field === "inventory") {
+        v.inventory = value !== "" ? parseInt(String(value), 10) || 0 : 0;
+      } else {
+        v[field] = value || undefined;
+      }
+      variants[idx] = v;
+      return { ...prev, variants };
+    });
   };
-  const updateVariantGroupOption = (groupIndex, optionIndex, field, value) => {
-    const next = variantGroups.map((g, i) => {
-      if (i !== groupIndex) return g;
+
+  // Group-level helpers — all go through applyVariantGroups
+  const vg_addGroup = () =>
+    applyVariantGroups([...variantGroups, { name: "", options: [{ value: "", swatch_image: "" }] }]);
+  const vg_removeGroup = (gi) =>
+    applyVariantGroups(variantGroups.filter((_, i) => i !== gi));
+  const vg_setGroupName = (gi, name) =>
+    applyVariantGroups(variantGroups.map((g, i) => (i === gi ? { ...g, name } : g)));
+  const vg_addOption = (gi) =>
+    applyVariantGroups(variantGroups.map((g, i) =>
+      i === gi ? { ...g, options: [...(g.options || []), { value: "", swatch_image: "" }] } : g
+    ));
+  const vg_removeOption = (gi, oi) =>
+    applyVariantGroups(variantGroups.map((g, i) =>
+      i === gi ? { ...g, options: (g.options || []).filter((_, j) => j !== oi) } : g
+    ));
+  const vg_setOption = (gi, oi, field, value) =>
+    applyVariantGroups(variantGroups.map((g, i) => {
+      if (i !== gi) return g;
       const opts = [...(g.options || [])];
-      if (!opts[optionIndex]) return g;
-      opts[optionIndex] = { ...opts[optionIndex], [field]: value };
+      if (!opts[oi]) return g;
+      opts[oi] = { ...opts[oi], [field]: value };
       return { ...g, options: opts };
-    });
-    setVariantGroups(next);
+    }));
+  const vg_moveGroup = (from, to) => {
+    if (from === to) return;
+    const next = [...variantGroups];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    applyVariantGroups(next);
   };
-  const addVariantGroupOption = (groupIndex) => {
-    const next = variantGroups.map((g, i) => (i === groupIndex ? { ...g, options: [...(g.options || []), { value: "", sku: "", ean: "", inventory: "", price: "", compare_at_price: "", image_url: "" }] } : g));
-    setVariantGroups(next);
+
+  // ─── Variant image picker ────────────────────────────────────────────────────
+  const openVariantImgPicker = (optionValues) => {
+    setVariantImgPickerTarget(optionValues);
+    setVariantImgPickerSelected(null);
+    // Load media library if empty
+    if (mediaLibraryList.length === 0) {
+      client.getMedia({ limit: 100 }).then((r) => setMediaLibraryList(r.media || [])).catch(() => {});
+    }
   };
-  const removeVariantGroupOption = (groupIndex, optionIndex) => {
-    const next = variantGroups.map((g, i) => {
-      if (i !== groupIndex) return g;
-      const opts = (g.options || []).filter((_, j) => j !== optionIndex);
-      return { ...g, options: opts };
-    });
-    setVariantGroups(next);
+
+  const applyVariantImg = () => {
+    if (variantImgPickerTarget && variantImgPickerSelected) {
+      updateMatrixVariant(variantImgPickerTarget, "image_url", variantImgPickerSelected);
+    }
+    setVariantImgPickerTarget(null);
+    setVariantImgPickerSelected(null);
   };
-  const addVariantGroup = () => {
-    setVariantGroups([...variantGroups, { name: "", options: [{ value: "", sku: "", ean: "", inventory: "", price: "", compare_at_price: "", image_url: "" }] }]);
+
+  const uploadVariantImg = useCallback((files) => {
+    setMediaUploading(true);
+    const fileList = Array.isArray(files) ? files : [files];
+    Promise.all(
+      fileList.map((file) => {
+        const fd = new FormData();
+        fd.append("file", file);
+        return client.uploadMedia(fd).then((r) => r.url || null);
+      })
+    )
+      .then((urls) => {
+        const newUrls = urls.filter(Boolean);
+        if (newUrls.length) {
+          const added = newUrls.map((u) => ({ id: `vup-${Date.now()}-${Math.random().toString(36).slice(2)}`, url: u }));
+          setMediaLibraryList((prev) => [...added, ...prev]);
+          // Auto-select the first uploaded image
+          setVariantImgPickerSelected(resolveMediaUrl(newUrls[0]));
+        }
+      })
+      .catch((err) => setMessage({ type: "error", text: err?.message || "Upload failed" }))
+      .finally(() => setMediaUploading(false));
+  }, [client]);
+
+  const openSwatchPicker = (gi, oi) => {
+    setSwatchPickerTarget({ gi, oi });
+    const current = variantGroups[gi]?.options?.[oi]?.swatch_image;
+    setSwatchPickerSelected(current ? resolveMediaUrl(current) : null);
+    if (mediaLibraryList.length === 0) {
+      client.getMedia({ limit: 100 }).then((r) => setMediaLibraryList(r.media || [])).catch(() => {});
+    }
   };
-  const removeVariantGroup = (groupIndex) => {
-    setVariantGroups(variantGroups.filter((_, i) => i !== groupIndex));
+
+  const applySwatchImg = () => {
+    if (swatchPickerTarget && swatchPickerSelected) {
+      vg_setOption(swatchPickerTarget.gi, swatchPickerTarget.oi, "swatch_image", swatchPickerSelected);
+    }
+    setSwatchPickerTarget(null);
+    setSwatchPickerSelected(null);
   };
+
+  const uploadSwatchImg = useCallback((files) => {
+    setMediaUploading(true);
+    const fileList = Array.isArray(files) ? files : [files];
+    Promise.all(
+      fileList.map((file) => {
+        const fd = new FormData();
+        fd.append("file", file);
+        return client.uploadMedia(fd).then((r) => r.url || null);
+      })
+    )
+      .then((urls) => {
+        const newUrls = urls.filter(Boolean);
+        if (newUrls.length) {
+          const added = newUrls.map((u) => ({ id: `swup-${Date.now()}-${Math.random().toString(36).slice(2)}`, url: u }));
+          setMediaLibraryList((prev) => [...added, ...prev]);
+          setSwatchPickerSelected(resolveMediaUrl(newUrls[0]));
+        }
+      })
+      .catch((err) => setMessage({ type: "error", text: err?.message || "Upload failed" }))
+      .finally(() => setMediaUploading(false));
+  }, [client]);
 
   const removeMedia = (index) => {
     const next = mediaUrls.filter((_, i) => i !== index);
@@ -600,6 +771,31 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .product-description-html:focus { outline: none; }
         .product-description-html::placeholder { color: var(--p-color-text-subdued); }
         .product-description-hint { margin-top: 8px; font-size: 12px; color: var(--p-color-text-subdued); }
+        /* Variation engine */
+        .vg-group { border: 1px solid var(--p-color-border); border-radius: 10px; padding: 16px; background: var(--p-color-bg-surface-secondary); transition: box-shadow 0.15s; }
+        .vg-group:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .vg-group[draggable]:active { cursor: grabbing; box-shadow: 0 6px 24px rgba(0,0,0,0.12); opacity: 0.9; }
+        .vg-drag-handle { color: var(--p-color-icon-subdued); font-size: 18px; cursor: grab; user-select: none; flex-shrink: 0; padding: 2px 6px; border-radius: 4px; }
+        .vg-drag-handle:hover { background: var(--p-color-bg-surface-hover); color: var(--p-color-icon); }
+        .vg-option-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--p-color-bg-surface); border: 1px solid var(--p-color-border); border-radius: 8px; padding: 4px 6px 4px 8px; }
+        .vg-option-chip input { border: none; outline: none; background: transparent; font-size: 13px; color: var(--p-color-text); min-width: 60px; width: 80px; }
+        .vg-option-chip input::placeholder { color: var(--p-color-text-subdued); }
+        .vg-remove-btn { border: none; background: none; cursor: pointer; color: var(--p-color-icon-subdued); font-size: 16px; line-height: 1; padding: 0 2px; border-radius: 3px; display: inline-flex; align-items: center; }
+        .vg-remove-btn:hover { color: var(--p-color-text-critical); background: var(--p-color-bg-fill-critical-secondary, rgba(222,54,24,0.06)); }
+        .vg-swatch { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0; border: 1.5px solid var(--p-color-border); cursor: pointer; padding: 0; background: none; appearance: none; display: block; }
+        .vg-swatch:hover { border-color: var(--p-color-border-hover); box-shadow: 0 0 0 3px rgba(0,113,227,0.12); }
+        .vg-swatch-empty { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; border: 1.5px dashed var(--p-color-border); display: inline-flex; align-items: center; justify-content: center; color: var(--p-color-icon-subdued); font-size: 14px; cursor: pointer; padding: 0; background: none; appearance: none; }
+        .vg-swatch-empty:hover { border-color: var(--p-color-border-info); color: var(--p-color-text-info); background: rgba(0,113,227,0.04); }
+        .vg-matrix-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .vg-matrix-table th { padding: 8px 10px; text-align: left; font-weight: 600; color: var(--p-color-text-subdued); white-space: nowrap; background: var(--p-color-bg-surface-secondary); border-bottom: 2px solid var(--p-color-border); }
+        .vg-matrix-table td { padding: 6px 10px; vertical-align: middle; border-bottom: 1px solid var(--p-color-border-subdued); }
+        .vg-matrix-table tr:last-child td { border-bottom: none; }
+        .vg-matrix-table tr:hover td { background: var(--p-color-bg-surface-hover, rgba(0,0,0,0.015)); }
+        .vg-img-thumb { width: 40px; height: 40px; flex-shrink: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--p-color-border); background: var(--p-color-bg-fill-secondary); display: flex; align-items: center; justify-content: center; }
+        .vg-img-thumb.is-override { border-color: var(--p-color-border-info); box-shadow: 0 0 0 2px var(--p-color-bg-fill-info, rgba(0,113,227,0.1)); }
+        .vg-img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .vg-clear-override { font-size: 10px; color: var(--p-color-text-subdued); background: none; border: none; cursor: pointer; padding: 0; margin-top: 2px; display: block; }
+        .vg-clear-override:hover { color: var(--p-color-text-critical); text-decoration: underline; }
         .checkbox-container { cursor: pointer; flex-shrink: 0; }
         .checkbox-container input { display: none; }
         .checkbox-container svg { overflow: visible; display: block; }
@@ -817,6 +1013,148 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 </Modal.Section>
               </Modal>
 
+              {/* ── Variant image picker modal ── */}
+              <Modal
+                open={variantImgPickerTarget !== null}
+                onClose={() => { setVariantImgPickerTarget(null); setVariantImgPickerSelected(null); }}
+                title={variantImgPickerTarget ? `Image — ${variantImgPickerTarget.join(" / ")}` : "Variant image"}
+                size="large"
+                primaryAction={{
+                  content: "Apply",
+                  onAction: applyVariantImg,
+                  disabled: !variantImgPickerSelected,
+                }}
+                secondaryActions={[{ content: "Cancel", onAction: () => { setVariantImgPickerTarget(null); setVariantImgPickerSelected(null); } }]}
+              >
+                <Modal.Section>
+                  {mediaUploading && (
+                    <Box paddingBlockEnd="300">
+                      <Text as="p" variant="bodySm" tone="subdued">Uploading…</Text>
+                    </Box>
+                  )}
+                  <div className="product-media-picker-grid">
+                    {/* Upload tile */}
+                    <DropZone accept="image/*" type="image" onDropAccepted={uploadVariantImg} allowMultiple={false}>
+                      <div className="product-media-picker-add" role="button" tabIndex={0} title="Upload new image">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8.75 3.75a.75.75 0 0 0-1.5 0v3.5h-3.5a.75.75 0 0 0 0 1.5h3.5v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5z" /></svg>
+                        <span className="product-media-picker-add-label">Upload new</span>
+                      </div>
+                    </DropZone>
+
+                    {/* Library items */}
+                    {mediaLibraryList.map((item) => {
+                      const url = item.url ? resolveMediaUrl(item.url) : "";
+                      if (!url) return null;
+                      const selected = variantImgPickerSelected === url;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`product-media-picker-item ${selected ? "selected" : ""}`}
+                          onClick={() => setVariantImgPickerSelected(selected ? null : url)}
+                        >
+                          <div className="product-media-picker-item-img">
+                            <Thumbnail source={url} alt={item.alt || item.filename || ""} size="large" />
+                          </div>
+                          {selected && (
+                            <span className="product-media-picker-tick" aria-hidden>
+                              <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0Z" /></svg>
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {mediaLibraryList.length === 0 && !mediaUploading && (
+                    <Box paddingBlockStart="400">
+                      <Text as="p" tone="subdued">No media in library yet. Drop an image on the + square above to upload.</Text>
+                    </Box>
+                  )}
+                </Modal.Section>
+              </Modal>
+
+              {/* ── Swatch image picker modal ── */}
+              <Modal
+                open={swatchPickerTarget !== null}
+                onClose={() => { setSwatchPickerTarget(null); setSwatchPickerSelected(null); }}
+                title={swatchPickerTarget ? `Swatch — ${variantGroups[swatchPickerTarget.gi]?.name || `Group ${swatchPickerTarget.gi + 1}`} › ${variantGroups[swatchPickerTarget.gi]?.options?.[swatchPickerTarget.oi]?.value || `Option ${swatchPickerTarget.oi + 1}`}` : "Swatch image"}
+                size="large"
+                primaryAction={{
+                  content: "Apply",
+                  onAction: applySwatchImg,
+                  disabled: !swatchPickerSelected,
+                }}
+                secondaryActions={[{ content: "Cancel", onAction: () => { setSwatchPickerTarget(null); setSwatchPickerSelected(null); } }]}
+              >
+                <Modal.Section>
+                  {/* URL entry as alternative */}
+                  <Box paddingBlockEnd="400">
+                    <InlineStack gap="200" blockAlign="center">
+                      <div style={{ flex: 1 }}>
+                        <TextField
+                          label="Or enter image URL directly"
+                          value={swatchPickerSelected && swatchPickerSelected.startsWith("http") ? swatchPickerSelected : ""}
+                          onChange={(v) => setSwatchPickerSelected(v || null)}
+                          placeholder="https://..."
+                          autoComplete="off"
+                          prefix={swatchPickerSelected && swatchPickerSelected.startsWith("http") ? (
+                            <div style={{ width: 20, height: 20, borderRadius: "50%", overflow: "hidden", flexShrink: 0 }}>
+                              <img src={swatchPickerSelected} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            </div>
+                          ) : undefined}
+                        />
+                      </div>
+                    </InlineStack>
+                  </Box>
+                  <Divider />
+                  <Box paddingBlockStart="400">
+                    <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Or choose from media library</Text>
+                  </Box>
+                </Modal.Section>
+                <Modal.Section>
+                  {mediaUploading && (
+                    <Box paddingBlockEnd="300">
+                      <Text as="p" variant="bodySm" tone="subdued">Uploading…</Text>
+                    </Box>
+                  )}
+                  <div className="product-media-picker-grid">
+                    <DropZone accept="image/*" type="image" onDropAccepted={uploadSwatchImg} allowMultiple={false}>
+                      <div className="product-media-picker-add" role="button" tabIndex={0} title="Upload new image">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8.75 3.75a.75.75 0 0 0-1.5 0v3.5h-3.5a.75.75 0 0 0 0 1.5h3.5v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5z" /></svg>
+                        <span className="product-media-picker-add-label">Upload new</span>
+                      </div>
+                    </DropZone>
+                    {mediaLibraryList.map((item) => {
+                      const url = item.url ? resolveMediaUrl(item.url) : "";
+                      if (!url) return null;
+                      const selected = swatchPickerSelected === url;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`product-media-picker-item ${selected ? "selected" : ""}`}
+                          onClick={() => setSwatchPickerSelected(selected ? null : url)}
+                        >
+                          <div className="product-media-picker-item-img">
+                            <Thumbnail source={url} alt={item.alt || item.filename || ""} size="large" />
+                          </div>
+                          {selected && (
+                            <span className="product-media-picker-tick" aria-hidden>
+                              <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0Z" /></svg>
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {mediaLibraryList.length === 0 && !mediaUploading && (
+                    <Box paddingBlockStart="300">
+                      <Text as="p" tone="subdued">No media in library yet. Drop an image on the + square above to upload.</Text>
+                    </Box>
+                  )}
+                </Modal.Section>
+              </Modal>
+
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">Pricing</Text>
               <InlineStack gap="300" wrap>
@@ -889,57 +1227,220 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <Text as="p" variant="bodySm" tone="subdued">Warehouse split can be set later in metadata.</Text>
 
               <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Variants</Text>
-              <Text as="p" variant="bodySm" tone="subdued">Variant group (e.g. Color) and rows: Görsel, Değer, SKU, EAN, Stok, Fiyat, UVP.</Text>
-              {variantGroups.map((group, gi) => (
-                <Box key={gi} padding="300" background="bg-surface-secondary" borderRadius="200" borderWidth="025" borderColor="border">
-                  <InlineStack gap="200" wrap blockAlign="center" paddingBlockEnd="200">
-                    <Box minWidth="140px">
-                      <TextField label="Variant group name" labelHidden value={group.name} onChange={(val) => updateVariantGroupName(gi, val)} placeholder="e.g. Color, Size" autoComplete="off" />
-                    </Box>
-                    <Button size="slim" variant="plain" tone="critical" onClick={() => removeVariantGroup(gi)} aria-label="Remove group">Remove group</Button>
-                    <Button size="slim" variant="plain" onClick={() => addVariantGroupOption(gi)}>+ Row</Button>
-                  </InlineStack>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: 14 }}>
-                      <thead>
-                        <tr style={{ borderBottom: "2px solid var(--p-color-border)" }}>
-                          <th style={{ textAlign: "left", padding: "8px", fontWeight: 600, color: "var(--p-color-text-subdued)" }}>Görsel</th>
-                          <th style={{ textAlign: "left", padding: "8px", fontWeight: 600, color: "var(--p-color-text-subdued)" }}>Renk / Değer</th>
-                          <th style={{ textAlign: "left", padding: "8px", fontWeight: 600, color: "var(--p-color-text-subdued)" }}>SKU</th>
-                          <th style={{ textAlign: "left", padding: "8px", fontWeight: 600, color: "var(--p-color-text-subdued)" }}>EAN</th>
-                          <th style={{ textAlign: "left", padding: "8px", fontWeight: 600, color: "var(--p-color-text-subdued)" }}>Stok</th>
-                          <th style={{ textAlign: "left", padding: "8px", fontWeight: 600, color: "var(--p-color-text-subdued)" }}>Fiyat (€)</th>
-                          <th style={{ textAlign: "left", padding: "8px", fontWeight: 600, color: "var(--p-color-text-subdued)" }}>UVP (€)</th>
-                          <th style={{ width: 40 }} />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(group.options || []).map((opt, oi) => (
-                          <tr key={oi} style={{ borderBottom: "1px solid var(--p-color-border-subdued)" }}>
-                            <td style={{ padding: "6px 8px", verticalAlign: "middle" }}>
-                              <InlineStack gap="200" blockAlign="center">
-                                <div style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: "hidden", background: "var(--p-color-bg-fill-secondary)" }}>
-                                  {opt.image_url ? <img src={opt.image_url.startsWith("http") || opt.image_url.startsWith("data:") ? opt.image_url : `${baseUrl}${opt.image_url}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 10, color: "var(--p-color-text-subdued)", display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>—</span>}
-                                </div>
-                                <Box minWidth="120px"><TextField label="" labelHidden value={opt.image_url ?? ""} onChange={(val) => updateVariantGroupOption(gi, oi, "image_url", val)} placeholder="Görsel URL" autoComplete="off" /></Box>
-                              </InlineStack>
-                            </td>
-                            <td style={{ padding: "6px 8px" }}><TextField label="" labelHidden value={opt.value} onChange={(val) => updateVariantGroupOption(gi, oi, "value", val)} placeholder="z.B. Rot" autoComplete="off" /></td>
-                            <td style={{ padding: "6px 8px" }}><TextField label="" labelHidden value={opt.sku} onChange={(val) => updateVariantGroupOption(gi, oi, "sku", val)} placeholder="SKU" autoComplete="off" /></td>
-                            <td style={{ padding: "6px 8px" }}><TextField label="" labelHidden value={opt.ean ?? ""} onChange={(val) => updateVariantGroupOption(gi, oi, "ean", val)} placeholder="EAN" autoComplete="off" /></td>
-                            <td style={{ padding: "6px 8px" }}><TextField label="" labelHidden type="number" min={0} value={opt.inventory} onChange={(val) => updateVariantGroupOption(gi, oi, "inventory", val)} placeholder="0" /></td>
-                            <td style={{ padding: "6px 8px" }}><TextField label="" labelHidden type="number" step="0.01" value={opt.price ?? ""} onChange={(val) => updateVariantGroupOption(gi, oi, "price", val)} placeholder="—" /></td>
-                            <td style={{ padding: "6px 8px" }}><TextField label="" labelHidden type="number" step="0.01" value={opt.compare_at_price ?? ""} onChange={(val) => updateVariantGroupOption(gi, oi, "compare_at_price", val)} placeholder="—" /></td>
-                            <td style={{ padding: "6px 8px" }}><Button size="slim" variant="plain" tone="critical" onClick={() => removeVariantGroupOption(gi, oi)} aria-label="Remove">×</Button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+
+              {/* ════════════════════════════════════════════════════════
+                  VARIATION ENGINE  (Amazon / eBay style)
+                  1. Define groups + options  →  2. Matrix auto-generates
+                  ════════════════════════════════════════════════════════ */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <Text as="h2" variant="bodyMd" fontWeight="semibold">Variations</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Add groups (e.g. Color, Size). Variant combinations are auto-generated.
+                  </Text>
+                </div>
+                <Button variant="primary" size="slim" onClick={vg_addGroup}>+ Add Group</Button>
+              </div>
+
+              {/* ── Step 1: Group definitions ── */}
+              {variantGroups.length === 0 && (
+                <div style={{ padding: "24px 0", textAlign: "center", color: "var(--p-color-text-subdued)", fontSize: 13 }}>
+                  No variant groups yet. Click <strong>+ Add Group</strong> to start.
+                </div>
+              )}
+
+              <BlockStack gap="300">
+                {variantGroups.map((group, gi) => (
+                  <div
+                    key={gi}
+                    className="vg-group"
+                    draggable
+                    onDragStart={() => { dragGroupIdx.current = gi; }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      const from = dragGroupIdx.current;
+                      dragGroupIdx.current = null;
+                      if (from !== null && from !== gi) vg_moveGroup(from, gi);
+                    }}
+                  >
+                    {/* Group header */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                      <span className="vg-drag-handle" title="Drag to reorder">⠿</span>
+                      <div style={{ flex: 1, maxWidth: 200 }}>
+                        <TextField
+                          label="Group name"
+                          labelHidden
+                          value={group.name}
+                          onChange={(v) => vg_setGroupName(gi, v)}
+                          placeholder="e.g. Color, Size, Material"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <Text as="span" variant="bodySm" tone="subdued">
+                        {(group.options || []).filter((o) => o.value.trim()).length} option(s)
+                      </Text>
+                      <Button size="slim" variant="plain" tone="critical" onClick={() => vg_removeGroup(gi)}>
+                        Remove
+                      </Button>
+                    </div>
+
+                    {/* Options row */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                      {(group.options || []).map((opt, oi) => (
+                        <div key={oi} className="vg-option-chip">
+                          {/* Swatch button — click to open picker */}
+                          <div style={{ position: "relative", flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              className={opt.swatch_image ? "vg-swatch" : "vg-swatch-empty"}
+                              title={opt.swatch_image ? "Change swatch image" : "Choose swatch image"}
+                              onClick={() => openSwatchPicker(gi, oi)}
+                            >
+                              {opt.swatch_image
+                                ? <img src={resolveMediaUrl(opt.swatch_image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                : "🖼"}
+                            </button>
+                            {opt.swatch_image && (
+                              <button
+                                type="button"
+                                style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "#de3618", border: "none", color: "#fff", fontSize: 9, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                                onClick={(e) => { e.stopPropagation(); vg_setOption(gi, oi, "swatch_image", ""); }}
+                                title="Remove swatch"
+                              >×</button>
+                            )}
+                          </div>
+                          {/* Value input */}
+                          <input
+                            type="text"
+                            value={opt.value}
+                            onChange={(e) => vg_setOption(gi, oi, "value", e.target.value)}
+                            placeholder="Value"
+                          />
+                          <button type="button" className="vg-remove-btn" onClick={() => vg_removeOption(gi, oi)} title="Remove option">×</button>
+                        </div>
+                      ))}
+                      <Button size="slim" variant="plain" onClick={() => vg_addOption(gi)}>+ Add option</Button>
+                    </div>
                   </div>
-                </Box>
-              ))}
-              <Button variant="secondary" size="slim" onClick={addVariantGroup}>Add variant group</Button>
+                ))}
+              </BlockStack>
+
+              {/* ── Step 2: Variation Matrix ── */}
+              {variantGroups.length > 0 && (() => {
+                const matrixRows = (product?.variants || []).filter((v) => Array.isArray(v.option_values));
+                if (matrixRows.length === 0) return (
+                  <div style={{ padding: "12px 16px", background: "var(--p-color-bg-surface-warning, #fffbeb)", borderRadius: 8, fontSize: 13, color: "var(--p-color-text-subdued)" }}>
+                    Add at least one option to each group to generate combinations.
+                  </div>
+                );
+                return (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <Text as="p" variant="bodySm" fontWeight="semibold">
+                        Variation Matrix — {matrixRows.length} {matrixRows.length === 1 ? "variant" : "variants"}
+                      </Text>
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="vg-matrix-table">
+                        <thead>
+                          <tr>
+                            {variantGroups.map((g, gi) => (
+                              <th key={gi}>{g.name || `Group ${gi + 1}`}</th>
+                            ))}
+                            <th>Image</th>
+                            <th>SKU</th>
+                            <th>EAN</th>
+                            <th>Stock</th>
+                            <th>Price (€)</th>
+                            <th>UVP (€)</th>
+                            <th>Sale (€)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {matrixRows.map((v, vi) => {
+                            // 2-level image: group swatch (level 1) → variant override (level 2)
+                            const groupSwatchUrl = (() => {
+                              const firstGroupOpts = variantGroups[0]?.options || [];
+                              const firstVal = v.option_values[0] ?? "";
+                              const matched = firstGroupOpts.find((o) => o.value === firstVal);
+                              return matched?.swatch_image ? resolveMediaUrl(matched.swatch_image) : null;
+                            })();
+                            const overrideUrl = v.image_url ? resolveMediaUrl(v.image_url) : null;
+                            const effectiveImg = overrideUrl || groupSwatchUrl;
+                            const isOverride = !!overrideUrl;
+
+                            return (
+                              <tr key={vi}>
+                                {/* Option values — read-only cells */}
+                                {v.option_values.map((val, oi) => {
+                                  const swatchUrl = variantGroups[oi]?.options?.find((o) => o.value === val)?.swatch_image;
+                                  return (
+                                    <td key={oi} style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                                      {swatchUrl ? (
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                          <span style={{ width: 14, height: 14, borderRadius: "50%", display: "inline-block", backgroundImage: `url(${resolveMediaUrl(swatchUrl)})`, backgroundSize: "cover", flexShrink: 0, border: "1px solid var(--p-color-border)" }} />
+                                          {val}
+                                        </span>
+                                      ) : val}
+                                    </td>
+                                  );
+                                })}
+
+                                {/* Image */}
+                                <td>
+                                  <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                                    <button
+                                      type="button"
+                                      className={`vg-img-thumb${isOverride ? " is-override" : ""}`}
+                                      style={{ cursor: "pointer", padding: 0, border: isOverride ? "2px solid var(--p-color-border-info)" : "1px solid var(--p-color-border)" }}
+                                      onClick={() => openVariantImgPicker(v.option_values)}
+                                      title="Click to choose image"
+                                    >
+                                      {effectiveImg
+                                        ? <img src={effectiveImg} alt="" />
+                                        : <span style={{ fontSize: 9, color: "var(--p-color-text-subdued)" }}>+</span>}
+                                    </button>
+                                    <div style={{ flex: 1, minWidth: 80 }}>
+                                      <TextField
+                                        label="" labelHidden
+                                        value={v.image_url ?? ""}
+                                        onChange={(val) => updateMatrixVariant(v.option_values, "image_url", val)}
+                                        placeholder={groupSwatchUrl ? "Override…" : "Image URL"}
+                                        autoComplete="off"
+                                      />
+                                      {isOverride && (
+                                        <button type="button" className="vg-clear-override" onClick={() => updateMatrixVariant(v.option_values, "image_url", "")}>
+                                          Clear override
+                                        </button>
+                                      )}
+                                      {!isOverride && groupSwatchUrl && (
+                                        <span style={{ fontSize: 10, color: "var(--p-color-text-subdued)", display: "block", marginTop: 2 }}>Using group swatch</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* SKU */}
+                                <td><TextField label="" labelHidden value={v.sku ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "sku", val)} placeholder="SKU" autoComplete="off" /></td>
+                                {/* EAN */}
+                                <td><TextField label="" labelHidden value={v.ean ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "ean", val)} placeholder="EAN" autoComplete="off" /></td>
+                                {/* Stock */}
+                                <td><TextField label="" labelHidden type="number" min={0} value={v.inventory != null ? String(v.inventory) : "0"} onChange={(val) => updateMatrixVariant(v.option_values, "inventory", val)} placeholder="0" /></td>
+                                {/* Price */}
+                                <td><TextField label="" labelHidden type="number" step="0.01" value={v.price_cents != null ? (Number(v.price_cents) / 100).toFixed(2) : ""} onChange={(val) => updateMatrixVariant(v.option_values, "price", val)} placeholder="0.00" /></td>
+                                {/* UVP */}
+                                <td><TextField label="" labelHidden type="number" step="0.01" value={v.compare_at_price_cents != null ? (Number(v.compare_at_price_cents) / 100).toFixed(2) : ""} onChange={(val) => updateMatrixVariant(v.option_values, "compare_at_price", val)} placeholder="—" /></td>
+                                {/* Sale */}
+                                <td><TextField label="" labelHidden type="number" step="0.01" value={v.sale_price_cents != null ? (Number(v.sale_price_cents) / 100).toFixed(2) : ""} onChange={(val) => updateMatrixVariant(v.option_values, "sale_price", val)} placeholder="—" /></td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">Metafields (catalog)</Text>
@@ -976,6 +1477,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 <BlockStack gap="200">
                   <Text as="h2" variant="bodyMd" fontWeight="regular">Status</Text>
                   <Select label="Status" labelHidden options={STATUS_OPTIONS} value={product.status || "draft"} onChange={(v) => update({ status: v })} />
+                </BlockStack>
+                <BlockStack gap="200">
+                  <Text as="h2" variant="bodyMd" fontWeight="regular">Yayın tarihi (opsiyonel)</Text>
+                  <TextField label="" labelHidden type="date" value={meta.publish_date ?? ""} onChange={(v) => updateMeta("publish_date", v || undefined)} placeholder="YYYY-MM-DD" helpText="İleri tarih seçilirse shop’ta “Pek yakında” gösterilir." />
                 </BlockStack>
 
                 <Divider />
@@ -1039,6 +1544,80 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             >
                               {label || "—"}
                               <button type="button" onClick={() => updateMeta("collection_ids", collectionIds.filter((x) => x !== id))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Remove">×</button>
+                            </span>
+                          );
+                        })}
+                      </InlineStack>
+                    )}
+                  </BlockStack>
+                </div>
+
+                <Divider />
+
+                <div style={{ position: "relative", zIndex: relatedProductPopoverOpen ? 10000 : undefined, overflow: "visible" }}>
+                  <BlockStack gap="200">
+                    <Text as="h2" variant="bodyMd" fontWeight="regular">Related products (Kunden kauften auch)</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">Ürün sayfasında &quot;Kunden, die diesen Artikel gekauft haben, kauften auch&quot; bölümünde gösterilecek ürünler.</Text>
+                    <TextField
+                      label=""
+                      labelHidden
+                      value={relatedProductSearch}
+                      onChange={setRelatedProductSearch}
+                      onFocus={() => setRelatedProductPopoverOpen(true)}
+                      placeholder="Ürün ara…"
+                      autoComplete="off"
+                    />
+                    <div style={{ position: "relative" }}>
+                      {relatedProductPopoverOpen && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            maxHeight: 280,
+                            overflowY: "auto",
+                            background: "var(--p-color-bg-surface)",
+                            border: "1px solid var(--p-color-border)",
+                            borderRadius: 8,
+                            marginTop: 4,
+                            zIndex: 10002,
+                            boxShadow: "var(--p-shadow-400)",
+                          }}
+                        >
+                          {(relatedProductsList || [])
+                            .filter((p) => p.id !== product?.id && (!relatedProductSearch.trim() || (p.title || p.handle || "").toLowerCase().includes(relatedProductSearch.toLowerCase())))
+                            .slice(0, 50)
+                            .map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                style={{ display: "block", width: "100%", padding: "8px 12px", textAlign: "left", border: "none", background: relatedProductIds.includes(p.id) ? "var(--p-color-bg-fill-secondary)" : "transparent", cursor: "pointer", fontSize: 13 }}
+                                onClick={() => {
+                                  const next = relatedProductIds.includes(p.id) ? relatedProductIds.filter((id) => id !== p.id) : [...relatedProductIds, p.id];
+                                  updateMeta("related_product_ids", next.length ? next : null);
+                                }}
+                              >
+                                <span style={{ marginRight: 8 }}>{relatedProductIds.includes(p.id) ? "✓" : ""}</span>
+                                {p.title || p.handle || p.id}
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                    {relatedProductPopoverOpen && <div style={{ position: "fixed", inset: 0, zIndex: 10001 }} onClick={() => setRelatedProductPopoverOpen(false)} aria-hidden />}
+                    {relatedProductIds.length > 0 && (
+                      <InlineStack gap="100" wrap>
+                        {relatedProductIds.map((id) => {
+                          const p = (relatedProductsList || []).find((x) => x.id === id);
+                          const label = p ? (p.title || p.handle || id) : id;
+                          return (
+                            <span
+                              key={id}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--p-color-bg-fill-secondary)", borderRadius: 6, fontSize: 12, color: "var(--p-color-text-subdued)" }}
+                            >
+                              {String(label).slice(0, 40)}{String(label).length > 40 ? "…" : ""}
+                              <button type="button" onClick={() => updateMeta("related_product_ids", relatedProductIds.filter((x) => x !== id).length ? relatedProductIds.filter((x) => x !== id) : null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Remove">×</button>
                             </span>
                           );
                         })}

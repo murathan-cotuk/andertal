@@ -24,7 +24,7 @@ function menuItemHref(item) {
 }
 
 const FooterContainer = styled.footer`
-  background-color: #1f2937;
+  background-color: #136761;
   color: white;
   padding: 48px 0 24px;
   margin-top: auto;
@@ -50,14 +50,14 @@ const Column = styled.div`
 `;
 
 const Title = styled.h3`
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   margin-bottom: 4px;
-  color: #f1f5f9;
+  color:rgb(255, 255, 255);
 `;
 
 const FooterLink = styled(Link)`
-  color: #9ca3af;
+  color:rgb(255, 255, 255);
   font-size: 14px;
   transition: color 0.2s ease;
 
@@ -67,12 +67,12 @@ const FooterLink = styled(Link)`
 `;
 
 const Placeholder = styled.div`
-  color: #64748b;
+  color:rgb(255, 255, 255);
   font-size: 14px;
 `;
 
 const LogoPlaceholder = styled(Link)`
-  color: #0ea5e9;
+  color:rgb(194, 236, 255);
   font-weight: 700;
   font-size: 18px;
   text-decoration: none;
@@ -83,7 +83,7 @@ const LogoPlaceholder = styled(Link)`
 `;
 
 const Bottom = styled.div`
-  border-top: 1px solid #374151;
+  border-top: 1px solidrgb(254, 254, 255);
   padding-top: 24px;
   display: flex;
   justify-content: space-between;
@@ -93,7 +93,7 @@ const Bottom = styled.div`
 `;
 
 const Copyright = styled.p`
-  color: #9ca3af;
+  color:rgb(255, 255, 255);
   font-size: 14px;
 `;
 

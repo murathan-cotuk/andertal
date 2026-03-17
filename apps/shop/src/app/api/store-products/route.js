@@ -11,7 +11,7 @@ export async function GET(request) {
     const url = qs ? `${base}/store/products?${qs}` : `${base}/store/products`;
     const res = await fetch(url, {
       headers: { "Content-Type": "application/json" },
-      next: { revalidate: 30 },
+      cache: "no-store",
     });
     if (!res.ok) {
       return NextResponse.json({ products: [], count: 0 }, { status: 200 });

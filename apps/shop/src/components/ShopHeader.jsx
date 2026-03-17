@@ -63,7 +63,7 @@ const HeaderWrap = styled(motion.header)`
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   transition: transform 0.25s ease-out;
-  overflow: hidden;
+  overflow: visible;
   visibility: ${(p) => (p.$visible ? "visible" : "hidden")};
   pointer-events: ${(p) => (p.$visible ? "auto" : "none")};
 `;
@@ -255,21 +255,24 @@ const CategoriesPanel = styled(motion.div)`
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  min-width: 260px;
+  min-width: 240px;
+  max-height: 80vh;
+  overflow-y: auto;
   background: ${tokens.background.card};
   border: 1px solid ${tokens.border.light};
-  border-radius: 12px;
-  box-shadow: ${tokens.shadow.hover};
-  padding: 8px 0;
-  z-index: 99999;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  padding: 4px 0;
+  z-index: 2147483647;
   display: ${(p) => (p.$open ? "block" : "none")};
 `;
 
 const CategoryItem = styled(Link)`
   display: block;
-  padding: 12px 20px;
+  padding: 6px 14px;
   color: ${tokens.dark[700]};
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.35;
   font-family: ${tokens.fontFamily.sans};
   text-decoration: none;
   transition: background ${tokens.transition.base}, color ${tokens.transition.base};
@@ -282,8 +285,8 @@ const CategoryItem = styled(Link)`
 
 const CategoryItemBanner = styled.div`
   width: 100%;
-  height: 56px;
-  margin: -8px -20px 8px -20px;
+  height: 48px;
+  margin: -6px -14px 6px -14px;
   padding: 0;
   overflow: hidden;
   border-radius: 12px 12px 0 0;

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import Link from "next/link";
 import {
   Page,
@@ -51,8 +52,15 @@ function stripSkuEanFromVariants(variants) {
   });
 }
 
+function getLocalizedTitle(product, locale) {
+  const tr = product.metadata?.translations;
+  if (tr && tr[locale]?.title) return tr[locale].title;
+  return product.title || "Untitled";
+}
+
 export default function InventoryPage() {
   const router = useRouter();
+  const locale = useLocale();
   const [products, setProducts] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [menuOpenId, setMenuOpenId] = useState(null);
@@ -127,7 +135,7 @@ export default function InventoryPage() {
       const variants = opt.variants ? stripSkuEanFromVariants(p.variants) : [];
       const payload = {
         title: opt.title ? (p.title || "").trim() + " (Copy)" : "Untitled",
-        handle: (p.handle || "product").replace(/-kopie-\d+$/, "") + "-kopie-" + Date.now(),
+        handle: (p.title || p.handle || "product").toString().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, 50) + "-" + Date.now().toString(36),
         sku: "",
         description: opt.description ? (p.description || "") : "",
         status: "draft",
@@ -236,7 +244,12 @@ export default function InventoryPage() {
                   {products.map((product) => {
                     const meta = product.metadata && typeof product.metadata === "object" ? product.metadata : {};
                     const media = meta.media;
-                    const thumbUrl = Array.isArray(media) && media[0] ? media[0] : (typeof media === "string" && media ? media : null);
+                    const rawThumb = product.thumbnail ||
+                      (Array.isArray(media) && media[0]
+                        ? (typeof media[0] === "string" ? media[0] : (media[0]?.url || null))
+                        : null) ||
+                      (typeof media === "string" && media ? media : null);
+                    const thumbUrl = rawThumb || null;
                     const price = product.price != null ? Number(product.price) : (product.variants?.[0]?.prices?.[0]?.amount ? Number(product.variants[0].prices[0].amount) / 100 : 0);
                     const inv = product.inventory != null ? Number(product.inventory) : 0;
                     const sku = product.sku || "—";
@@ -285,7 +298,7 @@ export default function InventoryPage() {
                                 style={{ textDecoration: "none", color: "inherit" }}
                               >
                                 <Text as="p" variant="bodyMd" fontWeight="medium">
-                                  {product.title || "Untitled"}
+                                  {getLocalizedTitle(product, locale)}
                                 </Text>
                               </Link>
                               <InlineStack gap="200" wrap>

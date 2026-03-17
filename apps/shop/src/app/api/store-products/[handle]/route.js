@@ -14,7 +14,7 @@ export async function GET(request, context) {
     const url = `${base}/store/products/${encodeURIComponent(handle)}`;
     const res = await fetch(url, {
       headers: { "Content-Type": "application/json" },
-      next: { revalidate: 60 },
+      cache: "no-store",
     });
     if (res.status === 404) {
       return NextResponse.json({ product: null }, { status: 404 });
