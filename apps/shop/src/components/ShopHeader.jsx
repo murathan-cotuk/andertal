@@ -81,7 +81,7 @@ const MiddleBarInner = styled.div`
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 24px;
-  min-height: 64px;
+  min-height: 72px;
   display: flex;
   align-items: center;
 `;
@@ -149,15 +149,15 @@ const SearchBarForm = styled.div`
   width: 100%;
   display: flex;
   align-items: center;
-  height: 48px;
-  padding: 0 6px 0 18px;
+  height: 37px;
+  padding: 0 4px 0 12px;
   background: #fff;
   border-radius: 9999px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 8px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 
   &:focus-within {
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+    box-shadow: 0 2px 14px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
   }
 `;
 
@@ -269,9 +269,10 @@ const CategoriesPanel = styled(motion.div)`
 
 const CategoryItem = styled(Link)`
   display: block;
-  padding: 6px 14px;
+  padding: 8px 14px;
   color: ${tokens.dark[700]};
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 500;
   line-height: 1.35;
   font-family: ${tokens.fontFamily.sans};
   text-decoration: none;
@@ -424,8 +425,8 @@ const UserDropdownBtn = styled.button`
 
 const SubNavWrap = styled.div`
   width: 100%;
-  min-height: ${(p) => (p.$hide ? "0" : "36px")};
-  max-height: ${(p) => (p.$hide ? "0" : "36px")};
+  min-height: ${(p) => (p.$hide ? "0" : "42px")};
+  max-height: ${(p) => (p.$hide ? "0" : "42px")};
   background: ${(p) => (p.$hide ? "transparent" : "#f0f0f0")};
   border-top: ${(p) => (p.$hide ? "none" : "1px solid rgba(0, 0, 0, 0.06)")};
   border-bottom: ${(p) => (p.$hide ? "none" : "1px solid rgba(0, 0, 0, 0.08)")};
@@ -448,8 +449,8 @@ const SecondMenuRowInner = styled.div`
   gap: ${tokens.spacing.lg};
   align-items: center;
   justify-content: flex-start;
-  font-size: 13px;
-  min-height: 36px;
+  font-size: 15px;
+  min-height: 42px;
 `;
 
 const SecondLink = styled(Link)`

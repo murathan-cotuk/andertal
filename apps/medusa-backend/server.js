@@ -2185,7 +2185,8 @@ async function start() {
           const optVals = Array.isArray(v.option_values) && v.option_values.length > 0 ? v.option_values : null
           const variationGroups = Array.isArray(meta.variation_groups) ? meta.variation_groups : null
           if (optVals && variationGroups && variationGroups.length === optVals.length) {
-            variantLabel = variationGroups.map((g, i) => `${g.name}: ${optVals[i]}`).join(' / ')
+            const toUpper = (g) => (g && g.name ? String(g.name).toUpperCase() : '')
+            variantLabel = variationGroups.map((g, i) => `${toUpper(g)}: ${optVals[i] || ''}`).join(' / ')
           } else if (optVals) {
             variantLabel = optVals.join(' / ')
           } else {

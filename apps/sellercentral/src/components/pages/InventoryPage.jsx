@@ -150,7 +150,7 @@ export default function InventoryPage() {
       }
       const created = await medusaClient.createAdminHubProduct(payload);
       closeDuplicateModal();
-      if (created?.id) router.push(`/products/${created.handle || created.id}`);
+      if (created?.id) router.push(`/products/${created.id}`);
     } catch (err) {
       setError(err?.message || "Duplicate failed");
     } finally {
@@ -214,7 +214,7 @@ export default function InventoryPage() {
                         const firstId = selectedIds[0];
                         if (firstId) {
                           const prod = products.find((p) => p.id === firstId);
-                          router.push(`/products/${prod?.handle || firstId}`);
+                          router.push(`/products/${prod?.id || firstId}`);
                         }
                       }}
                     >
@@ -294,7 +294,7 @@ export default function InventoryPage() {
                             </Box>
                             <BlockStack gap="100">
                               <Link
-                                href={`/products/${product.handle || product.id}`}
+                                href={`/products/${product.id}`}
                                 style={{ textDecoration: "none", color: "inherit" }}
                               >
                                 <Text as="p" variant="bodyMd" fontWeight="medium">
@@ -320,7 +320,7 @@ export default function InventoryPage() {
                           <InlineStack gap="200" blockAlign="center">
                             <Button
                               variant="tertiary"
-                              onClick={() => router.push(`/products/${product.handle || product.id}`)}
+                              onClick={() => router.push(`/products/${product.id}`)}
                               icon={() => <span style={{ fontSize: "16px" }}>✏</span>}
                               accessibilityLabel="Edit product"
                             />

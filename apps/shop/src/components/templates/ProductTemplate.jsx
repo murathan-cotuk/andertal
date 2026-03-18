@@ -19,7 +19,11 @@ import ToCartButton from "@/components/ui/To Cart Button";
 
 const Container = styled.div`
   max-width: 100%;
-  padding: 24px 250px 48px;
+  padding: 32px 24px 64px;
+  @media (min-width: 1200px) {
+    padding-left: 48px;
+    padding-right: 48px;
+  }
 `;
 
 const ThreeCol = styled.div`
@@ -28,7 +32,7 @@ const ThreeCol = styled.div`
   gap: 32px;
   margin-bottom: 48px;
   align-items: start;
-  @media (max-width: 102px) {
+  @media (max-width: 1024px) {
     grid-template-columns: 1fr 1fr;
   }
   @media (max-width: 768px) {
@@ -113,19 +117,19 @@ const PriceBlock = styled.div`
 const VariantSection = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-top: 4px;
+  gap: 10px;
+  margin-top: 2px;
 `;
 
 const VarGroup = styled.div``;
 
 const VarLabel = styled.div`
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 600;
   color: #6b7280;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 6px;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
 `;
 
 const VarLabelSelected = styled.span`
@@ -142,40 +146,42 @@ const VarRow = styled.div`
   gap: 6px;
 `;
 
-/* Text chip — sizes, materials, etc */
+/* Compact text chip — sizes, materials, etc */
 const VarChip = styled.button`
-  padding: 7px 15px;
-  font-size: 0.8125rem;
+  padding: 5px 12px;
+  font-size: 0.75rem;
   font-weight: 500;
-  line-height: 1.35;
-  border: 1.5px solid ${(p) => (p.$selected ? "#111" : "#e0e0e0")};
-  background: ${(p) => (p.$selected ? "#111" : "#fff")};
-  color: ${(p) => (p.$selected ? "#fff" : p.$oos ? "#bbb" : "#374151")};
-  border-radius: 4px;
+  line-height: 1.3;
+  border: 1px solid ${(p) => (p.$selected ? "#374151" : "#e5e7eb")};
+  background: ${(p) => (p.$selected ? "#374151" : "#fff")};
+  color: ${(p) => (p.$selected ? "#fff" : p.$oos ? "#9ca3af" : "#374151")};
+  border-radius: 999px;
   cursor: ${(p) => (p.$oos ? "default" : "pointer")};
   text-decoration: ${(p) => (p.$oos && !p.$selected ? "line-through" : "none")};
-  opacity: ${(p) => (p.$oos && !p.$selected ? 0.5 : 1)};
+  opacity: ${(p) => (p.$oos && !p.$selected ? 0.6 : 1)};
+  pointer-events: ${(p) => (p.$oos && !p.$selected ? "none" : "auto")};
   transition: border-color 0.12s, background 0.12s, color 0.12s;
   &:hover:not(:disabled) {
-    border-color: ${(p) => (p.$selected ? "#111" : "#999")};
+    border-color: ${(p) => (p.$selected ? "#374151" : "#9ca3af")};
     color: ${(p) => (p.$selected ? "#fff" : "#111")};
   }
 `;
 
-/* Swatch circle — color / image options */
+/* Compact swatch circle — color / image options */
 const VarSwatch = styled.button`
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 2.5px solid ${(p) => (p.$selected ? "#111" : "#e0e0e0")};
+  border: 1.5px solid ${(p) => (p.$selected ? "#374151" : "#e5e7eb")};
   padding: 0;
   background: none;
   cursor: pointer;
   overflow: hidden;
   flex-shrink: 0;
   transition: border-color 0.12s, transform 0.12s;
-  transform: ${(p) => (p.$selected ? "scale(1.1)" : "scale(1)")};
-  opacity: ${(p) => (p.$oos && !p.$selected ? 0.4 : 1)};
+  transform: ${(p) => (p.$selected ? "scale(1.08)" : "scale(1)")};
+  opacity: ${(p) => (p.$oos && !p.$selected ? 0.5 : 1)};
+  pointer-events: ${(p) => (p.$oos && !p.$selected ? "none" : "auto")};
   position: relative;
   display: block;
   &::after {
@@ -183,7 +189,7 @@ const VarSwatch = styled.button`
     display: ${(p) => (p.$oos && !p.$selected ? "block" : "none")};
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, transparent 45%, #999 45%, #999 55%, transparent 55%);
+    background: linear-gradient(135deg, transparent 45%, #9ca3af 45%, #9ca3af 55%, transparent 55%);
     border-radius: 50%;
   }
 `;
@@ -1040,6 +1046,16 @@ export default function ProductTemplate() {
                 >
                   {isComingSoon ? "Bald verfügbar" : !inStock ? "Ausverkauft" : "In den Einkaufswagen"}
                 </ToCartButton>
+                {isComingSoon && publishDate && (
+                  <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "8px 0 0", fontWeight: 400 }}>
+                    {locale === "tr" ? "Pek yakında" : "Bald verfügbar"}
+                    {publishDate && !isNaN(publishDate.getTime()) && (
+                      <span style={{ marginLeft: 6 }}>
+                        ({publishDate.toLocaleDateString(locale === "tr" ? "tr-TR" : "de-DE", { day: "numeric", month: "long", year: "numeric" })})
+                      </span>
+                    )}
+                  </p>
+                )}
               </CtaStack>
 
               <InfoList>

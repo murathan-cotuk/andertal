@@ -309,7 +309,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         const created = await client.createAdminHubProduct(payload);
         setMessage({ type: "success", text: "Product created" });
         onReload?.();
-        router.push(`/products/${created?.handle || created?.id || idOrHandle}`);
+        router.push(`/products/${created?.id}`);
         return;
       }
       await client.updateAdminHubProduct(idOrHandle, payload);
@@ -364,7 +364,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       }
       const created = await client.createAdminHubProduct(payload);
       setDuplicateModalOpen(false);
-      if (created?.id) router.push(`/products/${created.handle || created.id}`);
+      if (created?.id) router.push(`/products/${created.id}`);
     } catch (err) {
       setMessage({ type: "error", text: err?.message || "Duplicate failed" });
     } finally {

@@ -119,16 +119,31 @@ const QtyVal = styled.span`
 `;
 
 const RemoveBtn = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   background: none;
   border: none;
+  border-radius: 6px;
   cursor: pointer;
-  color: #9ca3af;
-  padding: 4px;
-  font-size: 13px;
+  color: #6b7280;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
   margin-left: auto;
   align-self: flex-start;
   flex-shrink: 0;
-  &:hover { color: #ef4444; }
+  transition: color 0.15s, background 0.15s;
+  &:hover:not(:disabled) {
+    color: #ef4444;
+    background: #fef2f2;
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const ItemTotal = styled.div`
@@ -264,7 +279,15 @@ export default function CartPage() {
                     {(() => {
                       const raw = item.title || "";
                       const m = raw.match(/^(.*)\s+\((.+)\)$/);
-                      return m ? <span style={{ fontSize: 12, color: "#6b7280", display: "block", marginTop: 2 }}>{m[2]}</span> : null;
+                      if (!m || !m[2]) return null;
+                      const parts = m[2].split(/\s*\/\s*/).filter(Boolean);
+                      return (
+                        <span style={{ fontSize: 12, color: "#6b7280", display: "block", marginTop: 4, lineHeight: 1.4 }}>
+                          {parts.map((p, i) => (
+                            <span key={i} style={{ display: "block" }}>{p.trim()}</span>
+                          ))}
+                        </span>
+                      );
                     })()}
                     <ItemPrice>{formatPriceCents(item.unit_price_cents || 0)} €</ItemPrice>
                     <QtyRow>
@@ -293,8 +316,9 @@ export default function CartPage() {
                       onClick={() => removeLineItem(item.id)}
                       disabled={loading}
                       aria-label={t("remove")}
+                      title={t("remove")}
                     >
-                      <i className="fas fa-times" />
+                      ×
                     </RemoveBtn>
                     <ItemTotal>
                       {formatPriceCents((item.unit_price_cents || 0) * (item.quantity || 1))} €
