@@ -336,8 +336,7 @@ export default function ProductsPage() {
       try {
         setProductsLoading(true);
         const data = await medusaClient.getAdminHubProducts();
-        const list = (data.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
-        setProducts(list);
+        setProducts(data.products || []);
       } catch (error) {
         console.error('Error fetching products:', error);
         setProducts([]);

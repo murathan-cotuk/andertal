@@ -105,8 +105,15 @@ export function CartProvider({ children }) {
       const client = getMedusaClient();
       const res = await client.removeLineItem(cart.id, lineId);
       const updated = res?.cart;
-      if (updated) setCart(updated);
-      return updated;
+      if (updated) {
+        setCart(updated);
+        return updated;
+      }
+      // Fallback: some environments block DELETE; PATCH quantity=0 also removes
+      const res2 = await client.updateLineItem(cart.id, lineId, 0);
+      const updated2 = res2?.cart;
+      if (updated2) setCart(updated2);
+      return updated2 || null;
     } catch (err) {
       console.error("Remove line item failed:", err);
       return null;
@@ -114,6 +121,30 @@ export function CartProvider({ children }) {
       setLoading(false);
     }
   }, [cart?.id]);
+
+  const clearCart = useCallback(async () => {
+    if (!cart?.id) return null;
+    setLoading(true);
+    try {
+      const client = getMedusaClient();
+      const res = await client.clearCart(cart.id);
+      const updated = res?.cart;
+      if (updated) {
+        setCart(updated);
+        return updated;
+      }
+      // Fallback: clear items by setting quantity to 0
+      const ids = (cart.items || []).map((i) => i.id).filter(Boolean);
+      await Promise.all(ids.map((id) => client.updateLineItem(cart.id, id, 0)));
+      const refreshed = await fetchCart(cart.id);
+      return refreshed;
+    } catch (err) {
+      console.error("Clear cart failed:", err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [cart?.id, cart?.items, fetchCart]);
 
   const openCartSidebar = useCallback(() => setSidebarOpen(true), []);
   const closeCartSidebar = useCallback(() => setSidebarOpen(false), []);
@@ -130,6 +161,7 @@ export function CartProvider({ children }) {
     addToCart,
     updateLineItem,
     removeLineItem,
+    clearCart,
     createCart,
     fetchCart,
     loading,

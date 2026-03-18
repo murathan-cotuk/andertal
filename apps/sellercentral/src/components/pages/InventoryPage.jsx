@@ -22,6 +22,7 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { formatDecimal } from "@/lib/format";
+import { resolveImageUrl } from "@/lib/image-url";
 
 const DEFAULT_DUPLICATE_OPTIONS = {
   title: true,
@@ -78,8 +79,7 @@ export default function InventoryPage() {
       try {
         setLoading(true);
         const data = await medusaClient.getAdminHubProducts();
-        const list = (data.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
-        setProducts(list);
+        setProducts(data.products || []);
       } catch (err) {
         setError(err?.message || "Failed to load products");
       } finally {
@@ -249,7 +249,7 @@ export default function InventoryPage() {
                         ? (typeof media[0] === "string" ? media[0] : (media[0]?.url || null))
                         : null) ||
                       (typeof media === "string" && media ? media : null);
-                    const thumbUrl = rawThumb || null;
+                    const thumbUrl = rawThumb ? resolveImageUrl(rawThumb) : null;
                     const price = product.price != null ? Number(product.price) : (product.variants?.[0]?.prices?.[0]?.amount ? Number(product.variants[0].prices[0].amount) / 100 : 0);
                     const inv = product.inventory != null ? Number(product.inventory) : 0;
                     const sku = product.sku || "—";

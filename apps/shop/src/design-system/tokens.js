@@ -8,7 +8,7 @@
 export const tokens = {
   // —— Primary (Brand Orange) — aksiyon rengi, CTA
   primary: {
-    DEFAULT: "#FF6A00",
+    DEFAULT: "#ff971c",
     hover: "#E65F00",
     active: "#CC5400",
     light: "#FFF2E6",

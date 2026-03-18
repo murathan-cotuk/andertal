@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { motion } from "framer-motion";
 import { tokens } from "@/design-system/tokens";
+import Carousel from "@/components/Carousel";
 
 const Section = styled(motion.section)`
   width: 100%;
@@ -80,15 +81,10 @@ const VisualBlock = styled(motion.div)`
   font-size: ${tokens.fontSize.small};
 `;
 
-const FloatingCards = styled.div`
-  display: flex;
-  gap: ${tokens.spacing.md};
+const CarouselWrap = styled.div`
   padding: ${tokens.spacing.lg} ${tokens.containerPadding};
   max-width: 1280px;
   margin: 0 auto;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
 `;
 
 const CollectionCard = styled(motion(Link))`
@@ -145,7 +141,16 @@ export default function HeroSection({
         </VisualBlock>
       </TopRow>
       {collections.length > 0 && (
-        <FloatingCards>
+        <CarouselWrap>
+          <Carousel
+            contained={false}
+            itemWidth={160}
+            gap={16}
+            showNav={false}
+            showFade
+            animateItems={false}
+            fadeBgColor={tokens.background.main}
+          >
           {collections.slice(0, 6).map((col, i) => (
             <CollectionCard
               key={col.id || i}
@@ -158,7 +163,8 @@ export default function HeroSection({
               {col.title || "Collection"}
             </CollectionCard>
           ))}
-        </FloatingCards>
+          </Carousel>
+        </CarouselWrap>
       )}
     </Section>
   );

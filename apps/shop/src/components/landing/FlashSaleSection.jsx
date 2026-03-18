@@ -3,23 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
-import { motion } from "framer-motion";
 import { tokens } from "@/design-system/tokens";
+import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
-
-const Section = styled.section`
-  padding: ${tokens.sectionGap} ${tokens.containerPadding};
-  max-width: 1280px;
-  margin: 0 auto;
-`;
-
-const Header = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${tokens.spacing.lg};
-  margin-bottom: ${tokens.spacing.xl};
-  flex-wrap: wrap;
-`;
 
 const Badge = styled.span`
   display: inline-block;
@@ -36,6 +22,7 @@ const Title = styled.h2`
   font-size: ${tokens.fontSize.h2};
   font-weight: 600;
   color: ${tokens.dark[900]};
+  margin: 0;
 `;
 
 const Timer = styled.div`
@@ -53,20 +40,6 @@ const Cta = styled(Link)`
 
   &:hover {
     text-decoration: underline;
-  }
-`;
-
-const Scroll = styled(motion.div)`
-  display: flex;
-  gap: ${tokens.spacing.lg};
-  overflow-x: auto;
-  padding-bottom: ${tokens.spacing.md};
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-
-  & > * {
-    flex-shrink: 0;
-    scroll-snap-align: start;
   }
 `;
 
@@ -105,27 +78,30 @@ export default function FlashSaleSection({
     return () => clearInterval(id);
   }, [endDate]);
 
+  const list = (products || []).slice(0, 10);
+
+  const header = (
+    <>
+      <Badge>{badgeText}</Badge>
+      <Title>{title}</Title>
+      {timeLeft ? <Timer>{timeLeft}</Timer> : null}
+      <Cta href={ctaHref}>{ctaText}</Cta>
+    </>
+  );
+
   return (
-    <Section>
-      <Header>
-        <Badge>{badgeText}</Badge>
-        <Title>{title}</Title>
-        {timeLeft && <Timer>{timeLeft}</Timer>}
-        <Cta href={ctaHref}>{ctaText}</Cta>
-      </Header>
-      <Scroll>
-        {(products || []).slice(0, 10).map((product, i) => (
-          <motion.div
-            key={product.id || i}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            style={{ width: 280 }}
-          >
-            <ProductCard product={product} compact />
-          </motion.div>
-        ))}
-      </Scroll>
-    </Section>
+    <Carousel
+      header={header}
+      visibleCount={4}
+      navOnSides
+      autoPlay
+      autoPlayInterval={8000}
+      gap={20}
+      ariaLabel={title}
+    >
+      {list.map((product, i) => (
+        <ProductCard key={product.id || i} product={product} compact />
+      ))}
+    </Carousel>
   );
 }

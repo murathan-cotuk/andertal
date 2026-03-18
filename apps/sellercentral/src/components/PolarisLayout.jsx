@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, forwardRef } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import {
   AppProvider,
   Frame,
@@ -11,6 +11,8 @@ import {
   Button,
   Modal,
   Text,
+  Popover,
+  ActionList,
 } from "@shopify/polaris";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import {
@@ -80,14 +82,13 @@ function getMenuItemsMain(t) {
       label: t("content"),
       icon: ListBulletedIcon,
       subNavigationItems: [
-        { url: "/content/metaobjects", label: t("metaobjects") },
-        { url: "/content/categories", label: t("categories") },
         { url: "/content/media", label: t("media") },
-        { url: "/content/pages", label: t("pages") },
-        { url: "/content/files", label: t("files") },
         { url: "/content/menus", label: t("menus") },
-        { url: "/content/blog-posts", label: t("blogPosts") },
+        { url: "/content/categories", label: t("categories") },
         { url: "/content/brands", label: t("brands") },
+        { url: "/content/metaobjects", label: t("metaobjects") },
+        { url: "/content/pages", label: t("pages") },
+        { url: "/content/blog-posts", label: t("blogPosts") },
       ],
     },
     {
@@ -130,13 +131,24 @@ const UnsavedAwareLink = forwardRef(function UnsavedAwareLink({ url, children, .
   );
 });
 
+const LOCALES = [
+  { code: "en", label: "EN" },
+  { code: "de", label: "DE" },
+  { code: "tr", label: "TR" },
+  { code: "fr", label: "FR" },
+  { code: "it", label: "IT" },
+  { code: "es", label: "ES" },
+];
+
 export default function PolarisLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations("nav");
+  const locale = useLocale();
   const unsaved = useUnsavedChanges();
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const storeName =
     typeof window !== "undefined"
@@ -199,19 +211,63 @@ export default function PolarisLayout({ children }) {
     return null;
   }
 
+  const GlobeIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path d="M10 18a8 8 0 100-16 8 8 0 000 16z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M2 10h16M10 2a12.5 12.5 0 010 16 12.5 12.5 0 010-16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+
+  const langSelector = (
+    <Popover
+      active={langDropdownOpen}
+      autofocusTarget="first-node"
+      preferredAlignment="right"
+      preferredPosition="below"
+      onClose={() => setLangDropdownOpen(false)}
+      activator={
+        <Button
+          variant="plain"
+          onClick={() => setLangDropdownOpen((v) => !v)}
+          accessibilityLabel="Language / Dil"
+          size="slim"
+          style={{ color: "#fff" }}
+        >
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, color: "#fff" }}>
+            <GlobeIcon />
+          </span>
+        </Button>
+      }
+    >
+      <ActionList
+        items={LOCALES.map(({ code, label }) => ({
+          content: label,
+          active: locale === code,
+          onAction: () => {
+            router.replace(pathname, { locale: code });
+            setLangDropdownOpen(false);
+          },
+        }))}
+      />
+    </Popover>
+  );
+
   const topBarMarkup = (
     <TopBar
       showNavigationToggle
       onNavigationToggle={() => setShowMobileNav((v) => !v)}
       userMenu={
-        <TopBar.UserMenu
-          name={storeName}
-          detail=""
-          initials={getUserInitials()}
-          actions={userMenuActions}
-          open={userMenuOpen}
-          onToggle={() => setUserMenuOpen((v) => !v)}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {langSelector}
+          <TopBar.UserMenu
+            name={storeName}
+            detail=""
+            initials={getUserInitials()}
+            actions={userMenuActions}
+            open={userMenuOpen}
+            onToggle={() => setUserMenuOpen((v) => !v)}
+          />
+        </div>
       }
       searchField={
         <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 520 }}>

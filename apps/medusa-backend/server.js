@@ -366,12 +366,14 @@ async function start() {
             name varchar(255) NOT NULL,
             handle varchar(255) NOT NULL UNIQUE,
             logo_image text,
+            banner_image text,
             address text,
             created_at timestamp DEFAULT now(),
             updated_at timestamp DEFAULT now()
           );
         `)
         await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_brands_handle ON admin_hub_brands(handle);')
+        await client.query('ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS banner_image text;')
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_carts (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1115,9 +1117,9 @@ async function start() {
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {
         await client.connect()
-        const r = await client.query('SELECT id, name, handle, logo_image, address, created_at FROM admin_hub_brands ORDER BY name')
+        const r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, created_at FROM admin_hub_brands ORDER BY name')
         await client.end()
-        res.json({ brands: (r.rows || []).map((row) => ({ id: row.id, name: row.name, handle: row.handle, logo_image: row.logo_image || null, address: row.address || null, created_at: row.created_at })) })
+        res.json({ brands: (r.rows || []).map((row) => ({ id: row.id, name: row.name, handle: row.handle, logo_image: row.logo_image || null, banner_image: row.banner_image || null, address: row.address || null, created_at: row.created_at })) })
       } catch (e) {
         try { await client.end() } catch (_) {}
         console.error('Brands GET:', e)
@@ -1130,14 +1132,15 @@ async function start() {
       if (!name) return res.status(400).json({ message: 'name is required' })
       const handle = (body.handle || '').trim() || slugifyTitle(name) || ('brand-' + Date.now())
       const logo_image = (body.logo_image || body.logo || '').trim() || null
+      const banner_image = (body.banner_image || '').trim() || null
       const address = (body.address || '').trim() || null
       const client = getBrandsDbClient()
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {
         await client.connect()
         const r = await client.query(
-          'INSERT INTO admin_hub_brands (name, handle, logo_image, address) VALUES ($1, $2, $3, $4) ON CONFLICT (handle) DO UPDATE SET name = $1, logo_image = $3, address = $4, updated_at = now() RETURNING id, name, handle, logo_image, address, created_at',
-          [name, handle, logo_image, address]
+          'INSERT INTO admin_hub_brands (name, handle, logo_image, banner_image, address) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (handle) DO UPDATE SET name = $1, logo_image = $3, banner_image = $4, address = $5, updated_at = now() RETURNING id, name, handle, logo_image, banner_image, address, created_at',
+          [name, handle, logo_image, banner_image, address]
         )
         await client.end()
         const row = r.rows && r.rows[0]
@@ -1160,6 +1163,7 @@ async function start() {
           const name = (body.name || '').trim()
           const handle = (body.handle || '').trim()
           const logo_image = (body.logo_image || body.logo || '').trim()
+          const banner_image = typeof body.banner_image === 'string' ? body.banner_image.trim() : undefined
           const address = (body.address || '').trim()
           const updates = []
           const params = []
@@ -1167,16 +1171,17 @@ async function start() {
           if (name) { updates.push('name = $' + n); params.push(name); n++ }
           if (handle) { updates.push('handle = $' + n); params.push(handle); n++ }
           if (logo_image !== undefined) { updates.push('logo_image = $' + n); params.push(logo_image || null); n++ }
+          if (banner_image !== undefined) { updates.push('banner_image = $' + n); params.push(banner_image || null); n++ }
           if (address !== undefined) { updates.push('address = $' + n); params.push(address || null); n++ }
           if (updates.length === 0) {
-            const r = await client.query('SELECT id, name, handle, logo_image, address, created_at FROM admin_hub_brands WHERE id = $1', [id])
+            const r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, created_at FROM admin_hub_brands WHERE id = $1', [id])
             await client.end()
             if (!r.rows || !r.rows[0]) return res.status(404).json({ message: 'Brand not found' })
             return res.json({ brand: r.rows[0] })
           }
           updates.push('updated_at = now()')
           params.push(id)
-          const r = await client.query('UPDATE admin_hub_brands SET ' + updates.join(', ') + ' WHERE id = $' + n + ' RETURNING id, name, handle, logo_image, address, created_at', params)
+          const r = await client.query('UPDATE admin_hub_brands SET ' + updates.join(', ') + ' WHERE id = $' + n + ' RETURNING id, name, handle, logo_image, banner_image, address, created_at', params)
           await client.end()
           if (!r.rows || !r.rows[0]) return res.status(404).json({ message: 'Brand not found' })
           res.json({ brand: r.rows[0] })
@@ -1825,13 +1830,26 @@ async function start() {
     httpApp.patch('/admin-hub/seller-settings', sellerSettingsPATCH)
     console.log('Admin Hub routes: GET/PATCH /admin-hub/seller-settings')
 
+    // Store API: public seller settings (store name) for "Sold by" on shop
+    const storeSellerSettingsGET = async (req, res) => {
+      try {
+        const sellerId = (req.query.seller_id || 'default').toString().trim() || 'default'
+        const store_name = (await getSellerStoreName(sellerId)) || ''
+        res.json({ store_name })
+      } catch (err) {
+        res.json({ store_name: '' })
+      }
+    }
+    httpApp.get('/store/seller-settings', storeSellerSettingsGET)
+    console.log('Store routes: GET /store/seller-settings')
+
     const getBrandById = async (brandId) => {
       if (!brandId) return null
       const client = getBrandsDbClient()
       if (!client) return null
       try {
         await client.connect()
-        const r = await client.query('SELECT id, name, handle, logo_image FROM admin_hub_brands WHERE id = $1', [brandId])
+        const r = await client.query('SELECT id, name, handle, logo_image, banner_image FROM admin_hub_brands WHERE id = $1', [brandId])
         await client.end()
         return r.rows && r.rows[0] ? r.rows[0] : null
       } catch (e) {
@@ -1939,6 +1957,8 @@ async function start() {
           const cidNorm = norm(collectionId)
           list = list.filter((p) => norm(p.collection_id) === cidNorm)
         }
+        // Only published products visible in store
+        list = list.filter((p) => (p.status || '').toLowerCase() === 'published')
         if (searchQ) {
           list = list.filter((p) => {
             const t = (p.title || '').toLowerCase()
@@ -1963,7 +1983,7 @@ async function start() {
           const brandId = mapped.metadata && mapped.metadata.brand_id
           if (brandId && brandsById[brandId]) {
             const b = brandsById[brandId]
-            mapped.metadata = { ...(mapped.metadata || {}), brand_name: b.name, brand_logo: b.logo_image || null }
+            mapped.metadata = { ...(mapped.metadata || {}), brand_name: b.name, brand_logo: b.logo_image || null, brand_handle: b.handle || null }
           }
           return mapped
         })
@@ -1999,7 +2019,7 @@ async function start() {
           return
         }
         const product = await getAdminHubProductByIdOrHandleDb(idOrHandle)
-        if (!product) {
+        if (!product || (product.status || '').toLowerCase() !== 'published') {
           res.status(404).json({ message: 'Product not found' })
           return
         }
@@ -2019,7 +2039,7 @@ async function start() {
         if (brandId) {
           const brand = await getBrandById(brandId)
           if (brand) {
-            mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null }
+            mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
           }
         }
         res.json({ product: mapped })
@@ -2030,7 +2050,40 @@ async function start() {
     }
     httpApp.get('/store/products', storeProductsFromAdminHubGET)
     httpApp.get('/store/products/:idOrHandle', storeProductByIdFromAdminHubGET)
-    console.log('Store routes: GET /store/products, GET /store/products/:idOrHandle (from Admin Hub)')
+    httpApp.get('/store/brands/:handle', async (req, res) => {
+      const handle = (req.params.handle || '').trim().toLowerCase()
+      if (!handle) return res.status(400).json({ message: 'handle required' })
+      const client = getBrandsDbClient()
+      if (!client) return res.status(500).json({ message: 'Database unavailable' })
+      try {
+        await client.connect()
+        const r = await client.query('SELECT id, name, handle, logo_image, banner_image, address FROM admin_hub_brands WHERE LOWER(handle) = $1', [handle])
+        await client.end()
+        const brand = r.rows && r.rows[0]
+        if (!brand) return res.status(404).json({ message: 'Brand not found' })
+        // Fetch products for this brand
+        let list = await listAdminHubProductsDb({ limit: 200 })
+        list = list.filter((p) => (p.status || '').toLowerCase() === 'published' && p.metadata && String(p.metadata.brand_id) === String(brand.id))
+        const sellerIds = [...new Set(list.map((p) => (p.seller_id || 'default').toString().trim()).filter(Boolean))]
+        const storeNamesBySeller = {}
+        await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))
+        const products = list.map((p) => {
+          const mapped = mapAdminHubToStoreProduct(p)
+          const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
+          if (!existingSeller && p.seller_id && storeNamesBySeller[(p.seller_id || 'default').toString().trim()]) {
+            const storeName = storeNamesBySeller[(p.seller_id || 'default').toString().trim()]
+            mapped.metadata = { ...(mapped.metadata || {}), seller_name: storeName, shop_name: storeName }
+          }
+          mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
+          return mapped
+        })
+        res.json({ brand, products, count: products.length })
+      } catch (e) {
+        console.error('Store brands GET:', e)
+        res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+      }
+    })
+    console.log('Store routes: GET /store/products, GET /store/products/:idOrHandle, GET /store/brands/:handle (from Admin Hub)')
 
     // --- Store Carts (session cart: create, get, add/update/remove line-items) ---
     const productIdFromVariantId = (variantId) => {
@@ -2211,11 +2264,37 @@ async function start() {
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
       }
     }
+
+    // Clear cart: delete all line items
+    const storeCartClearDELETE = async (req, res) => {
+      const cartId = (req.params.id || req.params.cartId || '').toString().trim()
+      if (!cartId) return res.status(400).json({ message: 'Cart id required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl || !dbUrl.startsWith('postgres')) return res.status(503).json({ message: 'Database not configured' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        // Ensure cart exists
+        const cartExists = await client.query('SELECT id FROM store_carts WHERE id = $1', [cartId])
+        if (!cartExists.rows || !cartExists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
+        await client.query('DELETE FROM store_cart_items WHERE cart_id = $1', [cartId])
+        const cart = await getCartWithItems(client, cartId)
+        await client.end()
+        res.json({ cart })
+      } catch (err) {
+        if (client) try { await client.end() } catch (_) {}
+        console.error('Store cart clear DELETE:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    }
     httpApp.post('/store/carts', storeCartsPOST)
     httpApp.get('/store/carts/:id', storeCartGET)
     httpApp.post('/store/carts/:id/line-items', storeCartLineItemsPOST)
     httpApp.patch('/store/carts/:id/line-items/:lineId', storeCartLineItemPATCH)
     httpApp.delete('/store/carts/:id/line-items/:lineId', storeCartLineItemDELETE)
+    httpApp.delete('/store/carts/:id/line-items', storeCartClearDELETE)
     console.log('Store routes: POST/GET /store/carts, POST/PATCH/DELETE line-items')
 
     const storeCollectionsGET = async (req, res) => {

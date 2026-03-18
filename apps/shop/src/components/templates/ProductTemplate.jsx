@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useParams } from "next/navigation";
 import { useLocale } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { Button } from "@belucha/ui";
 import { getMedusaClient } from "@/lib/medusa-client";
@@ -10,23 +11,24 @@ import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedProduct } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import Carousel from "@/components/Carousel";
 import { StarRating } from "@/components/ProductCard";
 import { ProductCard } from "@/components/ProductCard";
 import { Lightbox } from "@/components/Lightbox";
+import ToCartButton from "@/components/ui/To Cart Button";
 
 const Container = styled.div`
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 24px 16px 48px;
+  max-width: 100%;
+  padding: 24px 250px 48px;
 `;
 
 const ThreeCol = styled.div`
   display: grid;
-  grid-template-columns: 1.65fr 1fr 290px;
+  grid-template-columns: 0.55fr 1fr 290px;
   gap: 32px;
   margin-bottom: 48px;
   align-items: start;
-  @media (max-width: 1024px) {
+  @media (max-width: 102px) {
     grid-template-columns: 1fr 1fr;
   }
   @media (max-width: 768px) {
@@ -40,9 +42,11 @@ const GalleryCol = styled.div`
   gap: 12px;
   position: sticky;
   top: 116px;
+  margin-left: -40px;
   @media (max-width: 1024px) {
     position: static;
     top: auto;
+    margin-left: 0;
   }
 `;
 
@@ -140,7 +144,7 @@ const VarRow = styled.div`
 
 /* Text chip — sizes, materials, etc */
 const VarChip = styled.button`
-  padding: 5px 11px;
+  padding: 7px 15px;
   font-size: 0.8125rem;
   font-weight: 500;
   line-height: 1.35;
@@ -160,21 +164,20 @@ const VarChip = styled.button`
 
 /* Swatch circle — color / image options */
 const VarSwatch = styled.button`
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  border: 2px solid ${(p) => (p.$selected ? "#111" : "transparent")};
-  outline: ${(p) => (p.$selected ? "none" : "1.5px solid #e0e0e0")};
-  outline-offset: 1px;
-  padding: 2px;
+  border: 2.5px solid ${(p) => (p.$selected ? "#111" : "#e0e0e0")};
+  padding: 0;
   background: none;
   cursor: pointer;
   overflow: hidden;
   flex-shrink: 0;
   transition: border-color 0.12s, transform 0.12s;
-  transform: ${(p) => (p.$selected ? "scale(1.12)" : "scale(1)")};
+  transform: ${(p) => (p.$selected ? "scale(1.1)" : "scale(1)")};
   opacity: ${(p) => (p.$oos && !p.$selected ? 0.4 : 1)};
   position: relative;
+  display: block;
   &::after {
     content: "";
     display: ${(p) => (p.$oos && !p.$selected ? "block" : "none")};
@@ -223,44 +226,204 @@ const RightCol = styled.div`
   }
 `;
 
-const Card = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+const BuyboxCard = styled.aside`
+  position: static;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.98));
+  box-shadow:
+    0 8px 24px rgba(17, 24, 39, 0.10),
+    0 2px 8px rgba(17, 24, 39, 0.06);
+  overflow: hidden;
+  border: 1px solid rgba(17, 24, 39, 0.06);
+
+  @supports ((-webkit-backdrop-filter: blur(12px)) or (backdrop-filter: blur(12px))) {
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255,106,0,0.45), rgba(255,106,0,0.05), rgba(17,24,39,0.08));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+`;
+
+const BuyboxInner = styled.div`
+  position: relative;
   padding: 16px;
-  background: #fff;
 `;
 
-const StockBadge = styled.span`
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-weight: 600;
+const PriceTop = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+`;
+
+const PriceStack = styled.div`
+  min-width: 0;
+`;
+
+const PriceMainRow = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+`;
+
+const PriceMain = styled.span`
+  font-size: 1.7rem;
+  font-weight: 650;
+  color: #374151;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+`;
+
+const DiscountPill = styled.span`
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #7c2d12;
+  background: #ffedd5;
+  border: 1px solid #fed7aa;
+  padding: 3px 8px;
+  border-radius: 999px;
+`;
+
+const PriceSubRow = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+`;
+
+const Strike = styled.span`
   font-size: 0.9rem;
-  &.in-stock { background: #d1fae5; color: #065f46; }
-  &.out-of-stock { background: #fee2e2; color: #991b1b; }
+  color: #9ca3af;
+  text-decoration: line-through;
 `;
 
-const CarouselSection = styled.section`
-  margin-bottom: 48px;
+const MSRP = styled.span`
+  font-size: 0.82rem;
+  color: #9ca3af;
 `;
 
-const CarouselTitle = styled.h2`
+const TaxLine = styled.div`
+  font-size: 0.72rem;
+  color: #9ca3af;
+  margin-top: 6px;
+`;
+
+const StockRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px;
+  border-radius: 14px;
+  background: rgba(249, 250, 251, 0.9);
+  border: 1px solid rgba(229, 231, 235, 0.9);
+  margin-bottom: 14px;
+`;
+
+const QtyWrap = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const QtyLabel = styled.label`
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 600;
+`;
+
+const QtySelect = styled.select`
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 0.9rem;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  color: #111;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  &:focus {
+    border-color: rgba(255,106,0,0.55);
+    box-shadow: 0 0 0 4px rgba(255,106,0,0.12);
+  }
+`;
+
+const CtaStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+`;
+
+const InfoList = styled.div`
+  border-top: 1px solid rgba(229,231,235,0.9);
+  padding-top: 12px;
+  display: grid;
+  gap: 9px;
+`;
+
+const InfoRow = styled.div`
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 0.84rem;
+`;
+
+const InfoLabel = styled.span`
+  color: #9ca3af;
+  font-weight: 650;
+`;
+
+const InfoValue = styled.span`
+  color: #111827;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const CartNotice = styled.div`
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #065f46;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-align: center;
+  opacity: ${(p) => (p.$visible ? 1 : 0)};
+  transform: translateY(${(p) => (p.$visible ? "0px" : "6px")});
+  transition: opacity 450ms ease, transform 450ms ease;
+`;
+
+const HEADING_ORANGE = "#c2410c";
+
+const SectionTitle = styled.h2`
   font-size: 1.35rem;
   font-weight: 700;
   margin-bottom: 16px;
   color: #1f2937;
 `;
-
-const CarouselScroll = styled.div`
-  display: flex;
-  gap: 16px;
-  overflow-x: auto;
-  padding-bottom: 12px;
-  scroll-snap-type: x mandatory;
-  & > * { flex-shrink: 0; scroll-snap-align: start; }
-`;
-
-const HEADING_ORANGE = "#c2410c";
 
 const DescriptionSection = styled.section`
   margin-bottom: 48px;
@@ -308,12 +471,19 @@ const META_HIDDEN_KEYS = [
   "ean", "brand", "seller_name", "shop_name", "return_days", "return_cost", "return_kostenlos",
   "review_count", "review_avg", "sold_last_month", "metafields", "publish_date",
   "brand_id", "hersteller", "seo_keywords", "seo_meta_title", "seo_meta_description",
-  "hersteller_information", "verantwortliche_person_information", "brand_name", "brand_logo",
+  "hersteller_information", "verantwortliche_person_information", "brand_name", "brand_logo", "brand_handle",
 ];
+
+const DEFAULT_VARIANT_TITLES = new Set(["default title", "default", "standard"]);
 
 /* Legacy: group flat variants by title for products without variation_groups */
 function groupVariantsByTitle(variants) {
   if (!Array.isArray(variants) || variants.length === 0) return [];
+  // Single default variant → no UI needed
+  if (variants.length === 1) {
+    const t = (variants[0].title || variants[0].value || "").toString().trim().toLowerCase();
+    if (!t || DEFAULT_VARIANT_TITLES.has(t)) return [];
+  }
   const groups = [];
   const byTitle = new Map();
   variants.forEach((v, index) => {
@@ -393,6 +563,49 @@ function buildMetaRows(meta) {
     .map(([k, v]) => ({ key: k, value: String(v) }));
 }
 
+function slugify(str) {
+  return (str || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function BrandRow({ brandName, brandHandle, brandLogo, reviewCount }) {
+  // Fallback: if enrichment hasn't run yet, try to slugify the brand name
+  const handle = brandHandle || slugify(brandName) || null;
+
+  const content = (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.875rem" }}>
+      {brandLogo ? (
+        <img
+          src={brandLogo}
+          alt={brandName}
+          style={{ width: 26, height: 26, objectFit: "cover", borderRadius: "50%", border: "1px solid #e5e7eb", flexShrink: 0 }}
+        />
+      ) : (
+        <span style={{ width: 26, height: 26, borderRadius: "50%", background: "#f3f4f6", border: "1px solid #e5e7eb", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#9ca3af" }}>
+          {(brandName || "?").charAt(0).toUpperCase()}
+        </span>
+      )}
+      <span style={{ color: "#0ea5e9", textDecoration: "underline", textUnderlineOffset: 2, fontWeight: 500 }}>
+        {brandName}
+      </span>
+      {reviewCount > 0 && (
+        <span style={{ color: "#9ca3af", fontWeight: 400 }}>({reviewCount})</span>
+      )}
+    </span>
+  );
+
+  if (!handle) return <div>{content}</div>;
+
+  return (
+    <Link href={`/brand/${handle}`} style={{ textDecoration: "none" }}>
+      {content}
+    </Link>
+  );
+}
+
 export default function ProductTemplate() {
   const params = useParams();
   const locale = useLocale();
@@ -408,10 +621,25 @@ export default function ProductTemplate() {
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
   // Object map: { [groupName]: selectedValue } — each group is independent
   const [selectedOptions, setSelectedOptions] = useState({});
+  const [sellerStoreName, setSellerStoreName] = useState("");
+  const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
-  const [gallerySticky, setGallerySticky] = useState(true);
-  const kundenSectionRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/store-seller-settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setSellerStoreName((d?.store_name || "").toString());
+      })
+      .catch(() => {
+        if (!cancelled) setSellerStoreName("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -488,16 +716,6 @@ export default function ProductTemplate() {
     }).catch(() => {});
   }, [product]);
 
-  useEffect(() => {
-    const el = kundenSectionRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setGallerySticky(!entry.isIntersecting),
-      { rootMargin: "-116px 0px 0px 0px", threshold: 0 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [product]);
 
   if (loading) return <Container>Laden…</Container>;
   if (error) return <Container>Fehler: {error}</Container>;
@@ -523,7 +741,11 @@ export default function ProductTemplate() {
     : selectedVariantIndex;
   const variant = variants[effectiveVariantIndex] ?? variants[selectedVariantIndex] ?? variants[0];
   const variantImageUrl = variant?.image_url ? resolveImageUrl(variant.image_url) : null;
-  const mainImage = variantImageUrl || images[selectedImage]?.url || (product.thumbnail ? resolveImageUrl(product.thumbnail) : null) || "https://via.placeholder.com/600";
+  // When variant has its own image, gallery shows only that image; otherwise show product images
+  const displayImages = variantImageUrl
+    ? [{ url: variantImageUrl, alt: variant?.title || displayTitle }]
+    : images;
+  const mainImage = displayImages[selectedImage]?.url || variantImageUrl || (product.thumbnail ? resolveImageUrl(product.thumbnail) : null) || "https://via.placeholder.com/600";
   const priceCents =
     variant?.prices?.[0]?.amount != null
       ? Number(variant.prices[0].amount)
@@ -547,20 +769,32 @@ export default function ProductTemplate() {
   const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
   const metaRows = buildMetaRows(meta);
-  const sellerName = product?.metadata?.seller_name || product?.metadata?.shop_name || "Shop";
+  const storeName =
+    (sellerStoreName || "").trim() ||
+    product?.metadata?.shop_name ||
+    product?.metadata?.store_name ||
+    product?.metadata?.seller_name ||
+    "Shop";
   const returnDays = meta.return_days != null ? meta.return_days : 14;
   const returnCost = meta.return_cost === false || meta.return_kostenlos === true ? "kostenlos" : (meta.return_cost || "kostenlos");
   const titleDisplay = (displayTitle || "").slice(0, 120);
 
-  const goPrev = () => setSelectedImage((i) => (i <= 0 ? images.length - 1 : i - 1));
-  const goNext = () => setSelectedImage((i) => (i >= images.length - 1 ? 0 : i + 1));
+  const goPrev = () => setSelectedImage((i) => (i <= 0 ? displayImages.length - 1 : i - 1));
+  const goNext = () => setSelectedImage((i) => (i >= displayImages.length - 1 ? 0 : i + 1));
 
   const handleAddToCart = async () => {
     const variantId = variant?.id;
     if (!variantId) return;
     const ok = await addToCart(variantId, quantity);
-    if (ok) alert("In den Einkaufswagen gelegt");
-    else alert("Hinzufügen fehlgeschlagen");
+    if (ok) {
+      setCartNotice({ text: "Zum Warenkorb hinzugefügt", visible: true });
+      window.setTimeout(() => setCartNotice((s) => ({ ...s, visible: false })), 5000);
+      window.setTimeout(() => setCartNotice({ text: "", visible: false }), 5600);
+    } else {
+      setCartNotice({ text: "Hinzufügen fehlgeschlagen", visible: true });
+      window.setTimeout(() => setCartNotice((s) => ({ ...s, visible: false })), 5000);
+      window.setTimeout(() => setCartNotice({ text: "", visible: false }), 5600);
+    }
   };
 
   const breadcrumbItems = [
@@ -576,13 +810,13 @@ export default function ProductTemplate() {
 
       <ThreeCol>
         {/* Left: Gallery — sticky until Kunden section */}
-        <GalleryCol style={gallerySticky ? { position: "sticky", top: 116 } : { position: "relative" }}>
-          <MainImageWrap onClick={() => images.length > 0 && setLightboxOpen(true)}>
+        <GalleryCol>
+          <MainImageWrap onClick={() => displayImages.length > 0 && setLightboxOpen(true)}>
             <MainImage src={mainImage} alt={displayTitle} />
           </MainImageWrap>
-          {images.length > 1 && (
+          {displayImages.length > 1 && (
             <Thumbnails>
-              {images.map((img, index) => (
+              {displayImages.map((img, index) => (
                 <Thumbnail
                   key={index}
                   src={img.url || ""}
@@ -593,7 +827,7 @@ export default function ProductTemplate() {
               ))}
             </Thumbnails>
           )}
-          {images.length > 1 && (
+          {displayImages.length > 1 && (
             <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
               <button type="button" onClick={goPrev} className="px-3 py-1 border rounded hover:bg-gray-100">‹</button>
               <button type="button" onClick={goNext} className="px-3 py-1 border rounded hover:bg-gray-100">›</button>
@@ -604,15 +838,31 @@ export default function ProductTemplate() {
         {/* Center: Title, brand, reviews, price, variants, bullets, meta */}
         <CenterCol>
           <Title>{titleDisplay}</Title>
-          {(meta.brand_name || meta.brand) && (
-            <Brand>
-              {meta.brand_logo && <img src={meta.brand_logo} alt="" style={{ width: 20, height: 20, objectFit: "contain", marginRight: 6, verticalAlign: "middle" }} />}
-              {meta.brand_name || meta.brand}
-            </Brand>
-          )}
-          <a href="#reviews" className="inline-flex items-center gap-1 text-gray-600 hover:text-blue-600">
+          {/* ── Review row — always visible ── */}
+          <a
+            href="#reviews"
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit" }}
+          >
             <StarRating average={reviewAvg} count={reviewCount} />
+            {reviewAvg > 0 ? (
+              <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#374151" }}>
+                {reviewAvg.toFixed(1).replace(".", ",")}
+              </span>
+            ) : null}
+            <span style={{ fontSize: "0.8125rem", color: "#6b7280" }}>
+              {reviewCount > 0 ? `(${reviewCount} Bewertungen)` : "Noch keine Bewertungen"}
+            </span>
           </a>
+
+          {/* ── Seller / Brand row ── */}
+          {(meta.brand_name || meta.brand) && (
+            <BrandRow
+              brandName={meta.brand_name || meta.brand || ""}
+              brandHandle={meta.brand_handle || null}
+              brandLogo={meta.brand_logo ? resolveImageUrl(meta.brand_logo) : null}
+              reviewCount={reviewCount}
+            />
+          )}
           {soldLastMonth != null && soldLastMonth > 0 && (
             <p className="text-gray-500 text-sm">
               {soldLastMonth} im letzten Monat verkauft
@@ -645,6 +895,7 @@ export default function ProductTemplate() {
                         const handleClick = () => {
                           if (isSelected || !inStock) return;
                           setSelectedOptions((prev) => ({ ...prev, [groupName]: valueStr }));
+                          setSelectedImage(0);
                         };
                         if (isSwatch || swatchUrl) {
                           return (
@@ -745,92 +996,79 @@ export default function ProductTemplate() {
 
         {/* Right: Buybox — sticky */}
         <RightCol>
-          <Card>
-            {/* Price at top of buybox */}
-            <div style={{ marginBottom: 12 }}>
-              {uvpCents != null && uvpCents > 0 && (
-                <div style={{ fontSize: "0.8125rem", color: "#9ca3af", textDecoration: "line-through", marginBottom: 2 }}>
-                  UVP {formatPriceCents(uvpCents)} €
-                </div>
+          <BuyboxCard>
+            <BuyboxInner>
+              <PriceTop>
+                <PriceStack>
+                  <PriceMainRow>
+                    <PriceMain>{formatPriceCents(displayCents)} €</PriceMain>
+                    {discountPercent != null && discountPercent > 0 && (
+                      <DiscountPill>-{discountPercent}%</DiscountPill>
+                    )}
+                  </PriceMainRow>
+                  {(hasSale || (uvpCents != null && uvpCents > 0)) && (
+                    <PriceSubRow>
+                      {hasSale && <Strike>{formatPriceCents(priceCents)} €</Strike>}
+                      {uvpCents != null && uvpCents > 0 && <MSRP>UVP {formatPriceCents(uvpCents)} €</MSRP>}
+                    </PriceSubRow>
+                  )}
+                  <TaxLine>inkl. MwSt. · zzgl. Versandkosten</TaxLine>
+                </PriceStack>
+              </PriceTop>
+
+              {inStock && !isComingSoon && (
+                <StockRow>
+                  <QtyWrap>
+                    <QtyLabel>Menge</QtyLabel>
+                    <QtySelect value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}>
+                      {Array.from({ length: maxQty }, (_, i) => i + 1).map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </QtySelect>
+                  </QtyWrap>
+                </StockRow>
               )}
-              {hasSale && (
-                <div style={{ fontSize: "0.875rem", color: "#9ca3af", textDecoration: "line-through", marginBottom: 2 }}>
-                  {formatPriceCents(priceCents)} €
-                </div>
-              )}
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                <span style={{ fontSize: "1.875rem", fontWeight: 700, color: "#16a34a" }}>
-                  {formatPriceCents(displayCents)} €
-                </span>
-                {discountPercent != null && discountPercent > 0 && (
-                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#dc2626" }}>
-                    –{discountPercent}%
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 2 }}>
-                Preise inkl. MwSt. zzgl. Versandkosten
-              </div>
-            </div>
-            <StockBadge className={inStock ? "in-stock" : "out-of-stock"}>
-              {inStock ? "Auf Lager" : "Ausverkauft"}
-            </StockBadge>
-            <div style={{ marginTop: 12 }}>
-              <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Anzahl</label>
-              <select
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                style={{ width: "100%", maxWidth: 100, border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px", fontSize: 14 }}
-              >
-                {Array.from({ length: maxQty }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={n}>{n}</option>
+
+              <CtaStack>
+                {cartNotice.text ? (
+                  <CartNotice $visible={cartNotice.visible}>{cartNotice.text}</CartNotice>
+                ) : null}
+                <ToCartButton
+                  onClick={handleAddToCart}
+                  disabled={!inStock || isComingSoon}
+                  style={{ width: "100%" }}
+                >
+                  {isComingSoon ? "Bald verfügbar" : !inStock ? "Ausverkauft" : "In den Einkaufswagen"}
+                </ToCartButton>
+              </CtaStack>
+
+              <InfoList>
+                {[
+                  { label: "Versand", value: meta.shipping_info || meta.versand || "Standardversand" },
+                  { label: "Rückgabe", value: `${returnDays} Tage, ${returnCost}` },
+                  { label: "Sold by", value: storeName },
+                  ...((variant?.ean || meta.ean) ? [{ label: "EAN", value: variant?.ean || meta.ean }] : []),
+                ].map(({ label, value }) => (
+                  <InfoRow key={label}>
+                    <InfoLabel>{label}</InfoLabel>
+                    <InfoValue title={String(value ?? "")}>{value}</InfoValue>
+                  </InfoRow>
                 ))}
-              </select>
-            </div>
-            <Button size="lg" fullWidth onClick={handleAddToCart} disabled={!inStock || isComingSoon} style={{ marginTop: 16, marginBottom: 8, background: "#c2410c", color: "#fff", border: "none" }}>
-              {isComingSoon ? "Bald verfügbar" : "In den Einkaufswagen"}
-            </Button>
-            <Button size="lg" variant="outline" fullWidth disabled={!inStock || isComingSoon} style={{ borderColor: "#c2410c", color: "#c2410c" }}>
-              Jetzt kaufen
-            </Button>
-            {isComingSoon && publishDate && (
-              <p style={{ margin: "8px 0 0", fontSize: 13, color: "#6b7280", textAlign: "center" }}>
-                Verfügbar ab {publishDate.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" })}
-              </p>
-            )}
-            <div style={{ marginTop: 16, borderTop: "1px solid #f3f4f6", paddingTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ display: "flex", gap: 8, fontSize: 13 }}>
-                <span style={{ fontWeight: 600, color: "#374151", minWidth: 72, flexShrink: 0 }}>Versand</span>
-                <span style={{ color: "#6b7280" }}>{meta.shipping_info || meta.versand || "Standardversand"}</span>
-              </div>
-              <div style={{ display: "flex", gap: 8, fontSize: 13 }}>
-                <span style={{ fontWeight: 600, color: "#374151", minWidth: 72, flexShrink: 0 }}>Rückgabe</span>
-                <span style={{ color: "#6b7280" }}>{returnDays} Tage, {returnCost}</span>
-              </div>
-              <div style={{ display: "flex", gap: 8, fontSize: 13 }}>
-                <span style={{ fontWeight: 600, color: "#374151", minWidth: 72, flexShrink: 0 }}>Verkäufer</span>
-                <span style={{ color: "#6b7280" }} data-seller-source="metadata">{sellerName}</span>
-              </div>
-            </div>
-          </Card>
-          {isComingSoon && (
-            <p style={{ margin: "8px 0 0", padding: "10px 14px", background: "#FFF2E6", color: "#c2410c", borderRadius: 8, fontSize: 14, fontWeight: 600, textAlign: "center" }}>
-              Bald verfügbar
-            </p>
-          )}
+              </InfoList>
+            </BuyboxInner>
+          </BuyboxCard>
         </RightCol>
       </ThreeCol>
 
       {/* Full width below */}
       {alsoBought.length > 0 && (
-        <CarouselSection ref={kundenSectionRef}>
-          <CarouselTitle>Kunden, die diesen Artikel gekauft haben, kauften auch</CarouselTitle>
-          <CarouselScroll>
+        <div style={{ marginBottom: 48 }}>
+          <Carousel contained={false} title="Kunden, die diesen Artikel gekauft haben, kauften auch" itemWidth={260}>
             {alsoBought.map((p) => (
               <ProductCard key={p.id} product={p} compact />
             ))}
-          </CarouselScroll>
-        </CarouselSection>
+          </Carousel>
+        </div>
       )}
 
       {(displayDescription || product.subtitle) && (
@@ -851,28 +1089,18 @@ export default function ProductTemplate() {
         </DescriptionSection>
       )}
 
-      {recommended.length > 0 && (
-        <CarouselSection>
-          <CarouselTitle>Sizin için önerilenler</CarouselTitle>
-          <CarouselScroll>
-            {recommended.map((p) => (
-              <ProductCard key={p.id} product={p} compact />
-            ))}
-          </CarouselScroll>
-        </CarouselSection>
-      )}
 
       <ReviewsSection id="reviews">
-        <CarouselTitle>
+        <SectionTitle>
           Kundenbewertungen {reviewCount > 0 && `(${reviewCount})`}
-        </CarouselTitle>
+        </SectionTitle>
         <StarRating average={reviewAvg} count={reviewCount} />
         <p className="text-gray-500 text-sm mt-2">Hier können später die vollständigen Bewertungen angezeigt werden.</p>
       </ReviewsSection>
 
-      {lightboxOpen && images.length > 0 && (
+      {lightboxOpen && displayImages.length > 0 && (
         <Lightbox
-          images={images}
+          images={displayImages}
           currentIndex={selectedImage}
           onClose={() => setLightboxOpen(false)}
           onPrev={goPrev}

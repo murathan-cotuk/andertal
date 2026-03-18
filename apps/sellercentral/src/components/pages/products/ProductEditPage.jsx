@@ -16,19 +16,18 @@ import {
   Banner,
   Divider,
   Select,
-  DropZone,
   SkeletonBodyText,
   SkeletonDisplayText,
   Popover,
   ActionList,
   Modal,
-  Thumbnail,
   Checkbox,
 } from "@shopify/polaris";
 import { ProductIcon, MenuHorizontalIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
+import MediaPickerModal from "@/components/MediaPickerModal";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -131,11 +130,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [categories, setCategories] = useState([]);
   const [collections, setCollections] = useState([]);
   const [brands, setBrands] = useState([]);
-  const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
-  const [mediaLibraryList, setMediaLibraryList] = useState([]);
-  const [mediaPickerSelected, setMediaPickerSelected] = useState(() => new Set());
-  const [mediaUrlInput, setMediaUrlInput] = useState("");
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionPopoverOpen, setCollectionPopoverOpen] = useState(false);
   const [relatedProductsList, setRelatedProductsList] = useState([]);
@@ -148,10 +143,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const dragGroupIdx = useRef(null);
   // Variant image picker: null = closed, option_values[] = target variant being edited
   const [variantImgPickerTarget, setVariantImgPickerTarget] = useState(null);
-  const [variantImgPickerSelected, setVariantImgPickerSelected] = useState(null);
   // Swatch image picker: null = closed, {gi, oi} = target group/option
   const [swatchPickerTarget, setSwatchPickerTarget] = useState(null);
-  const [swatchPickerSelected, setSwatchPickerSelected] = useState(null);
+  // Draft price strings keyed by `${variantKey}_${field}` — committed on blur
+  const [priceInputs, setPriceInputs] = useState({});
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [duplicateOptions, setDuplicateOptions] = useState(DEFAULT_DUPLICATE_OPTIONS);
   const [duplicateSaving, setDuplicateSaving] = useState(false);
@@ -197,15 +192,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     return () => { cancelled = true; };
   }, [client]);
 
-  // Load products for "Related products" when dropdown is opened
+  // Load products list once on mount (needed to resolve titles for existing related_product_ids tags)
   useEffect(() => {
-    if (!relatedProductPopoverOpen) return;
     let cancelled = false;
     client.getAdminHubProducts({ limit: 200 }).then((r) => {
       if (!cancelled && r?.products) setRelatedProductsList(r.products);
     }).catch(() => { if (!cancelled) setRelatedProductsList([]); });
     return () => { cancelled = true; };
-  }, [client, relatedProductPopoverOpen]);
+  }, [client]);
 
   useEffect(() => {
     if (descriptionMode === "visual" && descEditorRef.current) descEditorRef.current.innerHTML = product?.description || "";
@@ -547,158 +541,20 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   // ─── Variant image picker ────────────────────────────────────────────────────
   const openVariantImgPicker = (optionValues) => {
     setVariantImgPickerTarget(optionValues);
-    setVariantImgPickerSelected(null);
-    // Load media library if empty
-    if (mediaLibraryList.length === 0) {
-      client.getMedia({ limit: 100 }).then((r) => setMediaLibraryList(r.media || [])).catch(() => {});
-    }
   };
-
-  const applyVariantImg = () => {
-    if (variantImgPickerTarget && variantImgPickerSelected) {
-      updateMatrixVariant(variantImgPickerTarget, "image_url", variantImgPickerSelected);
-    }
-    setVariantImgPickerTarget(null);
-    setVariantImgPickerSelected(null);
-  };
-
-  const uploadVariantImg = useCallback((files) => {
-    setMediaUploading(true);
-    const fileList = Array.isArray(files) ? files : [files];
-    Promise.all(
-      fileList.map((file) => {
-        const fd = new FormData();
-        fd.append("file", file);
-        return client.uploadMedia(fd).then((r) => r.url || null);
-      })
-    )
-      .then((urls) => {
-        const newUrls = urls.filter(Boolean);
-        if (newUrls.length) {
-          const added = newUrls.map((u) => ({ id: `vup-${Date.now()}-${Math.random().toString(36).slice(2)}`, url: u }));
-          setMediaLibraryList((prev) => [...added, ...prev]);
-          // Auto-select the first uploaded image
-          setVariantImgPickerSelected(resolveMediaUrl(newUrls[0]));
-        }
-      })
-      .catch((err) => setMessage({ type: "error", text: err?.message || "Upload failed" }))
-      .finally(() => setMediaUploading(false));
-  }, [client]);
 
   const openSwatchPicker = (gi, oi) => {
     setSwatchPickerTarget({ gi, oi });
-    const current = variantGroups[gi]?.options?.[oi]?.swatch_image;
-    setSwatchPickerSelected(current ? resolveMediaUrl(current) : null);
-    if (mediaLibraryList.length === 0) {
-      client.getMedia({ limit: 100 }).then((r) => setMediaLibraryList(r.media || [])).catch(() => {});
-    }
   };
-
-  const applySwatchImg = () => {
-    if (swatchPickerTarget && swatchPickerSelected) {
-      vg_setOption(swatchPickerTarget.gi, swatchPickerTarget.oi, "swatch_image", swatchPickerSelected);
-    }
-    setSwatchPickerTarget(null);
-    setSwatchPickerSelected(null);
-  };
-
-  const uploadSwatchImg = useCallback((files) => {
-    setMediaUploading(true);
-    const fileList = Array.isArray(files) ? files : [files];
-    Promise.all(
-      fileList.map((file) => {
-        const fd = new FormData();
-        fd.append("file", file);
-        return client.uploadMedia(fd).then((r) => r.url || null);
-      })
-    )
-      .then((urls) => {
-        const newUrls = urls.filter(Boolean);
-        if (newUrls.length) {
-          const added = newUrls.map((u) => ({ id: `swup-${Date.now()}-${Math.random().toString(36).slice(2)}`, url: u }));
-          setMediaLibraryList((prev) => [...added, ...prev]);
-          setSwatchPickerSelected(resolveMediaUrl(newUrls[0]));
-        }
-      })
-      .catch((err) => setMessage({ type: "error", text: err?.message || "Upload failed" }))
-      .finally(() => setMediaUploading(false));
-  }, [client]);
 
   const removeMedia = (index) => {
     const next = mediaUrls.filter((_, i) => i !== index);
     updateMeta("media", next);
   };
-  const addMediaByUrl = () => {
-    const url = (mediaUrlInput || "").trim();
-    if (!url) return;
-    const valid = url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:");
-    if (!valid) {
-      setMessage({ type: "error", text: "Please enter a valid URL (http:// or https://)" });
-      return;
-    }
-    if (mediaUrls.length >= 6) {
-      setMessage({ type: "error", text: "Maximum 6 images allowed." });
-      return;
-    }
-    updateMeta("media", [...mediaUrls, url].slice(0, 6));
-    setMediaUrlInput("");
-  };
   const resolveMediaUrl = (url) => {
     if (!url) return "";
     return url.startsWith("http") || url.startsWith("data:") ? url : `${baseUrl.replace(/\/$/, "")}${url.startsWith("/") ? "" : "/"}${url}`;
   };
-  const openMediaPicker = () => {
-    setMediaPickerSelected(new Set());
-    setMediaPickerOpen(true);
-    client.getMedia({ limit: 100 }).then((r) => setMediaLibraryList(r.media || [])).catch(() => setMediaLibraryList([]));
-  };
-  const toggleMediaPickerSelection = (item) => {
-    const url = item?.url ? resolveMediaUrl(item.url) : "";
-    if (!url) return;
-    setMediaPickerSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(url)) next.delete(url);
-      else next.add(url);
-      return next;
-    });
-  };
-  const addSelectedMediaToProduct = () => {
-    const toAdd = Array.from(mediaPickerSelected).slice(0, Math.max(0, 6 - mediaUrls.length));
-    if (toAdd.length) updateMeta("media", [...mediaUrls, ...toAdd].slice(0, 6));
-    setMediaPickerOpen(false);
-    setMediaPickerSelected(new Set());
-  };
-  const uploadMediaInPicker = useCallback(
-    (files) => {
-      setMediaUploading(true);
-      const fileList = Array.isArray(files) ? files : [files];
-      Promise.all(
-        fileList.map((file) => {
-          const fd = new FormData();
-          fd.append("file", file);
-          // Store relative path; resolveMediaUrl is used only for display in admin.
-          return client.uploadMedia(fd).then((r) => (r.url ? r.url : null));
-        })
-      )
-        .then((urls) => {
-          const newUrls = urls.filter(Boolean);
-          if (newUrls.length) {
-            setMediaLibraryList((prev) => {
-              const added = newUrls.map((u) => ({ id: `uploaded-${Date.now()}-${Math.random().toString(36).slice(2)}`, url: u }));
-              return [...added, ...prev];
-            });
-            setMediaPickerSelected((prev) => {
-              const next = new Set(prev);
-              newUrls.forEach((u) => next.add(u));
-              return next;
-            });
-          }
-        })
-        .catch((err) => setMessage({ type: "error", text: err?.message || "Upload failed" }))
-        .finally(() => setMediaUploading(false));
-    },
-    [client, baseUrl]
-  );
 
   return (
     <Page title="">
@@ -944,216 +800,52 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   </div>
                 ))}
                 {mediaUrls.length < 6 && (
-                  <div className="product-media-add" role="button" tabIndex={0} title="Select from media library" onClick={openMediaPicker}>
+                  <div className="product-media-add" role="button" tabIndex={0} title="Görsel ekle" onClick={() => setMediaPickerOpen(true)}>
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8.75 3.75a.75.75 0 0 0-1.5 0v3.5h-3.5a.75.75 0 0 0 0 1.5h3.5v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5z" /></svg>
                   </div>
                 )}
               </div>
-              {mediaUrls.length < 6 && (
-                <Box paddingBlockStart="300">
-                  <InlineStack gap="200" blockAlign="center" wrap>
-                    <Text as="span" variant="bodySm" fontWeight="medium">Add by URL:</Text>
-                  <Box minWidth="280px" flex="1">
-                    <TextField
-                      label="Image URL"
-                      labelHidden
-                      value={mediaUrlInput}
-                      onChange={setMediaUrlInput}
-                      placeholder="https://example.com/image.jpg"
-                      autoComplete="off"
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMediaByUrl(); } }}
-                    />
-                  </Box>
-                    <Button size="slim" variant="secondary" onClick={addMediaByUrl} disabled={!mediaUrlInput.trim()}>
-                      Add
-                    </Button>
-                  </InlineStack>
-                </Box>
-              )}
-              {mediaUploading && <Text as="p" variant="bodySm" tone="subdued">Uploading…</Text>}
-              <Modal
+              {/* ── Product media picker ── */}
+              <MediaPickerModal
                 open={mediaPickerOpen}
-                onClose={() => { setMediaPickerOpen(false); setMediaPickerSelected(new Set()); }}
-                title="Select media"
-                size="large"
-                primaryAction={{ content: "Add", onAction: addSelectedMediaToProduct, disabled: mediaPickerSelected.size === 0 || mediaUrls.length >= 6 }}
-              >
-                <Modal.Section>
-                  <div className="product-media-picker-grid">
-                    <DropZone accept="image/*" type="image" onDropAccepted={uploadMediaInPicker} allowMultiple>
-                      <div className="product-media-picker-add" role="button" tabIndex={0} title="Upload from computer">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8.75 3.75a.75.75 0 0 0-1.5 0v3.5h-3.5a.75.75 0 0 0 0 1.5h3.5v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5z" /></svg>
-                        <span className="product-media-picker-add-label">Upload</span>
-                      </div>
-                    </DropZone>
-                    {mediaLibraryList.map((item) => {
-                      const url = item.url ? resolveMediaUrl(item.url) : "";
-                      if (!url) return null;
-                      const selected = mediaPickerSelected.has(url);
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className={`product-media-picker-item ${selected ? "selected" : ""}`}
-                          onClick={() => toggleMediaPickerSelection(item)}
-                        >
-                          <div className="product-media-picker-item-img">
-                            <Thumbnail source={url} alt={item.alt || item.filename || ""} size="large" />
-                          </div>
-                          {selected && (
-                            <span className="product-media-picker-tick" aria-hidden>
-                              <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0Z" /></svg>
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {mediaLibraryList.length === 0 && !mediaUploading && <Text as="p" tone="subdued">No media yet. Drop an image on the + square above or upload in Content → Media.</Text>}
-                </Modal.Section>
-              </Modal>
+                onClose={() => setMediaPickerOpen(false)}
+                title="Görsel seç"
+                multiple
+                onSelect={(urls) => {
+                  const toAdd = urls.slice(0, Math.max(0, 6 - mediaUrls.length));
+                  if (toAdd.length) updateMeta("media", [...mediaUrls, ...toAdd].slice(0, 6));
+                }}
+              />
 
-              {/* ── Variant image picker modal ── */}
-              <Modal
+              {/* ── Variant image picker ── */}
+              <MediaPickerModal
                 open={variantImgPickerTarget !== null}
-                onClose={() => { setVariantImgPickerTarget(null); setVariantImgPickerSelected(null); }}
-                title={variantImgPickerTarget ? `Image — ${variantImgPickerTarget.join(" / ")}` : "Variant image"}
-                size="large"
-                primaryAction={{
-                  content: "Apply",
-                  onAction: applyVariantImg,
-                  disabled: !variantImgPickerSelected,
+                onClose={() => setVariantImgPickerTarget(null)}
+                title={variantImgPickerTarget ? `Görsel — ${variantImgPickerTarget.join(" / ")}` : "Varyant görseli"}
+                multiple={false}
+                onSelect={(urls) => {
+                  if (variantImgPickerTarget && urls[0]) {
+                    updateMatrixVariant(variantImgPickerTarget, "image_url", urls[0]);
+                  }
+                  setVariantImgPickerTarget(null);
                 }}
-                secondaryActions={[{ content: "Cancel", onAction: () => { setVariantImgPickerTarget(null); setVariantImgPickerSelected(null); } }]}
-              >
-                <Modal.Section>
-                  {mediaUploading && (
-                    <Box paddingBlockEnd="300">
-                      <Text as="p" variant="bodySm" tone="subdued">Uploading…</Text>
-                    </Box>
-                  )}
-                  <div className="product-media-picker-grid">
-                    {/* Upload tile */}
-                    <DropZone accept="image/*" type="image" onDropAccepted={uploadVariantImg} allowMultiple={false}>
-                      <div className="product-media-picker-add" role="button" tabIndex={0} title="Upload new image">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8.75 3.75a.75.75 0 0 0-1.5 0v3.5h-3.5a.75.75 0 0 0 0 1.5h3.5v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5z" /></svg>
-                        <span className="product-media-picker-add-label">Upload new</span>
-                      </div>
-                    </DropZone>
+              />
 
-                    {/* Library items */}
-                    {mediaLibraryList.map((item) => {
-                      const url = item.url ? resolveMediaUrl(item.url) : "";
-                      if (!url) return null;
-                      const selected = variantImgPickerSelected === url;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className={`product-media-picker-item ${selected ? "selected" : ""}`}
-                          onClick={() => setVariantImgPickerSelected(selected ? null : url)}
-                        >
-                          <div className="product-media-picker-item-img">
-                            <Thumbnail source={url} alt={item.alt || item.filename || ""} size="large" />
-                          </div>
-                          {selected && (
-                            <span className="product-media-picker-tick" aria-hidden>
-                              <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0Z" /></svg>
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {mediaLibraryList.length === 0 && !mediaUploading && (
-                    <Box paddingBlockStart="400">
-                      <Text as="p" tone="subdued">No media in library yet. Drop an image on the + square above to upload.</Text>
-                    </Box>
-                  )}
-                </Modal.Section>
-              </Modal>
-
-              {/* ── Swatch image picker modal ── */}
-              <Modal
+              {/* ── Swatch image picker ── */}
+              <MediaPickerModal
                 open={swatchPickerTarget !== null}
-                onClose={() => { setSwatchPickerTarget(null); setSwatchPickerSelected(null); }}
-                title={swatchPickerTarget ? `Swatch — ${variantGroups[swatchPickerTarget.gi]?.name || `Group ${swatchPickerTarget.gi + 1}`} › ${variantGroups[swatchPickerTarget.gi]?.options?.[swatchPickerTarget.oi]?.value || `Option ${swatchPickerTarget.oi + 1}`}` : "Swatch image"}
-                size="large"
-                primaryAction={{
-                  content: "Apply",
-                  onAction: applySwatchImg,
-                  disabled: !swatchPickerSelected,
+                onClose={() => setSwatchPickerTarget(null)}
+                title={swatchPickerTarget
+                  ? `Swatch — "${variantGroups[swatchPickerTarget.gi]?.options?.[swatchPickerTarget.oi]?.value || "option"}"`
+                  : "Swatch görseli"}
+                multiple={false}
+                onSelect={(urls) => {
+                  if (swatchPickerTarget && urls[0]) {
+                    vg_setOption(swatchPickerTarget.gi, swatchPickerTarget.oi, "swatch_image", urls[0]);
+                  }
+                  setSwatchPickerTarget(null);
                 }}
-                secondaryActions={[{ content: "Cancel", onAction: () => { setSwatchPickerTarget(null); setSwatchPickerSelected(null); } }]}
-              >
-                <Modal.Section>
-                  {/* URL entry as alternative */}
-                  <Box paddingBlockEnd="400">
-                    <InlineStack gap="200" blockAlign="center">
-                      <div style={{ flex: 1 }}>
-                        <TextField
-                          label="Or enter image URL directly"
-                          value={swatchPickerSelected && swatchPickerSelected.startsWith("http") ? swatchPickerSelected : ""}
-                          onChange={(v) => setSwatchPickerSelected(v || null)}
-                          placeholder="https://..."
-                          autoComplete="off"
-                          prefix={swatchPickerSelected && swatchPickerSelected.startsWith("http") ? (
-                            <div style={{ width: 20, height: 20, borderRadius: "50%", overflow: "hidden", flexShrink: 0 }}>
-                              <img src={swatchPickerSelected} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            </div>
-                          ) : undefined}
-                        />
-                      </div>
-                    </InlineStack>
-                  </Box>
-                  <Divider />
-                  <Box paddingBlockStart="400">
-                    <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Or choose from media library</Text>
-                  </Box>
-                </Modal.Section>
-                <Modal.Section>
-                  {mediaUploading && (
-                    <Box paddingBlockEnd="300">
-                      <Text as="p" variant="bodySm" tone="subdued">Uploading…</Text>
-                    </Box>
-                  )}
-                  <div className="product-media-picker-grid">
-                    <DropZone accept="image/*" type="image" onDropAccepted={uploadSwatchImg} allowMultiple={false}>
-                      <div className="product-media-picker-add" role="button" tabIndex={0} title="Upload new image">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8.75 3.75a.75.75 0 0 0-1.5 0v3.5h-3.5a.75.75 0 0 0 0 1.5h3.5v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5z" /></svg>
-                        <span className="product-media-picker-add-label">Upload new</span>
-                      </div>
-                    </DropZone>
-                    {mediaLibraryList.map((item) => {
-                      const url = item.url ? resolveMediaUrl(item.url) : "";
-                      if (!url) return null;
-                      const selected = swatchPickerSelected === url;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className={`product-media-picker-item ${selected ? "selected" : ""}`}
-                          onClick={() => setSwatchPickerSelected(selected ? null : url)}
-                        >
-                          <div className="product-media-picker-item-img">
-                            <Thumbnail source={url} alt={item.alt || item.filename || ""} size="large" />
-                          </div>
-                          {selected && (
-                            <span className="product-media-picker-tick" aria-hidden>
-                              <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0Z" /></svg>
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {mediaLibraryList.length === 0 && !mediaUploading && (
-                    <Box paddingBlockStart="300">
-                      <Text as="p" tone="subdued">No media in library yet. Drop an image on the + square above to upload.</Text>
-                    </Box>
-                  )}
-                </Modal.Section>
-              </Modal>
+              />
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">Pricing</Text>
@@ -1293,12 +985,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             <button
                               type="button"
                               className={opt.swatch_image ? "vg-swatch" : "vg-swatch-empty"}
-                              title={opt.swatch_image ? "Change swatch image" : "Choose swatch image"}
+                              title={opt.swatch_image ? "Swatch görselini değiştir" : "Swatch görseli ekle (shopta renk/desen simgesi)"}
                               onClick={() => openSwatchPicker(gi, oi)}
                             >
                               {opt.swatch_image
                                 ? <img src={resolveMediaUrl(opt.swatch_image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                : "🖼"}
+                                : <span style={{ fontSize: 10, lineHeight: 1, color: "#6b7280" }}>SW</span>}
                             </button>
                             {opt.swatch_image && (
                               <button
@@ -1314,6 +1006,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             type="text"
                             value={opt.value}
                             onChange={(e) => vg_setOption(gi, oi, "value", e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                vg_addOption(gi);
+                              }
+                            }}
                             placeholder="Value"
                           />
                           <button type="button" className="vg-remove-btn" onClick={() => vg_removeOption(gi, oi)} title="Remove option">×</button>
@@ -1427,11 +1125,49 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                 {/* Stock */}
                                 <td><TextField label="" labelHidden type="number" min={0} value={v.inventory != null ? String(v.inventory) : "0"} onChange={(val) => updateMatrixVariant(v.option_values, "inventory", val)} placeholder="0" /></td>
                                 {/* Price */}
-                                <td><TextField label="" labelHidden type="number" step="0.01" value={v.price_cents != null ? (Number(v.price_cents) / 100).toFixed(2) : ""} onChange={(val) => updateMatrixVariant(v.option_values, "price", val)} placeholder="0.00" /></td>
-                                {/* UVP */}
-                                <td><TextField label="" labelHidden type="number" step="0.01" value={v.compare_at_price_cents != null ? (Number(v.compare_at_price_cents) / 100).toFixed(2) : ""} onChange={(val) => updateMatrixVariant(v.option_values, "compare_at_price", val)} placeholder="—" /></td>
-                                {/* Sale */}
-                                <td><TextField label="" labelHidden type="number" step="0.01" value={v.sale_price_cents != null ? (Number(v.sale_price_cents) / 100).toFixed(2) : ""} onChange={(val) => updateMatrixVariant(v.option_values, "sale_price", val)} placeholder="—" /></td>
+                                {(() => {
+                                  const vkey = Array.isArray(v.option_values) ? v.option_values.join("\u0000") : "";
+                                  const mkDraftKey = (f) => `${vkey}_${f}`;
+                                  const priceFields = [
+                                    { f: "price",            centsKey: "price_cents",            placeholder: "0.00" },
+                                    { f: "compare_at_price", centsKey: "compare_at_price_cents",  placeholder: "—"    },
+                                    { f: "sale_price",       centsKey: "sale_price_cents",        placeholder: "—"    },
+                                  ];
+                                  return priceFields.map(({ f, centsKey, placeholder }) => {
+                                    const dk = mkDraftKey(f);
+                                    const isDraft = dk in priceInputs;
+                                    const displayVal = isDraft
+                                      ? priceInputs[dk]
+                                      : (v[centsKey] != null ? (Number(v[centsKey]) / 100).toFixed(2) : "");
+                                    return (
+                                      <td key={f}>
+                                        <TextField
+                                          label=""
+                                          labelHidden
+                                          value={displayVal}
+                                          placeholder={placeholder}
+                                          autoComplete="off"
+                                          onChange={(val) => {
+                                            // Only allow digits, dot, comma
+                                            const clean = val.replace(",", ".");
+                                            setPriceInputs((prev) => ({ ...prev, [dk]: clean }));
+                                          }}
+                                          onBlur={() => {
+                                            const raw = priceInputs[dk];
+                                            if (raw !== undefined) {
+                                              updateMatrixVariant(v.option_values, f, raw);
+                                              setPriceInputs((prev) => {
+                                                const next = { ...prev };
+                                                delete next[dk];
+                                                return next;
+                                              });
+                                            }
+                                          }}
+                                        />
+                                      </td>
+                                    );
+                                  });
+                                })()}
                               </tr>
                             );
                           })}

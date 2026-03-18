@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Page,
   Card,
@@ -12,42 +12,69 @@ import {
   Banner,
   Box,
   Modal,
-  DropZone,
-  Thumbnail,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
+import MediaPickerModal from "@/components/MediaPickerModal";
 
-const getDefaultBaseUrl = () => (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "") || (typeof window !== "undefined" ? "http://localhost:9000" : "");
+const getDefaultBaseUrl = () =>
+  (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "") ||
+  (typeof window !== "undefined" ? "http://localhost:9000" : "");
+
+const EMPTY_FORM = { name: "", handle: "", logo_image: "", banner_image: "", address: "" };
 
 export default function BrandPage() {
   const client = getMedusaAdminClient();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
+
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [logoUploading, setLogoUploading] = useState(false);
-  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
-  const [mediaLibraryList, setMediaLibraryList] = useState([]);
-  const [formData, setFormData] = useState({ name: "", handle: "", logo_image: "", address: "" });
+  const [editingId, setEditingId] = useState(null); // null = create mode
+  const [saving, setSaving] = useState(false);
+  const [logoPickerOpen, setLogoPickerOpen] = useState(false);
+  const [bannerPickerOpen, setBannerPickerOpen] = useState(false);
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
   const loadBrands = () => {
     setLoading(true);
-    client.getBrands().then((r) => {
-      setBrands(r.brands || []);
-      setLoading(false);
-    }).catch(() => {
-      setBrands([]);
-      setLoading(false);
-    });
+    client.getBrands()
+      .then((r) => setBrands(r.brands || []))
+      .catch(() => setBrands([]))
+      .finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    loadBrands();
-  }, []);
+  useEffect(() => { loadBrands(); }, []);
+
+  const openCreate = () => {
+    setEditingId(null);
+    setFormData(EMPTY_FORM);
+    setSlugManuallyEdited(false);
+    setMessage({ type: "", text: "" });
+    setModalOpen(true);
+  };
+
+  const openEdit = (brand) => {
+    setEditingId(brand.id);
+    setFormData({
+      name: brand.name || "",
+      handle: brand.handle || "",
+      logo_image: brand.logo_image || "",
+      banner_image: brand.banner_image || "",
+      address: brand.address || "",
+    });
+    setSlugManuallyEdited(true); // don't auto-change handle when editing
+    setMessage({ type: "", text: "" });
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingId(null);
+    setFormData(EMPTY_FORM);
+  };
 
   const handleSubmit = async () => {
     const name = (formData.name || "").trim();
@@ -56,45 +83,30 @@ export default function BrandPage() {
       return;
     }
     const handle = (formData.handle || "").trim() || titleToHandle(name) || "brand-" + Date.now();
-    setCreating(true);
+    setSaving(true);
     setMessage({ type: "", text: "" });
     try {
-      await client.createBrand({
+      const payload = {
         name,
         handle,
-        logo_image: (formData.logo_image || "").trim() || undefined,
-        address: (formData.address || "").trim() || undefined,
-      });
-      setMessage({ type: "success", text: "Brand created." });
-      setFormData({ name: "", handle: "", logo_image: "", address: "" });
-      setSlugManuallyEdited(false);
-      setModalOpen(false);
+        logo_image: (formData.logo_image || "").trim() || null,
+        banner_image: (formData.banner_image || "").trim() || null,
+        address: (formData.address || "").trim() || null,
+      };
+      if (editingId) {
+        await client.updateBrand(editingId, payload);
+        setMessage({ type: "success", text: "Brand updated." });
+      } else {
+        await client.createBrand(payload);
+        setMessage({ type: "success", text: "Brand created." });
+      }
+      closeModal();
       loadBrands();
     } catch (e) {
-      setMessage({ type: "error", text: e?.message || "Failed to create brand." });
+      setMessage({ type: "error", text: e?.message || "Failed to save brand." });
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
-  };
-
-  const handleLogoDrop = (files) => {
-    const file = Array.isArray(files) ? files[0] : files;
-    if (!file) return;
-    setLogoUploading(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    client.uploadMedia(fd).then((r) => {
-      const url = r?.url ? (r.url.startsWith("http") ? r.url : `${baseUrl}${r.url}`) : null;
-      if (url) setFormData((p) => ({ ...p, logo_image: url }));
-    }).catch(() => setMessage({ type: "error", text: "Logo upload failed." })).finally(() => setLogoUploading(false));
-  };
-  const openMediaPicker = () => {
-    setMediaPickerOpen(true);
-    client.getMedia({ limit: 100 }).then((r) => setMediaLibraryList(r.media || [])).catch(() => setMediaLibraryList([]));
-  };
-  const pickLogo = (url) => {
-    if (url) setFormData((p) => ({ ...p, logo_image: url.startsWith("http") ? url : `${baseUrl}${url}` }));
-    setMediaPickerOpen(false);
   };
 
   const handleDelete = async (id) => {
@@ -108,13 +120,16 @@ export default function BrandPage() {
     }
   };
 
+  const resolveUrl = (url) => {
+    if (!url) return "";
+    if (url.startsWith("http") || url.startsWith("data:")) return url;
+    return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
   return (
     <Page
       title="Brands"
-      primaryAction={{
-        content: "Add Brand",
-        onAction: () => setModalOpen(true),
-      }}
+      primaryAction={{ content: "Add Brand", onAction: openCreate }}
     >
       <BlockStack gap="400">
         {message.text && (
@@ -129,38 +144,8 @@ export default function BrandPage() {
         <Card>
           <BlockStack gap="400">
             <Text as="h2" variant="headingMd">
-              Your brands (product form uses this list only)
+              Your brands
             </Text>
-
-            <Modal
-              open={modalOpen}
-              onClose={() => setModalOpen(false)}
-              title="Add Brand"
-              primaryAction={{
-                content: "Create",
-                onAction: handleSubmit,
-                loading: creating,
-              }}
-              secondaryActions={[{ content: "Cancel", onAction: () => setModalOpen(false) }]}
-            >
-              <Modal.Section>
-                <BlockStack gap="300">
-                  <TextField label="Name" value={formData.name} onChange={(v) => setFormData((p) => ({ ...p, name: v, handle: slugManuallyEdited ? p.handle : titleToHandle(v) }))} placeholder="e.g. My Brand" autoComplete="off" />
-                  <TextField label="Handle" value={formData.handle} onChange={(v) => { setSlugManuallyEdited(true); setFormData((p) => ({ ...p, handle: v })); }} placeholder="e.g. my-brand" autoComplete="off" helpText="URL-friendly key. Auto-filled from name unless edited." />
-                  <Text as="p" variant="bodyMd" fontWeight="medium">Logo</Text>
-                  <InlineStack gap="300" blockAlign="center">
-                    {formData.logo_image ? (
-                      <Box><img src={formData.logo_image} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8 }} /><Button size="slim" variant="plain" tone="critical" onClick={() => setFormData((p) => ({ ...p, logo_image: "" }))}>Remove</Button></Box>
-                    ) : null}
-                    <DropZone accept="image/*" type="image" onDropAccepted={handleLogoDrop} allowMultiple={false}>
-                      <div style={{ width: 80, height: 80, border: "2px dashed var(--p-color-border)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--p-color-bg-fill-secondary)", cursor: "pointer" }}>{logoUploading ? "…" : "+"}</div>
-                    </DropZone>
-                    <Button size="slim" variant="secondary" onClick={openMediaPicker}>Mevcut medyadan seç</Button>
-                  </InlineStack>
-                  <TextField label="Address" value={formData.address} onChange={(v) => setFormData((p) => ({ ...p, address: v }))} placeholder="Optional" multiline={2} autoComplete="off" />
-                </BlockStack>
-              </Modal.Section>
-            </Modal>
 
             {loading ? (
               <Box padding="800">
@@ -175,41 +160,138 @@ export default function BrandPage() {
               </Box>
             ) : (
               <BlockStack gap="300">
-                {brands.map((brand) => (
-                  <Card key={brand.id} padding="400">
-                    <InlineStack gap="400" blockAlign="center" wrap>
-                      <Box minWidth="48px" minHeight="48px" background="bg-fill-secondary" borderRadius="full" display="flex" alignItems="center" justifyContent="center">
-                        {brand.logo_image ? (
-                          <img src={brand.logo_image} alt={brand.name} style={{ width: 48, height: 48, objectFit: "cover", borderRadius: "50%" }} />
-                        ) : (
-                          <Text as="span" variant="bodyMd" tone="subdued">—</Text>
-                        )}
-                      </Box>
-                      <BlockStack gap="100">
-                        <Text as="p" variant="bodyMd" fontWeight="semibold">{brand.name}</Text>
-                        {brand.handle && <Text as="p" variant="bodySm" tone="subdued">{brand.handle}</Text>}
-                        {brand.address && <Text as="p" variant="bodySm" tone="subdued">{brand.address}</Text>}
-                      </BlockStack>
-                      <Button variant="plain" tone="critical" onClick={() => handleDelete(brand.id)}>Delete</Button>
-                    </InlineStack>
-                  </Card>
-                ))}
+                {brands.map((brand) => {
+                  const logoSrc   = brand.logo_image   ? resolveUrl(brand.logo_image)   : null;
+                  const bannerSrc = brand.banner_image ? resolveUrl(brand.banner_image) : null;
+                  return (
+                    <Card key={brand.id} padding="400">
+                      {bannerSrc && (
+                        <div style={{ marginBottom: 12, borderRadius: 6, overflow: "hidden", height: 60 }}>
+                          <img src={bannerSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </div>
+                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: 16, width: "100%" }}>
+                        <div style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: "var(--p-color-bg-fill-secondary)", border: "1px solid #e5e7eb", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {logoSrc ? (
+                            <img src={logoSrc} alt={brand.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ) : (
+                            <Text as="span" variant="bodyMd" tone="subdued">—</Text>
+                          )}
+                        </div>
+                        <BlockStack gap="100">
+                          <Text as="p" variant="bodyMd" fontWeight="semibold">{brand.name}</Text>
+                          {brand.handle && <Text as="p" variant="bodySm" tone="subdued">{brand.handle}</Text>}
+                          {brand.address && <Text as="p" variant="bodySm" tone="subdued">{brand.address}</Text>}
+                        </BlockStack>
+                        <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexShrink: 0 }}>
+                          <Button size="slim" variant="secondary" onClick={() => openEdit(brand)}>Edit</Button>
+                          <Button size="slim" variant="plain" tone="critical" onClick={() => handleDelete(brand.id)}>Delete</Button>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
               </BlockStack>
             )}
           </BlockStack>
         </Card>
-
-        <Modal open={mediaPickerOpen} onClose={() => setMediaPickerOpen(false)} title="Logo seç">
-          <Modal.Section>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 8, maxHeight: 280, overflowY: "auto" }}>
-              {mediaLibraryList.map((item) => {
-                const url = item.url && (item.url.startsWith("http") ? item.url : `${baseUrl}${item.url}`);
-                return url ? <button key={item.id} type="button" onClick={() => pickLogo(item.url)} style={{ padding: 0, border: "none", borderRadius: 8, overflow: "hidden" }}><Thumbnail source={url} alt="" size="small" /></button> : null;
-              })}
-            </div>
-          </Modal.Section>
-        </Modal>
       </BlockStack>
+
+      {/* Create / Edit modal */}
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title={editingId ? "Edit Brand" : "Add Brand"}
+        primaryAction={{ content: editingId ? "Save" : "Create", onAction: handleSubmit, loading: saving }}
+        secondaryActions={[{ content: "Cancel", onAction: closeModal }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <TextField
+              label="Name"
+              value={formData.name}
+              onChange={(v) => setFormData((p) => ({
+                ...p,
+                name: v,
+                handle: (slugManuallyEdited || editingId) ? p.handle : titleToHandle(v),
+              }))}
+              placeholder="e.g. My Brand"
+              autoComplete="off"
+            />
+            <TextField
+              label="Handle"
+              value={formData.handle}
+              onChange={(v) => { setSlugManuallyEdited(true); setFormData((p) => ({ ...p, handle: v })); }}
+              placeholder="e.g. my-brand"
+              autoComplete="off"
+              helpText="URL-friendly key. Auto-filled from name unless edited."
+            />
+
+            {/* Logo */}
+            <Text as="p" variant="bodyMd" fontWeight="medium">Logo</Text>
+            <InlineStack gap="300" blockAlign="center">
+              {formData.logo_image ? (
+                <div>
+                  <img src={resolveUrl(formData.logo_image)} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: "50%", border: "1px solid #e5e7eb", display: "block", marginBottom: 4 }} />
+                  <Button size="slim" variant="plain" tone="critical" onClick={() => setFormData((p) => ({ ...p, logo_image: "" }))}>Remove</Button>
+                </div>
+              ) : (
+                <div style={{ width: 64, height: 64, borderRadius: "50%", border: "2px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", background: "#f9fafb", color: "#9ca3af", fontSize: 20 }}>
+                  +
+                </div>
+              )}
+              <Button size="slim" variant="secondary" onClick={() => setLogoPickerOpen(true)}>
+                {formData.logo_image ? "Görseli değiştir" : "Logo seç"}
+              </Button>
+            </InlineStack>
+
+            {/* Banner */}
+            <Text as="p" variant="bodyMd" fontWeight="medium">Banner</Text>
+            <InlineStack gap="300" blockAlign="center">
+              {formData.banner_image ? (
+                <div>
+                  <img src={resolveUrl(formData.banner_image)} alt="" style={{ width: 160, height: 50, objectFit: "cover", borderRadius: 6, border: "1px solid #e5e7eb", display: "block", marginBottom: 4 }} />
+                  <Button size="slim" variant="plain" tone="critical" onClick={() => setFormData((p) => ({ ...p, banner_image: "" }))}>Remove</Button>
+                </div>
+              ) : (
+                <div style={{ width: 160, height: 50, borderRadius: 6, border: "2px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", background: "#f9fafb", color: "#9ca3af", fontSize: 11 }}>
+                  Banner (21:6)
+                </div>
+              )}
+              <Button size="slim" variant="secondary" onClick={() => setBannerPickerOpen(true)}>
+                {formData.banner_image ? "Görseli değiştir" : "Banner seç"}
+              </Button>
+            </InlineStack>
+
+            <TextField
+              label="Address"
+              value={formData.address}
+              onChange={(v) => setFormData((p) => ({ ...p, address: v }))}
+              placeholder="Optional"
+              multiline={2}
+              autoComplete="off"
+            />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      {/* Logo picker */}
+      <MediaPickerModal
+        open={logoPickerOpen}
+        onClose={() => setLogoPickerOpen(false)}
+        onSelect={(urls) => { if (urls?.[0]) setFormData((p) => ({ ...p, logo_image: urls[0] })); }}
+        multiple={false}
+        title="Logo seç"
+      />
+
+      {/* Banner picker */}
+      <MediaPickerModal
+        open={bannerPickerOpen}
+        onClose={() => setBannerPickerOpen(false)}
+        onSelect={(urls) => { if (urls?.[0]) setFormData((p) => ({ ...p, banner_image: urls[0] })); }}
+        multiple={false}
+        title="Banner seç"
+      />
     </Page>
   );
 }

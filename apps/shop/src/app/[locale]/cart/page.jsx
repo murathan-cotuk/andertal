@@ -10,6 +10,7 @@ import { useCart } from "@/context/CartContext";
 import { formatPriceCents } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 import { tokens } from "@/design-system/tokens";
+import PayNowButton from "@/components/ui/PayNowButton";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -172,19 +173,6 @@ const SummaryTotal = styled(SummaryRow)`
   margin-bottom: 20px;
 `;
 
-const CheckoutBtn = styled(Link)`
-  display: block;
-  text-align: center;
-  padding: 14px 20px;
-  background: ${tokens.primary.DEFAULT};
-  color: #fff;
-  font-weight: 700;
-  font-size: 1rem;
-  border-radius: 8px;
-  text-decoration: none;
-  &:hover { background: ${tokens.primary.hover}; }
-`;
-
 const ContinueLink = styled(Link)`
   display: block;
   text-align: center;
@@ -195,6 +183,25 @@ const ContinueLink = styled(Link)`
   &:hover { color: #374151; text-decoration: underline; }
 `;
 
+const ClearCartBtn = styled.button`
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #6b7280;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  &:hover:not(:disabled) {
+    background: #f9fafb;
+    color: #111827;
+    border-color: #d1d5db;
+  }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`;
+
 const EmptyState = styled.div`
   text-align: center;
   padding: 80px 24px;
@@ -203,7 +210,7 @@ const EmptyState = styled.div`
 
 export default function CartPage() {
   const t = useTranslations("cart");
-  const { cart, loading, updateLineItem, removeLineItem, subtotalCents } = useCart();
+  const { cart, loading, updateLineItem, removeLineItem, clearCart, subtotalCents } = useCart();
   const items = cart?.items || [];
 
   return (
@@ -311,8 +318,15 @@ export default function CartPage() {
                 <span>{t("total")}</span>
                 <span>{formatPriceCents(subtotalCents)} €</span>
               </SummaryTotal>
-              <CheckoutBtn href="/checkout">{t("checkout")}</CheckoutBtn>
+              <PayNowButton href="/checkout">{t("checkout")}</PayNowButton>
               <ContinueLink href="/">Weiter einkaufen</ContinueLink>
+              <ClearCartBtn
+                type="button"
+                onClick={() => clearCart?.()}
+                disabled={loading || items.length === 0}
+              >
+                Warenkorb leeren
+              </ClearCartBtn>
             </SummaryCard>
           </Layout>
         )}

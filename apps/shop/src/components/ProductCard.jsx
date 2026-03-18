@@ -28,7 +28,7 @@ const Card = styled.article`
   overflow: hidden;
 `;
 
-/* Image block: hover = second image if present + slight zoom */
+/* Image block: hover = second image if present + slight zoom. */
 const ImgBlock = styled.div`
   position: relative;
   width: 100%;
@@ -53,10 +53,10 @@ const ImgBlock = styled.div`
     z-index: 2;
     opacity: 0;
   }
-  ${Card}:hover & img.img-primary {
+  &:hover img.img-primary {
     transform: scale(1.04);
   }
-  ${Card}:hover & img.img-secondary {
+  &:hover img.img-secondary {
     opacity: 1;
     transform: scale(1.04);
   }
@@ -177,23 +177,29 @@ const Pills = styled.div`
 `;
 
 const Pill = styled.button`
-  padding: 3px 7px;
+  padding: ${(p) => (p.$swatch ? "0" : "3px 7px")};
+  width: ${(p) => (p.$swatch ? "22px" : "auto")};
+  height: ${(p) => (p.$swatch ? "22px" : "auto")};
+  min-width: ${(p) => (p.$swatch ? "22px" : "24px")};
+  min-height: ${(p) => (p.$swatch ? "22px" : "22px")};
   font-size: 10px;
   font-weight: 500;
   line-height: 1.4;
-  border: 1px solid ${(p) => (p.$on ? "#111" : "#e0e0e0")};
-  background: ${(p) => (p.$on ? "#111" : "transparent")};
+  border-radius: ${(p) => (p.$swatch ? "50%" : "2px")};
+  border: ${(p) => p.$swatch
+    ? `2.5px solid ${p.$on ? "#111" : "#e0e0e0"}`
+    : `1px solid ${p.$on ? "#111" : "#e0e0e0"}`};
+  background: ${(p) => (p.$swatch ? "none" : p.$on ? "#111" : "transparent")};
   color: ${(p) => (p.$on ? "#fff" : p.$outOfStock ? "#bbb" : "#555")};
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  transition: border-color 0.12s, background 0.12s, color 0.12s, transform 0.12s;
+  transform: ${(p) => (p.$swatch && p.$on ? "scale(1.1)" : "scale(1)")};
   text-decoration: ${(p) => (p.$outOfStock && !p.$on ? "line-through" : "none")};
-  min-width: 24px;
-  min-height: 22px;
-  border-radius: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  flex-shrink: 0;
   opacity: ${(p) => (p.$outOfStock && !p.$on ? 0.5 : 1)};
 
   &:hover {
@@ -388,6 +394,7 @@ export function ProductCard({ product }) {
                             key={oIdx}
                             $on={isOn}
                             $outOfStock={!hasStock}
+                            $swatch={!!swatchUrl}
                             type="button"
                             title={val}
                             onClick={(e) => {
@@ -396,7 +403,7 @@ export function ProductCard({ product }) {
                             }}
                           >
                             {swatchUrl ? (
-                              <img src={swatchUrl} alt={val} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                              <img src={swatchUrl} alt={val} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }} />
                             ) : val}
                           </Pill>
                         );
@@ -419,12 +426,13 @@ export function ProductCard({ product }) {
                     key={i}
                     $on={i === selIdx}
                     $outOfStock={outOfStock}
+                    $swatch={!!swatchUrl}
                     type="button"
                     onClick={(e) => { e.preventDefault(); setSelIdx(i); }}
                     title={v.title || v.value || `${i + 1}`}
                   >
                     {swatchUrl ? (
-                      <img src={swatchUrl} alt={v.value || v.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <img src={swatchUrl} alt={v.value || v.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }} />
                     ) : (v.title || v.value || `${i + 1}`)}
                   </Pill>
                 );

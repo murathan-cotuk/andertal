@@ -132,6 +132,14 @@ class MedusaClient {
     return res
   }
 
+  async clearCart(cartId) {
+    const res = await this.request(`/store/carts/${cartId}/line-items`, {
+      method: 'DELETE',
+    })
+    if (res?.__error) return { cart: null }
+    return res
+  }
+
   async updateCart(cartId, data) {
     const res = await this.request(`/store/carts/${cartId}`, {
       method: 'POST',

@@ -441,7 +441,8 @@ class MedusaAdminClient {
    * Admin Hub Media (v1)
    */
   async getMedia(params = {}) {
-    const queryParams = new URLSearchParams(params).toString()
+    const p = { limit: 500, ...params }
+    const queryParams = new URLSearchParams(p).toString()
     return this.request(`/admin-hub/v1/media${queryParams ? `?${queryParams}` : ''}`)
   }
 
@@ -464,8 +465,44 @@ class MedusaAdminClient {
     return res.json()
   }
 
+  async registerMediaUrl(data) {
+    const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
+    const res = await fetch(`${base}/admin-hub/v1/media/register-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) { const e = await res.json().catch(() => ({ message: res.statusText })); throw new Error(e.message || `HTTP ${res.status}`) }
+    return res.json()
+  }
+
   async deleteMedia(id) {
     return this.request(`/admin-hub/v1/media/${id}`, { method: 'DELETE' })
+  }
+
+  async getMediaFolders() {
+    const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
+    const res = await fetch(`${base}/admin-hub/v1/media/folders`)
+    if (!res.ok) return { folders: [] }
+    return res.json()
+  }
+
+  async createMediaFolder(name) {
+    const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
+    const res = await fetch(`${base}/admin-hub/v1/media/folders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (!res.ok) { const e = await res.json().catch(() => ({ message: res.statusText })); throw new Error(e.message || `HTTP ${res.status}`) }
+    return res.json()
+  }
+
+  async deleteMediaFolder(name) {
+    const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
+    const res = await fetch(`${base}/admin-hub/v1/media/folders/${encodeURIComponent(name)}`, { method: 'DELETE' })
+    if (!res.ok) { const e = await res.json().catch(() => ({ message: res.statusText })); throw new Error(e.message || `HTTP ${res.status}`) }
+    return res.json()
   }
 
   /**

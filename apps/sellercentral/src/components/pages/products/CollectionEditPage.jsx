@@ -14,13 +14,13 @@ import {
   Box,
   Banner,
   Select,
-  DropZone,
   Button,
   Divider,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
+import MediaPickerModal from "@/components/MediaPickerModal";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -77,7 +77,8 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState([]);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
-  const [mediaUploading, setMediaUploading] = useState(false);
+  const [mainImgPickerOpen, setMainImgPickerOpen] = useState(false);
+  const [bannerImgPickerOpen, setBannerImgPickerOpen] = useState(false);
   const [richtextMode, setRichtextMode] = useState("visual");
   const richtextEditorRef = useRef(null);
 
@@ -144,43 +145,6 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
     if (richtextMode === "visual" && richtextEditorRef.current) richtextEditorRef.current.innerHTML = form.richtext || "";
   }, [richtextMode, form.richtext]);
 
-  const handleMainImageDrop = useCallback(
-    (files) => {
-      setMediaUploading(true);
-      const file = Array.isArray(files) ? files[0] : files;
-      if (!file) return setMediaUploading(false);
-      const fd = new FormData();
-      fd.append("file", file);
-      client
-        .uploadMedia(fd)
-        .then((r) => {
-          // Store relative path so the URL works across different backend deployments.
-          const url = r?.url || null;
-          if (url) setForm((prev) => ({ ...prev, image_url: url }));
-        })
-        .catch(() => setError("Upload failed"))
-        .finally(() => setMediaUploading(false));
-    },
-    [client, baseUrl]
-  );
-  const handleBannerImageDrop = useCallback(
-    (files) => {
-      setMediaUploading(true);
-      const file = Array.isArray(files) ? files[0] : files;
-      if (!file) return setMediaUploading(false);
-      const fd = new FormData();
-      fd.append("file", file);
-      client
-        .uploadMedia(fd)
-        .then((r) => {
-          const url = r?.url || null;
-          if (url) setForm((prev) => ({ ...prev, banner_image_url: url }));
-        })
-        .catch(() => setError("Upload failed"))
-        .finally(() => setMediaUploading(false));
-    },
-    [client, baseUrl]
-  );
 
   useEffect(() => {
     client.getAdminHubCategories({ all: true }).then((r) => setCategories(r.categories || [])).catch(() => setCategories([]));
@@ -546,13 +510,12 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                     <button type="button" onClick={() => setForm((prev) => ({ ...prev, image_url: "" }))} style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, border: "none", borderRadius: "50%", background: "rgba(0,0,0,0.5)", color: "#fff", cursor: "pointer", fontSize: 14 }} aria-label="Remove">×</button>
                   </div>
                 ) : null}
-                {!form.image_url && (
-                  <DropZone accept="image/*" type="image" onDropAccepted={handleMainImageDrop} allowMultiple={false}>
-                    <div style={{ width: 100, aspectRatio: 1, borderRadius: 8, border: "2px dashed var(--p-color-border)", background: "var(--p-color-bg-fill-secondary)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                      <span style={{ fontSize: 24, color: "var(--p-color-icon)" }}>+</span>
-                    </div>
-                  </DropZone>
-                )}
+                <div
+                  onClick={() => setMainImgPickerOpen(true)}
+                  style={{ width: 100, aspectRatio: 1, borderRadius: 8, border: "2px dashed var(--p-color-border)", background: "var(--p-color-bg-fill-secondary)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                >
+                  <span style={{ fontSize: 24, color: "var(--p-color-icon)" }}>+</span>
+                </div>
               </div>
               <Text as="p" variant="bodySm" fontWeight="medium">Banner image (1920×300 px, full-width)</Text>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
@@ -562,15 +525,27 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                     <button type="button" onClick={() => setForm((prev) => ({ ...prev, banner_image_url: "" }))} style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, border: "none", borderRadius: "50%", background: "rgba(0,0,0,0.5)", color: "#fff", cursor: "pointer", fontSize: 14 }} aria-label="Remove">×</button>
                   </div>
                 ) : null}
-                {!form.banner_image_url && (
-                  <DropZone accept="image/*" type="image" onDropAccepted={handleBannerImageDrop} allowMultiple={false}>
-                    <div style={{ width: 200, height: 50, borderRadius: 8, border: "2px dashed var(--p-color-border)", background: "var(--p-color-bg-fill-secondary)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                      <span style={{ fontSize: 18, color: "var(--p-color-icon)" }}>+ Banner</span>
-                    </div>
-                  </DropZone>
-                )}
+                <div
+                  onClick={() => setBannerImgPickerOpen(true)}
+                  style={{ width: 200, height: 50, borderRadius: 8, border: "2px dashed var(--p-color-border)", background: "var(--p-color-bg-fill-secondary)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                >
+                  <span style={{ fontSize: 18, color: "var(--p-color-icon)" }}>+ Banner</span>
+                </div>
               </div>
-              {mediaUploading && <Text as="p" variant="bodySm" tone="subdued">Uploading…</Text>}
+              <MediaPickerModal
+                open={mainImgPickerOpen}
+                onClose={() => setMainImgPickerOpen(false)}
+                title="Ana görsel seç"
+                multiple={false}
+                onSelect={(urls) => { if (urls[0]) setForm((prev) => ({ ...prev, image_url: urls[0] })); }}
+              />
+              <MediaPickerModal
+                open={bannerImgPickerOpen}
+                onClose={() => setBannerImgPickerOpen(false)}
+                title="Banner görseli seç"
+                multiple={false}
+                onSelect={(urls) => { if (urls[0]) setForm((prev) => ({ ...prev, banner_image_url: urls[0] })); }}
+              />
               <BlockStack gap="200">
                 <Text as="p" variant="bodySm" fontWeight="medium">Richtext (below products on collection page)</Text>
                 <div className="collection-description-box" style={{ border: "1px solid var(--p-color-border)", borderRadius: 12, overflow: "hidden", background: "var(--p-color-bg-surface)" }}>
