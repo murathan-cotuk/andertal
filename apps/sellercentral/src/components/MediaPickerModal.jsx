@@ -44,6 +44,7 @@ export default function MediaPickerModal({
   onSelect,
   multiple = false,
   title = "Select media",
+  onUploadingChange,
 }) {
   const client = getMedusaAdminClient();
 
@@ -90,6 +91,7 @@ export default function MediaPickerModal({
       const list = Array.isArray(files) ? files : [files];
       if (!list.length) return;
       setUploading(true);
+      onUploadingChange?.(true);
       Promise.all(
         list.map((file) => {
           const fd = new FormData();
@@ -119,7 +121,10 @@ export default function MediaPickerModal({
           }
         })
         .catch(() => {})
-        .finally(() => setUploading(false));
+        .finally(() => {
+          setUploading(false);
+          onUploadingChange?.(false);
+        });
     },
     [client, multiple]
   );

@@ -1524,7 +1524,18 @@ async function start() {
         const where = []
         if (sellerId) { where.push('seller_id = $' + (params.length + 1)); params.push(sellerId) }
         if (status) { where.push('status = $' + (params.length + 1)); params.push(status) }
-        if (collectionId) { where.push('LOWER(COALESCE(collection_id::text, \'\')) = LOWER($' + (params.length + 1) + ')'); params.push(collectionId) }
+        if (collectionId) {
+          where.push(
+            '(' +
+              'LOWER(COALESCE(collection_id::text, \'\')) = LOWER($' + (params.length + 1) + ')' +
+              ' OR EXISTS (' +
+                'SELECT 1 FROM jsonb_array_elements_text(COALESCE(metadata->\'collection_ids\', \'[]\'::jsonb)) AS cid(val) ' +
+                'WHERE LOWER(cid.val) = LOWER($' + (params.length + 1) + ')' +
+              ')' +
+            ')'
+          )
+          params.push(collectionId)
+        }
         if (where.length) sql += ' WHERE ' + where.join(' AND ')
         sql += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2)
         params.push(limit, offset)
@@ -1757,6 +1768,30 @@ async function start() {
         const existing = await getAdminHubProductByIdOrHandleDb(req.params.id)
         if (!existing) return res.status(404).json({ message: 'Product not found' })
         await client.connect()
+        // Remove deleted product id from other products' related_product_ids to avoid stale references in sellercentral UI
+        await client.query(
+          `UPDATE admin_hub_products
+             SET metadata = jsonb_set(
+               COALESCE(metadata, '{}'::jsonb),
+               '{related_product_ids}',
+               COALESCE(
+                 (
+                   SELECT jsonb_agg(to_jsonb(v))
+                   FROM (
+                     SELECT elem AS v
+                     FROM jsonb_array_elements_text(COALESCE(metadata->'related_product_ids', '[]'::jsonb)) AS elem
+                     WHERE LOWER(elem) <> LOWER($1::text)
+                   ) t
+                 ),
+                 '[]'::jsonb
+               ),
+               true
+             ),
+             updated_at = now()
+           WHERE id <> $2
+             AND COALESCE(metadata->'related_product_ids', '[]'::jsonb) @> to_jsonb(ARRAY[$1::text])`,
+          [existing.id, existing.id]
+        )
         await client.query('DELETE FROM admin_hub_products WHERE id = $1', [existing.id])
         await client.end()
         res.status(200).json({ deleted: true })
@@ -1955,7 +1990,13 @@ async function start() {
         if (collectionId) {
           const norm = (s) => (s || '').toString().trim().toLowerCase()
           const cidNorm = norm(collectionId)
-          list = list.filter((p) => norm(p.collection_id) === cidNorm)
+          list = list.filter((p) => {
+            const primaryMatch = norm(p.collection_id) === cidNorm
+            const metaIds = Array.isArray(p?.metadata?.collection_ids)
+              ? p.metadata.collection_ids.map((x) => norm(x))
+              : []
+            return primaryMatch || metaIds.includes(cidNorm)
+          })
         }
         // Only published products visible in store
         list = list.filter((p) => (p.status || '').toLowerCase() === 'published')

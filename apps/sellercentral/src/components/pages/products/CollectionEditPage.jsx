@@ -68,6 +68,20 @@ function flattenTree(tree, level = 0) {
   return out;
 }
 
+function getProductCollectionIds(product) {
+  const meta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
+  if (Array.isArray(meta.collection_ids)) return meta.collection_ids.filter(Boolean).map(String);
+  if (meta.collection_id != null) return [String(meta.collection_id)];
+  if (product?.collection_id != null) return [String(product.collection_id)];
+  return [];
+}
+
+function isProductInCollection(product, collectionId) {
+  if (!collectionId) return false;
+  const cid = String(collectionId);
+  return getProductCollectionIds(product).includes(cid);
+}
+
 export default function CollectionEditPage({ collection: initialCollection, isNew, onReload }) {
   const router = useRouter();
   const client = getMedusaAdminClient();
@@ -75,6 +89,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
   const [collection, setCollection] = useState(initialCollection ?? null);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [mediaUploading, setMediaUploading] = useState(false);
   const [categories, setCategories] = useState([]);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [mainImgPickerOpen, setMainImgPickerOpen] = useState(false);
@@ -99,7 +114,8 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
   const [allProducts, setAllProducts] = useState([]);
   const [addingProductId, setAddingProductId] = useState(null);
   const [removingProductId, setRemovingProductId] = useState(null);
-  const [addProductSelectValue, setAddProductSelectValue] = useState("");
+  const [addProductSearch, setAddProductSearch] = useState("");
+  const [addProductPopoverOpen, setAddProductPopoverOpen] = useState(false);
   const initialFormRef = useRef(null);
   const unsaved = useUnsavedChanges();
 
@@ -155,9 +171,9 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
       setCollectionProducts([]);
       return;
     }
-    client.getAdminHubProducts({ collection_id: collection.id }).then((r) => {
+    client.getAdminHubProducts({ limit: 500 }).then((r) => {
       const list = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
-      setCollectionProducts(list);
+      setCollectionProducts(list.filter((p) => isProductInCollection(p, collection.id)));
     }).catch(() => setCollectionProducts([]));
   }, [collection?.id, client]);
 
@@ -173,12 +189,19 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
     if (!collection?.id || !productId) return;
     setAddingProductId(productId);
     try {
-      await client.updateAdminHubProduct(productId, { collection_id: collection.id });
-      const r = await client.getAdminHubProducts({ collection_id: collection.id });
-      setCollectionProducts((r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft"));
+      const existing = await client.getAdminHubProduct(productId);
+      const existingIds = getProductCollectionIds(existing);
+      const nextIds = Array.from(new Set([...existingIds, String(collection.id)]));
+      await client.updateAdminHubProduct(productId, {
+        metadata: { ...(existing?.metadata || {}), collection_ids: nextIds },
+        collection_id: nextIds[0] || null,
+      });
+      const r = await client.getAdminHubProducts({ limit: 500 });
+      const nonDraft = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
+      setCollectionProducts(nonDraft.filter((p) => isProductInCollection(p, collection.id)));
       const all = await client.getAdminHubProducts({ limit: 200 });
       setAllProducts((all.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft"));
-      setAddProductSelectValue("");
+      setAddProductSearch("");
     } catch (e) {
       setError(e?.message || "Failed to add product to collection");
     } finally {
@@ -190,9 +213,16 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
     if (!productId) return;
     setRemovingProductId(productId);
     try {
-      await client.updateAdminHubProduct(productId, { collection_id: null });
-      const r = await client.getAdminHubProducts({ collection_id: collection?.id });
-      setCollectionProducts((r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft"));
+      const existing = await client.getAdminHubProduct(productId);
+      const existingIds = getProductCollectionIds(existing);
+      const nextIds = existingIds.filter((id) => String(id) !== String(collection?.id));
+      await client.updateAdminHubProduct(productId, {
+        metadata: { ...(existing?.metadata || {}), collection_ids: nextIds },
+        collection_id: nextIds[0] || null,
+      });
+      const r = await client.getAdminHubProducts({ limit: 500 });
+      const nonDraft = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
+      setCollectionProducts(nonDraft.filter((p) => isProductInCollection(p, collection?.id)));
       const all = await client.getAdminHubProducts({ limit: 200 });
       setAllProducts((all.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft"));
     } catch (e) {
@@ -417,7 +447,9 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                             <tr key={p.id} style={{ borderBottom: "1px solid var(--p-color-border-subdued)" }}>
                               <td style={{ padding: "8px 12px", verticalAlign: "middle" }}>
                                 {imgUrl ? (
-                                  <img src={imgUrl.startsWith("http") || imgUrl.startsWith("data:") ? imgUrl : `${baseUrl}${imgUrl}`} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 8 }} />
+                                  <Link href={`/products/${p.id}`} style={{ display: "inline-block" }}>
+                                    <img src={imgUrl.startsWith("http") || imgUrl.startsWith("data:") ? imgUrl : `${baseUrl}${imgUrl}`} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 8 }} />
+                                  </Link>
                                 ) : (
                                   <div style={{ width: 48, height: 48, background: "var(--p-color-bg-fill-secondary)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--p-color-text-subdued)", fontSize: 12 }}>—</div>
                                 )}
@@ -439,54 +471,66 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                   </div>
                 )}
                 <div style={{ marginTop: 16 }}>
-                  <Select
-                    label="Add product"
-                    labelHidden
-                    options={[
-                      { label: "— Select product to add —", value: "" },
-                      ...productsNotInCollection.map((p) => ({ label: p.title || p.handle || p.sku || p.id, value: p.id })),
-                    ]}
-                    value={addProductSelectValue}
-                    onChange={(value) => {
-                      setAddProductSelectValue(value);
-                      if (value) addProductToCollection(value);
-                    }}
-                  />
+                  <div style={{ position: "relative" }}>
+                    <TextField
+                      label="Add product"
+                      value={addProductSearch}
+                      onChange={setAddProductSearch}
+                      onFocus={() => setAddProductPopoverOpen(true)}
+                      placeholder="Search and add multiple products…"
+                      autoComplete="off"
+                    />
+                    {addProductPopoverOpen && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          maxHeight: 280,
+                          overflowY: "auto",
+                          background: "var(--p-color-bg-surface)",
+                          border: "1px solid var(--p-color-border)",
+                          borderRadius: 8,
+                          marginTop: 4,
+                          zIndex: 10002,
+                          boxShadow: "var(--p-shadow-400)",
+                        }}
+                      >
+                        {productsNotInCollection
+                          .filter((p) => !addProductSearch.trim() || (p.title || p.handle || p.sku || "").toLowerCase().includes(addProductSearch.toLowerCase()))
+                          .slice(0, 80)
+                          .map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              style={{
+                                display: "block",
+                                width: "100%",
+                                padding: "8px 12px",
+                                textAlign: "left",
+                                border: "none",
+                                background: addingProductId === p.id ? "var(--p-color-bg-fill-secondary)" : "transparent",
+                                cursor: addingProductId ? "wait" : "pointer",
+                                fontSize: 13,
+                              }}
+                              onClick={() => addProductToCollection(p.id)}
+                              disabled={!!addingProductId}
+                            >
+                              {addingProductId === p.id ? "Adding… " : ""}{p.title || p.handle || p.sku || p.id}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                    {addProductPopoverOpen && (
+                      <div
+                        style={{ position: "fixed", inset: 0, zIndex: 10001 }}
+                        onClick={() => setAddProductPopoverOpen(false)}
+                        aria-hidden
+                      />
+                    )}
+                  </div>
                 </div>
-                <Divider />
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingSm">Önerilen ürünler (shop sayfasında gösterilir)</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">Koleksiyon sayfasında &quot;Önerilen ürünler&quot; olarak gösterilecek ürünleri seçin.</Text>
-                  <Select
-                    label=""
-                    labelHidden
-                    options={[
-                      { label: "— Ürün ekle —", value: "" },
-                      ...(allProducts || []).filter((p) => !(form.recommended_product_ids || []).includes(p.id)).map((p) => ({ label: p.title || p.handle || p.sku || p.id, value: p.id })),
-                    ]}
-                    value=""
-                    onChange={(value) => {
-                      if (value) setForm((prev) => ({ ...prev, recommended_product_ids: [...(prev.recommended_product_ids || []), value] }));
-                    }}
-                  />
-                  {(form.recommended_product_ids || []).length > 0 && (
-                    <InlineStack gap="100" wrap>
-                      {(form.recommended_product_ids || []).map((id) => {
-                        const p = (allProducts || []).find((x) => x.id === id);
-                        const label = p ? (p.title || p.handle || id) : id;
-                        return (
-                          <span
-                            key={id}
-                            style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--p-color-bg-fill-secondary)", borderRadius: 6, fontSize: 12, color: "var(--p-color-text-subdued)" }}
-                          >
-                            {String(label).slice(0, 35)}{String(label).length > 35 ? "…" : ""}
-                            <button type="button" onClick={() => setForm((prev) => ({ ...prev, recommended_product_ids: (prev.recommended_product_ids || []).filter((x) => x !== id) }))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Kaldır">×</button>
-                          </span>
-                        );
-                      })}
-                    </InlineStack>
-                  )}
-                </BlockStack>
               </BlockStack>
             </Card>
           </Layout.Section>
@@ -537,6 +581,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                 onClose={() => setMainImgPickerOpen(false)}
                 title="Ana görsel seç"
                 multiple={false}
+                onUploadingChange={setMediaUploading}
                 onSelect={(urls) => { if (urls[0]) setForm((prev) => ({ ...prev, image_url: urls[0] })); }}
               />
               <MediaPickerModal
@@ -544,6 +589,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                 onClose={() => setBannerImgPickerOpen(false)}
                 title="Banner görseli seç"
                 multiple={false}
+                onUploadingChange={setMediaUploading}
                 onSelect={(urls) => { if (urls[0]) setForm((prev) => ({ ...prev, banner_image_url: urls[0] })); }}
               />
               <BlockStack gap="200">

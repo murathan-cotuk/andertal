@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
@@ -22,7 +22,7 @@ const Container = styled.div`
   padding: 32px 24px 64px;
   @media (min-width: 1200px) {
     padding-left: 150px;
-    padding-right: 250px;
+    padding-right: 150px;
   }
 `;
 
@@ -143,19 +143,19 @@ const VarLabelSelected = styled.span`
 const VarRow = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 `;
 
 /* Compact text chip — sizes, materials, etc */
 const VarChip = styled.button`
-  padding: 5px 12px;
-  font-size: 0.75rem;
+  padding: 8px 14px;
+  font-size: 0.85rem;
   font-weight: 500;
-  line-height: 1.3;
+  line-height: 1.2;
   border: 1px solid ${(p) => (p.$selected ? "#374151" : "#e5e7eb")};
   background: ${(p) => (p.$selected ? "#374151" : "#fff")};
   color: ${(p) => (p.$selected ? "#fff" : p.$oos ? "#9ca3af" : "#374151")};
-  border-radius: 999px;
+  border-radius: 10px;
   cursor: ${(p) => (p.$oos ? "default" : "pointer")};
   text-decoration: ${(p) => (p.$oos && !p.$selected ? "line-through" : "none")};
   opacity: ${(p) => (p.$oos && !p.$selected ? 0.6 : 1)};
@@ -169,10 +169,10 @@ const VarChip = styled.button`
 
 /* Compact swatch circle — color / image options */
 const VarSwatch = styled.button`
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  border: 1.5px solid ${(p) => (p.$selected ? "#374151" : "#e5e7eb")};
+  border: 2px solid ${(p) => (p.$selected ? "#374151" : "#e5e7eb")};
   padding: 0;
   background: none;
   cursor: pointer;
@@ -420,6 +420,9 @@ const CartNotice = styled.div`
   opacity: ${(p) => (p.$visible ? 1 : 0)};
   transform: translateY(${(p) => (p.$visible ? "0px" : "6px")});
   transition: opacity 450ms ease, transform 450ms ease;
+  z-index: 5;
+  position: relative;
+  pointer-events: none;
 `;
 
 const HEADING_ORANGE = "#c2410c";
@@ -629,8 +632,10 @@ export default function ProductTemplate() {
   const [selectedOptions, setSelectedOptions] = useState({});
   const [sellerStoreName, setSellerStoreName] = useState("");
   const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
+  const cartNoticeTimersRef = useRef({ hide: null, clear: null });
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
+  const openCartSidebar = cartState?.openCartSidebar ?? (() => {});
 
   useEffect(() => {
     let cancelled = false;
@@ -770,8 +775,15 @@ export default function ProductTemplate() {
   const reviewAvg = meta.review_avg != null ? Number(meta.review_avg) : 0;
   const soldLastMonth = meta.sold_last_month != null ? Number(meta.sold_last_month) : null;
   const inventory = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity ?? 0;
-  const inStock = inventory > 0;
-  const maxQty = Math.min(inventory || 10, 10);
+  const inventorySafe =
+    variant?.inventory_quantity ??
+    variant?.inventory ??
+    product.variants?.[0]?.inventory_quantity ??
+    product.variants?.[0]?.inventory ??
+    0;
+  const inventorySafeNum = Number(inventorySafe);
+  const inStock = inventorySafeNum > 0;
+  const maxQty = Math.min(inventorySafeNum || 10, 10);
   const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
   const metaRows = buildMetaRows(meta);
@@ -791,15 +803,34 @@ export default function ProductTemplate() {
   const handleAddToCart = async () => {
     const variantId = variant?.id;
     if (!variantId) return;
-    const ok = await addToCart(variantId, quantity);
-    if (ok) {
-      setCartNotice({ text: "Zum Warenkorb hinzugefügt", visible: true });
-      window.setTimeout(() => setCartNotice((s) => ({ ...s, visible: false })), 5000);
-      window.setTimeout(() => setCartNotice({ text: "", visible: false }), 5600);
-    } else {
-      setCartNotice({ text: "Hinzufügen fehlgeschlagen", visible: true });
-      window.setTimeout(() => setCartNotice((s) => ({ ...s, visible: false })), 5000);
-      window.setTimeout(() => setCartNotice({ text: "", visible: false }), 5600);
+    // Avoid timer-race when user clicks quickly multiple times
+    if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);
+    if (cartNoticeTimersRef.current.clear) window.clearTimeout(cartNoticeTimersRef.current.clear);
+
+    const successText =
+      locale === "tr" ? "Sepete eklendi" : locale === "de" ? "Zum Warenkorb hinzugefügt" : "Added to cart";
+    const errorText =
+      locale === "tr" ? "Sepete eklenemedi" : locale === "de" ? "Hinzufügen fehlgeschlagen" : "Add to cart failed";
+
+    try {
+      const ok = await addToCart(variantId, quantity);
+      if (ok) openCartSidebar();
+      setCartNotice({ text: ok ? successText : errorText, visible: true });
+
+      cartNoticeTimersRef.current.hide = window.setTimeout(() => {
+        setCartNotice((s) => ({ ...s, visible: false }));
+      }, 3800);
+      cartNoticeTimersRef.current.clear = window.setTimeout(() => {
+        setCartNotice({ text: "", visible: false });
+      }, 4300);
+    } catch (e) {
+      setCartNotice({ text: errorText, visible: true });
+      cartNoticeTimersRef.current.hide = window.setTimeout(() => {
+        setCartNotice((s) => ({ ...s, visible: false }));
+      }, 3800);
+      cartNoticeTimersRef.current.clear = window.setTimeout(() => {
+        setCartNotice({ text: "", visible: false });
+      }, 4300);
     }
   };
 
@@ -1022,18 +1053,20 @@ export default function ProductTemplate() {
                 </PriceStack>
               </PriceTop>
 
-              {inStock && !isComingSoon && (
-                <StockRow>
-                  <QtyWrap>
-                    <QtyLabel>Menge</QtyLabel>
-                    <QtySelect value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}>
-                      {Array.from({ length: maxQty }, (_, i) => i + 1).map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </QtySelect>
-                  </QtyWrap>
-                </StockRow>
-              )}
+              <StockRow>
+                <QtyWrap>
+                  <QtyLabel>Menge</QtyLabel>
+                  <QtySelect
+                    value={quantity}
+                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    disabled={!inStock || isComingSoon}
+                  >
+                    {Array.from({ length: maxQty }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </QtySelect>
+                </QtyWrap>
+              </StockRow>
 
               <CtaStack>
                 {cartNotice.text ? (
@@ -1076,17 +1109,6 @@ export default function ProductTemplate() {
         </RightCol>
       </ThreeCol>
 
-      {/* Full width below */}
-      {alsoBought.length > 0 && (
-        <div style={{ marginBottom: 48 }}>
-          <Carousel contained={false} title="Kunden, die diesen Artikel gekauft haben, kauften auch" itemWidth={260}>
-            {alsoBought.map((p) => (
-              <ProductCard key={p.id} product={p} compact />
-            ))}
-          </Carousel>
-        </div>
-      )}
-
       {(displayDescription || product.subtitle) && (
         <DescriptionSection
           id="description"
@@ -1113,6 +1135,21 @@ export default function ProductTemplate() {
         <StarRating average={reviewAvg} count={reviewCount} />
         <p className="text-gray-500 text-sm mt-2">Hier können später die vollständigen Bewertungen angezeigt werden.</p>
       </ReviewsSection>
+
+      {/* Full width below */}
+      {alsoBought.length > 0 && (
+        <div style={{ marginBottom: 48 }}>
+          <Carousel
+            contained={false}
+            title="Kunden, die diesen Artikel gekauft haben, kauften auch"
+            itemWidth={260}
+          >
+            {alsoBought.map((p) => (
+              <ProductCard key={p.id} product={p} compact />
+            ))}
+          </Carousel>
+        </div>
+      )}
 
       {lightboxOpen && displayImages.length > 0 && (
         <Lightbox

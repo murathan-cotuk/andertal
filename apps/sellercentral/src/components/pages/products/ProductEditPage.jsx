@@ -23,16 +23,26 @@ import {
   Modal,
   Checkbox,
 } from "@shopify/polaris";
-import { ProductIcon, MenuHorizontalIcon } from "@shopify/polaris-icons";
+import { ProductIcon, MenuHorizontalIcon, ViewIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
-import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
   const url = (typeof env === "string" ? env : "").trim();
   return url || (typeof window !== "undefined" ? "http://localhost:9000" : "");
+};
+
+const getDefaultShopUrl = () => {
+  const env = process.env.NEXT_PUBLIC_SHOP_URL || "";
+  const url = (typeof env === "string" ? env : "").trim();
+  if (url) return url.replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    if (window.location.hostname === "localhost") return "http://localhost:3000";
+    return window.location.origin;
+  }
+  return "";
 };
 
 const STATUS_OPTIONS = [
@@ -117,6 +127,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const locale = useLocale();
   const client = getMedusaAdminClient();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
+  const shopBaseUrl = getDefaultShopUrl();
   const [product, setProduct] = useState(() => {
     const p = initialProduct ?? (isNew ? getEmptyProduct() : null);
     if (!p || !p.metadata?.translations) return p;
@@ -201,6 +212,26 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     return () => { cancelled = true; };
   }, [client]);
 
+  // Auto-prune stale related_product_ids if those products were deleted
+  useEffect(() => {
+    if (!product) return;
+    const ids = Array.isArray(product?.metadata?.related_product_ids)
+      ? product.metadata.related_product_ids
+      : [];
+    if (!ids.length) return;
+    const valid = new Set((relatedProductsList || []).map((p) => p?.id).filter(Boolean));
+    const next = ids.filter((id) => valid.has(id));
+    if (next.length !== ids.length) {
+      setProduct((prev) => {
+        if (!prev) return prev;
+        const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
+        if (next.length) m.related_product_ids = next;
+        else delete m.related_product_ids;
+        return { ...prev, metadata: m };
+      });
+    }
+  }, [product?.id, product?.metadata?.related_product_ids, relatedProductsList]);
+
   useEffect(() => {
     if (descriptionMode === "visual" && descEditorRef.current) descEditorRef.current.innerHTML = product?.description || "";
   }, [descriptionMode]);
@@ -219,33 +250,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       variants: Array.isArray(p.variants) ? p.variants : [],
     };
   }
-  const isDirty = product && initialSnapshotRef.current != null && JSON.stringify(normalizeForCompare(product)) !== initialSnapshotRef.current;
-  const unsaved = useUnsavedChanges();
-
-  const handleDiscard = useCallback(() => {
-    setProduct(initialProduct ?? (isNew ? getEmptyProduct() : null));
-    if (initialProduct) initialSnapshotRef.current = JSON.stringify(normalizeForCompare(initialProduct));
-    else if (isNew) initialSnapshotRef.current = JSON.stringify(normalizeForCompare(getEmptyProduct()));
-    unsaved?.setDirty(false);
-  }, [initialProduct, isNew, unsaved]);
-
-  useEffect(() => {
-    if (!unsaved) return;
-    unsaved.setDirty(isDirty);
-  }, [isDirty, unsaved]);
-
-  useEffect(() => {
-    if (!unsaved) return;
-    unsaved.setHandlers({
-      onSave: () => saveRef.current?.(),
-      onDiscard: () => discardRef.current?.(),
-    });
-    return () => {
-      unsaved.clearHandlers();
-      unsaved.setDirty(false);
-    };
-  }, [unsaved]);
-
   const meta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
   const uvp = meta.uvp_cents != null ? Number(meta.uvp_cents) / 100 : null;
   const rabattpreis = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) / 100 : null;
@@ -312,9 +316,25 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         router.push(`/products/${created?.id}`);
         return;
       }
-      await client.updateAdminHubProduct(idOrHandle, payload);
+      const updated = await client.updateAdminHubProduct(idOrHandle, payload);
+      const savedProductRaw = updated || {
+        ...product,
+        ...payload,
+        metadata: payload.metadata ?? product.metadata,
+        variants: payload.variants ?? product.variants,
+      };
+      const savedTr = savedProductRaw?.metadata?.translations?.[locale];
+      const savedProduct = savedTr
+        ? {
+            ...savedProductRaw,
+            title: savedTr.title ?? savedProductRaw.title,
+            description: savedTr.description ?? savedProductRaw.description,
+          }
+        : savedProductRaw;
+
+      setProduct(savedProduct);
       setMessage({ type: "success", text: "Saved" });
-      initialSnapshotRef.current = JSON.stringify(normalizeForCompare({ ...product, ...payload }));
+      initialSnapshotRef.current = JSON.stringify(normalizeForCompare(savedProduct));
       onReload?.();
     } catch (err) {
       setMessage({ type: "error", text: err?.message || "Save failed" });
@@ -322,11 +342,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setSaving(false);
     }
   };
-
-  const saveRef = useRef(save);
-  const discardRef = useRef(handleDiscard);
-  saveRef.current = save;
-  discardRef.current = handleDiscard;
 
   const openDuplicateModal = () => {
     setDuplicateOptions({ ...DEFAULT_DUPLICATE_OPTIONS });
@@ -672,14 +687,31 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         </Link>
         <span style={{ flex: 1 }} />
         {!isNew && (
-          <Popover active={moreActionsOpen} onClose={() => setMoreActionsOpen(false)} activator={<Button size="slim" icon={MenuHorizontalIcon} onClick={() => setMoreActionsOpen(true)} accessibilityLabel="More actions" style={{ background: "#1f2937", color: "#fff", border: "none" }}>More actions</Button>} autofocusTarget="first-node">
-            <ActionList
-              items={[
-                { content: "Duplicate", onAction: () => { setMoreActionsOpen(false); openDuplicateModal(); } },
-                { content: "Delete", destructive: true, onAction: () => { setMoreActionsOpen(false); setDeleteConfirmOpen(true); } },
-              ]}
-            />
-          </Popover>
+          <>
+            {product?.handle && (
+              <a
+                href={`${shopBaseUrl}/produkt/${encodeURIComponent(product.handle)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: "none" }}
+              >
+                <Button size="slim" icon={ViewIcon}>
+                  View in shop
+                </Button>
+              </a>
+            )}
+            <Button size="slim" variant="primary" onClick={save} loading={saving}>
+              Save
+            </Button>
+            <Popover active={moreActionsOpen} onClose={() => setMoreActionsOpen(false)} activator={<Button size="slim" icon={MenuHorizontalIcon} onClick={() => setMoreActionsOpen(true)} accessibilityLabel="More actions" style={{ background: "#1f2937", color: "#fff", border: "none" }}>More actions</Button>} autofocusTarget="first-node">
+              <ActionList
+                items={[
+                  { content: "Duplicate", onAction: () => { setMoreActionsOpen(false); openDuplicateModal(); } },
+                  { content: "Delete", destructive: true, onAction: () => { setMoreActionsOpen(false); setDeleteConfirmOpen(true); } },
+                ]}
+              />
+            </Popover>
+          </>
         )}
       </div>
 

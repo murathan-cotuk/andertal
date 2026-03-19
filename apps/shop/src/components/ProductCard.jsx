@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useRef } from "react";
 import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { CartContext } from "@/context/CartContext";
-import { formatPriceCents, getLocalizedProduct } from "@/lib/format";
+import { formatPriceCents, getLocalizedProduct, htmlToText } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 import styled from "styled-components";
 
@@ -21,6 +21,7 @@ function resolveImg(src) {
  * ─────────────────────────────────────────────────────────── */
 
 const Card = styled.article`
+  position: relative;
   display: flex;
   flex-direction: column;
   background: #fff;
@@ -90,6 +91,90 @@ const AddToCartBtn = styled.button`
 
   &:hover:not(:disabled) { background: #333; }
   &:disabled { opacity: 0.5; cursor: not-allowed; background: #999; }
+`;
+
+const QtyRow = styled.div`
+  width: calc(100% - 4px);
+  margin: 6px 2px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #f3f4f6;
+  overflow: hidden;
+`;
+
+const QtyBtn = styled.button`
+  width: 34px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  &:hover:not(:disabled) {
+    background: #e5e7eb;
+    color: #111827;
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const QtyInput = styled.input`
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  letter-spacing: 0.02em;
+  border: 0;
+  background: transparent;
+  outline: none;
+  min-width: 0;
+  padding: 0 4px;
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  &[type="number"] {
+    -moz-appearance: textfield;
+  }
+`;
+
+const CartNotice = styled.div`
+  margin: 6px 10px 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #065f46;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-align: center;
+  opacity: ${(p) => (p.$visible ? 1 : 0)};
+  transform: translateY(${(p) => (p.$visible ? "0px" : "6px")});
+  transition: opacity 250ms ease, transform 250ms ease;
+  pointer-events: none;
+`;
+
+const DescriptionPreview = styled.p`
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: #6b7280;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+`;
+
+const ReviewRow = styled.div`
+  margin-top: 8px;
 `;
 
 /* Badges */
@@ -177,18 +262,18 @@ const Pills = styled.div`
 `;
 
 const Pill = styled.button`
-  padding: ${(p) => (p.$swatch ? "0" : "3px 7px")};
-  width: ${(p) => (p.$swatch ? "22px" : "auto")};
-  height: ${(p) => (p.$swatch ? "22px" : "auto")};
-  min-width: ${(p) => (p.$swatch ? "22px" : "24px")};
-  min-height: ${(p) => (p.$swatch ? "22px" : "22px")};
-  font-size: 10px;
+  padding: ${(p) => (p.$swatch ? "0" : "7px 12px")};
+  width: ${(p) => (p.$swatch ? "26px" : "auto")};
+  height: ${(p) => (p.$swatch ? "26px" : "auto")};
+  min-width: ${(p) => (p.$swatch ? "26px" : "34px")};
+  min-height: ${(p) => (p.$swatch ? "26px" : "28px")};
+  font-size: 11.5px;
   font-weight: 500;
-  line-height: 1.4;
-  border-radius: ${(p) => (p.$swatch ? "50%" : "2px")};
+  line-height: 1.1;
+  border-radius: ${(p) => (p.$swatch ? "50%" : "8px")};
   border: ${(p) => p.$swatch
-    ? `2.5px solid ${p.$on ? "#111" : "#e0e0e0"}`
-    : `1px solid ${p.$on ? "#111" : "#e0e0e0"}`};
+    ? `3px solid ${p.$on ? "#111" : "#e0e0e0"}`
+    : `1.5px solid ${p.$on ? "#111" : "#e0e0e0"}`};
   background: ${(p) => (p.$swatch ? "none" : p.$on ? "#111" : "transparent")};
   color: ${(p) => (p.$on ? "#fff" : p.$outOfStock ? "#bbb" : "#555")};
   cursor: pointer;
@@ -223,13 +308,17 @@ const MorePill = styled.span`
 
 export function ProductCard({ product }) {
   const locale = useLocale();
-  const { title: displayTitle } = getLocalizedProduct(product, locale);
+  const { title: displayTitle, description: localizedDescription } = getLocalizedProduct(product, locale);
   const cartCtx = useContext(CartContext);
   const addToCart = cartCtx?.addToCart ?? (async () => null);
+  const openCartSidebar = cartCtx?.openCartSidebar ?? (() => {});
   const cartLoading = cartCtx?.loading ?? false;
 
   const [selIdx, setSelIdx] = useState(0);
+  const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
+  const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
+  const cartNoticeTimersRef = useRef({ hide: null, clear: null });
 
   const variants = product.variants || [];
   const variationGroups = Array.isArray(product.variation_groups) && product.variation_groups.length > 0
@@ -303,6 +392,11 @@ export function ProductCard({ product }) {
   const managesInventory = variant?.manage_inventory === true;
   const inventoryQty = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity;
   const outOfStock = managesInventory && typeof inventoryQty === "number" && inventoryQty <= 0;
+  const maxQty = Math.max(1, Math.min(Number(inventoryQty) > 0 ? Number(inventoryQty) : 10, 10));
+
+  const meta = product.metadata || {};
+  const reviewAvg = meta.review_avg != null ? Number(meta.review_avg) : 0;
+  const reviewCount = meta.review_count != null ? Number(meta.review_count) : 0;
 
   const productUrl = `/produkt/${product.handle || product.id}`;
 
@@ -311,12 +405,40 @@ export function ProductCard({ product }) {
     const vid = variant?.id;
     if (!vid || outOfStock) return;
     setAdding(true);
-    await addToCart(vid, 1);
+    // Avoid timer races
+    if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);
+    if (cartNoticeTimersRef.current.clear) window.clearTimeout(cartNoticeTimersRef.current.clear);
+
+    const successText =
+      locale === "tr" ? "Sepete eklendi" : locale === "de" ? "Zum Warenkorb hinzugefügt" : "Added to cart";
+    const errorText =
+      locale === "tr" ? "Sepete eklenemedi" : locale === "de" ? "Hinzufügen fehlgeschlagen" : "Add to cart failed";
+
+    try {
+      const ok = await addToCart(vid, quantity);
+      if (ok) openCartSidebar();
+      setCartNotice({ text: ok ? successText : errorText, visible: true });
+      cartNoticeTimersRef.current.hide = window.setTimeout(
+        () => setCartNotice((s) => ({ ...s, visible: false })),
+        2200
+      );
+      cartNoticeTimersRef.current.clear = window.setTimeout(
+        () => setCartNotice({ text: "", visible: false }),
+        2700
+      );
+    } catch {
+      setCartNotice({ text: errorText, visible: true });
+    }
     setAdding(false);
     // Reset grouped selection back to first variant after add
   };
 
   const showPills = variants.length > 1;
+  const clampQty = (n) => {
+    const num = Number(n);
+    if (!Number.isFinite(num)) return 1;
+    return Math.max(1, Math.min(maxQty, Math.floor(num)));
+  };
 
   return (
     <Card>
@@ -342,7 +464,6 @@ export function ProductCard({ product }) {
         </Badges>
       </ImgBlock>
 
-      {/* ── Add to cart (always visible) ── */}
       <AddToCartBtn
         type="button"
         onClick={handleQuickAdd}
@@ -350,6 +471,37 @@ export function ProductCard({ product }) {
       >
         {adding ? "…" : isComingSoon ? "Pek yakında" : outOfStock ? "Sold out" : "Add to cart"}
       </AddToCartBtn>
+
+      <QtyRow>
+        <QtyBtn
+          type="button"
+          onClick={() => setQuantity((q) => clampQty(q - 1))}
+          disabled={quantity <= 1 || outOfStock || isComingSoon || adding || cartLoading}
+          aria-label="Menge verringern"
+        >
+          −
+        </QtyBtn>
+        <QtyInput
+          type="number"
+          min={1}
+          max={maxQty}
+          value={quantity}
+          onChange={(e) => setQuantity(clampQty(e.target.value))}
+          onBlur={(e) => setQuantity(clampQty(e.target.value))}
+          disabled={outOfStock || isComingSoon || adding || cartLoading}
+          aria-label="Menge"
+        />
+        <QtyBtn
+          type="button"
+          onClick={() => setQuantity((q) => clampQty(q + 1))}
+          disabled={quantity >= maxQty || outOfStock || isComingSoon || adding || cartLoading}
+          aria-label="Menge erhöhen"
+        >
+          +
+        </QtyBtn>
+      </QtyRow>
+
+      <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice>
 
       {/* ── Info ── */}
       <Info>
@@ -365,6 +517,16 @@ export function ProductCard({ product }) {
             {formatPriceCents(hasSale ? saleCents : priceCents)} €
           </CurrentPrice>
         </Prices>
+
+        {reviewCount > 0 || reviewAvg > 0 ? (
+          <ReviewRow>
+            <StarRating average={reviewAvg} count={reviewCount} />
+          </ReviewRow>
+        ) : null}
+
+        {localizedDescription ? (
+          <DescriptionPreview>{htmlToText(localizedDescription).slice(0, 100)}{htmlToText(localizedDescription).length > 100 ? "…" : ""}</DescriptionPreview>
+        ) : null}
 
         {showPills && (
           variationGroups ? (
