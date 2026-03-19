@@ -96,6 +96,33 @@ const ItemBody = styled.div`
   min-width: 0;
 `;
 
+const RemoveBtn = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+  &:hover:not(:disabled) {
+    color: #ef4444;
+    background: #fef2f2;
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
 const ItemTitle = styled.div`
   font-size: 0.875rem;
   font-weight: 500;
@@ -256,6 +283,15 @@ export default function CartSidebar() {
                   </QtyBtn>
                 </QtyRow>
               </ItemBody>
+              <RemoveBtn
+                type="button"
+                onClick={() => removeLineItem(item.id)}
+                disabled={loading}
+                aria-label="Aus Warenkorb entfernen"
+                title="Entfernen"
+              >
+                ×
+              </RemoveBtn>
             </Item>
           ))}
         </Scroll>

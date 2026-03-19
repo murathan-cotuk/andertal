@@ -21,8 +21,8 @@ const Container = styled.div`
   max-width: 100%;
   padding: 32px 24px 64px;
   @media (min-width: 1200px) {
-    padding-left: 48px;
-    padding-right: 48px;
+    padding-left: 150px;
+    padding-right: 250px;
   }
 `;
 
@@ -587,10 +587,10 @@ function BrandRow({ brandName, brandHandle, brandLogo, reviewCount }) {
         <img
           src={brandLogo}
           alt={brandName}
-          style={{ width: 26, height: 26, objectFit: "cover", borderRadius: "50%", border: "1px solid #e5e7eb", flexShrink: 0 }}
+          style={{ width: 34, height: 34, objectFit: "cover", borderRadius: "50%", border: "1px solid #e5e7eb", flexShrink: 0 }}
         />
       ) : (
-        <span style={{ width: 26, height: 26, borderRadius: "50%", background: "#f3f4f6", border: "1px solid #e5e7eb", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#9ca3af" }}>
+        <span style={{ width: 34, height: 34, borderRadius: "50%", background: "#f3f4f6", border: "1px solid #e5e7eb", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#9ca3af" }}>
           {(brandName || "?").charAt(0).toUpperCase()}
         </span>
       )}
