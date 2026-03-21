@@ -39,13 +39,40 @@ function StatusBadge({ value }) {
   );
 }
 
+const PM_LABELS = { visa: "Visa", mastercard: "Mastercard", amex: "American Express", paypal: "PayPal", klarna: "Klarna", sepa_debit: "SEPA", card: "Kreditkarte", apple_pay: "Apple Pay", google_pay: "Google Pay" };
+function fmtPM(pm) { return PM_LABELS[pm] || (pm ? pm.charAt(0).toUpperCase() + pm.slice(1).replace(/_/g, " ") : "—"); }
+
+function InfoPill({ label, value }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <span style={{ fontSize: 10, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
+      <span style={{ fontSize: 13, fontWeight: 500, color: "#111827" }}>{value}</span>
+    </div>
+  );
+}
+
 function ExpandedRow({ order }) {
   const items = order._items || [];
-  const subtotal = order.subtotal_cents || order.total_cents || 0;
+  const total = order.total_cents || order.subtotal_cents || 0;
+  const customerLabel = order._customer_number
+    ? `#${order._customer_number} – ${[order.first_name, order.last_name].filter(Boolean).join(" ") || "—"}`
+    : `Gastkunde – ${[order.first_name, order.last_name].filter(Boolean).join(" ") || "—"}`;
+
   return (
     <tr>
-      <td colSpan={11} style={{ padding: 0, background: "#f9fafb" }}>
-        <div style={{ padding: "12px 24px 16px", borderBottom: "1px solid #e5e7eb" }}>
+      <td colSpan={11} style={{ padding: 0, background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+        {/* Info bar */}
+        <div style={{ display: "flex", gap: 32, padding: "12px 24px", borderBottom: "1px solid #e5e7eb", flexWrap: "wrap", alignItems: "flex-start" }}>
+          <InfoPill label="Kunde" value={customerLabel} />
+          <InfoPill label="Kundentyp" value={order._is_guest !== false ? "Gastkunde" : "Registriert"} />
+          {order._payment_method && <InfoPill label="Zahlung" value={fmtPM(order._payment_method)} />}
+          <InfoPill label="Lieferadresse" value={[order.address_line1, order.postal_code, order.city, order.country].filter(Boolean).join(", ") || "—"} />
+          <InfoPill label="Erste Bestellung" value={order._is_first_order ? "Ja" : "Nein"} />
+          <InfoPill label="Gesamt" value={fmtCents(total)} />
+        </div>
+
+        {/* Items table */}
+        <div style={{ padding: "10px 24px 14px" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -61,9 +88,11 @@ function ExpandedRow({ order }) {
               )}
               {items.map((it, i) => (
                 <tr key={i} style={{ borderTop: "1px solid #e5e7eb" }}>
-                  <td style={{ padding: "6px 8px", display: "flex", alignItems: "center", gap: 8 }}>
-                    {it.thumbnail && <img src={it.thumbnail} alt="" style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4 }} />}
-                    <span>{it.title || "—"}</span>
+                  <td style={{ padding: "6px 8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {it.thumbnail && <img src={it.thumbnail} alt="" style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4 }} />}
+                      <span>{it.title || "—"}</span>
+                    </div>
                   </td>
                   <td style={{ textAlign: "right", padding: "6px 8px" }}>{it.quantity}</td>
                   <td style={{ textAlign: "right", padding: "6px 8px" }}>{fmtCents(it.unit_price_cents)}</td>
@@ -73,16 +102,8 @@ function ExpandedRow({ order }) {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: "2px solid #e5e7eb" }}>
-                <td colSpan={3} style={{ textAlign: "right", padding: "6px 8px", color: "#6b7280" }}>Versand</td>
-                <td style={{ textAlign: "right", padding: "6px 8px" }}>Kostenlos</td>
-              </tr>
-              <tr>
-                <td colSpan={3} style={{ textAlign: "right", padding: "6px 8px", color: "#6b7280" }}>Rabatt</td>
-                <td style={{ textAlign: "right", padding: "6px 8px" }}>—</td>
-              </tr>
-              <tr>
                 <td colSpan={3} style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>Gesamt</td>
-                <td style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>{fmtCents(subtotal)}</td>
+                <td style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>{fmtCents(total)}</td>
               </tr>
             </tfoot>
           </table>
@@ -161,12 +182,21 @@ export default function OrdersPage() {
   const toggleExpand = async (order) => {
     const id = order.id;
     if (expanded[id]) { setExpanded(e => ({ ...e, [id]: false })); return; }
-    if (order._items) { setExpanded(e => ({ ...e, [id]: true })); return; }
+    if (order._expanded) { setExpanded(e => ({ ...e, [id]: true })); return; }
     setLoadingItems(l => ({ ...l, [id]: true }));
     try {
       const client = getMedusaAdminClient();
       const data = await client.getOrder(id);
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, _items: data.order?.items || [] } : o));
+      const detail = data.order || {};
+      setOrders(prev => prev.map(o => o.id === id ? {
+        ...o,
+        _items: detail.items || [],
+        _customer_number: detail.customer_number || null,
+        _is_guest: detail.is_guest !== false,
+        _payment_method: detail.payment_method || null,
+        _is_first_order: detail.is_first_order === true,
+        _expanded: true,
+      } : o));
     } catch { }
     setLoadingItems(l => ({ ...l, [id]: false }));
     setExpanded(e => ({ ...e, [id]: true }));
