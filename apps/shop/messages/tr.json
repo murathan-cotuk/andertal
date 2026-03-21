@@ -60,6 +60,7 @@
   },
   "checkout": {
     "title": "Ödeme",
+    "paymentNotReady": "Ödeme formu henüz yüklenmedi. Lütfen birkaç saniye bekleyin.",
     "paymentError": "Ödeme başarısız. Lütfen tekrar deneyin.",
     "invalidEmail": "Geçersiz e-posta",
     "requiredField": "Zorunlu",

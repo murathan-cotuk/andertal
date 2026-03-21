@@ -61,6 +61,7 @@
   "checkout": {
     "title": "Paiement",
     "paymentError": "Paiement échoué. Veuillez réessayer.",
+    "paymentNotReady": "Le formulaire de paiement charge encore. Veuillez patienter.",
     "invalidEmail": "E-mail invalide",
     "requiredField": "Requis",
     "contactInfo": "Coordonnées",

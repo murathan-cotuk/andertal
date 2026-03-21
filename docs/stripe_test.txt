@@ -1,0 +1,6 @@
+Test kartı (en pratik)
+Alan	Değer
+Kart numarası	4242 4242 4242 4242
+Son kullanma	Gelecekte herhangi bir ay/yıl (örn. 12 / 34)
+CVC	Herhangi 3 hane (örn. 123)
+ZIP / posta kodu	İstenirse herhangi (örn. 12345)

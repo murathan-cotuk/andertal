@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -21,6 +21,8 @@ import { Link } from "@/i18n/navigation";
 import { tokens } from "@/design-system/tokens";
 
 const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+
+const CHECKOUT_SNAPSHOT_KEY = "belucha_checkout_snapshot";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -231,6 +233,38 @@ function useField(initial = "") {
   return { value, touched, onChange: (e) => setValue(e.target.value), onBlur: () => setTouched(true), reset: () => { setValue(initial); setTouched(false); } };
 }
 
+function CheckoutFormField({
+  label,
+  field,
+  type = "text",
+  placeholder,
+  fullWidth,
+  validate,
+  autoComplete,
+}) {
+  const t = useTranslations("checkout");
+  const required = (f) => f.touched && !f.value.trim();
+  const isRequired = !fullWidth ? required(field) : field.touched && !field.value.trim();
+  const isInvalid = validate ? field.touched && !validate(field.value) : isRequired;
+  return (
+    <FieldWrap style={fullWidth ? { gridColumn: "1/-1" } : {}}>
+      <Label>{label}</Label>
+      <Input
+        type={type}
+        value={field.value}
+        onChange={field.onChange}
+        onBlur={field.onBlur}
+        placeholder={placeholder}
+        $error={isInvalid}
+        autoComplete={autoComplete ?? "on"}
+      />
+      {isInvalid && (
+        <ErrorMsg>{validate && !required(field) ? t("invalidEmail") : t("requiredField")}</ErrorMsg>
+      )}
+    </FieldWrap>
+  );
+}
+
 function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
   const t = useTranslations("checkout");
   const stripe = useStripe();
@@ -239,6 +273,8 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
   const params = useParams();
   const locale = params?.locale || "de";
   const { setCart } = useCart();
+  const returnRunRef = useRef(false);
+  const [paymentElementReady, setPaymentElementReady] = useState(false);
 
   const email = useField("");
   const firstName = useField("");
@@ -253,9 +289,113 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    if (!stripe || typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const redirectStatus = sp.get("redirect_status");
+    if (!redirectStatus) return;
+
+    const checkoutPath = `/${locale}/checkout`;
+
+    if (redirectStatus === "failed") {
+      setError(t("paymentError"));
+      router.replace(checkoutPath);
+      return;
+    }
+
+    if (redirectStatus !== "succeeded") return;
+
+    const secret = sp.get("payment_intent_client_secret");
+    const piId = sp.get("payment_intent");
+    if (!secret || !piId) return;
+    if (sessionStorage.getItem(`belucha_pi_done_${piId}`) === "1") {
+      router.replace(checkoutPath);
+      return;
+    }
+    if (returnRunRef.current) return;
+    returnRunRef.current = true;
+
+    (async () => {
+      const { paymentIntent, error: retrieveErr } = await stripe.retrievePaymentIntent(secret);
+      if (retrieveErr || paymentIntent?.status !== "succeeded") {
+        returnRunRef.current = false;
+        setError(retrieveErr?.message || t("paymentError"));
+        router.replace(checkoutPath);
+        return;
+      }
+
+      let snapshot;
+      try {
+        const raw = sessionStorage.getItem(CHECKOUT_SNAPSHOT_KEY);
+        if (!raw) {
+          returnRunRef.current = false;
+          setError(t("paymentError"));
+          router.replace(checkoutPath);
+          return;
+        }
+        snapshot = JSON.parse(raw);
+      } catch {
+        returnRunRef.current = false;
+        setError(t("paymentError"));
+        router.replace(checkoutPath);
+        return;
+      }
+
+      if (snapshot.cartId !== cartId) {
+        returnRunRef.current = false;
+        router.replace(checkoutPath);
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/store-orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cart_id: cartId,
+            payment_intent_id: paymentIntent.id,
+            email: snapshot.email,
+            first_name: snapshot.first_name,
+            last_name: snapshot.last_name,
+            phone: snapshot.phone,
+            address_line1: snapshot.address_line1,
+            address_line2: snapshot.address_line2,
+            city: snapshot.city,
+            postal_code: snapshot.postal_code,
+            country: snapshot.country,
+          }),
+        });
+        const data = await res.json();
+        const orderId = data?.order?.id;
+        if (orderId) {
+          sessionStorage.setItem(`belucha_pi_done_${piId}`, "1");
+          try {
+            sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY);
+          } catch (_) {}
+          try {
+            window.localStorage.removeItem("belucha_cart_id");
+          } catch (_) {}
+          setCart(null);
+          router.replace(`/${locale}/order/${orderId}`);
+        } else {
+          returnRunRef.current = false;
+          setError(data?.message || t("paymentError"));
+          router.replace(checkoutPath);
+        }
+      } catch (err) {
+        returnRunRef.current = false;
+        setError(err?.message || t("paymentError"));
+        router.replace(checkoutPath);
+      }
+    })();
+  }, [stripe, cartId, locale, router, setCart, t]);
+
+  useEffect(() => {
+    setPaymentElementReady(false);
+  }, [clientSecret]);
+
   const validateEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
   const required = (field) => field.touched && !field.value.trim();
-  const invalidEmail = email.touched && !validateEmail(email.value);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -268,13 +408,59 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
       return;
     }
 
+    if (!paymentElementReady) {
+      setError(t("paymentNotReady"));
+      return;
+    }
+
     setProcessing(true);
     setError(null);
 
-    const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      redirect: "if_required",
-    });
+    const returnUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}${window.location.pathname}`
+        : "";
+
+    try {
+      sessionStorage.setItem(
+        CHECKOUT_SNAPSHOT_KEY,
+        JSON.stringify({
+          cartId,
+          email: email.value.trim(),
+          first_name: firstName.value.trim(),
+          last_name: lastName.value.trim(),
+          phone: phone.value.trim(),
+          address_line1: address.value.trim(),
+          address_line2: address2.value.trim(),
+          city: city.value.trim(),
+          postal_code: postalCode.value.trim(),
+          country: country.value.trim(),
+        }),
+      );
+    } catch (_) {}
+
+    const { error: submitError } = await elements.submit();
+    if (submitError) {
+      setError(submitError.message || t("paymentError"));
+      setProcessing(false);
+      return;
+    }
+
+    let stripeError;
+    let paymentIntent;
+    try {
+      const result = await stripe.confirmPayment({
+        elements,
+        confirmParams: { return_url: returnUrl },
+        redirect: "if_required",
+      });
+      stripeError = result.error;
+      paymentIntent = result.paymentIntent;
+    } catch (err) {
+      setError(err?.message || t("paymentError"));
+      setProcessing(false);
+      return;
+    }
 
     if (stripeError) {
       setError(stripeError.message || t("paymentError"));
@@ -304,6 +490,9 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
         const data = await res.json();
         const orderId = data?.order?.id;
         if (orderId) {
+          try {
+            sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY);
+          } catch (_) {}
           if (typeof window !== "undefined") {
             try { window.localStorage.removeItem("belucha_cart_id"); } catch (_) {}
           }
@@ -317,49 +506,35 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
     setProcessing(false);
   };
 
-  const Field = ({ label, field, type = "text", placeholder, fullWidth, validate }) => {
-    const isRequired = !fullWidth ? required(field) : (field.touched && !field.value.trim());
-    const isInvalid = validate ? (field.touched && !validate(field.value)) : isRequired;
-    return (
-      <FieldWrap style={fullWidth ? { gridColumn: "1/-1" } : {}}>
-        <Label>{label}</Label>
-        <Input
-          type={type}
-          value={field.value}
-          onChange={field.onChange}
-          onBlur={field.onBlur}
-          placeholder={placeholder}
-          $error={isInvalid}
-          autoComplete="off"
-        />
-        {isInvalid && <ErrorMsg>{validate && !required(field) ? t("invalidEmail") : t("requiredField")}</ErrorMsg>}
-      </FieldWrap>
-    );
-  };
-
   return (
     <form onSubmit={handleSubmit} noValidate>
       <FormCard style={{ marginBottom: 24 }}>
         <SectionTitle>{t("contactInfo")}</SectionTitle>
         <FieldGrid>
-          <Field label={t("email")} field={email} type="email" validate={validateEmail} />
-          <Field label={t("phone")} field={phone} type="tel" />
+          <CheckoutFormField
+            label={t("email")}
+            field={email}
+            type="email"
+            validate={validateEmail}
+            autoComplete="email"
+          />
+          <CheckoutFormField label={t("phone")} field={phone} type="tel" autoComplete="tel" />
         </FieldGrid>
         <FieldGrid $cols="1fr 1fr">
-          <Field label={t("firstName")} field={firstName} />
-          <Field label={t("lastName")} field={lastName} />
+          <CheckoutFormField label={t("firstName")} field={firstName} autoComplete="given-name" />
+          <CheckoutFormField label={t("lastName")} field={lastName} autoComplete="family-name" />
         </FieldGrid>
       </FormCard>
 
       <FormCard style={{ marginBottom: 24 }}>
         <SectionTitle>{t("shippingAddress")}</SectionTitle>
         <FieldGrid>
-          <Field label={t("address")} field={address} fullWidth />
-          <Field label={t("address2")} field={address2} fullWidth />
+          <CheckoutFormField label={t("address")} field={address} fullWidth autoComplete="street-address" />
+          <CheckoutFormField label={t("address2")} field={address2} fullWidth autoComplete="address-line2" />
         </FieldGrid>
         <FieldGrid $cols="1fr 1fr">
-          <Field label={t("postalCode")} field={postalCode} />
-          <Field label={t("city")} field={city} />
+          <CheckoutFormField label={t("postalCode")} field={postalCode} autoComplete="postal-code" />
+          <CheckoutFormField label={t("city")} field={city} autoComplete="address-level2" />
         </FieldGrid>
         <FieldGrid>
           <FieldWrap>
@@ -367,6 +542,7 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
             <select
               value={country.value}
               onChange={(e) => country.onChange({ target: { value: e.target.value } })}
+              autoComplete="country"
               style={{
                 padding: "10px 12px",
                 border: "1px solid #d1d5db",
@@ -393,9 +569,18 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
 
       <FormCard>
         <SectionTitle>{t("payment")}</SectionTitle>
-        <PaymentElement />
+        <PaymentElement
+          onReady={() => setPaymentElementReady(true)}
+          onLoadError={() => {
+            setPaymentElementReady(false);
+            setError(t("paymentError"));
+          }}
+        />
         {error && <ErrorBox>{error}</ErrorBox>}
-        <PayBtn type="submit" disabled={!stripe || !elements || processing}>
+        <PayBtn
+          type="submit"
+          disabled={!stripe || !elements || !paymentElementReady || processing}
+        >
           {processing ? t("processing") : `${t("placeOrder")} – ${formatPriceCents(subtotalCents)} €`}
         </PayBtn>
       </FormCard>
@@ -422,6 +607,19 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!cart?.id || items.length === 0 || !STRIPE_PK) return;
+
+    if (typeof window !== "undefined") {
+      const returnedSecret = new URLSearchParams(window.location.search).get(
+        "payment_intent_client_secret",
+      );
+      if (returnedSecret) {
+        setClientSecret(returnedSecret);
+        setPiError(null);
+        setLoadingPI(false);
+        return;
+      }
+    }
+
     setLoadingPI(true);
     setPiError(null);
     fetch("/api/store-payment-intent", {
@@ -465,6 +663,7 @@ export default function CheckoutPage() {
               {loadingPI && <p style={{ color: "#6b7280" }}>{t("processing")}</p>}
               {clientSecret && stripeInstance && (
                 <Elements
+                  key={clientSecret}
                   stripe={stripeInstance}
                   options={{
                     clientSecret,

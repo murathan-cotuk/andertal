@@ -61,6 +61,7 @@
   "checkout": {
     "title": "Checkout",
     "paymentError": "Payment failed. Please try again.",
+    "paymentNotReady": "Payment form is still loading. Please wait a moment.",
     "invalidEmail": "Invalid email",
     "requiredField": "Required",
     "contactInfo": "Contact information",

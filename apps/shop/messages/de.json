@@ -61,6 +61,7 @@
   "checkout": {
     "title": "Kasse",
     "paymentError": "Zahlung fehlgeschlagen. Bitte erneut versuchen.",
+    "paymentNotReady": "Zahlungsformular wird noch geladen. Bitte kurz warten.",
     "invalidEmail": "Ungültige E-Mail",
     "requiredField": "Pflichtfeld",
     "contactInfo": "Kontaktdaten",

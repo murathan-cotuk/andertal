@@ -61,6 +61,7 @@
   "checkout": {
     "title": "Pago",
     "paymentError": "Pago fallido. Inténtalo de nuevo.",
+    "paymentNotReady": "El formulario de pago aún se está cargando. Espera un momento.",
     "invalidEmail": "E-mail no válido",
     "requiredField": "Obligatorio",
     "contactInfo": "Datos de contacto",
