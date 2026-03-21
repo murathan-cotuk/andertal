@@ -3,8 +3,11 @@ const createNextIntlPlugin = require("next-intl/plugin");
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.js");
 
+const monorepoRoot = path.join(__dirname, "../..");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: monorepoRoot,
   reactStrictMode: true,
   transpilePackages: ["@belucha/ui", "@belucha/lib"],
   compiler: {

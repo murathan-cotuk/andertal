@@ -2780,7 +2780,9 @@ async function start() {
             [password_hash, first_name, last_name, phone, account_type, gender, birth_date || null,
              address_line1, address_line2, zip_code, city, country, company_name, vat_number, existingRow.id]
           )
-        } else {
+        }
+        // UPDATE 0 rows (satır silinmiş / yarış) → INSERT; misafir yokken de INSERT
+        if (!existingRow || !r.rows[0]) {
           r = await client.query(
             `INSERT INTO store_customers (email, password_hash, first_name, last_name, phone, account_type, gender, birth_date, address_line1, address_line2, zip_code, city, country, company_name, vat_number)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8::date,$9,$10,$11,$12,$13,$14,$15)

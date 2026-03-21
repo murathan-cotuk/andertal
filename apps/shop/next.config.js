@@ -5,8 +5,12 @@ const { withSentryConfig } = require("@sentry/nextjs");
 // Must be relative to app root so Turbopack alias resolves correctly at runtime
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.js");
 
+/** Monorepo kökü — aksi halde Next, üst dizindeki başka package-lock.json'ı seçip yanlış root kullanıyor (Windows'ta 500 / tracing hataları). */
+const monorepoRoot = path.join(__dirname, "../..");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: monorepoRoot,
   reactStrictMode: true,
   transpilePackages: ["@belucha/ui", "@belucha/lib"],
   compiler: {
