@@ -84,7 +84,9 @@
     "subtotal": "Subtotale",
     "shipping": "Spedizione",
     "freeShipping": "Gratis",
-    "total": "Totale"
+    "total": "Totale",
+    "billingSameAsShipping": "Indirizzo di fatturazione uguale alla spedizione",
+    "billingAddress": "Indirizzo di fatturazione"
   },
   "order": {
     "loading": "Caricamento…",

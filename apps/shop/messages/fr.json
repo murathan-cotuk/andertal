@@ -84,7 +84,9 @@
     "subtotal": "Sous-total",
     "shipping": "Livraison",
     "freeShipping": "Gratuit",
-    "total": "Total"
+    "total": "Total",
+    "billingSameAsShipping": "Adresse de facturation identique à la livraison",
+    "billingAddress": "Adresse de facturation"
   },
   "order": {
     "loading": "Chargement…",

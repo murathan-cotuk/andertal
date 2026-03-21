@@ -9,7 +9,19 @@ function fmtCents(c) {
 }
 function fmtDate(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleString("de-DE");
+  const dt = new Date(d);
+  const date = dt.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const time = dt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return `${date} / ${time}`;
+}
+function formatPaymentMethod(pm) {
+  const map = {
+    visa: "Visa", mastercard: "Mastercard", amex: "American Express",
+    paypal: "PayPal", klarna: "Klarna", sepa_debit: "SEPA-Lastschrift",
+    card: "Kreditkarte", apple_pay: "Apple Pay", google_pay: "Google Pay",
+    giropay: "Giropay", sofort: "Sofort", ideal: "iDEAL",
+  };
+  return map[pm] || (pm ? pm.charAt(0).toUpperCase() + pm.slice(1).replace(/_/g, " ") : "—");
 }
 
 const STATUS_COLORS = {
@@ -42,6 +54,15 @@ function Section({ title, children }) {
   );
 }
 
+function InfoRow({ label, value }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
+      <span style={{ color: "#6b7280" }}>{label}</span>
+      <span style={{ fontWeight: 500, color: "#111827" }}>{value}</span>
+    </div>
+  );
+}
+
 function StatusSelect({ label, value, options, onChange, saving }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
@@ -70,7 +91,6 @@ export default function OrderDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // local editable status state
   const [orderStatus, setOrderStatus] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
   const [deliveryStatus, setDeliveryStatus] = useState("");
@@ -99,6 +119,16 @@ export default function OrderDetailPage() {
     return () => { cancelled = true; };
   }, [id]);
 
+  // Auto-abgeschlossen when versendet + bezahlt
+  const handleDeliveryChange = (val) => {
+    setDeliveryStatus(val);
+    if (val === "versendet" && paymentStatus === "bezahlt") setOrderStatus("abgeschlossen");
+  };
+  const handlePaymentChange = (val) => {
+    setPaymentStatus(val);
+    if (val === "bezahlt" && deliveryStatus === "versendet") setOrderStatus("abgeschlossen");
+  };
+
   const handleSaveStatus = async () => {
     setSaving(true);
     try {
@@ -125,9 +155,7 @@ export default function OrderDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div style={{ padding: 24, color: "#9ca3af", textAlign: "center", marginTop: 60 }}>Laden…</div>
-    );
+    return <div style={{ padding: 24, color: "#9ca3af", textAlign: "center", marginTop: 60 }}>Laden…</div>;
   }
 
   if (error && !order) {
@@ -140,11 +168,19 @@ export default function OrderDetailPage() {
   }
 
   const items = order?.items || [];
-  const subtotal = order?.subtotal_cents || 0;
   const total = order?.total_cents || order?.subtotal_cents || 0;
 
+  // Billing address
+  const billingSame = order?.billing_same_as_shipping !== false;
+  const hasBillingAddr = !billingSame && order?.billing_address_line1;
+
+  // Customer label
+  const customerLabel = order?.customer_number
+    ? `${order.customer_number} – ${[order?.first_name, order?.last_name].filter(Boolean).join(" ") || "—"}`
+    : `Gast – ${[order?.first_name, order?.last_name].filter(Boolean).join(" ") || "—"}`;
+
   return (
-    <div style={{ padding: 24, maxWidth: 1100 }}>
+    <div style={{ padding: 24, background: "#fff", minHeight: "100%" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <button onClick={() => router.push("/orders")} style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "#374151" }}>
@@ -162,7 +198,7 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 16, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16, alignItems: "start" }}>
         {/* Left column */}
         <div>
           {/* Order items */}
@@ -215,8 +251,8 @@ export default function OrderDetailPage() {
           {/* Status management */}
           <Section title="Status verwalten">
             <StatusSelect label="Bestellstatus" value={orderStatus} options={["offen", "in_bearbeitung", "abgeschlossen", "storniert"]} onChange={setOrderStatus} saving={saving} />
-            <StatusSelect label="Zahlungsstatus" value={paymentStatus} options={["offen", "bezahlt", "teil_erstattet", "erstattet"]} onChange={setPaymentStatus} saving={saving} />
-            <StatusSelect label="Lieferstatus" value={deliveryStatus} options={["offen", "versendet", "zugestellt"]} onChange={setDeliveryStatus} saving={saving} />
+            <StatusSelect label="Zahlungsstatus" value={paymentStatus} options={["offen", "bezahlt", "teil_erstattet", "erstattet"]} onChange={handlePaymentChange} saving={saving} />
+            <StatusSelect label="Lieferstatus" value={deliveryStatus} options={["offen", "versendet", "zugestellt"]} onChange={handleDeliveryChange} saving={saving} />
             <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
               <button
                 onClick={handleSaveStatus}
@@ -230,13 +266,14 @@ export default function OrderDetailPage() {
           </Section>
 
           {/* Payment info */}
-          {order?.payment_intent_id && (
-            <Section title="Zahlungsinfo">
-              <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }}>
-                Stripe Payment Intent: {order.payment_intent_id}
+          <Section title="Zahlungsinfo">
+            <InfoRow label="Zahlungsmethode" value={formatPaymentMethod(order?.payment_method)} />
+            {order?.payment_intent_id && (
+              <div style={{ marginTop: 8, fontSize: 11, color: "#9ca3af", fontFamily: "monospace", wordBreak: "break-all" }}>
+                PI: {order.payment_intent_id}
               </div>
-            </Section>
-          )}
+            )}
+          </Section>
         </div>
 
         {/* Right column */}
@@ -244,7 +281,12 @@ export default function OrderDetailPage() {
           {/* Customer */}
           <Section title="Kunde">
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
-              {[order?.first_name, order?.last_name].filter(Boolean).join(" ") || "—"}
+              <a
+                href={order?.email ? `/customers?email=${encodeURIComponent(order.email)}` : "#"}
+                style={{ color: "#1d4ed8", textDecoration: "none" }}
+              >
+                {customerLabel}
+              </a>
             </div>
             {order?.email && (
               <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 2 }}>
@@ -254,6 +296,13 @@ export default function OrderDetailPage() {
             {order?.phone && (
               <div style={{ fontSize: 13, color: "#6b7280" }}>{order.phone}</div>
             )}
+          </Section>
+
+          {/* Customer info */}
+          <Section title="Kundeninfo">
+            <InfoRow label="Kundentyp" value={order?.is_guest !== false ? "Gastkunde" : "Registrierter Kunde"} />
+            <InfoRow label="Erste Bestellung" value={order?.is_first_order ? "Ja" : "Nein"} />
+            <InfoRow label="Newsletter" value={order?.newsletter_opted_in ? "Ja" : "Nein"} />
           </Section>
 
           {/* Shipping address */}
@@ -267,6 +316,23 @@ export default function OrderDetailPage() {
             </div>
           </Section>
 
+          {/* Billing address */}
+          <Section title="Rechnungsadresse">
+            {billingSame ? (
+              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>gleich wie Lieferadresse</div>
+            ) : hasBillingAddr ? (
+              <div style={{ fontSize: 13, lineHeight: 1.7, color: "#374151" }}>
+                {[order?.first_name, order?.last_name].filter(Boolean).join(" ")}<br />
+                {order.billing_address_line1}<br />
+                {order?.billing_address_line2 && <>{order.billing_address_line2}<br /></>}
+                {[order?.billing_postal_code, order?.billing_city].filter(Boolean).join(" ") || ""}<br />
+                {order?.billing_country || ""}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>gleich wie Lieferadresse</div>
+            )}
+          </Section>
+
           {/* Summary */}
           <Section title="Zusammenfassung">
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
@@ -275,7 +341,7 @@ export default function OrderDetailPage() {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
               <span style={{ color: "#6b7280" }}>Datum</span>
-              <span>{order?.created_at ? new Date(order.created_at).toLocaleDateString("de-DE") : "—"}</span>
+              <span>{fmtDate(order?.created_at)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
               <span style={{ color: "#6b7280" }}>Bestellstatus</span>

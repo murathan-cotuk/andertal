@@ -84,7 +84,9 @@
     "subtotal": "Ara toplam",
     "shipping": "Kargo",
     "freeShipping": "Ücretsiz",
-    "total": "Toplam"
+    "total": "Toplam",
+    "billingSameAsShipping": "Fatura adresi teslimat adresiyle aynı",
+    "billingAddress": "Fatura adresi"
   },
   "order": {
     "loading": "Yükleniyor…",

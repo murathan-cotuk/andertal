@@ -84,7 +84,9 @@
     "subtotal": "Subtotal",
     "shipping": "Shipping",
     "freeShipping": "Free",
-    "total": "Total"
+    "total": "Total",
+    "billingSameAsShipping": "Billing address same as shipping",
+    "billingAddress": "Billing address"
   },
   "order": {
     "loading": "Loading…",

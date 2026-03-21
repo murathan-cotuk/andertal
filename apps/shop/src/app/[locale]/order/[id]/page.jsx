@@ -189,7 +189,7 @@ export default function OrderConfirmationPage() {
               <MetaRow>
                 <MetaLabel>{t("orderNumber")}</MetaLabel>
                 <span style={{ fontFamily: "monospace", fontSize: "0.875rem" }}>
-                  {order.id?.slice(0, 8).toUpperCase()}
+                  #{order.order_number || order.id?.slice(0, 8).toUpperCase()}
                 </span>
               </MetaRow>
               <MetaRow>

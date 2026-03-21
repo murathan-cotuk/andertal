@@ -84,7 +84,9 @@
     "subtotal": "Zwischensumme",
     "shipping": "Versand",
     "freeShipping": "Kostenlos",
-    "total": "Gesamt"
+    "total": "Gesamt",
+    "billingSameAsShipping": "Rechnungsadresse ist gleich Lieferadresse",
+    "billingAddress": "Rechnungsadresse"
   },
   "order": {
     "loading": "Laden…",

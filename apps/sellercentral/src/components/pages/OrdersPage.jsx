@@ -188,7 +188,7 @@ export default function OrdersPage() {
     } catch { }
   };
 
-  const COLS = ["", "#", "Kunde", "Adresse", "Betrag", "Bestellstatus", "Zahlungsstatus", "Lieferstatus", "Datum", "Land", ""];
+  const COLS = ["", "Bestellnummer", "Kunde", "Adresse", "Betrag", "Bestellstatus", "Zahlungsstatus", "Lieferstatus", "Datum", "Land", ""];
 
   return (
     <div style={{ padding: 24 }}>

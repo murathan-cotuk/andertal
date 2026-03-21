@@ -436,6 +436,16 @@ async function start() {
         await client.query(`
   ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS seller_id varchar(255) DEFAULT 'default';
 `).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS payment_method varchar(100);`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS billing_address_line1 text;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS billing_address_line2 text;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS billing_city text;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS billing_postal_code varchar(20);`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS billing_country varchar(10);`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS billing_same_as_shipping boolean DEFAULT true;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS is_guest boolean DEFAULT true;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS newsletter_opted_in boolean DEFAULT false;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS customer_id uuid;`).catch(() => {})
         await client.query(`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS password_hash text;`).catch(() => {})
         await client.query(`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS account_type varchar(20) DEFAULT 'privat';`).catch(() => {})
         await client.query(`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS gender varchar(10);`).catch(() => {})
@@ -2485,7 +2495,7 @@ async function start() {
     // --- Store Orders (Stripe payment success sonrası) ---
     const getOrderWithItems = async (client, orderId) => {
       const oRes = await client.query(
-        'SELECT id, order_number, cart_id, payment_intent_id, status, order_status, payment_status, delivery_status, email, first_name, last_name, phone, address_line1, address_line2, city, postal_code, country, subtotal_cents, total_cents, currency, created_at, updated_at FROM store_orders WHERE id = $1',
+        'SELECT id, order_number, cart_id, payment_intent_id, status, order_status, payment_status, delivery_status, email, first_name, last_name, phone, address_line1, address_line2, city, postal_code, country, billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping, payment_method, customer_id, is_guest, newsletter_opted_in, subtotal_cents, total_cents, currency, created_at, updated_at FROM store_orders WHERE id = $1',
         [orderId]
       )
       const oRow = oRes.rows && oRes.rows[0]
@@ -2511,6 +2521,16 @@ async function start() {
         order_number: oRow.order_number ? Number(oRow.order_number) : null,
         cart_id: oRow.cart_id,
         payment_intent_id: oRow.payment_intent_id,
+        payment_method: oRow.payment_method,
+        billing_address_line1: oRow.billing_address_line1,
+        billing_address_line2: oRow.billing_address_line2,
+        billing_city: oRow.billing_city,
+        billing_postal_code: oRow.billing_postal_code,
+        billing_country: oRow.billing_country,
+        billing_same_as_shipping: oRow.billing_same_as_shipping !== false,
+        customer_id: oRow.customer_id,
+        is_guest: oRow.is_guest !== false,
+        newsletter_opted_in: oRow.newsletter_opted_in === true,
         status: oRow.status,
         order_status: oRow.order_status,
         payment_status: oRow.payment_status,
@@ -2704,6 +2724,13 @@ async function start() {
         const city = (body.city || '').toString().trim() || null
         const postal_code = (body.postal_code || '').toString().trim() || null
         const country = (body.country || '').toString().trim() || null
+        const billingSame = body.billing_same_as_shipping !== false
+        const billing_address_line1 = billingSame ? (body.address_line1 || '').toString().trim() || null : (body.billing_address_line1 || '').toString().trim() || null
+        const billing_address_line2 = billingSame ? (body.address_line2 || '').toString().trim() || null : (body.billing_address_line2 || '').toString().trim() || null
+        const billing_city = billingSame ? (body.city || '').toString().trim() || null : (body.billing_city || '').toString().trim() || null
+        const billing_postal_code = billingSame ? (body.postal_code || '').toString().trim() || null : (body.billing_postal_code || '').toString().trim() || null
+        const billing_country = billingSame ? (body.country || '').toString().trim() || null : (body.billing_country || '').toString().trim() || null
+        const newsletter_opted_in = body.newsletter_opted_in === true
 
         // Determine seller_id from the first cart item's product
         let sellerId = 'default'
@@ -2717,12 +2744,45 @@ async function start() {
           }
         } catch (_) {}
 
+        // Look up customer by email (registered vs guest)
+        let customerId = null
+        let isGuest = true
+        try {
+          const custRes = await client.query('SELECT id FROM store_customers WHERE email = $1', [email])
+          if (custRes.rows && custRes.rows[0]) { customerId = custRes.rows[0].id; isGuest = false }
+        } catch (_) {}
+
+        // Get payment method from Stripe
+        const secretKey = (process.env.STRIPE_SECRET_KEY || '').toString().trim()
+        let paymentMethod = 'card'
+        if (secretKey) {
+          try {
+            const stripeInst = new (require('stripe'))(secretKey)
+            const pi = await stripeInst.paymentIntents.retrieve(paymentIntentId, { expand: ['payment_method'] })
+            const pm = pi.payment_method
+            if (pm && typeof pm === 'object') {
+              if (pm.type === 'card' && pm.card && pm.card.brand) { paymentMethod = pm.card.brand }
+              else if (pm.type) { paymentMethod = pm.type }
+            } else if (pi.payment_method_types && pi.payment_method_types[0]) {
+              paymentMethod = pi.payment_method_types[0]
+            }
+          } catch (_) {}
+        }
+
         const ins = await client.query(
           `INSERT INTO store_orders
-            (cart_id, payment_intent_id, status, seller_id, email, first_name, last_name, phone, address_line1, address_line2, city, postal_code, country, subtotal_cents, total_cents, currency)
-           VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'eur')
+            (cart_id, payment_intent_id, status, seller_id, email, first_name, last_name, phone,
+             address_line1, address_line2, city, postal_code, country,
+             billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping,
+             payment_method, customer_id, is_guest, newsletter_opted_in,
+             subtotal_cents, total_cents, currency)
+           VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,'eur')
            RETURNING id, order_number`,
-          [cartId, paymentIntentId, sellerId, email, first_name, last_name, phone, address_line1, address_line2, city, postal_code, country, subtotalCents, totalCents]
+          [cartId, paymentIntentId, sellerId, email, first_name, last_name, phone,
+           address_line1, address_line2, city, postal_code, country,
+           billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billingSame,
+           paymentMethod, customerId, isGuest, newsletter_opted_in,
+           subtotalCents, totalCents]
         )
 
         const orderId = ins.rows && ins.rows[0] ? ins.rows[0].id : null
@@ -2730,11 +2790,10 @@ async function start() {
         if (!orderId) { await client.end(); return res.status(500).json({ message: 'Order insert failed' }) }
 
         // Update Stripe payment intent with order number and seller id
-        const secretKey = (process.env.STRIPE_SECRET_KEY || '').toString().trim()
         if (secretKey && orderNumber) {
           try {
-            const stripe = new (require('stripe'))(secretKey)
-            await stripe.paymentIntents.update(paymentIntentId, {
+            const stripeForUpdate = stripeInst || new (require('stripe'))(secretKey)
+            await stripeForUpdate.paymentIntents.update(paymentIntentId, {
               description: `Order #${orderNumber} - ${sellerId}`,
               metadata: { order_number: String(orderNumber), order_id: orderId, seller_id: sellerId },
             })
@@ -3318,8 +3377,20 @@ async function start() {
         if (!row) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
         const items = (iRes.rows || []).map(r => ({ id: r.id, variant_id: r.variant_id, product_id: r.product_id, quantity: r.quantity, unit_price_cents: r.unit_price_cents, title: r.title, thumbnail: r.thumbnail, product_handle: r.product_handle }))
+        // Look up customer info by email
+        let customerNumber = null
+        let isFirstOrder = false
+        let isRegistered = false
+        if (row.email) {
+          try {
+            const custR = await client.query('SELECT id, customer_number FROM store_customers WHERE email = $1', [row.email])
+            if (custR.rows && custR.rows[0]) { customerNumber = Number(custR.rows[0].customer_number); isRegistered = true }
+            const prevR = await client.query('SELECT COUNT(*) AS cnt FROM store_orders WHERE email = $1 AND created_at < $2', [row.email, row.created_at])
+            isFirstOrder = Number(prevR.rows[0]?.cnt || 0) === 0
+          } catch (_) {}
+        }
         await client.end()
-        res.json({ order: { ...row, order_number: row.order_number ? Number(row.order_number) : null, items } })
+        res.json({ order: { ...row, order_number: row.order_number ? Number(row.order_number) : null, items, customer_number: customerNumber, is_registered: isRegistered, is_first_order: isFirstOrder } })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })

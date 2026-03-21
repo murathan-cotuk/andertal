@@ -287,6 +287,13 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
   const postalCode = useField("");
   const country = useField("DE");
 
+  const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
+  const billingAddress = useField("");
+  const billingAddress2 = useField("");
+  const billingCity = useField("");
+  const billingPostalCode = useField("");
+  const billingCountry = useField("DE");
+
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
 
@@ -364,6 +371,12 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
             city: snapshot.city,
             postal_code: snapshot.postal_code,
             country: snapshot.country,
+            billing_same_as_shipping: snapshot.billing_same_as_shipping,
+            billing_address_line1: snapshot.billing_address_line1,
+            billing_address_line2: snapshot.billing_address_line2,
+            billing_city: snapshot.billing_city,
+            billing_postal_code: snapshot.billing_postal_code,
+            billing_country: snapshot.billing_country,
           }),
         });
         const data = await res.json();
@@ -436,6 +449,12 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
           city: city.value.trim(),
           postal_code: postalCode.value.trim(),
           country: country.value.trim(),
+          billing_same_as_shipping: billingSameAsShipping,
+          billing_address_line1: billingSameAsShipping ? undefined : billingAddress.value.trim(),
+          billing_address_line2: billingSameAsShipping ? undefined : billingAddress2.value.trim(),
+          billing_city: billingSameAsShipping ? undefined : billingCity.value.trim(),
+          billing_postal_code: billingSameAsShipping ? undefined : billingPostalCode.value.trim(),
+          billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
         }),
       );
     } catch (_) {}
@@ -486,6 +505,12 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
             city: city.value.trim(),
             postal_code: postalCode.value.trim(),
             country: country.value.trim(),
+            billing_same_as_shipping: billingSameAsShipping,
+            billing_address_line1: billingSameAsShipping ? undefined : billingAddress.value.trim(),
+            billing_address_line2: billingSameAsShipping ? undefined : billingAddress2.value.trim(),
+            billing_city: billingSameAsShipping ? undefined : billingCity.value.trim(),
+            billing_postal_code: billingSameAsShipping ? undefined : billingPostalCode.value.trim(),
+            billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
           }),
         });
         const data = await res.json();
@@ -566,7 +591,56 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents }) {
             </select>
           </FieldWrap>
         </FieldGrid>
+
+        {/* Billing address toggle */}
+        <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => setBillingSameAsShipping(v => !v)}>
+          <input
+            type="checkbox"
+            id="billing-same"
+            checked={billingSameAsShipping}
+            onChange={e => setBillingSameAsShipping(e.target.checked)}
+            style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#111827" }}
+          />
+          <label htmlFor="billing-same" style={{ fontSize: "0.875rem", color: "#374151", cursor: "pointer", userSelect: "none" }}>
+            {t("billingSameAsShipping")}
+          </label>
+        </div>
       </FormCard>
+
+      {!billingSameAsShipping && (
+        <FormCard style={{ marginBottom: 24 }}>
+          <SectionTitle>{t("billingAddress")}</SectionTitle>
+          <FieldGrid>
+            <CheckoutFormField label={t("address")} field={billingAddress} fullWidth autoComplete="billing street-address" />
+            <CheckoutFormField label={t("address2")} field={billingAddress2} fullWidth autoComplete="billing address-line2" />
+          </FieldGrid>
+          <FieldGrid $cols="1fr 1fr">
+            <CheckoutFormField label={t("postalCode")} field={billingPostalCode} autoComplete="billing postal-code" />
+            <CheckoutFormField label={t("city")} field={billingCity} autoComplete="billing address-level2" />
+          </FieldGrid>
+          <FieldGrid>
+            <FieldWrap>
+              <Label>{t("country")}</Label>
+              <select
+                value={billingCountry.value}
+                onChange={(e) => billingCountry.onChange({ target: { value: e.target.value } })}
+                autoComplete="billing country"
+                style={{ padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.9375rem", fontFamily: "inherit", color: "#111827", background: "#fff" }}
+              >
+                <option value="DE">Deutschland</option>
+                <option value="AT">Österreich</option>
+                <option value="CH">Schweiz</option>
+                <option value="TR">Türkiye</option>
+                <option value="FR">France</option>
+                <option value="IT">Italia</option>
+                <option value="ES">España</option>
+                <option value="GB">United Kingdom</option>
+                <option value="US">United States</option>
+              </select>
+            </FieldWrap>
+          </FieldGrid>
+        </FormCard>
+      )}
 
       <FormCard>
         <SectionTitle>{t("payment")}</SectionTitle>
