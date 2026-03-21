@@ -10,12 +10,12 @@ export function useMedusaAuth() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const register = async (email, password, firstName, lastName) => {
+  const register = async (email, password, firstName, lastName, extra = {}) => {
     try {
       setLoading(true)
       setError(null)
       const client = getMedusaClient()
-      const result = await client.registerCustomer(email, password, firstName, lastName)
+      const result = await client.registerCustomer(email, password, firstName, lastName, extra)
       return result
     } catch (err) {
       setError(err.message)

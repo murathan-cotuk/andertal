@@ -151,39 +151,51 @@ export default function AccountPage() {
               <InfoLabel>Telefonnummer</InfoLabel>
               <InfoValue>{customer?.phone || "-"}</InfoValue>
             </InfoItem>
+            <InfoItem>
+              <InfoLabel>Kontotyp</InfoLabel>
+              <InfoValue>{customer?.account_type === 'business' ? 'Gewerbe' : 'Privat'}</InfoValue>
+            </InfoItem>
+            {customer?.company_name && (
+              <InfoItem>
+                <InfoLabel>Firmenname</InfoLabel>
+                <InfoValue>{customer.company_name}</InfoValue>
+              </InfoItem>
+            )}
+            {customer?.vat_number && (
+              <InfoItem>
+                <InfoLabel>USt-IdNr.</InfoLabel>
+                <InfoValue>{customer.vat_number}</InfoValue>
+              </InfoItem>
+            )}
           </InfoGrid>
         </Section>
 
-        {customer?.shipping_addresses && customer.shipping_addresses.length > 0 && (
+        {customer?.address_line1 && (
           <Section>
             <SectionTitle>Adresse</SectionTitle>
             <InfoGrid>
-              {customer.shipping_addresses.map((addr, idx) => (
-                <div key={idx}>
-                  <InfoItem>
-                    <InfoLabel>Straße</InfoLabel>
-                    <InfoValue>{addr.address_1 || "-"}</InfoValue>
-                  </InfoItem>
-                  {addr.address_2 && (
-                    <InfoItem>
-                      <InfoLabel>Adresszusatz</InfoLabel>
-                      <InfoValue>{addr.address_2}</InfoValue>
-                    </InfoItem>
-                  )}
-                  <InfoItem>
-                    <InfoLabel>PLZ</InfoLabel>
-                    <InfoValue>{addr.postal_code || "-"}</InfoValue>
-                  </InfoItem>
-                  <InfoItem>
-                    <InfoLabel>Stadt</InfoLabel>
-                    <InfoValue>{addr.city || "-"}</InfoValue>
-                  </InfoItem>
-                  <InfoItem>
-                    <InfoLabel>Land</InfoLabel>
-                    <InfoValue>{addr.country_code || "-"}</InfoValue>
-                  </InfoItem>
-                </div>
-              ))}
+              <InfoItem>
+                <InfoLabel>Straße</InfoLabel>
+                <InfoValue>{customer.address_line1}</InfoValue>
+              </InfoItem>
+              {customer.address_line2 && (
+                <InfoItem>
+                  <InfoLabel>Adresszusatz</InfoLabel>
+                  <InfoValue>{customer.address_line2}</InfoValue>
+                </InfoItem>
+              )}
+              <InfoItem>
+                <InfoLabel>PLZ</InfoLabel>
+                <InfoValue>{customer.zip_code || "-"}</InfoValue>
+              </InfoItem>
+              <InfoItem>
+                <InfoLabel>Stadt</InfoLabel>
+                <InfoValue>{customer.city || "-"}</InfoValue>
+              </InfoItem>
+              <InfoItem>
+                <InfoLabel>Land</InfoLabel>
+                <InfoValue>{customer.country || "-"}</InfoValue>
+              </InfoItem>
             </InfoGrid>
           </Section>
         )}
