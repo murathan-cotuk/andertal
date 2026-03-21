@@ -11,7 +11,9 @@ function fmtCents(c) {
 function fmtDate(d) {
   if (!d) return "—";
   const dt = new Date(d);
-  return dt.toLocaleDateString("de-DE") + " / " + dt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const date = dt.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const time = dt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return `${date} / ${time}`;
 }
 
 const ORDER_STATUS_OPTIONS = ["offen", "in_bearbeitung", "abgeschlossen", "storniert"];
@@ -39,39 +41,15 @@ function StatusBadge({ value }) {
   );
 }
 
-const PM_LABELS = { visa: "Visa", mastercard: "Mastercard", amex: "American Express", paypal: "PayPal", klarna: "Klarna", sepa_debit: "SEPA", card: "Kreditkarte", apple_pay: "Apple Pay", google_pay: "Google Pay" };
-function fmtPM(pm) { return PM_LABELS[pm] || (pm ? pm.charAt(0).toUpperCase() + pm.slice(1).replace(/_/g, " ") : "—"); }
-
-function InfoPill({ label, value }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span style={{ fontSize: 10, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
-      <span style={{ fontSize: 13, fontWeight: 500, color: "#111827" }}>{value}</span>
-    </div>
-  );
-}
 
 function ExpandedRow({ order }) {
   const items = order._items || [];
+  const subtotal = items.reduce((s, it) => s + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0);
   const total = order.total_cents || order.subtotal_cents || 0;
-  const customerLabel = order._customer_number
-    ? `#${order._customer_number} – ${[order.first_name, order.last_name].filter(Boolean).join(" ") || "—"}`
-    : `Gastkunde – ${[order.first_name, order.last_name].filter(Boolean).join(" ") || "—"}`;
 
   return (
     <tr>
       <td colSpan={11} style={{ padding: 0, background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-        {/* Info bar */}
-        <div style={{ display: "flex", gap: 32, padding: "12px 24px", borderBottom: "1px solid #e5e7eb", flexWrap: "wrap", alignItems: "flex-start" }}>
-          <InfoPill label="Kunde" value={customerLabel} />
-          <InfoPill label="Kundentyp" value={order._is_guest !== false ? "Gastkunde" : "Registriert"} />
-          {order._payment_method && <InfoPill label="Zahlung" value={fmtPM(order._payment_method)} />}
-          <InfoPill label="Lieferadresse" value={[order.address_line1, order.postal_code, order.city, order.country].filter(Boolean).join(", ") || "—"} />
-          <InfoPill label="Erste Bestellung" value={order._is_first_order ? "Ja" : "Nein"} />
-          <InfoPill label="Gesamt" value={fmtCents(total)} />
-        </div>
-
-        {/* Items table */}
         <div style={{ padding: "10px 24px 14px" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
@@ -101,8 +79,20 @@ function ExpandedRow({ order }) {
               ))}
             </tbody>
             <tfoot>
+              <tr style={{ borderTop: "1px solid #e5e7eb" }}>
+                <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#6b7280" }}>Zwischensumme</td>
+                <td style={{ textAlign: "right", padding: "5px 8px" }}>{fmtCents(subtotal)}</td>
+              </tr>
+              <tr>
+                <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#6b7280" }}>Rabatt</td>
+                <td style={{ textAlign: "right", padding: "5px 8px" }}>—</td>
+              </tr>
+              <tr>
+                <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#6b7280" }}>Versandkosten</td>
+                <td style={{ textAlign: "right", padding: "5px 8px" }}>Kostenlos</td>
+              </tr>
               <tr style={{ borderTop: "2px solid #e5e7eb" }}>
-                <td colSpan={3} style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>Gesamt</td>
+                <td colSpan={3} style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>Gesamtkosten</td>
                 <td style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>{fmtCents(total)}</td>
               </tr>
             </tfoot>
