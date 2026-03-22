@@ -1,3 +1,5 @@
 "use client";
 
-export { default } from "../favorites/page";
+import WishlistMerkzettelPage from "@/components/account/WishlistMerkzettelPage";
+
+export default WishlistMerkzettelPage;
