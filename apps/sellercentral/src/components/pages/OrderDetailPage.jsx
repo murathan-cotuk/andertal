@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
 
 function fmtCents(c) {
   return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
@@ -84,40 +86,43 @@ export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id;
+  const locale = params?.locale || "de";
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [shipModalOpen, setShipModalOpen] = useState(false);
 
   const [orderStatus, setOrderStatus] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
   const [deliveryStatus, setDeliveryStatus] = useState("");
 
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const client = getMedusaAdminClient();
-        const data = await client.getOrder(id);
-        const o = data?.order ?? data;
-        if (!cancelled) {
-          setOrder(o || null);
-          setOrderStatus(o?.order_status || "offen");
-          setPaymentStatus(o?.payment_status || "bezahlt");
-          setDeliveryStatus(o?.delivery_status || "offen");
-        }
-      } catch (e) {
-        if (!cancelled) setError(e?.message || "Bestellung konnte nicht geladen werden");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  const loadOrder = useCallback(async () => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const client = getMedusaAdminClient();
+      const data = await client.getOrder(id);
+      const o = data?.order ?? data;
+      setOrder(o || null);
+      setOrderStatus(o?.order_status || "offen");
+      setPaymentStatus(o?.payment_status || "bezahlt");
+      setDeliveryStatus(o?.delivery_status || "offen");
+    } catch (e) {
+      setError(e?.message || "Bestellung konnte nicht geladen werden");
+    }
+    setLoading(false);
   }, [id]);
+
+  useEffect(() => {
+    loadOrder();
+  }, [loadOrder]);
 
   // Auto-abgeschlossen when versendet + bezahlt
   const handleDeliveryChange = (val) => {
@@ -148,7 +153,7 @@ export default function OrderDetailPage() {
     try {
       const client = getMedusaAdminClient();
       await client.deleteOrder(id);
-      router.push("/orders");
+      router.push(`/${locale}/orders`);
     } catch (e) {
       setError(e?.message || "Löschen fehlgeschlagen");
     }
@@ -162,7 +167,7 @@ export default function OrderDetailPage() {
     return (
       <div style={{ padding: 24 }}>
         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 16, color: "#b91c1c" }}>{error}</div>
-        <button onClick={() => router.push("/orders")} style={btnStyle}>← Zurück zu Bestellungen</button>
+        <button onClick={() => router.push(`/${locale}/orders`)} style={btnStyle}>← Zurück zu Bestellungen</button>
       </div>
     );
   }
@@ -181,11 +186,16 @@ export default function OrderDetailPage() {
 
   return (
     <div style={{ padding: 24, background: "#fff", minHeight: "100%" }}>
+      {shipModalOpen && order && (
+        <ShipOrdersModal
+          orders={[{ ...order, _items: order.items || [] }]}
+          onClose={() => setShipModalOpen(false)}
+          onDone={() => loadOrder()}
+        />
+      )}
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <button onClick={() => router.push("/orders")} style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "#374151" }}>
-          ← Bestellungen
-        </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <Button onClick={() => router.push(`/${locale}/orders`)}>← Bestellungen</Button>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
           Bestellung #{order?.order_number || "—"}
         </h1>
@@ -254,25 +264,30 @@ export default function OrderDetailPage() {
             <StatusSelect label="Zahlungsstatus" value={paymentStatus} options={["offen", "bezahlt", "teil_erstattet", "erstattet"]} onChange={handlePaymentChange} saving={saving} />
             <StatusSelect label="Lieferstatus" value={deliveryStatus} options={["offen", "versendet", "zugestellt"]} onChange={handleDeliveryChange} saving={saving} />
             <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
-              <button
-                onClick={handleSaveStatus}
-                disabled={saving}
-                style={{ padding: "8px 20px", background: saving ? "#9ca3af" : "#111827", color: "#fff", border: "none", borderRadius: 7, cursor: saving ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600 }}
-              >
-                {saving ? "Speichern…" : "Status speichern"}
-              </button>
+              <Button variant="primary" onClick={handleSaveStatus} disabled={saving} loading={saving}>
+                Status speichern
+              </Button>
               {saved && <span style={{ fontSize: 12, color: "#15803d" }}>✓ Gespeichert</span>}
+            </div>
+          </Section>
+
+          <Section title="Versand">
+            <InfoRow label="Versanddienst" value={order?.carrier_name?.trim() ? order.carrier_name : "—"} />
+            <InfoRow
+              label="Trackingnummer"
+              value={order?.tracking_number?.trim() ? order.tracking_number : "—"}
+            />
+            {order?.shipped_at && <InfoRow label="Versanddatum" value={fmtDate(order.shipped_at)} />}
+            <div style={{ marginTop: 14 }}>
+              <Button variant="primary" onClick={() => setShipModalOpen(true)}>
+                Versand bearbeiten / als versendet markieren
+              </Button>
             </div>
           </Section>
 
           {/* Payment info */}
           <Section title="Zahlungsinfo">
             <InfoRow label="Zahlungsmethode" value={formatPaymentMethod(order?.payment_method)} />
-            {order?.payment_intent_id && (
-              <div style={{ marginTop: 8, fontSize: 11, color: "#9ca3af", fontFamily: "monospace", wordBreak: "break-all" }}>
-                PI: {order.payment_intent_id}
-              </div>
-            )}
           </Section>
         </div>
 
@@ -282,8 +297,8 @@ export default function OrderDetailPage() {
           <Section title="Kunde">
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
               <a
-                href={order?.email ? `/customers?email=${encodeURIComponent(order.email)}` : "#"}
-                style={{ color: "#1d4ed8", textDecoration: "none" }}
+                href={order?.email ? `/${locale}/customers?email=${encodeURIComponent(order.email)}` : "#"}
+                style={{ color: "#202223", textDecoration: "underline" }}
               >
                 {customerLabel}
               </a>

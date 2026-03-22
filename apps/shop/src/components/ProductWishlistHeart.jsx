@@ -22,7 +22,7 @@ const btnBase = {
 /**
  * Merkzettel toggle on product card / PDP. Guests see login hint (no navigation away on first click).
  */
-export default function ProductWishlistHeart({ productId, title = "Merkzettel" }) {
+export default function ProductWishlistHeart({ productId, title = "Merkzettel", positionAbsolute = true }) {
   const { user } = useAuth();
   const { isInWishlist, toggle } = useWishlist();
   const [guestMsg, setGuestMsg] = useState(false);
@@ -42,7 +42,7 @@ export default function ProductWishlistHeart({ productId, title = "Merkzettel" }
 
   const btnStyle = {
     ...btnBase,
-    ...(useAbsolute ? { position: "absolute", top: 8, right: 8, zIndex: 5 } : { position: "relative" }),
+    ...(positionAbsolute ? { position: "absolute", top: 8, right: 8, zIndex: 5 } : { position: "relative" }),
   };
 
   return (

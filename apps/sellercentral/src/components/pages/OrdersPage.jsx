@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { Button, InlineStack } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function fmtCents(c) {
@@ -67,10 +69,40 @@ function ExpandedRow({ order }) {
   const totalNetto = vat.rate > 0 ? Math.round(total / (1 + vat.rate / 100)) : total;
   const totalVat = total - totalNetto;
 
+  const showShipBlock =
+    order.tracking_number ||
+    order.carrier_name ||
+    order.delivery_status === "versendet" ||
+    order.delivery_status === "zugestellt";
+
   return (
     <tr>
       <td colSpan={12} style={{ padding: 0, background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
         <div style={{ padding: "10px 24px 14px" }}>
+          {showShipBlock && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: "10px 14px",
+                background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+                borderRadius: 8,
+                border: "1px solid var(--p-color-border, #e3e5e8)",
+                fontSize: 13,
+              }}
+            >
+              <div style={{ fontWeight: 700, color: "#374151", marginBottom: 4 }}>Versand</div>
+              <div style={{ color: "#111827" }}>
+                {order.carrier_name ? <span>{order.carrier_name}</span> : null}
+                {order.carrier_name && order.tracking_number ? <span> · </span> : null}
+                {order.tracking_number ? (
+                  <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 600 }}>{order.tracking_number}</span>
+                ) : null}
+                {!order.tracking_number && order.delivery_status === "versendet" && (
+                  <span style={{ color: "#6b7280" }}>Keine Trackingnummer hinterlegt</span>
+                )}
+              </div>
+            </div>
+          )}
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -161,7 +193,7 @@ function CustomerCell({ order, locale, router }) {
     e.stopPropagation();
     if (navigating) return;
     if (order.customer_id) {
-      router.push(`/customers/${order.customer_id}`);
+      router.push(`/${locale}/customers/${order.customer_id}`);
       return;
     }
     if (!order.email) return;
@@ -170,7 +202,7 @@ function CustomerCell({ order, locale, router }) {
       const client = getMedusaAdminClient();
       const data = await client.getCustomers({ search: order.email, limit: 1 });
       const found = data?.customers?.[0];
-      if (found?.id) router.push(`/customers/${found.id}`);
+      if (found?.id) router.push(`/${locale}/customers/${found.id}`);
     } catch { }
     setNavigating(false);
   };
@@ -198,10 +230,12 @@ function CustomerCell({ order, locale, router }) {
   );
 }
 
-function ActionMenu({ order, onUpdate, onDelete, onVersenden }) {
+function ActionMenu({ order, onUpdate, onDelete }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, bottom: "auto", right: 0, openUp: false });
   const router = useRouter();
+  const params = useParams();
+  const locale = params?.locale || "de";
   const ref = React.useRef(null);
   const btnRef = React.useRef(null);
   const menuRef = React.useRef(null);
@@ -238,10 +272,7 @@ function ActionMenu({ order, onUpdate, onDelete, onVersenden }) {
       {open && (
         <div ref={menuRef} style={{ position: "fixed", top: pos.top, bottom: pos.bottom, right: pos.right, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,.1)", zIndex: 9999, minWidth: 170, overflow: "hidden" }}>
           {[
-            { label: "Details anzeigen", action: () => { router.push(`/orders/${order.id}`); setOpen(false); } },
-            { label: "Als zugestellt markieren", action: () => { onUpdate(order.id, { delivery_status: "zugestellt" }); setOpen(false); } },
-            { label: "Als bezahlt markieren", action: () => { onUpdate(order.id, { payment_status: "bezahlt" }); setOpen(false); } },
-            { label: "Abschließen", action: () => { onUpdate(order.id, { order_status: "abgeschlossen" }); setOpen(false); } },
+            { label: "Details anzeigen", action: () => { router.push(`/${locale}/orders/${order.id}`); setOpen(false); } },
             { label: "Stornieren", action: () => { onUpdate(order.id, { order_status: "storniert" }); setOpen(false); }, danger: true },
             { label: "Löschen", action: () => { if (confirm("Bestellung löschen?")) { onDelete(order.id); } setOpen(false); }, danger: true },
           ].map((item, i, arr) => (
@@ -254,164 +285,6 @@ function ActionMenu({ order, onUpdate, onDelete, onVersenden }) {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function VersendModal({ orders, onClose, onDone }) {
-  const [carrier, setCarrier] = useState("DHL");
-  const [customCarrier, setCustomCarrier] = useState("");
-  const [trackings, setTrackings] = useState(() => Object.fromEntries(orders.map(o => [o.id, ""])));
-  const [saving, setSaving] = useState(false);
-  const [printMode, setPrintMode] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const carrierName = carrier === "Sonstige" ? customCarrier : carrier;
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const client = getMedusaAdminClient();
-      for (const o of orders) {
-        await client.updateOrder(o.id, {
-          delivery_status: "versendet",
-          carrier_name: carrierName,
-          tracking_number: trackings[o.id] || "",
-        });
-      }
-      setSaved(true);
-      onDone();
-    } catch { }
-    setSaving(false);
-  };
-
-  const handlePrint = () => {
-    const win = window.open("", "_blank", "width=800,height=600");
-    const date = new Date().toLocaleDateString("de-DE");
-    const labelsHtml = orders.map(o => `
-      <div class="label" style="page-break-inside:avoid;border:2px solid #000;padding:20px;margin-bottom:20px;font-family:Arial,sans-serif;width:90mm;box-sizing:border-box;">
-        <div style="font-size:11px;color:#666;margin-bottom:8px">VERSANDAUFKLEBER / LIEFERSCHEIN</div>
-        <div style="font-size:18px;font-weight:bold;margin-bottom:12px">Bestellung #${o.order_number || "—"}</div>
-        <div style="font-size:13px;margin-bottom:4px"><strong>${[o.first_name, o.last_name].filter(Boolean).join(" ") || "—"}</strong></div>
-        <div style="font-size:12px">${o.address_line1 || "—"}</div>
-        <div style="font-size:12px">${[o.postal_code, o.city].filter(Boolean).join(" ")}</div>
-        <div style="font-size:12px">${o.country || "—"}</div>
-        <hr style="margin:12px 0">
-        <div style="font-size:11px;color:#666">Versanddienstleister: <strong>${carrierName}</strong></div>
-        <div style="font-size:11px;color:#666">Trackingnummer: <strong>${trackings[o.id] || "—"}</strong></div>
-        <div style="font-size:11px;color:#666">Datum: ${date}</div>
-        <div style="margin-top:12px;border:1px solid #ccc;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;letter-spacing:4px">${trackings[o.id] || "—"}</div>
-      </div>
-    `).join("");
-    win.document.write(`<!DOCTYPE html><html><head><title>Versandaufkleber</title><style>@media print{body{margin:0}} body{margin:20px;display:flex;flex-wrap:wrap;gap:16px}</style></head><body>${labelsHtml}<script>window.onload=()=>window.print()</script></body></html>`);
-    win.document.close();
-  };
-
-  const handlePrintLieferschein = () => {
-    const win = window.open("", "_blank", "width=900,height=700");
-    const date = new Date().toLocaleDateString("de-DE");
-    const sheets = orders.map(o => `
-      <div style="page-break-inside:avoid;padding:30px;font-family:Arial,sans-serif;border-bottom:2px dashed #ccc;margin-bottom:20px">
-        <h2 style="margin:0 0 16px">Lieferschein — Bestellung #${o.order_number || "—"}</h2>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-          <div>
-            <div style="font-size:11px;text-transform:uppercase;color:#666;margin-bottom:4px">Lieferadresse</div>
-            <div><strong>${[o.first_name, o.last_name].filter(Boolean).join(" ") || "—"}</strong></div>
-            <div>${o.address_line1 || "—"}</div>
-            <div>${[o.postal_code, o.city].filter(Boolean).join(" ")}</div>
-            <div>${o.country || ""}</div>
-          </div>
-          <div>
-            <div style="font-size:11px;text-transform:uppercase;color:#666;margin-bottom:4px">Versandinformation</div>
-            <div>Datum: ${date}</div>
-            <div>Carrier: ${carrierName}</div>
-            <div>Tracking: ${trackings[o.id] || "—"}</div>
-          </div>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
-          <thead>
-            <tr style="background:#f5f5f5">
-              <th style="padding:8px;text-align:left;border:1px solid #ddd">Artikel</th>
-              <th style="padding:8px;text-align:center;border:1px solid #ddd">Menge</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${(o._items || []).map(it => `<tr><td style="padding:8px;border:1px solid #ddd">${it.title || "—"}</td><td style="padding:8px;text-align:center;border:1px solid #ddd">${it.quantity}</td></tr>`).join("") || `<tr><td colspan="2" style="padding:8px;border:1px solid #ddd;color:#666">Keine Artikel</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-    `).join("");
-    win.document.write(`<!DOCTYPE html><html><head><title>Lieferschein</title><style>@media print{.noprint{display:none}}</style></head><body>${sheets}<script>window.onload=()=>window.print()</script></body></html>`);
-    win.document.close();
-  };
-
-  const inp = { padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#fff", borderRadius: 12, width: 600, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}>
-        <div style={{ padding: "18px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#fff", zIndex: 1 }}>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Versenden — {orders.length} Bestellung{orders.length !== 1 ? "en" : ""}</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>×</button>
-        </div>
-        <div style={{ padding: 24 }}>
-          {/* Carrier */}
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 8 }}>Versanddienstleister</label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {["DHL", "DPD", "GLS", "UPS", "FedEx", "Hermes", "Go! Express", "Sonstige"].map(c => (
-                <button key={c} onClick={() => setCarrier(c)} style={{ padding: "6px 14px", borderRadius: 20, border: `2px solid ${carrier === c ? "#2563eb" : "#e5e7eb"}`, background: carrier === c ? "#eff6ff" : "#fff", color: carrier === c ? "#1d4ed8" : "#374151", fontSize: 13, cursor: "pointer", fontWeight: carrier === c ? 600 : 400 }}>
-                  {c}
-                </button>
-              ))}
-            </div>
-            {carrier === "Sonstige" && (
-              <input style={{ ...inp, marginTop: 8 }} value={customCarrier} onChange={e => setCustomCarrier(e.target.value)} placeholder="Carrier-Name eingeben…" />
-            )}
-          </div>
-
-          {/* Tracking numbers */}
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 8 }}>Trackingnummern</label>
-            {orders.map(o => (
-              <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 10, marginBottom: 8, alignItems: "center" }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>
-                  #{o.order_number || "—"} — {[o.first_name, o.last_name].filter(Boolean).join(" ") || o.email || "—"}
-                </div>
-                <input
-                  style={inp}
-                  value={trackings[o.id] || ""}
-                  onChange={e => setTrackings(t => ({ ...t, [o.id]: e.target.value }))}
-                  placeholder="Trackingnr. eingeben…"
-                />
-              </div>
-            ))}
-          </div>
-
-          {saved && (
-            <div style={{ background: "#d1fae5", color: "#065f46", padding: "10px 14px", borderRadius: 7, fontSize: 13, marginBottom: 16 }}>
-              ✓ Bestellungen wurden als versendet markiert und Trackingnummern gespeichert.
-            </div>
-          )}
-
-          {/* Print buttons */}
-          <div style={{ display: "flex", gap: 10, marginBottom: 4 }}>
-            <button onClick={handlePrint} style={{ flex: 1, padding: "9px 0", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff", fontWeight: 500 }}>
-              🖨 Versandaufkleber drucken
-            </button>
-            <button onClick={handlePrintLieferschein} style={{ flex: 1, padding: "9px 0", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff", fontWeight: 500 }}>
-              📋 Lieferschein drucken
-            </button>
-          </div>
-        </div>
-
-        <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10, position: "sticky", bottom: 0, background: "#fff" }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>Schließen</button>
-          <button onClick={handleSave} disabled={saving || saved} style={{ padding: "8px 18px", background: saved ? "#16a34a" : "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
-            {saving ? "Speichern…" : saved ? "✓ Gespeichert" : "Als versendet markieren"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -497,7 +370,9 @@ function ManualOrderModal({ onClose, onCreated }) {
                 <button onClick={() => removeItem(i)} style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 5, cursor: "pointer", color: "#9ca3af", height: 34 }}>×</button>
               </div>
             ))}
-            <button onClick={addItem} style={{ fontSize: 12, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0 }}>+ Artikel hinzufügen</button>
+            <Button variant="plain" onClick={addItem}>
+              Artikel hinzufügen
+            </Button>
           </div>
 
           {/* Costs */}
@@ -561,11 +436,13 @@ function ManualOrderModal({ onClose, onCreated }) {
         </div>
 
         {err && <div style={{ margin: "0 24px 12px", color: "#ef4444", fontSize: 12 }}>{err}</div>}
-        <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10, position: "sticky", bottom: 0, background: "#fff" }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>Abbrechen</button>
-          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 18px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
-            {saving ? "Speichern…" : "Bestellung erstellen"}
-          </button>
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", position: "sticky", bottom: 0, background: "#fff" }}>
+          <InlineStack gap="200">
+            <Button onClick={onClose}>Abbrechen</Button>
+            <Button variant="primary" onClick={handleSave} disabled={saving} loading={saving}>
+              Bestellung erstellen
+            </Button>
+          </InlineStack>
         </div>
       </div>
     </div>
@@ -623,6 +500,10 @@ export default function OrdersPage() {
         _payment_method: detail.payment_method || null,
         _is_first_order: detail.is_first_order === true,
         _expanded: true,
+        tracking_number: detail.tracking_number ?? o.tracking_number,
+        carrier_name: detail.carrier_name ?? o.carrier_name,
+        shipped_at: detail.shipped_at ?? o.shipped_at,
+        delivery_status: detail.delivery_status ?? o.delivery_status,
       } : o));
     } catch { }
     setLoadingItems(l => ({ ...l, [id]: false }));
@@ -665,7 +546,7 @@ export default function OrdersPage() {
         />
       )}
       {versendModal && (
-        <VersendModal
+        <ShipOrdersModal
           orders={versendModal}
           onClose={() => setVersendModal(null)}
           onDone={() => { fetchOrders(); setSelected(new Set()); }}
@@ -676,40 +557,44 @@ export default function OrdersPage() {
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Bestellungen</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 13, color: "#6b7280" }}>{orders.length} Bestellungen</span>
-          <button
-            onClick={() => setShowNewOrder(true)}
-            style={{ padding: "8px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-          >
-            + Bestellung hinzufügen
-          </button>
+          <Button variant="primary" onClick={() => setShowNewOrder(true)}>
+            Bestellung hinzufügen
+          </Button>
         </div>
       </div>
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", background: "#eff6ff", borderRadius: 8, marginBottom: 12, border: "1px solid #bfdbfe" }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#1d4ed8" }}>{selected.size} ausgewählt</span>
-          <button
-            onClick={() => setVersendModal(selectedOrders)}
-            style={{ padding: "7px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-          >
-            📦 Versenden
-          </button>
-          <button
-            onClick={() => {
-              sessionStorage.setItem("versand_orders", JSON.stringify(selectedOrders));
-              router.push(`/${locale}/versand`);
-            }}
-            style={{ padding: "7px 16px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-          >
-            🏭 Verpackungszentrum
-          </button>
-          <button
-            onClick={() => setSelected(new Set())}
-            style={{ padding: "7px 12px", background: "none", border: "1px solid #bfdbfe", borderRadius: 7, fontSize: 13, cursor: "pointer", color: "#374151" }}
-          >
-            Auswahl aufheben
-          </button>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
+            padding: "10px 16px",
+            background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+            borderRadius: 8,
+            marginBottom: 12,
+            border: "1px solid var(--p-color-border, #e3e5e8)",
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>{selected.size} ausgewählt</span>
+          <InlineStack gap="200" wrap blockAlign="center">
+            <Button variant="primary" onClick={() => setVersendModal(selectedOrders)}>
+              Versenden
+            </Button>
+            <Button
+              onClick={() => {
+                sessionStorage.setItem("versand_orders", JSON.stringify(selectedOrders));
+                router.push(`/${locale}/versand`);
+              }}
+            >
+              Verpackungszentrum
+            </Button>
+            <Button variant="plain" onClick={() => setSelected(new Set())}>
+              Auswahl aufheben
+            </Button>
+          </InlineStack>
         </div>
       )}
 
@@ -764,7 +649,7 @@ export default function OrdersPage() {
             )}
             {orders.map((order) => (
               <React.Fragment key={order.id}>
-                <tr style={{ borderBottom: "1px solid #f3f4f6", cursor: "default", background: selected.has(order.id) ? "#f0f9ff" : "" }}
+                <tr style={{ borderBottom: "1px solid #f3f4f6", cursor: "default", background: selected.has(order.id) ? "#f6f6f7" : "" }}
                   onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fafafa"; }}
                   onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = ""; }}
                 >
@@ -844,12 +729,11 @@ export default function OrdersPage() {
                   <td style={{ padding: "10px 8px", textAlign: "right" }}>
                     <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
                       {order.delivery_status !== "versendet" && order.delivery_status !== "zugestellt" && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setVersendModal([order]); }}
-                          style={{ padding: "4px 10px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 5, fontSize: 12, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}
-                        >
-                          Versenden
-                        </button>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Button size="slim" variant="primary" onClick={() => setVersendModal([order])}>
+                            Versenden
+                          </Button>
+                        </div>
                       )}
                       <ActionMenu order={order} onUpdate={handleUpdate} onDelete={handleDelete} />
                     </div>

@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Modal, BlockStack, TextField, Text } from "@shopify/polaris";
+import { Modal, BlockStack, TextField, Text, Button, InlineStack } from "@shopify/polaris";
+import { EditIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 function fmtCents(c) {
@@ -171,11 +172,13 @@ function DiscountModal({ customerId, onClose, onAdded }) {
           </div>
         </div>
         {err && <div style={{ margin: "0 24px 12px", color: "#ef4444", fontSize: 12 }}>{err}</div>}
-        <div style={{ padding: "12px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button onClick={onClose} style={{ padding: "7px 16px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>Abbrechen</button>
-          <button onClick={handleSave} disabled={saving} style={{ padding: "7px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
-            {saving ? "…" : "Erstellen"}
-          </button>
+        <div style={{ padding: "12px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end" }}>
+          <InlineStack gap="200">
+            <Button onClick={onClose}>Abbrechen</Button>
+            <Button variant="primary" onClick={handleSave} loading={saving}>
+              Erstellen
+            </Button>
+          </InlineStack>
         </div>
       </div>
     </div>
@@ -387,21 +390,6 @@ export default function CustomerDetailPage() {
     setLedgerSaving(false);
   };
 
-  const handleDeleteLedgerEntry = async (entryId) => {
-    if (!window.confirm("Diesen Bonuspunkt-Eintrag wirklich löschen? Der Kontostand wird angepasst.")) return;
-    try {
-      const client = getMedusaAdminClient();
-      const res = await client.deleteCustomerBonusLedgerEntry(id, entryId);
-      setCustomer((c) => ({
-        ...c,
-        bonus_points: res.bonus_points != null ? res.bonus_points : c.bonus_points,
-        bonus_ledger: (c.bonus_ledger || []).filter((e) => e.id !== entryId),
-      }));
-      setBonusVal(String(res.bonus_points ?? ""));
-      if (ledgerEdit?.id === entryId) setLedgerEdit(null);
-    } catch { }
-  };
-
   // --- Billing address: prefer stored customer billing address, fallback to last order billing ---
   const billingFromOrders = orders.find(o => o.billing_address_line1);
   const hasStoredBilling = customer?.billing_address_line1 || customer?.billing_city;
@@ -424,12 +412,9 @@ export default function CustomerDetailPage() {
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
-        <button
-          onClick={() => router.push(`/${locale}/customers`)}
-          style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer", color: "#374151", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginTop: 4 }}
-        >
-          ← Zurück
-        </button>
+        <div style={{ flexShrink: 0, marginTop: 4 }}>
+          <Button onClick={() => router.push(`/${locale}/customers`)}>← Zurück</Button>
+        </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
@@ -487,11 +472,13 @@ export default function CustomerDetailPage() {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontSize: 18 }}>{s.icon}</span>
                     {s.editable && (
-                      <button onClick={s.onEdit} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#2563eb", padding: 0 }}>Ändern</button>
+                      <Button variant="plain" size="micro" onClick={s.onEdit}>
+                        Ändern
+                      </Button>
                     )}
                   </div>
                   {editBonus && s.editable ? (
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                       <input
                         type="number"
                         value={bonusVal}
@@ -499,8 +486,12 @@ export default function CustomerDetailPage() {
                         style={{ width: 70, padding: "3px 6px", border: "1px solid #e5e7eb", borderRadius: 5, fontSize: 13 }}
                         autoFocus
                       />
-                      <button onClick={handleSaveBonus} disabled={savingBonus} style={{ fontSize: 11, background: "#2563eb", color: "#fff", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer" }}>✓</button>
-                      <button onClick={() => setEditBonus(false)} style={{ fontSize: 11, background: "none", border: "none", cursor: "pointer", color: "#6b7280" }}>✕</button>
+                      <Button size="micro" variant="primary" onClick={handleSaveBonus} disabled={savingBonus} loading={savingBonus}>
+                        Speichern
+                      </Button>
+                      <Button size="micro" onClick={() => setEditBonus(false)}>
+                        Abbrechen
+                      </Button>
                     </div>
                   ) : (
                     <div style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>{s.value}</div>
@@ -535,7 +526,7 @@ export default function CustomerDetailPage() {
                         onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
                         onMouseLeave={e => e.currentTarget.style.background = ""}
                       >
-                        <td style={{ padding: "9px 0", fontWeight: 600, color: "#1d4ed8" }}>#{o.order_number || "—"}</td>
+                        <td style={{ padding: "9px 0", fontWeight: 600, color: "#202223" }}>#{o.order_number || "—"}</td>
                         <td style={{ padding: "9px 0" }}><StatusBadge value={o.order_status} /></td>
                         <td style={{ padding: "9px 0" }}><StatusBadge value={o.payment_status} /></td>
                         <td style={{ padding: "9px 0" }}><StatusBadge value={o.delivery_status} /></td>
@@ -552,12 +543,9 @@ export default function CustomerDetailPage() {
             <Card
               title="Rabatte & Gutscheine"
               action={
-                <button
-                  onClick={() => setShowDiscountModal(true)}
-                  style={{ fontSize: 12, padding: "4px 12px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600 }}
-                >
-                  + Hinzufügen
-                </button>
+                <Button size="slim" variant="primary" onClick={() => setShowDiscountModal(true)}>
+                  Hinzufügen
+                </Button>
               }
             >
               {discounts.length === 0 ? (
@@ -604,9 +592,9 @@ export default function CustomerDetailPage() {
             <Card
               title="Notizen"
               action={!editNotes && (
-                <button onClick={() => setEditNotes(true)} style={{ fontSize: 12, padding: "4px 12px", border: "1px solid #e5e7eb", background: "#fff", borderRadius: 6, cursor: "pointer" }}>
+                <Button size="slim" onClick={() => setEditNotes(true)}>
                   Bearbeiten
-                </button>
+                </Button>
               )}
             >
               {editNotes ? (
@@ -619,12 +607,12 @@ export default function CustomerDetailPage() {
                     autoFocus
                   />
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <button onClick={handleSaveNotes} disabled={savingNotes} style={{ padding: "6px 14px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
-                      {savingNotes ? "…" : "Speichern"}
-                    </button>
-                    <button onClick={() => { setEditNotes(false); setNotesVal(customer?.notes || ""); }} style={{ padding: "6px 14px", border: "1px solid #e5e7eb", background: "#fff", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
+                    <Button variant="primary" onClick={handleSaveNotes} disabled={savingNotes} loading={savingNotes}>
+                      Speichern
+                    </Button>
+                    <Button onClick={() => { setEditNotes(false); setNotesVal(customer?.notes || ""); }}>
                       Abbrechen
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -638,13 +626,9 @@ export default function CustomerDetailPage() {
             <Card
               title="Bonuspunkte — Verlauf"
               action={
-                <button
-                  type="button"
-                  onClick={() => setShowBonusLedgerModal(true)}
-                  style={{ fontSize: 12, padding: "4px 12px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600 }}
-                >
-                  + Hinzufügen
-                </button>
+                <Button size="slim" variant="primary" onClick={() => setShowBonusLedgerModal(true)}>
+                  Hinzufügen
+                </Button>
               }
             >
               {bonusLedger.length === 0 ? (
@@ -699,46 +683,29 @@ export default function CustomerDetailPage() {
                             </td>
                             <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
                               {isEdit ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={handleSaveLedgerEdit}
-                                    disabled={ledgerSaving}
-                                    style={{ marginRight: 6, padding: "4px 10px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600 }}
-                                  >
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Button size="slim" variant="primary" onClick={handleSaveLedgerEdit} disabled={ledgerSaving} loading={ledgerSaving}>
                                     Speichern
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setLedgerEdit(null)}
-                                    style={{ padding: "4px 10px", border: "1px solid #e5e7eb", background: "#fff", borderRadius: 6, fontSize: 11, cursor: "pointer" }}
-                                  >
+                                  </Button>
+                                  <Button size="slim" onClick={() => setLedgerEdit(null)}>
                                     Abbrechen
-                                  </button>
-                                </>
+                                  </Button>
+                                </InlineStack>
                               ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setLedgerEdit({
-                                        id: row.id,
-                                        description: row.description,
-                                        points_delta: String(row.points_delta),
-                                      })
-                                    }
-                                    style={{ marginRight: 8, background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: 12 }}
-                                  >
-                                    Bearbeiten
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteLedgerEntry(row.id)}
-                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 12 }}
-                                  >
-                                    Löschen
-                                  </button>
-                                </>
+                                <Button
+                                  size="slim"
+                                  variant="plain"
+                                  tone="subdued"
+                                  icon={EditIcon}
+                                  accessibilityLabel="Bearbeiten"
+                                  onClick={() =>
+                                    setLedgerEdit({
+                                      id: row.id,
+                                      description: row.description,
+                                      points_delta: String(row.points_delta),
+                                    })
+                                  }
+                                />
                               )}
                             </td>
                           </tr>
@@ -835,7 +802,7 @@ export default function CustomerDetailPage() {
                   orders.length > 1 && lastOrder && { date: lastOrder, text: "Letzte Bestellung" },
                 ].filter(Boolean).sort((a, b) => new Date(b.date) - new Date(a.date)).map((ev, i) => (
                   <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "flex-start" }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2563eb", marginTop: 5, flexShrink: 0 }} />
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#008060", marginTop: 5, flexShrink: 0 }} />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{ev.text}</div>
                       <div style={{ fontSize: 11, color: "#6b7280" }}>{fmtDateShort(ev.date)}</div>

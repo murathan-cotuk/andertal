@@ -319,6 +319,14 @@ export default function OrdersPage() {
                             </div>
                           ))}
                         </div>
+                        {(order.tracking_number || order.carrier_name) && (
+                          <div className="mt-3 p-3 bg-gray-100 rounded-lg text-sm">
+                            <p className="font-semibold text-gray-800">Sendungsverfolgung</p>
+                            <p className="text-gray-700 mt-1">
+                              {[order.carrier_name, order.tracking_number].filter(Boolean).join(" · ") || "—"}
+                            </p>
+                          </div>
+                        )}
                         <div className="mt-3 pt-3 border-t border-gray-200 space-y-1 text-sm">
                           {Number(order.shipping_cents||0)>0 && (
                             <div className="flex justify-between text-gray-600"><span>Versand</span><span>+{(Number(order.shipping_cents)/100).toLocaleString("de-DE",{minimumFractionDigits:2})} €</span></div>

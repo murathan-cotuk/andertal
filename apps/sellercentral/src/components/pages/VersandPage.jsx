@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { Button, InlineStack, BlockStack } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { buildShipLabelsHtml, buildShipLieferscheinHtml, openShipCombinedPrintWindow } from "@/lib/ship-print-html";
 
 function fmtCents(c) {
   return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
@@ -137,7 +139,9 @@ export default function VersandPage() {
 
   const handleSaveAll = async () => {
     setSaving(true);
-    const carrierName = carrier === "Sonstige" ? customCarrier : carrier;
+    const carrierName = carrier === "Sonstige" ? customCarrier.trim() || "Sonstige" : carrier;
+    const dateStr = new Date().toLocaleDateString("de-DE");
+    const shippedAt = new Date().toISOString();
     try {
       const client = getMedusaAdminClient();
       const newSaved = {};
@@ -145,34 +149,39 @@ export default function VersandPage() {
         await client.updateOrder(o.id, {
           delivery_status: "versendet",
           carrier_name: carrierName,
-          tracking_number: trackings[o.id] || "",
+          tracking_number: trackings[o.id] != null ? String(trackings[o.id]).trim() : "",
+          shipped_at: shippedAt,
         });
         newSaved[o.id] = true;
       }
       setSaved(newSaved);
       setPhase("done");
+      window.setTimeout(() => openShipCombinedPrintWindow(orders, carrierName, trackings, dateStr), 300);
     } catch { }
     setSaving(false);
   };
 
   const handlePrintAll = () => {
-    const carrierName = carrier === "Sonstige" ? customCarrier : carrier;
+    const carrierName = carrier === "Sonstige" ? customCarrier.trim() || "Sonstige" : carrier;
+    const dateStr = new Date().toLocaleDateString("de-DE");
+    const inner = buildShipLabelsHtml(orders, carrierName, trackings, dateStr);
     const win = window.open("", "_blank", "width=900,height=700");
-    const labels = orders.map(o => `
-      <div style="page-break-inside:avoid;border:2px solid #000;padding:20px;margin-bottom:20px;width:90mm;font-family:Arial,sans-serif;box-sizing:border-box">
-        <div style="font-size:10px;color:#666;margin-bottom:6px">VERSANDAUFKLEBER</div>
-        <div style="font-size:16px;font-weight:bold;margin-bottom:10px">Bestellung #${o.order_number || "—"}</div>
-        <div style="font-size:13px"><strong>${[o.first_name,o.last_name].filter(Boolean).join(" ")||"—"}</strong></div>
-        <div style="font-size:12px">${o.address_line1||"—"}</div>
-        <div style="font-size:12px">${[o.postal_code,o.city].filter(Boolean).join(" ")}</div>
-        <div style="font-size:12px">${o.country||""}</div>
-        <hr style="margin:10px 0">
-        <div style="font-size:11px">Carrier: <strong>${carrierName}</strong></div>
-        <div style="font-size:11px">Tracking: <strong>${trackings[o.id]||"—"}</strong></div>
-        <div style="margin-top:10px;border:1px solid #ccc;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;letter-spacing:3px">${trackings[o.id]||"—"}</div>
-      </div>
-    `).join("");
-    win.document.write(`<!DOCTYPE html><html><head><title>Versandaufkleber</title><style>body{margin:20px;display:flex;flex-wrap:wrap;gap:16px}@media print{body{margin:0}}</style></head><body>${labels}<script>window.onload=()=>window.print()</script></body></html>`);
+    if (!win) return;
+    win.document.write(
+      `<!DOCTYPE html><html><head><title>Versandaufkleber</title><style>body{margin:20px;display:flex;flex-wrap:wrap;gap:16px}@media print{body{margin:0}}</style></head><body>${inner}<script>window.onload=()=>window.print()<\/script></body></html>`,
+    );
+    win.document.close();
+  };
+
+  const handlePrintLieferscheinAll = () => {
+    const carrierName = carrier === "Sonstige" ? customCarrier.trim() || "Sonstige" : carrier;
+    const dateStr = new Date().toLocaleDateString("de-DE");
+    const inner = buildShipLieferscheinHtml(orders, carrierName, trackings, dateStr);
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) return;
+    win.document.write(
+      `<!DOCTYPE html><html><head><title>Lieferschein</title><style>body{margin:20px}@media print{body{margin:0}}</style></head><body>${inner}<script>window.onload=()=>window.print()<\/script></body></html>`,
+    );
     win.document.close();
   };
 
@@ -196,8 +205,8 @@ export default function VersandPage() {
   // === SHIP PHASE ===
   if (phase === "ship" || phase === "done") return (
     <div style={{ padding: 24, maxWidth: 700, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
-        <button onClick={() => setPhase("scan")} style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>← Zurück</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+        <Button onClick={() => setPhase("scan")}>← Zurück</Button>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Versenden — {orders.length} Bestellung{orders.length !== 1 ? "en" : ""}</h1>
       </div>
 
@@ -206,7 +215,7 @@ export default function VersandPage() {
           <span style={{ fontSize: 24 }}>✅</span>
           <div>
             <div style={{ fontWeight: 700, color: "#065f46" }}>Alle Bestellungen wurden als versendet markiert!</div>
-            <div style={{ fontSize: 13, color: "#047857", marginTop: 2 }}>Trackingnummern wurden gespeichert.</div>
+            <div style={{ fontSize: 13, color: "#047857", marginTop: 2 }}>Trackingnummern wurden gespeichert. Falls kein Druckfenster erscheint, Pop-ups für diese Seite erlauben.</div>
           </div>
         </div>
       )}
@@ -214,15 +223,15 @@ export default function VersandPage() {
       {/* Carrier selection */}
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Versanddienstleister</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: carrier === "Sonstige" ? 10 : 0 }}>
-          {CARRIERS.map(c => (
-            <button key={c} onClick={() => setCarrier(c)} style={{ padding: "6px 14px", borderRadius: 20, border: `2px solid ${carrier === c ? "#2563eb" : "#e5e7eb"}`, background: carrier === c ? "#eff6ff" : "#fff", color: carrier === c ? "#1d4ed8" : "#374151", fontSize: 13, cursor: "pointer", fontWeight: carrier === c ? 600 : 400 }}>
+        <InlineStack gap="200" wrap blockAlign="center">
+          {CARRIERS.map((c) => (
+            <Button key={c} size="slim" variant={carrier === c ? "primary" : "secondary"} onClick={() => setCarrier(c)}>
               {c}
-            </button>
+            </Button>
           ))}
-        </div>
+        </InlineStack>
         {carrier === "Sonstige" && (
-          <input value={customCarrier} onChange={e => setCustomCarrier(e.target.value)} placeholder="Carrier-Name…" style={{ padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" }} />
+          <input value={customCarrier} onChange={e => setCustomCarrier(e.target.value)} placeholder="Carrier-Name…" style={{ marginTop: 10, padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" }} />
         )}
       </div>
 
@@ -242,21 +251,24 @@ export default function VersandPage() {
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={handlePrintAll} style={{ flex: 1, padding: "10px 0", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>
-          🖨 Versandaufkleber drucken
-        </button>
-        {phase !== "done" && (
-          <button onClick={handleSaveAll} disabled={saving} style={{ flex: 1, padding: "10px 0", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
-            {saving ? "Speichern…" : "Als versendet markieren"}
-          </button>
-        )}
-        {phase === "done" && (
-          <button onClick={() => router.push(`/${locale}/orders`)} style={{ flex: 1, padding: "10px 0", background: "#16a34a", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
-            ✓ Zur Bestellübersicht
-          </button>
-        )}
-      </div>
+      <BlockStack gap="300">
+        <InlineStack gap="200" wrap>
+          <Button onClick={handlePrintAll}>Aufkleber drucken</Button>
+          <Button onClick={handlePrintLieferscheinAll}>Lieferschein drucken</Button>
+        </InlineStack>
+        <InlineStack gap="200" wrap>
+          {phase !== "done" && (
+            <Button variant="primary" onClick={handleSaveAll} disabled={saving} loading={saving}>
+              Als versendet speichern &amp; drucken
+            </Button>
+          )}
+          {phase === "done" && (
+            <Button variant="primary" onClick={() => router.push(`/${locale}/orders`)}>
+              Zur Bestellübersicht
+            </Button>
+          )}
+        </InlineStack>
+      </BlockStack>
     </div>
   );
 
@@ -276,7 +288,7 @@ export default function VersandPage() {
 
       {/* Progress */}
       <div style={{ height: 6, background: "#e5e7eb", borderRadius: 4, marginBottom: 24, overflow: "hidden" }}>
-        <div style={{ height: "100%", background: "#2563eb", borderRadius: 4, width: `${progress}%`, transition: "width 0.3s" }} />
+        <div style={{ height: "100%", background: "#008060", borderRadius: 4, width: `${progress}%`, transition: "width 0.3s" }} />
       </div>
 
       {currentOrder && (
@@ -335,34 +347,33 @@ export default function VersandPage() {
                   autoFocus
                   style={{ flex: 1, padding: "10px 14px", border: `1px solid ${scanError ? "#ef4444" : "#e5e7eb"}`, borderRadius: 8, fontSize: 14 }}
                 />
-                <button type="submit" style={{ padding: "10px 18px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
-                  Scannen
-                </button>
+                <Button submit variant="primary">
+                  Hinzufügen
+                </Button>
               </div>
               {scanError && <div style={{ color: "#ef4444", fontSize: 12, marginTop: 6 }}>{scanError}</div>}
             </form>
           </div>
 
           {/* Navigation */}
-          <div style={{ display: "flex", gap: 12 }}>
+          <InlineStack gap="300" wrap blockAlign="center">
             {currentIndex > 0 && (
-              <button onClick={() => { setCurrentIndex(i => i-1); setScanError(""); setBarcodeInput(""); }} style={{ padding: "10px 20px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>
+              <Button onClick={() => { setCurrentIndex(i => i - 1); setScanError(""); setBarcodeInput(""); }}>
                 ← Vorherige
-              </button>
+              </Button>
             )}
-            <button
-              onClick={goNext}
+            <Button
+              variant="primary"
               disabled={!allItemsScanned}
-              style={{ flex: 1, padding: "10px 0", background: allItemsScanned ? (currentIndex === orders.length - 1 ? "#16a34a" : "#2563eb") : "#e5e7eb", color: allItemsScanned ? "#fff" : "#9ca3af", border: "none", borderRadius: 7, fontSize: 14, cursor: allItemsScanned ? "pointer" : "not-allowed", fontWeight: 600 }}
+              onClick={goNext}
             >
               {!allItemsScanned
                 ? `${items.length - getScanned(currentOrder.id).size} Artikel ausstehend…`
                 : currentIndex === orders.length - 1
-                  ? "✓ Alle verpackt — Versenden"
-                  : `Nächste Bestellung →`
-              }
-            </button>
-          </div>
+                  ? "Alle verpackt — weiter zu Versand"
+                  : "Nächste Bestellung"}
+            </Button>
+          </InlineStack>
           {!allItemsScanned && (
             <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", marginTop: 8 }}>
               Klicke auf einen Artikel oder scanne den Barcode um ihn als verpackt zu markieren

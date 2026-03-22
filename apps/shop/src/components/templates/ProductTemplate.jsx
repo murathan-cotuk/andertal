@@ -870,7 +870,7 @@ export default function ProductTemplate() {
                 role="presentation"
               >
                 <div style={{ position: "relative" }}>
-                  <ProductWishlistHeart productId={product.id} useAbsolute={false} />
+                  <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
                 </div>
               </div>
             )}
