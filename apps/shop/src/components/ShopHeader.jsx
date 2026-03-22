@@ -742,6 +742,9 @@ export default function ShopHeader() {
             </MiddleBarLeft>
 
             <MiddleBarCenter>
+              {/*
+                Geçici: Arama solundaki Kategorien-Hamburger menü.
+                Tekrar açmak için bu yorum bloğunu kaldırın.
               <CategoriesDropdown data-categories-dropdown>
                 <CategoriesButton type="button" onClick={() => { setLocaleDropdownOpen(false); setUserMenuOpen(false); setMainMenuOpen((v) => !v); }} aria-expanded={mainMenuOpen} aria-label="Kategorien">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -764,6 +767,7 @@ export default function ShopHeader() {
                   ))}
                 </CategoriesPanel>
               </CategoriesDropdown>
+              */}
               <MiddleBarSearch>
                 <SearchBarForm role="search">
                   <SearchBarButton type="button" aria-label="Suchen">
