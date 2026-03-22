@@ -388,9 +388,10 @@ const PER_PAGE = 24;
  *  Page
  * ─────────────────────────────────────────────────────────── */
 export default function CollectionPage() {
-  const params      = useParams();
-  const locale      = params?.locale ?? "en";
-  const handle      = params?.handle ? String(params.handle) : undefined;
+  const params = useParams();
+  const router = useRouter();
+  const locale = params?.locale ?? "en";
+  const handle = params?.handle ? String(params.handle) : undefined;
 
   const [collection,  setCollection]  = useState(null);
   const [products,    setProducts]    = useState([]);
