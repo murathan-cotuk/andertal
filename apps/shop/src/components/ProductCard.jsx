@@ -60,6 +60,7 @@ const ImgBlock = styled.div`
     opacity: 0;
   }
   &:hover img.img-primary {
+    opacity: 0;
     transform: scale(1.04);
   }
   &:hover img.img-secondary {

@@ -1,24 +1,4 @@
-20.03.
-
-6. DUPLICATE PRODUCT + URL FIX
------------------------------------
-
-ŞU AN:
-- URL’de "copy" / "kopie" kalıyor
-- Ürün adı değişse bile URL değişmiyor
-
-İSTENEN:
-
-SELLERCENTRAL:
-- URL = product ID (unique, temiz)
-
-SHOP:
-- URL = slug(product name)
-- İsim değişince URL de güncellenmeli
-
-DUPLICATE:
-- Yeni ürün = yeni ID
-- Asla eski slug/copy kalmamalı
+23.03.
 
 -----------------------------------
 11. MEDIA MANAGEMENT (SELLERCENTRAL)
@@ -43,7 +23,7 @@ EK:
   - küçük image preview boş
 → ürün görselleri burada görünmeli
 
-
+- shopta bir üründen 10dan fazla adet secilmiyor. cartta, productpagede, product card ta maximum order quantity gibi bir sinirlama olmasin. her yerde istendigi kadar eklenebilsin sepete.
 - sellercentralde bir varyasyon optionuna swatch image ekleyince onu varyasyon ürününün ilk fotografi olarak da kabul ediyor. ürün fotosu size in sagindaki yer oldugu icin oraya etki etmemeli. oraya tiklayarak ürün eklenmeli. o kisimdan eklenen görselleri silebilme sansimiz da olmali.
 - sellercentralde ürüne girdigimde ya da database de olan herhangi bir seye girdigimde (kategori, kolkesiyon, ürün, fotograf vs.) database de ne sekilde tanimlaniyorsa o gözükmeli. yani ID si yazmali sellercentralde urlde. yani bunu lütfen atlama burasi cok kritik. isim tanimli su anda ancak ben sürekli isim degistiriyorum urlde güncellenmiyor. database ile sürekli iletisim halinde kalinmasi lazim. o yüzde id kullanalim id hep sabittir.
 

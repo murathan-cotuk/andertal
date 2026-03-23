@@ -232,6 +232,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [descriptionMode, setDescriptionMode] = useState("visual");
   const descEditorRef = useRef(null);
   const initialSnapshotRef = useRef(null);
+  const afterCleanRef = useRef(false);
   const [expandedVariantIndex, setExpandedVariantIndex] = useState(null);
   const dragGroupIdx = useRef(null);
   // Variant image picker: null = closed, option_values[] = target variant being edited
@@ -358,6 +359,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   unsavedRef.current = unsaved;
 
   const handleDiscard = useCallback(() => {
+    afterCleanRef.current = true;
+    setTimeout(() => { afterCleanRef.current = false; }, 100);
     setProduct(initialProduct ?? (isNew ? getEmptyProduct() : null));
     if (initialProduct) initialSnapshotRef.current = JSON.stringify(normalizeForCompare(initialProduct));
     else if (isNew) initialSnapshotRef.current = JSON.stringify(normalizeForCompare(getEmptyProduct()));
@@ -365,15 +368,24 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   }, [initialProduct, isNew]);
 
   useEffect(() => {
+    if (isDirty && afterCleanRef.current) {
+      afterCleanRef.current = false;
+      if (product) initialSnapshotRef.current = JSON.stringify(normalizeForCompare(product));
+      unsavedRef.current?.setDirty(false);
+      return;
+    }
     unsavedRef.current?.setDirty(isDirty);
   }, [isDirty]);
 
   useEffect(() => {
+    afterCleanRef.current = true;
+    setTimeout(() => { afterCleanRef.current = false; }, 100);
     unsavedRef.current?.setHandlers({
       onSave: () => saveRef.current?.(),
       onDiscard: () => discardRef.current?.(),
     });
     return () => {
+      afterCleanRef.current = false;
       unsavedRef.current?.clearHandlers();
       unsavedRef.current?.setDirty(false);
     };

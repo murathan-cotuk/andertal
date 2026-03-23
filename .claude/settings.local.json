@@ -55,7 +55,8 @@
       "Bash(find /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/shop/src/components -type f -name \"*.jsx\" -o -name \"*.tsx\" 2>/dev/null | head -30)",
       "Bash(find /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/shop/src -path \"*api*\" -type f -name \"*.js\" -o -name \"*.ts\" 2>/dev/null | head -20)",
       "Bash(find /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha -path \"*/node_modules\" -prune -o -path \"*belucha/lib*\" -type f -name \"*.js\" -o -name \"*.ts\" -o -name \"*.tsx\" 2>/dev/null | grep -v node_modules | head -20)",
-      "Bash(ls -la /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/shop/src/app/[locale]/ | grep -E \"^d\")"
+      "Bash(ls -la /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/shop/src/app/[locale]/ | grep -E \"^d\")",
+      "Bash(find /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/sellercentral/src -name *slug* -o -name *handle*)"
     ]
   }
 }
