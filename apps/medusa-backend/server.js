@@ -2823,7 +2823,6 @@ async function start() {
         const discountCents = discountCentsFromBonusPoints(reservedPts)
         const payCents = Math.max(0, subtotalCents - discountCents)
         if (payCents <= 0) {
-          await client.end()
           return res.status(400).json({
             message:
               'Der Bestellbetrag ist 0 €. Vollständige Bezahlung nur mit Bonuspunkten ist derzeit nicht möglich — bitte Punkte reduzieren oder Artikel hinzufügen.',

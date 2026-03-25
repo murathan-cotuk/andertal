@@ -328,6 +328,14 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
       if (c?.first_name) applyToField(firstName, c.first_name);
       if (c?.last_name) applyToField(lastName, c.last_name);
       if (c?.phone) applyToField(phone, c.phone);
+      // Save customer info to cart so it shows in abandoned checkouts
+      if (cartId && (c?.email || c?.first_name || c?.last_name)) {
+        const patch = {};
+        if (c?.email) patch.email = c.email;
+        if (c?.first_name) patch.first_name = c.first_name;
+        if (c?.last_name) patch.last_name = c.last_name;
+        client.patchStoreCart(cartId, patch).catch(() => {});
+      }
       const def = addrs.find((a) => a.is_default_shipping) || addrs[0];
       if (def?.id) {
         setShipAddrId(def.id);
@@ -646,8 +654,30 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
           <CheckoutFormField label={t("phone")} field={phone} type="tel" autoComplete="tel" />
         </FieldGrid>
         <FieldGrid $cols="1fr 1fr">
-          <CheckoutFormField label={t("firstName")} field={firstName} autoComplete="given-name" />
-          <CheckoutFormField label={t("lastName")} field={lastName} autoComplete="family-name" />
+          <CheckoutFormField
+            label={t("firstName")}
+            field={{
+              ...firstName,
+              onBlur: (e) => {
+                firstName.onBlur(e);
+                const v = (e?.target?.value || firstName.value || "").trim();
+                if (v) getMedusaClient().patchStoreCart(cartId, { first_name: v }).catch(() => {});
+              },
+            }}
+            autoComplete="given-name"
+          />
+          <CheckoutFormField
+            label={t("lastName")}
+            field={{
+              ...lastName,
+              onBlur: (e) => {
+                lastName.onBlur(e);
+                const v = (e?.target?.value || lastName.value || "").trim();
+                if (v) getMedusaClient().patchStoreCart(cartId, { last_name: v }).catch(() => {});
+              },
+            }}
+            autoComplete="family-name"
+          />
         </FieldGrid>
       </FormCard>
 
@@ -875,6 +905,7 @@ export default function CheckoutPage() {
   const [bonusErr, setBonusErr] = useState("");
   const [balancePoints, setBalancePoints] = useState(null);
   const [bonusApplying, setBonusApplying] = useState(false);
+  const [piRefreshKey, setPiRefreshKey] = useState(0);
   const [customerToken, setCustomerToken] = useState(null);
 
   useEffect(() => {
@@ -914,11 +945,18 @@ export default function CheckoutPage() {
         setBonusErr(out.message || t("bonusError"));
         return;
       }
-      if (out?.cart) setCart(out.cart);
-      setBonusDraft(String(out.bonus_points_reserved ?? 0));
-      const r2 = await client.getCustomer(tok);
-      setBalancePoints(r2?.customer?.bonus_points ?? 0);
-      setClientSecret(null);
+      // Update only bonus_points_reserved — don't replace whole cart (items would be lost)
+      const newPts = out.bonus_points_reserved ?? out.cart?.bonus_points_reserved ?? pts;
+      setCart((prev) => (prev ? { ...prev, bonus_points_reserved: newPts } : prev));
+      setBonusDraft(String(newPts));
+      // Apply discount immediately from PATCH response (no need to wait for PI refetch)
+      setBonusDiscountCents(Number(out.bonus_discount_cents || 0));
+      // Trigger PI refetch with new discounted amount
+      setPiRefreshKey((k) => k + 1);
+      // Fetch updated balance in background
+      client.getCustomer(tok).then((r2) => {
+        setBalancePoints(r2?.customer?.bonus_points ?? 0);
+      }).catch(() => {});
     } catch (e) {
       setBonusErr(e?.message || t("bonusError"));
     } finally {
@@ -969,7 +1007,7 @@ export default function CheckoutPage() {
         setBonusDiscountCents(0);
       })
       .finally(() => setLoadingPI(false));
-  }, [cart?.id, cart?.bonus_points_reserved, subtotalCents, t, items.length]);
+  }, [cart?.id, subtotalCents, t, items.length, piRefreshKey]);
 
   const stripeInstance = getStripe();
 
@@ -1046,7 +1084,14 @@ export default function CheckoutPage() {
                 {customerToken ? (
                   <>
                     {balancePoints != null && (
-                      <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0 0 8px" }}>{t("bonusBalance", { points: balancePoints })}</p>
+                      <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0 0 8px" }}>
+                        {t("bonusBalance", { points: Math.max(0, balancePoints - (cart?.bonus_points_reserved ?? 0)) })}
+                        {(cart?.bonus_points_reserved ?? 0) > 0 && (
+                          <span style={{ color: "#16a34a", marginLeft: 6, fontWeight: 600 }}>
+                            (−{cart.bonus_points_reserved} reserviert)
+                          </span>
+                        )}
+                      </p>
                     )}
                     <p style={{ fontSize: "0.7rem", color: "#9ca3af", margin: "0 0 8px", lineHeight: 1.4 }}>{t("bonusHint")}</p>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>

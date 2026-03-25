@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { Link } from "@/i18n/navigation";
 import { useCart } from "@/context/CartContext";
@@ -138,24 +138,27 @@ const ItemPrice = styled.div`
 `;
 
 const QtyRow = styled.div`
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #f3f4f6;
+  overflow: hidden;
 `;
 
 const QtyBtn = styled.button`
   width: 28px;
   height: 28px;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1rem;
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font-size: 15px;
   line-height: 1;
-  color: #374151;
+  cursor: pointer;
+  flex-shrink: 0;
   &:hover:not(:disabled) {
-    background: #f9fafb;
-    border-color: #9ca3af;
+    background: #e5e7eb;
+    color: #111827;
   }
   &:disabled {
     opacity: 0.5;
@@ -163,11 +166,44 @@ const QtyBtn = styled.button`
   }
 `;
 
-const QtyVal = styled.span`
-  font-size: 0.875rem;
-  min-width: 24px;
+const QtyInput = styled.input`
+  width: 36px;
+  height: 28px;
   text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  border: 0;
+  background: transparent;
+  outline: none;
+  min-width: 0;
+  padding: 0 2px;
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  &[type="number"] { -moz-appearance: textfield; }
+  &:disabled { opacity: 0.5; }
 `;
+
+function QtyInputCell({ itemId, quantity, disabled, onUpdate }) {
+  const [draft, setDraft] = useState(String(quantity));
+  useEffect(() => { setDraft(String(quantity)); }, [quantity]);
+  const commit = () => {
+    const val = parseInt(draft, 10);
+    if (!isNaN(val) && val >= 1 && val !== quantity) onUpdate(itemId, val);
+    else setDraft(String(quantity));
+  };
+  return (
+    <QtyInput
+      type="number"
+      min="1"
+      disabled={disabled}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+    />
+  );
+}
 
 const Footer = styled.div`
   padding: 16px 20px;
@@ -195,7 +231,7 @@ const PrimaryBtn = styled.a`
   display: block;
   text-align: center;
   padding: 12px 20px;
-  background: #0ea5e9;
+  background: #ff971c;
   color: #fff;
   font-weight: 600;
   font-size: 0.9375rem;
@@ -203,7 +239,7 @@ const PrimaryBtn = styled.a`
   text-decoration: none;
   margin-bottom: 12px;
   &:hover {
-    background: #0284c7;
+    background: #e65f00;
     color: #fff;
   }
 `;
@@ -212,7 +248,7 @@ const TextLink = styled(Link)`
   display: block;
   text-align: center;
   font-size: 0.875rem;
-  color: #0ea5e9;
+  color: #1a1a1a;
   text-decoration: none;
   &:hover {
     text-decoration: underline;
@@ -272,7 +308,12 @@ export default function CartSidebar() {
                   >
                     −
                   </QtyBtn>
-                  <QtyVal>{item.quantity || 0}</QtyVal>
+                  <QtyInputCell
+                    itemId={item.id}
+                    quantity={item.quantity || 1}
+                    disabled={loading}
+                    onUpdate={updateLineItem}
+                  />
                   <QtyBtn
                     type="button"
                     disabled={loading}

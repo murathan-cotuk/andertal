@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
@@ -90,33 +90,66 @@ const ItemPrice = styled.div`
 `;
 
 const QtyRow = styled.div`
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #f3f4f6;
+  overflow: hidden;
 `;
 
 const QtyBtn = styled.button`
-  width: 32px;
-  height: 32px;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  border-radius: 6px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font-size: 17px;
+  line-height: 1;
   cursor: pointer;
-  font-size: 1rem;
-  color: #374151;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  &:hover:not(:disabled) { background: #f9fafb; }
+  flex-shrink: 0;
+  &:hover:not(:disabled) { background: #e5e7eb; color: #111827; }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 `;
 
-const QtyVal = styled.span`
-  font-size: 0.9375rem;
-  font-weight: 500;
-  min-width: 28px;
+const QtyInput = styled.input`
+  width: 44px;
+  height: 34px;
   text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  border: 0;
+  background: transparent;
+  outline: none;
+  min-width: 0;
+  padding: 0 4px;
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  &[type="number"] { -moz-appearance: textfield; }
+  &:disabled { opacity: 0.4; }
 `;
+
+function QtyInputCell({ itemId, quantity, disabled, onUpdate }) {
+  const [draft, setDraft] = useState(String(quantity));
+  useEffect(() => { setDraft(String(quantity)); }, [quantity]);
+  const commit = () => {
+    const val = parseInt(draft, 10);
+    if (!isNaN(val) && val >= 1 && val !== quantity) onUpdate(itemId, val);
+    else setDraft(String(quantity));
+  };
+  return (
+    <QtyInput
+      type="number"
+      min="1"
+      disabled={disabled}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+    />
+  );
+}
 
 const RemoveBtn = styled.button`
   display: flex;
@@ -299,7 +332,12 @@ export default function CartPage() {
                       >
                         −
                       </QtyBtn>
-                      <QtyVal>{item.quantity || 0}</QtyVal>
+                      <QtyInputCell
+                        itemId={item.id}
+                        quantity={item.quantity || 1}
+                        disabled={loading}
+                        onUpdate={updateLineItem}
+                      />
                       <QtyBtn
                         type="button"
                         disabled={loading}

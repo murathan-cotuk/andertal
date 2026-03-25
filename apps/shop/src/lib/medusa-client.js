@@ -31,12 +31,13 @@ class MedusaClient {
     }
 
     const url = `${this.baseURL}${endpoint}`
+    const { headers: optHeaders, ...restOptions } = options
     const config = {
+      ...restOptions,
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers,
+        ...optHeaders,
       },
-      ...options,
     }
 
     try {

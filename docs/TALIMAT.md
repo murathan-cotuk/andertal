@@ -1,4 +1,4 @@
-24.03.
+25.03.
 
 -----------------------------------
 11. MEDIA MANAGEMENT (SELLERCENTRAL)
@@ -36,9 +36,11 @@
 
 ---------------------
 siparis
-- terkedilen sepet menüsü.
-- Siparis sayfasinda siparis listelerinin sagindaki 3 noktada iki tane markieren var. onlarin olmasini istemedim. ben direkt "Versenden" diye bir buton istedim siparisi göndermek icin. ayrica birden fazla siparis secilebilsin ve toplu bir sekilde gönderim yapilabilsin.
-+
+- terkedilen sepet menüsü. ???
+- shopta adres olusturmak istiyorum ancak address_line1 required uyarisi aliyorum. halbuki her yeri doldurdum. ???
+- shopta warenkorba stok yazabiliyoruz artik. ancak o input kismi cok kötü. side warenkorbta ve warenkorb sayfasinda stok input yapma kismini prodct carddaki gibi yap. ???
+- Shoptaki Bewertungen menüsü icinde verilen siparisler ve o siparislere verilen bewertunglar gözüksün. bewertung verilmemis siparisler de orada gözüksün ancak yildizla bos dursun ve jetzt bewerten desin. sonra shopta ürün sayfasinda ismin altindaki yildiz, bir siparis icin verilen tüm ortalama yorumlara göre dolsun, siparis sayfasinin en altinda yazilan yorumlar gözüksün, bewertunglar siparis bazli degil ürün bazli yapilsin. yani siparislerin icie girip bewerten dedigi zaman her ürün icin ayri ayri degerlendirme alani acilsin. ayrica sellercentralde de bu müsteri yorumlari bestellungen sayfasinda siparislerin saginda bir yerinde yildizlari gözüksün. yildiza bastiginda popup ciksin ve müsteri yorumunu görebilelim. ayrica liste seklinde müsteriler ana menüsünün altina submenü eklenip liste seklinde gözükebilir.
+- sellercentralde ürünlerin icine kargo metodunu secebilecegimiz bir acilir menü olsun. settings/Shipping sayfasinda belirledigimiz fiyatlandirmalar ciksin bu acilir menüde. ona göre shoptaki ürün sayfasinda +bilmem kac euor versand tarzi bir sey gözüksün ve sepette de hesaba katilsin. settings/shopping sayfasinda kargo sirketi girip fiyat grubu yazalim. fiyat grubunu her ülke icin ayri ayri ayarlayabilelim. atiyorum DHL sectim grup adi yazma kismina "Standart Paket" yazdim. fiyat kismi icin alt alta tüm ülkeler cikacak. secip yanlarina fiyatlari yazabilecegim.
 - shopta siparislerim sayfasinda siparislerin yaninda faturayi görmek istiyorum. kargoya verildiginde kargo takip numarasi da siparisin orada yer alsin. fatura olusturma modülü falan var stripe ta nasil yapilacaksa yap. yapmam gerekeni söyle. fatura icin nasil template hazirlayalim vs.
 - sellercentralde siprisi versenden yapabilelim. versenden yaptigimizda kargo etiketi basilsin ve lieferschein basilsin. bunlari print edebilelim. kargo etiketi basildiktan sonra kargo takip numarasi hem sellercentralde ilgili orderda yazsin hem de shopta müsteriye fatura ve takip numarasi gitsin. toplu siparis versenden yapildiginda verandzentrum gibi bir sayfa acilsin ve orada sirayla siparisler ciksin. atiyorum ilk siparisin icinde 3 farkli ürün var. o 3 farkli ürünün barkodu scanlendiginde ya da manuel olarak eklendi, siradaki ürün tarzi bir butona basmak sureti ile siparisler islensin. billbee ve xentral tarzi.
 - shopta müsteri siparisi iade et butonuna basabilsin. siparisin teslim edilme tarihi siparisin icinde olsun. teslimattan sonra 14 gün icinde retoure edebilir. 14 günü gecti ise maalesef iade edemezsin gibisinden bi uyari ciksin. 14 gün icindeyse de iade talebi bana gelsin sellercentralde retoure sayfasina düssün, talep incelendikten sonra onaylanirsa kargo etiketi basalim ve retourenschein ya da iade faturasi ya da yasal olarak gereklilik ne ise onlar basilsin. iade numarasi da basilsin ve gözüksün orderin icinde. bunlar tabii shopta müsterinin kontosunda görüntüleyebilecegi seyler olsun. 
