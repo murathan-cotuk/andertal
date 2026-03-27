@@ -677,6 +677,10 @@ class MedusaAdminClient {
   async refundReturn(id, { refund_amount_cents, refund_note }) {
     return this.updateReturn(id, { refund_amount_cents, refund_note, refund_status: 'erstattet' })
   }
+
+  async sendReturnLabel(id) {
+    return this.request(`/admin-hub/v1/returns/${id}/send-label`, { method: 'POST' })
+  }
 }
 
 // Singleton instance

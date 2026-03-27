@@ -58,7 +58,11 @@
       "Bash(ls -la /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/shop/src/app/[locale]/ | grep -E \"^d\")",
       "Bash(find /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/sellercentral/src -name *slug* -o -name *handle*)",
       "Bash(ls:*)",
-      "Bash(find C:UsersLenovoDesktopOrtamYazilimbelucha/apps/medusa-backend/src/api -type f -name *.js -o -name *.ts)"
+      "Bash(find C:UsersLenovoDesktopOrtamYazilimbelucha/apps/medusa-backend/src/api -type f -name *.js -o -name *.ts)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/**)",
+      "Bash(done)"
     ]
   }
 }

@@ -76,8 +76,36 @@ function requestWithPreferredLocale(request) {
 
 const intlMiddleware = createMiddleware(routing);
 
+// Paths that require customer login (matched against the locale-stripped path segment)
+const PROTECTED_SEGMENTS = new Set([
+  "account", "orders", "addresses", "reviews", "bonus",
+  "merkzettel", "wishlist", "invoices",
+]);
+
+function isProtectedPath(pathname) {
+  const parts = pathname.split("/").filter(Boolean);
+  return parts.some(p => PROTECTED_SEGMENTS.has(p));
+}
+
 export default function middleware(request) {
   const pathname = request.nextUrl.pathname || "";
+
+  // Server-level auth guard: redirect to login if cookie missing for protected routes
+  if (isProtectedPath(pathname)) {
+    const authCookie = request.cookies.get("belucha_cauth");
+    if (!authCookie?.value) {
+      // Determine locale from path segments
+      const parts = pathname.split("/").filter(Boolean);
+      // Try: market path like /{market}/{locale}/{currency}/... or /{locale}/...
+      const triple = parseMarketPath(pathname);
+      const locale = triple?.lang
+        || (parts.length >= 1 && LOCALES.includes(parts[0]) ? parts[0] : DEFAULT_LOCALE);
+      const market = defaultMarketForLocale(locale);
+      const loginUrl = new URL(`/${market}/${locale}/${DEFAULT_CURRENCY}/login`, request.url);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
 
   if (pathname === "/sale" || pathname === "/sale/") {
     return NextResponse.redirect(new URL(`${defaultMarketPath()}/sale`, request.url));

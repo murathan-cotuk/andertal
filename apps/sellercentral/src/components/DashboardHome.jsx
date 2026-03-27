@@ -28,6 +28,7 @@ export default function DashboardHome() {
     pendingOrders: 0,
   });
   const [recentOrders, setRecentOrders] = useState([]);
+  const [pendingReturns, setPendingReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const medusaClient = getMedusaAdminClient();
@@ -37,10 +38,13 @@ export default function DashboardHome() {
       try {
         setLoading(true);
         setError(null);
-        const [productsData, ordersData] = await Promise.all([
+        const [productsData, ordersData, returnsData] = await Promise.all([
           medusaClient.getAdminHubProducts(),
           medusaClient.getOrders().catch(() => ({ orders: [] })),
+          medusaClient.getReturns().catch(() => ({ returns: [] })),
         ]);
+        const allReturns = returnsData.returns || [];
+        setPendingReturns(allReturns.filter(r => r.status === 'offen'));
         const allProducts = productsData.products || [];
         const products = allProducts.filter((p) => (p.status || "").toLowerCase() !== "draft");
         const orders = ordersData.orders || [];
@@ -205,6 +209,38 @@ export default function DashboardHome() {
             </BlockStack>
           </Card>
         </Layout.Section>
+
+        {pendingReturns.length > 0 && (
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="300">
+                <InlineStack blockAlign="center" align="space-between" wrap>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Text as="h2" variant="headingMd">İadeye Cevap Bekleyenler</Text>
+                    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 22, height: 22, borderRadius: "50%", background: "#ef4444", color: "#fff", fontSize: 11, fontWeight: 700, padding: "0 5px" }}>
+                      {pendingReturns.length}
+                    </span>
+                  </InlineStack>
+                  <Button variant="plain" onClick={() => router.push("/orders/returns")}>Alle anzeigen</Button>
+                </InlineStack>
+                <Divider />
+                <DataTable
+                  columnContentTypes={["text", "text", "text", "text"]}
+                  headings={["Retoure-Nr.", "Bestellung", "Kunde", "Grund"]}
+                  rows={pendingReturns.slice(0, 5).map(r => [
+                    `R-${r.return_number || r.id?.slice(0, 8)}`,
+                    r.order_number ? `#${r.order_number}` : "—",
+                    [r.first_name, r.last_name].filter(Boolean).join(" ") || r.email || "—",
+                    r.reason || "—",
+                  ])}
+                />
+                <Button variant="primary" tone="critical" onClick={() => router.push("/orders/returns")}>
+                  Rückgabeanfragen bearbeiten
+                </Button>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        )}
 
         <Layout.Section>
           <Card>

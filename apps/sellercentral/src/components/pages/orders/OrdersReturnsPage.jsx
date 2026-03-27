@@ -36,13 +36,11 @@ function Badge({ value, map }) {
   );
 }
 
-/* ───────── Retourenschein print ───────── */
-function printRetourenschein(ret) {
-  const win = window.open("", "_blank", "width=800,height=900");
-  if (!win) return;
+/* ───────── Return label HTML builder ───────── */
+function buildReturnLabelHtml(ret) {
   const customerName = [ret.first_name, ret.last_name].filter(Boolean).join(" ") || ret.email || "Kunde";
-  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
-<title>Retourenschein #${ret.return_number || ret.id?.slice(0, 8)}</title>
+  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+<title>Retoureschein #${ret.return_number || ret.id?.slice(0, 8)}</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 40px; color: #111; }
   h1 { font-size: 22px; margin-bottom: 4px; }
@@ -57,10 +55,9 @@ function printRetourenschein(ret) {
   th { background: #f9fafb; padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing:.04em; color: #6b7280; }
   td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; }
   .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; }
-  @media print { body { margin: 20px; } }
 </style>
 </head><body>
-<h1>Retourenschein</h1>
+<h1>Retoureschein</h1>
 <div class="subtitle">Bitte legen Sie diesen Schein dem Paket bei.</div>
 <div class="grid">
   <div class="section">
@@ -90,10 +87,20 @@ ${ret.items && ret.items.length ? `
   <strong>Rücksendung an:</strong> Ihr Firmenname · Straße · PLZ Stadt · Deutschland<br>
   Retoure-Nr. R-${ret.return_number || "—"} · Erstellt am ${fmtDate(ret.created_at)}
 </div>
-<script>window.onload = () => { window.print(); }</script>
 </body></html>`;
-  win.document.write(html);
-  win.document.close();
+}
+
+function downloadRetourenschein(ret) {
+  const html = buildReturnLabelHtml(ret);
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Retoureschein-R${ret.return_number || ret.id?.slice(0, 8)}.html`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /* ───────── RefundModal ───────── */
@@ -198,6 +205,8 @@ function RefundModal({ ret, onClose, onRefunded }) {
 function DetailPanel({ ret, onClose, onUpdate }) {
   const [showRefund, setShowRefund] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [sendingLabel, setSendingLabel] = useState(false);
+  const [labelMsg, setLabelMsg] = useState("");
 
   const handleStatus = async (status) => {
     setUpdating(true);
@@ -254,17 +263,39 @@ function DetailPanel({ ret, onClose, onUpdate }) {
             </div>
           )}
           {ret.status === "genehmigt" && (
-            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-              <button
-                onClick={() => printRetourenschein(ret)}
-                style={{ flex: 1, padding: "10px 0", background: "#111827", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
-              >
-                🖨 Retourenschein drucken
-              </button>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <button
+                  onClick={() => downloadRetourenschein(ret)}
+                  style={{ flex: 1, padding: "10px 0", background: "#111827", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
+                >
+                  ⬇ Label herunterladen
+                </button>
+                <button
+                  disabled={sendingLabel || !!ret.label_sent_at}
+                  onClick={async () => {
+                    setSendingLabel(true); setLabelMsg("");
+                    try {
+                      const client = getMedusaAdminClient();
+                      const res = await client.sendReturnLabel(ret.id);
+                      onUpdate({ ...ret, label_sent_at: res?.label_sent_at || new Date().toISOString() });
+                      setLabelMsg(res?.emailSent ? "✓ E-Mail gesendet" : "✓ Markiert (kein SMTP konfiguriert)");
+                    } catch { setLabelMsg("Fehler beim Senden"); }
+                    setSendingLabel(false);
+                  }}
+                  style={{ flex: 1, padding: "10px 0", background: ret.label_sent_at ? "#f0fdf4" : "#2563eb", color: ret.label_sent_at ? "#15803d" : "#fff", border: ret.label_sent_at ? "1px solid #bbf7d0" : "none", borderRadius: 8, cursor: (sendingLabel || !!ret.label_sent_at) ? "default" : "pointer", fontSize: 13, fontWeight: 700 }}
+                >
+                  {sendingLabel ? "Senden…" : ret.label_sent_at ? "✓ Label gesendet" : "✉ Label per E-Mail"}
+                </button>
+              </div>
+              {labelMsg && <div style={{ fontSize: 12, color: "#15803d", marginBottom: 8 }}>{labelMsg}</div>}
+              {ret.label_sent_at && (
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Label gesendet am {fmtDate(ret.label_sent_at)}</div>
+              )}
               {!ret.refund_status && (
                 <button
                   onClick={() => setShowRefund(true)}
-                  style={{ flex: 1, padding: "10px 0", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
+                  style={{ width: "100%", marginTop: 8, padding: "10px 0", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
                 >
                   💶 Erstatten
                 </button>
@@ -582,13 +613,30 @@ export default function OrdersReturnsPage() {
                         </>
                       )}
                       {ret.status === "genehmigt" && (
-                        <button
-                          onClick={() => printRetourenschein(ret)}
-                          title="Retourenschein drucken"
-                          style={{ padding: "3px 10px", background: "#f9fafb", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer", fontSize: 11 }}
-                        >
-                          🖨
-                        </button>
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); downloadRetourenschein(ret); }}
+                            title="Label herunterladen"
+                            style={{ padding: "3px 10px", background: "#f9fafb", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer", fontSize: 11 }}
+                          >
+                            ⬇
+                          </button>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (ret.label_sent_at) return;
+                              try {
+                                const client = getMedusaAdminClient();
+                                await client.sendReturnLabel(ret.id);
+                                handleUpdate({ ...ret, label_sent_at: new Date().toISOString() });
+                              } catch {}
+                            }}
+                            title={ret.label_sent_at ? "Label bereits gesendet" : "Label per E-Mail senden"}
+                            style={{ padding: "3px 10px", background: ret.label_sent_at ? "#f0fdf4" : "#eff6ff", color: ret.label_sent_at ? "#15803d" : "#2563eb", border: `1px solid ${ret.label_sent_at ? "#bbf7d0" : "#bfdbfe"}`, borderRadius: 6, cursor: ret.label_sent_at ? "default" : "pointer", fontSize: 11 }}
+                          >
+                            ✉
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>

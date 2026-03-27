@@ -892,7 +892,7 @@ export default function ShopHeader() {
                       <UserDropdownItem href="/addresses" onClick={() => setUserMenuOpen(false)}>Adressen</UserDropdownItem>
                       <UserDropdownItem href="/reviews" onClick={() => setUserMenuOpen(false)}>Bewertungen</UserDropdownItem>
                       <UserDropdownItem href="/bonus" onClick={() => setUserMenuOpen(false)}>Bonuspunkte</UserDropdownItem>
-                      <UserDropdownBtn onClick={() => { logout(); setUserMenuOpen(false); }}>Abmelden</UserDropdownBtn>
+                      <UserDropdownBtn onClick={() => { document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax"; logout(); setUserMenuOpen(false); }}>Abmelden</UserDropdownBtn>
                     </>
                   ) : (
                     <>

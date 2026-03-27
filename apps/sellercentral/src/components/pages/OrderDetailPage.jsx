@@ -125,14 +125,14 @@ export default function OrderDetailPage() {
     loadOrder();
   }, [loadOrder]);
 
-  // Auto-abgeschlossen when versendet + bezahlt
+  // Auto-abgeschlossen when (zugestellt or versendet) + bezahlt
   const handleDeliveryChange = (val) => {
     setDeliveryStatus(val);
-    if (val === "versendet" && paymentStatus === "bezahlt") setOrderStatus("abgeschlossen");
+    if ((val === "zugestellt" || val === "versendet") && paymentStatus === "bezahlt") setOrderStatus("abgeschlossen");
   };
   const handlePaymentChange = (val) => {
     setPaymentStatus(val);
-    if (val === "bezahlt" && deliveryStatus === "versendet") setOrderStatus("abgeschlossen");
+    if (val === "bezahlt" && (deliveryStatus === "zugestellt" || deliveryStatus === "versendet")) setOrderStatus("abgeschlossen");
   };
 
   const handleSaveStatus = async () => {
@@ -140,7 +140,12 @@ export default function OrderDetailPage() {
     try {
       const client = getMedusaAdminClient();
       const res = await client.updateOrder(id, { order_status: orderStatus, payment_status: paymentStatus, delivery_status: deliveryStatus });
-      if (res?.order) setOrder(o => ({ ...o, ...res.order }));
+      if (res?.order) {
+        setOrder(o => ({ ...o, ...res.order }));
+        if (res.order.order_status) setOrderStatus(res.order.order_status);
+        if (res.order.payment_status) setPaymentStatus(res.order.payment_status);
+        if (res.order.delivery_status) setDeliveryStatus(res.order.delivery_status);
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {

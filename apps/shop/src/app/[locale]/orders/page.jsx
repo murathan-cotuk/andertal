@@ -17,6 +17,7 @@ const STATUS_LABEL = {
   abgeschlossen: "Abgeschlossen",
   storniert: "Storniert",
   bezahlt: "Bezahlt",
+  refunded: "Erstattet",
   pending: "Offen",
   shipped: "Versendet",
   delivered: "Zugestellt",
@@ -32,6 +33,7 @@ const STATUS_COLOR = {
   abgeschlossen: "#166534",
   storniert: "#991b1b",
   bezahlt: "#166534",
+  refunded: "#1d4ed8",
   pending: "#92400e",
   shipped: "#6d28d9",
   delivered: "#166534",
@@ -247,8 +249,13 @@ export default function OrdersPage() {
     return (Date.now() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24) > 14;
   };
 
-  // Effective display status: prefer order_status
-  const displayStatus = (order) => order.order_status || order.delivery_status || "offen";
+  // Effective display status: refunded takes priority if any return has refund_status=erstattet
+  const displayStatus = (order) => {
+    if (order.order_status === "refunded") return "refunded";
+    const hasRefund = (order.returns || []).some(r => r.refund_status === "erstattet");
+    if (hasRefund) return "refunded";
+    return order.order_status || order.delivery_status || "offen";
+  };
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
@@ -483,8 +490,19 @@ export default function OrdersPage() {
                                 </table>
                               </div>
                               {activeReturn && (
-                                <div style={{ marginTop: 12, fontSize: 12, color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "6px 10px" }}>
-                                  Retoure #{activeReturn.return_number || "—"} · {activeReturn.status}
+                                <div style={{ marginTop: 12, fontSize: 12, borderRadius: 6, padding: "8px 12px", background: activeReturn.refund_status === "erstattet" ? "#eff6ff" : activeReturn.status === "genehmigt" ? "#f0fdf4" : "#fffbeb", border: `1px solid ${activeReturn.refund_status === "erstattet" ? "#bfdbfe" : activeReturn.status === "genehmigt" ? "#bbf7d0" : "#fde68a"}`, color: activeReturn.refund_status === "erstattet" ? "#1d4ed8" : activeReturn.status === "genehmigt" ? "#15803d" : "#92400e" }}>
+                                  {activeReturn.refund_status === "erstattet" ? (
+                                    <span>💶 Erstattung bearbeitet – R-{activeReturn.return_number || "—"}</span>
+                                  ) : activeReturn.status === "genehmigt" ? (
+                                    <div>
+                                      <div>✓ Retoure genehmigt – R-{activeReturn.return_number || "—"}</div>
+                                      {activeReturn.label_sent_at && (
+                                        <div style={{ marginTop: 4 }}>Retoureschein wurde per E-Mail gesendet am {fmtDate(activeReturn.label_sent_at)}</div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span>Retoure #{activeReturn.return_number || "—"} · {activeReturn.status}</span>
+                                  )}
                                 </div>
                               )}
                             </div>

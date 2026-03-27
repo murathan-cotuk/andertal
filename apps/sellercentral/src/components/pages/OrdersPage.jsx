@@ -481,6 +481,7 @@ export default function OrdersPage() {
   const [versendModal, setVersendModal] = useState(null); // null | array of order objects
   const [allReviews, setAllReviews] = useState([]); // all product reviews
   const [reviewPopupOrderId, setReviewPopupOrderId] = useState(null);
+  const [returnsMap, setReturnsMap] = useState({}); // order_id → has active return
 
   const fetchReviews = useCallback(async () => {
     try {
@@ -490,13 +491,27 @@ export default function OrdersPage() {
     } catch { setAllReviews([]); }
   }, []);
 
+  const fetchReturns = useCallback(async () => {
+    try {
+      const client = getMedusaAdminClient();
+      const data = await client.getReturns();
+      const map = {};
+      for (const r of (data?.returns || [])) {
+        if (r.order_id && r.status !== "abgelehnt" && r.status !== "abgeschlossen") {
+          map[r.order_id] = true;
+        }
+      }
+      setReturnsMap(map);
+    } catch { setReturnsMap({}); }
+  }, []);
+
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
       const client = getMedusaAdminClient();
       const params = { sort };
       if (search) params.search = search;
-      if (filterOrderStatus) params.order_status = filterOrderStatus;
+      if (filterOrderStatus && filterOrderStatus !== "retoure") params.order_status = filterOrderStatus;
       if (filterPayStatus) params.payment_status = filterPayStatus;
       if (filterDelivery) params.delivery_status = filterDelivery;
       const data = await client.getOrders(params);
@@ -505,7 +520,7 @@ export default function OrdersPage() {
     setLoading(false);
   }, [search, filterOrderStatus, filterPayStatus, filterDelivery, sort]);
 
-  useEffect(() => { fetchOrders(); fetchReviews(); }, [fetchOrders, fetchReviews]);
+  useEffect(() => { fetchOrders(); fetchReviews(); fetchReturns(); }, [fetchOrders, fetchReviews, fetchReturns]);
 
   const toggleExpand = async (order) => {
     const id = order.id;
@@ -549,6 +564,31 @@ export default function OrdersPage() {
       await client.deleteOrder(id);
       setOrders(prev => prev.filter(o => o.id !== id));
     } catch { }
+  };
+
+  // col key → sort param base (without _asc/_desc)
+  const COL_SORT_KEY = {
+    2: "order_number",
+    3: "name",
+    5: "total",
+    6: "status",
+    9: "created_at",
+    10: "country",
+  };
+
+  const handleColSort = (colIdx) => {
+    const key = COL_SORT_KEY[colIdx];
+    if (!key) return;
+    const isCurrentCol = sort.startsWith(key + "_");
+    const newDir = isCurrentCol && sort.endsWith("_asc") ? "desc" : "asc";
+    setSort(`${key}_${newDir}`);
+  };
+
+  const sortIcon = (colIdx) => {
+    const key = COL_SORT_KEY[colIdx];
+    if (!key) return null;
+    if (sort.startsWith(key + "_")) return sort.endsWith("_asc") ? " ↑" : " ↓";
+    return " ⇅";
   };
 
   const COLS = ["☐", "", "Bestellnummer", "Kunde", "Adresse", "Betrag", "Bestellstatus", "Zahlungsstatus", "Lieferstatus", "Datum", "Land", "Bewertung", ""];
@@ -638,6 +678,7 @@ export default function OrdersPage() {
         />
         <select value={filterOrderStatus} onChange={e => setFilterOrderStatus(e.target.value)} style={selStyle}>
           <option value="">Alle Status</option>
+          <option value="retoure">Retoure (aktiv)</option>
           {ORDER_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <select value={filterPayStatus} onChange={e => setFilterPayStatus(e.target.value)} style={selStyle}>
@@ -648,12 +689,6 @@ export default function OrdersPage() {
           <option value="">Alle Lieferungen</option>
           {DELIVERY_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={sort} onChange={e => setSort(e.target.value)} style={selStyle}>
-          <option value="created_at_desc">Neueste zuerst</option>
-          <option value="created_at_asc">Älteste zuerst</option>
-          <option value="order_number_desc">Bestellnr. ↓</option>
-          <option value="total_desc">Betrag ↓</option>
-        </select>
       </div>
 
       {/* Table */}
@@ -661,13 +696,29 @@ export default function OrdersPage() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-              {COLS.map((c, i) => (
-                <th key={i} style={{ padding: "10px 12px", textAlign: i >= 5 && i <= 10 ? "center" : "left", fontWeight: 600, fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
-                  {i === 0 ? (
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ cursor: "pointer" }} />
-                  ) : c}
-                </th>
-              ))}
+              {COLS.map((c, i) => {
+                const isSortable = !!COL_SORT_KEY[i];
+                return (
+                  <th
+                    key={i}
+                    onClick={isSortable ? () => handleColSort(i) : undefined}
+                    style={{ padding: "10px 12px", textAlign: i >= 5 && i <= 10 ? "center" : "left", fontWeight: 600, fontSize: 11, color: isSortable ? "#374151" : "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap", cursor: isSortable ? "pointer" : "default", userSelect: "none" }}
+                  >
+                    {i === 0 ? (
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ cursor: "pointer" }} />
+                    ) : (
+                      <span>
+                        {c}
+                        {isSortable && (
+                          <span style={{ fontSize: 10, marginLeft: 3, opacity: sort.startsWith(COL_SORT_KEY[i] + "_") ? 1 : 0.35 }}>
+                            {sortIcon(i)}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -677,7 +728,7 @@ export default function OrdersPage() {
             {!loading && orders.length === 0 && (
               <tr><td colSpan={13} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Keine Bestellungen gefunden</td></tr>
             )}
-            {orders.map((order) => (
+            {orders.filter(o => filterOrderStatus !== "retoure" || returnsMap[o.id]).map((order) => (
               <React.Fragment key={order.id}>
                 <tr style={{ borderBottom: "1px solid #f3f4f6", cursor: "default", background: selected.has(order.id) ? "#f6f6f7" : "" }}
                   onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fafafa"; }}
@@ -695,12 +746,24 @@ export default function OrdersPage() {
                   </td>
                   {/* Order number */}
                   <td style={{ padding: "10px 12px", fontWeight: 600, fontSize: 13 }}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/${order.id}`); }}
-                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#111827", textDecoration: "underline" }}
-                    >
-                      #{order.order_number || "—"}
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/${order.id}`); }}
+                        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#111827", textDecoration: "underline" }}
+                      >
+                        #{order.order_number || "—"}
+                      </button>
+                      {returnsMap[order.id] && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/returns`); }}
+                          title="Aktive Retoureanfrage vorhanden"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 6px", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                        >
+                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
+                          Retoure
+                        </button>
+                      )}
+                    </div>
                   </td>
                   {/* Customer */}
                   <td style={{ padding: "10px 12px", minWidth: 240, maxWidth: 280 }}>
@@ -737,7 +800,14 @@ export default function OrdersPage() {
                   </td>
                   {/* Order status */}
                   <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                    <StatusBadge value={order.order_status} />
+                    {returnsMap[order.id] ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
+                        Retoure
+                      </span>
+                    ) : (
+                      <StatusBadge value={order.order_status} />
+                    )}
                   </td>
                   {/* Payment status */}
                   <td style={{ padding: "10px 12px", textAlign: "center" }}>

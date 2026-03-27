@@ -69,7 +69,10 @@ export default function AccountSidebar({ onLogout }) {
       })}
       <button
         type="button"
-        onClick={onLogout}
+        onClick={() => {
+          document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax";
+          onLogout?.();
+        }}
         style={{
           display: "flex",
           alignItems: "center",

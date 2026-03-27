@@ -667,6 +667,8 @@ async function start() {
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS refund_note text`).catch(() => {})
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS approved_at timestamp`).catch(() => {})
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS rejected_at timestamp`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_sent_at timestamp`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS order_status varchar(50) DEFAULT 'offen'`).catch(() => {})
 
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_order_items (
@@ -3923,7 +3925,7 @@ async function start() {
         if (orderIds.length > 0) {
           try {
             const returnsR = await client.query(
-              `SELECT id, order_id, status, reason, notes, return_number, created_at FROM store_returns WHERE order_id = ANY($1::uuid[]) ORDER BY created_at DESC`,
+              `SELECT id, order_id, status, reason, notes, return_number, refund_status, refund_amount_cents, label_sent_at, created_at FROM store_returns WHERE order_id = ANY($1::uuid[]) ORDER BY created_at DESC`,
               [orderIds]
             )
             for (const r of (returnsR.rows || [])) {
@@ -4877,7 +4879,14 @@ async function start() {
         if (payment_status) { params.push(payment_status); conditions.push(`o.payment_status = $${params.length}`) }
         if (delivery_status) { params.push(delivery_status); conditions.push(`o.delivery_status = $${params.length}`) }
         const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
-        const sortMap = { created_at_desc: 'o.created_at DESC', created_at_asc: 'o.created_at ASC', order_number_desc: 'o.order_number DESC', total_desc: 'o.total_cents DESC' }
+        const sortMap = {
+          created_at_desc: 'o.created_at DESC', created_at_asc: 'o.created_at ASC',
+          order_number_desc: 'o.order_number DESC', order_number_asc: 'o.order_number ASC',
+          total_desc: 'o.total_cents DESC', total_asc: 'o.total_cents ASC',
+          name_asc: 'o.last_name ASC, o.first_name ASC', name_desc: 'o.last_name DESC, o.first_name DESC',
+          status_asc: 'o.order_status ASC', status_desc: 'o.order_status DESC',
+          country_asc: 'o.country ASC', country_desc: 'o.country DESC',
+        }
         const orderBy = sortMap[sort] || 'o.created_at DESC'
         const lim = Math.min(Number(limit) || 50, 200)
         const off = Number(offset) || 0
@@ -5920,6 +5929,13 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         await client.query(`UPDATE store_returns SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
+        // If refund processed, also mark order as refunded
+        if (refund_status === 'erstattet') {
+          await client.query(
+            `UPDATE store_orders SET order_status = 'refunded', updated_at = now() WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
+            [id]
+          ).catch(() => {})
+        }
         const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.id = $1::uuid`, [id])
         await client.end()
         const row = r.rows && r.rows[0]
@@ -5979,9 +5995,72 @@ async function start() {
     httpApp.patch('/admin-hub/v1/integrations/:id', adminHubIntegrationPATCH)
     httpApp.delete('/admin-hub/v1/integrations/:id', adminHubIntegrationDELETE)
     httpApp.get('/admin-hub/v1/abandoned-carts', adminHubAbandonedCartsGET)
+    // POST /admin-hub/v1/returns/:id/send-label — mark label sent + send email to customer
+    const adminHubReturnSendLabelPOST = async (req, res) => {
+      const id = (req.params.id || '').trim()
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const r = await client.query(
+          `SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method
+           FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.id = $1::uuid`,
+          [id]
+        )
+        const row = r.rows && r.rows[0]
+        if (!row) { await client.end(); return res.status(404).json({ message: 'Return not found' }) }
+        await client.query(`UPDATE store_returns SET label_sent_at = now(), updated_at = now() WHERE id = $1::uuid`, [id])
+        await client.end()
+
+        let emailSent = false
+        if (row.email && process.env.SMTP_HOST) {
+          try {
+            const nodemailer = require('nodemailer')
+            const transport = nodemailer.createTransport({
+              host: process.env.SMTP_HOST,
+              port: parseInt(process.env.SMTP_PORT || '587'),
+              secure: process.env.SMTP_SECURE === 'true',
+              auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+            })
+            const customerName = [row.first_name, row.last_name].filter(Boolean).join(' ') || row.email
+            const fmtDate = (d) => d ? new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
+            const labelHtml = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Retoureschein</title></head><body style="font-family:Arial,sans-serif;margin:40px;color:#111">
+<h1 style="font-size:22px">Retoureschein</h1>
+<p style="color:#6b7280;font-size:13px;margin-bottom:24px">Retoure-Nr.: <strong>R-${row.return_number || '—'}</strong> · Bestellung: <strong>#${row.order_number || '—'}</strong></p>
+<div style="border:2px dashed #e5e7eb;border-radius:8px;padding:20px;text-align:center;margin:24px 0">
+  <div style="font-size:32px;font-weight:800;letter-spacing:4px">R-${row.return_number || '—'}</div>
+  <small style="color:#6b7280;font-size:11px">Retoure-Nummer – bitte gut sichtbar auf das Paket kleben</small>
+</div>
+<p><strong>Rückgabegrund:</strong> ${row.reason || 'Kein Grund angegeben'}</p>
+${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
+<p style="margin-top:32px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px">
+  Erstellt am ${fmtDate(row.created_at)} · Bitte legen Sie diesen Schein dem Paket bei.
+</p>
+</body></html>`
+            await transport.sendMail({
+              from: process.env.SMTP_FROM || '"Belucha Shop" <noreply@belucha.de>',
+              to: row.email,
+              subject: `Ihr Retoureschein R-${row.return_number} – Bestellung #${row.order_number}`,
+              html: `<p>Hallo ${customerName},</p><p>Ihre Retouranfrage wurde genehmigt. Anbei finden Sie Ihren Retoureschein.</p><p>Bitte legen Sie den Retoureschein dem Paket bei und senden Sie es an uns zurück.</p>${labelHtml}`,
+            })
+            emailSent = true
+          } catch (emailErr) {
+            console.error('Return label email error:', emailErr?.message)
+          }
+        }
+        res.json({ success: true, emailSent, label_sent_at: new Date().toISOString() })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     httpApp.get('/admin-hub/v1/returns', adminHubReturnsGET)
     httpApp.post('/admin-hub/v1/returns', adminHubReturnsPOST)
     httpApp.patch('/admin-hub/v1/returns/:id', adminHubReturnPATCH)
+    httpApp.post('/admin-hub/v1/returns/:id/send-label', adminHubReturnSendLabelPOST)
     console.log('Admin Hub routes: orders, customers, abandoned-carts, returns')
 
     // --- Admin Hub Pages (CRUD) + Store pages (published only) ---
