@@ -11,7 +11,11 @@ export async function GET(req) {
     );
     const data = await r.json().catch(() => ({}));
     return NextResponse.json(
-      { store_name: data?.store_name || "" },
+      {
+        store_name: data?.store_name || "",
+        free_shipping_threshold_cents: data?.free_shipping_threshold_cents ?? null,
+        free_shipping_thresholds: data?.free_shipping_thresholds ?? null,
+      },
       { status: r.ok ? 200 : r.status }
     );
   } catch (e) {

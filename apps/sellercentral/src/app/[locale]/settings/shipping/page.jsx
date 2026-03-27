@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Card,
   BlockStack,
@@ -87,66 +88,128 @@ const ALL_COUNTRIES = [
 ].sort((a, b) => a.label.localeCompare(b.label, "de"));
 
 /* ── Country multi-select ────────────────────────────────────── */
+const COUNTRY_PICKER_STYLES = `
+.cp-checkbox-container { cursor: pointer; flex-shrink: 0; }
+.cp-checkbox-container input { display: none; }
+.cp-checkbox-path {
+  fill: none; stroke: #8c9196; stroke-width: 6;
+  stroke-linecap: round; stroke-linejoin: round;
+  transition: stroke-dasharray 0.35s ease, stroke-dashoffset 0.35s ease, stroke 0.2s;
+  stroke-dasharray: 241 9999999; stroke-dashoffset: 0;
+}
+.cp-checkbox-container input:checked ~ svg .cp-checkbox-path {
+  stroke: #008060; stroke-dasharray: 70.5 9999999; stroke-dashoffset: -262.27;
+}
+.cp-item { display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer; border:none; background:none; width:100%; text-align:left; font-size:13px; color:#202223; }
+.cp-item:hover { background:#f6f6f7; }
+`;
+
 function CountryPicker({ selected, onChange }) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [panelStyle, setPanelStyle] = useState({});
+  const inputWrapRef = useRef(null);
 
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  const openPanel = () => {
+    if (inputWrapRef.current) {
+      const rect = inputWrapRef.current.getBoundingClientRect();
+      const dropdownHeight = 360;
+      const spaceBelow = window.innerHeight - rect.bottom - 4;
+      setPanelStyle({
+        position: "fixed",
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: Math.max(rect.width, 340),
+        zIndex: 10002,
+      });
+      if (spaceBelow < dropdownHeight) {
+        setTimeout(() => window.scrollBy({ top: dropdownHeight - spaceBelow + 16, behavior: "smooth" }), 0);
+      }
+    }
+    setOpen(true);
+  };
 
-  const filtered = ALL_COUNTRIES.filter(
-    (c) =>
-      !selected.includes(c.code) &&
-      (c.label.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const add = (code) => { onChange([...selected, code]); setSearch(""); };
+  const toggle = (code) => {
+    onChange(selected.includes(code) ? selected.filter((c) => c !== code) : [...selected, code]);
+  };
   const remove = (code) => onChange(selected.filter((c) => c !== code));
 
+  const filtered = ALL_COUNTRIES.filter(
+    (c) => c.label.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <div
-        style={{ border: "1px solid #8c9196", borderRadius: 4, padding: "6px 10px", background: "#fff", cursor: "text", minHeight: 36 }}
-        onClick={() => setOpen(true)}
-      >
-        <input
-          style={{ border: "none", outline: "none", width: "100%", fontSize: 13, background: "transparent", color: "#202223" }}
-          placeholder={selected.length === 0 ? "Land suchen und auswählen…" : "Weiteres Land hinzufügen…"}
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-        />
-      </div>
-      {open && filtered.length > 0 && (
-        <div style={{
-          position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100,
-          background: "#fff", border: "1px solid #c9cccf", borderRadius: 4,
-          boxShadow: "0 4px 16px rgba(0,0,0,0.12)", maxHeight: 220, overflowY: "auto", marginTop: 2,
-        }}>
-          {filtered.slice(0, 60).map((c) => (
-            <div
-              key={c.code}
-              onMouseDown={(e) => { e.preventDefault(); add(c.code); setOpen(false); }}
-              style={{ padding: "7px 12px", fontSize: 13, cursor: "pointer", display: "flex", gap: 8, alignItems: "center" }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "#f6f6f7"}
-              onMouseLeave={(e) => e.currentTarget.style.background = ""}
-            >
-              <span style={{ fontWeight: 600, color: "#6d7175", minWidth: 28, fontSize: 11 }}>{c.code}</span>
-              <span style={{ color: "#202223" }}>{c.label}</span>
-            </div>
-          ))}
-          {filtered.length > 60 && (
-            <div style={{ padding: "6px 12px", fontSize: 12, color: "#6d7175", borderTop: "1px solid #f1f1f1" }}>
-              … {filtered.length - 60} weitere Ergebnisse. Suche verfeinern.
-            </div>
-          )}
+    <>
+      <style>{COUNTRY_PICKER_STYLES}</style>
+      <div style={{ position: "relative" }}>
+        <div
+          ref={inputWrapRef}
+          style={{ border: "1px solid #8c9196", borderRadius: 4, padding: "6px 10px", background: "#fff", cursor: "text", minHeight: 36 }}
+          onClick={openPanel}
+        >
+          <input
+            style={{ border: "none", outline: "none", width: "100%", fontSize: 13, background: "transparent", color: "#202223" }}
+            placeholder="Land suchen…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); if (!open) openPanel(); }}
+            onFocus={openPanel}
+          />
         </div>
-      )}
-    </div>
+
+        {open && typeof document !== "undefined" && createPortal(
+          <>
+            <div
+              style={{ position: "fixed", inset: 0, zIndex: 10001 }}
+              onClick={() => { setOpen(false); setSearch(""); }}
+            />
+            <div style={{
+              ...panelStyle,
+              background: "#fff", border: "1px solid #c9cccf", borderRadius: 8,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.15)", maxHeight: 360, overflowY: "auto",
+            }}>
+              {filtered.slice(0, 80).map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  className="cp-item"
+                  onClick={() => toggle(c.code)}
+                >
+                  <span className="cp-checkbox-container" style={{ pointerEvents: "none" }}>
+                    <input type="checkbox" checked={selected.includes(c.code)} readOnly tabIndex={-1} />
+                    <svg viewBox="0 0 64 64" height="1.15em" width="1.15em">
+                      <path d="M 0 16 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 16 L 32 48 L 64 16 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 16" pathLength="575.0541381835938" className="cp-checkbox-path" />
+                    </svg>
+                  </span>
+                  <span style={{ fontWeight: 600, color: "#6d7175", minWidth: 28, fontSize: 11 }}>{c.code}</span>
+                  <span>{c.label}</span>
+                </button>
+              ))}
+              {filtered.length > 80 && (
+                <div style={{ padding: "6px 14px", fontSize: 12, color: "#6d7175", borderTop: "1px solid #f1f1f1" }}>
+                  … {filtered.length - 80} weitere. Suche verfeinern.
+                </div>
+              )}
+            </div>
+          </>,
+          document.body
+        )}
+
+        {selected.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+            {selected.map((code) => {
+              const country = ALL_COUNTRIES.find((c) => c.code === code);
+              return (
+                <span key={code} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", background: "var(--p-color-bg-fill-secondary, #f3f4f6)", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, color: "#374151" }}>
+                  <span style={{ fontWeight: 600, color: "#6d7175", fontSize: 11 }}>{code}</span>
+                  {country?.label}
+                  <button type="button" onClick={() => remove(code)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "#9ca3af", marginLeft: 2 }}>×</button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -443,19 +506,62 @@ const PRESET_CARRIERS = [
   { name: "USPS", tracking_url_template: "https://tools.usps.com/go/TrackConfirmAction?tLabels={tracking}" },
 ];
 
+const LS_THRESHOLDS_KEY = "belucha_free_shipping_thresholds";
+
 export default function ShippingSettingsPage() {
   const [carriers, setCarriers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const [currentStoreName, setCurrentStoreName] = useState("");
+  const [thresholds, setThresholds] = useState({});
+  const [thresholdCountries, setThresholdCountries] = useState([]);
+  const [addCountrySelect, setAddCountrySelect] = useState("");
+  const [savingThreshold, setSavingThreshold] = useState(false);
+  const [savedThreshold, setSavedThreshold] = useState(false);
+  const [thresholdErr, setThresholdErr] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await getMedusaAdminClient().getCarriers();
-    setCarriers(data.carriers || []);
+    const [carriersData, settings] = await Promise.all([
+      getMedusaAdminClient().getCarriers(),
+      getMedusaAdminClient().getSellerSettings().catch(() => ({})),
+    ]);
+    setCarriers(carriersData.carriers || []);
+    setCurrentStoreName(settings?.store_name || "");
+    const fromBackend = settings?.free_shipping_thresholds;
+    const fromLS = typeof window !== "undefined" ? window.localStorage.getItem(LS_THRESHOLDS_KEY) : null;
+    const thresholdData = fromBackend ?? (fromLS ? JSON.parse(fromLS) : null);
+    if (thresholdData && typeof thresholdData === "object") {
+      const codes = Object.keys(thresholdData);
+      setThresholdCountries(codes);
+      const display = {};
+      for (const [code, cents] of Object.entries(thresholdData)) display[code] = String(cents / 100);
+      setThresholds(display);
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleSaveThresholds = async () => {
+    const thresholdCents = {};
+    for (const code of thresholdCountries) {
+      const raw = (thresholds[code] || "").replace(",", ".");
+      const cents = Math.round(parseFloat(raw) * 100);
+      if (!isNaN(cents) && cents >= 0) thresholdCents[code] = cents;
+    }
+    setSavingThreshold(true); setThresholdErr("");
+    try {
+      await getMedusaAdminClient().updateSellerSettings({
+        store_name: currentStoreName,
+        free_shipping_thresholds: thresholdCents,
+      });
+    } catch (_) {}
+    if (typeof window !== "undefined") window.localStorage.setItem(LS_THRESHOLDS_KEY, JSON.stringify(thresholdCents));
+    setSavedThreshold(true);
+    setTimeout(() => setSavedThreshold(false), 3000);
+    setSavingThreshold(false);
+  };
 
   const handleCarrierSaved = (carrier, mode) => {
     if (mode === "edit") {
@@ -484,11 +590,102 @@ export default function ShippingSettingsPage() {
   };
 
   return (
-    <div style={{ maxWidth: 800 }}>
+    <div style={{ maxWidth: 1100 }}>
       <BlockStack gap="600">
+        <div>
+          <Text variant="headingLg" as="h1">Versand & Lieferung</Text>
+        </div>
+
+        <ShippingGroupsSection carriers={carriers} />
+
+        <Card>
+          <BlockStack gap="400">
+            <InlineStack align="space-between" blockAlign="center">
+              <BlockStack gap="100">
+                <Text variant="headingSm" as="h3">Versandkostenfrei ab</Text>
+                <Text variant="bodySm" tone="subdued">Mindestbestellwert für kostenlosen Versand pro Land.</Text>
+              </BlockStack>
+              {savedThreshold && <Badge tone="success">Gespeichert ✓</Badge>}
+            </InlineStack>
+
+            {thresholdCountries.length > 0 && (
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+                {thresholdCountries.map((code, i) => {
+                  const country = ALL_COUNTRIES.find((c) => c.code === code);
+                  return (
+                    <div key={code} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", borderBottom: i < thresholdCountries.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                      <span style={{ minWidth: 160, fontSize: 13, color: "#374151" }}>
+                        <span style={{ fontWeight: 600, color: "#6d7175", fontSize: 11, marginRight: 6 }}>{code}</span>
+                        {country?.label || code}
+                      </span>
+                      <div style={{ flex: 1, maxWidth: 160 }}>
+                        <TextField
+                          value={thresholds[code] || ""}
+                          onChange={(v) => setThresholds((t) => ({ ...t, [code]: v }))}
+                          suffix="€"
+                          placeholder="0.00"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setThresholdCountries((prev) => prev.filter((c) => c !== code));
+                          setThresholds((t) => { const n = { ...t }; delete n[code]; return n; });
+                        }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 18, lineHeight: 1, padding: "0 4px", flexShrink: 0 }}
+                        title="Entfernen"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <InlineStack gap="200" blockAlign="end">
+              <div style={{ flex: 1 }}>
+                <Select
+                  label="Land hinzufügen"
+                  labelHidden
+                  options={[
+                    { label: "Land hinzufügen…", value: "" },
+                    ...ALL_COUNTRIES
+                      .filter((c) => !thresholdCountries.includes(c.code))
+                      .map((c) => ({ label: `${c.label} (${c.code})`, value: c.code })),
+                  ]}
+                  value={addCountrySelect}
+                  onChange={setAddCountrySelect}
+                />
+              </div>
+              <Button
+                disabled={!addCountrySelect}
+                onClick={() => {
+                  if (addCountrySelect && !thresholdCountries.includes(addCountrySelect)) {
+                    setThresholdCountries((prev) => [...prev, addCountrySelect]);
+                    setAddCountrySelect("");
+                  }
+                }}
+              >
+                Hinzufügen
+              </Button>
+            </InlineStack>
+
+            {thresholdErr && <Text tone="critical">{thresholdErr}</Text>}
+            <InlineStack>
+              <Button variant="primary" onClick={handleSaveThresholds} loading={savingThreshold}>
+                Speichern
+              </Button>
+            </InlineStack>
+          </BlockStack>
+        </Card>
+
+        <Divider />
+
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <BlockStack gap="100">
-            <Text variant="headingLg" as="h1">Versand & Lieferung</Text>
+            <Text variant="headingMd" as="h2">Versanddienstleister</Text>
             <Text variant="bodySm" tone="subdued">Versanddienstleister verwalten und Tracking-URLs konfigurieren.</Text>
           </BlockStack>
           <Button variant="primary" onClick={() => setModal({ mode: "create" })}>+ Carrier hinzufügen</Button>
@@ -535,9 +732,6 @@ export default function ShippingSettingsPage() {
             </div>
           ))}
         </Card>
-
-        <Divider />
-        <ShippingGroupsSection carriers={carriers} />
       </BlockStack>
 
       {modal && (

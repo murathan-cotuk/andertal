@@ -753,16 +753,6 @@ export default function OrdersPage() {
                       >
                         #{order.order_number || "—"}
                       </button>
-                      {returnsMap[order.id] && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/returns`); }}
-                          title="Aktive Retoureanfrage vorhanden"
-                          style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 6px", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
-                        >
-                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
-                          Retoure
-                        </button>
-                      )}
                     </div>
                   </td>
                   {/* Customer */}

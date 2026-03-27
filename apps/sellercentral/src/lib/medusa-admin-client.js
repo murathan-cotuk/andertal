@@ -147,10 +147,14 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}`, { method: 'DELETE' });
   }
 
-  /** GET /admin-hub/seller-settings – store name (for Verkäufer on shop) */
+  /** GET /admin-hub/seller-settings */
   async getSellerSettings() {
     const res = await this.request('/admin-hub/seller-settings').catch(() => ({ store_name: '' }));
-    return { store_name: res?.store_name ?? '' };
+    return {
+      store_name: res?.store_name ?? '',
+      free_shipping_threshold_cents: res?.free_shipping_threshold_cents ?? null,
+      free_shipping_thresholds: res?.free_shipping_thresholds ?? null,
+    };
   }
 
   /** PATCH /admin-hub/seller-settings – save store name to DB */

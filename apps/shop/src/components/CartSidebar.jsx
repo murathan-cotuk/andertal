@@ -5,6 +5,7 @@ import styled from "styled-components";
 import { Link } from "@/i18n/navigation";
 import { useCart } from "@/context/CartContext";
 import { formatPriceCents } from "@/lib/format";
+import { useMarketPrefix } from "@/context/MarketPrefixContext";
 
 const Overlay = styled.div`
   position: fixed;
@@ -263,9 +264,62 @@ const Empty = styled.p`
   margin: 0;
 `;
 
+const ENV_THRESHOLD_CENTS = typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
+  ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS)
+  : null;
+
+function useShippingThresholds() {
+  const [thresholds, setThresholds] = useState(null);
+  useEffect(() => {
+    fetch("/api/store-seller-settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.free_shipping_thresholds && typeof d.free_shipping_thresholds === "object") {
+          setThresholds(d.free_shipping_thresholds);
+        } else if (d?.free_shipping_threshold_cents != null) {
+          setThresholds({ DE: d.free_shipping_threshold_cents });
+        }
+      })
+      .catch(() => {});
+  }, []);
+  return thresholds;
+}
+
+function calcShipping(items, shippingGroups, country = "DE") {
+  let maxCents = 0;
+  let found = false;
+  for (const item of items) {
+    const groupId =
+      item.shipping_group_id ||
+      item.metadata?.shipping_group_id ||
+      item.product?.metadata?.shipping_group_id;
+    if (!groupId) continue;
+    const group = shippingGroups.find((g) => g.id === groupId);
+    if (!group) continue;
+    const priceCents = group.prices?.[country] ?? group.prices?.["DE"] ?? 0;
+    if (priceCents > maxCents) maxCents = priceCents;
+    found = true;
+  }
+  return found ? maxCents : null;
+}
+
 export default function CartSidebar() {
-  const { cart, sidebarOpen, closeCartSidebar, updateLineItem, removeLineItem, loading, subtotalCents, bonusDiscountCents } = useCart();
+  const { cart, sidebarOpen, closeCartSidebar, updateLineItem, removeLineItem, loading, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
+  const allThresholds = useShippingThresholds();
+  const prefix = useMarketPrefix();
+  const countryCode = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
+  const freeShippingThreshold = allThresholds?.[countryCode] ?? allThresholds?.["DE"] ?? ENV_THRESHOLD_CENTS;
+  const effectiveTotal = subtotalCents - bonusDiscountCents;
+  const shippingCents = calcShipping(items, shippingGroups, countryCode);
+  const isFree = freeShippingThreshold != null && effectiveTotal >= freeShippingThreshold;
+  const shippingLabel = isFree
+    ? "Kostenlos"
+    : shippingCents != null
+      ? `${formatPriceCents(shippingCents)} €`
+      : freeShippingThreshold != null
+        ? `Ab ${formatPriceCents(freeShippingThreshold)} € versandkostenfrei`
+        : "Wird an der Kasse berechnet";
 
   return (
     <>
@@ -350,7 +404,7 @@ export default function CartSidebar() {
             )}
             <Row>
               <span>Versand</span>
-              <span>Wird an der Kasse berechnet</span>
+              <span style={{ color: effectiveTotal >= (freeShippingThreshold ?? Infinity) ? "#16a34a" : undefined }}>{shippingLabel}</span>
             </Row>
             <RowTotal>
               <span>Gesamt</span>

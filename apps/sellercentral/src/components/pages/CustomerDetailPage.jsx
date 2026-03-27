@@ -38,6 +38,7 @@ const STATUS_COLORS = {
   pending: { bg: "#fef3c7", color: "#92400e" }, ausstehend: { bg: "#fef3c7", color: "#92400e" },
   versendet: { bg: "#dbeafe", color: "#1e40af" },
   abgeschlossen: { bg: "#d1fae5", color: "#065f46" },
+  zugestellt: { bg: "#d1fae5", color: "#065f46" },
   cancelled: { bg: "#fee2e2", color: "#991b1b" }, storniert: { bg: "#fee2e2", color: "#991b1b" },
   offen: { bg: "#fff7ed", color: "#c2410c" },
 };
@@ -291,14 +292,34 @@ export default function CustomerDetailPage() {
   const [savingBonus, setSavingBonus] = useState(false);
   const [ledgerSaving, setLedgerSaving] = useState(false);
   const [ledgerEdit, setLedgerEdit] = useState(null);
+  const [returnsMap, setReturnsMap] = useState({});
+  const [reviews, setReviews] = useState([]);
 
   const loadCustomer = async () => {
     try {
       const client = getMedusaAdminClient();
-      const res = await client.getCustomerById(id);
+      const [res, returnsData, reviewsData] = await Promise.all([
+        client.getCustomerById(id),
+        client.getReturns().catch(() => ({ returns: [] })),
+        client.request("/admin-hub/reviews").catch(() => ({ reviews: [] })),
+      ]);
       setCustomer(res?.customer || null);
       setNotesVal(res?.customer?.notes || "");
       setBonusVal(String(res?.customer?.bonus_points || 0));
+      const map = {};
+      for (const r of (returnsData?.returns || [])) {
+        if (r.order_id && r.status !== "abgelehnt" && r.status !== "abgeschlossen") {
+          map[r.order_id] = true;
+        }
+      }
+      setReturnsMap(map);
+      const email = res?.customer?.email;
+      const orderIds = new Set((res?.customer?.orders || []).map(o => o.id));
+      setReviews((reviewsData?.reviews || []).filter(r =>
+        orderIds.has(r.order_id) ||
+        r.customer_email === email ||
+        r.customer_id === id
+      ));
     } catch (e) {
       setError(e?.message || "Fehler");
     }
@@ -527,11 +548,47 @@ export default function CustomerDetailPage() {
                         onMouseLeave={e => e.currentTarget.style.background = ""}
                       >
                         <td style={{ padding: "9px 0", fontWeight: 600, color: "#202223" }}>#{o.order_number || "—"}</td>
-                        <td style={{ padding: "9px 0" }}><StatusBadge value={o.order_status} /></td>
+                        <td style={{ padding: "9px 0" }}>
+                          {returnsMap[o.id] ? (
+                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#fef2f2", color: "#b91c1c", fontWeight: 600 }}>Retoure</span>
+                          ) : (
+                            <StatusBadge value={o.order_status} />
+                          )}
+                        </td>
                         <td style={{ padding: "9px 0" }}><StatusBadge value={o.payment_status} /></td>
                         <td style={{ padding: "9px 0" }}><StatusBadge value={o.delivery_status} /></td>
                         <td style={{ padding: "9px 0", textAlign: "right", fontWeight: 600 }}>{fmtCents(o.total_cents)}</td>
                         <td style={{ padding: "9px 0", textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtDateShort(o.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Card>
+
+            {/* Reviews */}
+            <Card title={`Bewertungen (${reviews.length})`}>
+              {reviews.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>Keine Bewertungen</p>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
+                  <thead>
+                    <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>SKU / Produkt</th>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Bewertung</th>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Kommentar</th>
+                      <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Datum</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reviews.map((r, i) => (
+                      <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        <td style={{ padding: "9px 0", color: "#374151" }}>{r.product_sku || r.product_title || r.product_id || "—"}</td>
+                        <td style={{ padding: "9px 0" }}>
+                          <span style={{ color: "#f59e0b", letterSpacing: 1 }}>{"★".repeat(r.rating || 0)}{"☆".repeat(5 - (r.rating || 0))}</span>
+                        </td>
+                        <td style={{ padding: "9px 0", color: "#6b7280", maxWidth: 300 }}>{r.comment || "—"}</td>
+                        <td style={{ padding: "9px 0", textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtDateShort(r.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>

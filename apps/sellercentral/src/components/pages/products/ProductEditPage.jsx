@@ -1165,9 +1165,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               </InlineStack>
 
               <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Category & Brand</Text>
+              <Text as="h2" variant="bodyMd" fontWeight="regular">Category & Brand & Versand</Text>
               <InlineStack gap="300" wrap>
-                <Box minWidth="280px" flex="1">
+                <Box minWidth="220px" flex="1">
                   <Select
                     label="Category"
                     labelHidden
@@ -1176,13 +1176,25 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     onChange={(v) => updateMeta("category_id", v)}
                   />
                 </Box>
-                <Box minWidth="280px" flex="1">
+                <Box minWidth="220px" flex="1">
                   <Select
                     label="Brand"
                     labelHidden
                     options={[{ label: "— None —", value: "" }, ...(brands || []).map((b) => ({ label: b.name, value: b.id }))]}
                     value={getMeta(product, "brand_id") || ""}
                     onChange={(v) => updateMeta("brand_id", v || undefined)}
+                  />
+                </Box>
+                <Box minWidth="220px" flex="1">
+                  <Select
+                    label="Versandgruppe"
+                    labelHidden
+                    options={[
+                      { label: "— Keine Versandgruppe —", value: "" },
+                      ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
+                    ]}
+                    value={meta.shipping_group_id ?? ""}
+                    onChange={(v) => updateMeta("shipping_group_id", v || undefined)}
                   />
                 </Box>
               </InlineStack>
@@ -1856,18 +1868,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               ) : null}
               <Button variant="secondary" size="slim" onClick={() => updateMeta("metafields", [...metafieldsList, { key: "", value: "" }])}>+ Metafield</Button>
 
-              <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Versand</Text>
-              <Select
-                label="Versandgruppe"
-                options={[
-                  { label: "— Keine Versandgruppe —", value: "" },
-                  ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
-                ]}
-                value={meta.shipping_group_id ?? ""}
-                onChange={(v) => updateMeta("shipping_group_id", v || undefined)}
-                helpText="Versandpreise werden anhand der zugewiesenen Versandgruppe im Shop angezeigt."
-              />
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">Produktsicherheitsinformationen (GPSR, optional)</Text>

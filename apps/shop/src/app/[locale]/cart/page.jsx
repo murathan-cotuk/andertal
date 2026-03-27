@@ -11,6 +11,7 @@ import { formatPriceCents } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 import { tokens } from "@/design-system/tokens";
 import PayNowButton from "@/components/ui/PayNowButton";
+import { useMarketPrefix } from "@/context/MarketPrefixContext";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -257,8 +258,46 @@ const EmptyState = styled.div`
 
 export default function CartPage() {
   const t = useTranslations("cart");
-  const { cart, loading, updateLineItem, removeLineItem, clearCart, subtotalCents, bonusDiscountCents } = useCart();
+  const { cart, loading, updateLineItem, removeLineItem, clearCart, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
+  const envThresholdCents = typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
+    ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS) : null;
+  const [allThresholds, setAllThresholds] = useState(null);
+  useEffect(() => {
+    fetch("/api/store-seller-settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.free_shipping_thresholds && typeof d.free_shipping_thresholds === "object") {
+          setAllThresholds(d.free_shipping_thresholds);
+        } else if (d?.free_shipping_threshold_cents != null) {
+          setAllThresholds({ DE: d.free_shipping_threshold_cents });
+        }
+      })
+      .catch(() => {});
+  }, []);
+  const prefix = useMarketPrefix();
+  const countryCode = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
+  const freeShippingThreshold = allThresholds?.[countryCode] ?? allThresholds?.["DE"] ?? envThresholdCents;
+  const effectiveTotal = subtotalCents - bonusDiscountCents;
+
+  // Kargo ücreti: sepetteki ürünlerin versandgruppe fiyatından hesaplanır
+  let shippingCents = null;
+  for (const item of items) {
+    const groupId = item.shipping_group_id || item.metadata?.shipping_group_id || item.product?.metadata?.shipping_group_id;
+    if (!groupId) continue;
+    const group = (shippingGroups || []).find((g) => g.id === groupId);
+    if (!group) continue;
+    const p = group.prices?.[countryCode] ?? group.prices?.["DE"] ?? 0;
+    if (shippingCents === null || p > shippingCents) shippingCents = p;
+  }
+  const isFree = freeShippingThreshold != null && effectiveTotal >= freeShippingThreshold;
+  const shippingLabel = isFree
+    ? "Kostenlos"
+    : shippingCents != null
+      ? `${formatPriceCents(shippingCents)} €`
+      : freeShippingThreshold != null
+        ? `Ab ${formatPriceCents(freeShippingThreshold)} € versandkostenfrei`
+        : t("shipping");
 
   return (
     <PageWrap>
@@ -379,7 +418,7 @@ export default function CartPage() {
               )}
               <SummaryRow>
                 <span>{t("shippingLabel")}</span>
-                <span>{t("shipping")}</span>
+                <span style={{ color: effectiveTotal >= (freeShippingThreshold ?? Infinity) ? "#16a34a" : undefined }}>{shippingLabel}</span>
               </SummaryRow>
               <SummaryTotal>
                 <span>{t("total")}</span>

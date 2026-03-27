@@ -72,6 +72,7 @@ function getMenuItemsMain(t) {
       icon: ProfileIcon,
       subNavigationItems: [
         { url: "/customers", label: "Liste" },
+        { url: "/customers/reviews", label: "Bewertungen" },
       ],
     },
     {
