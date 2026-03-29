@@ -685,6 +685,32 @@ class MedusaAdminClient {
   async sendReturnLabel(id) {
     return this.request(`/admin-hub/v1/returns/${id}/send-label`, { method: 'POST' })
   }
+
+  async getNotificationsUnread() {
+    return this.request('/admin-hub/v1/notifications/unread')
+  }
+  async markNotificationsSeen() {
+    return this.request('/admin-hub/v1/notifications/mark-seen', { method: 'POST' })
+  }
+  async getMessages(params = {}) {
+    const qs = params.order_id ? `?order_id=${encodeURIComponent(params.order_id)}` : ''
+    return this.request(`/admin-hub/v1/messages${qs}`)
+  }
+  async sendMessage(data) {
+    return this.request('/admin-hub/v1/messages', { method: 'POST', body: JSON.stringify(data) })
+  }
+  async markMessageRead(id) {
+    return this.request(`/admin-hub/v1/messages/${id}/read`, { method: 'PATCH' })
+  }
+  async getSmtpSettings() {
+    return this.request('/admin-hub/v1/smtp-settings')
+  }
+  async updateSmtpSettings(data) {
+    return this.request('/admin-hub/v1/smtp-settings', { method: 'PATCH', body: JSON.stringify(data) })
+  }
+  async testSmtpSettings() {
+    return this.request('/admin-hub/v1/smtp-settings/test', { method: 'POST' })
+  }
 }
 
 // Singleton instance

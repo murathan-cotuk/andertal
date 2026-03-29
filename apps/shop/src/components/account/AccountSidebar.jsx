@@ -14,6 +14,7 @@ const NAV = [
   { label: "Meine Bestellungen", icon: "📦", href: "/orders" },
   { label: "Merkzettel", icon: "♥", href: "/merkzettel" },
   { label: "Adressen", icon: "📍", href: "/addresses" },
+  { label: "Zahlungsmethoden", icon: "💳", href: "/payment-methods" },
   { label: "Bewertungen", icon: "💬", href: "/reviews" },
   { label: "Bonuspunkte", icon: "⭐", href: "/bonus" },
 ];

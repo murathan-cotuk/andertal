@@ -25,7 +25,7 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { getShippableCountries } from "@/lib/countries";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
-import { getShippingPriceCents } from "@/lib/shipping-price";
+import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 import { normalizeIsoCountryCode } from "@/lib/iso-country";
 import { CHECKOUT_SHIPPING_COUNTRY_LS, CHECKOUT_SHIPPING_MARKET_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
 
@@ -175,6 +175,20 @@ const SummaryItemPrice = styled.div`
   font-weight: 500;
   color: #111827;
   white-space: nowrap;
+`;
+
+const SummaryItemLink = styled(Link)`
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  align-items: flex-start;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  &:hover ${SummaryItemTitle} {
+    color: ${tokens.primary.DEFAULT};
+    text-decoration: underline;
+  }
 `;
 
 const Divider = styled.hr`
@@ -939,6 +953,7 @@ function getStripe() {
 
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
+  const locale = useLocale();
   const { cart, subtotalCents, setCart, clearBonusPoints, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
 
@@ -992,9 +1007,10 @@ export default function CheckoutPage() {
   for (const item of items) {
     const groupId = item.shipping_group_id || item.metadata?.shipping_group_id || item.variant?.product?.metadata?.shipping_group_id || item.product?.metadata?.shipping_group_id;
     if (!groupId) continue;
-    const group = (shippingGroups || []).find((g) => g.id === groupId);
-    if (!group?.prices) continue;
-    const p = getShippingPriceCents(group.prices, shippingCountry, "DE") ?? 0;
+    const group = findShippingGroup(shippingGroups, groupId);
+    if (!group?.prices || typeof group.prices !== "object") continue;
+    const p = resolveShippingQuoteCents(group.prices, shippingCountry);
+    if (p == null) continue;
     if (shippingCents === null || p > shippingCents) shippingCents = p;
   }
   const isFreeShipping = freeShippingThreshold != null && effectiveSubtotal >= freeShippingThreshold;
@@ -1002,9 +1018,7 @@ export default function CheckoutPage() {
     ? t("freeShipping")
     : shippingCents != null
       ? `${formatPriceCents(shippingCents)} €`
-      : freeShippingThreshold != null
-        ? `Ab ${formatPriceCents(freeShippingThreshold)} € versandkostenfrei`
-        : t("freeShipping");
+      : t("shippingPending");
 
   const [clientSecret, setClientSecret] = useState(null);
   const [loadingPI, setLoadingPI] = useState(false);
@@ -1183,24 +1197,35 @@ export default function CheckoutPage() {
 
             <SummaryCard>
               <SummaryTitle>{t("orderSummary")}</SummaryTitle>
-              {items.map((item) => (
-                <SummaryItem key={item.id}>
-                  <SummaryThumb>
-                    {item.thumbnail ? (
-                      <img src={resolveImageUrl(item.thumbnail)} alt={getLocalizedCartLineTitle(item, locale)} />
-                    ) : (
-                      <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
-                    )}
-                  </SummaryThumb>
-                  <SummaryItemDetails>
-                    <SummaryItemTitle>{getLocalizedCartLineTitle(item, locale)}</SummaryItemTitle>
-                    <SummaryItemQty>× {item.quantity}</SummaryItemQty>
-                  </SummaryItemDetails>
-                  <SummaryItemPrice>
-                    {formatPriceCents((item.unit_price_cents || 0) * (item.quantity || 1))} €
-                  </SummaryItemPrice>
-                </SummaryItem>
-              ))}
+              {items.map((item) => {
+                const productHref = item.product_handle ? `/produkt/${item.product_handle}` : null;
+                const lineTitle = getLocalizedCartLineTitle(item, locale);
+                const row = (
+                  <>
+                    <SummaryThumb>
+                      {item.thumbnail ? (
+                        <img src={resolveImageUrl(item.thumbnail)} alt={lineTitle} />
+                      ) : (
+                        <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                      )}
+                    </SummaryThumb>
+                    <SummaryItemDetails>
+                      <SummaryItemTitle>{lineTitle}</SummaryItemTitle>
+                      <SummaryItemQty>× {item.quantity}</SummaryItemQty>
+                    </SummaryItemDetails>
+                    <SummaryItemPrice>
+                      {formatPriceCents((item.unit_price_cents || 0) * (item.quantity || 1))} €
+                    </SummaryItemPrice>
+                  </>
+                );
+                return productHref ? (
+                  <SummaryItemLink key={item.id} href={productHref} title={lineTitle}>
+                    {row}
+                  </SummaryItemLink>
+                ) : (
+                  <SummaryItem key={item.id}>{row}</SummaryItem>
+                );
+              })}
               <Divider />
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#111827", marginBottom: 8 }}>{t("bonusTitle")}</div>

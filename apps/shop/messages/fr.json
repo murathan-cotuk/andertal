@@ -54,6 +54,7 @@
     "remove": "Supprimer",
     "subtotal": "Sous-total",
     "shippingLabel": "Livraison",
+    "freeShipping": "Gratuit",
     "shipping": "Calculé à la caisse",
     "total": "Total",
     "checkout": "Commander"
@@ -85,6 +86,7 @@
     "subtotal": "Sous-total",
     "shipping": "Livraison",
     "freeShipping": "Gratuit",
+    "shippingPending": "Calculé à la caisse",
     "total": "Total",
     "billingSameAsShipping": "Adresse de facturation identique à la livraison",
     "billingAddress": "Adresse de facturation",

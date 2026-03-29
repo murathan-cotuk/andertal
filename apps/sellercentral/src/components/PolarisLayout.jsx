@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, forwardRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import {
@@ -51,7 +51,6 @@ function getMenuItemsMain(t) {
       label: t("orders"),
       icon: OrderIcon,
       subNavigationItems: [
-        { url: "/orders/drafts", label: t("drafts") },
         { url: "/orders/abandoned-checkouts", label: t("abandonedCheckouts") },
         { url: "/orders/returns", label: t("returns") },
       ],
@@ -110,6 +109,15 @@ function getMenuItemsMain(t) {
       ],
     },
     { url: "/import-export", label: t("importExport"), icon: ImportIcon },
+    {
+      url: "/apps",
+      label: "Apps & Integrations",
+      icon: ImportIcon,
+      subNavigationItems: [
+        { url: "/apps", label: "Alle Apps" },
+        { url: "/apps/smtp", label: "E-Mail / SMTP" },
+      ],
+    },
   ];
 }
 
@@ -159,11 +167,39 @@ export default function PolarisLayout({ children }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifData, setNotifData] = useState(null);
+  const [msgUnread, setMsgUnread] = useState(0);
+  const notifRef = useRef(null);
   const [storeName, setStoreName] = useState(
     typeof window !== "undefined"
       ? localStorage.getItem("storeName") || "Seller Account"
       : "Seller Account"
   );
+
+  // Poll notifications + message unread count every 60s
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const fetchNotifs = async () => {
+      try {
+        const d = await getMedusaAdminClient().getNotificationsUnread();
+        if (d && !d.__error) { setNotifData(d); setMsgUnread(d.messages || 0); }
+      } catch {
+        // Backend unreachable — silently ignore
+      }
+    };
+    fetchNotifs();
+    const id = setInterval(fetchNotifs, 60000);
+    return () => clearInterval(id);
+  }, [isAuthenticated]);
+
+  // Close notif dropdown on outside click
+  useEffect(() => {
+    if (!notifOpen) return;
+    const handler = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [notifOpen]);
 
   useEffect(() => {
     if (pathname === "/login" || pathname === "/register") return;
@@ -231,15 +267,19 @@ export default function PolarisLayout({ children }) {
     return null;
   }
 
-  const GlobeIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <path d="M10 18a8 8 0 100-16 8 8 0 000 16z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M2 10h16M10 2a12.5 12.5 0 010 16 12.5 12.5 0 010-16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-
   const localeLabel =
     LOCALES.find((l) => l.code === locale)?.label ?? String(locale || "").toUpperCase();
+
+  const notifUnread = notifData
+    ? (notifData.orders || 0) + (notifData.returns || 0)
+    : 0;
+
+  const topBarIconStyle = {
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    width: 36, height: 36, borderRadius: 8, background: "rgba(255,255,255,0.1)",
+    border: "none", cursor: "pointer", color: "#fff", flexShrink: 0,
+    position: "relative",
+  };
 
   const langSelector = (
     <Popover
@@ -254,12 +294,11 @@ export default function PolarisLayout({ children }) {
           onClick={() => setLangDropdownOpen((v) => !v)}
           accessibilityLabel={`Language / Dil — ${localeLabel}`}
           size="slim"
-          style={{ color: "#fff" }}
         >
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#fff" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, flexShrink: 0 }}>
-              <GlobeIcon />
-            </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#fff", height: 36, padding: "0 6px" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" width="20" height="20" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
+            </svg>
             <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.04em", lineHeight: 1 }}>
               {localeLabel}
             </span>
@@ -285,8 +324,86 @@ export default function PolarisLayout({ children }) {
       showNavigationToggle
       onNavigationToggle={() => setShowMobileNav((v) => !v)}
       userMenu={
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, height: 56 }}>
+          {/* Language selector */}
           {langSelector}
+
+          {/* Mail / Inbox */}
+          <Link href="/inbox" style={{ ...topBarIconStyle, textDecoration: "none" }} title="Nachrichten">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" width="20" height="20" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+            </svg>
+            {msgUnread > 0 && (
+              <span style={{ position: "absolute", top: 4, right: 4, background: "#ef4444", color: "#fff", borderRadius: "50%", fontSize: 9, fontWeight: 800, width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+                {msgUnread > 9 ? "9+" : msgUnread}
+              </span>
+            )}
+          </Link>
+
+          {/* Bell / Notifications */}
+          <div ref={notifRef} style={{ position: "relative" }}>
+            <button
+              type="button"
+              onClick={async () => {
+                setNotifOpen((v) => !v);
+                if (!notifOpen) {
+                  try {
+                    await getMedusaAdminClient().markNotificationsSeen();
+                    setNotifData((d) => d ? { ...d, orders: 0, returns: 0 } : d);
+                  } catch {
+                    // ignore
+                  }
+                }
+              }}
+              style={{ ...topBarIconStyle }}
+              title="Benachrichtigungen"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" width="20" height="20" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+              </svg>
+              {notifUnread > 0 && (
+                <span style={{ position: "absolute", top: 4, right: 4, background: "#ef4444", color: "#fff", borderRadius: "50%", fontSize: 9, fontWeight: 800, width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+                  {notifUnread > 9 ? "9+" : notifUnread}
+                </span>
+              )}
+            </button>
+            {notifOpen && (
+              <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, background: "#fff", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", border: "1px solid #e5e7eb", zIndex: 9999 }}>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 13, fontWeight: 700, color: "#111827" }}>Benachrichtigungen</div>
+                <div style={{ maxHeight: 340, overflowY: "auto" }}>
+                  {(!notifData?.recent_orders?.length && !notifData?.recent_returns?.length) ? (
+                    <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Keine neuen Benachrichtigungen</div>
+                  ) : (
+                    <>
+                      {(notifData?.recent_orders || []).map((o) => (
+                        <Link key={o.id} href={`/orders/${o.id}`} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
+                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📦</span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Neue Bestellung #{o.order_number || "—"}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>{o.first_name} {o.last_name} · {o.total_cents ? (o.total_cents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : ""}</div>
+                          </div>
+                        </Link>
+                      ))}
+                      {(notifData?.recent_returns || []).map((r) => (
+                        <Link key={r.id} href="/orders/returns" onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
+                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>↩️</span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Rückgabeanfrage R-{r.return_number || "—"}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>Bestellung #{r.order_number || "—"} · {r.status}</div>
+                          </div>
+                        </Link>
+                      ))}
+                    </>
+                  )}
+                </div>
+                <div style={{ padding: "10px 16px", borderTop: "1px solid #f3f4f6" }}>
+                  <Link href="/orders" onClick={() => setNotifOpen(false)} style={{ fontSize: 12, color: "#ff971c", textDecoration: "none", fontWeight: 600 }}>Alle Bestellungen →</Link>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Profile */}
           <TopBar.UserMenu
             name={storeName}
             detail=""

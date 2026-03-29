@@ -223,9 +223,9 @@ function DetailPanel({ ret, onClose, onUpdate }) {
   return (
     <>
       {/* Backdrop */}
-      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.25)", zIndex: 900 }} onClick={onClose} />
+      <div style={{ position: "fixed", inset: 0, top: 56, background: "rgba(0,0,0,.25)", zIndex: 900 }} onClick={onClose} />
       {/* Panel */}
-      <div style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: 520, background: "#fff", boxShadow: "-4px 0 32px rgba(0,0,0,.12)", zIndex: 901, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ position: "fixed", right: 0, top: 56, bottom: 0, width: 520, background: "#fff", boxShadow: "-4px 0 32px rgba(0,0,0,.12)", zIndex: 901, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {/* Header */}
         <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

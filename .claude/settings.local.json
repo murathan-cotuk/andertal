@@ -65,7 +65,9 @@
       "Bash(done)",
       "Bash(find /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha -name *versand* -type f)",
       "Bash(find /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/sellercentral/src -type f -path *shipping* -o -type f -path *versand*)",
-      "Bash(/dev/null:*)"
+      "Bash(/dev/null:*)",
+      "Bash(find /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha -type f -name *.ts* -path */orders/*)",
+      "Bash(find:*)"
     ]
   }
 }

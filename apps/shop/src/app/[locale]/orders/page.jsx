@@ -9,6 +9,75 @@ import Footer from "@/components/Footer";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import { getMedusaClient } from "@/lib/medusa-client";
 
+function MessageModal({ order, onClose }) {
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState("");
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    const token = getToken("customer");
+    getMedusaClient().request(`/store/messages?order_id=${order.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then((d) => { if (!d?.__error) setHistory(d?.messages || []); }).catch(() => {});
+  }, [order.id]);
+
+  const handleSend = async () => {
+    if (!body.trim()) return;
+    setSending(true); setErr("");
+    try {
+      const token = getToken("customer");
+      await getMedusaClient().request("/store/messages", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: order.id, body: body.trim(), subject: `Bestellung #${order.order_number || ""}` }),
+      });
+      setSent(true);
+      setBody("");
+      const d = await getMedusaClient().request(`/store/messages?order_id=${order.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!d?.__error) setHistory(d?.messages || []);
+      setTimeout(() => setSent(false), 3000);
+    } catch (e) { setErr(e?.message || "Fehler"); }
+    setSending(false);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 480, maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>Nachricht — #{order.order_number || "—"}</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af" }}>×</button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {history.length === 0 && <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "20px 0" }}>Noch keine Nachrichten</div>}
+          {history.map((m) => {
+            const isSeller = m.sender_type === "seller";
+            return (
+              <div key={m.id} style={{ display: "flex", justifyContent: isSeller ? "flex-start" : "flex-end" }}>
+                <div style={{ maxWidth: "75%", background: isSeller ? "#f3f4f6" : "#ff971c", color: isSeller ? "#111827" : "#fff", borderRadius: isSeller ? "12px 12px 12px 2px" : "12px 12px 2px 12px", padding: "8px 12px", fontSize: 13 }}>
+                  {m.body}
+                  <div style={{ fontSize: 10, marginTop: 3, opacity: 0.6 }}>{new Date(m.created_at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ padding: "12px 18px", borderTop: "1px solid #f3f4f6" }}>
+          {sent && <div style={{ color: "#15803d", fontSize: 12, marginBottom: 6 }}>Nachricht gesendet ✓</div>}
+          {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 6 }}>{err}</div>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} style={{ flex: 1, padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, resize: "none" }} placeholder="Deine Nachricht…" />
+            <button onClick={handleSend} disabled={sending || !body.trim()} style={{ padding: "0 16px", background: "#ff971c", color: "#fff", border: "2px solid #000", borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 0 2px #000" }}>
+              {sending ? "…" : "Senden"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const STATUS_LABEL_FALLBACK = {
   offen: "Offen",
   in_bearbeitung: "In Bearbeitung",
@@ -231,6 +300,7 @@ export default function OrdersPage() {
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [retourModal, setRetourModal] = useState(null);
+  const [messageModal, setMessageModal] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
   const [reviewMap, setReviewMap] = useState({});
 
@@ -281,16 +351,27 @@ export default function OrdersPage() {
     return ratings.reduce((s, r) => s + Number(r), 0) / ratings.length;
   };
 
+  const SHIPPED_STATUSES = ["versendet", "zugestellt", "abgeschlossen", "shipped", "delivered", "completed", "retoure", "retoure_anfrage"];
+
   const canReturn = (order) => {
-    if (order.order_status === "storniert") return false;
+    if (order.order_status === "storniert" || order.order_status === "refunded") return false;
     if (order.returns?.some(r => r.status !== "abgelehnt")) return false;
+    const isShipped =
+      SHIPPED_STATUSES.includes(order.order_status) ||
+      SHIPPED_STATUSES.includes(order.delivery_status);
+    if (!isShipped) return false;
     const deliveryDate = order.delivery_date ? new Date(order.delivery_date) : null;
-    if (!deliveryDate) return order.delivery_status === "zugestellt" || order.delivery_status === "delivered";
+    if (!deliveryDate) return true; // no delivery date recorded → allow, backend validates
     const daysSince = (Date.now() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24);
     return daysSince <= 14;
   };
 
   const returnExpired = (order) => {
+    if (order.returns?.some(r => r.status !== "abgelehnt")) return false;
+    const isShipped =
+      SHIPPED_STATUSES.includes(order.order_status) ||
+      SHIPPED_STATUSES.includes(order.delivery_status);
+    if (!isShipped) return false;
     const deliveryDate = order.delivery_date ? new Date(order.delivery_date) : null;
     if (!deliveryDate) return false;
     return (Date.now() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24) > 14;
@@ -322,6 +403,9 @@ export default function OrdersPage() {
           onClose={() => setRetourModal(null)}
           onSubmitted={() => { setSuccessMsg("Retouranfrage wurde erfolgreich eingereicht. Wir melden uns bei dir!"); fetchOrders(); }}
         />
+      )}
+      {messageModal && (
+        <MessageModal order={messageModal} onClose={() => setMessageModal(null)} />
       )}
       <main style={{ flex: 1 }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 20px 64px" }}>
@@ -423,6 +507,11 @@ export default function OrdersPage() {
                                 )}
                               </div>
                             )}
+                            {order.delivery_date && (
+                              <div style={{ marginTop: 4, fontSize: 11, color: "#6b7280" }}>
+                                Zugestellt: {fmtDate(order.delivery_date)}
+                              </div>
+                            )}
                           </div>
 
                           {/* Right: total + actions */}
@@ -473,6 +562,14 @@ export default function OrdersPage() {
                               {returnExpired(order) && !activeReturn && (
                                 <span style={{ fontSize: 10, color: "#d1d5db" }}>Frist abgelaufen</span>
                               )}
+                              <button
+                                onClick={() => setMessageModal(order)}
+                                style={{ fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 3 }}
+                                title="Nachricht senden"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" width="12" height="12"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
+                                Nachricht
+                              </button>
                               {(() => {
                                 if (reviewState === null) return null;
                                 if (reviewState === "full") {

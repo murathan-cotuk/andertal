@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useCart } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
-import { getShippingPriceCents } from "@/lib/shipping-price";
+import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 
 const Overlay = styled.div`
   position: fixed;
@@ -290,8 +290,7 @@ function useShippingThresholds() {
 }
 
 function calcShipping(items, shippingGroups, country = "DE") {
-  let maxCents = 0;
-  let found = false;
+  let maxCents = null;
   for (const item of items) {
     const groupId =
       item.shipping_group_id ||
@@ -299,18 +298,18 @@ function calcShipping(items, shippingGroups, country = "DE") {
       item.variant?.product?.metadata?.shipping_group_id ||
       item.product?.metadata?.shipping_group_id;
     if (!groupId) continue;
-    const group = (shippingGroups || []).find((g) => g.id === groupId);
-    if (!group?.prices) continue;
-    console.log("[calcShipping] country:", country, "group.prices:", group.prices, "groupId:", groupId);
-    const priceCents = getShippingPriceCents(group.prices, country, "DE") ?? 0;
-    if (priceCents > maxCents) maxCents = priceCents;
-    found = true;
+    const group = findShippingGroup(shippingGroups, groupId);
+    if (!group?.prices || typeof group.prices !== "object") continue;
+    const priceCents = resolveShippingQuoteCents(group.prices, country);
+    if (priceCents == null) continue;
+    if (maxCents === null || priceCents > maxCents) maxCents = priceCents;
   }
-  return found ? maxCents : null;
+  return maxCents;
 }
 
 export default function CartSidebar() {
   const locale = useLocale();
+  const tCart = useTranslations("cart");
   const { cart, sidebarOpen, closeCartSidebar, updateLineItem, removeLineItem, loading, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
   const allThresholds = useShippingThresholds();
@@ -322,12 +321,10 @@ export default function CartSidebar() {
   const shippingCents = calcShipping(items, shippingGroups, countryCode);
   const isFree = freeShippingThreshold != null && effectiveTotal >= freeShippingThreshold;
   const shippingLabel = isFree
-    ? "Kostenlos"
+    ? tCart("freeShipping")
     : shippingCents != null
       ? `${formatPriceCents(shippingCents)} €`
-      : freeShippingThreshold != null
-        ? `Ab ${formatPriceCents(freeShippingThreshold)} € versandkostenfrei`
-        : "Wird an der Kasse berechnet";
+      : tCart("shipping");
 
   return (
     <>

@@ -16,7 +16,7 @@ import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } f
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
-import { getShippingPriceCents } from "@/lib/shipping-price";
+import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 import Carousel from "@/components/Carousel";
 import { StarRating } from "@/components/ProductCard";
 import { ProductCard } from "@/components/ProductCard";
@@ -653,11 +653,11 @@ export default function ProductTemplate() {
   const [sellerStoreName, setSellerStoreName] = useState("");
   const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
   const [productReviews, setProductReviews] = useState([]);
-  const [shippingGroups, setShippingGroups] = useState([]);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
   const openCartSidebar = cartState?.openCartSidebar ?? (() => {});
+  const shippingGroups = cartState?.shippingGroups ?? [];
 
   useEffect(() => {
     let cancelled = false;
@@ -758,12 +758,6 @@ export default function ProductTemplate() {
     }).catch(() => {});
   }, [product?.id]);
 
-  useEffect(() => {
-    getMedusaClient().request("/store/shipping-groups").then((res) => {
-      setShippingGroups(res?.groups || []);
-    }).catch(() => {});
-  }, []);
-
   if (loading) return <Container>Laden…</Container>;
   if (error) return <Container>Fehler: {error}</Container>;
   if (!product) return <Container>Produkt nicht gefunden.</Container>;
@@ -779,12 +773,16 @@ export default function ProductTemplate() {
         : [];
   const images = rawImages.map((img) => ({ ...img, url: resolveImageUrl(img?.url || img) || img?.url || img }));
   const meta = product.metadata || {};
-  const shippingGroupId = meta.shipping_group_id;
-  const shippingGroup = shippingGroups.find((g) => g.id === shippingGroupId);
-  const shippingPriceCents = getShippingPriceCents(shippingGroup?.prices, countryCode, "DE");
-  const shippingDisplay = shippingGroupId && shippingGroup
-    ? (shippingPriceCents != null ? `${(shippingPriceCents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : shippingGroup.name)
-    : (meta.shipping_info || meta.versand || "Standardversand");
+  const shippingGroupIdRaw = meta.shipping_group_id;
+  const shippingGroup =
+    shippingGroupIdRaw != null && String(shippingGroupIdRaw).trim() !== ""
+      ? findShippingGroup(shippingGroups, shippingGroupIdRaw)
+      : null;
+  const shippingPriceCents = resolveShippingQuoteCents(shippingGroup?.prices, countryCode);
+  const shippingDisplay =
+    shippingGroupIdRaw != null && String(shippingGroupIdRaw).trim() !== "" && shippingGroup
+      ? (shippingPriceCents != null ? `${formatPriceCents(shippingPriceCents)} €` : shippingGroup.name)
+      : (meta.shipping_info || meta.versand || "Standardversand");
   const rawVariants = product.variants || [];
   const variationGroups = product.variation_groups || null;
   const variants = normalizeVariants(rawVariants, variationGroups);

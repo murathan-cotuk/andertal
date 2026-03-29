@@ -54,6 +54,7 @@
     "remove": "Eliminar",
     "subtotal": "Subtotal",
     "shippingLabel": "Envío",
+    "freeShipping": "Gratis",
     "shipping": "Calculado en el pago",
     "total": "Total",
     "checkout": "Pagar"
@@ -85,6 +86,7 @@
     "subtotal": "Subtotal",
     "shipping": "Envío",
     "freeShipping": "Gratis",
+    "shippingPending": "Calculado en el pago",
     "total": "Total",
     "billingSameAsShipping": "Dirección de facturación igual que la de envío",
     "billingAddress": "Dirección de facturación",

@@ -571,6 +571,36 @@ async function start() {
         await client.query(`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS billing_zip_code varchar(20);`).catch(() => {})
         await client.query(`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS billing_city text;`).catch(() => {})
         await client.query(`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS billing_country varchar(100);`).catch(() => {})
+        await client.query(`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS stripe_customer_id text;`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS store_messages (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            order_id uuid REFERENCES store_orders(id) ON DELETE SET NULL,
+            sender_type varchar(20) NOT NULL,
+            sender_email text,
+            recipient_email text,
+            subject text,
+            body text NOT NULL,
+            is_read_by_seller boolean NOT NULL DEFAULT false,
+            is_read_by_customer boolean NOT NULL DEFAULT false,
+            created_at timestamp NOT NULL DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS store_smtp_settings (
+            seller_id varchar(255) PRIMARY KEY DEFAULT 'default',
+            provider varchar(50),
+            host text,
+            port integer DEFAULT 587,
+            secure boolean DEFAULT false,
+            username text,
+            password_enc text,
+            from_name text,
+            from_email text,
+            updated_at timestamp DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS notifications_seen_at timestamp;`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_customer_discounts (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -6186,6 +6216,93 @@ async function start() {
       }
     }
 
+    // ── Saved payment methods ────────────────────────────────────────────
+    const getOrCreateStripeCustomer = async (client, customerId, email) => {
+      const secretKey = (process.env.STRIPE_SECRET_KEY || '').trim()
+      if (!secretKey) throw new Error('STRIPE_SECRET_KEY not configured')
+      const stripe = new (require('stripe'))(secretKey)
+      const row = await client.query('SELECT stripe_customer_id FROM store_customers WHERE id = $1::uuid', [customerId])
+      let stripeCustomerId = row.rows[0]?.stripe_customer_id
+      if (!stripeCustomerId) {
+        const sc = await stripe.customers.create({ email, metadata: { belucha_customer_id: customerId } })
+        stripeCustomerId = sc.id
+        await client.query('UPDATE store_customers SET stripe_customer_id = $1 WHERE id = $2::uuid', [stripeCustomerId, customerId])
+      }
+      return { stripe, stripeCustomerId }
+    }
+
+    const storePaymentMethodsGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const token = (req.headers.authorization || '').replace('Bearer ', '').trim()
+      if (!token) return res.status(401).json({ message: 'Unauthorized' })
+      const payload = verifyCustomerToken(token)
+      if (!payload?.id) return res.status(401).json({ message: 'Invalid token' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const { stripe, stripeCustomerId } = await getOrCreateStripeCustomer(client, payload.id, payload.email)
+        const pms = await stripe.paymentMethods.list({ customer: stripeCustomerId, type: 'card' })
+        await client.end()
+        res.json({ payment_methods: pms.data })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const storePaymentMethodsSetupPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const token = (req.headers.authorization || '').replace('Bearer ', '').trim()
+      if (!token) return res.status(401).json({ message: 'Unauthorized' })
+      const payload = verifyCustomerToken(token)
+      if (!payload?.id) return res.status(401).json({ message: 'Invalid token' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const { stripe, stripeCustomerId } = await getOrCreateStripeCustomer(client, payload.id, payload.email)
+        const setupIntent = await stripe.setupIntents.create({
+          customer: stripeCustomerId,
+          automatic_payment_methods: { enabled: true },
+        })
+        await client.end()
+        res.json({ client_secret: setupIntent.client_secret })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const storePaymentMethodsDELETE = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const token = (req.headers.authorization || '').replace('Bearer ', '').trim()
+      if (!token) return res.status(401).json({ message: 'Unauthorized' })
+      const payload = verifyCustomerToken(token)
+      if (!payload?.id) return res.status(401).json({ message: 'Invalid token' })
+      const pmId = (req.params.pmId || '').trim()
+      if (!pmId) return res.status(400).json({ message: 'pmId required' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const { stripe, stripeCustomerId } = await getOrCreateStripeCustomer(client, payload.id, payload.email)
+        // Verify PM belongs to this customer
+        const pm = await stripe.paymentMethods.retrieve(pmId)
+        if (pm.customer !== stripeCustomerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        await stripe.paymentMethods.detach(pmId)
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────
+
     httpApp.post('/store/customers', storeCustomerRegisterPOST)
     httpApp.post('/store/auth/token', storeAuthTokenPOST)
     httpApp.get('/store/customers/me', storeCustomersMeGET)
@@ -6194,6 +6311,9 @@ async function start() {
     httpApp.post('/store/customers/me/addresses', storeCustomerAddressesPOST)
     httpApp.patch('/store/customers/me/addresses/:addressId', storeCustomerAddressesPATCH)
     httpApp.delete('/store/customers/me/addresses/:addressId', storeCustomerAddressesDELETE)
+    httpApp.get('/store/payment-methods', storePaymentMethodsGET)
+    httpApp.post('/store/payment-methods/setup', storePaymentMethodsSetupPOST)
+    httpApp.delete('/store/payment-methods/:pmId', storePaymentMethodsDELETE)
     httpApp.get('/store/wishlist', storeWishlistGET)
     httpApp.post('/store/wishlist', storeWishlistPOST)
     httpApp.delete('/store/wishlist/:productId', storeWishlistDELETE)
@@ -6468,6 +6588,297 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.get('/store/pages', storePagesListGET)
     httpApp.get('/store/pages/:slug', storePageBySlugGET)
     console.log('Store routes: GET /store/pages, GET /store/pages/:slug')
+
+    // ── Notifications ─────────────────────────────────────────────────────
+    const adminHubNotificationsUnreadGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const seenR = await client.query(`SELECT notifications_seen_at FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`)
+        const seenAt = seenR.rows[0]?.notifications_seen_at || new Date(0)
+        const [ordersR, returnsR, messagesR] = await Promise.all([
+          client.query(`SELECT COUNT(*)::int AS c FROM store_orders WHERE created_at > $1`, [seenAt]),
+          client.query(`SELECT COUNT(*)::int AS c FROM store_returns WHERE created_at > $1`, [seenAt]),
+          client.query(`SELECT COUNT(*)::int AS c FROM store_messages WHERE created_at > $1 AND sender_type = 'customer' AND is_read_by_seller = false`, [seenAt]),
+        ])
+        const recentOrders = await client.query(`SELECT id, order_number, first_name, last_name, total_cents, created_at FROM store_orders WHERE created_at > $1 ORDER BY created_at DESC LIMIT 5`, [seenAt])
+        const recentReturns = await client.query(`SELECT r.id, r.return_number, r.status, r.created_at, o.order_number FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.created_at > $1 ORDER BY r.created_at DESC LIMIT 5`, [seenAt])
+        await client.end()
+        res.json({
+          unread: (ordersR.rows[0]?.c || 0) + (returnsR.rows[0]?.c || 0) + (messagesR.rows[0]?.c || 0),
+          orders: ordersR.rows[0]?.c || 0,
+          returns: returnsR.rows[0]?.c || 0,
+          messages: messagesR.rows[0]?.c || 0,
+          recent_orders: recentOrders.rows.map(r => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null })),
+          recent_returns: recentReturns.rows.map(r => ({ ...r, return_number: r.return_number ? Number(r.return_number) : null, order_number: r.order_number ? Number(r.order_number) : null })),
+          seen_at: seenAt,
+        })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubNotificationsMarkSeenPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        await client.query(`INSERT INTO admin_hub_seller_settings (seller_id, notifications_seen_at) VALUES ('default', now()) ON CONFLICT (seller_id) DO UPDATE SET notifications_seen_at = now()`)
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // ── Messages ──────────────────────────────────────────────────────────
+    const getSmtpTransport = async (client) => {
+      let nodemailer
+      try { nodemailer = require('nodemailer') } catch { return null }
+      const r = await client.query(`SELECT * FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
+      const s = r.rows[0]
+      if (!s?.host || !s?.username) return null
+      return nodemailer.createTransport({
+        host: s.host, port: s.port || 587, secure: !!s.secure,
+        auth: { user: s.username, pass: s.password_enc || '' },
+      })
+    }
+
+    const adminHubMessagesGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const orderId = req.query.order_id || null
+        let q = `SELECT m.*, o.order_number FROM store_messages m LEFT JOIN store_orders o ON o.id = m.order_id`
+        const params = []
+        if (orderId) { params.push(orderId); q += ` WHERE m.order_id = $1::uuid` }
+        q += ' ORDER BY m.created_at DESC LIMIT 100'
+        const r = await client.query(q, params)
+        const unreadR = await client.query(`SELECT COUNT(*)::int AS c FROM store_messages WHERE sender_type = 'customer' AND is_read_by_seller = false`)
+        await client.end()
+        res.json({ messages: r.rows.map(row => ({ ...row, order_number: row.order_number ? Number(row.order_number) : null })), unread: unreadR.rows[0]?.c || 0 })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubMessagesPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const { order_id, body, subject } = req.body || {}
+        if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
+        // Get seller from_email
+        const smtpR = await client.query(`SELECT from_email, from_name FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
+        const sellerEmail = smtpR.rows[0]?.from_email || ''
+        // Get order's customer email
+        let recipientEmail = null
+        if (order_id) {
+          const oR = await client.query(`SELECT email FROM store_orders WHERE id = $1::uuid`, [order_id])
+          recipientEmail = oR.rows[0]?.email || null
+        }
+        const r = await client.query(
+          `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, is_read_by_seller, is_read_by_customer)
+           VALUES ($1, 'seller', $2, $3, $4, $5, true, false) RETURNING *`,
+          [order_id || null, sellerEmail, recipientEmail, subject || null, body]
+        )
+        const msg = r.rows[0]
+        // Send email via SMTP
+        if (recipientEmail) {
+          const transport = await getSmtpTransport(client)
+          if (transport) {
+            const fromName = smtpR.rows[0]?.from_name || 'Shop'
+            transport.sendMail({
+              from: `"${fromName}" <${sellerEmail}>`,
+              to: recipientEmail,
+              subject: subject || 'Nachricht vom Shop',
+              text: body,
+              html: `<p>${body.replace(/\n/g, '<br>')}</p>`,
+            }).catch((e) => console.error('[SMTP sendMail]', e.message))
+          }
+        }
+        await client.end()
+        res.status(201).json({ message: msg })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubMessageMarkReadPATCH = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const id = (req.params.id || '').trim()
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        await client.query(`UPDATE store_messages SET is_read_by_seller = true WHERE id = $1::uuid`, [id])
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const storeMessagesGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const token = (req.headers.authorization || '').replace('Bearer ', '').trim()
+      if (!token) return res.status(401).json({ message: 'Unauthorized' })
+      const payload = verifyCustomerToken(token)
+      if (!payload?.email) return res.status(401).json({ message: 'Invalid token' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const orderId = req.query.order_id || null
+        let q = `SELECT m.*, o.order_number FROM store_messages m
+          LEFT JOIN store_orders o ON o.id = m.order_id
+          WHERE (m.sender_email = $1 OR m.recipient_email = $1
+            OR (m.order_id IS NOT NULL AND m.order_id IN (
+              SELECT id FROM store_orders WHERE LOWER(email) = LOWER($1)
+            )))`
+        const params = [payload.email]
+        if (orderId) { params.push(orderId); q += ` AND m.order_id = $2::uuid` }
+        q += ' ORDER BY m.created_at ASC'
+        const r = await client.query(q, params)
+        await client.end()
+        res.json({ messages: r.rows.map(row => ({ ...row, order_number: row.order_number ? Number(row.order_number) : null })) })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const storeMessagesPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const token = (req.headers.authorization || '').replace('Bearer ', '').trim()
+      if (!token) return res.status(401).json({ message: 'Unauthorized' })
+      const payload = verifyCustomerToken(token)
+      if (!payload?.email) return res.status(401).json({ message: 'Invalid token' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const { order_id, body, subject } = req.body || {}
+        if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
+        const smtpR = await client.query(`SELECT from_email, from_name FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
+        const sellerEmail = smtpR.rows[0]?.from_email || ''
+        const r = await client.query(
+          `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, is_read_by_seller, is_read_by_customer)
+           VALUES ($1, 'customer', $2, $3, $4, $5, false, true) RETURNING *`,
+          [order_id || null, payload.email, sellerEmail, subject || null, body]
+        )
+        // Forward to seller via SMTP
+        if (sellerEmail) {
+          const transport = await getSmtpTransport(client)
+          if (transport) {
+            transport.sendMail({
+              from: `"Kunde" <${payload.email}>`,
+              to: sellerEmail,
+              replyTo: payload.email,
+              subject: subject || `Neue Nachricht von Kunde${order_id ? ' (Bestellung)' : ''}`,
+              text: body,
+              html: `<p><strong>Von:</strong> ${payload.email}</p><p>${body.replace(/\n/g, '<br>')}</p>`,
+            }).catch((e) => console.error('[SMTP sendMail]', e.message))
+          }
+        }
+        await client.end()
+        res.status(201).json({ message: r.rows[0] })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // ── SMTP Settings ─────────────────────────────────────────────────────
+    const adminHubSmtpSettingsGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const r = await client.query(`SELECT seller_id, provider, host, port, secure, username, from_name, from_email, updated_at FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
+        await client.end()
+        res.json({ smtp: r.rows[0] || null })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubSmtpSettingsPATCH = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const { provider, host, port, secure, username, password, from_name, from_email } = req.body || {}
+        await client.query(
+          `INSERT INTO store_smtp_settings (seller_id, provider, host, port, secure, username, password_enc, from_name, from_email, updated_at)
+           VALUES ('default', $1, $2, $3, $4, $5, $6, $7, $8, now())
+           ON CONFLICT (seller_id) DO UPDATE SET
+             provider = EXCLUDED.provider, host = EXCLUDED.host, port = EXCLUDED.port,
+             secure = EXCLUDED.secure, username = EXCLUDED.username,
+             password_enc = CASE WHEN EXCLUDED.password_enc IS NOT NULL AND EXCLUDED.password_enc <> '' THEN EXCLUDED.password_enc ELSE store_smtp_settings.password_enc END,
+             from_name = EXCLUDED.from_name, from_email = EXCLUDED.from_email, updated_at = now()`,
+          [provider || null, host || null, port || 587, !!secure, username || null, password || null, from_name || null, from_email || null]
+        )
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubSmtpSettingsTestPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const transport = await getSmtpTransport(client)
+        await client.end()
+        if (!transport) return res.status(400).json({ message: 'SMTP nicht konfiguriert' })
+        await transport.verify()
+        res.json({ success: true, message: 'Verbindung erfolgreich' })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(400).json({ message: e?.message || 'Verbindung fehlgeschlagen' })
+      }
+    }
+
+    httpApp.get('/admin-hub/v1/notifications/unread', adminHubNotificationsUnreadGET)
+    httpApp.post('/admin-hub/v1/notifications/mark-seen', adminHubNotificationsMarkSeenPOST)
+    httpApp.get('/admin-hub/v1/messages', adminHubMessagesGET)
+    httpApp.post('/admin-hub/v1/messages', adminHubMessagesPOST)
+    httpApp.patch('/admin-hub/v1/messages/:id/read', adminHubMessageMarkReadPATCH)
+    httpApp.get('/store/messages', storeMessagesGET)
+    httpApp.post('/store/messages', storeMessagesPOST)
+    httpApp.get('/admin-hub/v1/smtp-settings', adminHubSmtpSettingsGET)
+    httpApp.patch('/admin-hub/v1/smtp-settings', adminHubSmtpSettingsPATCH)
+    httpApp.post('/admin-hub/v1/smtp-settings/test', adminHubSmtpSettingsTestPOST)
 
     httpApp.listen(PORT, HOST, () => {
       console.log(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)

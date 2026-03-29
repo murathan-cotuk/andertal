@@ -14,7 +14,7 @@ import PayNowButton from "@/components/ui/PayNowButton";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
-import { getShippingPriceCents } from "@/lib/shipping-price";
+import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -261,6 +261,7 @@ const EmptyState = styled.div`
 
 export default function CartPage() {
   const t = useTranslations("cart");
+  const locale = useLocale();
   const { cart, loading, updateLineItem, removeLineItem, clearCart, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
   const envThresholdCents = typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
@@ -289,19 +290,18 @@ export default function CartPage() {
   for (const item of items) {
     const groupId = item.shipping_group_id || item.metadata?.shipping_group_id || item.variant?.product?.metadata?.shipping_group_id || item.product?.metadata?.shipping_group_id;
     if (!groupId) continue;
-    const group = (shippingGroups || []).find((g) => g.id === groupId);
-    if (!group?.prices) continue;
-    const p = getShippingPriceCents(group.prices, countryCode, "DE") ?? 0;
+    const group = findShippingGroup(shippingGroups, groupId);
+    if (!group?.prices || typeof group.prices !== "object") continue;
+    const p = resolveShippingQuoteCents(group.prices, countryCode);
+    if (p == null) continue;
     if (shippingCents === null || p > shippingCents) shippingCents = p;
   }
   const isFree = freeShippingThreshold != null && effectiveTotal >= freeShippingThreshold;
   const shippingLabel = isFree
-    ? "Kostenlos"
+    ? t("freeShipping")
     : shippingCents != null
       ? `${formatPriceCents(shippingCents)} €`
-      : freeShippingThreshold != null
-        ? `Ab ${formatPriceCents(freeShippingThreshold)} € versandkostenfrei`
-        : t("shipping");
+      : t("shipping");
 
   return (
     <PageWrap>

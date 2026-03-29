@@ -54,6 +54,7 @@
     "remove": "Kaldır",
     "subtotal": "Ara toplam",
     "shippingLabel": "Kargo",
+    "freeShipping": "Ücretsiz",
     "shipping": "Ödeme sayfasında hesaplanır",
     "total": "Toplam",
     "checkout": "Ödemeye geç"
@@ -85,6 +86,7 @@
     "subtotal": "Ara toplam",
     "shipping": "Kargo",
     "freeShipping": "Ücretsiz",
+    "shippingPending": "Ödeme sayfasında hesaplanır",
     "total": "Toplam",
     "billingSameAsShipping": "Fatura adresi teslimat adresiyle aynı",
     "billingAddress": "Fatura adresi",

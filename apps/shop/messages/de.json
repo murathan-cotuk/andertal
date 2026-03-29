@@ -54,6 +54,7 @@
     "remove": "Entfernen",
     "subtotal": "Zwischensumme",
     "shippingLabel": "Versand",
+    "freeShipping": "Kostenlos",
     "shipping": "Wird an der Kasse berechnet",
     "total": "Gesamt",
     "checkout": "Zur Kasse"
@@ -85,6 +86,7 @@
     "subtotal": "Zwischensumme",
     "shipping": "Versand",
     "freeShipping": "Kostenlos",
+    "shippingPending": "Wird an der Kasse berechnet",
     "total": "Gesamt",
     "billingSameAsShipping": "Rechnungsadresse ist gleich Lieferadresse",
     "billingAddress": "Rechnungsadresse",
