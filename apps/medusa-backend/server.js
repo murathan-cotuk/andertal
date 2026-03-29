@@ -2562,7 +2562,11 @@ async function start() {
       const cartRow = cartRes.rows && cartRes.rows[0]
       if (!cartRow) return null
       const itemsRes = await client.query(
-        'SELECT id, variant_id, product_id, quantity, unit_price_cents, title, thumbnail, product_handle FROM store_cart_items WHERE cart_id = $1 ORDER BY created_at',
+        `SELECT ci.id, ci.variant_id, ci.product_id, ci.quantity, ci.unit_price_cents, ci.title, ci.thumbnail, ci.product_handle,
+         p.metadata->>'shipping_group_id' AS shipping_group_id
+         FROM store_cart_items ci
+         LEFT JOIN admin_hub_products p ON p.id::text = ci.product_id
+         WHERE ci.cart_id = $1 ORDER BY ci.created_at`,
         [cartId]
       )
       const items = (itemsRes.rows || []).map((r) => ({
@@ -2574,6 +2578,7 @@ async function start() {
         title: r.title,
         thumbnail: r.thumbnail,
         product_handle: r.product_handle,
+        shipping_group_id: r.shipping_group_id || null,
       }))
       return {
         id: cartRow.id,
