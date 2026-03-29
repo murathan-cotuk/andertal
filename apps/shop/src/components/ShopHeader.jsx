@@ -23,8 +23,13 @@ import {
   marketPrefix,
   restPathFromPathname,
   SHOP_CURRENCIES,
+  DEFAULT_MARKET,
+  defaultCurrencyForMarket,
+  defaultLocaleForMarket,
+  isValidCurrency,
 } from "@/lib/shop-market";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { getShippableCountries } from "@/lib/countries";
 
 const SCROLL_THRESHOLD = 60;
 const SCROLL_DELTA = 8; /* px; only toggle direction after this much scroll to avoid jitter */
@@ -581,17 +586,7 @@ const LocaleOption = styled.button`
   }
 `;
 
-const SHOP_COUNTRIES = [
-  { code: "DE", label: "Deutschland",   flag: "🇩🇪", currency: "EUR", defaultLocale: "de" },
-  { code: "AT", label: "Österreich",    flag: "🇦🇹", currency: "EUR", defaultLocale: "de" },
-  { code: "CH", label: "Schweiz",       flag: "🇨🇭", currency: "CHF", defaultLocale: "de" },
-  { code: "FR", label: "France",        flag: "🇫🇷", currency: "EUR", defaultLocale: "fr" },
-  { code: "IT", label: "Italia",        flag: "🇮🇹", currency: "EUR", defaultLocale: "it" },
-  { code: "ES", label: "España",        flag: "🇪🇸", currency: "EUR", defaultLocale: "es" },
-  { code: "TR", label: "Türkiye",       flag: "🇹🇷", currency: "TRY", defaultLocale: "tr" },
-  { code: "US", label: "United States", flag: "🇺🇸", currency: "USD", defaultLocale: "en" },
-  { code: "GB", label: "United Kingdom",flag: "🇬🇧", currency: "GBP", defaultLocale: "en" },
-];
+// SHOP_COUNTRIES is now computed dynamically from shippingGroups in the component
 
 const SHOP_LOCALES = [
   { code: "de", label: "Deutsch",    flag: "🇩🇪" },
@@ -627,11 +622,15 @@ export default function ShopHeader() {
   const [mainMenuItems, setMainMenuItems] = useState([]);
   const [secondMenuItems, setSecondMenuItems] = useState([]);
   const { isAuthenticated, user, logout } = useAuth();
+  const { openCartSidebar, itemCount, shippingGroups } = useCart();
+
+  // Dynamically computed from shipping groups — only countries with configured prices
+  const shopCountries = getShippableCountries(shippingGroups);
 
   const selectedCountry = (() => {
-    if (!marketParsed) return "DE";
-    const up = marketParsed.country.toUpperCase();
-    return SHOP_COUNTRIES.some((c) => c.code === up) ? up : "DE";
+    const t = marketParsed || (ctxPrefix ? parseMarketPath(ctxPrefix) : null);
+    if (!t?.country) return String(DEFAULT_MARKET).toUpperCase();
+    return t.country.toUpperCase();
   })();
 
   const navigateTriple = (countryLower, langLower, curLower) => {
@@ -641,15 +640,12 @@ export default function ShopHeader() {
   };
 
   const handleSelectCountry = (countryCode) => {
-    const c = SHOP_COUNTRIES.find((x) => x.code === countryCode);
-    if (!c) return;
     const m = countryCode.toLowerCase();
-    const lang = (c.defaultLocale || "de").toLowerCase();
-    const cur = CCY_FROM_ISO[c.currency] || "eur";
+    const lang = defaultLocaleForMarket(m);
+    const cur = defaultCurrencyForMarket(m);
     navigateTriple(m, lang, cur);
     setLocaleDropdownOpen(false);
   };
-  const { openCartSidebar, itemCount } = useCart();
   const tLocale = useTranslations("locale");
   const locale = useLocale();
 
@@ -799,7 +795,9 @@ export default function ShopHeader() {
                 <LocaleDropdown $open={localeDropdownOpen}>
                   <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", padding: "16px 0" }}>
                     <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Land</div>
-                    {SHOP_COUNTRIES.map((c) => (
+                    {shopCountries.length === 0 ? (
+                      <div style={{ padding: "8px 16px", fontSize: 13, color: "#9ca3af" }}>Keine Länder konfiguriert</div>
+                    ) : shopCountries.map((c) => (
                       <LocaleOption
                         key={c.code}
                         type="button"
@@ -809,7 +807,7 @@ export default function ShopHeader() {
                         <span style={{ fontSize: 20 }}>{c.flag}</span>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 600 }}>{c.label}</div>
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{c.currency}</div>
+                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{c.currency.toUpperCase()}</div>
                         </div>
                       </LocaleOption>
                     ))}
@@ -823,8 +821,11 @@ export default function ShopHeader() {
                         data-active={locale === l.code ? "true" : "false"}
                         onClick={() => {
                           setLocaleDropdownOpen(false);
-                          const m = marketParsed?.country ?? "de";
-                          const cur = marketParsed?.currency ?? "eur";
+                          const m = marketParsed?.country ?? DEFAULT_MARKET;
+                          const cur =
+                            marketParsed?.currency && isValidCurrency(marketParsed.currency)
+                              ? marketParsed.currency
+                              : defaultCurrencyForMarket(m);
                           navigateTriple(m, l.code, cur);
                         }}
                       >
@@ -845,7 +846,7 @@ export default function ShopHeader() {
                           data-active={active ? "true" : "false"}
                           onClick={() => {
                             setLocaleDropdownOpen(false);
-                            const m = marketParsed?.country ?? "de";
+                            const m = marketParsed?.country ?? DEFAULT_MARKET;
                             const lang = marketParsed?.lang ?? locale;
                             navigateTriple(m, lang, code);
                           }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuthGuard, getToken } from "@belucha/lib";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
@@ -8,8 +8,8 @@ import Footer from "@/components/Footer";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useCustomerAuth as useAuth } from "@belucha/lib";
-
-const COUNTRY_NAMES = { DE: "Deutschland", AT: "Österreich", CH: "Schweiz", TR: "Türkiye", FR: "France", IT: "Italia", ES: "España", GB: "United Kingdom", US: "United States" };
+import { useCart } from "@/context/CartContext";
+import { COUNTRY_MAP, getShippableCountries } from "@/lib/countries";
 const ORANGE = "#ff971c";
 const DARK = "#1A1A1A";
 const GRAY = "#6b7280";
@@ -29,6 +29,8 @@ const cardStyle = {
 export default function AddressesPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
   const { user, logout } = useAuth();
+  const { shippingGroups } = useCart();
+  const shippableCountries = useMemo(() => getShippableCountries(shippingGroups), [shippingGroups]);
   const router = useRouter();
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +61,12 @@ export default function AddressesPage() {
     load();
   }, [user?.id, load]);
 
+  useEffect(() => {
+    if (!shippableCountries.length) return;
+    const codes = new Set(shippableCountries.map((c) => c.code));
+    setForm((f) => (codes.has(f.country) ? f : { ...f, country: shippableCountries[0].code }));
+  }, [shippableCountries]);
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const saveNew = async () => {
@@ -87,7 +95,7 @@ export default function AddressesPage() {
         address_line2: "",
         zip_code: "",
         city: "",
-        country: "DE",
+        country: shippableCountries.find((c) => c.code === "DE")?.code || shippableCountries[0]?.code || "DE",
         is_default_shipping: false,
         is_default_billing: false,
       });
@@ -160,7 +168,7 @@ export default function AddressesPage() {
                         <div>
                           {[a.zip_code, a.city].filter(Boolean).join(" ")}
                         </div>
-                        <div>{COUNTRY_NAMES[a.country] || a.country}</div>
+                        <div>{COUNTRY_MAP[a.country]?.label || a.country}</div>
                       </div>
                       <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8, fontSize: 12 }}>
                         {a.is_default_shipping && (
@@ -236,16 +244,10 @@ export default function AddressesPage() {
                       <input style={inp} name="zip_code" autoComplete="postal-code" placeholder="PLZ" value={form.zip_code} onChange={(e) => set("zip_code", e.target.value)} />
                       <input style={inp} name="city" autoComplete="address-level2" placeholder="Stadt" value={form.city} onChange={(e) => set("city", e.target.value)} />
                     </div>
-                    <select style={inp} name="country" autoComplete="country" value={form.country} onChange={(e) => set("country", e.target.value)}>
-                      <option value="DE">Deutschland</option>
-                      <option value="AT">Österreich</option>
-                      <option value="CH">Schweiz</option>
-                      <option value="TR">Türkiye</option>
-                      <option value="FR">France</option>
-                      <option value="IT">Italia</option>
-                      <option value="ES">España</option>
-                      <option value="GB">United Kingdom</option>
-                      <option value="US">United States</option>
+                    <select style={inp} name="country" autoComplete="country" value={shippableCountries.some((c) => c.code === form.country) ? form.country : (shippableCountries[0]?.code || "")} onChange={(e) => set("country", e.target.value)} disabled={!shippableCountries.length}>
+                      {shippableCountries.map((c) => (
+                        <option key={c.code} value={c.code}>{c.flag ? `${c.flag} ` : ""}{c.label}</option>
+                      ))}
                     </select>
                     <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
                       <input type="checkbox" checked={form.is_default_shipping} onChange={(e) => set("is_default_shipping", e.target.checked)} />

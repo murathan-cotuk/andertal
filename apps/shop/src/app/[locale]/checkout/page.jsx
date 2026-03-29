@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import styled from "styled-components";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,11 @@ import PayNowButton from "@/components/ui/PayNowButton";
 import { getToken, useCustomerAuth as useCustomerAuthHook } from "@belucha/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { getShippableCountries } from "@/lib/countries";
+import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
+import { getShippingPriceCents } from "@/lib/shipping-price";
+import { normalizeIsoCountryCode } from "@/lib/iso-country";
+import { CHECKOUT_SHIPPING_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
 
 const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
 
@@ -272,7 +277,13 @@ function applyToField(field, value) {
   field.onChange({ target: { value: value ?? "" } });
 }
 
-function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry }) {
+function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry, shippableCountries }) {
+  const shipList = useMemo(() => shippableCountries || [], [shippableCountries]);
+  const pickShipCountry = (raw) => {
+    const u = String(raw || "DE").toUpperCase();
+    if (!shipList.length) return u;
+    return shipList.some((c) => c.code === u) ? u : shipList[0].code;
+  };
   const t = useTranslations("checkout");
   const stripe = useStripe();
   const elements = useElements();
@@ -297,6 +308,17 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
   const city = useField("");
   const postalCode = useField("");
   const country = useField(defaultCountry || "DE");
+
+  useEffect(() => {
+    if (!defaultCountry) return;
+    applyToField(country, defaultCountry);
+  }, [defaultCountry]);
+
+  useEffect(() => {
+    if (!shipList.length) return;
+    const codes = new Set(shipList.map((c) => c.code));
+    if (!codes.has(billingCountry.value)) applyToField(billingCountry, shipList[0].code);
+  }, [shipList]);
 
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
   const billingAddress = useField("");
@@ -700,8 +722,9 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
                   applyToField(address2, a.address_line2 || "");
                   applyToField(city, a.city || "");
                   applyToField(postalCode, a.zip_code || "");
-                  applyToField(country, a.country || "DE");
-                  onCountryChange?.(a.country || "DE");
+                  const sc = pickShipCountry(a.country);
+                  applyToField(country, sc);
+                  onCountryChange?.(sc);
                 }
               }}
               style={{
@@ -736,30 +759,34 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
         <FieldGrid>
           <FieldWrap>
             <Label>{t("country")}</Label>
-            <select
-              value={country.value}
-              onChange={(e) => { country.onChange({ target: { value: e.target.value } }); onCountryChange?.(e.target.value); }}
-              autoComplete="country"
-              style={{
-                padding: "10px 12px",
-                border: "1px solid #d1d5db",
-                borderRadius: 8,
-                fontSize: "0.9375rem",
-                fontFamily: "inherit",
-                color: "#111827",
-                background: "#fff",
-              }}
-            >
-              <option value="DE">Deutschland</option>
-              <option value="AT">Österreich</option>
-              <option value="CH">Schweiz</option>
-              <option value="TR">Türkiye</option>
-              <option value="FR">France</option>
-              <option value="IT">Italia</option>
-              <option value="ES">España</option>
-              <option value="GB">United Kingdom</option>
-              <option value="US">United States</option>
-            </select>
+            {shipList.length === 0 ? (
+              <p style={{ margin: 0, fontSize: "0.875rem", color: "#6b7280" }}>
+                {t("noShippableCountries")}
+              </p>
+            ) : (
+              <select
+                value={shipList.some((c) => c.code === country.value) ? country.value : shipList[0].code}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  country.onChange({ target: { value: v } });
+                  onCountryChange?.(v);
+                }}
+                autoComplete="country"
+                style={{
+                  padding: "10px 12px",
+                  border: "1px solid #d1d5db",
+                  borderRadius: 8,
+                  fontSize: "0.9375rem",
+                  fontFamily: "inherit",
+                  color: "#111827",
+                  background: "#fff",
+                }}
+              >
+                {shipList.map((c) => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+              </select>
+            )}
           </FieldWrap>
         </FieldGrid>
 
@@ -795,7 +822,7 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
                     applyToField(billingAddress2, a.address_line2 || "");
                     applyToField(billingCity, a.city || "");
                     applyToField(billingPostalCode, a.zip_code || "");
-                    applyToField(billingCountry, a.country || "DE");
+                    applyToField(billingCountry, pickShipCountry(a.country));
                   }
                 }}
                 style={{
@@ -830,22 +857,20 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
           <FieldGrid>
             <FieldWrap>
               <Label>{t("country")}</Label>
-              <select
-                value={billingCountry.value}
-                onChange={(e) => billingCountry.onChange({ target: { value: e.target.value } })}
-                autoComplete="billing country"
-                style={{ padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.9375rem", fontFamily: "inherit", color: "#111827", background: "#fff" }}
-              >
-                <option value="DE">Deutschland</option>
-                <option value="AT">Österreich</option>
-                <option value="CH">Schweiz</option>
-                <option value="TR">Türkiye</option>
-                <option value="FR">France</option>
-                <option value="IT">Italia</option>
-                <option value="ES">España</option>
-                <option value="GB">United Kingdom</option>
-                <option value="US">United States</option>
-              </select>
+              {shipList.length === 0 ? (
+                <p style={{ margin: 0, fontSize: "0.875rem", color: "#6b7280" }}>{t("noShippableCountries")}</p>
+              ) : (
+                <select
+                  value={shipList.some((c) => c.code === billingCountry.value) ? billingCountry.value : shipList[0].code}
+                  onChange={(e) => billingCountry.onChange({ target: { value: e.target.value } })}
+                  autoComplete="billing country"
+                  style={{ padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.9375rem", fontFamily: "inherit", color: "#111827", background: "#fff" }}
+                >
+                  {shipList.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
+              )}
             </FieldWrap>
           </FieldGrid>
         </FormCard>
@@ -904,6 +929,24 @@ export default function CheckoutPage() {
   const marketCountryCode = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const [shippingCountry, setShippingCountry] = useState(marketCountryCode);
 
+  const shippableCountries = useMemo(() => getShippableCountries(shippingGroups), [shippingGroups]);
+
+  useEffect(() => {
+    if (!shippableCountries.length) return;
+    const codes = new Set(shippableCountries.map((c) => c.code));
+    setShippingCountry((prev) => {
+      if (codes.has(prev)) return prev;
+      return shippableCountries[0].code;
+    });
+  }, [shippableCountries]);
+
+  useEffect(() => {
+    try {
+      const iso = normalizeIsoCountryCode(shippingCountry);
+      if (iso) localStorage.setItem(CHECKOUT_SHIPPING_COUNTRY_LS, iso);
+    } catch (_) {}
+  }, [shippingCountry]);
+
   const [allThresholds, setAllThresholds] = useState(null);
   useEffect(() => {
     fetch("/api/store-seller-settings")
@@ -918,9 +961,11 @@ export default function CheckoutPage() {
       .catch(() => {});
   }, []);
 
-  const freeShippingThreshold = allThresholds?.[shippingCountry] ?? allThresholds?.["DE"] ??
-    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
-      ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS) : null);
+  const envThreshold =
+    typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
+      ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS)
+      : null;
+  const freeShippingThreshold = resolveFreeShippingThresholdCents(allThresholds, shippingCountry, envThreshold);
   const effectiveSubtotal = subtotalCents - bonusDiscountCents;
 
   let shippingCents = null;
@@ -929,7 +974,7 @@ export default function CheckoutPage() {
     if (!groupId) continue;
     const group = (shippingGroups || []).find((g) => g.id === groupId);
     if (!group?.prices) continue;
-    const p = group.prices[shippingCountry] ?? group.prices["DE"] ?? 0;
+    const p = getShippingPriceCents(group.prices, shippingCountry, "DE") ?? 0;
     if (shippingCents === null || p > shippingCents) shippingCents = p;
   }
   const isFreeShipping = freeShippingThreshold != null && effectiveSubtotal >= freeShippingThreshold;
@@ -1062,7 +1107,7 @@ export default function CheckoutPage() {
         setPayCents(null);
       })
       .finally(() => setLoadingPI(false));
-  }, [cart?.id, subtotalCents, shippingCents, isFreeShipping, t, items.length, piRefreshKey]);
+  }, [cart?.id, subtotalCents, shippingCents, isFreeShipping, shippingCountry, t, items.length, piRefreshKey]);
 
   const stripeInstance = getStripe();
 
@@ -1110,7 +1155,8 @@ export default function CheckoutPage() {
                     amountToPayCents={payCents}
                     shippingCents={isFreeShipping ? 0 : (shippingCents ?? 0)}
                     onCountryChange={setShippingCountry}
-                    defaultCountry={marketCountryCode}
+                    defaultCountry={shippingCountry}
+                    shippableCountries={shippableCountries}
                   />
                 </Elements>
               )}

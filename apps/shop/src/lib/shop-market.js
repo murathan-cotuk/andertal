@@ -5,15 +5,13 @@
 
 export const SHOP_LOCALES = ["en", "de", "tr", "fr", "it", "es"];
 
-/** Lowercase ISO country (market) codes in URL */
+/** Lowercase ISO country (market) codes in URL — well-known markets (for reference) */
 export const SHOP_MARKETS = ["de", "at", "ch", "fr", "it", "es", "tr", "gb", "us"];
 
-/** Lowercase currency codes in URL */
+/** Lowercase currency codes in URL — well-known currencies (for reference) */
 export const SHOP_CURRENCIES = ["eur", "gbp", "chf", "usd", "try"];
 
 const LOCALE_SET = new Set(SHOP_LOCALES);
-const MARKET_SET = new Set(SHOP_MARKETS);
-const CURRENCY_SET = new Set(SHOP_CURRENCIES);
 
 export const DEFAULT_MARKET = "de";
 export const DEFAULT_CURRENCY = "eur";
@@ -33,20 +31,36 @@ export function defaultMarketForLocale(locale) {
 export function defaultCurrencyForMarket(market) {
   const m = String(market || "de").toLowerCase();
   if (m === "gb") return "gbp";
-  if (m === "ch") return "chf";
-  if (m === "us") return "usd";
+  if (m === "ch" || m === "li") return "chf";
+  if (m === "us" || m === "ca") return "usd";
   if (m === "tr") return "try";
+  // All other countries default to EUR
   return "eur";
 }
 
+/** Default locale for a market country (lowercase ISO). */
+export function defaultLocaleForMarket(market) {
+  const m = String(market || "de").toLowerCase();
+  if (["de", "at", "ch", "li", "lu", "be"].includes(m)) return "de";
+  if (["fr", "mc", "sn", "ci", "cm", "cd"].includes(m)) return "fr";
+  if (["it", "sm", "va"].includes(m)) return "it";
+  if (["es", "mx", "ar", "co", "cl", "pe", "ve", "ec", "bo", "py", "uy", "cr", "gt", "hn", "sv", "ni", "pa", "do", "cu", "pr"].includes(m)) return "es";
+  if (m === "tr") return "tr";
+  return "en";
+}
+
+/** Any 2-letter ISO country code is a valid market */
 export function isValidMarket(s) {
-  return MARKET_SET.has(String(s || "").toLowerCase());
+  const v = String(s || "").toLowerCase();
+  return /^[a-z]{2}$/.test(v);
 }
 export function isValidLocale(s) {
   return LOCALE_SET.has(String(s || "").toLowerCase());
 }
+/** Any 3-letter currency code is valid; EUR is the default for unknowns */
 export function isValidCurrency(s) {
-  return CURRENCY_SET.has(String(s || "").toLowerCase());
+  const v = String(s || "").toLowerCase();
+  return /^[a-z]{3}$/.test(v);
 }
 
 /**

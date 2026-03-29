@@ -18,6 +18,12 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
+function normalizeSellerCountryCode(code) {
+  const u = String(code ?? "").trim().toUpperCase();
+  if (u === "UK") return "GB";
+  return /^[A-Z]{2}$/.test(u) ? u : "";
+}
+
 /* ── World countries ─────────────────────────────────────────── */
 const ALL_COUNTRIES = [
   { code: "AF", label: "Afghanistan" }, { code: "AL", label: "Albanien" }, { code: "DZ", label: "Algerien" },
@@ -271,10 +277,16 @@ function ShippingGroupsSection({ carriers }) {
     setSaving(true); setErr("");
     try {
       const client = getMedusaAdminClient();
-      const pricesPayload = form.selectedCountries.map((code) => ({
-        country_code: code,
-        price_cents: Math.round(Number(String(form.prices[code] || "0").replace(",", ".")) * 100) || 0,
-      }));
+      const pricesPayload = [];
+      for (const rawCode of form.selectedCountries) {
+        const code = normalizeSellerCountryCode(rawCode);
+        if (!code) continue;
+        const rawVal = form.prices[rawCode] ?? form.prices[code] ?? "0";
+        pricesPayload.push({
+          country_code: code,
+          price_cents: Math.round(Number(String(rawVal).replace(",", ".")) * 100) || 0,
+        });
+      }
       if (editingId) {
         await client.request(`/admin-hub/v1/shipping-groups/${editingId}`, {
           method: "PATCH",
@@ -532,10 +544,15 @@ export default function ShippingSettingsPage() {
     const fromLS = typeof window !== "undefined" ? window.localStorage.getItem(LS_THRESHOLDS_KEY) : null;
     const thresholdData = fromBackend ?? (fromLS ? JSON.parse(fromLS) : null);
     if (thresholdData && typeof thresholdData === "object") {
-      const codes = Object.keys(thresholdData);
-      setThresholdCountries(codes);
       const display = {};
-      for (const [code, cents] of Object.entries(thresholdData)) display[code] = String(cents / 100);
+      const codes = [];
+      for (const [code, cents] of Object.entries(thresholdData)) {
+        const iso = normalizeSellerCountryCode(code);
+        if (!iso) continue;
+        if (!codes.includes(iso)) codes.push(iso);
+        display[iso] = String(Number(cents) / 100);
+      }
+      setThresholdCountries(codes);
       setThresholds(display);
     }
     setLoading(false);
@@ -546,9 +563,11 @@ export default function ShippingSettingsPage() {
   const handleSaveThresholds = async () => {
     const thresholdCents = {};
     for (const code of thresholdCountries) {
+      const iso = normalizeSellerCountryCode(code);
+      if (!iso) continue;
       const raw = (thresholds[code] || "").replace(",", ".");
       const cents = Math.round(parseFloat(raw) * 100);
-      if (!isNaN(cents) && cents >= 0) thresholdCents[code] = cents;
+      if (!isNaN(cents) && cents >= 0) thresholdCents[iso] = cents;
     }
     setSavingThreshold(true); setThresholdErr("");
     try {
@@ -556,10 +575,12 @@ export default function ShippingSettingsPage() {
         store_name: currentStoreName,
         free_shipping_thresholds: thresholdCents,
       });
-    } catch (_) {}
-    if (typeof window !== "undefined") window.localStorage.setItem(LS_THRESHOLDS_KEY, JSON.stringify(thresholdCents));
-    setSavedThreshold(true);
-    setTimeout(() => setSavedThreshold(false), 3000);
+      if (typeof window !== "undefined") window.localStorage.setItem(LS_THRESHOLDS_KEY, JSON.stringify(thresholdCents));
+      setSavedThreshold(true);
+      setTimeout(() => setSavedThreshold(false), 3000);
+    } catch (e) {
+      setThresholdErr(e?.message || "Fehler beim Speichern");
+    }
     setSavingThreshold(false);
   };
 

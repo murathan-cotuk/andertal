@@ -75,6 +75,7 @@
     "postalCode": "Posta kodu",
     "city": "Şehir",
     "country": "Ülke",
+    "noShippableCountries": "Henüz kargo fiyatı tanımlı teslimat ülkesi yok. Lütfen mağaza ile iletişime geçin.",
     "payment": "Ödeme",
     "processing": "İşleniyor…",
     "placeOrder": "Siparişi ver",

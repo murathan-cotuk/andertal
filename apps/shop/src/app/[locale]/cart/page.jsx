@@ -12,6 +12,9 @@ import { resolveImageUrl } from "@/lib/image-url";
 import { tokens } from "@/design-system/tokens";
 import PayNowButton from "@/components/ui/PayNowButton";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
+import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
+import { getShippingPriceCents } from "@/lib/shipping-price";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -276,8 +279,9 @@ export default function CartPage() {
       .catch(() => {});
   }, []);
   const prefix = useMarketPrefix();
-  const countryCode = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
-  const freeShippingThreshold = allThresholds?.[countryCode] ?? allThresholds?.["DE"] ?? envThresholdCents;
+  const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
+  const countryCode = useShippingCountryForQuotes(marketCountry);
+  const freeShippingThreshold = resolveFreeShippingThresholdCents(allThresholds, countryCode, envThresholdCents);
   const effectiveTotal = subtotalCents - bonusDiscountCents;
 
   // Kargo ücreti: sepetteki ürünlerin versandgruppe fiyatından hesaplanır
@@ -287,7 +291,7 @@ export default function CartPage() {
     if (!groupId) continue;
     const group = (shippingGroups || []).find((g) => g.id === groupId);
     if (!group?.prices) continue;
-    const p = group.prices[countryCode] ?? group.prices["DE"] ?? 0;
+    const p = getShippingPriceCents(group.prices, countryCode, "DE") ?? 0;
     if (shippingCents === null || p > shippingCents) shippingCents = p;
   }
   const isFree = freeShippingThreshold != null && effectiveTotal >= freeShippingThreshold;

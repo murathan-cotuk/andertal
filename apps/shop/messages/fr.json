@@ -75,6 +75,7 @@
     "postalCode": "Code postal",
     "city": "Ville",
     "country": "Pays",
+    "noShippableCountries": "Aucun pays de livraison n’est configuré avec des frais d’envoi. Contactez la boutique.",
     "payment": "Paiement",
     "processing": "Traitement…",
     "placeOrder": "Passer la commande",

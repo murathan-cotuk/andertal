@@ -75,6 +75,7 @@
     "postalCode": "PLZ",
     "city": "Stadt",
     "country": "Land",
+    "noShippableCountries": "Es sind noch keine Lieferländer mit Versandpreisen hinterlegt. Bitte kontaktieren Sie den Händler.",
     "payment": "Zahlung",
     "processing": "Wird verarbeitet…",
     "placeOrder": "Bestellung aufgeben",

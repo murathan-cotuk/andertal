@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter, Link } from "@/i18n/navigation";
 import { useMedusaAuth } from "@/hooks/useMedusaAuth";
 import { useCustomerAuth as useAuth, useAuthGuard } from "@belucha/lib";
 import { tokens } from "@/design-system/tokens";
+import { useCart } from "@/context/CartContext";
+import { getShippableCountries } from "@/lib/countries";
 
 /* ── Monkey SVG ─────────────────────────────────────────────────────────── */
 function MonkeyAvatar({ isBlind }) {
@@ -92,6 +94,20 @@ export default function RegisterPage() {
   const { login } = useAuth();
   const router = useRouter();
   const { register: registerMedusa, login: loginMedusa, loading } = useMedusaAuth();
+  const { shippingGroups } = useCart();
+  const shippableCountries = useMemo(() => getShippableCountries(shippingGroups), [shippingGroups]);
+
+  useEffect(() => {
+    if (!shippableCountries.length) return;
+    const codes = new Set(shippableCountries.map((c) => c.code));
+    setFormData((f) => {
+      const next = { ...f };
+      if (!codes.has(next.country)) next.country = shippableCountries[0].code;
+      const bc = next.billingCountry || "DE";
+      if (!codes.has(bc)) next.billingCountry = shippableCountries[0].code;
+      return next;
+    });
+  }, [shippableCountries]);
 
   const set = (key) => (e) => setFormData(f => ({ ...f, [key]: e.target.value }));
 
@@ -291,16 +307,10 @@ export default function RegisterPage() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Land</label>
-              <select id="country" value={formData.country} onChange={set("country")} autoComplete="country" style={selStyle} onFocus={focusStyle} onBlur={blurStyle}>
-                <option value="DE">Deutschland</option>
-                <option value="AT">Österreich</option>
-                <option value="CH">Schweiz</option>
-                <option value="TR">Türkiye</option>
-                <option value="FR">France</option>
-                <option value="IT">Italia</option>
-                <option value="ES">España</option>
-                <option value="GB">United Kingdom</option>
-                <option value="US">United States</option>
+              <select id="country" value={shippableCountries.some((c) => c.code === formData.country) ? formData.country : (shippableCountries[0]?.code || "")} onChange={set("country")} autoComplete="country" style={selStyle} onFocus={focusStyle} onBlur={blurStyle} disabled={!shippableCountries.length}>
+                {shippableCountries.map((c) => (
+                  <option key={c.code} value={c.code}>{c.flag ? `${c.flag} ` : ""}{c.label}</option>
+                ))}
               </select>
             </div>
 
@@ -337,16 +347,10 @@ export default function RegisterPage() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Land</label>
-                  <select id="billingCountry" value={formData.billingCountry || "DE"} onChange={set("billingCountry")} style={selStyle} onFocus={focusStyle} onBlur={blurStyle}>
-                    <option value="DE">Deutschland</option>
-                    <option value="AT">Österreich</option>
-                    <option value="CH">Schweiz</option>
-                    <option value="TR">Türkiye</option>
-                    <option value="FR">France</option>
-                    <option value="IT">Italia</option>
-                    <option value="ES">España</option>
-                    <option value="GB">United Kingdom</option>
-                    <option value="US">United States</option>
+                  <select id="billingCountry" value={(shippableCountries.find((c) => c.code === (formData.billingCountry || "")) || shippableCountries[0])?.code || ""} onChange={set("billingCountry")} style={selStyle} onFocus={focusStyle} onBlur={blurStyle} disabled={!shippableCountries.length}>
+                    {shippableCountries.map((c) => (
+                      <option key={c.code} value={c.code}>{c.flag ? `${c.flag} ` : ""}{c.label}</option>
+                    ))}
                   </select>
                 </div>
               </>

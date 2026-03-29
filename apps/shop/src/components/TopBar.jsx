@@ -1,9 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { tokens } from "@/design-system/tokens";
+import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
+import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
+import { formatPriceCents } from "@/lib/format";
 
 const TOP_BAR_HEIGHT = "32px";
 const TOP_BAR_BG = "#e4eaf2";
@@ -42,19 +46,52 @@ const Item = styled(Link)`
   }
 `;
 
-const DEFAULT_ITEMS = [
-  { text: "Kostenloser Versand ab 50 €", href: "/shipping" },
+const STATIC_LINKS = [
   { text: "Kontakt", href: "/contact" },
   { text: "Retouren & Umtausch", href: "/returns" },
   { text: "Sicher einkaufen", href: "/secure" },
 ];
 
-export default function TopBar({ items = DEFAULT_ITEMS }) {
+export default function TopBar() {
+  const prefix = useMarketPrefix();
+  const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
+  const countryCode = useShippingCountryForQuotes(marketCountry);
+  const envThresholdCents =
+    typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
+      ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS)
+      : null;
+
+  const [rawThresholds, setRawThresholds] = useState(null);
+  useEffect(() => {
+    fetch("/api/store-seller-settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.free_shipping_thresholds && typeof d.free_shipping_thresholds === "object") {
+          setRawThresholds(d.free_shipping_thresholds);
+        } else if (d?.free_shipping_threshold_cents != null) {
+          setRawThresholds({ DE: d.free_shipping_threshold_cents });
+        } else {
+          setRawThresholds(null);
+        }
+      })
+      .catch(() => setRawThresholds(null));
+  }, []);
+
+  const thresholdCents = resolveFreeShippingThresholdCents(rawThresholds, countryCode, envThresholdCents);
+
+  const items = useMemo(() => {
+    const first =
+      thresholdCents != null
+        ? [{ text: `Kostenloser Versand ab ${formatPriceCents(thresholdCents)} €`, href: "/shipping" }]
+        : [];
+    return [...first, ...STATIC_LINKS];
+  }, [thresholdCents]);
+
   return (
     <Bar>
       <Container>
         {items.slice(0, 4).map((item, i) => (
-          <Item key={i} href={item.href || "#"}>
+          <Item key={`${item.href}-${i}`} href={item.href || "#"}>
             {item.text}
           </Item>
         ))}

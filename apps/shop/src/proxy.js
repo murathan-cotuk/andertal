@@ -4,10 +4,19 @@ import { routing } from "./i18n/routing";
 import {
   parseMarketPath,
   defaultMarketForLocale,
+  defaultCurrencyForMarket,
   DEFAULT_CURRENCY,
+  isValidCurrency,
   isValidLocale,
+  isValidMarket,
   marketPrefix,
 } from "./lib/shop-market";
+
+function marketTripleFromCookie(request) {
+  const raw = (request.cookies.get("belucha_market_prefix")?.value || "").trim();
+  if (!raw.startsWith("/")) return null;
+  return parseMarketPath(raw);
+}
 
 const LOCALES = routing.locales;
 const DEFAULT_LOCALE = routing.defaultLocale;
@@ -98,10 +107,18 @@ export default function middleware(request) {
       const parts = pathname.split("/").filter(Boolean);
       // Try: market path like /{market}/{locale}/{currency}/... or /{locale}/...
       const triple = parseMarketPath(pathname);
+      const cookieT = marketTripleFromCookie(request);
       const locale = triple?.lang
         || (parts.length >= 1 && LOCALES.includes(parts[0]) ? parts[0] : DEFAULT_LOCALE);
-      const market = defaultMarketForLocale(locale);
-      const loginUrl = new URL(`/${market}/${locale}/${DEFAULT_CURRENCY}/login`, request.url);
+      const market =
+        cookieT?.country && isValidMarket(cookieT.country)
+          ? cookieT.country
+          : defaultMarketForLocale(locale);
+      const cur =
+        cookieT?.currency && isValidCurrency(cookieT.currency)
+          ? cookieT.currency
+          : DEFAULT_CURRENCY;
+      const loginUrl = new URL(`/${market}/${locale}/${cur}/login`, request.url);
       loginUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(loginUrl);
     }
@@ -128,16 +145,44 @@ export default function middleware(request) {
       headers: h,
       method: request.method,
     });
-    return intlMiddleware(forwarded);
+    const intlRes = intlMiddleware(forwarded);
+    const mp = marketPrefix(triple.country, triple.lang, triple.currency);
+    try {
+      intlRes.cookies.set("belucha_market_prefix", mp, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+    } catch (_) {}
+    return intlRes;
   }
 
   const parts = pathname.split("/").filter(Boolean);
   if (parts.length >= 1 && isValidLocale(parts[0])) {
     const loc = parts[0].toLowerCase();
     const rest = parts.length > 1 ? `/${parts.slice(1).join("/")}` : "";
-    const market = defaultMarketForLocale(loc);
-    const url = new URL(`/${market}/${loc}/${DEFAULT_CURRENCY}${rest}`, request.url);
-    return NextResponse.redirect(url);
+    const cookieT = marketTripleFromCookie(request);
+    const market =
+      cookieT?.country && isValidMarket(cookieT.country)
+        ? cookieT.country
+        : defaultMarketForLocale(loc);
+    const cur =
+      cookieT?.currency && isValidCurrency(cookieT.currency)
+        ? cookieT.currency
+        : defaultCurrencyForMarket(market);
+    const dest = new URL(`/${market}/${loc}/${cur}${rest}`, request.url);
+    const redirectRes = NextResponse.redirect(dest);
+    const mp = marketPrefix(market, loc, cur);
+    try {
+      redirectRes.cookies.set("belucha_market_prefix", mp, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+    } catch (_) {}
+    return redirectRes;
   }
 
   if (pathname === "/" || pathname === "") {

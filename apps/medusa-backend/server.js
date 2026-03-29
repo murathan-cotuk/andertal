@@ -2158,6 +2158,24 @@ async function start() {
     httpApp.delete('/admin-hub/products/:id', adminHubProductByIdDELETE)
     console.log('Admin Hub routes: GET/POST /admin-hub/products, GET/PUT/DELETE /admin-hub/products/:id')
 
+    /** ISO2 uppercase; UK → GB. Invalid → ''. */
+    const normalizeHubCountryCode = (code) => {
+      if (code == null || code === '') return ''
+      const s = String(code).trim().toUpperCase()
+      if (s === 'UK') return 'GB'
+      return /^[A-Z]{2}$/.test(s) ? s : ''
+    }
+    const normalizeThresholdsObject = (raw) => {
+      if (!raw || typeof raw !== 'object') return null
+      const out = {}
+      for (const [k, v] of Object.entries(raw)) {
+        const nk = normalizeHubCountryCode(k)
+        if (!nk) continue
+        out[nk] = v
+      }
+      return out
+    }
+
     // Seller settings (store name) – persisted in DB so shop shows correct Verkäufer
     const getSellerStoreName = async (sellerId) => {
       const id = (sellerId || 'default').toString().trim() || 'default'
@@ -2185,7 +2203,10 @@ async function start() {
         await client.end()
         const row = r.rows && r.rows[0]
         const store_name = row && row.store_name != null ? String(row.store_name) : ''
-        const free_shipping_thresholds = (row && row.free_shipping_thresholds) || null
+        let free_shipping_thresholds = (row && row.free_shipping_thresholds) || null
+        if (free_shipping_thresholds && typeof free_shipping_thresholds === 'object') {
+          free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
+        }
         res.json({ store_name, free_shipping_thresholds })
       } catch (err) {
         console.error('sellerSettingsGET:', err)
@@ -2197,8 +2218,11 @@ async function start() {
         const body = req.body || {}
         const store_name = (body.store_name != null ? String(body.store_name) : '').trim()
         const sellerId = (body.seller_id || req.query.seller_id || 'default').toString().trim() || 'default'
-        const free_shipping_thresholds = (body.free_shipping_thresholds && typeof body.free_shipping_thresholds === 'object')
+        let free_shipping_thresholds = (body.free_shipping_thresholds && typeof body.free_shipping_thresholds === 'object')
           ? body.free_shipping_thresholds : null
+        if (free_shipping_thresholds) {
+          free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
+        }
         const client = getProductsDbClient()
         if (!client) return res.status(500).json({ message: 'Database unavailable' })
         await client.connect()
@@ -2234,7 +2258,10 @@ async function start() {
         await client.end()
         const row = r.rows && r.rows[0]
         const store_name = row && row.store_name != null ? String(row.store_name) : ''
-        const free_shipping_thresholds = (row && row.free_shipping_thresholds) || null
+        let free_shipping_thresholds = (row && row.free_shipping_thresholds) || null
+        if (free_shipping_thresholds && typeof free_shipping_thresholds === 'object') {
+          free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
+        }
         console.log('[storeSellerSettingsGET] free_shipping_thresholds:', JSON.stringify(free_shipping_thresholds))
         res.json({ store_name, free_shipping_thresholds })
       } catch (err) {
@@ -3345,7 +3372,9 @@ async function start() {
         const pricesByGroup = {}
         for (const p of (prices.rows || [])) {
           if (!pricesByGroup[p.group_id]) pricesByGroup[p.group_id] = []
-          pricesByGroup[p.group_id].push(p)
+          const cc = normalizeHubCountryCode(p.country_code)
+          if (!cc) continue
+          pricesByGroup[p.group_id].push({ ...p, country_code: cc })
         }
         const result = (groups.rows || []).map(g => ({ ...g, prices: pricesByGroup[g.id] || [] }))
         res.json({ groups: result })
@@ -3371,11 +3400,12 @@ async function start() {
         const group = r.rows[0]
         if (Array.isArray(prices) && prices.length > 0) {
           for (const p of prices) {
-            if (!p.country_code) continue
+            const cc = normalizeHubCountryCode(p.country_code)
+            if (!cc) continue
             await client.query(
               `INSERT INTO store_shipping_prices (group_id, country_code, price_cents) VALUES ($1,$2,$3)
                ON CONFLICT (group_id, country_code) DO UPDATE SET price_cents=$3`,
-              [group.id, p.country_code, Math.round(Number(p.price_cents) || 0)]
+              [group.id, cc, Math.round(Number(p.price_cents) || 0)]
             )
           }
         }
@@ -3406,18 +3436,25 @@ async function start() {
         }
         if (Array.isArray(prices)) {
           for (const p of prices) {
-            if (!p.country_code) continue
+            const cc = normalizeHubCountryCode(p.country_code)
+            if (!cc) continue
             await client.query(
               `INSERT INTO store_shipping_prices (group_id, country_code, price_cents) VALUES ($1,$2,$3)
                ON CONFLICT (group_id, country_code) DO UPDATE SET price_cents=$3`,
-              [id, p.country_code, Math.round(Number(p.price_cents) || 0)]
+              [id, cc, Math.round(Number(p.price_cents) || 0)]
             )
           }
         }
         const r = await client.query(`SELECT g.*, c.name AS carrier_name FROM store_shipping_groups g LEFT JOIN store_shipping_carriers c ON c.id=g.carrier_id WHERE g.id=$1::uuid`, [id])
         const pr = await client.query('SELECT * FROM store_shipping_prices WHERE group_id=$1 ORDER BY country_code', [id])
         await client.end()
-        const group = r.rows[0] ? { ...r.rows[0], prices: pr.rows || [] } : null
+        const normPrices = (pr.rows || [])
+          .map((row) => {
+            const cc = normalizeHubCountryCode(row.country_code)
+            return cc ? { ...row, country_code: cc } : null
+          })
+          .filter(Boolean)
+        const group = r.rows[0] ? { ...r.rows[0], prices: normPrices } : null
         res.json({ group })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -3456,7 +3493,9 @@ async function start() {
         const pricesByGroup = {}
         for (const p of (prices.rows || [])) {
           if (!pricesByGroup[p.group_id]) pricesByGroup[p.group_id] = {}
-          pricesByGroup[p.group_id][p.country_code] = Number(p.price_cents)
+          const cc = normalizeHubCountryCode(p.country_code)
+          if (!cc) continue
+          pricesByGroup[p.group_id][cc] = Number(p.price_cents)
         }
         const result = (groups.rows || []).map(g => ({ id: g.id, name: g.name, prices: pricesByGroup[g.id] || {} }))
         res.json({ groups: result })

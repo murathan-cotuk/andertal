@@ -14,6 +14,9 @@ import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { localizedProductMediaList, variantImageUrlForLocale } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
+import { getShippingPriceCents } from "@/lib/shipping-price";
 import Carousel from "@/components/Carousel";
 import { StarRating } from "@/components/ProductCard";
 import { ProductCard } from "@/components/ProductCard";
@@ -623,6 +626,9 @@ function BrandRow({ brandName, brandHandle, brandLogo, reviewCount }) {
 export default function ProductTemplate() {
   const params = useParams();
   const locale = useLocale();
+  const marketPrefixVal = useMarketPrefix();
+  const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
+  const countryCode = useShippingCountryForQuotes(marketCountry);
   const slug = params?.slug ?? params?.handle;
   const [selectedImage, setSelectedImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -766,10 +772,9 @@ export default function ProductTemplate() {
   const meta = product.metadata || {};
   const shippingGroupId = meta.shipping_group_id;
   const shippingGroup = shippingGroups.find((g) => g.id === shippingGroupId);
-  const defaultCountry = "DE";
-  const shippingPriceCents = shippingGroup?.prices?.[defaultCountry];
+  const shippingPriceCents = getShippingPriceCents(shippingGroup?.prices, countryCode, "DE");
   const shippingDisplay = shippingGroupId && shippingGroup
-    ? (shippingPriceCents != null ? `${(shippingPriceCents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 })} € Versand` : shippingGroup.name)
+    ? (shippingPriceCents != null ? `${(shippingPriceCents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : shippingGroup.name)
     : (meta.shipping_info || meta.versand || "Standardversand");
   const rawVariants = product.variants || [];
   const variationGroups = product.variation_groups || null;

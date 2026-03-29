@@ -6,6 +6,9 @@ import { Link } from "@/i18n/navigation";
 import { useCart } from "@/context/CartContext";
 import { formatPriceCents } from "@/lib/format";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
+import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
+import { getShippingPriceCents } from "@/lib/shipping-price";
 
 const Overlay = styled.div`
   position: fixed;
@@ -298,7 +301,7 @@ function calcShipping(items, shippingGroups, country = "DE") {
     const group = (shippingGroups || []).find((g) => g.id === groupId);
     if (!group?.prices) continue;
     console.log("[calcShipping] country:", country, "group.prices:", group.prices, "groupId:", groupId);
-    const priceCents = group.prices[country] ?? group.prices["DE"] ?? 0;
+    const priceCents = getShippingPriceCents(group.prices, country, "DE") ?? 0;
     if (priceCents > maxCents) maxCents = priceCents;
     found = true;
   }
@@ -310,8 +313,9 @@ export default function CartSidebar() {
   const items = cart?.items || [];
   const allThresholds = useShippingThresholds();
   const prefix = useMarketPrefix();
-  const countryCode = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
-  const freeShippingThreshold = allThresholds?.[countryCode] ?? allThresholds?.["DE"] ?? ENV_THRESHOLD_CENTS;
+  const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
+  const countryCode = useShippingCountryForQuotes(marketCountry);
+  const freeShippingThreshold = resolveFreeShippingThresholdCents(allThresholds, countryCode, ENV_THRESHOLD_CENTS);
   const effectiveTotal = subtotalCents - bonusDiscountCents;
   const shippingCents = calcShipping(items, shippingGroups, countryCode);
   const isFree = freeShippingThreshold != null && effectiveTotal >= freeShippingThreshold;

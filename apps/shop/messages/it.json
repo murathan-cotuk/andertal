@@ -75,6 +75,7 @@
     "postalCode": "CAP",
     "city": "Città",
     "country": "Paese",
+    "noShippableCountries": "Non è ancora stato configurato alcun paese di spedizione con prezzi. Contatta il negozio.",
     "payment": "Pagamento",
     "processing": "Elaborazione…",
     "placeOrder": "Invia ordine",

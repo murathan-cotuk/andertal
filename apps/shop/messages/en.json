@@ -75,6 +75,7 @@
     "postalCode": "Postal code",
     "city": "City",
     "country": "Country",
+    "noShippableCountries": "No shipping countries are configured yet. Please contact the store.",
     "payment": "Payment",
     "processing": "Processing…",
     "placeOrder": "Place order",
