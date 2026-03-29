@@ -125,7 +125,26 @@
         "delivered": "Consegnato",
         "completed": "Completato",
         "cancelled": "Annullato"
-      }
+      },
+      "orderStatus": {
+        "offen": "Aperto",
+        "in_bearbeitung": "In elaborazione",
+        "versendet": "Spedito",
+        "zugestellt": "Consegnato",
+        "abgeschlossen": "Completato",
+        "storniert": "Annullato",
+        "bezahlt": "Pagato",
+        "refunded": "Rimborsato",
+        "retoure": "Reso",
+        "retoure_anfrage": "Reso in attesa di approvazione",
+        "pending": "Aperto",
+        "shipped": "Spedito",
+        "delivered": "Consegnato",
+        "completed": "Completato",
+        "cancelled": "Annullato"
+      },
+      "retourenschein": "Modulo di reso (PDF)",
+      "ruecksendeEtikett": "Etichetta di reso (PDF)"
     }
   }
 }

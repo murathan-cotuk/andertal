@@ -376,6 +376,15 @@ const QtySelect = styled.select`
   color: #111;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
+  &[type="number"] {
+    width: 11.5rem;
+    min-width: 0;
+    box-sizing: border-box;
+    text-align: center;
+    padding-left: 6px;
+    padding-right: 6px;
+    cursor: text;
+  }
   &:focus {
     border-color: rgba(255,106,0,0.55);
     box-shadow: 0 0 0 4px rgba(255,106,0,0.12);

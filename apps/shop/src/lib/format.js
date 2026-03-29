@@ -37,6 +37,24 @@ export function getLocalizedProduct(product, locale) {
 }
 
 /**
+ * Cart line title from API: `title` is frozen at add-to-cart; `product_title` + `product_metadata`
+ * carry DB + translations so the name follows the active shop locale.
+ */
+export function getLocalizedCartLineTitle(item, locale) {
+  if (!item) return "";
+  const raw = item.title || "";
+  const dbTitle = item.product_title;
+  const meta = item.product_metadata;
+  if (dbTitle != null && String(dbTitle).trim() !== "" && meta != null && typeof meta === "object") {
+    const { title } = getLocalizedProduct({ title: dbTitle, metadata: meta }, locale);
+    const m = raw.match(/^(.*)\s+\((.+)\)$/);
+    if (m && m[2]) return `${title} (${m[2]})`;
+    return title || raw;
+  }
+  return raw;
+}
+
+/**
  * Strip HTML tags and return plain text (for product description preview)
  */
 export function htmlToText(html) {

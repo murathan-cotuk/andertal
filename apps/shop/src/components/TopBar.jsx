@@ -5,7 +5,6 @@ import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { tokens } from "@/design-system/tokens";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
-import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
 import { formatPriceCents } from "@/lib/format";
 
@@ -54,8 +53,8 @@ const STATIC_LINKS = [
 
 export default function TopBar() {
   const prefix = useMarketPrefix();
+  /** Storefront region from URL — not checkout LS (avoids wrong threshold on /gb/). */
   const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
-  const countryCode = useShippingCountryForQuotes(marketCountry);
   const envThresholdCents =
     typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
       ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS)
@@ -77,7 +76,7 @@ export default function TopBar() {
       .catch(() => setRawThresholds(null));
   }, []);
 
-  const thresholdCents = resolveFreeShippingThresholdCents(rawThresholds, countryCode, envThresholdCents);
+  const thresholdCents = resolveFreeShippingThresholdCents(rawThresholds, marketCountry, envThresholdCents);
 
   const items = useMemo(() => {
     const first =

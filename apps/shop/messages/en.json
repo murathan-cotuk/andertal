@@ -125,7 +125,26 @@
         "delivered": "Delivered",
         "completed": "Completed",
         "cancelled": "Cancelled"
-      }
+      },
+      "orderStatus": {
+        "offen": "Open",
+        "in_bearbeitung": "Processing",
+        "versendet": "Shipped",
+        "zugestellt": "Delivered",
+        "abgeschlossen": "Completed",
+        "storniert": "Cancelled",
+        "bezahlt": "Paid",
+        "refunded": "Refunded",
+        "retoure": "Return",
+        "retoure_anfrage": "Return pending approval",
+        "pending": "Open",
+        "shipped": "Shipped",
+        "delivered": "Delivered",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
+      },
+      "retourenschein": "Return form (PDF)",
+      "ruecksendeEtikett": "Return label (PDF)"
     }
   }
 }

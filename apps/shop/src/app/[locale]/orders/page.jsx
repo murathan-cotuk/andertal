@@ -9,7 +9,7 @@ import Footer from "@/components/Footer";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import { getMedusaClient } from "@/lib/medusa-client";
 
-const STATUS_LABEL = {
+const STATUS_LABEL_FALLBACK = {
   offen: "Offen",
   in_bearbeitung: "In Bearbeitung",
   versendet: "Versendet",
@@ -18,6 +18,8 @@ const STATUS_LABEL = {
   storniert: "Storniert",
   bezahlt: "Bezahlt",
   refunded: "Erstattet",
+  retoure: "Retoure",
+  retoure_anfrage: "Rückgabe wird geprüft",
   pending: "Offen",
   shipped: "Versendet",
   delivered: "Zugestellt",
@@ -34,6 +36,8 @@ const STATUS_COLOR = {
   storniert: "#991b1b",
   bezahlt: "#166534",
   refunded: "#1d4ed8",
+  retoure: "#b91c1c",
+  retoure_anfrage: "#b45309",
   pending: "#92400e",
   shipped: "#6d28d9",
   delivered: "#166534",
@@ -41,9 +45,9 @@ const STATUS_COLOR = {
   cancelled: "#991b1b",
 };
 
-function StatusPill({ status }) {
+function StatusPill({ status, label }) {
   const key = (status || "").toLowerCase();
-  const label = STATUS_LABEL[key] || status || "—";
+  const labelText = label ?? STATUS_LABEL_FALLBACK[key] ?? status ?? "—";
   const color = STATUS_COLOR[key] || "#6b7280";
   return (
     <span style={{
@@ -56,7 +60,7 @@ function StatusPill({ status }) {
       padding: "2px 8px",
       letterSpacing: 0.2,
     }}>
-      {label}
+      {labelText}
     </span>
   );
 }
@@ -94,6 +98,40 @@ async function downloadInvoice(order) {
   const a = document.createElement("a");
   a.href = url;
   a.download = `Rechnung-${order.order_number || order.id?.slice(0, 8)}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function downloadReturnRetourenschein(order) {
+  const token = getToken("customer");
+  const res = await fetch(`/api/store-return-retourenschein/${order.id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) { alert("Retourenschein konnte nicht geladen werden."); return; }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Retourenschein-${order.order_number || order.id?.slice(0, 8)}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function downloadReturnEtikett(order) {
+  const token = getToken("customer");
+  const res = await fetch(`/api/store-return-etikett/${order.id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) { alert("Rücksende-Etikett konnte nicht geladen werden."); return; }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Ruecksende-Etikett-${order.order_number || order.id?.slice(0, 8)}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -178,6 +216,15 @@ export default function OrdersPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
   const { logout } = useAuth();
   const router = useRouter();
+  const tOrd = useTranslations("pages.orders");
+  const statusLabel = (code) => {
+    const k = (code || "").toLowerCase();
+    try {
+      return tOrd(`orderStatus.${k}`);
+    } catch {
+      return STATUS_LABEL_FALLBACK[k] || code || "—";
+    }
+  };
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -249,11 +296,20 @@ export default function OrdersPage() {
     return (Date.now() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24) > 14;
   };
 
-  // Effective display status: refunded takes priority if any return has refund_status=erstattet
+  /** Refund > aktive Retoure (offen / genehmigt) > sonst DB order_status (retoure_* wird nicht von „Abgeschlossen“ überschrieben) */
   const displayStatus = (order) => {
     if (order.order_status === "refunded") return "refunded";
     const hasRefund = (order.returns || []).some(r => r.refund_status === "erstattet");
     if (hasRefund) return "refunded";
+    const activeRet = (order.returns || []).find(
+      (r) => r.status !== "abgelehnt" && r.status !== "abgeschlossen",
+    );
+    if (activeRet) {
+      if (activeRet.status === "genehmigt") return "retoure";
+      if (activeRet.status === "offen") return "retoure_anfrage";
+      return "retoure_anfrage";
+    }
+    if (order.order_status === "retoure" || order.order_status === "retoure_anfrage") return order.order_status;
     return order.order_status || order.delivery_status || "offen";
   };
 
@@ -302,7 +358,10 @@ export default function OrdersPage() {
                 <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
                   {orders.map((order, idx) => {
                     const isExpanded = expanded[order.id];
-                    const activeReturn = order.returns?.find(r => r.status !== "abgelehnt");
+                    const activeReturn = order.returns?.find(
+                      (r) => r.status !== "abgelehnt" && r.status !== "abgeschlossen",
+                    );
+                    const approvedReturn = order.returns?.find((r) => r.status === "genehmigt");
                     const items = order.items || [];
                     const subtotal = Number(order.subtotal_cents || 0);
                     const shipping = Number(order.shipping_cents || 0);
@@ -325,7 +384,7 @@ export default function OrdersPage() {
                             </div>
                             <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{fmtDate(order.created_at)}</div>
                             <div style={{ marginTop: 6 }}>
-                              <StatusPill status={displayStatus(order)} />
+                              <StatusPill status={displayStatus(order)} label={statusLabel(displayStatus(order))} />
                             </div>
                           </div>
 
@@ -379,11 +438,30 @@ export default function OrdersPage() {
                                 {isExpanded ? "Weniger ▲" : "Details ▼"}
                               </button>
                               <button
+                                type="button"
                                 onClick={() => downloadInvoice(order)}
                                 style={{ fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline", textDecorationColor: "#d1d5db" }}
                               >
                                 Rechnung
                               </button>
+                              {approvedReturn && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadReturnRetourenschein(order)}
+                                    style={{ fontSize: 11, color: "#b45309", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline", textDecorationColor: "#fcd34d" }}
+                                  >
+                                    {tOrd("retourenschein")}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadReturnEtikett(order)}
+                                    style={{ fontSize: 11, color: "#b45309", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline", textDecorationColor: "#fcd34d" }}
+                                  >
+                                    {tOrd("ruecksendeEtikett")}
+                                  </button>
+                                </>
+                              )}
                               {canReturn(order) && !activeReturn && (
                                 <button
                                   onClick={() => setRetourModal(order)}

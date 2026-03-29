@@ -2608,23 +2608,37 @@ async function start() {
       if (!cartRow) return null
       const itemsRes = await client.query(
         `SELECT ci.id, ci.variant_id, ci.product_id, ci.quantity, ci.unit_price_cents, ci.title, ci.thumbnail, ci.product_handle,
-         p.metadata->>'shipping_group_id' AS shipping_group_id
+         p.metadata->>'shipping_group_id' AS shipping_group_id,
+         p.title AS product_title,
+         p.metadata AS product_metadata
          FROM store_cart_items ci
          LEFT JOIN admin_hub_products p ON p.id::text = ci.product_id
          WHERE ci.cart_id = $1 ORDER BY ci.created_at`,
         [cartId]
       )
-      const items = (itemsRes.rows || []).map((r) => ({
-        id: r.id,
-        variant_id: r.variant_id,
-        product_id: r.product_id,
-        quantity: r.quantity,
-        unit_price_cents: r.unit_price_cents,
-        title: r.title,
-        thumbnail: r.thumbnail,
-        product_handle: r.product_handle,
-        shipping_group_id: r.shipping_group_id || null,
-      }))
+      const items = (itemsRes.rows || []).map((r) => {
+        let pm = r.product_metadata
+        if (pm != null && typeof pm === 'string') {
+          try {
+            pm = JSON.parse(pm)
+          } catch (_) {
+            pm = null
+          }
+        }
+        return {
+          id: r.id,
+          variant_id: r.variant_id,
+          product_id: r.product_id,
+          quantity: r.quantity,
+          unit_price_cents: r.unit_price_cents,
+          title: r.title,
+          thumbnail: r.thumbnail,
+          product_handle: r.product_handle,
+          shipping_group_id: r.shipping_group_id || null,
+          product_title: r.product_title || null,
+          product_metadata: pm && typeof pm === 'object' ? pm : null,
+        }
+      })
       return {
         id: cartRow.id,
         created_at: cartRow.created_at,
@@ -3586,6 +3600,147 @@ async function start() {
       }
     }
 
+    const storeReturnPdfLatin = (s) => {
+      if (s == null || s === undefined) return ''
+      return String(s)
+        .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
+        .replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue')
+        .replace(/ß/g, 'ss')
+    }
+    const storeReturnPdfFmtDate = (d) => {
+      if (!d) return '—'
+      try {
+        return new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      } catch (_) {
+        return '—'
+      }
+    }
+
+    /** Approved return only — customer Retourenschein PDF */
+    const storeOrderReturnRetourenscheinGET = async (req, res) => {
+      const orderId = (req.params.id || '').trim()
+      if (!orderId) return res.status(400).json({ message: 'id required' })
+      const authHeader = req.headers.authorization || ''
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+      if (!token) return res.status(401).json({ message: 'Unauthorized' })
+      const payload = verifyCustomerToken(token)
+      if (!payload?.email) return res.status(401).json({ message: 'Invalid token' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const PDFDocument = require('pdfkit')
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const oRes = await client.query(
+          `SELECT * FROM store_orders WHERE id = $1::uuid
+            AND (LOWER(TRIM(email)) = LOWER(TRIM($2)) OR (customer_id IS NOT NULL AND customer_id = $3::uuid))`,
+          [orderId, payload.email, payload.id],
+        )
+        if (!oRes.rows?.[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const row = oRes.rows[0]
+        const rRes = await client.query(
+          `SELECT * FROM store_returns WHERE order_id = $1::uuid AND status = 'genehmigt' ORDER BY created_at DESC LIMIT 1`,
+          [orderId],
+        )
+        const ret = rRes.rows?.[0]
+        if (!ret) { await client.end(); return res.status(404).json({ message: 'Keine genehmigte Retoure' }) }
+        await client.end()
+        client = null
+        const rn = ret.return_number != null ? `R-${ret.return_number}` : 'R-—'
+        const on = row.order_number != null ? String(row.order_number) : String(orderId).slice(0, 8)
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', `attachment; filename="Retourenschein-${on}.pdf"`)
+        const doc = new PDFDocument({ margin: 48, size: 'A4' })
+        doc.pipe(res)
+        doc.fontSize(20).fillColor('#111').text('Retourenschein', { align: 'center' })
+        doc.moveDown(0.8)
+        doc.fontSize(11).fillColor('#374151').text(`Retoure-Nr.: ${rn}   ·   Bestellung: #${on}`, { align: 'center' })
+        doc.moveDown(1.2)
+        doc.fontSize(10).font('Helvetica-Bold').text('Retoure-Nummer (gut sichtbar aufs Paket kleben)')
+        doc.moveDown(0.4)
+        const boxTop = doc.y
+        doc.lineWidth(2).rect(72, boxTop, 450, 72).stroke('#111827')
+        doc.fontSize(30).font('Helvetica-Bold').text(rn, 72, boxTop + 16, { width: 450, align: 'center' })
+        doc.y = boxTop + 88
+        doc.moveDown(0.5)
+        doc.font('Helvetica').fontSize(10)
+        doc.text(`Erstellt am: ${storeReturnPdfFmtDate(ret.created_at)}`)
+        if (ret.approved_at) doc.text(`Genehmigt am: ${storeReturnPdfFmtDate(ret.approved_at)}`)
+        doc.moveDown(0.6)
+        doc.font('Helvetica-Bold').text('Rückgabegrund')
+        doc.font('Helvetica').text(storeReturnPdfLatin(ret.reason || '—'))
+        if (ret.notes) {
+          doc.moveDown(0.4)
+          doc.font('Helvetica-Bold').text('Anmerkungen')
+          doc.font('Helvetica').text(storeReturnPdfLatin(ret.notes))
+        }
+        doc.moveDown(1)
+        doc.fontSize(9).fillColor('#666').text(
+          'Bitte legen Sie diesen Schein dem Paket bei. Ohne sichtbare Retoure-Nummer kann die Zuordnung verzögert werden.',
+          { width: 480 },
+        )
+        doc.end()
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        if (!res.headersSent) res.status(500).json({ message: e?.message || 'PDF error' })
+      }
+    }
+
+    /** Compact shipping label style PDF — gleiche Retoure-Nr., zum Ausschneiden/Kleben */
+    const storeOrderReturnEtikettGET = async (req, res) => {
+      const orderId = (req.params.id || '').trim()
+      if (!orderId) return res.status(400).json({ message: 'id required' })
+      const authHeader = req.headers.authorization || ''
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+      if (!token) return res.status(401).json({ message: 'Unauthorized' })
+      const payload = verifyCustomerToken(token)
+      if (!payload?.email) return res.status(401).json({ message: 'Invalid token' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const PDFDocument = require('pdfkit')
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const oRes = await client.query(
+          `SELECT * FROM store_orders WHERE id = $1::uuid
+            AND (LOWER(TRIM(email)) = LOWER(TRIM($2)) OR (customer_id IS NOT NULL AND customer_id = $3::uuid))`,
+          [orderId, payload.email, payload.id],
+        )
+        if (!oRes.rows?.[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const row = oRes.rows[0]
+        const rRes = await client.query(
+          `SELECT * FROM store_returns WHERE order_id = $1::uuid AND status = 'genehmigt' ORDER BY created_at DESC LIMIT 1`,
+          [orderId],
+        )
+        const ret = rRes.rows?.[0]
+        if (!ret) { await client.end(); return res.status(404).json({ message: 'Keine genehmigte Retoure' }) }
+        await client.end()
+        client = null
+        const rn = ret.return_number != null ? `R-${ret.return_number}` : 'R-—'
+        const on = row.order_number != null ? String(row.order_number) : String(orderId).slice(0, 8)
+        const cust = [row.first_name, row.last_name].filter(Boolean).join(' ')
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', `attachment; filename="Ruecksende-Etikett-${on}.pdf"`)
+        const doc = new PDFDocument({ margin: 24, size: [288, 432] })
+        doc.pipe(res)
+        doc.fontSize(9).fillColor('#666').text('Rücksendung', { align: 'center' })
+        doc.moveDown(0.2)
+        doc.fontSize(22).font('Helvetica-Bold').fillColor('#111').text(rn, { align: 'center' })
+        doc.moveDown(0.3)
+        doc.font('Helvetica').fontSize(9).fillColor('#374151').text(`Bestellung #${on}`, { align: 'center' })
+        if (cust) doc.text(storeReturnPdfLatin(cust), { align: 'center' })
+        doc.text(storeReturnPdfLatin([row.address_line1, [row.postal_code, row.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'), { align: 'center', width: 240 })
+        doc.moveDown(0.5)
+        doc.fontSize(7).fillColor('#9ca3af').text('Bitte gut sichtbar auf dem Paket anbringen.', { align: 'center', width: 240 })
+        doc.end()
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        if (!res.headersSent) res.status(500).json({ message: e?.message || 'PDF error' })
+      }
+    }
+
     // GET /store/reviews/my — customer's own reviews
     const storeReviewsMyGET = async (req, res) => {
       const authHeader = req.headers.authorization || ''
@@ -4059,6 +4214,10 @@ async function start() {
            VALUES ($1::uuid, 'offen', $2, $3, $4)
            RETURNING id, return_number, status, created_at`,
           [orderId, reason, notes||null, items ? JSON.stringify(items) : null]
+        )
+        await client.query(
+          `UPDATE store_orders SET order_status = 'retoure_anfrage', updated_at = now() WHERE id = $1::uuid`,
+          [orderId],
         )
         await client.end()
         const ret = r.rows[0]
@@ -5206,10 +5365,11 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         await client.query(`UPDATE store_orders SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
-        // Auto-complete: if payment is paid and delivery is delivered, mark order as completed
+        // Auto-complete: if payment is paid and delivery is delivered, mark order as completed — do not override Retoure / Rückgabe / Erstattung
         await client.query(
           `UPDATE store_orders SET order_status = 'abgeschlossen', updated_at = now()
-           WHERE id = $1::uuid AND payment_status = 'bezahlt' AND delivery_status = 'zugestellt' AND order_status != 'abgeschlossen'`,
+           WHERE id = $1::uuid AND payment_status = 'bezahlt' AND delivery_status = 'zugestellt'
+           AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`,
           [id]
         )
         const oRes = await client.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
@@ -5993,6 +6153,22 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         await client.query(`UPDATE store_returns SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
+        if (status === 'genehmigt') {
+          await client.query(
+            `UPDATE store_orders SET order_status = 'retoure', updated_at = now() WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
+            [id],
+          ).catch(() => {})
+        }
+        if (status === 'abgelehnt') {
+          await client.query(
+            `UPDATE store_orders SET order_status = CASE
+               WHEN payment_status = 'bezahlt' AND delivery_status = 'zugestellt' THEN 'abgeschlossen'
+               ELSE order_status
+             END, updated_at = now()
+             WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
+            [id],
+          ).catch(() => {})
+        }
         // If refund processed, also mark order as refunded
         if (refund_status === 'erstattet') {
           await client.query(
@@ -6028,6 +6204,8 @@ async function start() {
     httpApp.delete('/admin-hub/v1/shipping-groups/:id', adminHubShippingGroupDELETE)
     httpApp.get('/store/shipping-groups', storeShippingGroupsGET)
     httpApp.get('/store/orders/:id/invoice', storeOrderInvoicePdfGET)
+    httpApp.get('/store/orders/:id/return-retourenschein', storeOrderReturnRetourenscheinGET)
+    httpApp.get('/store/orders/:id/return-etikett', storeOrderReturnEtikettGET)
     httpApp.get('/store/reviews/my', storeReviewsMyGET)
     httpApp.get('/store/reviews', storeReviewsGET)
     httpApp.post('/store/reviews', storeReviewsPOST)

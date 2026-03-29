@@ -41,6 +41,9 @@ const STATUS_COLORS = {
   zugestellt: { bg: "#d1fae5", color: "#065f46" },
   cancelled: { bg: "#fee2e2", color: "#991b1b" }, storniert: { bg: "#fee2e2", color: "#991b1b" },
   offen: { bg: "#fff7ed", color: "#c2410c" },
+  retoure: { bg: "#fef2f2", color: "#b91c1c" },
+  retoure_anfrage: { bg: "#fffbeb", color: "#b45309" },
+  refunded: { bg: "#eff6ff", color: "#1d4ed8" },
 };
 function StatusBadge({ value }) {
   const s = STATUS_COLORS[value?.toLowerCase()] || { bg: "#f3f4f6", color: "#6b7280" };

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import styled from "styled-components";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
@@ -15,7 +15,7 @@ import {
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import { useCart } from "@/context/CartContext";
-import { formatPriceCents } from "@/lib/format";
+import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 import { Link } from "@/i18n/navigation";
 import { tokens } from "@/design-system/tokens";
@@ -27,7 +27,7 @@ import { getShippableCountries } from "@/lib/countries";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
 import { getShippingPriceCents } from "@/lib/shipping-price";
 import { normalizeIsoCountryCode } from "@/lib/iso-country";
-import { CHECKOUT_SHIPPING_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
+import { CHECKOUT_SHIPPING_COUNTRY_LS, CHECKOUT_SHIPPING_MARKET_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
 
 const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
 
@@ -284,6 +284,11 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
     if (!shipList.length) return u;
     return shipList.some((c) => c.code === u) ? u : shipList[0].code;
   };
+  /** Latest Versand-land from parent (summary); avoids async customer fetch overwriting GB with default DE */
+  const defaultCountryRef = useRef(defaultCountry);
+  defaultCountryRef.current = defaultCountry;
+  const shipListRef = useRef(shipList);
+  shipListRef.current = shipList;
   const t = useTranslations("checkout");
   const stripe = useStripe();
   const elements = useElements();
@@ -358,15 +363,27 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
         if (c?.last_name) patch.last_name = c.last_name;
         client.patchStoreCart(cartId, patch).catch(() => {});
       }
+      const list = shipListRef.current;
+      const pickNow = (raw) => {
+        const u = String(raw || "DE").toUpperCase();
+        if (!list.length) return u;
+        return list.some((c) => c.code === u) ? u : list[0].code;
+      };
+      const wantC = pickNow(defaultCountryRef.current);
       const def = addrs.find((a) => a.is_default_shipping) || addrs[0];
       if (def?.id) {
-        setShipAddrId(def.id);
-        applyToField(address, def.address_line1 || "");
-        applyToField(address2, def.address_line2 || "");
-        applyToField(city, def.city || "");
-        applyToField(postalCode, def.zip_code || "");
-        applyToField(country, def.country || "DE");
-        onCountryChange?.(def.country || "DE");
+        const defC = pickNow(def.country);
+        if (list.length > 0 && defC !== wantC) {
+          setShipAddrId("");
+        } else {
+          setShipAddrId(def.id);
+          applyToField(address, def.address_line1 || "");
+          applyToField(address2, def.address_line2 || "");
+          applyToField(city, def.city || "");
+          applyToField(postalCode, def.zip_code || "");
+          applyToField(country, defC);
+          onCountryChange?.(defC);
+        }
       }
       const defB = addrs.find((a) => a.is_default_billing) || def;
       if (defB?.id) setBillAddrId(defB.id);
@@ -943,9 +960,12 @@ export default function CheckoutPage() {
   useEffect(() => {
     try {
       const iso = normalizeIsoCountryCode(shippingCountry);
-      if (iso) localStorage.setItem(CHECKOUT_SHIPPING_COUNTRY_LS, iso);
+      if (iso) {
+        localStorage.setItem(CHECKOUT_SHIPPING_COUNTRY_LS, iso);
+        localStorage.setItem(CHECKOUT_SHIPPING_MARKET_COUNTRY_LS, marketCountryCode);
+      }
     } catch (_) {}
-  }, [shippingCountry]);
+  }, [shippingCountry, marketCountryCode]);
 
   const [allThresholds, setAllThresholds] = useState(null);
   useEffect(() => {
@@ -1085,7 +1105,6 @@ export default function CheckoutPage() {
 
     setLoadingPI(true);
     setPiError(null);
-    setClientSecret(null);
     const effectiveShippingCents = isFreeShipping ? 0 : (shippingCents ?? 0);
     fetch("/api/store-payment-intent", {
       method: "POST",
@@ -1133,7 +1152,7 @@ export default function CheckoutPage() {
               {loadingPI && <p style={{ color: "#6b7280" }}>{t("processing")}</p>}
               {clientSecret && stripeInstance && (
                 <Elements
-                  key={clientSecret}
+                  key={cart.id}
                   stripe={stripeInstance}
                   options={{
                     clientSecret,
@@ -1168,13 +1187,13 @@ export default function CheckoutPage() {
                 <SummaryItem key={item.id}>
                   <SummaryThumb>
                     {item.thumbnail ? (
-                      <img src={resolveImageUrl(item.thumbnail)} alt={item.title || ""} />
+                      <img src={resolveImageUrl(item.thumbnail)} alt={getLocalizedCartLineTitle(item, locale)} />
                     ) : (
                       <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
                     )}
                   </SummaryThumb>
                   <SummaryItemDetails>
-                    <SummaryItemTitle>{item.title}</SummaryItemTitle>
+                    <SummaryItemTitle>{getLocalizedCartLineTitle(item, locale)}</SummaryItemTitle>
                     <SummaryItemQty>× {item.quantity}</SummaryItemQty>
                   </SummaryItemDetails>
                   <SummaryItemPrice>

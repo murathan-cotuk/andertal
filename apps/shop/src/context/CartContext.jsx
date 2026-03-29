@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useLocale } from "next-intl";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 const CART_ID_KEY = "belucha_cart_id";
@@ -8,6 +9,18 @@ const CART_ID_KEY = "belucha_cart_id";
 const CartContext = createContext(null);
 
 export { CartContext };
+
+/** Refetch cart when UI locale changes so line items include fresh product_metadata for localized titles. */
+function CartLocaleRefetch() {
+  const locale = useLocale();
+  const { cart, fetchCart } = useContext(CartContext);
+  useEffect(() => {
+    const id = cart?.id;
+    if (id) fetchCart(id);
+  }, [locale, cart?.id, fetchCart]);
+  return null;
+}
+
 export function CartProvider({ children }) {
   const [cart, setCart] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -193,6 +206,7 @@ export function CartProvider({ children }) {
 
   return (
     <CartContext.Provider value={value}>
+      <CartLocaleRefetch />
       {children}
     </CartContext.Provider>
   );

@@ -125,7 +125,26 @@
         "delivered": "Zugestellt",
         "completed": "Abgeschlossen",
         "cancelled": "Storniert"
-      }
+      },
+      "orderStatus": {
+        "offen": "Offen",
+        "in_bearbeitung": "In Bearbeitung",
+        "versendet": "Versendet",
+        "zugestellt": "Zugestellt",
+        "abgeschlossen": "Abgeschlossen",
+        "storniert": "Storniert",
+        "bezahlt": "Bezahlt",
+        "refunded": "Erstattet",
+        "retoure": "Retoure",
+        "retoure_anfrage": "Rückgabe wird geprüft",
+        "pending": "Offen",
+        "shipped": "Versendet",
+        "delivered": "Zugestellt",
+        "completed": "Abgeschlossen",
+        "cancelled": "Storniert"
+      },
+      "retourenschein": "Retourenschein",
+      "ruecksendeEtikett": "Rücksende-Etikett"
     }
   }
 }

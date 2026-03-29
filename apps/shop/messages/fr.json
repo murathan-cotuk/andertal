@@ -125,7 +125,26 @@
         "delivered": "Livré",
         "completed": "Terminé",
         "cancelled": "Annulé"
-      }
+      },
+      "orderStatus": {
+        "offen": "Ouvert",
+        "in_bearbeitung": "En cours",
+        "versendet": "Expédié",
+        "zugestellt": "Livré",
+        "abgeschlossen": "Terminé",
+        "storniert": "Annulé",
+        "bezahlt": "Payé",
+        "refunded": "Remboursé",
+        "retoure": "Retour",
+        "retoure_anfrage": "Retour en attente d’approbation",
+        "pending": "Ouvert",
+        "shipped": "Expédié",
+        "delivered": "Livré",
+        "completed": "Terminé",
+        "cancelled": "Annulé"
+      },
+      "retourenschein": "Bon de retour (PDF)",
+      "ruecksendeEtikett": "Étiquette de retour (PDF)"
     }
   }
 }

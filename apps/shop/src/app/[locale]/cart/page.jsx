@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import { useCart } from "@/context/CartContext";
-import { formatPriceCents } from "@/lib/format";
+import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 import { tokens } from "@/design-system/tokens";
 import PayNowButton from "@/components/ui/PayNowButton";
@@ -281,7 +281,7 @@ export default function CartPage() {
   const prefix = useMarketPrefix();
   const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const countryCode = useShippingCountryForQuotes(marketCountry);
-  const freeShippingThreshold = resolveFreeShippingThresholdCents(allThresholds, countryCode, envThresholdCents);
+  const freeShippingThreshold = resolveFreeShippingThresholdCents(allThresholds, marketCountry, envThresholdCents);
   const effectiveTotal = subtotalCents - bonusDiscountCents;
 
   // Kargo ücreti: sepetteki ürünlerin versandgruppe fiyatından hesaplanır
@@ -333,7 +333,7 @@ export default function CartPage() {
                 <ItemRow key={item.id}>
                   <Thumb>
                     {item.thumbnail ? (
-                      <img src={resolveImageUrl(item.thumbnail)} alt={item.title || ""} />
+                      <img src={resolveImageUrl(item.thumbnail)} alt={getLocalizedCartLineTitle(item, locale)} />
                     ) : (
                       <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
                     )}
@@ -345,15 +345,15 @@ export default function CartPage() {
                         style={{ color: "inherit", textDecoration: "none" }}
                       >
                         {(() => {
-                          const raw = item.title || "";
-                          const m = raw.match(/^(.*)\s+\((.+)\)$/);
-                          return m ? m[1] : raw;
+                          const lineTitle = getLocalizedCartLineTitle(item, locale);
+                          const m = lineTitle.match(/^(.*)\s+\((.+)\)$/);
+                          return m ? m[1] : lineTitle;
                         })()}
                       </Link>
                     </ItemTitle>
                     {(() => {
-                      const raw = item.title || "";
-                      const m = raw.match(/^(.*)\s+\((.+)\)$/);
+                      const lineTitle = getLocalizedCartLineTitle(item, locale);
+                      const m = lineTitle.match(/^(.*)\s+\((.+)\)$/);
                       if (!m || !m[2]) return null;
                       const parts = m[2].split(/\s*\/\s*/).filter(Boolean);
                       return (

@@ -125,7 +125,26 @@
         "delivered": "Entregado",
         "completed": "Completado",
         "cancelled": "Cancelado"
-      }
+      },
+      "orderStatus": {
+        "offen": "Abierto",
+        "in_bearbeitung": "En proceso",
+        "versendet": "Enviado",
+        "zugestellt": "Entregado",
+        "abgeschlossen": "Completado",
+        "storniert": "Cancelado",
+        "bezahlt": "Pagado",
+        "refunded": "Reembolsado",
+        "retoure": "Devolución",
+        "retoure_anfrage": "Devolución pendiente de aprobación",
+        "pending": "Abierto",
+        "shipped": "Enviado",
+        "delivered": "Entregado",
+        "completed": "Completado",
+        "cancelled": "Cancelado"
+      },
+      "retourenschein": "Formulario de devolución (PDF)",
+      "ruecksendeEtikett": "Etiqueta de devolución (PDF)"
     }
   }
 }

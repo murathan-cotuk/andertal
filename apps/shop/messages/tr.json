@@ -125,7 +125,26 @@
         "delivered": "Teslim edildi",
         "completed": "Tamamlandı",
         "cancelled": "İptal"
-      }
+      },
+      "orderStatus": {
+        "offen": "Açık",
+        "in_bearbeitung": "İşleniyor",
+        "versendet": "Kargolandı",
+        "zugestellt": "Teslim edildi",
+        "abgeschlossen": "Tamamlandı",
+        "storniert": "İptal",
+        "bezahlt": "Ödendi",
+        "refunded": "İade edildi",
+        "retoure": "İade",
+        "retoure_anfrage": "İade onayı bekleniyor",
+        "pending": "Açık",
+        "shipped": "Kargolandı",
+        "delivered": "Teslim edildi",
+        "completed": "Tamamlandı",
+        "cancelled": "İptal"
+      },
+      "retourenschein": "İade formu (PDF)",
+      "ruecksendeEtikett": "İade etiketi (PDF)"
     }
   }
 }

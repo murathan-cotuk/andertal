@@ -19,7 +19,7 @@ function fmtDate(d) {
   return `${date} / ${time}`;
 }
 
-const ORDER_STATUS_OPTIONS = ["offen", "in_bearbeitung", "abgeschlossen", "storniert"];
+const ORDER_STATUS_OPTIONS = ["offen", "in_bearbeitung", "abgeschlossen", "retoure_anfrage", "retoure", "refunded", "storniert"];
 const PAYMENT_STATUS_OPTIONS = ["offen", "bezahlt", "teil_erstattet", "erstattet"];
 const DELIVERY_STATUS_OPTIONS = ["offen", "versendet", "zugestellt"];
 
@@ -39,6 +39,9 @@ const STATUS_COLORS = {
   offen: { bg: "#fff7ed", color: "#c2410c" },
   in_bearbeitung: { bg: "#eff6ff", color: "#1d4ed8" },
   abgeschlossen: { bg: "#f0fdf4", color: "#15803d" },
+  retoure: { bg: "#fef2f2", color: "#b91c1c" },
+  retoure_anfrage: { bg: "#fffbeb", color: "#b45309" },
+  refunded: { bg: "#eff6ff", color: "#1d4ed8" },
   storniert: { bg: "#fef2f2", color: "#b91c1c" },
   bezahlt: { bg: "#f0fdf4", color: "#15803d" },
   teil_erstattet: { bg: "#fffbeb", color: "#b45309" },

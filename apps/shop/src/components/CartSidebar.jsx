@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
+import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useCart } from "@/context/CartContext";
-import { formatPriceCents } from "@/lib/format";
+import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
@@ -309,13 +310,14 @@ function calcShipping(items, shippingGroups, country = "DE") {
 }
 
 export default function CartSidebar() {
+  const locale = useLocale();
   const { cart, sidebarOpen, closeCartSidebar, updateLineItem, removeLineItem, loading, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
   const allThresholds = useShippingThresholds();
   const prefix = useMarketPrefix();
   const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const countryCode = useShippingCountryForQuotes(marketCountry);
-  const freeShippingThreshold = resolveFreeShippingThresholdCents(allThresholds, countryCode, ENV_THRESHOLD_CENTS);
+  const freeShippingThreshold = resolveFreeShippingThresholdCents(allThresholds, marketCountry, ENV_THRESHOLD_CENTS);
   const effectiveTotal = subtotalCents - bonusDiscountCents;
   const shippingCents = calcShipping(items, shippingGroups, countryCode);
   const isFree = freeShippingThreshold != null && effectiveTotal >= freeShippingThreshold;
@@ -343,7 +345,7 @@ export default function CartSidebar() {
             <Item key={item.id}>
               <ItemImage>
                 {item.thumbnail ? (
-                  <img src={item.thumbnail} alt="" />
+                  <img src={item.thumbnail} alt={getLocalizedCartLineTitle(item, locale)} />
                 ) : (
                   <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
                 )}
@@ -355,7 +357,7 @@ export default function CartSidebar() {
                     onClick={closeCartSidebar}
                     style={{ color: "inherit", textDecoration: "none" }}
                   >
-                    {item.title || "Artikel"}
+                    {getLocalizedCartLineTitle(item, locale) || "Artikel"}
                   </Link>
                 </ItemTitle>
                 <ItemPrice>{formatPriceCents(item.unit_price_cents || 0)}</ItemPrice>
