@@ -1,12 +1,12 @@
 "use client";
 
 import DashboardLayout from "@/components/DashboardLayout";
-import MinimalPage from "@/components/MinimalPage";
+import MetaobjectsPage from "@/components/pages/content/MetaobjectsPage";
 
 export default function ContentMetaobjects() {
   return (
     <DashboardLayout>
-      <MinimalPage title="Metaobjects" subtitle="Structured content" />
+      <MetaobjectsPage />
     </DashboardLayout>
   );
 }

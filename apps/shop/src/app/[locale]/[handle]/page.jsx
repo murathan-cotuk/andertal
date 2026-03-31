@@ -477,21 +477,72 @@ export default function CollectionPage() {
 
   /* ── Facets ── */
   const facets = (() => {
-    const SKIP = new Set(["media","image_url","image","review_count","review_avg",
-      "sold_last_month","rabattpreis_cents","is_new","badge"]);
+    // System/internal keys — never shown as filters
+    const SKIP = new Set([
+      "media", "image_url", "image", "thumbnail",
+      "review_count", "review_avg", "sold_last_month",
+      "rabattpreis_cents", "uvp_cents", "price_cents", "compare_at_price_cents", "sale_price_cents",
+      "is_new", "badge", "sale",
+      "ean", "sku",
+      "bullet_points", "translations", "variation_groups", "metafields",
+      "shipping_group_id",
+      "collection_id", "collection_ids", "admin_category_id", "category_id",
+      "seller_id", "product_id",
+      "brand", "brand_id", "brand_logo", "brand_handle",
+      "shop_name", "store_name", "seller_name",
+      "hersteller", "hersteller_information", "verantwortliche_person_information",
+      "seo_keywords", "seo_meta_title", "seo_meta_description",
+      "publish_date", "return_days", "return_cost", "return_kostenlos",
+      "related_product_ids",
+      "dimensions", "dimensions_length", "dimensions_width", "dimensions_height",
+      "weight", "weight_grams", "unit_type", "unit_value", "unit_reference",
+      "shipping_info", "versand",
+    ]);
+
+    const isCleanValue = (s) => {
+      if (!s || s.length > 80) return false;
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return false;
+      if (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("/uploads/")) return false;
+      return true;
+    };
+
+    const addValue = (f, key, rawVal) => {
+      const vals = Array.isArray(rawVal) ? rawVal : [rawVal];
+      vals.forEach(x => {
+        if (x == null || typeof x === "object") return;
+        const s = String(x).trim();
+        if (!isCleanValue(s)) return;
+        if (!f[key]) f[key] = new Set();
+        f[key].add(s);
+      });
+    };
+
     const f = {};
     products.forEach(p => {
       const meta = typeof p.metadata === "object" && p.metadata ? p.metadata : {};
+
+      // 1. Flat metadata keys
       Object.entries(meta).forEach(([k, v]) => {
-        if (SKIP.has(k)) return;
-        if (!f[k]) f[k] = new Set();
-        (Array.isArray(v) ? v : [v]).forEach(x => { const s = String(x).trim(); if (s) f[k].add(s); });
+        if (SKIP.has(k) || k.startsWith("_")) return;
+        if (Array.isArray(v) && v.length > 0 && typeof v[0] === "object") return; // skip arrays of objects
+        if (v !== null && typeof v === "object" && !Array.isArray(v)) return; // skip plain objects
+        addValue(f, k, v);
       });
+
+      // 2. metafields array: [{key, value}, ...]
+      if (Array.isArray(meta.metafields)) {
+        meta.metafields.forEach(({ key, value } = {}) => {
+          if (!key || value == null || value === "") return;
+          if (SKIP.has(key) || key.startsWith("_")) return;
+          addValue(f, key, value);
+        });
+      }
     });
+
     return Object.fromEntries(
       Object.entries(f)
         .map(([k, s]) => [k, [...s].sort()])
-        .filter(([, v]) => v.length > 0 && v.length <= 30)
+        .filter(([, v]) => v.length > 0 && v.length <= 50)
     );
   })();
 
@@ -651,7 +702,12 @@ export default function CollectionPage() {
               <FilterPanelInner>
                 {Object.entries(facets).map(([key, vals]) => (
                   <FilterGroup key={key}>
-                    <FilterGroupTitle>{key.replace(/_/g, " ")}</FilterGroupTitle>
+                    <FilterGroupTitle>{({
+                      brand_name: "Marke", farbe: "Farbe", colour: "Colour", color: "Color",
+                      material: "Material", size: "Größe", groesse: "Größe",
+                      typ: "Typ", style: "Style", gender: "Gender",
+                      age_group: "Altersgruppe", season: "Saison",
+                    })[key] ?? key.replace(/_/g, " ")}</FilterGroupTitle>
                     {vals.map(val => {
                       const on = (filters[key] || []).includes(val);
                       return (

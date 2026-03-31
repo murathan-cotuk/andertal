@@ -669,22 +669,32 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
               <Divider />
 
               <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Bullet points (max 5)
+                Bullet points (max 5, je max. 120 Zeichen)
               </Text>
-              {bullets.map((b, i) => (
-                <TextField
-                  key={i}
-                  label={`Bullet ${i + 1}`}
-                  labelHidden
-                  value={b}
-                  onChange={(t) => {
-                    const next = [...bullets];
-                    next[i] = t;
-                    if (locale === "de") updateVariantMeta("bullet_points", next.filter((x) => x != null && String(x).trim() !== ""));
-                    else updateLocaleVariantField("bullet_points", next.filter((x) => x != null && String(x).trim() !== ""));
-                  }}
-                />
-              ))}
+              {bullets.map((b, i) => {
+                const len = String(b ?? "").length;
+                const overLimit = len > 120;
+                return (
+                  <Box key={i}>
+                    <TextField
+                      label={`Bullet ${i + 1}`}
+                      labelHidden
+                      value={b}
+                      maxLength={120}
+                      onChange={(t) => {
+                        const trimmed = String(t).slice(0, 120);
+                        const next = [...bullets];
+                        next[i] = trimmed;
+                        if (locale === "de") updateVariantMeta("bullet_points", next.filter((x) => x != null && String(x).trim() !== ""));
+                        else updateLocaleVariantField("bullet_points", next.filter((x) => x != null && String(x).trim() !== ""));
+                      }}
+                    />
+                    <Text as="p" variant="bodySm" tone="subdued" style={{ marginTop: 4, color: overLimit ? "var(--p-color-text-critical)" : undefined }}>
+                      {len} / 120
+                    </Text>
+                  </Box>
+                );
+              })}
               {bullets.length < 5 && (
                 <Button
                   size="slim"

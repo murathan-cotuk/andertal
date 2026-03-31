@@ -1578,6 +1578,121 @@ async function start() {
     httpApp.delete('/admin-hub/brands/:id', (req, res) => adminBrandsPatchDelete(req, res, false))
     console.log('Admin route: GET/POST /admin-hub/brands, PATCH/DELETE /admin-hub/brands/:id')
 
+    // --- Metafield Definitions ---
+    const dbQ = async (sql, params = []) => {
+      const { Client } = require('pg')
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      await client.connect()
+      try { const r = await client.query(sql, params); return r } finally { await client.end() }
+    }
+
+    // Ensure table exists
+    dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_metafield_definitions (
+      key varchar(120) PRIMARY KEY,
+      label varchar(255),
+      values JSONB NOT NULL DEFAULT '[]',
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`).catch(() => {})
+
+    // GET /admin-hub/metafield-definitions
+    // Returns merged: stored definitions + values found in products
+    httpApp.get('/admin-hub/metafield-definitions', async (req, res) => {
+      try {
+        // 1. Load stored definitions
+        const storedRes = await dbQ('SELECT key, label, values FROM admin_hub_metafield_definitions ORDER BY key')
+        const stored = {}
+        for (const row of storedRes.rows) {
+          stored[row.key] = { label: row.label || row.key, values: Array.isArray(row.values) ? row.values : [] }
+        }
+
+        // 2. Scan product metafields for additional values
+        const prodRes = await dbQ('SELECT metadata FROM admin_hub_products WHERE metadata IS NOT NULL')
+        const SYSTEM_KEYS = new Set(['media','image_url','image','thumbnail','ean','sku','bullet_points',
+          'translations','variation_groups','metafields','shipping_group_id','collection_id','collection_ids',
+          'admin_category_id','category_id','seller_id','product_id','brand_id','brand_logo','brand_handle',
+          'brand','brand_name','shop_name','store_name','seller_name','hersteller','hersteller_information',
+          'verantwortliche_person_information','seo_keywords','seo_meta_title','seo_meta_description',
+          'publish_date','return_days','return_cost','return_kostenlos','related_product_ids',
+          'dimensions','dimensions_length','dimensions_width','dimensions_height','weight','weight_grams',
+          'unit_type','unit_value','unit_reference','shipping_info','versand','rabattpreis_cents',
+          'uvp_cents','price_cents','compare_at_price_cents','sale_price_cents','review_count',
+          'review_avg','sold_last_month','is_new','badge','sale'])
+
+        const fromProducts = {} // key → Set of values
+        for (const row of prodRes.rows) {
+          const meta = typeof row.metadata === 'object' && row.metadata ? row.metadata : {}
+          // Flat meta keys
+          for (const [k, v] of Object.entries(meta)) {
+            if (SYSTEM_KEYS.has(k) || k.startsWith('_')) continue
+            if (v == null || v === '') continue
+            if (typeof v === 'object' && !Array.isArray(v)) continue
+            const vals = Array.isArray(v) ? v : [v]
+            if (vals.length > 0 && typeof vals[0] === 'object') continue
+            if (!fromProducts[k]) fromProducts[k] = new Set()
+            vals.forEach(x => { const s = String(x).trim(); if (s && s.length <= 120) fromProducts[k].add(s) })
+          }
+          // metafields array
+          if (Array.isArray(meta.metafields)) {
+            for (const { key, value } of meta.metafields) {
+              if (!key || !value || SYSTEM_KEYS.has(key) || key.startsWith('_')) continue
+              if (!fromProducts[key]) fromProducts[key] = new Set()
+              const s = String(value).trim()
+              if (s && s.length <= 120) fromProducts[key].add(s)
+            }
+          }
+        }
+
+        // 3. Merge: stored + fromProducts
+        const allKeys = new Set([...Object.keys(stored), ...Object.keys(fromProducts)])
+        const definitions = {}
+        for (const key of allKeys) {
+          const storedVals = new Set(stored[key]?.values || [])
+          const prodVals = fromProducts[key] || new Set()
+          const merged = [...new Set([...storedVals, ...prodVals])].sort()
+          definitions[key] = { label: stored[key]?.label || key, values: merged }
+        }
+
+        res.json({ definitions })
+      } catch (err) {
+        console.error('metafield-definitions GET:', err)
+        res.status(500).json({ error: err.message })
+      }
+    })
+
+    // PUT /admin-hub/metafield-definitions/:key  — upsert values for a key
+    httpApp.put('/admin-hub/metafield-definitions/:key', async (req, res) => {
+      try {
+        const key = (req.params.key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
+        if (!key) return res.status(400).json({ error: 'key required' })
+        const { label, values } = req.body || {}
+        const safeValues = (Array.isArray(values) ? values : []).map(v => String(v).trim()).filter(Boolean)
+        const safeLabel = (label || key).toString().trim()
+        await dbQ(
+          `INSERT INTO admin_hub_metafield_definitions (key, label, values, updated_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (key) DO UPDATE SET label = $2, values = $3, updated_at = NOW()`,
+          [key, safeLabel, JSON.stringify(safeValues)]
+        )
+        res.json({ ok: true, key, label: safeLabel, values: safeValues })
+      } catch (err) {
+        console.error('metafield-definitions PUT:', err)
+        res.status(500).json({ error: err.message })
+      }
+    })
+
+    // DELETE /admin-hub/metafield-definitions/:key
+    httpApp.delete('/admin-hub/metafield-definitions/:key', async (req, res) => {
+      try {
+        await dbQ('DELETE FROM admin_hub_metafield_definitions WHERE key = $1', [req.params.key])
+        res.json({ ok: true })
+      } catch (err) {
+        res.status(500).json({ error: err.message })
+      }
+    })
+
+    console.log('Admin route: GET/PUT/DELETE /admin-hub/metafield-definitions')
+
     // --- Admin Hub Menus (service or raw DB fallback when loader fails) ---
     const resolveMenuService = () => {
       try {

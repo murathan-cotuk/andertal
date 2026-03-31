@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Page, Card, Text, Button, Badge, BlockStack, InlineStack,
+  Box, Divider, Spinner, TextField,
+} from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 function fmtDate(d) {
   if (!d) return "";
-  const dt = new Date(d);
-  return dt.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(d).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function fmtCents(c) {
@@ -14,10 +17,13 @@ function fmtCents(c) {
   return (Number(c) / 100).toFixed(2).replace(".", ",") + " €";
 }
 
-const ORDER_STATUS_LABEL = {
+const STATUS_TONE = {
+  pending: "warning", processing: "info", shipped: "info",
+  delivered: "success", cancelled: "critical", refunded: "critical", completed: "success",
+};
+const STATUS_LABEL = {
   pending: "Ausstehend", processing: "In Bearbeitung", shipped: "Versendet",
-  delivered: "Geliefert", cancelled: "Storniert", refunded: "Erstattet",
-  completed: "Abgeschlossen",
+  delivered: "Geliefert", cancelled: "Storniert", refunded: "Erstattet", completed: "Abgeschlossen",
 };
 
 function groupByOrder(messages) {
@@ -38,7 +44,6 @@ function groupByOrder(messages) {
     }
     map[key].messages.push(m);
   }
-  // Sort threads by latest message (descending) and messages within thread ascending
   return Object.values(map)
     .map((t) => ({ ...t, messages: [...t.messages].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "")) }))
     .sort((a, b) => {
@@ -71,7 +76,6 @@ export default function InboxPage() {
 
   useEffect(() => { fetchMessages(); }, [fetchMessages]);
 
-  // Scroll to bottom whenever thread changes or new message arrives
   useEffect(() => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
   }, [selected?.messages?.length]);
@@ -81,14 +85,12 @@ export default function InboxPage() {
     setReply("");
     setErr("");
     setOrderItems([]);
-    // Fetch order items if there's an order
     if (thread.order_id) {
       try {
         const data = await client.request(`/admin-hub/orders/${thread.order_id}`);
         if (data?.order?.items) setOrderItems(data.order.items);
       } catch (_) {}
     }
-    // Mark unread as read
     for (const m of thread.messages) {
       if (m.sender_type === "customer" && !m.is_read_by_seller) {
         client.markMessageRead(m.id).catch(() => {});
@@ -109,14 +111,14 @@ export default function InboxPage() {
       setReply("");
       const data = await client.getMessages();
       if (!data?.__error) {
-        const updatedThreads = groupByOrder(data?.messages || []);
-        setThreads(updatedThreads);
+        const updated = groupByOrder(data?.messages || []);
+        setThreads(updated);
         const key = selected.order_id || "__no_order__";
-        const updatedThread = updatedThreads.find((t) => (t.order_id || "__no_order__") === key);
+        const updatedThread = updated.find((t) => (t.order_id || "__no_order__") === key);
         if (updatedThread) setSelected(updatedThread);
       }
     } catch (e) {
-      setErr(e?.message || "Fehler");
+      setErr(e?.message || "Fehler beim Senden");
     }
     setSending(false);
   };
@@ -124,22 +126,27 @@ export default function InboxPage() {
   const unreadCount = (thread) =>
     thread.messages.filter((m) => m.sender_type === "customer" && !m.is_read_by_seller).length;
 
-  const statusLabel = (s) => ORDER_STATUS_LABEL[s] || s || "—";
-
   return (
-    <div style={{ padding: "24px 20px" }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: "0 0 20px" }}>Nachrichten</h1>
-      <div style={{ display: "grid", gridTemplateColumns: "300px 1fr 280px", gap: 12, height: "calc(100vh - 160px)", minHeight: 400 }}>
+    <Page title="Nachrichten">
+      <div style={{ display: "grid", gridTemplateColumns: "280px 1fr 260px", gap: 12, height: "calc(100vh - 160px)", minHeight: 500 }}>
 
         {/* ── Thread list ── */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "10px 14px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".06em", borderBottom: "1px solid #f3f4f6" }}>
-            Konversationen
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-300)", background: "var(--p-color-bg-surface)" }}>
+          <Box padding="300" borderBlockEndWidth="025" borderColor="border">
+            <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">
+              Konversationen
+            </Text>
+          </Box>
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {loading && <div style={{ padding: 20, color: "#9ca3af", fontSize: 13, textAlign: "center" }}>Laden…</div>}
+            {loading && (
+              <Box padding="400">
+                <InlineStack align="center"><Spinner size="small" /></InlineStack>
+              </Box>
+            )}
             {!loading && threads.length === 0 && (
-              <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, textAlign: "center" }}>Keine Nachrichten</div>
+              <Box padding="400">
+                <Text as="p" variant="bodySm" tone="subdued" alignment="center">Keine Nachrichten</Text>
+              </Box>
             )}
             {threads.map((thread) => {
               const last = thread.messages[thread.messages.length - 1];
@@ -151,25 +158,30 @@ export default function InboxPage() {
                   key={thread.order_id || "__no_order__"}
                   onClick={() => handleSelectThread(thread)}
                   style={{
-                    width: "100%", textAlign: "left", padding: "11px 14px",
-                    background: isActive ? "#fff7ed" : "#fff",
-                    borderLeft: isActive ? "3px solid #ff971c" : "3px solid transparent",
-                    borderRight: "none", borderTop: "none", borderBottom: "1px solid #f3f4f6", cursor: "pointer",
+                    width: "100%", textAlign: "left", padding: "10px 14px",
+                    background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
+                    borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : "3px solid transparent",
+                    border: "none", borderBottom: "1px solid var(--p-color-border-subdued)",
+                    cursor: "pointer", display: "block",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <InlineStack align="space-between" blockAlign="start" gap="100">
+                    <Text as="span" variant="bodySm" fontWeight="semibold">
                       {thread.order_number ? `#${thread.order_number}` : "Allgemein"}
-                    </span>
-                    {unread > 0 && (
-                      <span style={{ background: "#ef4444", color: "#fff", borderRadius: "50%", fontSize: 10, fontWeight: 800, width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{unread}</span>
-                    )}
+                    </Text>
+                    <InlineStack gap="100" blockAlign="center">
+                      {unread > 0 && (
+                        <span style={{ background: "var(--p-color-bg-fill-critical)", color: "#fff", borderRadius: "50%", fontSize: 10, fontWeight: 800, width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          {unread}
+                        </span>
+                      )}
+                      <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at)}</Text>
+                    </InlineStack>
+                  </InlineStack>
+                  <Text as="p" variant="bodySm" tone="subdued">{customerName}</Text>
+                  <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {last?.body?.slice(0, 55) || "—"}
                   </div>
-                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{customerName}</div>
-                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {last?.body?.slice(0, 50) || "—"}
-                  </div>
-                  <div style={{ fontSize: 10, color: "#b4b4b4", marginTop: 2 }}>{fmtDate(last?.created_at)}</div>
                 </button>
               );
             })}
@@ -177,28 +189,33 @@ export default function InboxPage() {
         </div>
 
         {/* ── Message thread ── */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-300)", background: "var(--p-color-bg-surface)" }}>
           {!selected ? (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 14 }}>
-              Konversation auswählen
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Text as="p" variant="bodySm" tone="subdued">Konversation auswählen</Text>
             </div>
           ) : (
             <>
-              <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
-                  {selected.order_number ? `Bestellung #${selected.order_number}` : "Allgemein"}
-                </span>
-                {selected.order_id && (
-                  <a href={`/orders/${selected.order_id}`} style={{ fontSize: 11, color: "#ff971c", textDecoration: "none", fontWeight: 600 }}>
-                    Öffnen →
-                  </a>
-                )}
-                {selected.order_status && (
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#f3f4f6", color: "#374151" }}>
-                    {statusLabel(selected.order_status)}
-                  </span>
-                )}
-              </div>
+              {/* Header */}
+              <Box padding="300" borderBlockEndWidth="025" borderColor="border">
+                <InlineStack gap="200" blockAlign="center">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                    {selected.order_number ? `Bestellung #${selected.order_number}` : "Allgemein"}
+                  </Text>
+                  {selected.order_status && (
+                    <Badge tone={STATUS_TONE[selected.order_status] || "new"}>
+                      {STATUS_LABEL[selected.order_status] || selected.order_status}
+                    </Badge>
+                  )}
+                  {selected.order_id && (
+                    <Button variant="plain" size="slim" url={`/orders/${selected.order_id}`}>
+                      Öffnen →
+                    </Button>
+                  )}
+                </InlineStack>
+              </Box>
+
+              {/* Messages */}
               <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
                 {selected.messages.map((m) => {
                   const isSeller = m.sender_type === "seller";
@@ -206,12 +223,18 @@ export default function InboxPage() {
                     <div key={m.id} style={{ display: "flex", justifyContent: isSeller ? "flex-end" : "flex-start" }}>
                       <div style={{
                         maxWidth: "72%",
-                        background: isSeller ? "#ff971c" : "#f3f4f6",
-                        color: isSeller ? "#fff" : "#111827",
+                        background: isSeller ? "var(--p-color-bg-fill-brand, #ff971c)" : "var(--p-color-bg-surface-secondary)",
+                        color: isSeller ? "#fff" : "var(--p-color-text)",
                         borderRadius: isSeller ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
-                        padding: "9px 13px", fontSize: 13,
+                        padding: "9px 13px",
+                        border: isSeller ? "none" : "1px solid var(--p-color-border-subdued)",
                       }}>
-                        <div style={{ lineHeight: 1.5 }}>{m.body}</div>
+                        {!isSeller && (
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--p-color-text-subdued)", marginBottom: 3, textTransform: "uppercase", letterSpacing: ".04em" }}>
+                            Kunde
+                          </div>
+                        )}
+                        <Text as="p" variant="bodySm">{m.body}</Text>
                         <div style={{ fontSize: 10, marginTop: 4, opacity: 0.65 }}>{fmtDate(m.created_at)}</div>
                       </div>
                     </div>
@@ -219,94 +242,117 @@ export default function InboxPage() {
                 })}
                 <div ref={bottomRef} />
               </div>
-              <div style={{ padding: "10px 16px", borderTop: "1px solid #f3f4f6" }}>
-                {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 6 }}>{err}</div>}
-                <div style={{ display: "flex", gap: 8 }}>
-                  <textarea
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    placeholder="Antwort schreiben… (Enter zum Senden)"
-                    rows={2}
-                    style={{ flex: 1, padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, resize: "none", outline: "none" }}
-                  />
-                  <button
-                    onClick={handleSend}
-                    disabled={sending || !reply.trim()}
-                    style={{ padding: "0 16px", background: "#ff971c", color: "#fff", border: "2px solid #000", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "0 2px 0 2px #000", flexShrink: 0 }}
-                  >
-                    {sending ? "…" : "Senden"}
-                  </button>
-                </div>
-              </div>
+
+              {/* Reply box */}
+              <Box padding="300" borderBlockStartWidth="025" borderColor="border">
+                <BlockStack gap="200">
+                  {err && <Text as="p" variant="bodySm" tone="critical">{err}</Text>}
+                  <InlineStack gap="200" blockAlign="end">
+                    <div style={{ flex: 1 }}>
+                      <TextField
+                        value={reply}
+                        onChange={setReply}
+                        placeholder="Antwort schreiben… (Enter zum Senden)"
+                        multiline={2}
+                        autoComplete="off"
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                      />
+                    </div>
+                    <Button
+                      variant="primary"
+                      onClick={handleSend}
+                      disabled={sending || !reply.trim()}
+                      loading={sending}
+                    >
+                      Senden
+                    </Button>
+                  </InlineStack>
+                </BlockStack>
+              </Box>
             </>
           )}
         </div>
 
         {/* ── Order detail sidebar ── */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "10px 14px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".06em", borderBottom: "1px solid #f3f4f6" }}>
-            Bestelldetails
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-300)", background: "var(--p-color-bg-surface)" }}>
+          <Box padding="300" borderBlockEndWidth="025" borderColor="border">
+            <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">
+              Bestelldetails
+            </Text>
+          </Box>
           {!selected || !selected.order_id ? (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 12, padding: 16, textAlign: "center" }}>
-              Bestellung auswählen
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, textAlign: "center" }}>
+              <Text as="p" variant="bodySm" tone="subdued">Bestellung auswählen</Text>
             </div>
           ) : (
-            <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10, fontSize: 12 }}>
-              {/* Customer */}
-              <div>
-                <div style={{ fontWeight: 700, color: "#111827", marginBottom: 2 }}>Kunde</div>
-                <div style={{ color: "#374151" }}>{[selected.order_first_name, selected.order_last_name].filter(Boolean).join(" ") || "—"}</div>
-                <div style={{ color: "#6b7280", fontSize: 11 }}>{selected.order_email || "—"}</div>
-              </div>
-              {/* Status + Total */}
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, color: "#111827", marginBottom: 2 }}>Status</div>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#f3f4f6", color: "#374151" }}>
-                    {statusLabel(selected.order_status)}
-                  </span>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, color: "#111827", marginBottom: 2 }}>Gesamt</div>
-                  <div style={{ color: "#111827", fontWeight: 700 }}>{fmtCents(selected.order_total_cents)}</div>
-                </div>
-              </div>
-              {/* Order items */}
-              {orderItems.length > 0 && (
-                <div>
-                  <div style={{ fontWeight: 700, color: "#111827", marginBottom: 6 }}>Artikel</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {orderItems.map((item, i) => (
-                      <div key={item.id || i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        {item.thumbnail ? (
-                          <img src={item.thumbnail} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, border: "1px solid #e5e7eb", flexShrink: 0 }} />
-                        ) : (
-                          <div style={{ width: 36, height: 36, background: "#f3f4f6", borderRadius: 4, flexShrink: 0 }} />
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {item.title || "—"}
-                          </div>
-                          <div style={{ color: "#6b7280", fontSize: 11 }}>
-                            {item.quantity}× {fmtCents(item.unit_price_cents)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {selected.order_id && (
-                <a href={`/orders/${selected.order_id}`} style={{ display: "block", marginTop: 8, padding: "6px 12px", background: "#ff971c", color: "#fff", border: "2px solid #000", borderRadius: 8, fontWeight: 700, fontSize: 12, textAlign: "center", textDecoration: "none", boxShadow: "0 2px 0 2px #000" }}>
-                  Bestellung öffnen →
-                </a>
-              )}
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <Box padding="300">
+                <BlockStack gap="300">
+                  {/* Customer */}
+                  <BlockStack gap="100">
+                    <Text as="p" variant="bodySm" fontWeight="semibold">Kunde</Text>
+                    <Text as="p" variant="bodySm">
+                      {[selected.order_first_name, selected.order_last_name].filter(Boolean).join(" ") || "—"}
+                    </Text>
+                    {selected.order_email && (
+                      <Text as="p" variant="bodySm" tone="subdued">{selected.order_email}</Text>
+                    )}
+                  </BlockStack>
+
+                  <Divider />
+
+                  {/* Status + Total */}
+                  <InlineStack gap="300">
+                    <BlockStack gap="100">
+                      <Text as="p" variant="bodySm" fontWeight="semibold">Status</Text>
+                      <Badge tone={STATUS_TONE[selected.order_status] || "new"}>
+                        {STATUS_LABEL[selected.order_status] || selected.order_status || "—"}
+                      </Badge>
+                    </BlockStack>
+                    <BlockStack gap="100">
+                      <Text as="p" variant="bodySm" fontWeight="semibold">Gesamt</Text>
+                      <Text as="p" variant="bodySm" fontWeight="semibold">
+                        {fmtCents(selected.order_total_cents)}
+                      </Text>
+                    </BlockStack>
+                  </InlineStack>
+
+                  {/* Order items */}
+                  {orderItems.length > 0 && (
+                    <>
+                      <Divider />
+                      <BlockStack gap="200">
+                        <Text as="p" variant="bodySm" fontWeight="semibold">Artikel</Text>
+                        {orderItems.map((item, i) => (
+                          <InlineStack key={item.id || i} gap="200" blockAlign="center" wrap={false}>
+                            <div style={{ width: 36, height: 36, borderRadius: 6, border: "1px solid var(--p-color-border)", overflow: "hidden", flexShrink: 0, background: "var(--p-color-bg-surface-secondary)" }}>
+                              {item.thumbnail && (
+                                <img src={item.thumbnail} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                              )}
+                            </div>
+                            <BlockStack gap="0">
+                              <Text as="p" variant="bodySm" fontWeight="medium" truncate>
+                                {item.title || "—"}
+                              </Text>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                {item.quantity}× {fmtCents(item.unit_price_cents)}
+                              </Text>
+                            </BlockStack>
+                          </InlineStack>
+                        ))}
+                      </BlockStack>
+                    </>
+                  )}
+
+                  <Button variant="primary" url={`/orders/${selected.order_id}`} fullWidth>
+                    Bestellung öffnen →
+                  </Button>
+                </BlockStack>
+              </Box>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

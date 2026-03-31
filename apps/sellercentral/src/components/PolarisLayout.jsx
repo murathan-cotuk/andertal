@@ -110,15 +110,6 @@ function getMenuItemsMain(t) {
       ],
     },
     { url: "/import-export", label: t("importExport"), icon: ImportIcon },
-    {
-      url: "/apps",
-      label: "Apps & Integrations",
-      icon: ImportIcon,
-      subNavigationItems: [
-        { url: "/apps", label: "Alle Apps" },
-        { url: "/apps/smtp", label: "E-Mail / SMTP" },
-      ],
-    },
   ];
 }
 
@@ -126,21 +117,40 @@ function getMenuItemsSettings(t) {
   return [{ url: "/settings", label: t("settings"), icon: SettingsIcon }];
 }
 
-const NextLink = forwardRef(function NextLink({ url, children, external, ...rest }, ref) {
+// Parent nav URLs that should expand/collapse sub-menus on click (no page navigation)
+const PARENT_NAV_URLS = new Set([
+  "/orders", "/products", "/customers", "/marketing",
+  "/content", "/analytics",
+]);
+
+const NextLink = forwardRef(function NextLink({ url, children, external, onClick, ...rest }, ref) {
+  const handleClick = (e) => {
+    if (PARENT_NAV_URLS.has(url || "")) {
+      e.preventDefault();
+    }
+    onClick?.(e);
+  };
   return (
-    <Link href={url || ""} ref={ref} {...rest}>
+    <Link href={url || ""} ref={ref} onClick={handleClick} {...rest}>
       {children}
     </Link>
   );
 });
 
-const UnsavedAwareLink = forwardRef(function UnsavedAwareLink({ url, children, external, ...rest }, ref) {
+const UnsavedAwareLink = forwardRef(function UnsavedAwareLink({ url, children, external, onClick, ...rest }, ref) {
   const ctx = useUnsavedChanges();
   const handleClick = (e) => {
+    if (PARENT_NAV_URLS.has(url || "")) {
+      e.preventDefault();
+      onClick?.(e);
+      return;
+    }
     if (ctx?.isDirty && (url || "").trim() && !(url || "").startsWith("#")) {
       e.preventDefault();
       ctx.startNavigate(url || "/");
+      return;
     }
+    onClick?.(e);
   };
   return (
     <Link ref={ref} href={url || "#"} onClick={handleClick} {...rest}>
@@ -172,6 +182,8 @@ export default function PolarisLayout({ children }) {
   const [notifData, setNotifData] = useState(null);
   const [msgUnread, setMsgUnread] = useState(0);
   const notifRef = useRef(null);
+  // Track which parent nav item has its sub-menu expanded
+  const [expandedLabel, setExpandedLabel] = useState(null);
   const [storeName, setStoreName] = useState(
     typeof window !== "undefined"
       ? localStorage.getItem("storeName") || "Seller Account"
@@ -458,19 +470,29 @@ export default function PolarisLayout({ children }) {
     />
   );
 
-  const navLocation = pathname && pathname !== "" ? pathname : "/";
   const menuMain = getMenuItemsMain(t);
   const menuSettings = getMenuItemsSettings(t);
+  const navLocation = pathname && pathname !== "" ? pathname : "/";
 
   const navMarkup = (
     <Navigation location={navLocation} onDismiss={() => setShowMobileNav(false)}>
       <Navigation.Section
-        items={menuMain.map((item) => ({
-          url: item.subNavigationItems?.length ? undefined : item.url,
-          label: item.label,
-          icon: item.icon,
-          subNavigationItems: item.subNavigationItems,
-        }))}
+        items={menuMain.map((item) => {
+          const hasSub = item.subNavigationItems?.length > 0;
+          // A parent is "selected" (expanded) if we manually toggled it OR a child matches current path
+          const childIsActive = hasSub && item.subNavigationItems.some((s) => navLocation.startsWith(s.url));
+          const isSelected = hasSub ? (expandedLabel === item.label || childIsActive) : undefined;
+          return {
+            url: item.url,
+            label: item.label,
+            icon: item.icon,
+            subNavigationItems: item.subNavigationItems,
+            selected: isSelected,
+            onClick: hasSub
+              ? () => setExpandedLabel((prev) => prev === item.label ? null : item.label)
+              : undefined,
+          };
+        })}
       />
       <Navigation.Section
         fill

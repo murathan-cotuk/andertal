@@ -147,6 +147,24 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}`, { method: 'DELETE' });
   }
 
+  /** GET /admin-hub/metafield-definitions */
+  async getMetafieldDefinitions() {
+    return this.request('/admin-hub/metafield-definitions');
+  }
+
+  /** PUT /admin-hub/metafield-definitions/:key */
+  async putMetafieldDefinition(key, data) {
+    return this.request(`/admin-hub/metafield-definitions/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /** DELETE /admin-hub/metafield-definitions/:key */
+  async deleteMetafieldDefinition(key) {
+    return this.request(`/admin-hub/metafield-definitions/${encodeURIComponent(key)}`, { method: 'DELETE' });
+  }
+
   /** GET /admin-hub/seller-settings */
   async getSellerSettings() {
     const res = await this.request('/admin-hub/seller-settings').catch(() => ({ store_name: '' }));

@@ -67,7 +67,9 @@
       "Bash(find /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/sellercentral/src -type f -path *shipping* -o -type f -path *versand*)",
       "Bash(/dev/null:*)",
       "Bash(find /c/Users/Lenovo/Desktop/Ortam/Yazilim/belucha -type f -name *.ts* -path */orders/*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''version'''',''''?''''\\)\\)\")",
+      "Bash(node:*)"
     ]
   }
 }

@@ -1091,31 +1091,48 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .product-description-html:focus { outline: none; }
         .product-description-html::placeholder { color: var(--p-color-text-subdued); }
         .product-description-hint { margin-top: 8px; font-size: 12px; color: var(--p-color-text-subdued); }
-        /* Variation engine */
-        .vg-group { border: 1px solid var(--p-color-border); border-radius: 10px; padding: 16px; background: var(--p-color-bg-surface-secondary); transition: box-shadow 0.15s; }
-        .vg-group:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-        .vg-group[draggable]:active { cursor: grabbing; box-shadow: 0 6px 24px rgba(0,0,0,0.12); opacity: 0.9; }
-        .vg-drag-handle { color: var(--p-color-icon-subdued); font-size: 18px; cursor: grab; user-select: none; flex-shrink: 0; padding: 2px 6px; border-radius: 4px; }
+        /* ── Variation engine — Groups ── */
+        .vg-group { border: 1px solid var(--p-color-border); border-radius: 12px; padding: 0; background: var(--p-color-bg-surface); overflow: hidden; transition: box-shadow 0.15s; }
+        .vg-group:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+        .vg-group[draggable]:active { cursor: grabbing; box-shadow: 0 8px 28px rgba(0,0,0,0.13); opacity: 0.92; }
+        .vg-group-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--p-color-bg-surface-secondary); border-bottom: 1px solid var(--p-color-border-subdued); }
+        .vg-group-body { padding: 14px 16px; }
+        .vg-group-num { width: 22px; height: 22px; border-radius: 50%; background: var(--p-color-bg-fill-brand); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .vg-drag-handle { color: var(--p-color-icon-subdued); font-size: 18px; cursor: grab; user-select: none; flex-shrink: 0; padding: 2px 4px; border-radius: 4px; }
         .vg-drag-handle:hover { background: var(--p-color-bg-surface-hover); color: var(--p-color-icon); }
-        .vg-option-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--p-color-bg-surface); border: 1px solid var(--p-color-border); border-radius: 8px; padding: 4px 6px 4px 8px; }
-        .vg-option-chip input { border: none; outline: none; background: transparent; font-size: 13px; color: var(--p-color-text); min-width: 60px; width: 80px; }
+        .vg-option-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--p-color-bg-surface-secondary); border: 1.5px solid var(--p-color-border); border-radius: 30px; padding: 4px 4px 4px 10px; transition: border-color .12s; }
+        .vg-option-chip:focus-within { border-color: var(--p-color-border-focus, #005bd3); box-shadow: 0 0 0 2px rgba(0,91,211,.12); }
+        .vg-option-chip input { border: none; outline: none; background: transparent; font-size: 13px; color: var(--p-color-text); min-width: 64px; width: 90px; }
         .vg-option-chip input::placeholder { color: var(--p-color-text-subdued); }
-        .vg-remove-btn { border: none; background: none; cursor: pointer; color: var(--p-color-icon-subdued); font-size: 16px; line-height: 1; padding: 0 2px; border-radius: 3px; display: inline-flex; align-items: center; }
-        .vg-remove-btn:hover { color: var(--p-color-text-critical); background: var(--p-color-bg-fill-critical-secondary, rgba(222,54,24,0.06)); }
-        .vg-swatch { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0; border: 1.5px solid var(--p-color-border); cursor: pointer; padding: 0; background: none; appearance: none; display: block; }
+        .vg-remove-btn { border: none; background: none; cursor: pointer; color: var(--p-color-icon-subdued); font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 50%; display: inline-flex; align-items: center; }
+        .vg-remove-btn:hover { color: var(--p-color-text-critical); background: var(--p-color-bg-fill-critical-secondary, rgba(222,54,24,0.08)); }
+        .vg-swatch { width: 26px; height: 26px; border-radius: 50%; overflow: hidden; flex-shrink: 0; border: 1.5px solid var(--p-color-border); cursor: pointer; padding: 0; background: none; appearance: none; display: block; }
         .vg-swatch:hover { border-color: var(--p-color-border-hover); box-shadow: 0 0 0 3px rgba(0,113,227,0.12); }
-        .vg-swatch-empty { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; border: 1.5px dashed var(--p-color-border); display: inline-flex; align-items: center; justify-content: center; color: var(--p-color-icon-subdued); font-size: 14px; cursor: pointer; padding: 0; background: none; appearance: none; }
-        .vg-swatch-empty:hover { border-color: var(--p-color-border-info); color: var(--p-color-text-info); background: rgba(0,113,227,0.04); }
-        .vg-matrix-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .vg-matrix-table th { padding: 8px 10px; text-align: left; font-weight: 600; color: var(--p-color-text-subdued); white-space: nowrap; background: var(--p-color-bg-surface-secondary); border-bottom: 2px solid var(--p-color-border); }
-        .vg-matrix-table td { padding: 6px 10px; vertical-align: middle; border-bottom: 1px solid var(--p-color-border-subdued); }
-        .vg-matrix-table tr:last-child td { border-bottom: none; }
-        .vg-matrix-table tr:hover td { background: var(--p-color-bg-surface-hover, rgba(0,0,0,0.015)); }
-        .vg-img-thumb { width: 40px; height: 40px; flex-shrink: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--p-color-border); background: var(--p-color-bg-fill-secondary); display: flex; align-items: center; justify-content: center; }
-        .vg-img-thumb.is-override { border-color: var(--p-color-border-info); box-shadow: 0 0 0 2px var(--p-color-bg-fill-info, rgba(0,113,227,0.1)); }
-        .vg-img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .vg-clear-override { font-size: 10px; color: var(--p-color-text-subdued); background: none; border: none; cursor: pointer; padding: 0; margin-top: 2px; display: block; }
-        .vg-clear-override:hover { color: var(--p-color-text-critical); text-decoration: underline; }
+        .vg-swatch-empty { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; border: 1.5px dashed var(--p-color-border); display: inline-flex; align-items: center; justify-content: center; color: var(--p-color-icon-subdued); font-size: 11px; cursor: pointer; padding: 0; background: none; appearance: none; }
+        .vg-swatch-empty:hover { border-color: var(--p-color-border-info); background: rgba(0,113,227,0.04); }
+        /* ── Variation engine — Matrix cards ── */
+        .vm-card { border: 1px solid var(--p-color-border); border-radius: 10px; margin-bottom: 8px; background: var(--p-color-bg-surface); overflow: hidden; transition: box-shadow .12s; }
+        .vm-card:last-child { margin-bottom: 0; }
+        .vm-card-header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; transition: background .1s; user-select: none; min-height: 52px; }
+        .vm-card-header:hover { background: var(--p-color-bg-surface-hover, rgba(0,0,0,.02)); }
+        .vm-thumb { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; border: 1px solid var(--p-color-border); display: block; flex-shrink: 0; }
+        .vm-thumb-empty { width: 38px; height: 38px; border-radius: 6px; border: 1.5px dashed var(--p-color-border); background: var(--p-color-bg-surface-secondary); display: flex; align-items: center; justify-content: center; color: var(--p-color-icon-subdued); font-size: 16px; flex-shrink: 0; }
+        .vm-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--p-color-bg-surface-secondary); border: 1px solid var(--p-color-border); border-radius: 20px; padding: 2px 10px; font-size: 12px; font-weight: 500; color: var(--p-color-text); white-space: nowrap; }
+        .vm-stat { font-size: 12px; color: var(--p-color-text-subdued); white-space: nowrap; }
+        .vm-stat strong { color: var(--p-color-text); font-weight: 600; }
+        .vm-card-body { border-top: 1px solid var(--p-color-border-subdued); padding: 20px 18px; background: var(--p-color-bg-surface-secondary, #fafafa); display: flex; flex-direction: column; gap: 18px; }
+        .vm-sub-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--p-color-text-subdued); margin-bottom: 8px; }
+        .vm-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .vm-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .vm-img-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .vm-img-item { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
+        .vm-img-item img { width: 52px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid var(--p-color-border); display: block; }
+        .vm-img-del { position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; border-radius: 50%; border: none; background: rgba(0,0,0,.55); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+        .vm-img-del:hover { background: rgba(200,0,0,.8); }
+        .vm-img-add { width: 52px; height: 52px; border-radius: 6px; border: 2px dashed var(--p-color-border); background: transparent; cursor: pointer; font-size: 20px; color: var(--p-color-text-subdued); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: border-color .12s, color .12s; }
+        .vm-img-add:hover { border-color: var(--p-color-border-hover); color: var(--p-color-text); }
+        .vm-expand-toggle { margin-left: auto; font-size: 11px; color: var(--p-color-text-subdued); flex-shrink: 0; transition: transform .2s; }
+        .vm-card.is-open .vm-expand-toggle { transform: rotate(180deg); }
         .checkbox-container { cursor: pointer; flex-shrink: 0; }
         .checkbox-container input { display: none; }
         .checkbox-container svg { overflow: visible; display: block; }
@@ -1617,9 +1634,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     }}
                   >
                     {/* Group header */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                    <div className="vg-group-header">
                       <span className="vg-drag-handle" title="Drag to reorder">⠿</span>
-                      <div style={{ flex: 1, maxWidth: 200 }}>
+                      <span className="vg-group-num">{gi + 1}</span>
+                      <div style={{ flex: 1, maxWidth: 220 }}>
                         <TextField
                           label="Group name"
                           labelHidden
@@ -1638,6 +1656,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     </div>
 
                     {/* Options row */}
+                    <div className="vg-group-body">
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                       {(group.options || []).map((opt, oi) => (
                         <div key={oi} className="vg-option-chip">
@@ -1680,6 +1699,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       ))}
                       <Button size="slim" variant="plain" onClick={() => vg_addOption(gi)}>+ Add option</Button>
                     </div>
+                    </div>
                   </div>
                 ))}
               </BlockStack>
@@ -1694,47 +1714,40 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 );
                 return (
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                       <Text as="p" variant="bodySm" fontWeight="semibold">
                         Variation Matrix — {matrixRows.length} {matrixRows.length === 1 ? "variant" : "variants"}
                       </Text>
+                      <Text as="p" variant="bodySm" tone="subdued">Click a variant to edit details</Text>
                     </div>
-                    <div style={{ overflowX: "auto" }}>
-                      <table className="vg-matrix-table">
-                        <thead>
-                          <tr>
-                            <th style={{ width: 72 }} />
-                            {variantGroups.map((g, gi) => (
-                              <th key={gi}>{getGroupDisplayName(gi) || g.name || `Group ${gi + 1}`}</th>
-                            ))}
-                            <th>Image</th>
-                            <th>SKU</th>
-                            <th>EAN</th>
-                            <th>Stock</th>
-                            <th>Price (€)</th>
-                            <th>UVP (€)</th>
-                            <th>Sale (€)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {matrixRows.map((v, vi) => {
-                            return (
-                              <tr key={vi}>
-                                <td style={{ verticalAlign: "middle" }}>
-                                  {isNew ? (
-                                    <Text as="span" variant="bodySm" tone="subdued">
-                                      —
-                                    </Text>
-                                  ) : (
-                                    <Link
-                                      href={`/products/${idOrHandle}/variants/${encodeVariantPathKey(v.option_values)}`}
-                                      style={{ fontSize: 13, fontWeight: 600 }}
-                                    >
-                                      Open
-                                    </Link>
-                                  )}
-                                </td>
-                                {/* Option values — read-only cells */}
+                    <div>
+                      {matrixRows.map((v, vi) => {
+                        const isOpen = expandedVariantIndex === vi;
+                        const variantImgs = Array.isArray(v.metadata?.media) ? v.metadata.media : [];
+                        const thumbUrl = variantImgs[0] ? resolveMediaUrl(variantImgs[0]) : null;
+                        const vkey = Array.isArray(v.option_values) ? v.option_values.join("\u0000") : "";
+                        const mkDraftKey = (f) => `${vkey}_${f}`;
+                        const priceFields = [
+                          { f: "price",            centsKey: "price_cents",            label: "Price (€)",   placeholder: "0.00" },
+                          { f: "compare_at_price", centsKey: "compare_at_price_cents", label: "UVP (€)",     placeholder: "—"    },
+                          { f: "sale_price",       centsKey: "sale_price_cents",       label: "Sale (€)",    placeholder: "—"    },
+                        ];
+
+                        return (
+                          <div key={vi} className={`vm-card${isOpen ? " is-open" : ""}`}>
+                            {/* Card header — click to expand */}
+                            <div
+                              className="vm-card-header"
+                              onClick={() => setExpandedVariantIndex(isOpen ? null : vi)}
+                            >
+                              {/* Thumbnail */}
+                              {thumbUrl
+                                ? <img src={thumbUrl} alt="" className="vm-thumb" />
+                                : <div className="vm-thumb-empty">+</div>
+                              }
+
+                              {/* Option badges */}
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1 }}>
                                 {v.option_values.map((val, oi) => {
                                   const gOpt = variantGroups[oi];
                                   const opt = (gOpt?.options || []).find(
@@ -1743,87 +1756,93 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                   const label = opt ? optionDisplayLabel(opt, locale) : val;
                                   const swatchUrl = opt?.swatch_image;
                                   return (
-                                    <td key={oi} style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                                      {swatchUrl ? (
-                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                                          <span style={{ width: 14, height: 14, borderRadius: "50%", display: "inline-block", backgroundImage: `url(${resolveMediaUrl(swatchUrl)})`, backgroundSize: "cover", flexShrink: 0, border: "1px solid var(--p-color-border)" }} />
-                                          {label}
-                                        </span>
-                                      ) : label}
-                                    </td>
+                                    <span key={oi} className="vm-badge">
+                                      {swatchUrl && (
+                                        <span style={{ width: 12, height: 12, borderRadius: "50%", display: "inline-block", backgroundImage: `url(${resolveMediaUrl(swatchUrl)})`, backgroundSize: "cover", border: "1px solid var(--p-color-border)", flexShrink: 0 }} />
+                                      )}
+                                      <span style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginRight: 2 }}>{getGroupDisplayName(oi) || gOpt?.name || `G${oi + 1}`}:</span>
+                                      {label}
+                                    </span>
                                   );
                                 })}
+                              </div>
 
-                                  {/* Images (multiple) */}
-                                <td>
-                                  {(() => {
-                                    const variantImgs = Array.isArray(v.metadata?.media) ? v.metadata.media : [];
-                                    return (
-                                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", minWidth: 80 }}>
-                                        {variantImgs.map((imgUrl, imgIdx) => (
-                                          <div key={imgIdx} style={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
-                                            <img
-                                              src={resolveMediaUrl(imgUrl)}
-                                              alt=""
-                                              style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, border: "1px solid var(--p-color-border)", display: "block" }}
-                                            />
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                const next = variantImgs.filter((_, i) => i !== imgIdx);
-                                                updateMatrixVariantMeta(v.option_values, "media", next.length ? next : null);
-                                              }}
-                                              style={{
-                                                position: "absolute", top: -5, right: -5, width: 16, height: 16,
-                                                borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.6)",
-                                                color: "#fff", fontSize: 10, lineHeight: 1, cursor: "pointer",
-                                                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                                              }}
-                                            >×</button>
-                                          </div>
-                                        ))}
-                                        {variantImgs.length < 8 && (
-                                          <button
-                                            type="button"
-                                            onClick={() => openVariantImgPicker(v.option_values)}
-                                            style={{
-                                              width: 44, height: 44, borderRadius: 4, border: "2px dashed var(--p-color-border)",
-                                              background: "transparent", cursor: "pointer", fontSize: 18, color: "var(--p-color-text-subdued)",
-                                              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                                            }}
-                                          >+</button>
-                                        )}
+                              {/* Quick stats */}
+                              <div style={{ display: "flex", gap: 16, flexShrink: 0 }}>
+                                {v.price_cents != null && (
+                                  <span className="vm-stat"><strong>€{(Number(v.price_cents) / 100).toFixed(2)}</strong></span>
+                                )}
+                                <span className="vm-stat">Stock: <strong>{v.inventory ?? 0}</strong></span>
+                              </div>
+
+                              {/* Open link (not new) */}
+                              {!isNew && (
+                                <Link
+                                  href={`/products/${idOrHandle}/variants/${encodeVariantPathKey(v.option_values)}`}
+                                  style={{ fontSize: 12, fontWeight: 600, color: "var(--p-color-text-interactive)", flexShrink: 0, whiteSpace: "nowrap" }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Open →
+                                </Link>
+                              )}
+
+                              <span className="vm-expand-toggle">▼</span>
+                            </div>
+
+                            {/* Card body — expanded */}
+                            {isOpen && (
+                              <div className="vm-card-body">
+                                {/* Images */}
+                                <div>
+                                  <div className="vm-sub-label">Images</div>
+                                  <div className="vm-img-strip">
+                                    {variantImgs.map((imgUrl, imgIdx) => (
+                                      <div key={imgIdx} className="vm-img-item">
+                                        <img src={resolveMediaUrl(imgUrl)} alt="" />
+                                        <button
+                                          type="button"
+                                          className="vm-img-del"
+                                          onClick={() => {
+                                            const next = variantImgs.filter((_, i) => i !== imgIdx);
+                                            updateMatrixVariantMeta(v.option_values, "media", next.length ? next : null);
+                                          }}
+                                        >×</button>
                                       </div>
-                                    );
-                                  })()}
-                                </td>
+                                    ))}
+                                    {variantImgs.length < 8 && (
+                                      <button
+                                        type="button"
+                                        className="vm-img-add"
+                                        onClick={() => openVariantImgPicker(v.option_values)}
+                                      >+</button>
+                                    )}
+                                  </div>
+                                </div>
 
-                                {/* SKU */}
-                                <td><TextField label="" labelHidden value={v.sku ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "sku", val)} placeholder="SKU" autoComplete="off" /></td>
-                                {/* EAN */}
-                                <td><TextField label="" labelHidden value={v.ean ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "ean", val)} placeholder="EAN" autoComplete="off" /></td>
-                                {/* Stock */}
-                                <td><TextField label="" labelHidden type="number" min={0} value={v.inventory != null ? String(v.inventory) : "0"} onChange={(val) => updateMatrixVariant(v.option_values, "inventory", val)} placeholder="0" /></td>
-                                {/* Price */}
-                                {(() => {
-                                  const vkey = Array.isArray(v.option_values) ? v.option_values.join("\u0000") : "";
-                                  const mkDraftKey = (f) => `${vkey}_${f}`;
-                                  const priceFields = [
-                                    { f: "price",            centsKey: "price_cents",            placeholder: "0.00" },
-                                    { f: "compare_at_price", centsKey: "compare_at_price_cents",  placeholder: "—"    },
-                                    { f: "sale_price",       centsKey: "sale_price_cents",        placeholder: "—"    },
-                                  ];
-                                  return priceFields.map(({ f, centsKey, placeholder }) => {
-                                    const dk = mkDraftKey(f);
-                                    const isDraft = Object.prototype.hasOwnProperty.call(priceInputs, dk);
-                                    const displayVal = isDraft
-                                      ? priceInputs[dk]
-                                      : (v[centsKey] != null ? (Number(v[centsKey]) / 100).toFixed(2) : "");
-                                    return (
-                                      <td key={f}>
+                                {/* SKU / EAN / Stock */}
+                                <div>
+                                  <div className="vm-sub-label">Inventory & Identifiers</div>
+                                  <div className="vm-grid-3">
+                                    <TextField label="SKU" value={v.sku ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "sku", val)} placeholder="SKU" autoComplete="off" />
+                                    <TextField label="EAN / GTIN" value={v.ean ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "ean", val)} placeholder="EAN" autoComplete="off" />
+                                    <TextField label="Stock" type="number" min={0} value={v.inventory != null ? String(v.inventory) : "0"} onChange={(val) => updateMatrixVariant(v.option_values, "inventory", val)} placeholder="0" />
+                                  </div>
+                                </div>
+
+                                {/* Prices */}
+                                <div>
+                                  <div className="vm-sub-label">Pricing</div>
+                                  <div className="vm-grid-3">
+                                    {priceFields.map(({ f, centsKey, label, placeholder }) => {
+                                      const dk = mkDraftKey(f);
+                                      const isDraft = Object.prototype.hasOwnProperty.call(priceInputs, dk);
+                                      const displayVal = isDraft
+                                        ? priceInputs[dk]
+                                        : (v[centsKey] != null ? (Number(v[centsKey]) / 100).toFixed(2) : "");
+                                      return (
                                         <TextField
-                                          label={`Variant ${f}`}
-                                          labelHidden
+                                          key={f}
+                                          label={label}
                                           value={displayVal}
                                           placeholder={placeholder}
                                           autoComplete="off"
@@ -1846,15 +1865,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                             });
                                           }}
                                         />
-                                      </td>
-                                    );
-                                  });
-                                })()}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );

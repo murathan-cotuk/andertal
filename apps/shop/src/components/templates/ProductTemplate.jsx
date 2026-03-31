@@ -489,7 +489,7 @@ function sanitizeHtml(html) {
     .replace(/\s*on\w+=["'][^"']*["']/gi, "");
 }
 
-const META_ATTR_KEYS = ["material", "farbe", "colour", "color", "size", "gewicht", "dimensions", "cart", "curt", "stoff", "typ"];
+const META_ATTR_KEYS = ["material", "farbe", "colour", "color", "size", "gewicht", "cart", "curt", "stoff", "typ"];
 
 const META_HIDDEN_KEYS = [
   "category_id", "admin_category_id", "collection_id", "collection_ids",
@@ -498,6 +498,10 @@ const META_HIDDEN_KEYS = [
   "review_count", "review_avg", "sold_last_month", "metafields", "publish_date",
   "brand_id", "hersteller", "seo_keywords", "seo_meta_title", "seo_meta_description",
   "hersteller_information", "verantwortliche_person_information", "brand_name", "brand_logo", "brand_handle",
+  "shipping_group_id", "unit_type", "unit_value", "unit_reference",
+  "dimensions", "dimension_width", "dimension_height", "dimension_depth", "dimension_length", "dimension_weight",
+  "dimensions_length", "dimensions_width", "dimensions_height",
+  "weight", "width", "height", "depth", "length",
 ];
 
 const DEFAULT_VARIANT_TITLES = new Set(["default title", "default", "standard"]);
@@ -838,6 +842,35 @@ export default function ProductTemplate() {
   const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
   const metaRows = buildMetaRows(meta);
+
+  // Grundpreis (unit price) — e.g. "1 kg = 50,00 €"
+  const grundpreis = (() => {
+    const unitTypeRaw = meta.unit_type;
+    const unitValueRaw = meta.unit_value;
+    const unitRefRaw = meta.unit_reference;
+    if (!unitTypeRaw || unitValueRaw == null || unitValueRaw === "") return null;
+    // Support both "0.2" and "0,2" (German decimal)
+    const unitVal = parseFloat(String(unitValueRaw).replace(",", "."));
+    const unitRef = parseFloat(String(unitRefRaw ?? "1").replace(",", ".")) || 1;
+    if (!unitVal || unitVal <= 0 || !isFinite(unitVal)) return null;
+    const perUnitCents = Math.round((displayCents / unitVal) * unitRef);
+    if (!perUnitCents || perUnitCents <= 0) return null;
+    const unitLabel = unitTypeRaw === "stück" ? "Stück" : unitTypeRaw;
+    const refLabel = unitRef === 1 ? `1 ${unitLabel}` : `${unitRef} ${unitLabel}`;
+    const contentLabel = `${String(unitValueRaw).replace(".", ",")} ${unitLabel}`;
+    return { display: `(${refLabel} = ${formatPriceCents(perUnitCents)} €)`, contentLabel };
+  })();
+
+  // Combined dimensions row — "H × B × T cm" (only if at least one value is set)
+  const dimensionsDisplay = (() => {
+    const h = meta.dimensions_height != null && meta.dimensions_height !== "" ? String(meta.dimensions_height).replace(".", ",") : null;
+    const w = meta.dimensions_width  != null && meta.dimensions_width  !== "" ? String(meta.dimensions_width).replace(".", ",")  : null;
+    const l = meta.dimensions_length != null && meta.dimensions_length !== "" ? String(meta.dimensions_length).replace(".", ",") : null;
+    const parts = [h, w, l].filter(Boolean);
+    if (!parts.length) return null;
+    return parts.join(" × ") + " cm";
+  })();
+
   const storeName =
     (sellerStoreName || "").trim() ||
     product?.metadata?.shop_name ||
@@ -858,10 +891,14 @@ export default function ProductTemplate() {
     if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);
     if (cartNoticeTimersRef.current.clear) window.clearTimeout(cartNoticeTimersRef.current.clear);
 
-    const successText =
-      locale === "tr" ? "Sepete eklendi" : locale === "de" ? "Zum Warenkorb hinzugefügt" : "Added to cart";
-    const errorText =
-      locale === "tr" ? "Sepete eklenemedi" : locale === "de" ? "Hinzufügen fehlgeschlagen" : "Add to cart failed";
+    const successText = {
+      de: "Zum Warenkorb hinzugefügt", tr: "Sepete eklendi",
+      fr: "Ajouté au panier", it: "Aggiunto al carrello", es: "Añadido al carrito",
+    }[locale] ?? "Added to cart";
+    const errorText = {
+      de: "Hinzufügen fehlgeschlagen", tr: "Sepete eklenemedi",
+      fr: "Échec de l'ajout", it: "Aggiunta fallita", es: "Error al añadir",
+    }[locale] ?? "Add to cart failed";
 
     try {
       const ok = await addToCart(variantId, quantity);
@@ -1091,7 +1128,7 @@ export default function ProductTemplate() {
               ))}
             </BulletList>
           )}
-          {(metaRows.length > 0 || (Array.isArray(meta.metafields) && meta.metafields.some((f) => f?.key && f?.value))) && (
+          {(metaRows.length > 0 || dimensionsDisplay || (Array.isArray(meta.metafields) && meta.metafields.some((f) => f?.key && f?.value))) && (
             <MetaTable>
               <tbody>
                 {metaRows.map(({ key, value }) => (
@@ -1100,6 +1137,12 @@ export default function ProductTemplate() {
                     <td>{value}</td>
                   </tr>
                 ))}
+                {dimensionsDisplay && (
+                  <tr>
+                    <th>Abmessungen</th>
+                    <td>{dimensionsDisplay}</td>
+                  </tr>
+                )}
                 {Array.isArray(meta.metafields) && meta.metafields.filter((f) => f?.key && f?.value).map((f, i) => (
                   <tr key={`mf-${i}`}>
                     <th>{f.key}</th>
@@ -1130,6 +1173,12 @@ export default function ProductTemplate() {
                     </PriceSubRow>
                   )}
                   <TaxLine>inkl. MwSt. · zzgl. Versandkosten</TaxLine>
+                  {grundpreis && (
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                      {grundpreis.contentLabel && <span>{grundpreis.contentLabel} · </span>}
+                      <span>{grundpreis.display}</span>
+                    </div>
+                  )}
                 </PriceStack>
               </PriceTop>
 
@@ -1161,13 +1210,17 @@ export default function ProductTemplate() {
                 <ToCartButton
                   onClick={handleAddToCart}
                   disabled={!inStock || isComingSoon}
-                  style={{ width: "100%" }}
                 >
-                  {isComingSoon ? "Bald verfügbar" : !inStock ? "Ausverkauft" : "In den Einkaufswagen"}
+                  {isComingSoon
+                    ? ({ de: "Bald verfügbar", tr: "Yakında", fr: "Bientôt disponible", it: "Disponibile presto", es: "Próximamente" }[locale] ?? "Coming Soon")
+                    : !inStock
+                      ? ({ de: "Ausverkauft", tr: "Stokta Yok", fr: "Épuisé", it: "Esaurito", es: "Agotado" }[locale] ?? "Out of Stock")
+                      : ({ de: "In den Einkaufswagen", tr: "Sepete Ekle", fr: "Ajouter au panier", it: "Aggiungi al carrello", es: "Añadir al carrito" }[locale] ?? "Add to Cart")
+                  }
                 </ToCartButton>
                 {isComingSoon && publishDate && (
                   <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "8px 0 0", fontWeight: 400 }}>
-                    {locale === "tr" ? "Pek yakında" : "Bald verfügbar"}
+                    {({ de: "Bald verfügbar", tr: "Pek yakında", fr: "Bientôt disponible", it: "Disponibile presto", es: "Próximamente" }[locale] ?? "Coming Soon")}
                     {publishDate && !isNaN(publishDate.getTime()) && (
                       <span style={{ marginLeft: 6 }}>
                         ({publishDate.toLocaleDateString(locale === "tr" ? "tr-TR" : "de-DE", { day: "numeric", month: "long", year: "numeric" })})
