@@ -321,19 +321,13 @@ const MorePill = styled.span`
  *  Component
  * ─────────────────────────────────────────────────────────── */
 
-export function ProductCard({ product }) {
+export function ProductCard({ product, activeFilters = {} }) {
   const locale = useLocale();
   const { title: displayTitle, description: localizedDescription } = getLocalizedProduct(product, locale);
   const cartCtx = useContext(CartContext);
   const addToCart = cartCtx?.addToCart ?? (async () => null);
   const openCartSidebar = cartCtx?.openCartSidebar ?? (() => {});
   const cartLoading = cartCtx?.loading ?? false;
-
-  const [selIdx, setSelIdx] = useState(0);
-  const [quantity, setQuantity] = useState(1);
-  const [adding, setAdding] = useState(false);
-  const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
-  const cartNoticeTimersRef = useRef({ hide: null, clear: null });
 
   const variants = product.variants || [];
   const variationGroups = Array.isArray(product.variation_groups) && product.variation_groups.length > 0
@@ -348,11 +342,34 @@ export function ProductCard({ product }) {
     return v;
   }) : variants;
 
+  // Find best initial variant: filter-matching first, then first in-stock, then 0
+  const filterVals = Object.values(activeFilters).flat().map(s => String(s).toLowerCase());
+  const bestVariantIdx = (() => {
+    if (filterVals.length > 0) {
+      const idx = normalizedVariants.findIndex(v => {
+        const ov = (Array.isArray(v.option_values) ? v.option_values : []).map(x => String(x).toLowerCase());
+        return filterVals.some(fv => ov.includes(fv));
+      });
+      if (idx >= 0) return idx;
+    }
+    const stockIdx = normalizedVariants.findIndex(v => {
+      const inStock = !v.manage_inventory || (v.inventory_quantity ?? v.inventory ?? 0) > 0;
+      return inStock;
+    });
+    return stockIdx >= 0 ? stockIdx : 0;
+  })();
+
+  const [selIdx, setSelIdx] = useState(bestVariantIdx);
+  const [quantity, setQuantity] = useState(1);
+  const [adding, setAdding] = useState(false);
+  const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
+  const cartNoticeTimersRef = useRef({ hide: null, clear: null });
+
   // For grouped display: track selected option per group index
   const [selectedOpts, setSelectedOpts] = useState(() => {
     if (!variationGroups) return {};
-    const first = variants[0];
-    const ov = Array.isArray(first?.option_values) ? first.option_values : [];
+    const target = normalizedVariants[bestVariantIdx] ?? normalizedVariants[0];
+    const ov = Array.isArray(target?.option_values) ? target.option_values : [];
     const init = {};
     variationGroups.forEach((_, i) => { if (ov[i]) init[i] = ov[i]; });
     return init;

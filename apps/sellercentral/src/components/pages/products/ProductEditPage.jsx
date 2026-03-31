@@ -22,6 +22,7 @@ import {
   ActionList,
   Modal,
   Checkbox,
+  Tag,
 } from "@shopify/polaris";
 import { ProductIcon, MenuHorizontalIcon, ViewIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
@@ -256,6 +257,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [duplicateSaving, setDuplicateSaving] = useState(false);
   const editingCountry = COUNTRY_FOR_UI_LOCALE[locale] || "DE";
   const [shippingGroupsList, setShippingGroupsList] = useState([]);
+  const [metaDefs, setMetaDefs] = useState({});
+  const [metaDefSearch, setMetaDefSearch] = useState({});
+  const [metaDefPopover, setMetaDefPopover] = useState({});
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -305,6 +309,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     client.getAdminHubProducts({ limit: 200 }).then((r) => {
       if (!cancelled && r?.products) setRelatedProductsList(r.products);
     }).catch(() => { if (!cancelled) setRelatedProductsList([]); });
+    return () => { cancelled = true; };
+  }, [client]);
+
+  // Load metafield definitions from MetaObjects
+  useEffect(() => {
+    let cancelled = false;
+    client.getMetafieldDefinitions().then((r) => {
+      if (!cancelled) setMetaDefs(r?.definitions || {});
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [client]);
 
@@ -1881,16 +1894,94 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">Metafields (catalog)</Text>
-              <Text as="p" variant="bodySm" tone="subdued">e.g. Material: 100% Cotton. Key = metafield name from catalog.</Text>
-              {metafieldsList.length > 0 ? (
-                metafieldsList.map((item, i) => (
-                  <InlineStack key={i} gap="200" wrap>
-                    <TextField label="Key" labelHidden value={item.key || ""} onChange={(v) => { const arr = [...metafieldsList]; arr[i] = { ...arr[i], key: v }; updateMeta("metafields", arr); }} placeholder="e.g. Material" />
-                    <TextField label="Value" labelHidden value={item.value || ""} onChange={(v) => { const arr = [...metafieldsList]; arr[i] = { ...arr[i], value: v }; updateMeta("metafields", arr); }} placeholder="e.g. 100% Cotton" />
-                  </InlineStack>
-                ))
-              ) : null}
-              <Button variant="secondary" size="slim" onClick={() => updateMeta("metafields", [...metafieldsList, { key: "", value: "" }])}>+ Metafield</Button>
+              {Object.keys(metaDefs).length === 0 ? (
+                <Text as="p" variant="bodySm" tone="subdued">Keine Metafeld-Definitionen. Erstelle welche unter Content → Metaobjects.</Text>
+              ) : (
+                <BlockStack gap="400">
+                  {Object.entries(metaDefs).sort(([a], [b]) => a.localeCompare(b)).map(([defKey, def]) => {
+                    const selected = metafieldsList.filter(m => m.key === defKey).map(m => m.value).filter(Boolean);
+                    const isOpen = !!metaDefPopover[defKey];
+                    const search = metaDefSearch[defKey] || "";
+                    const availableVals = (def.values || []).filter(v => !selected.includes(v) && v.toLowerCase().includes(search.toLowerCase()));
+                    const canAddCustom = search.trim() && !selected.includes(search.trim()) && !(def.values || []).includes(search.trim());
+                    const toggleVal = (val) => {
+                      const others = metafieldsList.filter(m => m.key !== defKey);
+                      const cur = selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val];
+                      updateMeta("metafields", [...others, ...cur.map(v => ({ key: defKey, value: v }))]);
+                    };
+                    return (
+                      <Box key={defKey}>
+                        <BlockStack gap="200">
+                          <Text as="p" variant="bodySm" fontWeight="semibold">{def.label}</Text>
+                          {selected.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {selected.map(val => (
+                                <Tag key={val} onRemove={() => {
+                                  const others = metafieldsList.filter(m => m.key !== defKey);
+                                  updateMeta("metafields", [...others, ...selected.filter(v => v !== val).map(v => ({ key: defKey, value: v }))]);
+                                }}>{val}</Tag>
+                              ))}
+                            </div>
+                          )}
+                          <Popover
+                            active={isOpen}
+                            onClose={() => setMetaDefPopover(p => ({ ...p, [defKey]: false }))}
+                            activator={
+                              <Button size="slim" variant="secondary" onClick={() => setMetaDefPopover(p => ({ ...p, [defKey]: !p[defKey] }))}>
+                                + Wert wählen
+                              </Button>
+                            }
+                          >
+                            <div style={{ padding: 10, minWidth: 220 }}>
+                              <TextField
+                                label="Suchen"
+                                labelHidden
+                                placeholder="Suchen oder eingeben…"
+                                value={search}
+                                onChange={v => setMetaDefSearch(p => ({ ...p, [defKey]: v }))}
+                                autoComplete="off"
+                                size="slim"
+                              />
+                              <div style={{ marginTop: 8, maxHeight: 200, overflowY: "auto" }}>
+                                {availableVals.map(val => (
+                                  <div
+                                    key={val}
+                                    style={{ padding: "6px 10px", cursor: "pointer", borderRadius: 4, fontSize: 13 }}
+                                    onMouseEnter={e => e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"}
+                                    onMouseLeave={e => e.currentTarget.style.background = ""}
+                                    onMouseDown={e => {
+                                      e.preventDefault();
+                                      toggleVal(val);
+                                      setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
+                                      setMetaDefPopover(p => ({ ...p, [defKey]: false }));
+                                    }}
+                                  >{val}</div>
+                                ))}
+                                {canAddCustom && (
+                                  <div
+                                    style={{ padding: "6px 10px", cursor: "pointer", borderRadius: 4, fontSize: 13, fontStyle: "italic", color: "var(--p-color-text-subdued)" }}
+                                    onMouseEnter={e => e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"}
+                                    onMouseLeave={e => e.currentTarget.style.background = ""}
+                                    onMouseDown={e => {
+                                      e.preventDefault();
+                                      toggleVal(search.trim());
+                                      setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
+                                      setMetaDefPopover(p => ({ ...p, [defKey]: false }));
+                                    }}
+                                  >"{search.trim()}" hinzufügen</div>
+                                )}
+                                {availableVals.length === 0 && !canAddCustom && (
+                                  <div style={{ padding: "6px 10px", fontSize: 13, color: "var(--p-color-text-subdued)" }}>Keine weiteren Optionen</div>
+                                )}
+                              </div>
+                            </div>
+                          </Popover>
+                        </BlockStack>
+                      </Box>
+                    );
+                  })}
+                </BlockStack>
+              )}
 
 
               <Divider />

@@ -96,6 +96,7 @@ function getMenuItemsMain(t) {
         { url: "/content/brands", label: t("brands") },
         { url: "/content/metaobjects", label: t("metaobjects") },
         { url: "/content/landing-page", label: "Landing Page" },
+        { url: "/content/styles", label: "Styles" },
         { url: "/content/pages", label: t("pages") },
         { url: "/content/blog-posts", label: t("blogPosts") },
       ],

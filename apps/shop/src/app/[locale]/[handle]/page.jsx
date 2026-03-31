@@ -127,8 +127,8 @@ const Breadcrumb = styled.nav`
   @media (max-width: 600px) { padding: 8px 16px; }
 `;
 
-/* ─── Filter bar ─────────────────────────────────────────── */
-const FilterBar = styled.div`
+/* ─── Sort bar (top, sticky) ─────────────────────────────── */
+const SortBar = styled.div`
   position: sticky;
   top: ${HEADER_H}px;
   z-index: 20;
@@ -137,7 +137,7 @@ const FilterBar = styled.div`
   border-bottom: 1px solid #e8e8e6;
 `;
 
-const FilterBarInner = styled.div`
+const SortBarInner = styled.div`
   max-width: 1440px;
   margin: 0 auto;
   padding: 0 32px;
@@ -149,8 +149,9 @@ const FilterBarInner = styled.div`
   @media (max-width: 600px) { padding: 0 16px; }
 `;
 
+/* Mobile-only filter toggle */
 const FilterBtn = styled.button`
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 7px;
   padding: 12px 0;
@@ -168,6 +169,8 @@ const FilterBtn = styled.button`
 
   svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
   &:hover { color: #111; }
+
+  @media (max-width: 767px) { display: inline-flex; }
 `;
 
 const SortWrap = styled.div`
@@ -204,27 +207,71 @@ const SortSelect = styled.select`
   background-position: right 4px center;
 `;
 
-/* ─── Filter panel (drawer below bar) ──────────────────── */
-const FilterPanel = styled.div`
-  background: #fff;
-  border-bottom: 1px solid #e8e8e6;
-  overflow: hidden;
-  max-height: ${(p) => (p.$open ? "600px" : "0")};
-  transition: max-height 0.35s ease;
-`;
-
-const FilterPanelInner = styled.div`
+/* ─── Sidebar + content layout ───────────────────────────── */
+const ContentWrap = styled.div`
   max-width: 1440px;
   margin: 0 auto;
-  padding: 20px 32px 24px;
+  padding: 0 32px 80px;
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
-  flex-wrap: wrap;
   gap: 32px;
+  align-items: flex-start;
 
-  @media (max-width: 600px) { padding: 16px 16px 20px; gap: 20px; }
+  @media (max-width: 767px) { padding: 0 16px 60px; }
 `;
 
-const FilterGroup = styled.div``;
+/* Left filter sidebar */
+const Sidebar = styled.aside`
+  width: 220px;
+  flex-shrink: 0;
+  position: sticky;
+  top: ${HEADER_H + 56}px;
+  max-height: calc(100vh - ${HEADER_H + 56}px);
+  overflow-y: auto;
+
+  /* Mobile: hidden overlay drawer */
+  @media (max-width: 767px) {
+    position: fixed;
+    top: 0;
+    left: ${(p) => (p.$open ? "0" : "-260px")};
+    width: 250px;
+    height: 100vh;
+    max-height: 100vh;
+    z-index: 100;
+    background: #fff;
+    box-shadow: 4px 0 16px rgba(0,0,0,0.12);
+    transition: left 0.3s ease;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+`;
+
+const SidebarOverlay = styled.div`
+  display: none;
+  @media (max-width: 767px) {
+    display: ${(p) => (p.$open ? "block" : "none")};
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 99;
+  }
+`;
+
+const SidebarHead = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8e8e6;
+
+  @media (min-width: 768px) { display: none; }
+`;
+
+const FilterGroup = styled.div`
+  margin-bottom: 24px;
+`;
 
 const FilterGroupTitle = styled.div`
   font-size: 10px;
@@ -257,18 +304,10 @@ const CheckRow = styled.label`
   &:hover { color: #111; }
 `;
 
-const FilterActions = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 8px;
-  width: 100%;
-`;
-
 const ClearAllBtn = styled.button`
   background: none;
   border: 1px solid #ccc;
-  padding: 6px 14px;
+  padding: 5px 12px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -280,15 +319,10 @@ const ClearAllBtn = styled.button`
   &:hover { border-color: #111; color: #111; }
 `;
 
-/* ─── Body (content only, no sidebar) ───────────────────── */
+/* Main content area (right of sidebar) */
 const Body = styled.div`
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 0 32px 80px;
-  width: 100%;
-  box-sizing: border-box;
-
-  @media (max-width: 600px) { padding: 0 16px 60px; }
+  flex: 1;
+  min-width: 0;
 `;
 
 /* ─── Active-filter chips ────────────────────────────────── */
@@ -563,9 +597,18 @@ export default function CollectionPage() {
   Object.entries(filters).forEach(([k, vals]) => {
     if (!vals?.length) return;
     filtered = filtered.filter(p => {
-      const v = (p.metadata || {})[k];
-      if (v == null) return false;
-      return (Array.isArray(v) ? v : [v]).some(x => vals.includes(String(x).trim()));
+      const meta = p.metadata || {};
+      // 1. Direct metadata key
+      const direct = meta[k];
+      if (direct != null && (Array.isArray(direct) ? direct : [direct]).some(x => vals.includes(String(x).trim()))) return true;
+      // 2. metafields array [{key, value}, ...]
+      if (Array.isArray(meta.metafields) && meta.metafields.some(mf => mf?.key === k && vals.includes(String(mf.value ?? "").trim()))) return true;
+      // 3. variant option_values — e.g. filter "farbe: Rot" matches variants with "Rot" option
+      if (Array.isArray(p.variants) && p.variants.some(v => {
+        const ov = Array.isArray(v.option_values) ? v.option_values : [];
+        return ov.some(x => vals.includes(String(x).trim()));
+      })) return true;
+      return false;
     });
   });
 
@@ -660,28 +703,28 @@ export default function CollectionPage() {
           <b>{title}</b>
         </Breadcrumb>
 
-        {/* ── Sticky filter/sort bar ── */}
-        <FilterBar>
-          <FilterBarInner>
-            {/* Filter toggle */}
-            <FilterBtn
-              type="button"
-              $active={panelOpen || activeCount > 0}
-              onClick={() => setPanelOpen(o => !o)}
-              aria-expanded={panelOpen}
-            >
-              <svg viewBox="0 0 16 12">
-                <line x1="0" y1="2"  x2="16" y2="2" />
-                <line x1="0" y1="6"  x2="16" y2="6" />
-                <line x1="0" y1="10" x2="16" y2="10"/>
-                <circle cx="5"  cy="2"  r="1.5" fill="#111" stroke="none"/>
-                <circle cx="11" cy="6"  r="1.5" fill="#111" stroke="none"/>
-                <circle cx="5"  cy="10" r="1.5" fill="#111" stroke="none"/>
-              </svg>
-              Filter {activeCount > 0 ? `(${activeCount})` : ""}
-            </FilterBtn>
-
-            {/* Sort */}
+        {/* ── Sort bar (sticky) ── */}
+        <SortBar>
+          <SortBarInner>
+            {/* Mobile filter toggle */}
+            {hasFacets && (
+              <FilterBtn
+                type="button"
+                $active={panelOpen || activeCount > 0}
+                onClick={() => setPanelOpen(o => !o)}
+                aria-expanded={panelOpen}
+              >
+                <svg viewBox="0 0 16 12">
+                  <line x1="0" y1="2"  x2="16" y2="2" />
+                  <line x1="0" y1="6"  x2="16" y2="6" />
+                  <line x1="0" y1="10" x2="16" y2="10"/>
+                  <circle cx="5"  cy="2"  r="1.5" fill="#111" stroke="none"/>
+                  <circle cx="11" cy="6"  r="1.5" fill="#111" stroke="none"/>
+                  <circle cx="5"  cy="10" r="1.5" fill="#111" stroke="none"/>
+                </svg>
+                Filter {activeCount > 0 ? `(${activeCount})` : ""}
+              </FilterBtn>
+            )}
             <SortWrap>
               <SortLabel>Sort:</SortLabel>
               <SortSelect
@@ -694,127 +737,136 @@ export default function CollectionPage() {
                 ))}
               </SortSelect>
             </SortWrap>
-          </FilterBarInner>
+          </SortBarInner>
+        </SortBar>
 
-          {/* ── Filter panel ── */}
+        {/* ── Sidebar + content ── */}
+        {hasFacets && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
+        <ContentWrap ref={bodyRef}>
+
+          {/* Left filter sidebar */}
           {hasFacets && (
-            <FilterPanel $open={panelOpen}>
-              <FilterPanelInner>
-                {Object.entries(facets).map(([key, vals]) => (
-                  <FilterGroup key={key}>
-                    <FilterGroupTitle>{({
-                      brand_name: "Marke", farbe: "Farbe", colour: "Colour", color: "Color",
-                      material: "Material", size: "Größe", groesse: "Größe",
-                      typ: "Typ", style: "Style", gender: "Gender",
-                      age_group: "Altersgruppe", season: "Saison",
-                    })[key] ?? key.replace(/_/g, " ")}</FilterGroupTitle>
-                    {vals.map(val => {
-                      const on = (filters[key] || []).includes(val);
-                      return (
-                        <CheckRow key={val} $on={on}>
-                          <input
-                            type="checkbox"
-                            checked={on}
-                            onChange={() => toggle(key, val)}
-                          />
-                          {val}
-                        </CheckRow>
-                      );
-                    })}
-                  </FilterGroup>
-                ))}
+            <Sidebar $open={panelOpen}>
+              {/* Mobile header */}
+              <SidebarHead>
+                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>Filter</span>
+                <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555", lineHeight: 1 }}>×</button>
+              </SidebarHead>
 
+              {/* Desktop title */}
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 20, paddingBottom: 12, borderBottom: "1px solid #e8e8e6" }}>
+                Filter
                 {activeCount > 0 && (
-                  <FilterActions>
-                    <ClearAllBtn
-                      type="button"
-                      onClick={() => { setFilters({}); setPage(1); }}
-                    >
-                      Clear all
-                    </ClearAllBtn>
-                  </FilterActions>
+                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
+                    Clear
+                  </ClearAllBtn>
                 )}
-              </FilterPanelInner>
-            </FilterPanel>
-          )}
-        </FilterBar>
+              </div>
 
-        {/* ── Body ── */}
-        <Body ref={bodyRef}>
+              {Object.entries(facets).map(([key, vals]) => (
+                <FilterGroup key={key}>
+                  <FilterGroupTitle>{({
+                    brand_name: "Marke", farbe: "Farbe", colour: "Colour", color: "Color",
+                    material: "Material", size: "Größe", groesse: "Größe",
+                    typ: "Typ", style: "Style", gender: "Gender",
+                    age_group: "Altersgruppe", season: "Saison",
+                  })[key] ?? key.replace(/_/g, " ")}</FilterGroupTitle>
+                  {vals.map(val => {
+                    const on = (filters[key] || []).includes(val);
+                    return (
+                      <CheckRow key={val} $on={on}>
+                        <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
+                        {val}
+                      </CheckRow>
+                    );
+                  })}
+                </FilterGroup>
+              ))}
 
-          {/* Active filter chips */}
-          {activeCount > 0 && (
-            <ChipBar>
-              {Object.entries(filters).flatMap(([k, vals]) =>
-                (vals || []).map(v => (
-                  <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
-                    {v} ×
-                  </Chip>
-                ))
+              {activeCount > 0 && (
+                <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
+                  Clear all filters
+                </ClearAllBtn>
               )}
-            </ChipBar>
+            </Sidebar>
           )}
 
-          {/* Result count */}
-          <ResultBar>
-            {total} {total === 1 ? "product" : "products"}
-          </ResultBar>
-
-          {/* Grid */}
-          {paginated.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "80px 0", color: "#bbb", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-              No products match your filters.
-            </div>
-          ) : (
-            <ProductGrid products={paginated} maxColumns={4} />
-          )}
-
-          {/* Önerilen ürünler (collection.recommended_product_ids) */}
-          {recommendedProducts.length > 0 && (
-            <section style={{ marginTop: 48, marginBottom: 24 }}>
-              <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 16, color: "#111" }}>Önerilen ürünler</h2>
-              <ProductGrid products={recommendedProducts} maxColumns={4} />
-            </section>
-          )}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <Pager>
-              <PBtn
-                type="button"
-                disabled={curPage <= 1}
-                onClick={() => { setPage(p => p - 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-              >‹</PBtn>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - curPage) <= 2)
-                .reduce((acc, p, idx, arr) => {
-                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p, i) =>
-                  p === "…"
-                    ? <span key={`d${i}`} style={{ width: 36, textAlign: "center", color: "#bbb", fontSize: 12 }}>…</span>
-                    : <PBtn key={p} type="button" $on={p === curPage}
-                        onClick={() => { setPage(p); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}>
-                        {p}
-                      </PBtn>
+          {/* Main content */}
+          <Body>
+            {/* Active filter chips */}
+            {activeCount > 0 && (
+              <ChipBar>
+                {Object.entries(filters).flatMap(([k, vals]) =>
+                  (vals || []).map(v => (
+                    <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
+                      {v} ×
+                    </Chip>
+                  ))
                 )}
+              </ChipBar>
+            )}
 
-              <PBtn
-                type="button"
-                disabled={curPage >= totalPages}
-                onClick={() => { setPage(p => p + 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-              >›</PBtn>
-            </Pager>
-          )}
+            {/* Result count */}
+            <ResultBar>
+              {total} {total === 1 ? "product" : "products"}
+            </ResultBar>
 
-          {/* Description */}
-          {collection.description && (
-            <Desc dangerouslySetInnerHTML={{ __html: sanitize(rewriteImageUrlsInHtml(collection.description)) }} />
-          )}
-        </Body>
+            {/* Grid */}
+            {paginated.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "80px 0", color: "#bbb", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                No products match your filters.
+              </div>
+            ) : (
+              <ProductGrid products={paginated} maxColumns={4} activeFilters={filters} />
+            )}
+
+            {/* Önerilen ürünler */}
+            {recommendedProducts.length > 0 && (
+              <section style={{ marginTop: 48, marginBottom: 24 }}>
+                <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 16, color: "#111" }}>Önerilen ürünler</h2>
+                <ProductGrid products={recommendedProducts} maxColumns={4} />
+              </section>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Pager>
+                <PBtn
+                  type="button"
+                  disabled={curPage <= 1}
+                  onClick={() => { setPage(p => p - 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                >‹</PBtn>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - curPage) <= 2)
+                  .reduce((acc, p, idx, arr) => {
+                    if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    p === "…"
+                      ? <span key={`d${i}`} style={{ width: 36, textAlign: "center", color: "#bbb", fontSize: 12 }}>…</span>
+                      : <PBtn key={p} type="button" $on={p === curPage}
+                          onClick={() => { setPage(p); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}>
+                          {p}
+                        </PBtn>
+                  )}
+
+                <PBtn
+                  type="button"
+                  disabled={curPage >= totalPages}
+                  onClick={() => { setPage(p => p + 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                >›</PBtn>
+              </Pager>
+            )}
+
+            {/* Description */}
+            {collection.description && (
+              <Desc dangerouslySetInnerHTML={{ __html: sanitize(rewriteImageUrlsInHtml(collection.description)) }} />
+            )}
+          </Body>
+        </ContentWrap>
       </Main>
       <Footer />
     </PageWrap>

@@ -772,6 +772,19 @@ async function start() {
     updated_at TIMESTAMPTZ DEFAULT NOW()
   );
 `).catch(() => {})
+        await client.query(`
+  CREATE TABLE IF NOT EXISTS admin_hub_landing_pages (
+    page_id varchar(100) PRIMARY KEY,
+    containers JSONB NOT NULL DEFAULT '[]',
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  );
+`).catch(() => {})
+        await client.query(`
+  CREATE TABLE IF NOT EXISTS admin_hub_styles (
+    key varchar(50) PRIMARY KEY,
+    value JSONB
+  );
+`).catch(() => {})
         await client.end()
         console.log('Admin Hub: admin_hub_menus, admin_hub_menu_locations, admin_hub_media, admin_hub_pages, admin_hub_collections, admin_hub_seller_settings, admin_hub_brands, store_carts, store_cart_items tabloları hazır')
       } catch (migErr) {
@@ -6785,6 +6798,81 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.get('/admin-hub/landing-page', landingPageGET)
     httpApp.put('/admin-hub/landing-page', landingPagePUT)
     httpApp.get('/store/landing-page', landingPageGET)
+
+    // ── Landing page by page_id ──────────────────────────────────────────────
+    const landingPageByIdGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const pageId = req.params.pageId
+        const r = await client.query('SELECT containers, updated_at FROM admin_hub_landing_pages WHERE page_id = $1', [pageId])
+        res.json({ containers: r.rows[0]?.containers || [], updated_at: r.rows[0]?.updated_at || null })
+      } catch (err) {
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const landingPageByIdPUT = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const pageId = req.params.pageId
+        const containers = Array.isArray(req.body?.containers) ? req.body.containers : []
+        await client.query(
+          `INSERT INTO admin_hub_landing_pages (page_id, containers, updated_at) VALUES ($1, $2, NOW())
+           ON CONFLICT (page_id) DO UPDATE SET containers = $2, updated_at = NOW()`,
+          [pageId, JSON.stringify(containers)]
+        )
+        res.json({ ok: true, containers })
+      } catch (err) {
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    httpApp.get('/admin-hub/landing-page/:pageId', landingPageByIdGET)
+    httpApp.put('/admin-hub/landing-page/:pageId', landingPageByIdPUT)
+    httpApp.get('/store/landing-page/:pageId', landingPageByIdGET)
+
+    // ── Styles ───────────────────────────────────────────────────────────────
+    const stylesGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query('SELECT key, value FROM admin_hub_styles')
+        const data = {}
+        r.rows.forEach(row => { data[row.key] = row.value })
+        res.json({ styles: data.styles || { colors: {}, buttons: {} } })
+      } catch (err) {
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const stylesPUT = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const styles = req.body?.styles || { colors: {}, buttons: {} }
+        await client.query(
+          `INSERT INTO admin_hub_styles (key, value) VALUES ('styles', $1)
+           ON CONFLICT (key) DO UPDATE SET value = $1`,
+          [JSON.stringify(styles)]
+        )
+        res.json({ ok: true, styles })
+      } catch (err) {
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    httpApp.get('/admin-hub/styles', stylesGET)
+    httpApp.put('/admin-hub/styles', stylesPUT)
     console.log('Landing page routes: GET/PUT /admin-hub/landing-page, GET /store/landing-page')
 
     // ── Notifications ─────────────────────────────────────────────────────

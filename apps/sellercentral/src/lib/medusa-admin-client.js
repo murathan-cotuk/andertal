@@ -165,6 +165,32 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/metafield-definitions/${encodeURIComponent(key)}`, { method: 'DELETE' });
   }
 
+  /** GET /admin-hub/landing-page/:pageId */
+  async getLandingPageContainers(pageId) {
+    return this.request(`/admin-hub/landing-page/${encodeURIComponent(pageId)}`);
+  }
+
+  /** PUT /admin-hub/landing-page/:pageId */
+  async saveLandingPageContainers(pageId, containers) {
+    return this.request(`/admin-hub/landing-page/${encodeURIComponent(pageId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ containers }),
+    });
+  }
+
+  /** GET /admin-hub/styles */
+  async getStyles() {
+    return this.request('/admin-hub/styles');
+  }
+
+  /** PUT /admin-hub/styles */
+  async saveStyles(styles) {
+    return this.request('/admin-hub/styles', {
+      method: 'PUT',
+      body: JSON.stringify({ styles }),
+    });
+  }
+
   /** GET /admin-hub/seller-settings */
   async getSellerSettings() {
     const res = await this.request('/admin-hub/seller-settings').catch(() => ({ store_name: '' }));

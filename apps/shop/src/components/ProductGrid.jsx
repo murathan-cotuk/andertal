@@ -26,13 +26,13 @@ const Empty = styled.div`
   text-transform: uppercase;
 `;
 
-export function ProductGrid({ products = [], maxColumns = 3 }) {
+export function ProductGrid({ products = [], maxColumns = 3, activeFilters = {} }) {
   if (!products.length) return <Empty>No products found</Empty>;
 
   return (
     <Grid $cols={maxColumns}>
       {products.map((p) => (
-        <ProductCard key={p.id} product={p} />
+        <ProductCard key={p.id} product={p} activeFilters={activeFilters} />
       ))}
     </Grid>
   );

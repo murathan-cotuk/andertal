@@ -154,35 +154,36 @@ export default function InboxPage() {
               const isActive = selected && (selected.order_id || "__no_order__") === (thread.order_id || "__no_order__");
               const customerName = [thread.order_first_name, thread.order_last_name].filter(Boolean).join(" ") || thread.order_email || "Kunde";
               return (
-                <button
-                  key={thread.order_id || "__no_order__"}
-                  onClick={() => handleSelectThread(thread)}
-                  style={{
-                    width: "100%", textAlign: "left", padding: "10px 14px",
-                    background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
-                    borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : "3px solid transparent",
-                    border: "none", borderBottom: "1px solid var(--p-color-border-subdued)",
-                    cursor: "pointer", display: "block",
-                  }}
-                >
-                  <InlineStack align="space-between" blockAlign="start" gap="100">
-                    <Text as="span" variant="bodySm" fontWeight="semibold">
+                <div key={thread.order_id || "__no_order__"} style={{ borderBottom: "1px solid var(--p-color-border-subdued)" }}>
+                  <button
+                    onClick={() => handleSelectThread(thread)}
+                    style={{
+                      width: "100%", textAlign: "left", padding: "10px 14px",
+                      background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
+                      borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : "3px solid transparent",
+                      borderTop: "none", borderRight: "none", borderBottom: "none",
+                      cursor: "pointer", display: "block",
+                    }}
+                  >
+                    <InlineStack align="space-between" blockAlign="start" gap="100">
+                      <Text as="span" variant="bodySm" fontWeight="bold">{customerName}</Text>
+                      <InlineStack gap="100" blockAlign="center">
+                        {unread > 0 && (
+                          <span style={{ background: "var(--p-color-bg-fill-critical)", color: "#fff", borderRadius: "50%", fontSize: 10, fontWeight: 800, width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            {unread}
+                          </span>
+                        )}
+                        <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at)}</Text>
+                      </InlineStack>
+                    </InlineStack>
+                    <Text as="p" variant="bodySm" tone="subdued">
                       {thread.order_number ? `#${thread.order_number}` : "Allgemein"}
                     </Text>
-                    <InlineStack gap="100" blockAlign="center">
-                      {unread > 0 && (
-                        <span style={{ background: "var(--p-color-bg-fill-critical)", color: "#fff", borderRadius: "50%", fontSize: 10, fontWeight: 800, width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          {unread}
-                        </span>
-                      )}
-                      <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at)}</Text>
-                    </InlineStack>
-                  </InlineStack>
-                  <Text as="p" variant="bodySm" tone="subdued">{customerName}</Text>
-                  <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {last?.body?.slice(0, 55) || "—"}
-                  </div>
-                </button>
+                    <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {last?.body?.slice(0, 55) || "—"}
+                    </div>
+                  </button>
+                </div>
               );
             })}
           </div>
