@@ -791,6 +791,19 @@ async function start() {
     value JSONB
   );
 `).catch(() => {})
+        // Seller users table for authentication
+        await client.query(`
+  CREATE TABLE IF NOT EXISTS seller_users (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    email varchar(255) UNIQUE NOT NULL,
+    password_hash varchar(255) NOT NULL,
+    store_name varchar(255) DEFAULT '',
+    seller_id varchar(255) UNIQUE NOT NULL,
+    is_superuser boolean DEFAULT false,
+    created_at timestamp DEFAULT now(),
+    updated_at timestamp DEFAULT now()
+  );
+`).catch(() => {})
         await client.end()
         console.log('Admin Hub: admin_hub_menus, admin_hub_menu_locations, admin_hub_media, admin_hub_pages, admin_hub_collections, admin_hub_seller_settings, admin_hub_brands, store_carts, store_cart_items tabloları hazır')
       } catch (migErr) {
@@ -2418,6 +2431,198 @@ async function start() {
     httpApp.get('/admin-hub/seller-settings', sellerSettingsGET)
     httpApp.patch('/admin-hub/seller-settings', sellerSettingsPATCH)
     console.log('Admin Hub routes: GET/PATCH /admin-hub/seller-settings')
+
+    // ── Seller Auth ───────────────────────────────────────────────────────────
+    const SELLER_JWT_SECRET = (process.env.JWT_SECRET || 'belucha-seller-secret-2025')
+    // Initial superuser email(s) — can also be managed via DB
+    const INITIAL_SUPERUSER_EMAILS = (process.env.SUPERUSER_EMAILS || 'murathan.cotuk@gmail.com')
+      .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+
+    function signSellerToken(payload) {
+      const _c = require('crypto')
+      const header = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')
+      const body = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 30 * 24 * 3600 })).toString('base64url')
+      const sig = _c.createHmac('sha256', SELLER_JWT_SECRET).update(`${header}.${body}`).digest('base64url')
+      return `${header}.${body}.${sig}`
+    }
+
+    function verifySellerToken(token) {
+      if (!token) return null
+      try {
+        const _c = require('crypto')
+        const parts = token.split('.')
+        if (parts.length !== 3) return null
+        const [header, body, sig] = parts
+        const expected = _c.createHmac('sha256', SELLER_JWT_SECRET).update(`${header}.${body}`).digest('base64url')
+        if (sig !== expected) return null
+        const payload = JSON.parse(Buffer.from(body, 'base64url').toString())
+        if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null
+        return payload
+      } catch { return null }
+    }
+
+    function hashSellerPassword(password) {
+      const _c = require('crypto')
+      const salt = _c.randomBytes(16).toString('hex')
+      const hash = _c.scryptSync(password, salt, 64).toString('hex')
+      return `${salt}:${hash}`
+    }
+
+    function verifySellerPassword(password, stored) {
+      try {
+        const _c = require('crypto')
+        const [salt, hash] = stored.split(':')
+        if (!salt || !hash) return false
+        const attempt = _c.scryptSync(password, salt, 64).toString('hex')
+        return attempt === hash
+      } catch { return false }
+    }
+
+    function getSellerDbClient() {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl || !dbUrl.startsWith('postgres')) return null
+      const { Client } = require('pg')
+      return new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    }
+
+    // Middleware: reads Bearer token from Authorization header, sets req.sellerUser
+    function requireSellerAuth(req, res, next) {
+      const auth = req.headers['authorization'] || ''
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+      const payload = verifySellerToken(token)
+      if (!payload) return res.status(401).json({ message: 'Unauthorized' })
+      req.sellerUser = payload
+      next()
+    }
+
+    function requireSuperuser(req, res, next) {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      next()
+    }
+
+    // POST /admin-hub/auth/register
+    const sellerAuthRegisterPOST = async (req, res) => {
+      const body = req.body || {}
+      const email = (body.email || '').trim().toLowerCase()
+      const password = (body.password || '').toString()
+      const store_name = (body.store_name || body.storeName || '').trim()
+      if (!email || !password) return res.status(400).json({ message: 'Email and password are required' })
+      if (password.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' })
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const existing = await client.query('SELECT id FROM seller_users WHERE email = $1', [email])
+        if (existing.rows.length > 0) {
+          await client.end()
+          return res.status(409).json({ message: 'An account with this email already exists' })
+        }
+        const is_superuser = INITIAL_SUPERUSER_EMAILS.includes(email)
+        const password_hash = hashSellerPassword(password)
+        const seller_id = `seller_${require('crypto').randomBytes(8).toString('hex')}`
+        const r = await client.query(
+          `INSERT INTO seller_users (email, password_hash, store_name, seller_id, is_superuser)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id, email, store_name, seller_id, is_superuser, created_at`,
+          [email, password_hash, store_name || null, seller_id, is_superuser]
+        )
+        // Also upsert seller_settings so store name is available
+        if (store_name) {
+          await client.query(
+            `INSERT INTO admin_hub_seller_settings (seller_id, store_name, updated_at) VALUES ($1, $2, now())
+             ON CONFLICT (seller_id) DO UPDATE SET store_name = $2, updated_at = now()`,
+            [seller_id, store_name]
+          ).catch(() => {})
+        }
+        await client.end()
+        const user = r.rows[0]
+        const token = signSellerToken({ id: user.id, email: user.email, seller_id: user.seller_id, is_superuser: user.is_superuser, store_name: user.store_name || '' })
+        res.json({ token, user: { id: user.id, email: user.email, seller_id: user.seller_id, is_superuser: user.is_superuser, store_name: user.store_name || '' } })
+      } catch (err) {
+        try { await client.end() } catch (_) {}
+        console.error('sellerAuthRegisterPOST:', err)
+        res.status(500).json({ message: err?.message || 'Registration failed' })
+      }
+    }
+
+    // POST /admin-hub/auth/login
+    const sellerAuthLoginPOST = async (req, res) => {
+      const body = req.body || {}
+      const email = (body.email || '').trim().toLowerCase()
+      const password = (body.password || '').toString()
+      if (!email || !password) return res.status(400).json({ message: 'Email and password are required' })
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query('SELECT id, email, password_hash, store_name, seller_id, is_superuser FROM seller_users WHERE email = $1', [email])
+        await client.end()
+        const user = r.rows[0]
+        if (!user) return res.status(401).json({ message: 'Invalid email or password' })
+        // Check if email is in initial superuser list (in case they registered before the list was set)
+        const shouldBeSuperuser = user.is_superuser || INITIAL_SUPERUSER_EMAILS.includes(email)
+        if (!verifySellerPassword(password, user.password_hash)) return res.status(401).json({ message: 'Invalid email or password' })
+        // Ensure superuser flag is up-to-date
+        if (shouldBeSuperuser && !user.is_superuser) {
+          const c2 = getSellerDbClient()
+          try { await c2.connect(); await c2.query('UPDATE seller_users SET is_superuser = true WHERE id = $1', [user.id]); await c2.end() } catch (_) {}
+          user.is_superuser = true
+        }
+        const token = signSellerToken({ id: user.id, email: user.email, seller_id: user.seller_id, is_superuser: shouldBeSuperuser, store_name: user.store_name || '' })
+        res.json({ token, user: { id: user.id, email: user.email, seller_id: user.seller_id, is_superuser: shouldBeSuperuser, store_name: user.store_name || '' } })
+      } catch (err) {
+        try { await client.end() } catch (_) {}
+        console.error('sellerAuthLoginPOST:', err)
+        res.status(500).json({ message: err?.message || 'Login failed' })
+      }
+    }
+
+    // GET /admin-hub/auth/me
+    const sellerAuthMeGET = async (req, res) => {
+      const user = req.sellerUser
+      if (!user) return res.status(401).json({ message: 'Unauthorized' })
+      res.json({ user })
+    }
+
+    // GET /admin-hub/users — list all seller users (superuser only)
+    const sellerUsersGET = async (req, res) => {
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query('SELECT id, email, store_name, seller_id, is_superuser, created_at FROM seller_users ORDER BY created_at DESC')
+        await client.end()
+        res.json({ users: r.rows })
+      } catch (err) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: err?.message })
+      }
+    }
+
+    // PATCH /admin-hub/users/:id/superuser — toggle superuser (superuser only)
+    const sellerUserSuperuserPATCH = async (req, res) => {
+      const { id } = req.params
+      const { is_superuser } = req.body || {}
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query('UPDATE seller_users SET is_superuser = $1, updated_at = now() WHERE id = $2 RETURNING id, email, is_superuser', [!!is_superuser, id])
+        await client.end()
+        if (!r.rows.length) return res.status(404).json({ message: 'User not found' })
+        res.json({ user: r.rows[0] })
+      } catch (err) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: err?.message })
+      }
+    }
+
+    httpApp.post('/admin-hub/auth/register', sellerAuthRegisterPOST)
+    httpApp.post('/admin-hub/auth/login', sellerAuthLoginPOST)
+    httpApp.get('/admin-hub/auth/me', requireSellerAuth, sellerAuthMeGET)
+    httpApp.get('/admin-hub/users', requireSellerAuth, requireSuperuser, sellerUsersGET)
+    httpApp.patch('/admin-hub/users/:id/superuser', requireSellerAuth, requireSuperuser, sellerUserSuperuserPATCH)
+    console.log('Admin Hub routes: seller auth + users')
 
     // Store API: public seller settings (store name) for "Sold by" on shop
     const storeSellerSettingsGET = async (req, res) => {
@@ -5322,7 +5527,7 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const { search = '', order_status = '', payment_status = '', delivery_status = '', sort = 'created_at_desc', limit = '50', offset = '0' } = req.query
+        const { search = '', order_status = '', payment_status = '', delivery_status = '', seller_id = '', sort = 'created_at_desc', limit = '50', offset = '0' } = req.query
         const conditions = []
         const params = []
         if (search) {
@@ -5332,6 +5537,7 @@ async function start() {
         if (order_status) { params.push(order_status); conditions.push(`o.order_status = $${params.length}`) }
         if (payment_status) { params.push(payment_status); conditions.push(`o.payment_status = $${params.length}`) }
         if (delivery_status) { params.push(delivery_status); conditions.push(`o.delivery_status = $${params.length}`) }
+        if (seller_id) { params.push(seller_id); conditions.push(`o.seller_id = $${params.length}`) }
         const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
         const sortMap = {
           created_at_desc: 'o.created_at DESC', created_at_asc: 'o.created_at ASC',

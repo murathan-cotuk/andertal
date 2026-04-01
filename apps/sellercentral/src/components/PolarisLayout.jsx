@@ -114,8 +114,12 @@ function getMenuItemsMain(t) {
   ];
 }
 
-function getMenuItemsSettings(t) {
-  return [{ url: "/settings", label: t("settings"), icon: SettingsIcon }];
+function getMenuItemsSettings(t, isSuperuser = false) {
+  const items = [{ url: "/settings", label: t("settings"), icon: SettingsIcon }];
+  if (isSuperuser) {
+    items.push({ url: "/settings/users-permissions", label: "Users & Permissions", icon: ProfileIcon });
+  }
+  return items;
 }
 
 // Parent nav URLs that should expand/collapse sub-menus on click (no page navigation)
@@ -179,6 +183,9 @@ export default function PolarisLayout({ children }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isSuperuser, setIsSuperuser] = useState(
+    typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true"
+  );
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifData, setNotifData] = useState(null);
   const [msgUnread, setMsgUnread] = useState(0);
@@ -215,13 +222,33 @@ export default function PolarisLayout({ children }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [notifOpen]);
 
+  // Routes blocked for non-superuser sellers
+  const SELLER_BLOCKED_ROUTES = new Set([
+    "/products/collections",
+    "/products/collections/new",
+    "/content/menus",
+    "/content/menus/new",
+    "/content/categories",
+    "/content/landing-page",
+    "/content/styles",
+    "/content/pages",
+    "/content/blog-posts",
+  ]);
+
   useEffect(() => {
     if (pathname === "/login" || pathname === "/register") return;
     const loggedIn = localStorage.getItem("sellerLoggedIn");
     if (!loggedIn) {
       router.push("/login");
     } else {
+      const superuser = localStorage.getItem("sellerIsSuperuser") === "true";
       setIsAuthenticated(true);
+      setIsSuperuser(superuser);
+      // Redirect non-superusers away from blocked routes
+      if (!superuser && SELLER_BLOCKED_ROUTES.has(pathname)) {
+        router.replace("/dashboard");
+        return;
+      }
       // Fetch store name from backend if not cached
       const cached = localStorage.getItem("storeName");
       if (!cached) {
@@ -249,6 +276,8 @@ export default function PolarisLayout({ children }) {
     localStorage.removeItem("sellerEmail");
     localStorage.removeItem("sellerId");
     localStorage.removeItem("storeName");
+    localStorage.removeItem("sellerToken");
+    localStorage.removeItem("sellerIsSuperuser");
     router.push("/login");
   }, [router]);
 
@@ -420,7 +449,7 @@ export default function PolarisLayout({ children }) {
           {/* Profile */}
           <TopBar.UserMenu
             name={storeName}
-            detail=""
+            detail={isSuperuser ? "⚡ Superuser" : "Seller"}
             initials={getUserInitials()}
             actions={userMenuActions}
             open={userMenuOpen}
@@ -471,8 +500,28 @@ export default function PolarisLayout({ children }) {
     />
   );
 
-  const menuMain = getMenuItemsMain(t);
-  const menuSettings = getMenuItemsSettings(t);
+  // Filter nav items based on role
+  const SELLER_BLOCKED_NAV = new Set([
+    "/products/collections",
+    "/content/menus",
+    "/content/categories",
+    "/content/landing-page",
+    "/content/styles",
+    "/content/pages",
+    "/content/blog-posts",
+  ]);
+
+  const filterNavForRole = (items) => {
+    if (isSuperuser) return items;
+    return items.map((item) => {
+      if (!item.subNavigationItems) return item;
+      const filteredSubs = item.subNavigationItems.filter((s) => !SELLER_BLOCKED_NAV.has(s.url));
+      return { ...item, subNavigationItems: filteredSubs };
+    });
+  };
+
+  const menuMain = filterNavForRole(getMenuItemsMain(t));
+  const menuSettings = getMenuItemsSettings(t, isSuperuser);
   const navLocation = pathname && pathname !== "" ? pathname : "/";
 
   const navMarkup = (

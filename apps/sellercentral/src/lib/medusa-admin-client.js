@@ -33,9 +33,12 @@ class MedusaAdminClient {
       throw err;
     }
 
+    // Attach seller auth token if available
+    const token = typeof window !== 'undefined' ? localStorage.getItem('sellerToken') : null;
     const config = {
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...options.headers,
       },
       ...options,
@@ -105,7 +108,14 @@ class MedusaAdminClient {
    * Backend erişilemezse boş liste döner, sayfa çökmez.
    */
   async getAdminHubProducts(params = {}) {
-    const queryParams = new URLSearchParams(params).toString();
+    // Non-superusers only see their own products
+    const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';
+    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+    const filteredParams = { ...params };
+    if (!isSuperuser && sellerId && !filteredParams.seller_id) {
+      filteredParams.seller_id = sellerId;
+    }
+    const queryParams = new URLSearchParams(filteredParams).toString();
     try {
       const data = await this.request(`/admin-hub/products${queryParams ? `?${queryParams}` : ''}`);
       return { products: data?.products ?? [], count: data?.count ?? data?.products?.length ?? 0 };
@@ -120,9 +130,12 @@ class MedusaAdminClient {
   }
 
   async createAdminHubProduct(data) {
+    // Always tag the product with the current seller's ID
+    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+    const body = sellerId ? { seller_id: sellerId, seller: sellerId, ...data } : data;
     const res = await this.request('/admin-hub/products', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(body),
     });
     return res?.product ?? res;
   }
@@ -193,7 +206,9 @@ class MedusaAdminClient {
 
   /** GET /admin-hub/seller-settings */
   async getSellerSettings() {
-    const res = await this.request('/admin-hub/seller-settings').catch(() => ({ store_name: '' }));
+    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+    const params = sellerId ? `?seller_id=${encodeURIComponent(sellerId)}` : '';
+    const res = await this.request(`/admin-hub/seller-settings${params}`).catch(() => ({ store_name: '' }));
     return {
       store_name: res?.store_name ?? '',
       free_shipping_threshold_cents: res?.free_shipping_threshold_cents ?? null,
@@ -203,9 +218,11 @@ class MedusaAdminClient {
 
   /** PATCH /admin-hub/seller-settings – save store name to DB */
   async updateSellerSettings(data) {
+    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+    const body = sellerId ? { seller_id: sellerId, ...data } : data;
     const res = await this.request('/admin-hub/seller-settings', {
       method: 'PATCH',
-      body: JSON.stringify(data || {}),
+      body: JSON.stringify(body),
     });
     return res;
   }
@@ -592,7 +609,14 @@ class MedusaAdminClient {
    * Orders (admin)
    */
   async getOrders(params = {}) {
-    const queryParams = new URLSearchParams(params).toString()
+    // Non-superusers only see their own orders
+    const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';
+    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+    const filteredParams = { ...params };
+    if (!isSuperuser && sellerId && !filteredParams.seller_id) {
+      filteredParams.seller_id = sellerId;
+    }
+    const queryParams = new URLSearchParams(filteredParams).toString()
     return this.request(`/admin-hub/v1/orders${queryParams ? `?${queryParams}` : ''}`)
   }
 
@@ -754,6 +778,36 @@ class MedusaAdminClient {
   }
   async testSmtpSettings() {
     return this.request('/admin-hub/v1/smtp-settings/test', { method: 'POST' })
+  }
+
+  // ── Seller Auth ─────────────────────────────────────────────────────────────
+  async loginSeller(email, password) {
+    return this.request('/admin-hub/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
+  async registerSeller(email, password, storeName) {
+    return this.request('/admin-hub/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, store_name: storeName }),
+    });
+  }
+
+  async getSellerMe() {
+    return this.request('/admin-hub/auth/me');
+  }
+
+  async getSellerUsers() {
+    return this.request('/admin-hub/users');
+  }
+
+  async setSellerUserSuperuser(userId, isSuperuser) {
+    return this.request(`/admin-hub/users/${userId}/superuser`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_superuser: isSuperuser }),
+    });
   }
 }
 

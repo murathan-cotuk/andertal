@@ -1,4 +1,4 @@
-29.03.
+01.04.
 
 -----------------------------------
 11. MEDIA MANAGEMENT (SELLERCENTRAL)
@@ -36,14 +36,6 @@
 
 ---------------------
  
-- shopta menü sayfasinda sortieren sola almissin. sagda kalmaya devam etsin. filter kismini cok az asagi cek cünkü sort cubugunun altinda kaliyor ayrica filtre basliklari acilabilir menü seklinde görünsün. yani farbe altinda sürekli blau durmasin. farbe acildiginda blau gözüksün. ve basliklari birbirine yapisik yap böyle cok daginik duruyor. bir ürünün varyasyonunda pembe renk secmis olmama ragmen filtrelerde renk altinda hala pembe gözükmüyor. varyasyonlar dahil tüüm ürünlerin metafieldslarina dikkat et o kategori ya da collection icinde olan. breadcumbs ta o barin icinde olsun.
-- landing page sayfasinda olusturulan landing pagelerde conteyner olusturma kisminda hero baner / slider olusturdum. folieler ekledim ancak simdi file 1 ile folie 2 nin yerini degistirmek istiyorum. ancak kaydirma gibi bir sey yada baska bir yöntem mümkün degil. silip eklemek de istemiyorum. nasi yapalim?
-- ???sellercentralde landing-page sayfasi harika olmus. olusturdugum hero bannerdaki eklenen görsellere direkt tiklanabilsin butona gerek olmadan. ayrica baslik ve buton gibi iceriklerin rengleri, büyüklükleri ve banner üzerindeki konumlari buradan ayarlanabilsin. sag, sol, üst, alt, orta, sag üst vs... diye. ayrica eklenen görsellerin üstünde siyah bir katman var gibi duruyor. görsellerin renkleri koyulastirilmasin. 
-- ???bild + text ve text konteynerleri de ekledim. buradaki text kismi yine html olarak ayarlanabilsin.
-- ???bild-raster konteynerinde eklenen bildler ya kare ya dik ya yatay olarak görüntülenmesi secilebilsin. mesela örnek boytular: 1500x1500px , 1600x2600px, 3000x1000px gibi.
-- ???shopta menüde filtreler en üstte satir olarak listelenmesin. onun yerine ürünlerin solunca bir sidebar gibi listelensin. amazon mantigi yani.
-- ???CTA konteyneri bölümünde de konumlandirmalar secilebilsin.
 - ???Sellercentralde inhalte menüsünün altinda "Styles" adinda bir submenü olusturalim. Burada websitesindeki ana renk, ikincil renk, ne bileyim buton stili ve daha onlarca istedigimizde degistirecegimiz stiller olsun eklenip degistirilebilsin. kodun icinde yok turuncu yok mor diye ayarlamak yerine buradan ayarlayalim. Su anda kullandigimiz butonlar neler ise onlarin kodunu oraya yaz. Mesela de ki "Add to cart button" ve ben buna bastigimda altinda html css kodu ciksin ya da sen her nasil ayarladiysan. react mi ayarladin next mi ayarladin bilmiyorum. buton stilini buradaki kodlari düzenleyerek yapabilelim. her bir özellik icin birden fazla tasarim ekleyebilelim. yanina da aktiv butonu koyalim istedigimizde istedigimizi aktiflestirebilelim.
-- ???landing page sayfasinda ekleyebilecegimiz daha fazla konteyner templateleri ekle. bir tane koleksiyon ekleme konteyneri ekle. sayfaya ekleyelim, icinden koleksiyon secelim. o koleksiyon icindeki ürünler slider carousel olsun. yan yana kac ürün istedigimizi burada da belirtelim bild-raster de belirttigimiz gibi. 
-- ???landing page sayfasindan bu landing page i hangi page icin yaptigimizi secelim. mesela ben sellercentralde /content/pages altinda Home Page adinda /# slug olan bir sayfa ekledim. /# yapma sebebim sonunda bir sey olmamasi. bu mesela bizim home landing page imiz ile tanimli olsun. landing page menüsü altindan Home Page sayfasini secip onun altina ekledigmiz konteynerlar o sayfada gözüksün. ne bileyim ileride baska bir sayfa ekleriz atiyorum impression. o zaman da landing page menüsünden impression sayfasini secip oraya konteynerleri ekleriz falan. cok iyi olur yap bunu.
+- ???landing page sayfasinda ekleyebilecegimiz daha fazla konteyner templateleri ekle. accordion ve tab ile degisen metin sekmeleri ekle.
 - ???bir varyasyon ürününe de metafields alaninda farbe ekledim. ancak bu filtrelerde görünmüyor. o secildiginde ilgili ürünün secili renge sahip varyasyonu gözükmeli. ayrica shopta ilk gösterilecek ürün varyasyonu varsayilan olarak hangi ürünün stogu var ise o gözükmeli. hepsinde varsa ilk varyasyon gözüksün. filtrelerde secili renk hangi varyasyondaysa o gözüksün. ayrica filtreyi seciyorum ancak 0 products diyor. nasil olabilir ki? ürün filtreyi secmeden önce orada ve onun icinde metafield eklendigini biliyorum cünkü filtrelerde cikiyor. filtreyi sectigimde sectigim ürünü varyasyonu secili halde göstermiyor
