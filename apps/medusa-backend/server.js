@@ -6539,7 +6539,11 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id ORDER BY r.created_at DESC LIMIT 100`)
+        const sellerId = (req.query.seller_id || '').trim()
+        const params = []
+        let where = ''
+        if (sellerId) { params.push(sellerId); where = `WHERE o.seller_id = $${params.length}` }
+        const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method, o.seller_id FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id ${where} ORDER BY r.created_at DESC LIMIT 100`, params)
         await client.end()
         res.json({ returns: (r.rows || []).map(row => ({ ...row, return_number: row.return_number ? Number(row.return_number) : null, order_number: row.order_number ? Number(row.order_number) : null })) })
       } catch (e) {
@@ -7195,16 +7199,21 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const orderId = req.query.order_id || null
+        const sellerId = (req.query.seller_id || '').trim()
         let q = `SELECT m.*,
           o.order_number, o.status AS order_status, o.order_status AS order_order_status,
           o.total_cents AS order_total_cents, o.first_name AS order_first_name,
           o.last_name AS order_last_name, o.email AS order_email
           FROM store_messages m LEFT JOIN store_orders o ON o.id = m.order_id`
         const params = []
-        if (orderId) { params.push(orderId); q += ` WHERE m.order_id = $1::uuid` }
+        const conditions = []
+        if (orderId) { params.push(orderId); conditions.push(`m.order_id = $${params.length}::uuid`) }
+        if (sellerId) { params.push(sellerId); conditions.push(`o.seller_id = $${params.length}`) }
+        if (conditions.length) q += ' WHERE ' + conditions.join(' AND ')
         q += ' ORDER BY m.created_at ASC LIMIT 200'
         const r = await client.query(q, params)
-        const unreadR = await client.query(`SELECT COUNT(*)::int AS c FROM store_messages WHERE sender_type = 'customer' AND is_read_by_seller = false`)
+        const unreadWhere = sellerId ? `AND m2.order_id IN (SELECT id FROM store_orders WHERE seller_id = $1)` : ''
+        const unreadR = await client.query(`SELECT COUNT(*)::int AS c FROM store_messages m2 WHERE m2.sender_type = 'customer' AND m2.is_read_by_seller = false ${unreadWhere}`, sellerId ? [sellerId] : [])
         await client.end()
         res.json({
           messages: r.rows.map(row => ({

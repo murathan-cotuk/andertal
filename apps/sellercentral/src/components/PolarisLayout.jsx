@@ -51,8 +51,9 @@ function getMenuItemsMain(t) {
       label: t("orders"),
       icon: OrderIcon,
       subNavigationItems: [
-        { url: "/orders/abandoned-checkouts", label: t("abandonedCheckouts") },
+        { url: "/orders", label: "Ansicht" },
         { url: "/orders/returns", label: t("returns") },
+        { url: "/orders/abandoned-checkouts", label: t("abandonedCheckouts") },
       ],
     },
     {
@@ -66,11 +67,12 @@ function getMenuItemsMain(t) {
       ],
     },
     {
-      url: "/customers",
+      url: "/customers-menu",
       label: t("customers"),
       icon: ProfileIcon,
       subNavigationItems: [
         { url: "/customers", label: "Liste" },
+        { url: "/orders/abandoned-checkouts", label: t("abandonedCheckouts") },
         { url: "/customers/reviews", label: "Bewertungen" },
       ],
     },
@@ -107,6 +109,7 @@ function getMenuItemsMain(t) {
       icon: ChartVerticalIcon,
       subNavigationItems: [
         { url: "/analytics/reports", label: t("reports") },
+        { url: "/analytics/transactions", label: "Transactions" },
         { url: "/analytics/live-view", label: t("liveView") },
       ],
     },
@@ -115,22 +118,17 @@ function getMenuItemsMain(t) {
 }
 
 function getMenuItemsSettings(t, isSuperuser = false) {
-  const items = [{ url: "/settings", label: t("settings"), icon: SettingsIcon }];
-  if (isSuperuser) {
-    items.push({ url: "/settings/users-permissions", label: "Users & Permissions", icon: ProfileIcon });
-  }
-  return items;
+  return [{ url: "/settings", label: t("settings"), icon: SettingsIcon }];
 }
 
 // Parent nav URLs that should expand/collapse sub-menus on click (no page navigation)
 const PARENT_NAV_URLS = new Set([
-  "/orders", "/products", "/customers", "/marketing",
-  "/content", "/analytics",
+  "/products", "/marketing", "/content", "/analytics", "/customers-menu",
 ]);
 
 const NextLink = forwardRef(function NextLink({ url, children, external, onClick, ...rest }, ref) {
   const handleClick = (e) => {
-    if (PARENT_NAV_URLS.has(url || "")) {
+    if (PARENT_NAV_URLS.has(url || "") && typeof onClick === "function") {
       e.preventDefault();
     }
     onClick?.(e);
@@ -145,7 +143,7 @@ const NextLink = forwardRef(function NextLink({ url, children, external, onClick
 const UnsavedAwareLink = forwardRef(function UnsavedAwareLink({ url, children, external, onClick, ...rest }, ref) {
   const ctx = useUnsavedChanges();
   const handleClick = (e) => {
-    if (PARENT_NAV_URLS.has(url || "")) {
+    if (PARENT_NAV_URLS.has(url || "") && typeof onClick === "function") {
       e.preventDefault();
       onClick?.(e);
       return;
@@ -233,6 +231,8 @@ export default function PolarisLayout({ children }) {
     "/content/styles",
     "/content/pages",
     "/content/blog-posts",
+    "/analytics/live-view",
+    "/orders/abandoned-checkouts",
   ]);
 
   useEffect(() => {
@@ -509,6 +509,8 @@ export default function PolarisLayout({ children }) {
     "/content/styles",
     "/content/pages",
     "/content/blog-posts",
+    "/analytics/live-view",
+    "/orders/abandoned-checkouts",
   ]);
 
   const filterNavForRole = (items) => {
@@ -529,16 +531,21 @@ export default function PolarisLayout({ children }) {
       <Navigation.Section
         items={menuMain.map((item) => {
           const hasSub = item.subNavigationItems?.length > 0;
+          const shouldToggleOnly = hasSub && PARENT_NAV_URLS.has(item.url);
           // A parent is "selected" (expanded) if we manually toggled it OR a child matches current path
-          const childIsActive = hasSub && item.subNavigationItems.some((s) => navLocation.startsWith(s.url));
-          const isSelected = hasSub ? (expandedLabel === item.label || childIsActive) : undefined;
+          const parentTargetUrl = shouldToggleOnly && item.subNavigationItems?.[0]?.url ? item.subNavigationItems[0].url : item.url;
+          const parentIsActive = !!parentTargetUrl && (navLocation === parentTargetUrl || navLocation.startsWith(`${parentTargetUrl}/`));
+          const childIsActive = hasSub && item.subNavigationItems.some((s) => s.url !== item.url && navLocation.startsWith(s.url));
+          const isSelected = hasSub
+            ? ((shouldToggleOnly && expandedLabel === item.label) || parentIsActive || childIsActive)
+            : undefined;
           return {
             url: item.url,
             label: item.label,
             icon: item.icon,
             subNavigationItems: item.subNavigationItems,
             selected: isSelected,
-            onClick: hasSub
+            onClick: shouldToggleOnly
               ? () => setExpandedLabel((prev) => prev === item.label ? null : item.label)
               : undefined,
           };

@@ -13,6 +13,11 @@ function resolveUrl(url) {
   return `${BACKEND_URL}/uploads/${url}`;
 }
 
+function collectionHref(handle) {
+  const value = String(handle || "").trim();
+  return value ? `/kollektion/${value}` : "#";
+}
+
 function getPositionStyle(pos) {
   const map = {
     "top-left":     { alignItems: "flex-start", justifyContent: "flex-start", textAlign: "left" },
@@ -318,6 +323,74 @@ function CollectionCarousel({ container }) {
   );
 }
 
+function CollectionsCarousel({ container }) {
+  const collections = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
+  const itemsPerRow = container.items_per_row || 4;
+  const pad = container.padding || "32px 24px";
+  const ratio = container.card_aspect_ratio || "4/5";
+
+  if (!collections.length) return null;
+
+  return (
+    <div style={{ padding: pad, background: "#fff" }}>
+      <Carousel
+        title={container.title || "Kollektionen"}
+        visibleCount={itemsPerRow}
+        navOnSides
+        gap={16}
+        ariaLabel={container.title || "Collections carousel"}
+      >
+        {collections.map((collection, i) => {
+          const href = collectionHref(collection.handle);
+          const image = resolveUrl(collection.image);
+          const card = (
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                aspectRatio: ratio,
+                borderRadius: 18,
+                overflow: "hidden",
+                background: "#f3f4f6",
+                border: "1px solid #ececec",
+              }}
+            >
+              {image ? (
+                <img src={image} alt={collection.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              ) : (
+                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
+                  Keine Vorschau
+                </div>
+              )}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: "auto 0 0 0",
+                  padding: "16px 18px",
+                  background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)",
+                  color: "#fff",
+                }}
+              >
+                <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>
+                  {collection.title || collection.handle || `Kollektion ${i + 1}`}
+                </div>
+              </div>
+            </div>
+          );
+
+          return href === "#" ? (
+            <div key={collection.id || i}>{card}</div>
+          ) : (
+            <a key={collection.id || i} href={href} style={{ display: "block", textDecoration: "none" }}>
+              {card}
+            </a>
+          );
+        })}
+      </Carousel>
+    </div>
+  );
+}
+
 // ── Renderer ──────────────────────────────────────────────────────────────────
 function renderContainer(c) {
   if (!c.visible) return null;
@@ -328,6 +401,7 @@ function renderContainer(c) {
     case "image_grid":          return <ImageGrid key={c.id} container={c} />;
     case "banner_cta":          return <BannerCta key={c.id} container={c} />;
     case "collection_carousel": return <CollectionCarousel key={c.id} container={c} />;
+    case "collections_carousel": return <CollectionsCarousel key={c.id} container={c} />;
     default: return null;
   }
 }

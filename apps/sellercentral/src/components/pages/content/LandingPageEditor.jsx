@@ -48,6 +48,7 @@ const CONTAINER_TYPES = [
   { type: "image_grid",          label: "Bild-Raster",           description: "2–4 Bilder nebeneinander mit Seitenverhältnis-Auswahl" },
   { type: "banner_cta",          label: "CTA-Banner",            description: "Farbiger Banner mit Handlungsaufforderung und Positionierung" },
   { type: "collection_carousel", label: "Kollektion-Karussell",  description: "Produkte einer Kollektion als Karussell" },
+  { type: "collections_carousel", label: "Kollektionen-Karussell", description: "Mehrere Kollektionen als anklickbare Karten nebeneinander" },
 ];
 
 function newContainer(type) {
@@ -66,6 +67,8 @@ function newContainer(type) {
       return { ...base, title: "", subtitle: "", btn_text: "", btn_url: "", bg_color: "#ff971c", text_color: "#ffffff", text_position: "center", padding: "40px 48px", btn_bg: "#ffffff", btn_color: "#111827", btn_border: "2px solid #000", btn_radius: 8 };
     case "collection_carousel":
       return { ...base, title: "", collection_id: "", collection_handle: "", items_per_row: 4, padding: "32px 24px" };
+    case "collections_carousel":
+      return { ...base, title: "", collections: [], items_per_row: 4, padding: "32px 24px", card_aspect_ratio: "4/5" };
     default:
       return base;
   }
@@ -504,6 +507,128 @@ function CollectionCarouselEditor({ container, onChange }) {
   );
 }
 
+function CollectionsCarouselEditor({ container, onChange }) {
+  const client = getMedusaAdminClient();
+  const [collections, setCollections] = useState([]);
+  const [selectedId, setSelectedId] = useState("");
+
+  useEffect(() => {
+    client.getCollections({ adminHub: true })
+      .then((r) => {
+        setCollections(Array.isArray(r?.collections) ? r.collections : []);
+      })
+      .catch(() => {});
+  }, [client]);
+
+  const chosen = Array.isArray(container.collections) ? container.collections : [];
+  const availableOptions = [
+    { label: "— Kollektion hinzufügen —", value: "" },
+    ...collections
+      .filter((c) => !chosen.some((entry) => entry.id === c.id))
+      .map((c) => ({ label: c.title || c.handle || c.id, value: c.id })),
+  ];
+
+  const addCollection = (id) => {
+    if (!id) return;
+    const col = collections.find((c) => c.id === id);
+    if (!col) return;
+    onChange({
+      ...container,
+      collections: [
+        ...chosen,
+        {
+          id: col.id,
+          title: col.title || "",
+          handle: col.handle || "",
+          image: col.thumbnail || col.image_url || col.banner || col.banner_image_url || "",
+        },
+      ],
+    });
+    setSelectedId("");
+  };
+
+  const removeCollection = (id) => {
+    onChange({
+      ...container,
+      collections: chosen.filter((entry) => entry.id !== id),
+    });
+  };
+
+  const moveCollection = (idx, direction) => {
+    const nextIdx = idx + direction;
+    if (nextIdx < 0 || nextIdx >= chosen.length) return;
+    const next = [...chosen];
+    [next[idx], next[nextIdx]] = [next[nextIdx], next[idx]];
+    onChange({ ...container, collections: next });
+  };
+
+  return (
+    <BlockStack gap="400">
+      <TextField label="Überschrift (optional)" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
+      <InlineStack gap="400" wrap={false}>
+        <div style={{ flex: 2 }}>
+          <Select
+            label="Kollektion hinzufügen"
+            options={availableOptions}
+            value={selectedId}
+            onChange={(id) => {
+              setSelectedId(id);
+              addCollection(id);
+            }}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <Select
+            label="Karten pro Reihe"
+            options={[2, 3, 4, 5, 6].map((n) => ({ label: String(n), value: String(n) }))}
+            value={String(container.items_per_row || 4)}
+            onChange={(v) => onChange({ ...container, items_per_row: Number(v) })}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <Select
+            label="Kartenformat"
+            options={[
+              { label: "Hochformat (4:5)", value: "4/5" },
+              { label: "Quadrat (1:1)", value: "1/1" },
+              { label: "Querformat (16:9)", value: "16/9" },
+            ]}
+            value={container.card_aspect_ratio || "4/5"}
+            onChange={(v) => onChange({ ...container, card_aspect_ratio: v })}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <TextField label="Padding" value={container.padding || "32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" />
+        </div>
+      </InlineStack>
+
+      {chosen.length === 0 ? (
+        <Card>
+          <Box padding="400">
+            <Text as="p" tone="subdued">Noch keine Kollektionen ausgewählt.</Text>
+          </Box>
+        </Card>
+      ) : chosen.map((entry, idx) => (
+        <Card key={entry.id || idx}>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <BlockStack gap="100">
+                <Text as="h3" variant="headingSm">{entry.title || entry.handle || `Kollektion ${idx + 1}`}</Text>
+                <Text as="p" variant="bodySm" tone="subdued">/{entry.handle || "ohne-handle"}</Text>
+              </BlockStack>
+              <InlineStack gap="200">
+                <Button size="slim" disabled={idx === 0} onClick={() => moveCollection(idx, -1)}>Nach oben</Button>
+                <Button size="slim" disabled={idx === chosen.length - 1} onClick={() => moveCollection(idx, 1)}>Nach unten</Button>
+                <Button size="slim" tone="critical" onClick={() => removeCollection(entry.id)}>Entfernen</Button>
+              </InlineStack>
+            </InlineStack>
+          </BlockStack>
+        </Card>
+      ))}
+    </BlockStack>
+  );
+}
+
 function ContainerEditor({ container, onChange }) {
   switch (container.type) {
     case "hero_banner":         return <HeroBannerEditor container={container} onChange={onChange} />;
@@ -512,6 +637,7 @@ function ContainerEditor({ container, onChange }) {
     case "image_grid":          return <ImageGridEditor container={container} onChange={onChange} />;
     case "banner_cta":          return <BannerCtaEditor container={container} onChange={onChange} />;
     case "collection_carousel": return <CollectionCarouselEditor container={container} onChange={onChange} />;
+    case "collections_carousel": return <CollectionsCarouselEditor container={container} onChange={onChange} />;
     default: return null;
   }
 }

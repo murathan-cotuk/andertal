@@ -726,8 +726,13 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/abandoned-carts')
   }
 
-  async getReturns() {
-    return this.request('/admin-hub/v1/returns')
+  async getReturns(params = {}) {
+    const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';
+    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+    const p = { ...params };
+    if (!isSuperuser && sellerId && !p.seller_id) p.seller_id = sellerId;
+    const qs = Object.keys(p).length ? '?' + new URLSearchParams(p).toString() : '';
+    return this.request(`/admin-hub/v1/returns${qs}`)
   }
 
   async createReturn(data) {
@@ -755,13 +760,20 @@ class MedusaAdminClient {
   }
 
   async getNotificationsUnread() {
-    return this.request('/admin-hub/v1/notifications/unread')
+    const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';
+    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+    const qs = (!isSuperuser && sellerId) ? `?seller_id=${encodeURIComponent(sellerId)}` : '';
+    return this.request(`/admin-hub/v1/notifications/unread${qs}`)
   }
   async markNotificationsSeen() {
     return this.request('/admin-hub/v1/notifications/mark-seen', { method: 'POST' })
   }
   async getMessages(params = {}) {
-    const qs = params.order_id ? `?order_id=${encodeURIComponent(params.order_id)}` : ''
+    const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';
+    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+    const p = { ...params };
+    if (!isSuperuser && sellerId && !p.seller_id) p.seller_id = sellerId;
+    const qs = Object.keys(p).length ? '?' + new URLSearchParams(p).toString() : '';
     return this.request(`/admin-hub/v1/messages${qs}`)
   }
   async sendMessage(data) {
