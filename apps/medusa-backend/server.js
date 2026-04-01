@@ -6810,12 +6810,15 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (r.rows[0]) {
           return res.json({ containers: r.rows[0].containers || [], updated_at: r.rows[0].updated_at || null })
         }
-        // Fallback: if new table is empty, migrate old single-row data
+        // One-time fallback: only for the oldest page when new table is completely empty
         const newCount = await client.query('SELECT COUNT(*) FROM admin_hub_landing_pages')
         if (parseInt(newCount.rows[0].count) === 0) {
-          const old = await client.query('SELECT containers FROM admin_hub_landing_page WHERE id = 1')
-          if (old.rows[0]?.containers?.length) {
-            return res.json({ containers: old.rows[0].containers, updated_at: null, _migrated: true })
+          const firstPage = await client.query('SELECT id FROM admin_hub_pages ORDER BY id ASC LIMIT 1')
+          if (firstPage.rows[0] && String(firstPage.rows[0].id) === String(pageId)) {
+            const old = await client.query('SELECT containers FROM admin_hub_landing_page WHERE id = 1')
+            if (old.rows[0]?.containers?.length) {
+              return res.json({ containers: old.rows[0].containers, updated_at: null, _migrated: true })
+            }
           }
         }
         res.json({ containers: [], updated_at: null })

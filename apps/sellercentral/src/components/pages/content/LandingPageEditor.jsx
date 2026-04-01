@@ -438,7 +438,7 @@ export default function LandingPageEditor() {
   const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
-    client.request("/admin-hub/pages").then((r) => {
+    client.request("/admin-hub/v1/pages").then((r) => {
       const list = Array.isArray(r?.pages) ? r.pages : [];
       setPages(list);
       if (list.length > 0) setSelectedPageId(String(list[0].id));

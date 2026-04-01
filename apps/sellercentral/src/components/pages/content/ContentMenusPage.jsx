@@ -190,7 +190,7 @@ function MenuEditorPanel(props) {
   const tree = buildMenuTree(items);
   const openInlineAdd = (parentId) => {
     setAddUnderParentId(parentId ?? null);
-    setItemForm({ label: "", link_type: "url", link_value: "", parent_id: parentId ?? "", collection_id: "", product_id: "" });
+    setItemForm({ label: "", link_type: "url", link_value: "", parent_id: parentId ?? "", collection_id: "", product_id: "", page_id: "" });
     setInlineNewOpen(true);
     setEditingItemId(null);
   };
@@ -422,6 +422,7 @@ function MenuEditorPanel(props) {
                               setItemForm={setItemForm}
                               collections={collections}
                               products={products}
+                              pages={pages}
                               LINK_TYPES={LINK_TYPES}
                               flatItems={flatItems}
                               parentOptionsForForm={parentOptionsForForm}
@@ -558,7 +559,7 @@ function MenuEditorPanel(props) {
                             flatItems={flatItems}
                             parentOptionsForForm={parentOptionsForForm}
                             onSave={inlineSaveItem}
-                            onCancel={() => { setInlineNewOpen(false); setItemForm({ label: "", link_type: "url", link_value: "", parent_id: "", collection_id: "", product_id: "" }); }}
+                            onCancel={() => { setInlineNewOpen(false); setItemForm({ label: "", link_type: "url", link_value: "", parent_id: "", collection_id: "", product_id: "", page_id: "" }); }}
                             saving={saving}
                           />
                         </div>
@@ -581,7 +582,7 @@ function MenuEditorPanel(props) {
   );
 }
 
-function InlineItemRow({ itemForm, setItemForm, collections, products, LINK_TYPES, flatItems, parentOptionsForForm, onSave, onCancel, saving }) {
+function InlineItemRow({ itemForm, setItemForm, collections, products, pages, LINK_TYPES, flatItems, parentOptionsForForm, onSave, onCancel, saving }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr auto", gap: "16px", padding: "14px 20px", alignItems: "center", background: "var(--p-color-bg-surface-secondary)", borderRadius: "8px", margin: "8px 12px" }}>
       <span />
@@ -594,7 +595,10 @@ function InlineItemRow({ itemForm, setItemForm, collections, products, LINK_TYPE
         {itemForm.link_type === "product" && (
           <Select label="Product" labelHidden options={[{ label: "— Select —", value: "" }, ...(products || []).map((p) => ({ label: p.title || p.handle, value: p.id }))]} value={itemForm.product_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, product_id: v }))} />
         )}
-        {(itemForm.link_type === "url" || itemForm.link_type === "page" || itemForm.link_type === "policy" || itemForm.link_type === "blog" || itemForm.link_type === "blog_post") && (
+        {itemForm.link_type === "page" && (
+          <Select label="Page" labelHidden options={[{ label: "— Select page —", value: "" }, ...(pages || []).map((pg) => ({ label: pg.title || pg.slug, value: String(pg.id) }))]} value={itemForm.page_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, page_id: v }))} />
+        )}
+        {(itemForm.link_type === "url" || itemForm.link_type === "policy" || itemForm.link_type === "blog" || itemForm.link_type === "blog_post") && (
           <TextField label="URL/Path" value={itemForm.link_value} onChange={(v) => setItemForm((p) => ({ ...p, link_value: v }))} placeholder={itemForm.link_type === "url" ? "https://…" : "/path"} labelHidden />
         )}
       </div>
@@ -623,6 +627,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   const [addUnderParentId, setAddUnderParentId] = useState(null);
   const [collections, setCollections] = useState([]);
   const [products, setProducts] = useState([]);
+  const [pages, setPages] = useState([]);
   const [menuForm, setMenuForm] = useState({ name: "", slug: "", location: "main" });
   const [menuSlugManuallyEdited, setMenuSlugManuallyEdited] = useState(false);
   const [itemForm, setItemForm] = useState({
@@ -632,6 +637,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
     parent_id: "",
     collection_id: "",
     product_id: "",
+    page_id: "",
   });
   const [saving, setSaving] = useState(false);
   const [popoverActiveId, setPopoverActiveId] = useState(null);
@@ -758,6 +764,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       const list = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
       setProducts(list);
     }).catch(() => setProducts([]));
+    client.request("/admin-hub/v1/pages").then((r) => setPages(Array.isArray(r?.pages) ? r.pages : [])).catch(() => setPages([]));
   }, []);
 
   const selectedMenu = menus.find((m) => m.id === selectedMenuId);
@@ -877,6 +884,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
     setAddUnderParentId(null);
     let collection_id = "";
     let product_id = "";
+    let page_id = "";
     if (item.link_type === "collection" && item.link_value) {
       try {
         const v = JSON.parse(item.link_value);
@@ -889,13 +897,20 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
         if (v && v.id) product_id = v.id;
       } catch (_) {}
     }
+    if (item.link_type === "page" && item.link_value) {
+      try {
+        const v = JSON.parse(item.link_value);
+        if (v && v.id) page_id = String(v.id);
+      } catch (_) {}
+    }
     setItemForm({
       label: item.label || "",
       link_type: item.link_type || "url",
-      link_value: item.link_type === "url" || item.link_type === "page" || item.link_type === "policy" || item.link_type === "blog" || item.link_type === "blog_post" ? (item.link_value || "") : "",
+      link_value: item.link_type === "url" || item.link_type === "policy" || item.link_type === "blog" || item.link_type === "blog_post" ? (item.link_value || "") : "",
       parent_id: item.parent_id || "",
       collection_id,
       product_id,
+      page_id,
     });
     setItemModalOpen(true);
   };
@@ -944,6 +959,9 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
     } else if (itemForm.link_type === "product" && itemForm.product_id) {
       const p = products.find((x) => x.id === itemForm.product_id);
       link_value = JSON.stringify({ id: p?.id, title: p?.title, handle: p?.handle });
+    } else if (itemForm.link_type === "page" && itemForm.page_id) {
+      const pg = pages.find((x) => String(x.id) === itemForm.page_id);
+      link_value = JSON.stringify({ id: pg?.id, title: pg?.title, slug: pg?.slug });
     } else if (itemForm.link_type !== "url") {
       link_value = itemForm.link_value || "";
     }
@@ -1190,6 +1208,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
               client={client}
               collections={collections}
               products={products}
+              pages={pages}
               LINK_TYPES={LINK_TYPES}
               getLinkDisplay={getLinkDisplay}
               TAB_SIZE={TAB_SIZE}
@@ -1520,7 +1539,18 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
                 onChange={(value) => setItemForm((prev) => ({ ...prev, product_id: value }))}
               />
             )}
-            {(itemForm.link_type === "url" || itemForm.link_type === "page" || itemForm.link_type === "policy" || itemForm.link_type === "blog" || itemForm.link_type === "blog_post") && (
+            {itemForm.link_type === "page" && (
+              <Select
+                label="Page"
+                options={[
+                  { label: "— Sayfa seç —", value: "" },
+                  ...pages.map((pg) => ({ label: pg.title || pg.slug, value: String(pg.id) })),
+                ]}
+                value={itemForm.page_id || ""}
+                onChange={(value) => setItemForm((prev) => ({ ...prev, page_id: value }))}
+              />
+            )}
+            {(itemForm.link_type === "url" || itemForm.link_type === "policy" || itemForm.link_type === "blog" || itemForm.link_type === "blog_post") && (
               <TextField
                 label={itemForm.link_type === "url" ? "URL" : "Path or URL"}
                 value={itemForm.link_value}
