@@ -439,7 +439,9 @@ export default function LandingPageEditor() {
 
   useEffect(() => {
     client.request("/admin-hub/pages").then((r) => {
-      setPages(Array.isArray(r?.pages) ? r.pages : []);
+      const list = Array.isArray(r?.pages) ? r.pages : [];
+      setPages(list);
+      if (list.length > 0) setSelectedPageId(String(list[0].id));
     }).catch(() => {});
   }, []);
 
@@ -499,8 +501,8 @@ export default function LandingPageEditor() {
 
   const typeInfo = (type) => CONTAINER_TYPES.find((t) => t.type === type) || { label: type };
   const pageOptions = [
-    { label: "— Seite auswählen —", value: "" },
-    ...pages.map((p) => ({ label: `${p.title || "Seite"} (${p.slug || p.id})`, value: p.id })),
+    { label: "— Sayfa seç —", value: "" },
+    ...pages.map((p) => ({ label: `${p.title || "Sayfa"} (/${p.slug || p.id})`, value: String(p.id) })),
   ];
 
   return (

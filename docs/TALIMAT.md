@@ -35,7 +35,7 @@
 
 
 ---------------------
-
+ 
 - shopta menü sayfasinda sortieren sola almissin. sagda kalmaya devam etsin. filter kismini cok az asagi cek cünkü sort cubugunun altinda kaliyor ayrica filtre basliklari acilabilir menü seklinde görünsün. yani farbe altinda sürekli blau durmasin. farbe acildiginda blau gözüksün. ve basliklari birbirine yapisik yap böyle cok daginik duruyor. bir ürünün varyasyonunda pembe renk secmis olmama ragmen filtrelerde renk altinda hala pembe gözükmüyor. varyasyonlar dahil tüüm ürünlerin metafieldslarina dikkat et o kategori ya da collection icinde olan. breadcumbs ta o barin icinde olsun.
 - ???sellercentralde inbox sayfasinda solda gözüken konverstaionen kisminda müsteri ismi koyu puntoyla olmali siparis numarasi altta acik punto olmali. ayrica her konversation un sonuna yatay cizgi koy ki diger mesajlardan ayrilsin.
 - ???sellercentralde landing-page sayfasi harika olmus. olusturdugum hero bannerdaki eklenen görsellere direkt tiklanabilsin butona gerek olmadan. ayrica baslik ve buton gibi iceriklerin rengleri, büyüklükleri ve banner üzerindeki konumlari buradan ayarlanabilsin. sag, sol, üst, alt, orta, sag üst vs... diye. ayrica eklenen görsellerin üstünde siyah bir katman var gibi duruyor. görsellerin renkleri koyulastirilmasin. 
