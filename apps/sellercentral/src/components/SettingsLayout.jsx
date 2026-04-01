@@ -11,6 +11,7 @@ const SETTINGS_ITEMS = [
   { href: "/settings/billing", label: "Billing" },
   { href: "/settings/users-permissions", label: "Users and Permissions" },
   { href: "/settings/payments", label: "Payments" },
+  { href: "/settings/security", label: "Security" },
   { href: "/settings/checkout", label: "Checkout" },
   { href: "/settings/shipping", label: "Shipping and delivery" },
   { href: "/settings/integrations", label: "Apps & Integrations" },

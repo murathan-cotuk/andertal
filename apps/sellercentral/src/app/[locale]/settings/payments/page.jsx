@@ -161,8 +161,10 @@ export default function PaymentsSettingsPage() {
               {payoutsLoading ? (
                 <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
               ) : payouts.length === 0 ? (
-                <Box padding="600" textAlign="center">
-                  <Text tone="subdued">Noch keine Auszahlungen vorhanden.</Text>
+                <Box padding="600">
+                  <div style={{ textAlign: "center" }}>
+                    <Text tone="subdued">Noch keine Auszahlungen vorhanden.</Text>
+                  </div>
                 </Box>
               ) : (
                 <div>

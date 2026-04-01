@@ -70,7 +70,17 @@
       "Bash(find:*)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''version'''',''''?''''\\)\\)\")",
       "Bash(node:*)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3000 \\\\|:3002 \")",
+      "Bash(findstr ':3002 ')",
+      "Bash(taskkill /F /PID 15052)",
+      "Bash(taskkill /F /PID 33052)",
+      "Bash(cmd /c \"taskkill /F /PID 15052 & taskkill /F /PID 33052\")",
+      "Bash(cmd /c \"taskkill /F /PID 15052\")",
+      "Bash(cmd /c \"taskkill /F /PID 33052\")",
+      "Bash(powershell -Command \"Stop-Process -Id 15052 -Force -ErrorAction SilentlyContinue; Stop-Process -Id 33052 -Force -ErrorAction SilentlyContinue; Write-Host 'Done'\")",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Select-Object Id, ProcessName, StartTime | Format-Table\")"
     ]
   }
 }

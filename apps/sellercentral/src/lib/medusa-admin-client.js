@@ -811,8 +811,20 @@ class MedusaAdminClient {
   async updateSellerIban(iban) {
     return this.request('/admin-hub/v1/seller/iban', { method: 'PATCH', body: JSON.stringify({ iban }) })
   }
-  async inviteUser(email) {
-    return this.request('/admin-hub/users/invite', { method: 'POST', body: JSON.stringify({ email }) })
+  async inviteUser(data) {
+    return this.request('/admin-hub/users/invite', { method: 'POST', body: JSON.stringify(data) })
+  }
+  async getSubusers() {
+    return this.request('/admin-hub/v1/subusers')
+  }
+  async updateSubuser(userId, data) {
+    return this.request(`/admin-hub/v1/subusers/${userId}`, { method: 'PATCH', body: JSON.stringify(data) })
+  }
+  async deleteSubuser(userId) {
+    return this.request(`/admin-hub/v1/subusers/${userId}`, { method: 'DELETE' })
+  }
+  async deletePendingInvite(inviteId) {
+    return this.request(`/admin-hub/v1/pending-invites/${inviteId}`, { method: 'DELETE' })
   }
 
   // ── Seller Auth ─────────────────────────────────────────────────────────────
@@ -823,10 +835,10 @@ class MedusaAdminClient {
     });
   }
 
-  async registerSeller(email, password, storeName) {
+  async registerSeller(email, password, storeName, extra = {}) {
     return this.request('/admin-hub/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, store_name: storeName }),
+      body: JSON.stringify({ email, password, store_name: storeName, ...extra }),
     });
   }
 

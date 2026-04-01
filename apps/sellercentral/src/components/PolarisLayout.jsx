@@ -122,19 +122,12 @@ function getMenuItemsSettings(t, isSuperuser = false) {
     url: "/settings",
     label: t("settings"),
     icon: SettingsIcon,
-    subNavigationItems: [
-      { url: "/settings/general", label: "Allgemein" },
-      { url: "/settings/payments", label: "Zahlungen & IBAN" },
-      { url: "/settings/users-permissions", label: "Benutzer & Rechte" },
-      { url: "/settings/notifications", label: "Benachrichtigungen" },
-      { url: "/settings/security", label: "Sicherheit" },
-    ],
   }];
 }
 
 // Parent nav URLs that should expand/collapse sub-menus on click (no page navigation)
 const PARENT_NAV_URLS = new Set([
-  "/products", "/marketing", "/content", "/analytics", "/customers-menu", "/settings",
+  "/products", "/marketing", "/content", "/analytics", "/customers-menu",
 ]);
 
 const NextLink = forwardRef(function NextLink({ url, children, external, onClick, ...rest }, ref) {
@@ -311,7 +304,7 @@ export default function PolarisLayout({ children }) {
   const userMenuActions = [
     {
       items: [
-        { content: "Settings", url: "/settings" },
+        { content: "Settings", onAction: () => router.push("/settings") },
         { content: "Logout", destructive: true, onAction: handleLogout },
       ],
     },
@@ -590,8 +583,9 @@ export default function PolarisLayout({ children }) {
         items={menuSettings.map((item) => {
           const hasSub = item.subNavigationItems?.length > 0;
           const shouldToggleOnly = hasSub && PARENT_NAV_URLS.has(item.url);
+          const parentIsActive = navLocation === item.url || navLocation.startsWith(item.url + "/");
           const childIsActive = hasSub && item.subNavigationItems.some((s) => navLocation.startsWith(s.url));
-          const isSelected = hasSub ? (shouldToggleOnly && expandedLabel === item.label) || childIsActive : undefined;
+          const isSelected = hasSub ? (shouldToggleOnly && expandedLabel === item.label) || parentIsActive || childIsActive : undefined;
           return {
             url: item.url,
             label: item.label,

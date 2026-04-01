@@ -610,6 +610,12 @@ async function start() {
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS iban text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS commission_rate numeric(5,4) NOT NULL DEFAULT 0.10;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS sub_of_seller_id varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS first_name varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS last_name varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS first_name varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS last_name varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT NULL;`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS seller_payouts (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2538,6 +2544,9 @@ async function start() {
       const email = (body.email || '').trim().toLowerCase()
       const password = (body.password || '').toString()
       const store_name = (body.store_name || body.storeName || '').trim()
+      const invite_token = (body.invite_token || '').trim()
+      const first_name = (body.first_name || '').trim()
+      const last_name = (body.last_name || '').trim()
       if (!email || !password) return res.status(400).json({ message: 'Email and password are required' })
       if (password.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' })
       const client = getSellerDbClient()
@@ -2549,27 +2558,50 @@ async function start() {
           await client.end()
           return res.status(409).json({ message: 'An account with this email already exists' })
         }
+        // Check invite token if provided
+        let invite = null
+        if (invite_token) {
+          const invRes = await client.query(
+            `SELECT * FROM seller_invitations WHERE token = $1 AND accepted_at IS NULL AND expires_at > now()`,
+            [invite_token]
+          )
+          if (invRes.rows.length > 0) invite = invRes.rows[0]
+        }
         const is_superuser = INITIAL_SUPERUSER_EMAILS.includes(email)
         const password_hash = hashSellerPassword(password)
-        const seller_id = `seller_${require('crypto').randomBytes(8).toString('hex')}`
+        const own_seller_id = `seller_${require('crypto').randomBytes(8).toString('hex')}`
+        // Sub-users inherit parent's seller_id for data access
+        const sub_of_seller_id = invite ? invite.invited_by_seller_id : null
+        const effective_permissions = invite?.permissions || null
+        const display_first = first_name || invite?.first_name || null
+        const display_last = last_name || invite?.last_name || null
         const r = await client.query(
-          `INSERT INTO seller_users (email, password_hash, store_name, seller_id, is_superuser)
-           VALUES ($1, $2, $3, $4, $5)
-           RETURNING id, email, store_name, seller_id, is_superuser, created_at`,
-          [email, password_hash, store_name || null, seller_id, is_superuser]
+          `INSERT INTO seller_users (email, password_hash, store_name, seller_id, is_superuser, sub_of_seller_id, permissions, first_name, last_name)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           RETURNING id, email, store_name, seller_id, is_superuser, sub_of_seller_id, permissions, first_name, last_name, created_at`,
+          [email, password_hash, store_name || null, own_seller_id, is_superuser, sub_of_seller_id, effective_permissions ? JSON.stringify(effective_permissions) : null, display_first, display_last]
         )
-        // Also upsert seller_settings so store name is available
-        if (store_name) {
+        // Also upsert seller_settings so store name is available (only for main sellers, not sub-users)
+        if (store_name && !sub_of_seller_id) {
           await client.query(
             `INSERT INTO admin_hub_seller_settings (seller_id, store_name, updated_at) VALUES ($1, $2, now())
              ON CONFLICT (seller_id) DO UPDATE SET store_name = $2, updated_at = now()`,
-            [seller_id, store_name]
+            [own_seller_id, store_name]
+          ).catch(() => {})
+        }
+        // Mark invitation as accepted
+        if (invite) {
+          await client.query(
+            `UPDATE seller_invitations SET accepted_at = now() WHERE id = $1`,
+            [invite.id]
           ).catch(() => {})
         }
         await client.end()
         const user = r.rows[0]
-        const token = signSellerToken({ id: user.id, email: user.email, seller_id: user.seller_id, is_superuser: user.is_superuser, store_name: user.store_name || '' })
-        res.json({ token, user: { id: user.id, email: user.email, seller_id: user.seller_id, is_superuser: user.is_superuser, store_name: user.store_name || '' } })
+        // JWT uses effective seller_id (parent's if sub-user)
+        const effectiveSellerId = user.sub_of_seller_id || user.seller_id
+        const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: user.store_name || '' })
+        res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: user.store_name || '' } })
       } catch (err) {
         try { await client.end() } catch (_) {}
         console.error('sellerAuthRegisterPOST:', err)
@@ -2587,7 +2619,7 @@ async function start() {
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
-        const r = await client.query('SELECT id, email, password_hash, store_name, seller_id, is_superuser, permissions FROM seller_users WHERE email = $1', [email])
+        const r = await client.query('SELECT id, email, password_hash, store_name, seller_id, sub_of_seller_id, is_superuser, permissions FROM seller_users WHERE email = $1', [email])
         await client.end()
         const user = r.rows[0]
         if (!user) return res.status(401).json({ message: 'Invalid email or password' })
@@ -2600,8 +2632,10 @@ async function start() {
           try { await c2.connect(); await c2.query('UPDATE seller_users SET is_superuser = true WHERE id = $1', [user.id]); await c2.end() } catch (_) {}
           user.is_superuser = true
         }
-        const token = signSellerToken({ id: user.id, email: user.email, seller_id: user.seller_id, is_superuser: shouldBeSuperuser, store_name: user.store_name || '' })
-        res.json({ token, user: { id: user.id, email: user.email, seller_id: user.seller_id, is_superuser: shouldBeSuperuser, store_name: user.store_name || '', permissions: user.permissions || null } })
+        // Sub-users use parent's seller_id for data access
+        const effectiveSellerId = user.sub_of_seller_id || user.seller_id
+        const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: user.store_name || '' })
+        res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: user.store_name || '', permissions: user.permissions || null } })
       } catch (err) {
         try { await client.end() } catch (_) {}
         console.error('sellerAuthLoginPOST:', err)
@@ -4323,6 +4357,14 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        const isSuperuser = req.sellerUser?.is_superuser || false
+        const sellerSellerId = req.sellerUser?.seller_id
+        let sellerFilter = ''
+        const params = []
+        if (!isSuperuser && sellerSellerId) {
+          params.push(sellerSellerId)
+          sellerFilter = `WHERE p.seller_id = $${params.length}`
+        }
         const r = await client.query(
           `SELECT r.id, r.order_id, r.product_id, r.rating, r.comment, r.customer_name, r.created_at,
                   o.order_number,
@@ -4330,8 +4372,10 @@ async function start() {
            FROM store_product_reviews r
            LEFT JOIN store_orders o ON o.id = r.order_id
            LEFT JOIN admin_hub_products p ON p.id::text = r.product_id
+           ${sellerFilter}
            ORDER BY r.created_at DESC
-           LIMIT 1000`
+           LIMIT 1000`,
+          params
         )
         await client.end()
         res.json({ reviews: r.rows || [] })
@@ -6050,19 +6094,28 @@ async function start() {
         const { search = '', limit = '50', offset = '0' } = req.query
         const lim = Math.min(Number(limit)||50, 200)
         const off = Number(offset)||0
+        // Seller isolation: non-superusers only see customers who ordered from them
+        const isSuperuser = req.sellerUser?.is_superuser || false
+        const sellerSellerId = req.sellerUser?.seller_id
         let whereParts = []
         let params = []
+        // Restrict to seller's own customers
+        if (!isSuperuser && sellerSellerId) {
+          params.push(sellerSellerId)
+          whereParts.push(`EXISTS (SELECT 1 FROM store_orders o WHERE LOWER(o.email) = LOWER(c.email) AND o.seller_id = $${params.length})`)
+        }
         if (search) {
           params.push(`%${search}%`)
           whereParts.push(`(c.email ILIKE $${params.length} OR c.first_name ILIKE $${params.length} OR c.last_name ILIKE $${params.length})`)
-          // Also search by customer_number if search looks numeric
           const numSearch = search.replace(/^#/, '').trim()
           if (/^\d+$/.test(numSearch)) {
             params.push(Number(numSearch))
             whereParts.push(`c.customer_number = $${params.length}`)
           }
         }
-        const where = whereParts.length > 0 ? 'WHERE ' + whereParts.join(' OR ') : ''
+        const where = whereParts.length > 0 ? 'WHERE ' + whereParts.join(' AND ') : ''
+        // For stats, also filter by seller if not superuser
+        const orderStatsSeller = (!isSuperuser && sellerSellerId) ? `WHERE seller_id = '${sellerSellerId.replace(/'/g,"''")}'` : ''
         const q = `
           SELECT c.id, c.customer_number, c.email, c.first_name, c.last_name, c.phone, c.country,
                  c.account_type, c.created_at,
@@ -6076,7 +6129,7 @@ async function start() {
             SELECT email, COUNT(*) AS order_count, SUM(total_cents) AS total_spent,
                    MIN(created_at) AS first_order, MAX(created_at) AS last_order,
                    BOOL_OR(newsletter_opted_in) AS newsletter_opted_in
-            FROM store_orders GROUP BY email
+            FROM store_orders ${orderStatsSeller} GROUP BY email
           ) s ON LOWER(s.email) = LOWER(c.email)
           ${where}
           ORDER BY c.created_at DESC
@@ -6873,7 +6926,7 @@ async function start() {
     httpApp.get('/store/reviews/my', storeReviewsMyGET)
     httpApp.get('/store/reviews', storeReviewsGET)
     httpApp.post('/store/reviews', storeReviewsPOST)
-    httpApp.get('/admin-hub/reviews', adminHubReviewsGET)
+    httpApp.get('/admin-hub/reviews', requireSellerAuth, adminHubReviewsGET)
 
     httpApp.get('/admin-hub/v1/orders', adminHubOrdersGET)
     httpApp.post('/admin-hub/v1/orders', adminHubOrderPOST)
@@ -6882,7 +6935,7 @@ async function start() {
     httpApp.get('/admin-hub/v1/orders/:id', adminHubOrderByIdGET)
     httpApp.patch('/admin-hub/v1/orders/:id', adminHubOrderPATCH)
     httpApp.delete('/admin-hub/v1/orders/:id', adminHubOrderDELETE)
-    httpApp.get('/admin-hub/v1/customers', adminHubCustomersGET)
+    httpApp.get('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomersGET)
     httpApp.post('/admin-hub/v1/customers', adminHubCustomerPOST)
     httpApp.patch('/admin-hub/v1/customers/:id', adminHubCustomerPATCH)
     httpApp.delete('/admin-hub/v1/customers/:id', adminHubCustomerDELETE)
@@ -7783,7 +7836,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
-    // POST /admin-hub/users/invite — invite a new seller user
+    // POST /admin-hub/users/invite — invite a new seller sub-user
     const adminHubUsersInvitePOST = async (req, res) => {
       const inviterSellerId = req.sellerUser?.seller_id
       if (!inviterSellerId) return res.status(401).json({ message: 'Unauthorized' })
@@ -7791,20 +7844,21 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const { email } = req.body || {}
+        const { email, first_name, last_name, permissions } = req.body || {}
         if (!email) { await client.end(); return res.status(400).json({ message: 'Email required' }) }
         const normalEmail = email.trim().toLowerCase()
         // Check if already registered
         const existing = await client.query('SELECT id FROM seller_users WHERE email = $1', [normalEmail])
-        if (existing.rows.length) { await client.end(); return res.status(409).json({ message: 'User already exists with this email' }) }
+        if (existing.rows.length) { await client.end(); return res.status(409).json({ message: 'Ein Benutzer mit dieser E-Mail existiert bereits' }) }
         // Create/replace invitation token
         const token = require('crypto').randomBytes(32).toString('hex')
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        const permJson = permissions ? JSON.stringify(permissions) : null
         await client.query(
-          `INSERT INTO seller_invitations (email, invited_by_seller_id, token, expires_at)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (email) DO UPDATE SET token = $3, expires_at = $4, invited_by_seller_id = $2, accepted_at = NULL`,
-          [normalEmail, inviterSellerId, token, expiresAt]
+          `INSERT INTO seller_invitations (email, invited_by_seller_id, token, expires_at, first_name, last_name, permissions)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+           ON CONFLICT (email) DO UPDATE SET token = $3, expires_at = $4, invited_by_seller_id = $2, accepted_at = NULL, first_name = $5, last_name = $6, permissions = $7::jsonb`,
+          [normalEmail, inviterSellerId, token, expiresAt, first_name || null, last_name || null, permJson]
         )
         await client.end()
         // Try to send invitation email
@@ -7816,16 +7870,106 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             const transport = await getSmtpTransport(dbClient2)
             await dbClient2.end()
             if (transport) {
+              const displayName = [first_name, last_name].filter(Boolean).join(' ')
               await transport.sendMail({
                 to: normalEmail,
                 subject: 'Einladung zur Belucha Seller Platform',
-                text: `Sie wurden eingeladen, der Belucha Seller Platform beizutreten.\n\nRegistrierungslink: ${inviteUrl}\n\nDieser Link ist 7 Tage gültig.`,
-                html: `<p>Sie wurden eingeladen, der <strong>Belucha Seller Platform</strong> beizutreten.</p><p><a href="${inviteUrl}">Jetzt registrieren</a></p><p>Dieser Link ist 7 Tage gültig.</p>`
+                text: `${displayName ? `Hallo ${displayName},\n\n` : ''}Sie wurden eingeladen, der Belucha Seller Platform beizutreten.\n\nRegistrierungslink: ${inviteUrl}\n\nDieser Link ist 7 Tage gültig.`,
+                html: `<p>${displayName ? `Hallo <strong>${displayName}</strong>,` : ''}</p><p>Sie wurden eingeladen, der <strong>Belucha Seller Platform</strong> beizutreten.</p><p><a href="${inviteUrl}">Jetzt registrieren</a></p><p>Dieser Link ist 7 Tage gültig.</p>`
               })
             }
           }
         } catch (_) { /* email sending is best-effort */ }
         res.json({ success: true, invite_url: inviteUrl })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // GET /admin-hub/v1/subusers — list sub-users belonging to current seller
+    const adminHubSubusersGET = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        // Sub-users: those whose sub_of_seller_id matches our seller_id
+        const r = await client.query(
+          `SELECT id, email, first_name, last_name, permissions, created_at FROM seller_users WHERE sub_of_seller_id = $1 ORDER BY created_at ASC`,
+          [sellerId]
+        )
+        // Pending invitations (not yet accepted)
+        const inv = await client.query(
+          `SELECT id, email, first_name, last_name, permissions, expires_at, created_at FROM seller_invitations WHERE invited_by_seller_id = $1 AND accepted_at IS NULL AND expires_at > now() ORDER BY created_at DESC`,
+          [sellerId]
+        )
+        await client.end()
+        res.json({ subusers: r.rows || [], pending_invites: inv.rows || [] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // PATCH /admin-hub/v1/subusers/:id — update sub-user permissions
+    const adminHubSubuserUpdatePATCH = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const { id } = req.params
+      const { permissions } = req.body || {}
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        // Ensure the sub-user belongs to this seller
+        const check = await client.query('SELECT id FROM seller_users WHERE id = $1 AND sub_of_seller_id = $2', [id, sellerId])
+        if (!check.rows.length) { await client.end(); return res.status(404).json({ message: 'Benutzer nicht gefunden' }) }
+        const r = await client.query(
+          `UPDATE seller_users SET permissions = $1::jsonb, updated_at = now() WHERE id = $2 RETURNING id, email, first_name, last_name, permissions`,
+          [permissions ? JSON.stringify(permissions) : null, id]
+        )
+        await client.end()
+        res.json({ user: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // DELETE /admin-hub/v1/subusers/:id — delete sub-user
+    const adminHubSubuserDeleteDELETE = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const { id } = req.params
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const check = await client.query('SELECT id FROM seller_users WHERE id = $1 AND sub_of_seller_id = $2', [id, sellerId])
+        if (!check.rows.length) { await client.end(); return res.status(404).json({ message: 'Benutzer nicht gefunden' }) }
+        await client.query('DELETE FROM seller_users WHERE id = $1', [id])
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // DELETE /admin-hub/v1/pending-invites/:id — cancel a pending invite
+    const adminHubPendingInviteDeleteDELETE = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const { id } = req.params
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        await client.query('DELETE FROM seller_invitations WHERE id = $1 AND invited_by_seller_id = $2', [id, sellerId])
+        await client.end()
+        res.json({ success: true })
       } catch (e) {
         try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -7839,6 +7983,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.patch('/admin-hub/v1/seller/iban', requireSellerAuth, adminHubSellerIbanPATCH)
     httpApp.get('/admin-hub/v1/seller/profile', requireSellerAuth, adminHubSellerProfileGET)
     httpApp.post('/admin-hub/users/invite', requireSellerAuth, adminHubUsersInvitePOST)
+    httpApp.get('/admin-hub/v1/subusers', requireSellerAuth, adminHubSubusersGET)
+    httpApp.patch('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserUpdatePATCH)
+    httpApp.delete('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserDeleteDELETE)
+    httpApp.delete('/admin-hub/v1/pending-invites/:id', requireSellerAuth, adminHubPendingInviteDeleteDELETE)
 
     httpApp.listen(PORT, HOST, () => {
       console.log(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)
