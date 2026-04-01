@@ -68,7 +68,6 @@ export default function RichTextEditor({
       editorRef.current.innerHTML = value || "";
       mountedValueRef.current = value;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // When switching to visual: restore innerHTML from current value prop
@@ -77,7 +76,6 @@ export default function RichTextEditor({
       editorRef.current.innerHTML = value || "";
       mountedValueRef.current = value;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   // If value changes externally while in visual mode (e.g. container switch), resync
