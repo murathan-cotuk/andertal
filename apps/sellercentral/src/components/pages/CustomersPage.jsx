@@ -216,6 +216,8 @@ export default function CustomersPage() {
   const [modal, setModal] = useState(null); // null | { mode: "create" } | { mode: "edit", customer }
   const [confirmDelete, setConfirmDelete] = useState(null);
   const searchDebounceRef = useRef(null);
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
   const fetchCustomers = useCallback(async (q) => {
     setLoading(true);
@@ -363,7 +365,7 @@ export default function CustomersPage() {
                   <td style={{ padding: "10px 12px", fontWeight: 500 }}>
                     {[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}
                   </td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280" }}>{c.email}</td>
+                  <td style={{ padding: "10px 12px", color: "#6b7280" }}>{isSuperuser ? c.email : "—"}</td>
                   <td style={{ padding: "10px 12px" }}>
                     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: typeColor.bg, color: typeColor.color, fontWeight: 600 }}>
                       {accountTypeLabel(c.account_type)}

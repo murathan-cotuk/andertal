@@ -799,6 +799,17 @@ class MedusaAdminClient {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
     return this.request(`/admin-hub/v1/payouts${qs}`)
   }
+  async getPayoutSummary(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/payout-summary${qs}`)
+  }
+  async getAdminPayoutOverview(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/payout-overview${qs}`)
+  }
+  async markPayoutPaid(data) {
+    return this.request('/admin-hub/v1/payouts/mark-paid', { method: 'POST', body: JSON.stringify(data) })
+  }
   async createPayout(data) {
     return this.request('/admin-hub/v1/payouts', { method: 'POST', body: JSON.stringify(data) })
   }

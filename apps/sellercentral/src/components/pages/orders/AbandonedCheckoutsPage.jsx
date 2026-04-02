@@ -57,6 +57,8 @@ export default function AbandonedCheckoutsPage() {
   const [carts, setCarts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState({});
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
   useEffect(() => {
     (async () => {
@@ -121,7 +123,7 @@ export default function AbandonedCheckoutsPage() {
                   <td style={{ padding: "10px 12px", fontWeight: 500 }}>
                     {[cart.first_name, cart.last_name].filter(Boolean).join(" ") || "—"}
                   </td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280" }}>{cart.email || "—"}</td>
+                  <td style={{ padding: "10px 12px", color: "#6b7280" }}>{isSuperuser ? (cart.email || "—") : "—"}</td>
                   <td style={{ padding: "10px 12px", textAlign: "center" }}>
                     <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: "#eff6ff", color: "#1d4ed8" }}>
                       {cart.item_count || 0} Artikel

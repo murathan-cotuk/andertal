@@ -405,6 +405,11 @@ export default function UsersPermissionsPage() {
   const [editUser, setEditUser] = useState(null);
   const [deleting, setDeleting] = useState(null);
 
+  // Search / sort / filter state (superuser view)
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all"); // "all" | "seller" | "superuser"
+  const [sortBy, setSortBy] = useState("date_desc"); // "date_desc" | "date_asc" | "name_asc" | "name_desc" | "role"
+
   useEffect(() => {
     const su = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
     setIsSuperuser(su);
@@ -469,6 +474,38 @@ export default function UsersPermissionsPage() {
 
   // ── Superuser view ──
   if (isSuperuser) {
+    // Apply search + role filter + sort
+    const q = search.trim().toLowerCase();
+    const filtered = users
+      .filter((u) => {
+        if (roleFilter === "seller" && u.is_superuser) return false;
+        if (roleFilter === "superuser" && !u.is_superuser) return false;
+        if (q) {
+          const haystack = [u.email, u.store_name, u.first_name, u.last_name].filter(Boolean).join(" ").toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === "date_desc") return new Date(b.created_at) - new Date(a.created_at);
+        if (sortBy === "date_asc") return new Date(a.created_at) - new Date(b.created_at);
+        if (sortBy === "name_asc") return (a.store_name || a.email).localeCompare(b.store_name || b.email);
+        if (sortBy === "name_desc") return (b.store_name || b.email).localeCompare(a.store_name || a.email);
+        if (sortBy === "role") return (b.is_superuser ? 1 : 0) - (a.is_superuser ? 1 : 0);
+        return 0;
+      });
+
+    const filterTabStyle = (val) => ({
+      padding: "5px 14px",
+      borderRadius: 20,
+      fontSize: 13,
+      fontWeight: roleFilter === val ? 700 : 400,
+      background: roleFilter === val ? "#111827" : "#f3f4f6",
+      color: roleFilter === val ? "#fff" : "#374151",
+      border: "none",
+      cursor: "pointer",
+    });
+
     return (
       <Page
         title="Benutzer & Berechtigungen"
@@ -478,21 +515,63 @@ export default function UsersPermissionsPage() {
           <Layout.Section>
             {error && <Banner tone="critical" onDismiss={() => setError(null)}><Text>{error}</Text></Banner>}
             <Card padding="0">
-              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Text variant="headingMd" as="h2">Seller-Konten ({users.length})</Text>
+              {/* Search + Sort + Filter toolbar */}
+              <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+                {/* Search */}
+                <div style={{ flex: "1 1 220px", minWidth: 180 }}>
+                  <TextField
+                    placeholder="Suchen (E-Mail, Store-Name…)"
+                    value={search}
+                    onChange={setSearch}
+                    autoComplete="off"
+                    clearButton
+                    onClearButtonClick={() => setSearch("")}
+                    size="slim"
+                  />
+                </div>
+                {/* Role filter tabs */}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button style={filterTabStyle("all")} onClick={() => setRoleFilter("all")}>Alle</button>
+                  <button style={filterTabStyle("seller")} onClick={() => setRoleFilter("seller")}>Seller</button>
+                  <button style={filterTabStyle("superuser")} onClick={() => setRoleFilter("superuser")}>Superuser</button>
+                </div>
+                {/* Sort */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  style={{ padding: "6px 10px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 13, background: "#fff", cursor: "pointer" }}
+                >
+                  <option value="date_desc">Datum ↓ (neueste)</option>
+                  <option value="date_asc">Datum ↑ (älteste)</option>
+                  <option value="name_asc">Name A → Z</option>
+                  <option value="name_desc">Name Z → A</option>
+                  <option value="role">Rolle (Superuser zuerst)</option>
+                </select>
                 <Button onClick={fetchSuperuserData} loading={loading} size="slim">Aktualisieren</Button>
               </div>
+
+              {/* Count line */}
+              <div style={{ padding: "8px 20px", borderBottom: "1px solid #f9fafb", background: "#fafafa" }}>
+                <Text variant="bodySm" tone="subdued">
+                  {filtered.length} von {users.length} Benutzer{users.length !== 1 ? "n" : ""}
+                </Text>
+              </div>
+
               {loading ? (
                 <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
-              ) : users.length === 0 ? (
-                <Box padding="400"><Text tone="subdued">Noch keine Benutzer registriert.</Text></Box>
+              ) : filtered.length === 0 ? (
+                <Box padding="400">
+                  <Text tone="subdued">
+                    {users.length === 0 ? "Noch keine Benutzer registriert." : "Keine Benutzer gefunden."}
+                  </Text>
+                </Box>
               ) : (
-                users.map((user, i) => (
+                filtered.map((user, i) => (
                   <div
                     key={user.id}
                     style={{
                       padding: "14px 20px",
-                      borderBottom: i < users.length - 1 ? "1px solid #f9fafb" : "none",
+                      borderBottom: i < filtered.length - 1 ? "1px solid #f9fafb" : "none",
                       display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center",
                     }}
                   >

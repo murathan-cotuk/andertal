@@ -285,6 +285,7 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isSuperuser, setIsSuperuser] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showBonusLedgerModal, setShowBonusLedgerModal] = useState(false);
   const [editNotes, setEditNotes] = useState(false);
@@ -333,6 +334,7 @@ export default function CustomerDetailPage() {
     if (!id) return;
     loadCustomer();
   }, [id]);
+  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
   const orders = customer?.orders || [];
   const discounts = customer?.discounts || [];
@@ -459,7 +461,7 @@ export default function CustomerDetailPage() {
           </div>
           {customer?.customer_number && (
             <div style={{ fontSize: 13, color: "#6b7280", marginTop: 3 }}>
-              #{customer.customer_number} · {customer.email}
+              #{customer.customer_number}{isSuperuser && customer.email ? ` · ${customer.email}` : ""}
             </div>
           )}
         </div>
@@ -784,8 +786,8 @@ export default function CustomerDetailPage() {
             <Card title="Kundenprofil">
               <InfoRow label="Vorname" value={customer.first_name} />
               <InfoRow label="Nachname" value={customer.last_name} />
-              <InfoRow label="E-Mail" value={customer.email} />
-              <InfoRow label="Telefon" value={customer.phone} />
+              {isSuperuser && <InfoRow label="E-Mail" value={customer.email} />}
+              {isSuperuser && <InfoRow label="Telefon" value={customer.phone} />}
               {customer.gender && <InfoRow label="Geschlecht" value={customer.gender === "male" ? "Männlich" : customer.gender === "female" ? "Weiblich" : customer.gender} />}
               {customer.birth_date && <InfoRow label="Geburtsdatum" value={fmtBirthDate(customer.birth_date)} />}
               <InfoRow label="Kundentyp" value={accountTypeLabel()} />

@@ -95,6 +95,8 @@ export default function OrderDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [shipModalOpen, setShipModalOpen] = useState(false);
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
   const [orderStatus, setOrderStatus] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
@@ -347,18 +349,18 @@ export default function OrderDetailPage() {
           <Section title="Kunde">
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
               <a
-                href={order?.email ? `/${locale}/customers?email=${encodeURIComponent(order.email)}` : "#"}
+                href={isSuperuser && order?.email ? `/${locale}/customers?email=${encodeURIComponent(order.email)}` : "#"}
                 style={{ color: "#202223", textDecoration: "underline" }}
               >
                 {customerLabel}
               </a>
             </div>
-            {order?.email && (
+            {isSuperuser && order?.email && (
               <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 2 }}>
                 <a href={`mailto:${order.email}`} style={{ color: "#1d4ed8" }}>{order.email}</a>
               </div>
             )}
-            {order?.phone && (
+            {isSuperuser && order?.phone && (
               <div style={{ fontSize: 13, color: "#6b7280" }}>{order.phone}</div>
             )}
           </Section>

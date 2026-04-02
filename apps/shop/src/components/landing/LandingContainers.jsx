@@ -391,6 +391,118 @@ function CollectionsCarousel({ container }) {
   );
 }
 
+// ── Accordion ─────────────────────────────────────────────────────────────────
+function Accordion({ container }) {
+  const [openIdx, setOpenIdx] = useState(null);
+  const items = container.items || [];
+  const bg = container.bg_color || "#ffffff";
+  const textColor = container.text_color || "#111827";
+  const borderColor = container.border_color || "#e5e7eb";
+  const iconColor = container.icon_color || "#111827";
+
+  return (
+    <div style={{ background: bg, padding: container.padding || "48px 24px" }}>
+      <div style={{ maxWidth: 860, margin: "0 auto" }}>
+        {container.title && (
+          <h2 style={{ fontSize: "clamp(20px,3vw,32px)", fontWeight: 700, color: textColor, marginBottom: 28, textAlign: "center" }}>
+            {container.title}
+          </h2>
+        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 0, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden" }}>
+          {items.map((item, idx) => {
+            const isOpen = openIdx === idx;
+            return (
+              <div key={idx} style={{ borderBottom: idx < items.length - 1 ? `1px solid ${borderColor}` : "none" }}>
+                <button
+                  onClick={() => setOpenIdx(isOpen ? null : idx)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "18px 22px", background: isOpen ? `${bg}ee` : bg,
+                    border: "none", cursor: "pointer", textAlign: "left", gap: 16,
+                  }}
+                >
+                  <span style={{ fontSize: 16, fontWeight: 600, color: textColor, flex: 1 }}>{item.question}</span>
+                  <span style={{ fontSize: 22, fontWeight: 300, color: iconColor, lineHeight: 1, flexShrink: 0, transform: isOpen ? "rotate(45deg)" : "none", transition: "transform 0.2s" }}>+</span>
+                </button>
+                {isOpen && (
+                  <div
+                    style={{ padding: "0 22px 20px", color: textColor, fontSize: 15, lineHeight: 1.7 }}
+                    dangerouslySetInnerHTML={{ __html: item.answer || "" }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function Tabs({ container }) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const tabs = container.tabs || [];
+  const bg = container.bg_color || "#ffffff";
+  const textColor = container.text_color || "#111827";
+  const activeColor = container.active_color || "#ff971c";
+  const tabBg = container.tab_bg || "#f3f4f6";
+  const style = container.tab_style || "underline";
+
+  const tabStyle = (idx) => {
+    const isActive = idx === activeIdx;
+    if (style === "pills") return {
+      padding: "8px 20px", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600,
+      background: isActive ? activeColor : tabBg,
+      color: isActive ? "#fff" : textColor,
+      transition: "background 0.2s",
+    };
+    if (style === "boxes") return {
+      padding: "10px 22px", border: `2px solid ${isActive ? activeColor : "transparent"}`, cursor: "pointer", fontSize: 14, fontWeight: 600,
+      background: isActive ? `${activeColor}15` : tabBg,
+      color: isActive ? activeColor : textColor,
+      borderRadius: 6,
+    };
+    // underline (default)
+    return {
+      padding: "12px 22px", border: "none", borderBottom: `3px solid ${isActive ? activeColor : "transparent"}`,
+      cursor: "pointer", fontSize: 14, fontWeight: 600, background: "transparent",
+      color: isActive ? activeColor : textColor, transition: "border-color 0.2s, color 0.2s",
+    };
+  };
+
+  const activeTab = tabs[activeIdx] || tabs[0];
+
+  return (
+    <div style={{ background: bg, padding: container.padding || "48px 24px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+        {/* Tab bar */}
+        <div style={{
+          display: "flex", flexWrap: "wrap", gap: style === "pills" ? 8 : 0,
+          borderBottom: style === "underline" ? `1px solid #e5e7eb` : "none",
+          background: style === "underline" ? "transparent" : tabBg,
+          borderRadius: style !== "underline" ? 8 : 0,
+          padding: style !== "underline" ? 6 : 0,
+          marginBottom: 24,
+        }}>
+          {tabs.map((tab, idx) => (
+            <button key={idx} style={tabStyle(idx)} onClick={() => setActiveIdx(idx)}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {/* Active content */}
+        {activeTab && (
+          <div
+            style={{ color: textColor, fontSize: 15, lineHeight: 1.75 }}
+            dangerouslySetInnerHTML={{ __html: activeTab.content || "" }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Renderer ──────────────────────────────────────────────────────────────────
 function renderContainer(c) {
   if (!c.visible) return null;
@@ -402,6 +514,8 @@ function renderContainer(c) {
     case "banner_cta":          return <BannerCta key={c.id} container={c} />;
     case "collection_carousel": return <CollectionCarousel key={c.id} container={c} />;
     case "collections_carousel": return <CollectionsCarousel key={c.id} container={c} />;
+    case "accordion":           return <Accordion key={c.id} container={c} />;
+    case "tabs":                return <Tabs key={c.id} container={c} />;
     default: return null;
   }
 }

@@ -208,7 +208,7 @@ function ExpandedRow({ order, locale = "de" }) {
   );
 }
 
-function CustomerCell({ order, locale, router }) {
+function CustomerCell({ order, locale, router, isSuperuser }) {
   const [navigating, setNavigating] = useState(false);
 
   const handleClick = async (e) => {
@@ -247,7 +247,7 @@ function CustomerCell({ order, locale, router }) {
           </span>
         )}
       </div>
-      <div style={{ fontSize: 11, color: "#9ca3af" }}>{order.email || ""}</div>
+      {isSuperuser && <div style={{ fontSize: 11, color: "#9ca3af" }}>{order.email || ""}</div>}
     </div>
   );
 }
@@ -480,6 +480,8 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterOrderStatus, setFilterOrderStatus] = useState("");
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
   const [filterPayStatus, setFilterPayStatus] = useState("");
   const [filterDelivery, setFilterDelivery] = useState("");
   const [sort, setSort] = useState("created_at_desc");
@@ -766,7 +768,7 @@ export default function OrdersPage() {
                   </td>
                   {/* Customer */}
                   <td style={{ padding: "10px 12px", minWidth: 240, maxWidth: 280 }}>
-                    <CustomerCell order={order} locale={locale} router={router} />
+                    <CustomerCell order={order} locale={locale} router={router} isSuperuser={isSuperuser} />
                   </td>
                   {/* Address */}
                   <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12, lineHeight: 1.5 }}>

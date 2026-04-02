@@ -223,6 +223,54 @@ const DEFAULT_STYLES = {
     text:       "#111827",
     background: "#ffffff",
   },
+  topbar: {
+    bg_color: "#111827",
+    text_color: "#ffffff",
+    height: "40px",
+    font_size: "13px",
+    font_weight: "400",
+  },
+  header: {
+    bg_color: "#ffffff",
+    text_color: "#111827",
+    height: "72px",
+    shadow: "0 2px 8px rgba(0,0,0,0.08)",
+    border_bottom: "1px solid #f3f4f6",
+  },
+  secondNav: {
+    bg_color: "#f9fafb",
+    text_color: "#374151",
+    active_color: "#ff971c",
+    height: "44px",
+    font_size: "14px",
+    font_weight: "500",
+  },
+  footer: {
+    bg_color: "#111827",
+    text_color: "#d1d5db",
+    border_top: "none",
+  },
+  typography: {
+    font_family: "Inter, system-ui, sans-serif",
+    font_size: "16px",
+    line_height: "1.6",
+    color: "#111827",
+    h1_size: "clamp(28px,5vw,52px)",
+    h1_weight: "800",
+    h1_color: "#111827",
+    h1_spacing: "-0.02em",
+    h2_size: "clamp(22px,3.5vw,36px)",
+    h2_weight: "700",
+    h2_color: "#111827",
+    h2_spacing: "-0.01em",
+  },
+  scrollUpButton: {
+    bg_color: "#ff971c",
+    icon_color: "#ffffff",
+    border_radius: "50%",
+    size: "44px",
+    shadow: "0 4px 12px rgba(0,0,0,0.2)",
+  },
   buttons: {
     add_to_cart: {
       label: "Add to Cart Button",
@@ -233,21 +281,13 @@ const DEFAULT_STYLES = {
     primary: {
       label: "Primary Button",
       variants: [
-        {
-          name: "Current Shop Button",
-          code: DEFAULT_PRIMARY_BUTTON_CODE,
-          active: true,
-        },
+        { name: "Current Shop Button", code: DEFAULT_PRIMARY_BUTTON_CODE, active: true },
       ],
     },
     secondary: {
       label: "Secondary Button",
       variants: [
-        {
-          name: "Outlined Secondary",
-          code: DEFAULT_SECONDARY_BUTTON_CODE,
-          active: true,
-        },
+        { name: "Outlined Secondary", code: DEFAULT_SECONDARY_BUTTON_CODE, active: true },
       ],
     },
   },
@@ -406,11 +446,23 @@ export default function StylesPage() {
       const loaded = data?.styles || {};
       setStyles({
         colors: { ...DEFAULT_STYLES.colors, ...(loaded.colors || {}) },
+        topbar: { ...DEFAULT_STYLES.topbar, ...(loaded.topbar || {}) },
+        header: { ...DEFAULT_STYLES.header, ...(loaded.header || {}) },
+        secondNav: { ...DEFAULT_STYLES.secondNav, ...(loaded.secondNav || {}) },
+        footer: { ...DEFAULT_STYLES.footer, ...(loaded.footer || {}) },
+        typography: { ...DEFAULT_STYLES.typography, ...(loaded.typography || {}) },
+        scrollUpButton: { ...DEFAULT_STYLES.scrollUpButton, ...(loaded.scrollUpButton || {}) },
         buttons: mergeButtons(DEFAULT_STYLES.buttons, loaded.buttons || {}),
       });
     } catch (_) {
       setStyles({
         colors: { ...DEFAULT_STYLES.colors },
+        topbar: { ...DEFAULT_STYLES.topbar },
+        header: { ...DEFAULT_STYLES.header },
+        secondNav: { ...DEFAULT_STYLES.secondNav },
+        footer: { ...DEFAULT_STYLES.footer },
+        typography: { ...DEFAULT_STYLES.typography },
+        scrollUpButton: { ...DEFAULT_STYLES.scrollUpButton },
         buttons: mergeButtons(DEFAULT_STYLES.buttons, {}),
       });
     }
@@ -436,6 +488,9 @@ export default function StylesPage() {
   const updateColor = (key, val) => {
     setStyles((prev) => ({ ...prev, colors: { ...prev.colors, [key]: val } }));
   };
+
+  const updateSection = (section, key, val) =>
+    setStyles((prev) => ({ ...prev, [section]: { ...prev[section], [key]: val } }));
 
   const updateButtonType = (key, updated) => {
     setStyles((prev) => ({ ...prev, buttons: { ...prev.buttons, [key]: updated } }));
@@ -502,6 +557,303 @@ export default function StylesPage() {
                   </div>
                 ))}
               </InlineStack>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        {/* Typography */}
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Typografie</Text>
+              <Divider />
+              <TextField
+                label="Schriftart (font-family)"
+                value={styles.typography.font_family}
+                onChange={(v) => updateSection("typography", "font_family", v)}
+                autoComplete="off"
+              />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                <TextField
+                  label="Schriftgröße (font-size)"
+                  value={styles.typography.font_size}
+                  onChange={(v) => updateSection("typography", "font_size", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Zeilenhöhe (line-height)"
+                  value={styles.typography.line_height}
+                  onChange={(v) => updateSection("typography", "line_height", v)}
+                  autoComplete="off"
+                />
+                <ColorField
+                  label="Textfarbe (color)"
+                  value={styles.typography.color}
+                  onChange={(v) => updateSection("typography", "color", v)}
+                />
+              </div>
+              <Divider />
+              <Text as="h3" variant="headingSm">H1</Text>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+                <TextField
+                  label="Größe (h1-size)"
+                  value={styles.typography.h1_size}
+                  onChange={(v) => updateSection("typography", "h1_size", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Gewicht (h1-weight)"
+                  value={styles.typography.h1_weight}
+                  onChange={(v) => updateSection("typography", "h1_weight", v)}
+                  autoComplete="off"
+                />
+                <ColorField
+                  label="Farbe (h1-color)"
+                  value={styles.typography.h1_color}
+                  onChange={(v) => updateSection("typography", "h1_color", v)}
+                />
+                <TextField
+                  label="Zeichenabstand (h1-spacing)"
+                  value={styles.typography.h1_spacing}
+                  onChange={(v) => updateSection("typography", "h1_spacing", v)}
+                  autoComplete="off"
+                />
+              </div>
+              <Text as="h3" variant="headingSm">H2</Text>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+                <TextField
+                  label="Größe (h2-size)"
+                  value={styles.typography.h2_size}
+                  onChange={(v) => updateSection("typography", "h2_size", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Gewicht (h2-weight)"
+                  value={styles.typography.h2_weight}
+                  onChange={(v) => updateSection("typography", "h2_weight", v)}
+                  autoComplete="off"
+                />
+                <ColorField
+                  label="Farbe (h2-color)"
+                  value={styles.typography.h2_color}
+                  onChange={(v) => updateSection("typography", "h2_color", v)}
+                />
+                <TextField
+                  label="Zeichenabstand (h2-spacing)"
+                  value={styles.typography.h2_spacing}
+                  onChange={(v) => updateSection("typography", "h2_spacing", v)}
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        {/* Top Bar */}
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Layout: Top Bar</Text>
+              <Divider />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                <ColorField
+                  label="Hintergrundfarbe"
+                  value={styles.topbar.bg_color}
+                  onChange={(v) => updateSection("topbar", "bg_color", v)}
+                />
+                <ColorField
+                  label="Textfarbe"
+                  value={styles.topbar.text_color}
+                  onChange={(v) => updateSection("topbar", "text_color", v)}
+                />
+                <TextField
+                  label="Höhe (height)"
+                  value={styles.topbar.height}
+                  onChange={(v) => updateSection("topbar", "height", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Schriftgröße (font-size)"
+                  value={styles.topbar.font_size}
+                  onChange={(v) => updateSection("topbar", "font_size", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Schriftgewicht (font-weight)"
+                  value={styles.topbar.font_weight}
+                  onChange={(v) => updateSection("topbar", "font_weight", v)}
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        {/* Header / Navbar */}
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Layout: Header / Navbar</Text>
+              <Divider />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                <ColorField
+                  label="Hintergrundfarbe"
+                  value={styles.header.bg_color}
+                  onChange={(v) => updateSection("header", "bg_color", v)}
+                />
+                <ColorField
+                  label="Textfarbe"
+                  value={styles.header.text_color}
+                  onChange={(v) => updateSection("header", "text_color", v)}
+                />
+                <TextField
+                  label="Höhe (height)"
+                  value={styles.header.height}
+                  onChange={(v) => updateSection("header", "height", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Schatten (box-shadow)"
+                  value={styles.header.shadow}
+                  onChange={(v) => updateSection("header", "shadow", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Unterer Rand (border-bottom)"
+                  value={styles.header.border_bottom}
+                  onChange={(v) => updateSection("header", "border_bottom", v)}
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        {/* Second Nav */}
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Layout: Second Nav</Text>
+              <Divider />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                <ColorField
+                  label="Hintergrundfarbe"
+                  value={styles.secondNav.bg_color}
+                  onChange={(v) => updateSection("secondNav", "bg_color", v)}
+                />
+                <ColorField
+                  label="Textfarbe"
+                  value={styles.secondNav.text_color}
+                  onChange={(v) => updateSection("secondNav", "text_color", v)}
+                />
+                <ColorField
+                  label="Aktiv-Farbe"
+                  value={styles.secondNav.active_color}
+                  onChange={(v) => updateSection("secondNav", "active_color", v)}
+                />
+                <TextField
+                  label="Höhe (height)"
+                  value={styles.secondNav.height}
+                  onChange={(v) => updateSection("secondNav", "height", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Schriftgröße (font-size)"
+                  value={styles.secondNav.font_size}
+                  onChange={(v) => updateSection("secondNav", "font_size", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Schriftgewicht (font-weight)"
+                  value={styles.secondNav.font_weight}
+                  onChange={(v) => updateSection("secondNav", "font_weight", v)}
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        {/* Footer */}
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Layout: Footer</Text>
+              <Divider />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                <ColorField
+                  label="Hintergrundfarbe"
+                  value={styles.footer.bg_color}
+                  onChange={(v) => updateSection("footer", "bg_color", v)}
+                />
+                <ColorField
+                  label="Textfarbe"
+                  value={styles.footer.text_color}
+                  onChange={(v) => updateSection("footer", "text_color", v)}
+                />
+                <TextField
+                  label="Oberer Rand (border-top)"
+                  value={styles.footer.border_top}
+                  onChange={(v) => updateSection("footer", "border_top", v)}
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        {/* Scroll-up Button */}
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Scroll-up Button</Text>
+              <Divider />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                <ColorField
+                  label="Hintergrundfarbe"
+                  value={styles.scrollUpButton.bg_color}
+                  onChange={(v) => updateSection("scrollUpButton", "bg_color", v)}
+                />
+                <ColorField
+                  label="Icon-Farbe"
+                  value={styles.scrollUpButton.icon_color}
+                  onChange={(v) => updateSection("scrollUpButton", "icon_color", v)}
+                />
+                <TextField
+                  label="Randradius (border-radius)"
+                  value={styles.scrollUpButton.border_radius}
+                  onChange={(v) => updateSection("scrollUpButton", "border_radius", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Größe (size)"
+                  value={styles.scrollUpButton.size}
+                  onChange={(v) => updateSection("scrollUpButton", "size", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Schatten (box-shadow)"
+                  value={styles.scrollUpButton.shadow}
+                  onChange={(v) => updateSection("scrollUpButton", "shadow", v)}
+                  autoComplete="off"
+                />
+              </div>
+              {/* Live preview */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8 }}>
+                <Text variant="bodySm" tone="subdued">Vorschau:</Text>
+                <div style={{
+                  width: styles.scrollUpButton.size || "44px",
+                  height: styles.scrollUpButton.size || "44px",
+                  borderRadius: styles.scrollUpButton.border_radius || "50%",
+                  background: styles.scrollUpButton.bg_color || "#ff971c",
+                  boxShadow: styles.scrollUpButton.shadow || "0 4px 12px rgba(0,0,0,0.2)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke={styles.scrollUpButton.icon_color || "#fff"} strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                  </svg>
+                </div>
+              </div>
             </BlockStack>
           </Card>
         </Layout.Section>

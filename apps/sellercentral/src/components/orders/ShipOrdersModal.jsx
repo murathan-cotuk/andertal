@@ -18,6 +18,8 @@ export default function ShipOrdersModal({ orders, onClose, onDone }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
   const [resolvedOrders, setResolvedOrders] = useState(() =>
     orders.map((o) => ({ ...o, _items: o._items || o.items || [] })),
   );
@@ -160,7 +162,7 @@ export default function ShipOrdersModal({ orders, onClose, onDone }) {
                 {orders.map((o) => (
                   <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1fr minmax(140px,200px)", gap: 10, alignItems: "center" }}>
                     <Text as="span" variant="bodyMd" fontWeight="semibold">
-                      #{o.order_number || "—"} — {[o.first_name, o.last_name].filter(Boolean).join(" ") || o.email || "—"}
+                      #{o.order_number || "—"} — {[o.first_name, o.last_name].filter(Boolean).join(" ") || (isSuperuser ? o.email : null) || "—"}
                     </Text>
                     <input
                       style={inp}

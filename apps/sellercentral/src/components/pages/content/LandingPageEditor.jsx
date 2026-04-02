@@ -49,6 +49,8 @@ const CONTAINER_TYPES = [
   { type: "banner_cta",          label: "CTA-Banner",            description: "Farbiger Banner mit Handlungsaufforderung und Positionierung" },
   { type: "collection_carousel", label: "Kollektion-Karussell",  description: "Produkte einer Kollektion als Karussell" },
   { type: "collections_carousel", label: "Kollektionen-Karussell", description: "Mehrere Kollektionen als anklickbare Karten nebeneinander" },
+  { type: "accordion",           label: "Accordion (FAQ)",       description: "Aufklappbare Frage-Antwort-Sektionen, ideal für FAQs" },
+  { type: "tabs",                label: "Tabs (Registerkarten)", description: "Inhalte in wechselbaren Reitern anzeigen" },
 ];
 
 function newContainer(type) {
@@ -69,6 +71,10 @@ function newContainer(type) {
       return { ...base, title: "", collection_id: "", collection_handle: "", items_per_row: 4, padding: "32px 24px" };
     case "collections_carousel":
       return { ...base, title: "", collections: [], items_per_row: 4, padding: "32px 24px", card_aspect_ratio: "4/5" };
+    case "accordion":
+      return { ...base, title: "", items: [{ question: "Frage 1", answer: "" }, { question: "Frage 2", answer: "" }], bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", border_color: "#e5e7eb", icon_color: "#111827" };
+    case "tabs":
+      return { ...base, tabs: [{ label: "Tab 1", content: "" }, { label: "Tab 2", content: "" }], bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", tab_style: "underline", active_color: "#ff971c", tab_bg: "#f3f4f6" };
     default:
       return base;
   }
@@ -629,6 +635,149 @@ function CollectionsCarouselEditor({ container, onChange }) {
   );
 }
 
+// ── Accordion editor ─────────────────────────────────────────────────────────
+function AccordionEditor({ container, onChange }) {
+  const items = container.items || [];
+
+  const updateItem = (idx, key, val) => {
+    const next = items.map((item, i) => i === idx ? { ...item, [key]: val } : item);
+    onChange({ ...container, items: next });
+  };
+  const addItem = () => onChange({ ...container, items: [...items, { question: `Frage ${items.length + 1}`, answer: "" }] });
+  const removeItem = (idx) => onChange({ ...container, items: items.filter((_, i) => i !== idx) });
+  const moveItem = (idx, dir) => {
+    const next = [...items];
+    const target = idx + dir;
+    if (target < 0 || target >= next.length) return;
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange({ ...container, items: next });
+  };
+
+  return (
+    <BlockStack gap="400">
+      {/* Global settings */}
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">Accordion-Einstellungen</Text>
+          <TextField label="Überschrift (optional)" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}><ColorField label="Hintergrundfarbe" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Rahmenfarbe" value={container.border_color || "#e5e7eb"} onChange={(v) => onChange({ ...container, border_color: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Icon-Farbe (+/−)" value={container.icon_color || "#111827"} onChange={(v) => onChange({ ...container, icon_color: v })} /></div>
+          </InlineStack>
+          <TextField label="Padding" value={container.padding || "48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" />
+        </BlockStack>
+      </Card>
+
+      {/* Items */}
+      {items.map((item, idx) => (
+        <Card key={idx}>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingSm">Eintrag {idx + 1}</Text>
+              <InlineStack gap="200">
+                <Button size="slim" disabled={idx === 0} onClick={() => moveItem(idx, -1)}>↑</Button>
+                <Button size="slim" disabled={idx === items.length - 1} onClick={() => moveItem(idx, 1)}>↓</Button>
+                {items.length > 1 && <Button size="slim" tone="critical" onClick={() => removeItem(idx)}>Entfernen</Button>}
+              </InlineStack>
+            </InlineStack>
+            <TextField label="Frage / Titel" value={item.question || ""} onChange={(v) => updateItem(idx, "question", v)} autoComplete="off" />
+            <div>
+              <Text as="span" variant="bodyMd" fontWeight="medium">Antwort / Inhalt</Text>
+              <Box paddingBlockStart="100">
+                <RichTextEditor value={item.answer || ""} onChange={(v) => updateItem(idx, "answer", v)} />
+              </Box>
+            </div>
+          </BlockStack>
+        </Card>
+      ))}
+
+      <InlineStack>
+        <Button onClick={addItem}>+ Eintrag hinzufügen</Button>
+      </InlineStack>
+    </BlockStack>
+  );
+}
+
+// ── Tabs editor ───────────────────────────────────────────────────────────────
+function TabsEditor({ container, onChange }) {
+  const tabs = container.tabs || [];
+
+  const updateTab = (idx, key, val) => {
+    const next = tabs.map((tab, i) => i === idx ? { ...tab, [key]: val } : tab);
+    onChange({ ...container, tabs: next });
+  };
+  const addTab = () => onChange({ ...container, tabs: [...tabs, { label: `Tab ${tabs.length + 1}`, content: "" }] });
+  const removeTab = (idx) => onChange({ ...container, tabs: tabs.filter((_, i) => i !== idx) });
+  const moveTab = (idx, dir) => {
+    const next = [...tabs];
+    const target = idx + dir;
+    if (target < 0 || target >= next.length) return;
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange({ ...container, tabs: next });
+  };
+
+  return (
+    <BlockStack gap="400">
+      {/* Global settings */}
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">Tab-Einstellungen</Text>
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}>
+              <Select
+                label="Tab-Stil"
+                options={[
+                  { label: "Unterstrichen", value: "underline" },
+                  { label: "Pills (abgerundet)", value: "pills" },
+                  { label: "Boxen", value: "boxes" },
+                ]}
+                value={container.tab_style || "underline"}
+                onChange={(v) => onChange({ ...container, tab_style: v })}
+              />
+            </div>
+            <div style={{ flex: 1 }}><ColorField label="Aktiv-Farbe" value={container.active_color || "#ff971c"} onChange={(v) => onChange({ ...container, active_color: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Tab-Hintergrund" value={container.tab_bg || "#f3f4f6"} onChange={(v) => onChange({ ...container, tab_bg: v })} /></div>
+          </InlineStack>
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}><ColorField label="Seiten-Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
+            <div style={{ flex: 1 }}><TextField label="Padding" value={container.padding || "48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" /></div>
+          </InlineStack>
+        </BlockStack>
+      </Card>
+
+      {/* Tabs */}
+      {tabs.map((tab, idx) => (
+        <Card key={idx}>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingSm">Reiter {idx + 1}</Text>
+              <InlineStack gap="200">
+                <Button size="slim" disabled={idx === 0} onClick={() => moveTab(idx, -1)}>↑</Button>
+                <Button size="slim" disabled={idx === tabs.length - 1} onClick={() => moveTab(idx, 1)}>↓</Button>
+                {tabs.length > 1 && <Button size="slim" tone="critical" onClick={() => removeTab(idx)}>Entfernen</Button>}
+              </InlineStack>
+            </InlineStack>
+            <TextField label="Tab-Bezeichnung" value={tab.label || ""} onChange={(v) => updateTab(idx, "label", v)} autoComplete="off" placeholder="z.B. Beschreibung, Merkmale, Lieferung…" />
+            <div>
+              <Text as="span" variant="bodyMd" fontWeight="medium">Inhalt</Text>
+              <Box paddingBlockStart="100">
+                <RichTextEditor value={tab.content || ""} onChange={(v) => updateTab(idx, "content", v)} />
+              </Box>
+            </div>
+          </BlockStack>
+        </Card>
+      ))}
+
+      <InlineStack>
+        <Button onClick={addTab}>+ Reiter hinzufügen</Button>
+      </InlineStack>
+    </BlockStack>
+  );
+}
+
 function ContainerEditor({ container, onChange }) {
   switch (container.type) {
     case "hero_banner":         return <HeroBannerEditor container={container} onChange={onChange} />;
@@ -638,6 +787,8 @@ function ContainerEditor({ container, onChange }) {
     case "banner_cta":          return <BannerCtaEditor container={container} onChange={onChange} />;
     case "collection_carousel": return <CollectionCarouselEditor container={container} onChange={onChange} />;
     case "collections_carousel": return <CollectionsCarouselEditor container={container} onChange={onChange} />;
+    case "accordion":           return <AccordionEditor container={container} onChange={onChange} />;
+    case "tabs":                return <TabsEditor container={container} onChange={onChange} />;
     default: return null;
   }
 }

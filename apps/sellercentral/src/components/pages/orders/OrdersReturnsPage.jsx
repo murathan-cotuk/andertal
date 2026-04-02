@@ -202,7 +202,7 @@ function RefundModal({ ret, onClose, onRefunded }) {
 }
 
 /* ───────── DetailPanel (slide-out) ───────── */
-function DetailPanel({ ret, onClose, onUpdate }) {
+function DetailPanel({ ret, onClose, onUpdate, isSuperuser }) {
   const [showRefund, setShowRefund] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [sendingLabel, setSendingLabel] = useState(false);
@@ -218,7 +218,7 @@ function DetailPanel({ ret, onClose, onUpdate }) {
     setUpdating(false);
   };
 
-  const customerName = [ret.first_name, ret.last_name].filter(Boolean).join(" ") || ret.email || "Unbekannt";
+  const customerName = [ret.first_name, ret.last_name].filter(Boolean).join(" ") || (isSuperuser ? ret.email : null) || "Unbekannt";
 
   return (
     <>
@@ -317,7 +317,7 @@ function DetailPanel({ ret, onClose, onUpdate }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
             {[
               ["Kunde", customerName],
-              ["E-Mail", ret.email || "—"],
+              ...(isSuperuser ? [["E-Mail", ret.email || "—"]] : []),
               ["Bestellung", ret.order_number ? `#${ret.order_number}` : "—"],
               ["Bestellsumme", fmtMoney(ret.total_cents)],
               ["Erstellt", fmtDate(ret.created_at)],
@@ -458,6 +458,8 @@ export default function OrdersReturnsPage() {
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState(null); // selected return for detail panel
   const [filterStatus, setFilterStatus] = useState("alle");
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
   useEffect(() => {
     (async () => {
@@ -572,7 +574,7 @@ export default function OrdersReturnsPage() {
                   </td>
                   <td style={{ padding: "10px 12px" }}>
                     <div style={{ fontWeight: 500 }}>{customerName}</div>
-                    <div style={{ fontSize: 11, color: "#9ca3af" }}>{ret.email || ""}</div>
+                    {isSuperuser && <div style={{ fontSize: 11, color: "#9ca3af" }}>{ret.email || ""}</div>}
                   </td>
                   <td style={{ padding: "10px 12px", color: "#6b7280", maxWidth: 180 }}>
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ret.reason || "—"}</div>
@@ -652,6 +654,7 @@ export default function OrdersReturnsPage() {
           ret={selected}
           onClose={() => setSelected(null)}
           onUpdate={handleUpdate}
+          isSuperuser={isSuperuser}
         />
       )}
 

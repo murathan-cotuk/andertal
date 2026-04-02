@@ -20,6 +20,8 @@ export default function VersandPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
   const [scannedItems, setScannedItems] = useState({}); // { orderId: Set of scanned titles }
   const [barcodeInput, setBarcodeInput] = useState("");
   const [scanError, setScanError] = useState("");
@@ -240,7 +242,7 @@ export default function VersandPage() {
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Trackingnummern</div>
         {orders.map(o => (
           <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 10, marginBottom: 10, alignItems: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 500 }}>#{o.order_number || "—"} — {[o.first_name,o.last_name].filter(Boolean).join(" ")||o.email||"—"}</div>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>#{o.order_number || "—"} — {[o.first_name,o.last_name].filter(Boolean).join(" ")||(isSuperuser ? o.email : null)||"—"}</div>
             <input
               value={trackings[o.id] || ""}
               onChange={e => setTrackings(t => ({ ...t, [o.id]: e.target.value }))}
@@ -299,7 +301,7 @@ export default function VersandPage() {
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700 }}>Bestellung #{currentOrder.order_number || "—"}</div>
                 <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-                  {[currentOrder.first_name, currentOrder.last_name].filter(Boolean).join(" ") || "—"} · {currentOrder.email}
+                  {[currentOrder.first_name, currentOrder.last_name].filter(Boolean).join(" ") || "—"}{isSuperuser && currentOrder.email ? ` · ${currentOrder.email}` : ""}
                 </div>
                 <div style={{ fontSize: 13, color: "#6b7280" }}>
                   {[currentOrder.address_line1, currentOrder.city, currentOrder.country].filter(Boolean).join(", ")}

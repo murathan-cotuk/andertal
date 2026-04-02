@@ -42,6 +42,8 @@ function CustomerReviewsPage() {
   const [search, setSearch] = useState("");
   const [filterRating, setFilterRating] = useState("");
   const [sort, setSort] = useState({ col: "created_at", dir: "desc" });
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
   useEffect(() => {
     getMedusaAdminClient()
@@ -66,7 +68,7 @@ function CustomerReviewsPage() {
       const q = search.toLowerCase();
       list = list.filter(
         (r) =>
-          (r.customer_name || r.customer_email || "").toLowerCase().includes(q) ||
+          (r.customer_name || (isSuperuser ? r.customer_email : "") || "").toLowerCase().includes(q) ||
           (r.customer_number || "").toLowerCase().includes(q) ||
           (r.product_sku || "").toLowerCase().includes(q) ||
           (r.product_title || "").toLowerCase().includes(q) ||
@@ -190,12 +192,12 @@ function CustomerReviewsPage() {
                         <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>#{r.customer_number}</div>
                       )}
                       <div style={{ fontWeight: 600, color: "#111827", textDecoration: "underline", fontSize: 13 }}>
-                        {r.customer_name || r.customer_email || "—"}
+                        {r.customer_name || (isSuperuser ? r.customer_email : null) || "—"}
                       </div>
                     </button>
                   ) : (
                     <div>
-                      <div style={{ fontWeight: 600, color: "#111827" }}>{r.customer_name || r.customer_email || "—"}</div>
+                      <div style={{ fontWeight: 600, color: "#111827" }}>{r.customer_name || (isSuperuser ? r.customer_email : null) || "—"}</div>
                     </div>
                   )}
                 </td>

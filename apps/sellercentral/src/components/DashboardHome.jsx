@@ -31,6 +31,8 @@ export default function DashboardHome() {
   const [pendingReturns, setPendingReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
   const medusaClient = getMedusaAdminClient();
 
   useEffect(() => {
@@ -230,7 +232,7 @@ export default function DashboardHome() {
                   rows={pendingReturns.slice(0, 5).map(r => [
                     `R-${r.return_number || r.id?.slice(0, 8)}`,
                     r.order_number ? `#${r.order_number}` : "—",
-                    [r.first_name, r.last_name].filter(Boolean).join(" ") || r.email || "—",
+                    [r.first_name, r.last_name].filter(Boolean).join(" ") || (isSuperuser ? r.email : null) || "—",
                     r.reason || "—",
                   ])}
                 />

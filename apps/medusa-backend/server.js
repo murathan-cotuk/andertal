@@ -380,6 +380,7 @@ async function start() {
         `)
         await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_brands_handle ON admin_hub_brands(handle);')
         await client.query('ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS banner_image text;')
+        await client.query('ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS seller_id varchar(255) DEFAULT NULL;')
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_carts (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -613,6 +614,8 @@ async function start() {
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS sub_of_seller_id varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS first_name varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS last_name varchar(255) DEFAULT NULL;`).catch(() => {})
+        // Normalize store_name: convert empty string to NULL so sub-users don't conflict
+        await client.query(`UPDATE seller_users SET store_name = NULL WHERE store_name = ''`).catch(() => {})
         await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS first_name varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS last_name varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT NULL;`).catch(() => {})
@@ -796,6 +799,7 @@ async function start() {
     UNIQUE(group_id, country_code)
   );
 `).catch(() => {})
+        await client.query(`ALTER TABLE store_shipping_groups ADD COLUMN IF NOT EXISTS seller_id varchar(255) DEFAULT NULL`).catch(() => {})
         await client.query(`ALTER TABLE store_order_items ADD COLUMN IF NOT EXISTS product_id text`).catch(() => {})
         // Backfill product_id for old order items that have a product_handle
         await client.query(`
@@ -1562,7 +1566,14 @@ async function start() {
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {
         await client.connect()
-        const r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, created_at FROM admin_hub_brands ORDER BY name')
+        const isSuperuserReq = req.sellerUser?.is_superuser === true
+        const callerSellerId = req.sellerUser?.seller_id
+        let r
+        if (isSuperuserReq) {
+          r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, seller_id, created_at FROM admin_hub_brands ORDER BY name')
+        } else {
+          r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, seller_id, created_at FROM admin_hub_brands WHERE seller_id = $1 ORDER BY name', [callerSellerId])
+        }
         await client.end()
         res.json({ brands: (r.rows || []).map((row) => ({ id: row.id, name: row.name, handle: row.handle, logo_image: row.logo_image || null, banner_image: row.banner_image || null, address: row.address || null, created_at: row.created_at })) })
       } catch (e) {
@@ -1579,13 +1590,14 @@ async function start() {
       const logo_image = (body.logo_image || body.logo || '').trim() || null
       const banner_image = (body.banner_image || '').trim() || null
       const address = (body.address || '').trim() || null
+      const callerSellerId = req.sellerUser?.seller_id || null
       const client = getBrandsDbClient()
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {
         await client.connect()
         const r = await client.query(
-          'INSERT INTO admin_hub_brands (name, handle, logo_image, banner_image, address) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (handle) DO UPDATE SET name = $1, logo_image = $3, banner_image = $4, address = $5, updated_at = now() RETURNING id, name, handle, logo_image, banner_image, address, created_at',
-          [name, handle, logo_image, banner_image, address]
+          'INSERT INTO admin_hub_brands (name, handle, logo_image, banner_image, address, seller_id) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (handle) DO UPDATE SET name = $1, logo_image = $3, banner_image = $4, address = $5, updated_at = now() RETURNING id, name, handle, logo_image, banner_image, address, created_at',
+          [name, handle, logo_image, banner_image, address, callerSellerId]
         )
         await client.end()
         const row = r.rows && r.rows[0]
@@ -2558,7 +2570,7 @@ async function start() {
           await client.end()
           return res.status(409).json({ message: 'An account with this email already exists' })
         }
-        // Check invite token if provided
+        // Lookup pending invitation — first by token, then by email (so even without the link, invited users get linked)
         let invite = null
         if (invite_token) {
           const invRes = await client.query(
@@ -2567,26 +2579,56 @@ async function start() {
           )
           if (invRes.rows.length > 0) invite = invRes.rows[0]
         }
+        if (!invite) {
+          // Always check by email — if someone was invited and registers without the link, still link them
+          const invByEmail = await client.query(
+            `SELECT * FROM seller_invitations WHERE LOWER(email) = $1 AND accepted_at IS NULL AND expires_at > now() ORDER BY created_at DESC LIMIT 1`,
+            [email]
+          )
+          if (invByEmail.rows.length > 0) invite = invByEmail.rows[0]
+        }
+        // Check store name uniqueness (only for independent sellers, not sub-users)
+        if (store_name && !invite) {
+          const storeCheck = await client.query(
+            `SELECT id FROM seller_users WHERE LOWER(store_name) = LOWER($1)`,
+            [store_name]
+          )
+          if (storeCheck.rows.length > 0) {
+            await client.end()
+            return res.status(409).json({ message: 'Dieser Store-Name ist bereits vergeben. Bitte wählen Sie einen anderen Namen.' })
+          }
+          // Also check in seller_settings
+          const settingsCheck = await client.query(
+            `SELECT seller_id FROM admin_hub_seller_settings WHERE LOWER(store_name) = LOWER($1) LIMIT 1`,
+            [store_name]
+          ).catch(() => ({ rows: [] }))
+          if (settingsCheck.rows.length > 0) {
+            await client.end()
+            return res.status(409).json({ message: 'Dieser Store-Name ist bereits vergeben. Bitte wählen Sie einen anderen Namen.' })
+          }
+        }
         const is_superuser = INITIAL_SUPERUSER_EMAILS.includes(email)
         const password_hash = hashSellerPassword(password)
         const own_seller_id = `seller_${require('crypto').randomBytes(8).toString('hex')}`
-        // Sub-users inherit parent's seller_id for data access
+        // Sub-users: linked to the inviting seller; they don't get their own store
         const sub_of_seller_id = invite ? invite.invited_by_seller_id : null
         const effective_permissions = invite?.permissions || null
         const display_first = first_name || invite?.first_name || null
         const display_last = last_name || invite?.last_name || null
+        // Sub-users never get their own store_name — they operate under the parent seller's account
+        const effective_store_name = sub_of_seller_id ? null : (store_name || null)
         const r = await client.query(
           `INSERT INTO seller_users (email, password_hash, store_name, seller_id, is_superuser, sub_of_seller_id, permissions, first_name, last_name)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            RETURNING id, email, store_name, seller_id, is_superuser, sub_of_seller_id, permissions, first_name, last_name, created_at`,
-          [email, password_hash, store_name || null, own_seller_id, is_superuser, sub_of_seller_id, effective_permissions ? JSON.stringify(effective_permissions) : null, display_first, display_last]
+          [email, password_hash, effective_store_name, own_seller_id, is_superuser, sub_of_seller_id, effective_permissions ? JSON.stringify(effective_permissions) : null, display_first, display_last]
         )
         // Also upsert seller_settings so store name is available (only for main sellers, not sub-users)
-        if (store_name && !sub_of_seller_id) {
+        if (effective_store_name && !sub_of_seller_id) {
           await client.query(
             `INSERT INTO admin_hub_seller_settings (seller_id, store_name, updated_at) VALUES ($1, $2, now())
              ON CONFLICT (seller_id) DO UPDATE SET store_name = $2, updated_at = now()`,
-            [own_seller_id, store_name]
+            [own_seller_id, effective_store_name]
           ).catch(() => {})
         }
         // Mark invitation as accepted
@@ -2596,12 +2638,21 @@ async function start() {
             [invite.id]
           ).catch(() => {})
         }
-        await client.end()
         const user = r.rows[0]
         // JWT uses effective seller_id (parent's if sub-user)
         const effectiveSellerId = user.sub_of_seller_id || user.seller_id
-        const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: user.store_name || '' })
-        res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: user.store_name || '' } })
+        // For sub-users: fetch parent's store_name so UI shows correct store
+        let displayStoreName = user.store_name || ''
+        if (user.sub_of_seller_id) {
+          const parentRow = await client.query(
+            `SELECT store_name FROM seller_users WHERE seller_id = $1 LIMIT 1`,
+            [user.sub_of_seller_id]
+          ).catch(() => ({ rows: [] }))
+          displayStoreName = parentRow.rows[0]?.store_name || ''
+        }
+        await client.end()
+        const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName })
+        res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName } })
       } catch (err) {
         try { await client.end() } catch (_) {}
         console.error('sellerAuthRegisterPOST:', err)
@@ -3958,10 +4009,14 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        const isSuperuser = req.sellerUser?.is_superuser || false
+        const callerSellerId = req.sellerUser?.seller_id
+        const sellerFilter = !isSuperuser && callerSellerId ? `WHERE g.seller_id = '${callerSellerId}'` : ''
         const groups = await client.query(`
           SELECT g.*, c.name AS carrier_name
           FROM store_shipping_groups g
           LEFT JOIN store_shipping_carriers c ON c.id = g.carrier_id
+          ${sellerFilter}
           ORDER BY g.created_at ASC
         `)
         const prices = await client.query('SELECT * FROM store_shipping_prices ORDER BY country_code')
@@ -3985,14 +4040,15 @@ async function start() {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { name, carrier_id, prices } = req.body || {}
       if (!name) return res.status(400).json({ message: 'name required' })
+      const callerSellerId = req.sellerUser?.seller_id || null
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const r = await client.query(
-          `INSERT INTO store_shipping_groups (name, carrier_id) VALUES ($1, $2) RETURNING *`,
-          [name.trim(), carrier_id || null]
+          `INSERT INTO store_shipping_groups (name, carrier_id, seller_id) VALUES ($1, $2, $3) RETURNING *`,
+          [name.trim(), carrier_id || null, callerSellerId]
         )
         const group = r.rows[0]
         if (Array.isArray(prices) && prices.length > 0) {
@@ -4018,11 +4074,18 @@ async function start() {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const id = (req.params.id || '').trim()
       const { name, carrier_id, prices } = req.body || {}
+      const isSuperuser = req.sellerUser?.is_superuser || false
+      const callerSellerId = req.sellerUser?.seller_id
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        // Ownership check for non-superusers
+        if (!isSuperuser) {
+          const own = await client.query(`SELECT id FROM store_shipping_groups WHERE id=$1::uuid AND seller_id=$2`, [id, callerSellerId])
+          if (!own.rows.length) { await client.end(); return res.status(403).json({ message: 'Nicht erlaubt' }) }
+        }
         if (name !== undefined || carrier_id !== undefined) {
           const sets = []; const vals = []
           if (name !== undefined) { vals.push(name.trim()); sets.push(`name=$${vals.length}`) }
@@ -4062,11 +4125,17 @@ async function start() {
     const adminHubShippingGroupDELETE = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const id = (req.params.id || '').trim()
+      const isSuperuser = req.sellerUser?.is_superuser || false
+      const callerSellerId = req.sellerUser?.seller_id
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        if (!isSuperuser) {
+          const own = await client.query(`SELECT id FROM store_shipping_groups WHERE id=$1::uuid AND seller_id=$2`, [id, callerSellerId])
+          if (!own.rows.length) { await client.end(); return res.status(403).json({ message: 'Nicht erlaubt' }) }
+        }
         await client.query('DELETE FROM store_shipping_groups WHERE id=$1::uuid', [id])
         await client.end()
         res.json({ success: true })
@@ -6915,10 +6984,10 @@ async function start() {
     httpApp.post('/store/wishlist', storeWishlistPOST)
     httpApp.delete('/store/wishlist/:productId', storeWishlistDELETE)
     httpApp.post('/store/orders/:id/return-request', storeReturnRequestPOST)
-    httpApp.get('/admin-hub/v1/shipping-groups', adminHubShippingGroupsGET)
-    httpApp.post('/admin-hub/v1/shipping-groups', adminHubShippingGroupPOST)
-    httpApp.patch('/admin-hub/v1/shipping-groups/:id', adminHubShippingGroupPATCH)
-    httpApp.delete('/admin-hub/v1/shipping-groups/:id', adminHubShippingGroupDELETE)
+    httpApp.get('/admin-hub/v1/shipping-groups', requireSellerAuth, adminHubShippingGroupsGET)
+    httpApp.post('/admin-hub/v1/shipping-groups', requireSellerAuth, adminHubShippingGroupPOST)
+    httpApp.patch('/admin-hub/v1/shipping-groups/:id', requireSellerAuth, adminHubShippingGroupPATCH)
+    httpApp.delete('/admin-hub/v1/shipping-groups/:id', requireSellerAuth, adminHubShippingGroupDELETE)
     httpApp.get('/store/shipping-groups', storeShippingGroupsGET)
     httpApp.get('/store/orders/:id/invoice', storeOrderInvoicePdfGET)
     httpApp.get('/store/orders/:id/return-retourenschein', storeOrderReturnRetourenscheinGET)
@@ -7667,24 +7736,28 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const callerSellerId = req.sellerUser?.seller_id
         const filterSellerId = req.query.seller_id || (!isSuperuser ? callerSellerId : null)
         const limitDays = parseInt(req.query.payout_days || '14', 10)
+        const includePending = req.query.include_pending === 'true'
         const params = []
         const where = []
         // Only paid orders
         where.push(`o.payment_status = 'bezahlt'`)
-        // Only delivered 14+ days ago (eligible)
-        where.push(`o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days'`)
+        // If include_pending: all paid orders; otherwise only delivered 14+ days ago
+        if (!includePending) {
+          where.push(`o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days'`)
+        }
         if (filterSellerId) { params.push(filterSellerId); where.push(`o.seller_id = $${params.length}`) }
         const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
         const r = await client.query(
           `SELECT o.id, o.order_number, o.seller_id, o.total_cents, o.shipping_cents, o.discount_cents,
                   o.payment_status, o.delivery_status, o.delivery_date, o.created_at,
                   o.first_name, o.last_name, o.email, o.currency,
-                  s.store_name, s.commission_rate, s.iban
+                  s.store_name, s.commission_rate, s.iban,
+                  (o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days') AS payout_eligible
            FROM store_orders o
            LEFT JOIN seller_users s ON s.seller_id = o.seller_id
            ${whereClause}
-           ORDER BY o.delivery_date DESC
-           LIMIT 500`,
+           ORDER BY o.created_at DESC
+           LIMIT 1000`,
           params
         )
         const transactions = r.rows.map(row => {
@@ -7698,9 +7771,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             seller_id: row.seller_id,
             store_name: row.store_name || row.seller_id,
             total_cents: total,
+            shipping_cents: row.shipping_cents || 0,
+            discount_cents: row.discount_cents || 0,
             commission_rate: commRate,
             commission_cents: commission,
             payout_cents: payout,
+            payout_eligible: row.payout_eligible === true || row.payout_eligible === 't',
             iban: isSuperuser ? row.iban : undefined,
             delivery_date: row.delivery_date,
             created_at: row.created_at,
@@ -7738,7 +7814,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const filterSellerId = req.query.seller_id || (!isSuperuser ? callerSellerId : null)
         const params = []
         let where = ''
-        if (filterSellerId) { params.push(filterSellerId); where = `WHERE seller_id = $1` }
+        if (filterSellerId) { params.push(filterSellerId); where = `WHERE p.seller_id = $1` }
         const r = await client.query(
           `SELECT p.*, s.store_name FROM seller_payouts p LEFT JOIN seller_users s ON s.seller_id = p.seller_id ${where} ORDER BY p.period_start DESC LIMIT 200`,
           params
@@ -7793,6 +7869,157 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.end()
         if (!r.rows.length) return res.status(404).json({ message: 'Payout not found' })
         res.json({ payout: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // POST /admin-hub/v1/payouts/mark-paid — superuser marks a seller period as paid
+    const adminHubPayoutsMarkPaidPOST = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const { seller_id, period_start, period_end, amount_cents, reference } = req.body || {}
+        if (!seller_id || !period_start || !period_end) { await client.end(); return res.status(400).json({ message: 'seller_id, period_start, period_end required' }) }
+        // Upsert: if a payout record exists for this seller+period, update it; otherwise create it
+        const existing = await client.query(
+          `SELECT id FROM seller_payouts WHERE seller_id = $1 AND period_start = $2 AND period_end = $3 LIMIT 1`,
+          [seller_id, period_start, period_end]
+        )
+        let row
+        if (existing.rows.length) {
+          const r = await client.query(
+            `UPDATE seller_payouts SET status = 'bezahlt', payout_cents = $1, notes = COALESCE($2, notes), paid_at = now(), updated_at = now() WHERE id = $3 RETURNING *`,
+            [amount_cents || 0, reference || null, existing.rows[0].id]
+          )
+          row = r.rows[0]
+        } else {
+          const r = await client.query(
+            `INSERT INTO seller_payouts (seller_id, period_start, period_end, payout_cents, notes, status, paid_at)
+             VALUES ($1, $2, $3, $4, $5, 'bezahlt', now()) RETURNING *`,
+            [seller_id, period_start, period_end, amount_cents || 0, reference || null]
+          )
+          row = r.rows[0]
+        }
+        await client.end()
+        res.json({ payout: row })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // GET /admin-hub/v1/payout-summary — seller's own summary for a period
+    const adminHubPayoutSummaryGET = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const { period_start, period_end } = req.query
+        const params = [sellerId]
+        const dateFilter = period_start && period_end
+          ? `AND o.created_at >= $2 AND o.created_at <= $3`
+          : ''
+        if (period_start) params.push(period_start)
+        if (period_end) params.push(period_end)
+        const r = await client.query(
+          `SELECT
+             COALESCE(SUM(o.total_cents), 0) AS total_cents,
+             COALESCE(SUM(o.shipping_cents), 0) AS shipping_cents,
+             COUNT(*) FILTER (WHERE o.payment_status = 'bezahlt') AS paid_count,
+             COALESCE(SUM(o.total_cents) FILTER (WHERE o.refund_status = 'refunded'), 0) AS refund_cents
+           FROM store_orders o
+           WHERE o.seller_id = $1 AND o.payment_status = 'bezahlt' ${dateFilter}`,
+          params
+        )
+        const row = r.rows[0] || {}
+        // Also get payout status for this period
+        let payoutStatus = null
+        if (period_start && period_end) {
+          const po = await client.query(
+            `SELECT status FROM seller_payouts WHERE seller_id = $1 AND period_start <= $3 AND period_end >= $2 ORDER BY created_at DESC LIMIT 1`,
+            [sellerId, period_start, period_end]
+          )
+          payoutStatus = po.rows[0]?.status || null
+        }
+        await client.end()
+        res.json({ summary: {
+          total_cents: parseInt(row.total_cents) || 0,
+          shipping_cents: parseInt(row.shipping_cents) || 0,
+          refund_cents: parseInt(row.refund_cents) || 0,
+          paid_count: parseInt(row.paid_count) || 0,
+          status: payoutStatus,
+        }})
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // GET /admin-hub/v1/payout-overview — superuser: all sellers summary for a period
+    const adminHubPayoutOverviewGET = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const { period_start, period_end } = req.query
+        const params = []
+        const dateFilter = period_start && period_end
+          ? `AND o.created_at >= $1 AND o.created_at <= $2`
+          : ''
+        if (period_start) params.push(period_start)
+        if (period_end) params.push(period_end)
+        const r = await client.query(
+          `SELECT
+             o.seller_id,
+             s.store_name,
+             s.email,
+             COALESCE(SUM(o.total_cents), 0) AS total_cents,
+             COUNT(*) AS order_count,
+             ROUND(COALESCE(SUM(o.total_cents), 0) * 0.10) AS commission_cents,
+             ROUND(COALESCE(SUM(o.total_cents), 0) * 0.90) AS payout_cents
+           FROM store_orders o
+           LEFT JOIN seller_users s ON s.seller_id = o.seller_id
+           WHERE o.payment_status = 'bezahlt'
+             AND o.delivery_date IS NOT NULL
+             AND o.delivery_date <= now() - interval '14 days'
+             ${dateFilter}
+           GROUP BY o.seller_id, s.store_name, s.email
+           ORDER BY total_cents DESC`,
+          params
+        )
+        // Fetch payout statuses for this period
+        const sellerIds = r.rows.map(row => row.seller_id)
+        let payoutMap = {}
+        if (sellerIds.length && period_start && period_end) {
+          const po = await client.query(
+            `SELECT DISTINCT ON (seller_id) seller_id, status, paid_at
+             FROM seller_payouts
+             WHERE seller_id = ANY($1) AND period_start <= $3 AND period_end >= $2
+             ORDER BY seller_id, created_at DESC`,
+            [sellerIds, period_start, period_end]
+          )
+          po.rows.forEach(p => { payoutMap[p.seller_id] = p })
+        }
+        await client.end()
+        const sellers = r.rows.map(row => ({
+          seller_id: row.seller_id,
+          store_name: row.store_name || row.seller_id,
+          email: row.email,
+          total_cents: parseInt(row.total_cents) || 0,
+          order_count: parseInt(row.order_count) || 0,
+          commission_cents: parseInt(row.commission_cents) || 0,
+          payout_cents: parseInt(row.payout_cents) || 0,
+          status: payoutMap[row.seller_id]?.status || 'ausstehend',
+          paid_at: payoutMap[row.seller_id]?.paid_at || null,
+        }))
+        res.json({ sellers })
       } catch (e) {
         try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -7980,6 +8207,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.get('/admin-hub/v1/payouts', requireSellerAuth, adminHubPayoutsGET)
     httpApp.post('/admin-hub/v1/payouts', requireSellerAuth, adminHubPayoutsPOST)
     httpApp.patch('/admin-hub/v1/payouts/:id', requireSellerAuth, adminHubPayoutsPATCH)
+    httpApp.post('/admin-hub/v1/payouts/mark-paid', requireSellerAuth, adminHubPayoutsMarkPaidPOST)
+    httpApp.get('/admin-hub/v1/payout-summary', requireSellerAuth, adminHubPayoutSummaryGET)
+    httpApp.get('/admin-hub/v1/payout-overview', requireSellerAuth, adminHubPayoutOverviewGET)
     httpApp.patch('/admin-hub/v1/seller/iban', requireSellerAuth, adminHubSellerIbanPATCH)
     httpApp.get('/admin-hub/v1/seller/profile', requireSellerAuth, adminHubSellerProfileGET)
     httpApp.post('/admin-hub/users/invite', requireSellerAuth, adminHubUsersInvitePOST)

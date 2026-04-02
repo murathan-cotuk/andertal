@@ -521,6 +521,7 @@ const PRESET_CARRIERS = [
 const LS_THRESHOLDS_KEY = "belucha_free_shipping_thresholds";
 
 export default function ShippingSettingsPage() {
+  const [isSuperuser, setIsSuperuser] = useState(false);
   const [carriers, setCarriers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
@@ -556,6 +557,10 @@ export default function ShippingSettingsPage() {
       setThresholds(display);
     }
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -619,7 +624,7 @@ export default function ShippingSettingsPage() {
 
         <ShippingGroupsSection carriers={carriers} />
 
-        <Card>
+        {isSuperuser && <Card>
           <BlockStack gap="400">
             <InlineStack align="space-between" blockAlign="center">
               <BlockStack gap="100">
@@ -700,7 +705,7 @@ export default function ShippingSettingsPage() {
               </Button>
             </InlineStack>
           </BlockStack>
-        </Card>
+        </Card>}
 
         <Divider />
 
