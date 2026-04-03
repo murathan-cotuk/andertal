@@ -63,13 +63,7 @@ const HeroText = styled.div`
   padding: 24px 32px;
 
   h1 {
-    font-size: clamp(20px, 3vw, 34px);
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -0.02em;
     margin: 0 0 4px;
-    line-height: 1.1;
-    text-shadow: 0 1px 8px rgba(0,0,0,0.35);
   }
 `;
 
@@ -85,10 +79,6 @@ const ColHeader = styled.div`
   gap: 14px;
 
   h1 {
-    font-size: clamp(18px, 2.5vw, 28px);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: #111;
     margin: 0;
   }
 
@@ -542,7 +532,7 @@ export default function BrandPage() {
           <HeroBanner>
             <img src={bannerUrl} alt={title} />
             <HeroText>
-              <h1>
+              <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">
                 {logoUrl && (
                   <img src={logoUrl} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: "50%", verticalAlign: "middle", marginRight: 10, border: "2px solid rgba(255,255,255,0.8)" }} />
                 )}
@@ -553,7 +543,7 @@ export default function BrandPage() {
         ) : (
           <ColHeader>
             {logoUrl && <LogoCircle><img src={logoUrl} alt={title} /></LogoCircle>}
-            <h1>{title}</h1>
+            <h1 className="shop-typo-catalog-title">{title}</h1>
           </ColHeader>
         )}
 

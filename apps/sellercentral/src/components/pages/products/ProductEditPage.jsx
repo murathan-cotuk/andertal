@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import {
@@ -260,6 +260,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [metaDefs, setMetaDefs] = useState({});
   const [metaDefSearch, setMetaDefSearch] = useState({});
   const [metaDefPopover, setMetaDefPopover] = useState({});
+  /** Katalogdaki tüm tanımlar yerine: değeri olan veya kullanıcının eklediği metafield satırları */
+  const [extraVisibleMetaDefKeys, setExtraVisibleMetaDefKeys] = useState({});
+  const [addMetaDefPopoverOpen, setAddMetaDefPopoverOpen] = useState(false);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -320,6 +323,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [client]);
+
+  // Başka ürüne geçince “ek satır” seçimlerini sıfırla
+  useEffect(() => {
+    setExtraVisibleMetaDefKeys({});
+  }, [product?.id, product?.handle]);
 
   // Load shipping groups for the dropdown
   useEffect(() => {
@@ -731,6 +739,31 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   };
 
   const metafieldsList = Array.isArray(meta.metafields) ? meta.metafields : (meta.metafields && typeof meta.metafields === "object" ? Object.entries(meta.metafields).map(([k, v]) => ({ key: k, value: v })) : []);
+
+  const metaDefKeysWithValues = useMemo(() => {
+    const s = new Set();
+    for (const m of metafieldsList) {
+      if (!m?.key) continue;
+      if (m.value != null && String(m.value).trim() !== "") s.add(m.key);
+    }
+    return s;
+  }, [metafieldsList]);
+
+  const visibleMetaDefEntries = useMemo(
+    () =>
+      Object.entries(metaDefs)
+        .filter(([k]) => metaDefKeysWithValues.has(k) || extraVisibleMetaDefKeys[k])
+        .sort(([a], [b]) => a.localeCompare(b)),
+    [metaDefs, metaDefKeysWithValues, extraVisibleMetaDefKeys],
+  );
+
+  const hiddenMetaDefKeys = useMemo(
+    () =>
+      Object.keys(metaDefs)
+        .filter((k) => !metaDefKeysWithValues.has(k) && !extraVisibleMetaDefKeys[k])
+        .sort((a, b) => a.localeCompare(b)),
+    [metaDefs, metaDefKeysWithValues, extraVisibleMetaDefKeys],
+  );
 
   if (!product && !isNew) {
     return (
@@ -1894,11 +1927,17 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">Metafields (catalog)</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen“ ausgewählte — werden angezeigt (nicht der gesamte Katalog).
+              </Text>
               {Object.keys(metaDefs).length === 0 ? (
                 <Text as="p" variant="bodySm" tone="subdued">Keine Metafeld-Definitionen. Erstelle welche unter Content → Metaobjects.</Text>
               ) : (
                 <BlockStack gap="400">
-                  {Object.entries(metaDefs).sort(([a], [b]) => a.localeCompare(b)).map(([defKey, def]) => {
+                  {visibleMetaDefEntries.length === 0 && (
+                    <Text as="p" variant="bodySm" tone="subdued">Keine Metafelder für dieses Produkt. Unten kannst du welche hinzufügen.</Text>
+                  )}
+                  {visibleMetaDefEntries.map(([defKey, def]) => {
                     const selected = metafieldsList.filter(m => m.key === defKey).map(m => m.value).filter(Boolean);
                     const isOpen = !!metaDefPopover[defKey];
                     const search = metaDefSearch[defKey] || "";
@@ -1980,6 +2019,29 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       </Box>
                     );
                   })}
+                  {hiddenMetaDefKeys.length > 0 && (
+                    <Popover
+                      active={addMetaDefPopoverOpen}
+                      onClose={() => setAddMetaDefPopoverOpen(false)}
+                      activator={
+                        <Button size="slim" variant="secondary" onClick={() => setAddMetaDefPopoverOpen((o) => !o)}>
+                          + Metafeld hinzufügen
+                        </Button>
+                      }
+                    >
+                      <div style={{ maxHeight: 280, overflowY: "auto", minWidth: 220 }}>
+                        <ActionList
+                          items={hiddenMetaDefKeys.map((k) => ({
+                            content: metaDefs[k]?.label || k,
+                            onAction: () => {
+                              setExtraVisibleMetaDefKeys((p) => ({ ...p, [k]: true }));
+                              setAddMetaDefPopoverOpen(false);
+                            },
+                          }))}
+                        />
+                      </div>
+                    </Popover>
+                  )}
                 </BlockStack>
               )}
 

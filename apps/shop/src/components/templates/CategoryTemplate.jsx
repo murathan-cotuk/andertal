@@ -98,13 +98,8 @@ const CategoryHeader = styled.div`
   margin-top: 0;
 `;
 
-const HEADING_ORANGE = "#c2410c";
-
-const CategoryTitle = styled.h1`
-  font-size: 32px;
-  font-weight: 700;
+const CategoryTitle = styled.h1.attrs({ className: "shop-typo-catalog-title" })`
   margin: 0 0 8px 0;
-  color: ${HEADING_ORANGE};
 `;
 
 const CategoryDescription = styled.p`
@@ -117,18 +112,82 @@ const CategoryDescription = styled.p`
 const LongContent = styled.div`
   max-width: 800px;
   margin: 0 0 32px 0;
-  color: #4b5563;
-  line-height: 1.6;
-  font-size: 1rem;
+  color: var(--body-color, #4b5563);
+  line-height: var(--body-lh, 1.6);
+  font-size: var(--body-fs, 1rem);
+  font-family: var(--body-font);
   border: 1px solid #000;
   border-radius: 8px;
   padding: 24px;
 
-  & h1 { font-size: 1.75rem; font-weight: 700; margin: 1.25em 0 0.5em; color: ${HEADING_ORANGE}; line-height: 1.3; }
-  & h2 { font-size: 1.5rem; font-weight: 700; margin: 1.25em 0 0.5em; color: ${HEADING_ORANGE}; line-height: 1.3; }
-  & h3 { font-size: 1.25rem; font-weight: 600; margin: 1em 0 0.4em; color: ${HEADING_ORANGE}; line-height: 1.35; }
-  & h4, & h5, & h6 { font-size: 1.125rem; font-weight: 600; margin: 0.85em 0 0.35em; color: ${HEADING_ORANGE}; line-height: 1.4; }
-  & h1:first-child, & h2:first-child, & h3:first-child { margin-top: 0; }
+  & h1 {
+    font-family: var(--h1-ff);
+    font-size: var(--h1-fs);
+    font-weight: var(--h1-fw);
+    font-style: var(--h1-style);
+    color: var(--h1-color);
+    letter-spacing: var(--h1-ls);
+    line-height: var(--h1-lh);
+    margin: 1.25em 0 0.5em;
+  }
+  & h2 {
+    font-family: var(--h2-ff);
+    font-size: var(--h2-fs);
+    font-weight: var(--h2-fw);
+    font-style: var(--h2-style);
+    color: var(--h2-color);
+    letter-spacing: var(--h2-ls);
+    line-height: var(--h2-lh);
+    margin: 1.25em 0 0.5em;
+  }
+  & h3 {
+    font-family: var(--h3-ff);
+    font-size: var(--h3-fs);
+    font-weight: var(--h3-fw);
+    font-style: var(--h3-style);
+    color: var(--h3-color);
+    letter-spacing: var(--h3-ls);
+    line-height: var(--h3-lh);
+    margin: 1em 0 0.4em;
+  }
+  & h4 {
+    font-family: var(--h4-ff);
+    font-size: var(--h4-fs);
+    font-weight: var(--h4-fw);
+    font-style: var(--h4-style);
+    color: var(--h4-color);
+    letter-spacing: var(--h4-ls);
+    line-height: var(--h4-lh);
+    margin: 0.85em 0 0.35em;
+  }
+  & h5 {
+    font-family: var(--h5-ff);
+    font-size: var(--h5-fs);
+    font-weight: var(--h5-fw);
+    font-style: var(--h5-style);
+    color: var(--h5-color);
+    letter-spacing: var(--h5-ls);
+    line-height: var(--h5-lh);
+    margin: 0.85em 0 0.35em;
+  }
+  & h6 {
+    font-family: var(--h5-ff);
+    font-size: var(--h5-fs);
+    font-weight: var(--h5-fw);
+    font-style: var(--h5-style);
+    color: var(--h5-color);
+    letter-spacing: var(--h5-ls);
+    line-height: var(--h5-lh);
+    margin: 0.85em 0 0.35em;
+  }
+  & h1:first-child,
+  & h2:first-child,
+  & h3:first-child,
+  & h4:first-child,
+  & h5:first-child,
+  & h6:first-child {
+    margin-top: 0;
+  }
   & p { margin: 0 0 1em; }
   & p:last-child { margin-bottom: 0; }
   & ul, & ol { margin: 0.5em 0 1em 1.5em; padding-left: 1.5em; }

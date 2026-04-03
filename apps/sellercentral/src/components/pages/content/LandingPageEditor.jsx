@@ -62,10 +62,10 @@ function PaddingEditor({ label = "Seitenabstand", value, onChange, defaultValue 
         <div style={{ fontSize: 13, fontWeight: 500, color: "#202223", marginBottom: 6 }}>{label}</div>
         <div style={{ display: "flex", gap: 8 }}>
           <div style={fieldStyle}>
-            <TextField label="Rechts" value={r} onChange={(v) => emit("0px", v, "0px", l)} autoComplete="off" placeholder="0px" />
+            <TextField label="Rechts" value={r} onChange={(v) => emit(t, v, b, l)} autoComplete="off" placeholder="0px" />
           </div>
           <div style={fieldStyle}>
-            <TextField label="Links" value={l} onChange={(v) => emit("0px", r, "0px", v)} autoComplete="off" placeholder="0px" />
+            <TextField label="Links" value={l} onChange={(v) => emit(t, r, b, v)} autoComplete="off" placeholder="0px" />
           </div>
         </div>
       </div>
@@ -103,7 +103,7 @@ const CONTAINER_TYPES = [
   { type: "accordion",           label: "Accordion (FAQ)",       description: "Aufklappbare Frage-Antwort-Sektionen, ideal für FAQs" },
   { type: "tabs",                label: "Tabs (Registerkarten)", description: "Inhalte in wechselbaren Reitern anzeigen" },
   { type: "single_product",     label: "Einzelnes Produkt",     description: "Ein hervorgehobenes Produkt (Karte mit Warenkorb)" },
-  { type: "blog_carousel",      label: "Blog-Beiträge (Karussell)", description: "Manuelle Beiträge mit Bild, Text und ausklappbarem Inhalt" },
+  { type: "blog_carousel",      label: "Blog-Beiträge (Karussell)", description: "Veröffentlichte Blog-Seiten aus „Content → Blog-Beiträge“ auswählen (Bild, Teaser, Text & SEO kommen aus dem Beitrag)" },
   { type: "newsletter",         label: "Newsletter-Anmeldung",  description: "Formular (Mailchimp, Brevo, Klaviyo u. a.) per action-URL" },
 ];
 
@@ -120,7 +120,7 @@ function newContainer(type) {
     case "image_grid":
       return { ...base, images: [{ url: "", link: "", aspect_ratio: "1/1" }, { url: "", link: "", aspect_ratio: "1/1" }], cols: 2, gap: 16, padding: "32px 24px" };
     case "banner_cta":
-      return { ...base, title: "", subtitle: "", btn_text: "", btn_url: "", bg_color: "#ff971c", text_color: "#ffffff", text_position: "center", padding: "40px 48px", btn_bg: "#ffffff", btn_color: "#111827", btn_border: "2px solid #000", btn_radius: 8 };
+      return { ...base, title: "", subtitle: "", btn_text: "", btn_url: "", bg_color: "#ff971c", text_color: "#ffffff", text_position: "center", padding: "32px 48px 40px 48px", btn_bg: "#ffffff", btn_color: "#111827", btn_border: "2px solid #000", btn_radius: 8 };
     case "collection_carousel":
       return { ...base, title: "", collection_id: "", collection_handle: "", items_per_row: 4, padding: "32px 24px" };
     case "collections_carousel":
@@ -135,9 +135,7 @@ function newContainer(type) {
       return {
         ...base,
         title: "Blog",
-        posts: [
-          { id: Math.random().toString(36).slice(2), title: "Beitrag 1", excerpt: "Kurzer Teaser …", image: "", href: "", body: "" },
-        ],
+        posts: [],
         items_per_row: 3,
         bg_color: "#ffffff",
         text_color: "#111827",
@@ -501,8 +499,8 @@ function ImageGridEditor({ container, onChange }) {
                 <Select label="Seitenverhältnis" options={ASPECT_RATIO_OPTIONS} value={img.aspect_ratio || "1/1"} onChange={(v) => updateImg(idx, "aspect_ratio", v)} />
               </div>
             </InlineStack>
-            <TextField label="Titel (optional)" value={img.title || ""} onChange={(v) => updateImg(idx, "title", v)} autoComplete="off" placeholder="z. B. Neuheiten" />
-            <TextField label="Text (optional)" value={img.text || ""} onChange={(v) => updateImg(idx, "text", v)} autoComplete="off" placeholder="Kurze Beschreibung unter dem Bild" multiline={2} />
+            <TextField label="Überschrift (optional)" value={img.title || ""} onChange={(v) => updateImg(idx, "title", v)} autoComplete="off" placeholder="z. B. Neuheiten" />
+            <RichTextEditor label="Text (optional)" value={img.text || ""} onChange={(v) => updateImg(idx, "text", v)} placeholder="Text eingeben…" minHeight="160px" />
           </BlockStack>
         </Card>
       ))}
@@ -535,10 +533,15 @@ function BannerCtaEditor({ container, onChange }) {
         <div style={{ flex: 1 }}>
           <ColorField label="Textfarbe" value={container.text_color || "#ffffff"} onChange={(v) => onChange({ ...container, text_color: v })} />
         </div>
-        <div style={{ flex: 1 }}>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "40px 48px 40px 48px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="40px 48px 40px 48px" horizontalOnly />
-        </div>
       </InlineStack>
+      <Card>
+        <BlockStack gap="300">
+          <Text as="span" variant="bodySm" tone="subdued">
+            Innenabstand: oben/unten = Abstand Text/Button zum Banner-Rand; links/rechts = seitlich. Außenabstand zwischen Containern weiter unter „Außenabstand (Margin)“.
+          </Text>
+          <PaddingEditor label="Innenabstand (Padding)" value={container.padding || "32px 48px 40px 48px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 48px 40px 48px" />
+        </BlockStack>
+      </Card>
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}>
           <ColorField label="Button-Hintergrund" value={container.btn_bg || "#ffffff"} onChange={(v) => onChange({ ...container, btn_bg: v })} />
@@ -913,8 +916,32 @@ function SingleProductEditor({ container, onChange }) {
 }
 
 function BlogCarouselEditor({ container, onChange }) {
+  const client = getMedusaAdminClient();
   const posts = Array.isArray(container.posts) ? container.posts : [];
-  const [pickerIdx, setPickerIdx] = useState(null);
+  const [blogPages, setBlogPages] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await client.getPages({ limit: 200, page_type: "blog" });
+        if (!cancelled) setBlogPages(data.pages || []);
+      } catch {
+        if (!cancelled) setBlogPages([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [client]);
+
+  const blogOptions = [
+    { label: "— Blog-Beitrag wählen —", value: "" },
+    ...blogPages.map((p) => ({
+      label: `${p.title || p.slug || p.id}${p.status === "published" ? "" : " (Entwurf)"}`,
+      value: String(p.id),
+    })),
+  ];
 
   const updatePost = (idx, key, val) => {
     const next = posts.map((p, i) => (i === idx ? { ...p, [key]: val } : p));
@@ -923,7 +950,7 @@ function BlogCarouselEditor({ container, onChange }) {
   const addPost = () => {
     onChange({
       ...container,
-      posts: [...posts, { id: Math.random().toString(36).slice(2), title: "", excerpt: "", image: "", href: "", body: "" }],
+      posts: [...posts, { id: Math.random().toString(36).slice(2), page_id: "" }],
     });
   };
   const removePost = (idx) => onChange({ ...container, posts: posts.filter((_, i) => i !== idx) });
@@ -935,23 +962,17 @@ function BlogCarouselEditor({ container, onChange }) {
     onChange({ ...container, posts: next });
   };
 
+  const resolveBlogPage = (pageId) => blogPages.find((p) => String(p.id) === String(pageId));
+
   return (
     <BlockStack gap="400">
-      {pickerIdx !== null && (
-        <MediaPickerModal
-          open
-          multiple={false}
-          onClose={() => setPickerIdx(null)}
-          onSelect={(urls) => {
-            if (urls[0]) updatePost(pickerIdx, "image", urls[0]);
-            setPickerIdx(null);
-          }}
-        />
-      )}
       <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">Karussell</Text>
-          <TextField label="Titel" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
+          <Text as="p" variant="bodySm" tone="subdued">
+            Beiträge unter „Content → Blog-Beiträge“ anlegen (Typ „Blog“, Bild, Teaser, Text, SEO). Nur veröffentlichte Beiträge erscheinen im Shop.
+          </Text>
+          <TextField label="Abschnitt-Titel" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
           <InlineStack gap="400" wrap={false}>
             <div style={{ flex: 1 }}>
               <Select
@@ -970,33 +991,46 @@ function BlogCarouselEditor({ container, onChange }) {
         </BlockStack>
       </Card>
 
-      {posts.map((post, idx) => (
-        <Card key={post.id || idx}>
-          <BlockStack gap="300">
-            <InlineStack align="space-between" blockAlign="center">
-              <Text as="h3" variant="headingSm">Beitrag {idx + 1}</Text>
-              <InlineStack gap="200">
-                <Button size="slim" disabled={idx === 0} onClick={() => movePost(idx, -1)}>↑</Button>
-                <Button size="slim" disabled={idx === posts.length - 1} onClick={() => movePost(idx, 1)}>↓</Button>
-                {posts.length > 1 && <Button size="slim" tone="critical" onClick={() => removePost(idx)}>Entfernen</Button>}
+      {posts.map((post, idx) => {
+        const bp = post.page_id ? resolveBlogPage(post.page_id) : null;
+        const legacy = !post.page_id && (post.title || post.image || post.body);
+        return (
+          <Card key={post.id || idx}>
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h3" variant="headingSm">Karte {idx + 1}</Text>
+                <InlineStack gap="200">
+                  <Button size="slim" disabled={idx === 0} onClick={() => movePost(idx, -1)}>↑</Button>
+                  <Button size="slim" disabled={idx === posts.length - 1} onClick={() => movePost(idx, 1)}>↓</Button>
+                  {posts.length > 1 && <Button size="slim" tone="critical" onClick={() => removePost(idx)}>Entfernen</Button>}
+                </InlineStack>
               </InlineStack>
-            </InlineStack>
-            <ImageField label="Bild" value={post.image} onPick={() => setPickerIdx(idx)} onClear={() => updatePost(idx, "image", "")} />
-            <TextField label="Titel" value={post.title || ""} onChange={(v) => updatePost(idx, "title", v)} autoComplete="off" />
-            <TextField label="Kurztext / Teaser" value={post.excerpt || ""} onChange={(v) => updatePost(idx, "excerpt", v)} multiline={3} autoComplete="off" />
-            <TextField label="Link (optional, intern /de/... oder https://)" value={post.href || ""} onChange={(v) => updatePost(idx, "href", v)} autoComplete="off" />
-            <div>
-              <Text as="span" variant="bodyMd" fontWeight="medium">Ausklappbarer Inhalt (HTML)</Text>
-              <Box paddingBlockStart="100">
-                <RichTextEditor value={post.body || ""} onChange={(v) => updatePost(idx, "body", v)} />
-              </Box>
-            </div>
-          </BlockStack>
-        </Card>
-      ))}
+              <Select
+                label="Blog-Beitrag"
+                options={blogOptions}
+                value={post.page_id ? String(post.page_id) : ""}
+                onChange={(v) => updatePost(idx, "page_id", v)}
+              />
+              {legacy && (
+                <Banner tone="warning">
+                  Alter manueller Eintrag (ohne Seite). Bitte einen Blog-Beitrag wählen oder entfernen — im Shop werden nur verknüpfte Beiträge mit Daten aus dem CMS befüllt.
+                </Banner>
+              )}
+              {bp && (
+                <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                  <BlockStack gap="100">
+                    <Text as="p" variant="bodySm"><strong>Vorschau:</strong> {bp.title} · /pages/{bp.slug}</Text>
+                    {bp.meta_title ? <Text as="p" variant="bodySm" tone="subdued">SEO-Titel: {bp.meta_title}</Text> : null}
+                  </BlockStack>
+                </Box>
+              )}
+            </BlockStack>
+          </Card>
+        );
+      })}
 
       <InlineStack>
-        <Button onClick={addPost}>+ Beitrag</Button>
+        <Button onClick={addPost}>+ Blog-Karte</Button>
       </InlineStack>
     </BlockStack>
   );
@@ -1076,6 +1110,54 @@ function NewsletterEditor({ container, onChange }) {
   );
 }
 
+function ContainerLayoutEditor({ container, onChange }) {
+  const layout = container.content_layout === "full" ? "full" : "contained";
+  const maxW =
+    container.content_max_width !== undefined && container.content_max_width !== null
+      ? String(container.content_max_width)
+      : "";
+  return (
+    <div>
+      <Divider />
+      <Box paddingBlockStart="400">
+        <Text variant="headingSm" as="h3">Inhaltsbreite</Text>
+        <Text as="p" variant="bodySm" tone="subdued">
+          Innenabstand (Padding) begrenzt den Rand zum Viewport. Darunter liegt der Inhalt: volle Breite innerhalb dieses Bereichs oder zentriert mit optionaler Maximalbreite.
+        </Text>
+        <Box paddingBlockStart="300">
+          <BlockStack gap="400">
+            <Select
+              label="Inhalt"
+              options={[
+                { label: "Volle Breite (innerhalb des Innenabstands)", value: "full" },
+                { label: "Zentriert, max. Breite", value: "contained" },
+              ]}
+              value={layout}
+              onChange={(v) => onChange({ ...container, content_layout: v })}
+            />
+            {layout === "contained" ? (
+              <TextField
+                label="Max. Breite"
+                value={maxW}
+                onChange={(v) => {
+                  const t = v != null ? String(v).trim() : "";
+                  onChange({
+                    ...container,
+                    content_max_width: t === "" ? undefined : t,
+                  });
+                }}
+                autoComplete="off"
+                placeholder="z. B. 1200 oder 1200px"
+                helpText="Auf schmalen Screens immer 100% der verfügbaren Breite (responsive)."
+              />
+            ) : null}
+          </BlockStack>
+        </Box>
+      </Box>
+    </div>
+  );
+}
+
 function ContainerSpacingEditor({ container, onChange }) {
   const m = container.margin || {};
   const set = (k, v) => {
@@ -1138,6 +1220,9 @@ function ContainerEditor({ container, onChange }) {
   return (
     <BlockStack gap="0">
       {editor}
+      {container.type !== "hero_banner" ? (
+        <ContainerLayoutEditor container={container} onChange={onChange} />
+      ) : null}
       <ContainerSpacingEditor container={container} onChange={onChange} />
     </BlockStack>
   );

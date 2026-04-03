@@ -8,19 +8,12 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
 import { formatPriceCents } from "@/lib/format";
 
-const TOP_BAR_HEIGHT = "32px";
-const TOP_BAR_BG = "#e4eaf2";
-
 const Bar = styled.div`
-  height: ${TOP_BAR_HEIGHT};
-  min-height: ${TOP_BAR_HEIGHT};
-  background: ${TOP_BAR_BG};
-  color: #2c3e5a;
-  font-size: 12px;
-  font-family: ${tokens.fontFamily.sans};
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  font-family: ${tokens.fontFamily.sans};
 `;
 
 const Container = styled.div`
@@ -87,7 +80,7 @@ export default function TopBar() {
   }, [thresholdCents]);
 
   return (
-    <Bar>
+    <Bar className="topbar">
       <Container>
         {items.slice(0, 4).map((item, i) => (
           <Item key={`${item.href}-${i}`} href={item.href || "#"}>

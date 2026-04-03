@@ -81,19 +81,14 @@ const BreadcrumbWrap = styled.div`
   margin-bottom: 12px;
 `;
 
-const HEADING_ORANGE = "#c2410c";
-
 const CategoryHeader = styled.div`
   text-align: left;
   margin-bottom: 20px;
   margin-top: 0;
 `;
 
-const CategoryTitle = styled.h1`
-  font-size: 32px;
-  font-weight: 700;
+const CategoryTitle = styled.h1.attrs({ className: "shop-typo-catalog-title" })`
   margin: 0 0 8px 0;
-  color: ${HEADING_ORANGE};
 `;
 
 const Container = styled.div`

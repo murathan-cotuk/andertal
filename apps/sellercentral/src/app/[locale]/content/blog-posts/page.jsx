@@ -1,12 +1,12 @@
 "use client";
 
 import DashboardLayout from "@/components/DashboardLayout";
-import MinimalPage from "@/components/MinimalPage";
+import ContentPagesPage from "@/components/pages/content/ContentPagesPage";
 
 export default function ContentBlogPosts() {
   return (
     <DashboardLayout>
-      <MinimalPage title="Blog Posts" subtitle="Blog and articles" />
+      <ContentPagesPage blogOnly />
     </DashboardLayout>
   );
 }

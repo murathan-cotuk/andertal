@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@belucha/lib": "*",
+    "@belucha/shop-theme": "file:../../packages/shop-theme",
     "next-intl": "^3.25.0",
     "@belucha/ui": "*",
     "@shopify/polaris": "^13.0.0",

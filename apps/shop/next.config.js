@@ -12,7 +12,7 @@ const monorepoRoot = path.join(__dirname, "../..");
 const nextConfig = {
   outputFileTracingRoot: monorepoRoot,
   reactStrictMode: true,
-  transpilePackages: ["@belucha/ui", "@belucha/lib"],
+  transpilePackages: ["@belucha/ui", "@belucha/lib", "@belucha/shop-theme"],
   compiler: {
     styledComponents: true,
   },

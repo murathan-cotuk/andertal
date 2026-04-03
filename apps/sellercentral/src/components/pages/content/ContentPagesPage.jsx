@@ -27,7 +27,15 @@ function slugFromTitle(title) {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-export default function ContentPagesPage() {
+const PAGE_TYPE_OPTIONS = [
+  { label: "Normale Seite", value: "page" },
+  { label: "Blog-Beitrag", value: "blog" },
+];
+
+/**
+ * @param {{ blogOnly?: boolean }} props — blogOnly: nur Blog-Typ, gleiche DB-Tabelle (admin_hub_pages)
+ */
+export default function ContentPagesPage({ blogOnly = false }) {
   const [pages, setPages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -41,6 +49,12 @@ export default function ContentPagesPage() {
     slug: "",
     body: "",
     status: "draft",
+    page_type: "page",
+    featured_image: "",
+    excerpt: "",
+    meta_title: "",
+    meta_description: "",
+    meta_keywords: "",
   });
   const client = getMedusaAdminClient();
 
@@ -48,7 +62,9 @@ export default function ContentPagesPage() {
     try {
       setLoading(true);
       setError(null);
-      const data = await client.getPages({ limit: 100 });
+      const params = { limit: 100 };
+      if (blogOnly) params.page_type = "blog";
+      const data = await client.getPages(params);
       setPages(data.pages || []);
     } catch (err) {
       setError(err?.message || "Failed to load pages");
@@ -60,11 +76,22 @@ export default function ContentPagesPage() {
 
   useEffect(() => {
     fetchPages();
-  }, []);
+  }, [blogOnly]);
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ title: "", slug: "", body: "", status: "draft" });
+    setForm({
+      title: "",
+      slug: "",
+      body: "",
+      status: "draft",
+      page_type: blogOnly ? "blog" : "page",
+      featured_image: "",
+      excerpt: "",
+      meta_title: "",
+      meta_description: "",
+      meta_keywords: "",
+    });
     setModalOpen(true);
   };
 
@@ -75,6 +102,12 @@ export default function ContentPagesPage() {
       slug: page.slug || "",
       body: page.body || "",
       status: page.status || "draft",
+      page_type: page.page_type === "blog" ? "blog" : "page",
+      featured_image: page.featured_image || "",
+      excerpt: page.excerpt || "",
+      meta_title: page.meta_title || "",
+      meta_description: page.meta_description || "",
+      meta_keywords: page.meta_keywords || "",
     });
     setModalOpen(true);
   };
@@ -87,10 +120,26 @@ export default function ContentPagesPage() {
     }));
   };
 
-  const handleSubmit = async () => {
+  const payloadFromForm = () => {
     const title = (form.title || "").trim();
     const slug = (form.slug || "").trim() || slugFromTitle(title);
-    if (!title) {
+    return {
+      title,
+      slug,
+      body: form.body,
+      status: form.status,
+      page_type: blogOnly ? "blog" : form.page_type,
+      featured_image: (form.featured_image || "").trim() || null,
+      excerpt: form.excerpt || "",
+      meta_title: (form.meta_title || "").trim() || null,
+      meta_description: form.meta_description || "",
+      meta_keywords: (form.meta_keywords || "").trim() || null,
+    };
+  };
+
+  const handleSubmit = async () => {
+    const p = payloadFromForm();
+    if (!p.title) {
       setError("Title is required.");
       return;
     }
@@ -98,19 +147,9 @@ export default function ContentPagesPage() {
       setSaving(true);
       setError(null);
       if (editingId) {
-        await client.updatePage(editingId, {
-          title,
-          slug,
-          body: form.body,
-          status: form.status,
-        });
+        await client.updatePage(editingId, p);
       } else {
-        await client.createPage({
-          title,
-          slug,
-          body: form.body,
-          status: form.status,
-        });
+        await client.createPage(p);
       }
       setModalOpen(false);
       await fetchPages();
@@ -144,22 +183,31 @@ export default function ContentPagesPage() {
     { label: "Published", value: "published" },
   ];
 
-  const rows = pages.map((p) => [
-    p.title || "—",
-    `/${p.slug || ""}`,
-    p.status || "draft",
-    p.updated_at ? new Date(p.updated_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—",
-    <InlineStack key={p.id} gap="200">
-      <Button size="slim" onClick={() => openEdit(p)}>Edit</Button>
-      <Button size="slim" tone="critical" onClick={() => handleDeleteRequest(p)}>Delete</Button>
-    </InlineStack>,
-  ]);
+  const rows = pages.map((p) => {
+    const base = [
+      p.title || "—",
+      `/${p.slug || ""}`,
+      p.status || "draft",
+      p.updated_at ? new Date(p.updated_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—",
+      <InlineStack key={p.id} gap="200">
+        <Button size="slim" onClick={() => openEdit(p)}>Edit</Button>
+        <Button size="slim" tone="critical" onClick={() => handleDeleteRequest(p)}>Delete</Button>
+      </InlineStack>,
+    ];
+    if (!blogOnly) {
+      base.splice(3, 0, p.page_type === "blog" ? "Blog" : "Seite");
+    }
+    return base;
+  });
+
+  const pageTitle = blogOnly ? "Blog-Beiträge" : "Pages";
+  const primaryLabel = blogOnly ? "Blog-Beitrag hinzufügen" : "Add page";
 
   return (
     <Page
-      title="Pages"
+      title={pageTitle}
       primaryAction={{
-        content: "Add page",
+        content: primaryLabel,
         onAction: openCreate,
       }}
     >
@@ -177,10 +225,10 @@ export default function ContentPagesPage() {
             <BlockStack gap="400">
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h2" variant="headingSm">
-                  All pages
+                  {blogOnly ? "Alle Blog-Beiträge" : "All pages"}
                 </Text>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  {pages.length} {pages.length === 1 ? "page" : "pages"}
+                  {pages.length} {pages.length === 1 ? "Eintrag" : "Einträge"}
                 </Text>
               </InlineStack>
 
@@ -192,17 +240,23 @@ export default function ContentPagesPage() {
                 <Box paddingBlock="400">
                   <BlockStack gap="300">
                     <Text as="p" tone="subdued">
-                      No pages yet. Add a page to show on your store (e.g. About, Contact).
+                      {blogOnly
+                        ? "Noch keine Blog-Beiträge. Erstelle einen Eintrag mit Teaser, Bild und SEO — er erscheint dann im Blog-Karussell der Landing Page."
+                        : "No pages yet. Add a page to show on your store (e.g. About, Contact)."}
                     </Text>
                     <Button variant="primary" onClick={openCreate}>
-                      Add page
+                      {primaryLabel}
                     </Button>
                   </BlockStack>
                 </Box>
               ) : (
                 <DataTable
-                  columnContentTypes={["text", "text", "text", "text", "text"]}
-                  headings={["Title", "Slug", "Status", "Updated", "Actions"]}
+                  columnContentTypes={blogOnly
+                    ? ["text", "text", "text", "text", "text"]
+                    : ["text", "text", "text", "text", "text", "text"]}
+                  headings={blogOnly
+                    ? ["Title", "Slug", "Status", "Updated", "Actions"]
+                    : ["Title", "Slug", "Status", "Typ", "Updated", "Actions"]}
                   rows={rows}
                 />
               )}
@@ -216,7 +270,7 @@ export default function ContentPagesPage() {
         onClose={() => {
           if (!saving) setModalOpen(false);
         }}
-        title={editingId ? "Edit page" : "Add page"}
+        title={editingId ? (blogOnly ? "Blog-Beitrag bearbeiten" : "Edit page") : (blogOnly ? "Blog-Beitrag" : "Add page")}
         primaryAction={{
           content: saving ? "Saving…" : "Save",
           onAction: handleSubmit,
@@ -225,12 +279,20 @@ export default function ContentPagesPage() {
       >
         <Modal.Section>
           <BlockStack gap="400">
+            {!blogOnly && (
+              <Select
+                label="Seitentyp"
+                options={PAGE_TYPE_OPTIONS}
+                value={form.page_type}
+                onChange={(value) => setForm((prev) => ({ ...prev, page_type: value }))}
+              />
+            )}
             <TextField
               label="Title"
               value={form.title}
               onChange={handleTitleChange}
               autoComplete="off"
-              placeholder="e.g. About Us"
+              placeholder={blogOnly ? "Beitragstitel" : "e.g. About Us"}
             />
             <TextField
               label="Slug"
@@ -238,16 +300,59 @@ export default function ContentPagesPage() {
               onChange={(value) => setForm((prev) => ({ ...prev, slug: value }))}
               autoComplete="off"
               placeholder="e.g. about-us"
-              helpText="URL path: /pages/[slug]"
+              helpText="URL: /pages/[slug]"
             />
+            {(blogOnly || form.page_type === "blog") && (
+              <>
+                <TextField
+                  label="Teaser / Kurztext (Karussell)"
+                  value={form.excerpt}
+                  onChange={(value) => setForm((prev) => ({ ...prev, excerpt: value }))}
+                  multiline={3}
+                  autoComplete="off"
+                  helpText="Kurzer Text auf der Karte; wenn leer, wird aus dem Inhalt gekürzt."
+                />
+                <TextField
+                  label="Beitragsbild (URL)"
+                  value={form.featured_image}
+                  onChange={(value) => setForm((prev) => ({ ...prev, featured_image: value }))}
+                  autoComplete="off"
+                  helpText="Bild-URL aus der Mediathek oder volle https-Adresse"
+                />
+              </>
+            )}
             <TextField
-              label="Body"
+              label="Body (HTML)"
               value={form.body}
               onChange={(value) => setForm((prev) => ({ ...prev, body: value }))}
               multiline={6}
               autoComplete="off"
               placeholder="Page content (plain text or HTML)"
             />
+            {(blogOnly || form.page_type === "blog") && (
+              <BlockStack gap="300">
+                <Text as="h3" variant="headingSm">SEO</Text>
+                <TextField
+                  label="Meta-Titel"
+                  value={form.meta_title}
+                  onChange={(value) => setForm((prev) => ({ ...prev, meta_title: value }))}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Meta-Beschreibung"
+                  value={form.meta_description}
+                  onChange={(value) => setForm((prev) => ({ ...prev, meta_description: value }))}
+                  multiline={3}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Meta-Keywords (kommagetrennt)"
+                  value={form.meta_keywords}
+                  onChange={(value) => setForm((prev) => ({ ...prev, meta_keywords: value }))}
+                  autoComplete="off"
+                />
+              </BlockStack>
+            )}
             <Select
               label="Status"
               options={statusOptions}

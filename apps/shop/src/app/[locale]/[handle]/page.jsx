@@ -80,12 +80,7 @@ const HeroText = styled.div`
   padding: 24px 32px;
 
   h1 {
-    font-size: clamp(20px, 3vw, 34px);
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -0.02em;
     margin: 0 0 4px;
-    line-height: 1.1;
   }
 `;
 
@@ -98,10 +93,6 @@ const ColHeader = styled.div`
   box-sizing: border-box;
 
   h1 {
-    font-size: clamp(18px, 2.5vw, 28px);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: #111;
     margin: 0;
   }
 
@@ -460,14 +451,69 @@ const Desc = styled.div`
   margin-top: 56px;
   padding-top: 28px;
   border-top: 1px solid #e8e8e6;
-  font-size: 13.5px;
-  line-height: 1.8;
-  color: #666;
+  font-size: var(--body-fs);
+  line-height: var(--body-lh);
+  color: var(--body-color);
+  font-family: var(--body-font);
   max-width: 700px;
 
-  h1,h2,h3 { font-size: 15px; font-weight: 700; color: #111; margin: 1.5em 0 0.5em; }
+  & h1 {
+    font-family: var(--h1-ff);
+    font-size: var(--h1-fs);
+    font-weight: var(--h1-fw);
+    font-style: var(--h1-style);
+    color: var(--h1-color);
+    letter-spacing: var(--h1-ls);
+    line-height: var(--h1-lh);
+    margin: 1.25em 0 0.5em;
+  }
+  & h2 {
+    font-family: var(--h2-ff);
+    font-size: var(--h2-fs);
+    font-weight: var(--h2-fw);
+    font-style: var(--h2-style);
+    color: var(--h2-color);
+    letter-spacing: var(--h2-ls);
+    line-height: var(--h2-lh);
+    margin: 1.25em 0 0.5em;
+  }
+  & h3 {
+    font-family: var(--h3-ff);
+    font-size: var(--h3-fs);
+    font-weight: var(--h3-fw);
+    font-style: var(--h3-style);
+    color: var(--h3-color);
+    letter-spacing: var(--h3-ls);
+    line-height: var(--h3-lh);
+    margin: 1em 0 0.4em;
+  }
+  & h4 {
+    font-family: var(--h4-ff);
+    font-size: var(--h4-fs);
+    font-weight: var(--h4-fw);
+    font-style: var(--h4-style);
+    color: var(--h4-color);
+    letter-spacing: var(--h4-ls);
+    line-height: var(--h4-lh);
+    margin: 0.85em 0 0.35em;
+  }
+  & h5, & h6 {
+    font-family: var(--h5-ff);
+    font-size: var(--h5-fs);
+    font-weight: var(--h5-fw);
+    font-style: var(--h5-style);
+    color: var(--h5-color);
+    letter-spacing: var(--h5-ls);
+    line-height: var(--h5-lh);
+    margin: 0.85em 0 0.35em;
+  }
+  & h1:first-child,
+  & h2:first-child,
+  & h3:first-child {
+    margin-top: 0;
+  }
   p { margin: 0 0 0.75em; }
-  a { color: #111; text-decoration: underline; }
+  a { color: var(--shop-primary, #111); text-decoration: underline; }
 `;
 
 /* ─────────────────────────────────────────────────────────── */
@@ -848,10 +894,12 @@ export default function CollectionPage() {
         {bannerUrl ? (
           <HeroBanner>
             <img src={bannerUrl} alt={title} />
-            <HeroText><h1>{title}</h1></HeroText>
+            <HeroText>
+              <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">{title}</h1>
+            </HeroText>
           </HeroBanner>
         ) : (
-          <ColHeader><h1>{title}</h1></ColHeader>
+          <ColHeader><h1 className="shop-typo-catalog-title">{title}</h1></ColHeader>
         )}
 
         {/* ── Sort bar (sticky) ── */}

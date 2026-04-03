@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@belucha/lib": "*",
+    "@belucha/shop-theme": "file:../../packages/shop-theme",
     "@belucha/ui": "*",
     "@sentry/nextjs": "^10.35.0",
     "next-intl": "^3.25.0",

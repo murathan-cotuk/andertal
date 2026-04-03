@@ -104,12 +104,7 @@ const CenterCol = styled.div`
   min-height: 200px;
 `;
 
-const Title = styled.h1`
-  font-size: clamp(1.25rem, 2.5vw, 1.75rem);
-  font-weight: 700;
-  color: #111827;
-  line-height: 1.3;
-`;
+const Title = styled.h1.attrs({ className: "shop-typo-product-title" })``;
 
 const Brand = styled.span`
   font-size: 0.9rem;
@@ -443,8 +438,6 @@ const CartNotice = styled.div`
   pointer-events: none;
 `;
 
-const HEADING_ORANGE = "#c2410c";
-
 const SectionTitle = styled.h2`
   font-size: 1.35rem;
   font-weight: 700;
@@ -454,15 +447,80 @@ const SectionTitle = styled.h2`
 
 const DescriptionSection = styled.section`
   margin-bottom: 48px;
-  color: #4b5563;
-  line-height: 1.7;
-  font-size: 1rem;
+  color: var(--body-color, #4b5563);
+  line-height: var(--body-lh, 1.7);
+  font-size: var(--body-fs, 1rem);
+  font-family: var(--body-font);
 
-  & h1 { font-size: 1.75rem; font-weight: 700; margin: 1.25em 0 0.5em; color: ${HEADING_ORANGE}; line-height: 1.3; }
-  & h2 { font-size: 1.5rem; font-weight: 700; margin: 1.25em 0 0.5em; color: ${HEADING_ORANGE}; line-height: 1.3; }
-  & h3 { font-size: 1.25rem; font-weight: 600; margin: 1em 0 0.4em; color: ${HEADING_ORANGE}; line-height: 1.35; }
-  & h4, & h5, & h6 { font-size: 1.125rem; font-weight: 600; margin: 0.85em 0 0.35em; color: ${HEADING_ORANGE}; line-height: 1.4; }
-  & h1:first-child, & h2:first-child, & h3:first-child { margin-top: 0; }
+  /* && = çift sınıf özgüllüğü: Tailwind preflight / global h1 tema H1–H5’i ezmesin */
+  && h1 {
+    font-family: var(--h1-ff);
+    font-size: var(--h1-fs);
+    font-weight: var(--h1-fw);
+    font-style: var(--h1-style);
+    color: var(--h1-color);
+    letter-spacing: var(--h1-ls);
+    line-height: var(--h1-lh);
+    margin: 1.25em 0 0.5em;
+  }
+  && h2 {
+    font-family: var(--h2-ff);
+    font-size: var(--h2-fs);
+    font-weight: var(--h2-fw);
+    font-style: var(--h2-style);
+    color: var(--h2-color);
+    letter-spacing: var(--h2-ls);
+    line-height: var(--h2-lh);
+    margin: 1.25em 0 0.5em;
+  }
+  && h3 {
+    font-family: var(--h3-ff);
+    font-size: var(--h3-fs);
+    font-weight: var(--h3-fw);
+    font-style: var(--h3-style);
+    color: var(--h3-color);
+    letter-spacing: var(--h3-ls);
+    line-height: var(--h3-lh);
+    margin: 1em 0 0.4em;
+  }
+  && h4 {
+    font-family: var(--h4-ff);
+    font-size: var(--h4-fs);
+    font-weight: var(--h4-fw);
+    font-style: var(--h4-style);
+    color: var(--h4-color);
+    letter-spacing: var(--h4-ls);
+    line-height: var(--h4-lh);
+    margin: 0.85em 0 0.35em;
+  }
+  && h5 {
+    font-family: var(--h5-ff);
+    font-size: var(--h5-fs);
+    font-weight: var(--h5-fw);
+    font-style: var(--h5-style);
+    color: var(--h5-color);
+    letter-spacing: var(--h5-ls);
+    line-height: var(--h5-lh);
+    margin: 0.85em 0 0.35em;
+  }
+  && h6 {
+    font-family: var(--h5-ff);
+    font-size: var(--h5-fs);
+    font-weight: var(--h5-fw);
+    font-style: var(--h5-style);
+    color: var(--h5-color);
+    letter-spacing: var(--h5-ls);
+    line-height: var(--h5-lh);
+    margin: 0.85em 0 0.35em;
+  }
+  && h1:first-child,
+  && h2:first-child,
+  && h3:first-child,
+  && h4:first-child,
+  && h5:first-child,
+  && h6:first-child {
+    margin-top: 0;
+  }
   & p { margin: 0 0 1em; }
   & ul, & ol { margin: 0.5em 0 1em 1.5em; padding-left: 1.5em; }
   & strong { font-weight: 600; }
@@ -487,7 +545,11 @@ function sanitizeHtml(html) {
   return html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, "")
-    .replace(/\s*on\w+=["'][^"']*["']/gi, "");
+    .replace(/\s*on\w+=["'][^"']*["']/gi, "")
+    // Editor’den gelen inline stiller (font-size, color, font-family) tema H1–H5’i bastırıyor
+    .replace(/\sstyle\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/<font\b[^>]*>/gi, "")
+    .replace(/<\/font>/gi, "");
 }
 
 const META_ATTR_KEYS = ["material", "farbe", "colour", "color", "size", "gewicht", "cart", "curt", "stoff", "typ"];
@@ -681,7 +743,12 @@ export default function ProductTemplate() {
 
   useEffect(() => {
     const fetchProduct = async () => {
-      if (!slug) return;
+      if (!slug) {
+        setLoading(false);
+        setProduct(null);
+        setError(null);
+        return;
+      }
       try {
         setLoading(true);
         setError(null);
@@ -799,6 +866,7 @@ export default function ProductTemplate() {
   const variant = variants[effectiveVariantIndex] ?? variants[selectedVariantIndex] ?? variants[0];
   // Variant media: prefer metadata.media array, fall back to single image_url
   const variantMediaList = variant ? variantMediaForLocale(variant, locale).map((u) => resolveImageUrl(u)).filter(Boolean) : [];
+  const variantImageUrl = variant ? resolveImageUrl(variantImageUrlForLocale(variant, locale)) : null;
   // When variant has its own images, gallery shows those; otherwise show product images
   const displayImages = variantMediaList.length > 0
     ? variantMediaList.map((url) => ({ url, alt: variant?.title || displayTitle }))

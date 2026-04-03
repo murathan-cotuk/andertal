@@ -91,8 +91,9 @@ const HeaderWrap = styled(motion.header)`
 const MiddleBarWrap = styled.div`
   width: 100%;
   min-height: 64px;
-  background-color: ${MIDDLE_BAR_BG};
-  transition: background-color 0.3s ease;
+  background-color: var(--header-bg, ${MIDDLE_BAR_BG});
+  color: var(--header-text, #111827);
+  transition: background-color 0.3s ease, color 0.3s ease;
 `;
 
 const MiddleBarInner = styled.div`
@@ -111,7 +112,7 @@ const MiddleBarLeft = styled.div`
 `;
 
 const MiddleBarLogo = styled(Link)`
-  color: #fff;
+  color: var(--header-text, #fff);
   font-size: 1.35rem;
   font-weight: 700;
   font-family: ${tokens.fontFamily.sans};
@@ -122,7 +123,7 @@ const MiddleBarLogo = styled(Link)`
 
   &:hover {
     opacity: 0.92;
-    color: #fff;
+    color: var(--header-text, #fff);
   }
 `;
 
@@ -316,17 +317,19 @@ const CategoriesPanel = styled(motion.div)`
 const CategoryItem = styled(Link)`
   display: block;
   padding: 8px 14px;
-  color: ${tokens.dark[700]};
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.35;
-  font-family: ${tokens.fontFamily.sans};
   text-decoration: none;
   transition: background ${tokens.transition.base}, color ${tokens.transition.base};
+  font-family: var(--menu-catalog-ff);
+  font-size: var(--menu-catalog-fs);
+  font-weight: var(--menu-catalog-fw);
+  font-style: var(--menu-catalog-style);
+  color: var(--menu-catalog-color);
+  letter-spacing: var(--menu-catalog-ls);
+  line-height: var(--menu-catalog-lh);
 
   &:hover {
     background: ${tokens.background.soft};
-    color: ${tokens.primary.DEFAULT};
+    color: var(--shop-primary, ${tokens.primary.DEFAULT});
   }
 `;
 
@@ -471,9 +474,9 @@ const UserDropdownBtn = styled.button`
 
 const SubNavWrap = styled.div`
   width: 100%;
-  min-height: ${(p) => (p.$hide ? "0" : "42px")};
-  max-height: ${(p) => (p.$hide ? "0" : "42px")};
-  background: ${(p) => (p.$hide ? "transparent" : "#f0f0f0")};
+  min-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 44px)")};
+  max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 44px)")};
+  background: ${(p) => (p.$hide ? "transparent" : "var(--second-nav-bg, #f0f0f0)")};
   border-top: ${(p) => (p.$hide ? "none" : "1px solid rgba(0, 0, 0, 0.06)")};
   border-bottom: ${(p) => (p.$hide ? "none" : "1px solid rgba(0, 0, 0, 0.08)")};
   overflow: hidden;
@@ -484,6 +487,9 @@ const SubNavWrap = styled.div`
   box-shadow: none;
   display: flex;
   align-items: center;
+  color: var(--second-nav-text, #374151);
+  font-size: var(--second-nav-fs, 15px);
+  font-weight: var(--second-nav-fw, 500);
 `;
 
 const SecondMenuRowInner = styled.div`
@@ -500,8 +506,8 @@ const SecondMenuRowInner = styled.div`
 `;
 
 const SecondLink = styled(Link)`
-  color: ${tokens.dark[600]};
-  font-weight: 500;
+  color: var(--second-nav-text, ${tokens.dark[600]});
+  font-weight: inherit;
   font-family: ${tokens.fontFamily.sans};
   text-decoration: none;
   transition: color ${tokens.transition.base};
@@ -510,7 +516,7 @@ const SecondLink = styled(Link)`
   line-height: 1;
 
   &:hover {
-    color: ${tokens.primary.DEFAULT};
+    color: var(--second-nav-active, ${tokens.primary.DEFAULT});
     text-decoration: underline;
   }
 `;
@@ -737,7 +743,7 @@ export default function ShopHeader() {
     <>
       <HeaderWrap $atTop={atTop} $visible={showHeader} style={{ transform: showHeader ? undefined : "translateY(-100%)" }}>
         {atTop && <TopBar />}
-        <MiddleBarWrap>
+        <MiddleBarWrap className="shop-header-main">
           <MiddleBarInner>
             <MiddleBarLeft>
               <MiddleBarLogo href="/">Belucha</MiddleBarLogo>
@@ -920,7 +926,7 @@ export default function ShopHeader() {
             </MiddleBarRight>
           </MiddleBarInner>
         </MiddleBarWrap>
-        <SubNavWrap id="subnav" $hide={!showSubNav}>
+        <SubNavWrap id="subnav" className="second-nav" $hide={!showSubNav}>
           <SecondMenuRowInner>
             {secondMenuItems.map((item) => (
               <SecondLink key={item.id} href={menuItemHref(item)}>{item.label}</SecondLink>

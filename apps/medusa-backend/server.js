@@ -344,6 +344,13 @@ async function start() {
           );
         `)
         await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_pages_slug ON admin_hub_pages(slug);')
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS page_type varchar(50) DEFAULT 'page';`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS featured_image text;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS excerpt text;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_title varchar(512);`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_description text;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_keywords varchar(512);`).catch(() => {})
+        await client.query(`UPDATE admin_hub_pages SET page_type = 'page' WHERE page_type IS NULL`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_collections (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -5506,7 +5513,10 @@ async function start() {
         if (!r.rows[0]) return res.status(404).json({ message: 'Not found' })
         const lv = JSON.parse(r.rows[0].link_value)
         if (!lv?.id) return res.status(404).json({ message: 'Not found' })
-        const pr = await client.query('SELECT id, title, slug, body FROM admin_hub_pages WHERE id = $1', [lv.id])
+        const pr = await client.query(
+          `SELECT id, title, slug, body, featured_image, excerpt, page_type, meta_title, meta_description, meta_keywords FROM admin_hub_pages WHERE id = $1`,
+          [lv.id]
+        )
         if (!pr.rows[0]) return res.status(404).json({ message: 'Not found' })
         res.json(pr.rows[0])
       } catch { res.status(404).json({ message: 'Not found' }) } finally { await client.end().catch(() => {}) }
@@ -7101,18 +7111,22 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       try {
         await client.connect()
         const status = (req.query.status || '').trim() || null
+        const pageType = (req.query.page_type || '').trim() || null
         const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100)
         const offset = parseInt(req.query.offset, 10) || 0
-        let q = 'SELECT id, title, slug, body, status, created_at, updated_at FROM admin_hub_pages WHERE 1=1'
+        let q = `SELECT id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, created_at, updated_at
+          FROM admin_hub_pages WHERE 1=1`
         const params = []
         if (status) { params.push(status); q += ` AND status = $${params.length}` }
+        if (pageType) { params.push(pageType); q += ` AND page_type = $${params.length}` }
         q += ' ORDER BY updated_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2)
         params.push(limit, offset)
         const r = await client.query(q, params)
-        const countRes = await client.query(
-          status ? 'SELECT COUNT(*)::int AS c FROM admin_hub_pages WHERE status = $1' : 'SELECT COUNT(*)::int AS c FROM admin_hub_pages',
-          status ? [status] : []
-        )
+        let countSql = 'SELECT COUNT(*)::int AS c FROM admin_hub_pages WHERE 1=1'
+        const countParams = []
+        if (status) { countParams.push(status); countSql += ` AND status = $${countParams.length}` }
+        if (pageType) { countParams.push(pageType); countSql += ` AND page_type = $${countParams.length}` }
+        const countRes = await client.query(countSql, countParams)
         res.json({ pages: r.rows, count: countRes.rows[0].c })
       } catch (err) {
         console.error('Pages list error:', err)
@@ -7131,12 +7145,19 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       if (!slug) slug = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
       const body = (b.body != null ? b.body : '')
       const status = (b.status === 'published' ? 'published' : 'draft')
+      const page_type = (b.page_type === 'blog' ? 'blog' : 'page')
+      const featured_image = b.featured_image != null ? String(b.featured_image).trim() || null : null
+      const excerpt = b.excerpt != null ? String(b.excerpt) : null
+      const meta_title = b.meta_title != null ? String(b.meta_title).trim() || null : null
+      const meta_description = b.meta_description != null ? String(b.meta_description) : null
+      const meta_keywords = b.meta_keywords != null ? String(b.meta_keywords).trim() || null : null
       try {
         await client.connect()
         const r = await client.query(
-          `INSERT INTO admin_hub_pages (title, slug, body, status) VALUES ($1, $2, $3, $4)
-           RETURNING id, title, slug, body, status, created_at, updated_at`,
-          [title, slug, body, status]
+          `INSERT INTO admin_hub_pages (title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           RETURNING id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, created_at, updated_at`,
+          [title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords]
         )
         res.status(201).json(r.rows[0])
       } catch (err) {
@@ -7153,7 +7174,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       try {
         await client.connect()
         const r = await client.query(
-          'SELECT id, title, slug, body, status, created_at, updated_at FROM admin_hub_pages WHERE id = $1',
+          `SELECT id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, created_at, updated_at
+           FROM admin_hub_pages WHERE id = $1`,
           [req.params.id]
         )
         if (r.rows.length === 0) return res.status(404).json({ message: 'Page not found' })
@@ -7176,13 +7198,19 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       if (b.slug !== undefined) { updates.push(`slug = $${i++}`); values.push(b.slug) }
       if (b.body !== undefined) { updates.push(`body = $${i++}`); values.push(b.body) }
       if (b.status !== undefined) { updates.push(`status = $${i++}`); values.push(b.status === 'published' ? 'published' : 'draft') }
+      if (b.page_type !== undefined) { updates.push(`page_type = $${i++}`); values.push(b.page_type === 'blog' ? 'blog' : 'page') }
+      if (b.featured_image !== undefined) { updates.push(`featured_image = $${i++}`); values.push(b.featured_image ? String(b.featured_image).trim() : null) }
+      if (b.excerpt !== undefined) { updates.push(`excerpt = $${i++}`); values.push(b.excerpt) }
+      if (b.meta_title !== undefined) { updates.push(`meta_title = $${i++}`); values.push(b.meta_title ? String(b.meta_title).trim() : null) }
+      if (b.meta_description !== undefined) { updates.push(`meta_description = $${i++}`); values.push(b.meta_description) }
+      if (b.meta_keywords !== undefined) { updates.push(`meta_keywords = $${i++}`); values.push(b.meta_keywords ? String(b.meta_keywords).trim() : null) }
       if (updates.length === 0) return res.status(400).json({ message: 'No fields to update' })
       updates.push(`updated_at = now()`)
       values.push(req.params.id)
       try {
         await client.connect()
         const r = await client.query(
-          `UPDATE admin_hub_pages SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, title, slug, body, status, created_at, updated_at`,
+          `UPDATE admin_hub_pages SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, created_at, updated_at`,
           values
         )
         if (r.rows.length === 0) return res.status(404).json({ message: 'Page not found' })
@@ -7223,10 +7251,13 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
-        const r = await client.query(
-          'SELECT id, title, slug, body, updated_at FROM admin_hub_pages WHERE status = $1 ORDER BY updated_at DESC',
-          ['published']
-        )
+        const pageType = (req.query.page_type || '').trim() || null
+        let q = `SELECT id, title, slug, body, excerpt, featured_image, page_type, meta_title, meta_description, meta_keywords, updated_at
+          FROM admin_hub_pages WHERE status = $1`
+        const params = ['published']
+        if (pageType) { params.push(pageType); q += ` AND page_type = $2` }
+        q += ' ORDER BY updated_at DESC'
+        const r = await client.query(q, params)
         res.json({ pages: r.rows, count: r.rows.length })
       } catch (err) {
         console.error('Store pages list error:', err)
@@ -7241,7 +7272,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       try {
         await client.connect()
         const r = await client.query(
-          'SELECT id, title, slug, body, updated_at FROM admin_hub_pages WHERE slug = $1',
+          `SELECT id, title, slug, body, excerpt, featured_image, page_type, meta_title, meta_description, meta_keywords, updated_at
+           FROM admin_hub_pages WHERE slug = $1 AND status = 'published'`,
           [req.params.slug]
         )
         if (r.rows.length === 0) return res.status(404).json({ message: 'Page not found' })
@@ -7299,13 +7331,73 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       })
     }
 
+    const _previewPlain = (html, max) => {
+      const t = String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      return t.length <= max ? t : t.slice(0, max - 1) + '…'
+    }
+
+    const enrichBlogCarousel = async (containers, client) => {
+      if (!Array.isArray(containers)) return containers
+      const ids = new Set()
+      containers.forEach((c) => {
+        if (c.type === 'blog_carousel' && Array.isArray(c.posts)) {
+          c.posts.forEach((p) => {
+            if (p && p.page_id) ids.add(String(p.page_id))
+          })
+        }
+      })
+      if (!ids.size) return containers
+      const idList = [...ids]
+      let rows = []
+      try {
+        const r = await client.query(
+          `SELECT id, title, slug, body, excerpt, featured_image, page_type, status
+           FROM admin_hub_pages
+           WHERE id = ANY($1::uuid[]) AND status = 'published' AND page_type = 'blog'`,
+          [idList]
+        )
+        rows = r.rows
+      } catch (_) {}
+      const map = {}
+      rows.forEach((row) => {
+        map[String(row.id)] = row
+      })
+      return containers.map((c) => {
+        if (c.type !== 'blog_carousel' || !Array.isArray(c.posts)) return c
+        const posts = c.posts
+          .map((p) => {
+            if (!p || !p.page_id) return p
+            const row = map[String(p.page_id)]
+            if (!row) return null
+            const excerpt = row.excerpt ? String(row.excerpt) : _previewPlain(row.body, 280)
+            return {
+              ...p,
+              title: row.title,
+              excerpt,
+              body: row.body,
+              image: row.featured_image || p.image || '',
+              href: (p.href && String(p.href).trim()) || `pages/${row.slug}`,
+            }
+          })
+          .filter(Boolean)
+        return { ...c, posts }
+      })
+    }
+
+    const enrichLandingContainers = async (containers, client) => {
+      let list = containers
+      list = await enrichCollectionImages(list, client)
+      list = await enrichBlogCarousel(list, client)
+      return list
+    }
+
     const landingPageGET = async (req, res) => {
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
         const r = await client.query('SELECT containers, updated_at FROM admin_hub_landing_page WHERE id = 1')
-        const containers = await enrichCollectionImages(r.rows[0]?.containers || [], client)
+        const containers = await enrichLandingContainers(r.rows[0]?.containers || [], client)
         res.json({ containers, updated_at: r.rows[0]?.updated_at || null })
       } catch (err) {
         console.error('Landing page GET error:', err)
@@ -7346,7 +7438,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const pageId = req.params.pageId
         const r = await client.query('SELECT containers, updated_at FROM admin_hub_landing_pages WHERE page_id = $1', [pageId])
         if (r.rows[0]) {
-          const containers = await enrichCollectionImages(r.rows[0].containers || [], client)
+          const containers = await enrichLandingContainers(r.rows[0].containers || [], client)
           return res.json({ containers, updated_at: r.rows[0].updated_at || null })
         }
         // One-time fallback: only for the oldest page when new table is completely empty
@@ -7356,7 +7448,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           if (firstPage.rows[0] && String(firstPage.rows[0].id) === String(pageId)) {
             const old = await client.query('SELECT containers FROM admin_hub_landing_page WHERE id = 1')
             if (old.rows[0]?.containers?.length) {
-              const containers = await enrichCollectionImages(old.rows[0].containers, client)
+              const containers = await enrichLandingContainers(old.rows[0].containers, client)
               return res.json({ containers, updated_at: null, _migrated: true })
             }
           }

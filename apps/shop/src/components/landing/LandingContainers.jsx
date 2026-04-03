@@ -22,21 +22,43 @@ function parsePaddingParts(val) {
   return [parts[0], parts[1], parts[2], parts[3]];
 }
 
-function marginValueMeaningful(v) {
-  if (v === undefined || v === null) return false;
-  return String(v).trim() !== "";
-}
-
-// Returns padding style for a container.
-// If container.margin has a non-empty top or bottom, inner vertical padding is cleared
-// so margin is the only vertical inset (avoids fighting horizontal-only padding editor).
+// Inner padding from container.padding only. External gaps between containers use margin on the wrapper.
 function getContainerPadding(container, defaultPad) {
   const [t, r, b, l] = parsePaddingParts(container.padding || defaultPad || "0px");
-  const m = container.margin;
-  const hasVerticalMargin =
-    m != null && (marginValueMeaningful(m.top) || marginValueMeaningful(m.bottom));
-  if (hasVerticalMargin) return { paddingTop: "0px", paddingRight: r, paddingBottom: "0px", paddingLeft: l };
   return { paddingTop: t, paddingRight: r, paddingBottom: b, paddingLeft: l };
+}
+
+/** Innere Zeile: volle Breite innerhalb des Container-Paddings oder zentriert mit max-width (pro Block typischer Fallback in px). */
+function normalizeContentMaxWidth(val, fallbackPx) {
+  const n = Number(fallbackPx);
+  const fb = `${Number.isFinite(n) && n > 0 ? n : 1200}px`;
+  if (val == null || val === "") return fb;
+  const s = String(val).trim();
+  if (/^\d+$/.test(s)) return `${s}px`;
+  if (/^[\d.]+(px|%|rem|em|ch|vw)$/i.test(s)) return s;
+  return fb;
+}
+
+function getContentInnerStyle(container, fallbackMaxPx) {
+  if (container.content_layout === "full") {
+    return {
+      width: "100%",
+      maxWidth: "none",
+      boxSizing: "border-box",
+      minWidth: 0,
+      marginLeft: 0,
+      marginRight: 0,
+    };
+  }
+  const cap = normalizeContentMaxWidth(container.content_max_width, fallbackMaxPx);
+  return {
+    width: "100%",
+    maxWidth: cap,
+    boxSizing: "border-box",
+    minWidth: 0,
+    marginLeft: "auto",
+    marginRight: "auto",
+  };
 }
 
 function collectionHref(handle) {
@@ -190,7 +212,7 @@ function TextBlock({ container }) {
   const posStyle = getPositionStyle(container.text_position || `center-${align === "left" ? "left" : align === "right" ? "right" : "center"}`);
   return (
     <div style={{ background: container.bg_color || "#fff", ...getContainerPadding(container, "48px 24px") }}>
-      <div style={{ maxWidth: 800, margin: "0 auto", textAlign: align }}>
+      <div style={{ ...getContentInnerStyle(container, 800), textAlign: align }}>
         {container.title && (
           <h2 style={{ fontSize: "clamp(20px,3vw,36px)", fontWeight: 800, color: container.text_color || "#111827", margin: "0 0 16px" }}>
             {container.title}
@@ -226,7 +248,7 @@ function ImageText({ container }) {
   const textAlign = container.text_align || "left";
   return (
     <div style={{ background: container.bg_color || "#fff", ...getContainerPadding(container, "48px 24px") }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: imageLeft ? "row" : "row-reverse", gap: 40, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ ...getContentInnerStyle(container, 1100), display: "flex", flexDirection: imageLeft ? "row" : "row-reverse", gap: 40, alignItems: "center", flexWrap: "wrap" }}>
         {imgSrc && (
           <div style={{ flex: "0 0 auto", width: "min(45%, 480px)" }}>
             <img src={imgSrc} alt={container.title || ""} style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} />
@@ -270,14 +292,19 @@ function ImageGrid({ container }) {
   if (!images.length) return null;
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap }}>
+      <div style={{ ...getContentInnerStyle(container, 1100), display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap }}>
         {images.map((img, i) => {
           const ratio = img.aspect_ratio || "1/1";
           const imgEl = <img src={resolveUrl(img.url)} alt={img.title || ""} style={{ width: "100%", aspectRatio: ratio, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />;
           const caption = (img.title || img.text) ? (
             <div style={{ paddingTop: 10 }}>
               {img.title && <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.3 }}>{img.title}</div>}
-              {img.text && <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4, lineHeight: 1.5 }}>{img.text}</div>}
+              {img.text ? (
+                <div
+                  style={{ fontSize: 14, color: "#374151", marginTop: img.title ? 6 : 0, lineHeight: 1.7 }}
+                  dangerouslySetInnerHTML={{ __html: img.text }}
+                />
+              ) : null}
             </div>
           ) : null;
           const inner = <>{imgEl}{caption}</>;
@@ -293,34 +320,60 @@ function ImageGrid({ container }) {
 // ── Banner CTA ────────────────────────────────────────────────────────────────
 function BannerCta({ container }) {
   const posStyle = getPositionStyle(container.text_position || "center");
+  const padRaw = getContainerPadding(container, "32px 48px 40px 48px");
+  // Eski horizontal-only kayıtlar 0 üst/alt veriyordu; buton/gölge taşmasın diye minimum.
+  const pad =
+    padRaw.paddingTop === "0px" && padRaw.paddingBottom === "0px"
+      ? { ...padRaw, paddingTop: "32px", paddingBottom: "40px" }
+      : padRaw;
   return (
-    <div style={{ background: container.bg_color || "#ff971c", ...getContainerPadding(container, "40px 48px"), display: "flex", flexDirection: "column", ...posStyle }}>
-      {container.title && (
-        <h2 style={{ fontSize: "clamp(20px,3vw,36px)", fontWeight: 900, color: container.text_color || "#fff", margin: "0 0 8px" }}>
-          {container.title}
-        </h2>
-      )}
-      {container.subtitle && (
-        <p style={{ fontSize: 16, color: container.subtitle_color || container.text_color || "#fff", margin: "0 0 20px", opacity: 0.9 }}>
-          {container.subtitle}
-        </p>
-      )}
-      {container.btn_text && container.btn_url && (
-        <a
-          href={container.btn_url}
-          style={{
-            display: "inline-block", padding: container.btn_padding || "12px 28px",
-            background: container.btn_bg || "#fff",
-            color: container.btn_color || "#111827",
-            border: container.btn_border || "2px solid #000",
-            borderRadius: container.btn_radius || 8,
-            fontWeight: 800, fontSize: 14, textDecoration: "none", boxShadow: "0 3px 0 2px #000",
-            alignSelf: btnAlignSelf(posStyle.justifyContent),
-          }}
-        >
-          {container.btn_text}
-        </a>
-      )}
+    <div
+      style={{
+        background: container.bg_color || "#ff971c",
+        boxSizing: "border-box",
+        width: "100%",
+        minWidth: 0,
+        ...pad,
+        display: "flex",
+        flexDirection: "column",
+        ...posStyle,
+      }}
+    >
+      <div style={getContentInnerStyle(container, 960)}>
+        {container.title && (
+          <h2 style={{ fontSize: "clamp(20px,3vw,36px)", fontWeight: 900, color: container.text_color || "#fff", margin: "0 0 8px", maxWidth: "100%" }}>
+            {container.title}
+          </h2>
+        )}
+        {container.subtitle && (
+          <p style={{ fontSize: 16, color: container.subtitle_color || container.text_color || "#fff", margin: "0 0 20px", opacity: 0.9, maxWidth: "100%" }}>
+            {container.subtitle}
+          </p>
+        )}
+        {container.btn_text && container.btn_url && (
+          <a
+            href={container.btn_url}
+            style={{
+              display: "inline-block",
+              maxWidth: "100%",
+              boxSizing: "border-box",
+              padding: container.btn_padding || "12px 28px",
+              background: container.btn_bg || "#fff",
+              color: container.btn_color || "#111827",
+              border: container.btn_border || "2px solid #000",
+              borderRadius: container.btn_radius || 8,
+              fontWeight: 800,
+              fontSize: 14,
+              textDecoration: "none",
+              boxShadow: "0 2px 0 1px rgba(0,0,0,0.35)",
+              marginBottom: 4,
+              alignSelf: btnAlignSelf(posStyle.justifyContent),
+            }}
+          >
+            {container.btn_text}
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -345,18 +398,20 @@ function CollectionCarousel({ container }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
-      <Carousel
-        contained={false}
-        title={container.title?.trim() ? container.title : undefined}
-        visibleCount={itemsPerRow}
-        navOnSides
-        gap={16}
-        ariaLabel={container.title?.trim() || "Collection carousel"}
-      >
-        {products.map((product, i) => (
-          <ProductCard key={product.id || i} product={product} />
-        ))}
-      </Carousel>
+      <div style={getContentInnerStyle(container, 1280)}>
+        <Carousel
+          contained={false}
+          title={container.title?.trim() ? container.title : undefined}
+          visibleCount={itemsPerRow}
+          navOnSides
+          gap={16}
+          ariaLabel={container.title?.trim() || "Collection carousel"}
+        >
+          {products.map((product, i) => (
+            <ProductCard key={product.id || i} product={product} />
+          ))}
+        </Carousel>
+      </div>
     </div>
   );
 }
@@ -370,15 +425,16 @@ function CollectionsCarousel({ container }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
-      <Carousel
-        contained={false}
-        title={container.title?.trim() ? container.title : undefined}
-        visibleCount={itemsPerRow}
-        navOnSides
-        gap={16}
-        ariaLabel={container.title?.trim() || "Collections carousel"}
-      >
-        {collections.map((collection, i) => {
+      <div style={getContentInnerStyle(container, 1280)}>
+        <Carousel
+          contained={false}
+          title={container.title?.trim() ? container.title : undefined}
+          visibleCount={itemsPerRow}
+          navOnSides
+          gap={16}
+          ariaLabel={container.title?.trim() || "Collections carousel"}
+        >
+          {collections.map((collection, i) => {
           const href = collectionHref(collection.handle);
           const image = resolveUrl(collection.image);
           const card = (
@@ -424,7 +480,8 @@ function CollectionsCarousel({ container }) {
             </a>
           );
         })}
-      </Carousel>
+        </Carousel>
+      </div>
     </div>
   );
 }
@@ -449,7 +506,7 @@ function SingleProduct({ container }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "48px 24px"), background: wrapBg }}>
-      <div style={{ maxWidth: 420, margin: "0 auto" }}>
+      <div style={getContentInnerStyle(container, 420)}>
         {title ? (
           <h2 style={{
             fontSize: "clamp(20px,3vw,28px)",
@@ -469,7 +526,9 @@ function SingleProduct({ container }) {
 
 // ── Featured blog posts (manual entries, carousel + expand) ──────────────────
 function BlogCarousel({ container }) {
-  const posts = Array.isArray(container.posts) ? container.posts.filter((p) => p && (p.title || p.image || p.excerpt)) : [];
+  const posts = Array.isArray(container.posts)
+    ? container.posts.filter((p) => p && (p.title || p.image || p.excerpt || p.body))
+    : [];
   const [openId, setOpenId] = useState(null);
   const itemsPerRow = container.items_per_row || 3;
   const gap = 16;
@@ -481,16 +540,17 @@ function BlogCarousel({ container }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "40px 24px"), background: bg }}>
-      <Carousel
-        contained={false}
-        title={container.title?.trim() ? container.title : undefined}
-        visibleCount={Math.min(itemsPerRow, posts.length)}
-        navOnSides
-        gap={gap}
-        fadeBgColor={bg}
-        ariaLabel={container.title?.trim() || "Blog"}
-      >
-        {posts.map((post, i) => {
+      <div style={getContentInnerStyle(container, 1280)}>
+        <Carousel
+          contained={false}
+          title={container.title?.trim() ? container.title : undefined}
+          visibleCount={Math.min(itemsPerRow, posts.length)}
+          navOnSides
+          gap={gap}
+          fadeBgColor={bg}
+          ariaLabel={container.title?.trim() || "Blog"}
+        >
+          {posts.map((post, i) => {
           const id = post.id || `post-${i}`;
           const img = resolveUrl(post.image);
           const open = openId === id;
@@ -509,7 +569,7 @@ function BlogCarousel({ container }) {
             >
               {img ? (
                 <div style={{ aspectRatio: "16/10", overflow: "hidden", background: "#eee" }}>
-                  <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <img src={img} alt={post.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 </div>
               ) : null}
               <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column" }}>
@@ -563,7 +623,8 @@ function BlogCarousel({ container }) {
           );
           return <div key={id} style={{ height: "100%" }}>{CardInner}</div>;
         })}
-      </Carousel>
+        </Carousel>
+      </div>
     </div>
   );
 }
@@ -583,7 +644,7 @@ function NewsletterSignup({ container }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "48px 24px"), background: bg }}>
-      <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
+      <div style={{ ...getContentInnerStyle(container, 560), textAlign: "center" }}>
         {container.title ? (
           <h2 style={{ fontSize: "clamp(20px,3vw,28px)", fontWeight: 800, color: textColor, margin: "0 0 8px" }}>
             {container.title}
@@ -640,44 +701,121 @@ function NewsletterSignup({ container }) {
 }
 
 // ── Accordion ─────────────────────────────────────────────────────────────────
+function AccordionChevron({ color, open }) {
+  return (
+    <svg
+      width={22}
+      height={22}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+      style={{
+        flexShrink: 0,
+        transform: open ? "rotate(180deg)" : "rotate(0deg)",
+        transition: "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+      }}
+    >
+      <path d="M6 9l6 6 6-6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function Accordion({ container }) {
   const [openIdx, setOpenIdx] = useState(null);
   const items = container.items || [];
   const bg = container.bg_color || "#ffffff";
   const textColor = container.text_color || "#111827";
   const borderColor = container.border_color || "#e5e7eb";
-  const iconColor = container.icon_color || "#111827";
+  const iconColor = container.icon_color || "#64748b";
 
   return (
     <div style={{ background: bg, ...getContainerPadding(container, "48px 24px") }}>
-      <div style={{ maxWidth: 860, margin: "0 auto" }}>
+      <div style={getContentInnerStyle(container, 720)}>
         {container.title && (
-          <h2 style={{ fontSize: "clamp(20px,3vw,32px)", fontWeight: 700, color: textColor, marginBottom: 28, textAlign: "center" }}>
+          <h2
+            style={{
+              fontSize: "clamp(22px, 3.2vw, 34px)",
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+              color: textColor,
+              margin: "0 0 32px",
+              textAlign: "center",
+              lineHeight: 1.2,
+            }}
+          >
             {container.title}
           </h2>
         )}
-        <div style={{ display: "flex", flexDirection: "column", gap: 0, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {items.map((item, idx) => {
             const isOpen = openIdx === idx;
             return (
-              <div key={idx} style={{ borderBottom: idx < items.length - 1 ? `1px solid ${borderColor}` : "none" }}>
+              <div
+                key={idx}
+                style={{
+                  borderRadius: 18,
+                  border: `1px solid ${borderColor}`,
+                  background: bg,
+                  boxShadow: isOpen
+                    ? "0 10px 40px -12px rgba(15, 23, 42, 0.12), 0 2px 8px -4px rgba(15, 23, 42, 0.06)"
+                    : "0 1px 3px rgba(15, 23, 42, 0.05)",
+                  overflow: "hidden",
+                  transition: "box-shadow 0.3s ease, border-color 0.25s ease, background 0.25s ease",
+                }}
+              >
                 <button
+                  type="button"
+                  aria-expanded={isOpen}
                   onClick={() => setOpenIdx(isOpen ? null : idx)}
                   style={{
-                    width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "18px 22px", background: isOpen ? `${bg}ee` : bg,
-                    border: "none", cursor: "pointer", textAlign: "left", gap: 16,
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 20,
+                    padding: "20px 24px",
+                    background: "transparent",
+                    border: "none",
+                    borderLeft: isOpen ? `4px solid ${iconColor}` : "4px solid transparent",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    boxSizing: "border-box",
                   }}
                 >
-                  <span style={{ fontSize: 16, fontWeight: 600, color: textColor, flex: 1 }}>{item.question}</span>
-                  <span style={{ fontSize: 22, fontWeight: 300, color: iconColor, lineHeight: 1, flexShrink: 0, transform: isOpen ? "rotate(45deg)" : "none", transition: "transform 0.2s" }}>+</span>
+                  <span
+                    style={{
+                      fontSize: "1.0625rem",
+                      fontWeight: 600,
+                      letterSpacing: "-0.015em",
+                      color: textColor,
+                      flex: 1,
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {item.question}
+                  </span>
+                  <AccordionChevron color={iconColor} open={isOpen} />
                 </button>
-                {isOpen && (
+                <div
+                  style={{
+                    maxHeight: isOpen ? 3200 : 0,
+                    opacity: isOpen ? 1 : 0,
+                    transition: "max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+                    overflow: "hidden",
+                    pointerEvents: isOpen ? "auto" : "none",
+                  }}
+                >
                   <div
-                    style={{ padding: "0 22px 20px", color: textColor, fontSize: 15, lineHeight: 1.7 }}
+                    style={{
+                      padding: "4px 24px 22px 28px",
+                      color: textColor,
+                      fontSize: "0.984rem",
+                      lineHeight: 1.75,
+                    }}
                     dangerouslySetInnerHTML={{ __html: item.answer || "" }}
                   />
-                )}
+                </div>
               </div>
             );
           })}
@@ -694,55 +832,144 @@ function Tabs({ container }) {
   const bg = container.bg_color || "#ffffff";
   const textColor = container.text_color || "#111827";
   const activeColor = container.active_color || "#ff971c";
-  const tabBg = container.tab_bg || "#f3f4f6";
+  const tabBg = container.tab_bg || "#f1f5f9";
   const style = container.tab_style || "underline";
 
   const tabStyle = (idx) => {
     const isActive = idx === activeIdx;
-    if (style === "pills") return {
-      padding: "8px 20px", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600,
-      background: isActive ? activeColor : tabBg,
-      color: isActive ? "#fff" : textColor,
-      transition: "background 0.2s",
-    };
-    if (style === "boxes") return {
-      padding: "10px 22px", border: `2px solid ${isActive ? activeColor : "transparent"}`, cursor: "pointer", fontSize: 14, fontWeight: 600,
-      background: isActive ? `${activeColor}15` : tabBg,
-      color: isActive ? activeColor : textColor,
-      borderRadius: 6,
-    };
-    // underline (default)
+    const baseTransition =
+      "color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease, border-color 0.25s ease";
+
+    if (style === "pills") {
+      return {
+        padding: "11px 22px",
+        borderRadius: 9999,
+        border: "none",
+        cursor: "pointer",
+        fontSize: "0.9375rem",
+        fontWeight: 600,
+        letterSpacing: "-0.02em",
+        background: isActive ? activeColor : "transparent",
+        color: isActive ? "#fff" : textColor,
+        transition: baseTransition,
+        boxShadow: isActive
+          ? `0 4px 14px -4px ${activeColor}99, 0 2px 6px -2px rgba(15, 23, 42, 0.08)`
+          : "none",
+        transform: isActive ? "translateY(-1px)" : "none",
+      };
+    }
+    if (style === "boxes") {
+      return {
+        padding: "12px 20px",
+        border: `1.5px solid ${isActive ? activeColor : "rgba(148, 163, 184, 0.35)"}`,
+        cursor: "pointer",
+        fontSize: "0.9375rem",
+        fontWeight: 600,
+        letterSpacing: "-0.02em",
+        background: isActive ? `${activeColor}12` : "rgba(255,255,255,0.55)",
+        color: isActive ? activeColor : textColor,
+        borderRadius: 12,
+        transition: baseTransition,
+        boxShadow: isActive ? `0 0 0 1px ${activeColor}22 inset` : "none",
+      };
+    }
     return {
-      padding: "12px 22px", border: "none", borderBottom: `3px solid ${isActive ? activeColor : "transparent"}`,
-      cursor: "pointer", fontSize: 14, fontWeight: 600, background: "transparent",
-      color: isActive ? activeColor : textColor, transition: "border-color 0.2s, color 0.2s",
+      padding: "14px 20px",
+      marginBottom: -2,
+      border: "none",
+      borderBottom: `3px solid ${isActive ? activeColor : "transparent"}`,
+      cursor: "pointer",
+      fontSize: "0.9375rem",
+      fontWeight: isActive ? 600 : 500,
+      letterSpacing: "-0.02em",
+      background: "transparent",
+      color: isActive ? activeColor : textColor,
+      opacity: isActive ? 1 : 0.78,
+      transition: baseTransition,
+      borderRadius: "10px 10px 0 0",
     };
   };
 
   const activeTab = tabs[activeIdx] || tabs[0];
 
+  const barWrap = (() => {
+    if (style === "underline") {
+      return {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 4,
+        borderBottom: "2px solid rgba(148, 163, 184, 0.35)",
+        marginBottom: 0,
+        paddingBottom: 0,
+      };
+    }
+    if (style === "pills") {
+      return {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6,
+        padding: 6,
+        borderRadius: 9999,
+        background: tabBg,
+        boxShadow: "inset 0 1px 2px rgba(15, 23, 42, 0.06)",
+        marginBottom: 0,
+        width: "fit-content",
+        maxWidth: "100%",
+      };
+    }
+    return {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 10,
+      padding: 4,
+      borderRadius: 16,
+      background: tabBg,
+      marginBottom: 0,
+      border: "1px solid rgba(148, 163, 184, 0.25)",
+      boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+      width: "fit-content",
+      maxWidth: "100%",
+    };
+  })();
+
   return (
     <div style={{ background: bg, ...getContainerPadding(container, "48px 24px") }}>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        {/* Tab bar */}
-        <div style={{
-          display: "flex", flexWrap: "wrap", gap: style === "pills" ? 8 : 0,
-          borderBottom: style === "underline" ? `1px solid #e5e7eb` : "none",
-          background: style === "underline" ? "transparent" : tabBg,
-          borderRadius: style !== "underline" ? 8 : 0,
-          padding: style !== "underline" ? 6 : 0,
-          marginBottom: 24,
-        }}>
-          {tabs.map((tab, idx) => (
-            <button key={idx} style={tabStyle(idx)} onClick={() => setActiveIdx(idx)}>
-              {tab.label}
-            </button>
-          ))}
+      <div style={getContentInnerStyle(container, 880)}>
+        <div
+          style={{
+            marginBottom: 22,
+            ...(style === "underline" ? {} : { display: "flex", justifyContent: "flex-start", flexWrap: "wrap", gap: 12 }),
+          }}
+        >
+          <div role="tablist" aria-label="Inhalt" style={barWrap}>
+            {tabs.map((tab, idx) => (
+              <button
+                key={idx}
+                type="button"
+                role="tab"
+                aria-selected={idx === activeIdx}
+                style={tabStyle(idx)}
+                onClick={() => setActiveIdx(idx)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
-        {/* Active content */}
         {activeTab && (
           <div
-            style={{ color: textColor, fontSize: 15, lineHeight: 1.75 }}
+            role="tabpanel"
+            style={{
+              color: textColor,
+              fontSize: "0.984rem",
+              lineHeight: 1.78,
+              padding: "28px 32px",
+              borderRadius: 20,
+              background: `linear-gradient(165deg, ${tabBg} 0%, ${bg} 72%)`,
+              border: "1px solid rgba(148, 163, 184, 0.28)",
+              boxShadow: "0 4px 28px -8px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.05)",
+              minHeight: 48,
+            }}
             dangerouslySetInnerHTML={{ __html: activeTab.content || "" }}
           />
         )}

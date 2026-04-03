@@ -5,7 +5,7 @@ import Footer from "@/components/Footer";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { getMedusaClient } from "@/lib/medusa-client";
-import styled from "styled-components";
+import { resolveImageUrl } from "@/lib/image-url";
 
 function sanitizeHtml(html) {
   if (!html || typeof html !== "string") return "";
@@ -71,11 +71,21 @@ export default function CmsPageBySlug() {
   }
 
   const safeBody = sanitizeHtml(page.body || "");
+  const hero = page.featured_image ? resolveImageUrl(page.featured_image) : "";
 
   return (
     <div className="min-h-screen flex flex-col">
       <ShopHeader />
       <main className="flex-1 container mx-auto px-4 py-12 max-w-3xl" style={{ paddingTop: 128 }}>
+        {hero ? (
+          <div className="mb-8 rounded-xl overflow-hidden border border-gray-100">
+            <img
+              src={hero}
+              alt={page.title || ""}
+              className="w-full max-h-[420px] object-cover block"
+            />
+          </div>
+        ) : null}
         <h1 className="text-3xl font-semibold text-gray-900 mb-6">{page.title}</h1>
         {safeBody ? (
           <div

@@ -36,8 +36,8 @@ function menuItemHref(item) {
 }
 
 const FooterContainer = styled.footer`
-  background-color: #136761;
-  color: white;
+  background-color: var(--footer-bg, #136761);
+  color: var(--footer-text, #ffffff);
   padding: 48px 0 24px;
   margin-top: auto;
 `;
@@ -65,37 +65,40 @@ const Title = styled.h3`
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 4px;
-  color:rgb(255, 255, 255);
+  color: var(--footer-text, #ffffff);
 `;
 
 const FooterLink = styled(Link)`
-  color:rgb(255, 255, 255);
+  color: var(--footer-text, #ffffff);
   font-size: 14px;
   transition: color 0.2s ease;
 
   &:hover {
-    color: white;
+    color: var(--footer-text, #ffffff);
+    opacity: 0.9;
   }
 `;
 
 const Placeholder = styled.div`
-  color:rgb(255, 255, 255);
+  color: var(--footer-text, #ffffff);
   font-size: 14px;
 `;
 
 const LogoPlaceholder = styled(Link)`
-  color:rgb(194, 236, 255);
+  color: var(--footer-text, #ffffff);
+  opacity: 0.95;
   font-weight: 700;
   font-size: 18px;
   text-decoration: none;
 
   &:hover {
-    color: #38bdf8;
+    opacity: 1;
+    color: var(--footer-text, #ffffff);
   }
 `;
 
 const Bottom = styled.div`
-  border-top: 1px solidrgb(254, 254, 255);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
   padding-top: 24px;
   display: flex;
   justify-content: space-between;
@@ -105,7 +108,7 @@ const Bottom = styled.div`
 `;
 
 const Copyright = styled.p`
-  color:rgb(255, 255, 255);
+  color: var(--footer-text, #ffffff);
   font-size: 14px;
 `;
 
@@ -131,7 +134,7 @@ export default function Footer() {
   }, []);
 
   return (
-    <FooterContainer>
+    <FooterContainer className="site-footer">
       <Container>
         {footerColumns.length > 0 && (
           <Grid $columns={4}>
