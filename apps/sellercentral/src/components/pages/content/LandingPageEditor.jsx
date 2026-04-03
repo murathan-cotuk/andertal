@@ -1317,7 +1317,7 @@ export default function LandingPageEditor() {
     }
     unsaved?.setHandlers({ onSave: handleSave, onDiscard: handleDiscard });
     return () => unsaved?.clearHandlers();
-  }, [isDirty, handleSave, handleDiscard]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isDirty, handleSave, handleDiscard]);
 
   // Reset dirty state when switching pages
   useEffect(() => {

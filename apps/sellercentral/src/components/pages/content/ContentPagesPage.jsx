@@ -27,13 +27,8 @@ function slugFromTitle(title) {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-const PAGE_TYPE_OPTIONS = [
-  { label: "Normale Seite", value: "page" },
-  { label: "Blog-Beitrag", value: "blog" },
-];
-
 /**
- * @param {{ blogOnly?: boolean }} props — blogOnly: nur Blog-Typ, gleiche DB-Tabelle (admin_hub_pages)
+ * @param {{ blogOnly?: boolean }} props — blogOnly: nur Blog; sonst nur normale Seiten (gleiche Tabelle admin_hub_pages, getrennt über page_type)
  */
 export default function ContentPagesPage({ blogOnly = false }) {
   const [pages, setPages] = useState([]);
@@ -63,7 +58,9 @@ export default function ContentPagesPage({ blogOnly = false }) {
       setLoading(true);
       setError(null);
       const params = { limit: 100 };
+      // Aynı tablo (admin_hub_pages); ayrı ekranlar: Blog nur blog, Pages nur normale Seiten
       if (blogOnly) params.page_type = "blog";
+      else params.page_type = "page";
       const data = await client.getPages(params);
       setPages(data.pages || []);
     } catch (err) {
@@ -102,7 +99,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
       slug: page.slug || "",
       body: page.body || "",
       status: page.status || "draft",
-      page_type: page.page_type === "blog" ? "blog" : "page",
+      page_type: blogOnly ? "blog" : "page",
       featured_image: page.featured_image || "",
       excerpt: page.excerpt || "",
       meta_title: page.meta_title || "",
@@ -128,7 +125,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
       slug,
       body: form.body,
       status: form.status,
-      page_type: blogOnly ? "blog" : form.page_type,
+      page_type: blogOnly ? "blog" : "page",
       featured_image: (form.featured_image || "").trim() || null,
       excerpt: form.excerpt || "",
       meta_title: (form.meta_title || "").trim() || null,
@@ -194,9 +191,6 @@ export default function ContentPagesPage({ blogOnly = false }) {
         <Button size="slim" tone="critical" onClick={() => handleDeleteRequest(p)}>Delete</Button>
       </InlineStack>,
     ];
-    if (!blogOnly) {
-      base.splice(3, 0, p.page_type === "blog" ? "Blog" : "Seite");
-    }
     return base;
   });
 
@@ -251,12 +245,8 @@ export default function ContentPagesPage({ blogOnly = false }) {
                 </Box>
               ) : (
                 <DataTable
-                  columnContentTypes={blogOnly
-                    ? ["text", "text", "text", "text", "text"]
-                    : ["text", "text", "text", "text", "text", "text"]}
-                  headings={blogOnly
-                    ? ["Title", "Slug", "Status", "Updated", "Actions"]
-                    : ["Title", "Slug", "Status", "Typ", "Updated", "Actions"]}
+                  columnContentTypes={["text", "text", "text", "text", "text"]}
+                  headings={["Title", "Slug", "Status", "Updated", "Actions"]}
                   rows={rows}
                 />
               )}
@@ -279,14 +269,6 @@ export default function ContentPagesPage({ blogOnly = false }) {
       >
         <Modal.Section>
           <BlockStack gap="400">
-            {!blogOnly && (
-              <Select
-                label="Seitentyp"
-                options={PAGE_TYPE_OPTIONS}
-                value={form.page_type}
-                onChange={(value) => setForm((prev) => ({ ...prev, page_type: value }))}
-              />
-            )}
             <TextField
               label="Title"
               value={form.title}
@@ -302,7 +284,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
               placeholder="e.g. about-us"
               helpText="URL: /pages/[slug]"
             />
-            {(blogOnly || form.page_type === "blog") && (
+            {blogOnly && (
               <>
                 <TextField
                   label="Teaser / Kurztext (Karussell)"
@@ -329,7 +311,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
               autoComplete="off"
               placeholder="Page content (plain text or HTML)"
             />
-            {(blogOnly || form.page_type === "blog") && (
+            {blogOnly && (
               <BlockStack gap="300">
                 <Text as="h3" variant="headingSm">SEO</Text>
                 <TextField

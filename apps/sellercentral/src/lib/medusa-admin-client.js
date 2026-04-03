@@ -4,13 +4,14 @@
  * Sellercentral'dan Medusa backend'e product eklemek için REST API client
  */
 
+/** Belucha production backend — used when NEXT_PUBLIC_MEDUSA_BACKEND_URL is unset. Local: set .env to http://localhost:9000 */
+const DEFAULT_PUBLIC_MEDUSA_URL = 'https://belucha-medusa-backend.onrender.com';
+
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '';
   const url = (typeof env === 'string' ? env : '').trim();
-  if (url) return url;
-  return typeof window !== 'undefined'
-    ? 'http://localhost:9000'
-    : 'https://belucha-medusa-backend.onrender.com';
+  if (url) return url.replace(/\/$/, '');
+  return DEFAULT_PUBLIC_MEDUSA_URL.replace(/\/$/, '');
 };
 
 const MEDUSA_BACKEND_URL = getDefaultBaseUrl();
@@ -579,8 +580,13 @@ class MedusaAdminClient {
    * Admin Hub Pages (v1)
    */
   async getPages(params = {}) {
-    const queryParams = new URLSearchParams(params).toString()
-    return this.request(`/admin-hub/v1/pages${queryParams ? `?${queryParams}` : ''}`)
+    const sp = new URLSearchParams();
+    if (params.limit != null && params.limit !== '') sp.set('limit', String(params.limit));
+    if (params.offset != null && params.offset !== '') sp.set('offset', String(params.offset));
+    if (params.status) sp.set('status', String(params.status));
+    if (params.page_type) sp.set('page_type', String(params.page_type));
+    const qs = sp.toString();
+    return this.request(`/admin-hub/v1/pages${qs ? `?${qs}` : ''}`)
   }
 
   async getPage(id) {
