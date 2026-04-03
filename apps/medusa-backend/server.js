@@ -1119,9 +1119,12 @@ async function start() {
         const isRender = dbUrl.includes('render.com')
         const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const res = await client.query('SELECT id, title, handle FROM admin_hub_collections ORDER BY title')
+        const res = await client.query('SELECT id, title, handle, metadata FROM admin_hub_collections ORDER BY title')
         await client.end()
-        return res.rows || []
+        return (res.rows || []).map(r => {
+          const meta = r.metadata && typeof r.metadata === 'object' ? r.metadata : {}
+          return { id: r.id, title: r.title, handle: r.handle, image_url: meta.image_url || null, banner_image_url: meta.banner_image_url || null }
+        })
       } catch (_) { return [] }
     }
     const createAdminHubCollectionDb = async (title, handle) => {
@@ -7256,13 +7259,54 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     console.log('Store routes: GET /store/pages, GET /store/pages/:slug')
 
     // ── Landing Page CMS ──────────────────────────────────────────────────
+
+    // Enrich collections_carousel containers with live image_url from DB
+    const enrichCollectionImages = async (containers, client) => {
+      if (!Array.isArray(containers)) return containers
+      // Collect all collection IDs that are missing images
+      const missingIds = new Set()
+      containers.forEach(c => {
+        if (c.type === 'collections_carousel' && Array.isArray(c.collections)) {
+          c.collections.forEach(col => { if (!col.image && col.id) missingIds.add(col.id) })
+        }
+      })
+      if (!missingIds.size) return containers
+      // Fetch images for missing IDs
+      const idList = [...missingIds]
+      const placeholders = idList.map((_, i) => `$${i + 1}`).join(',')
+      let imageMap = {}
+      try {
+        const res = await client.query(
+          `SELECT id, metadata FROM admin_hub_collections WHERE id::text = ANY($1::text[])`,
+          [idList]
+        )
+        res.rows.forEach(row => {
+          const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
+          const img = meta.image_url || meta.banner_image_url || null
+          if (img) imageMap[row.id] = img
+        })
+      } catch (_) {}
+      // Inject images into containers
+      return containers.map(c => {
+        if (c.type !== 'collections_carousel' || !Array.isArray(c.collections)) return c
+        return {
+          ...c,
+          collections: c.collections.map(col => {
+            if (col.image || !imageMap[col.id]) return col
+            return { ...col, image: imageMap[col.id] }
+          })
+        }
+      })
+    }
+
     const landingPageGET = async (req, res) => {
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
         const r = await client.query('SELECT containers, updated_at FROM admin_hub_landing_page WHERE id = 1')
-        res.json({ containers: r.rows[0]?.containers || [], updated_at: r.rows[0]?.updated_at || null })
+        const containers = await enrichCollectionImages(r.rows[0]?.containers || [], client)
+        res.json({ containers, updated_at: r.rows[0]?.updated_at || null })
       } catch (err) {
         console.error('Landing page GET error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -7302,7 +7346,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const pageId = req.params.pageId
         const r = await client.query('SELECT containers, updated_at FROM admin_hub_landing_pages WHERE page_id = $1', [pageId])
         if (r.rows[0]) {
-          return res.json({ containers: r.rows[0].containers || [], updated_at: r.rows[0].updated_at || null })
+          const containers = await enrichCollectionImages(r.rows[0].containers || [], client)
+          return res.json({ containers, updated_at: r.rows[0].updated_at || null })
         }
         // One-time fallback: only for the oldest page when new table is completely empty
         const newCount = await client.query('SELECT COUNT(*) FROM admin_hub_landing_pages')
@@ -7311,7 +7356,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           if (firstPage.rows[0] && String(firstPage.rows[0].id) === String(pageId)) {
             const old = await client.query('SELECT containers FROM admin_hub_landing_page WHERE id = 1')
             if (old.rows[0]?.containers?.length) {
-              return res.json({ containers: old.rows[0].containers, updated_at: null, _migrated: true })
+              const containers = await enrichCollectionImages(old.rows[0].containers, client)
+              return res.json({ containers, updated_at: null, _migrated: true })
             }
           }
         }
@@ -7382,7 +7428,36 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.get('/admin-hub/styles', stylesGET)
     httpApp.put('/admin-hub/styles', stylesPUT)
     httpApp.get('/store/styles', stylesGET) // public — no auth
-    console.log('Landing page routes: GET/PUT /admin-hub/landing-page, GET /store/landing-page, GET /store/styles')
+
+    // ── Public Trustpilot widget config (Business Unit ID is public in TrustBox embeds) ──
+    const storeTrustpilotConfigGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.json({ enabled: false, businessUnitId: null, templateId: null })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `SELECT api_key, config FROM store_integrations WHERE LOWER(TRIM(slug)) = 'trustpilot' AND is_active = true LIMIT 1`
+        )
+        const row = r.rows[0]
+        const bu = row && row.api_key ? String(row.api_key).trim() : ''
+        if (!bu) return res.json({ enabled: false, businessUnitId: null, templateId: null })
+        let cfg = {}
+        try {
+          const c = row.config
+          cfg = typeof c === 'string' ? JSON.parse(c) : (c && typeof c === 'object' ? c : {})
+        } catch (_) {}
+        const templateId = (cfg.template_id || cfg.templateId || '').toString().trim() || '5419b732-fbfb-4c9d-8b9d-0a9952a935df'
+        res.json({ enabled: true, businessUnitId: bu, templateId })
+      } catch (err) {
+        console.error('storeTrustpilotConfigGET:', err)
+        res.json({ enabled: false, businessUnitId: null, templateId: null })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    httpApp.get('/store/trustpilot-config', storeTrustpilotConfigGET)
+
+    console.log('Landing page routes: GET/PUT /admin-hub/landing-page, GET /store/landing-page, GET /store/styles, GET /store/trustpilot-config')
 
     // ── Notifications ─────────────────────────────────────────────────────
     const adminHubNotificationsUnreadGET = async (req, res) => {

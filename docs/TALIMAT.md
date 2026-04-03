@@ -1,5 +1,13 @@
-01.04.
+03.04.
 
+-- sellecentralde superuserlarin görebildigi content/landing-page safasinda eklenecek konteynerlere yenilerini ekleyelim. yeni konteynerlar teker teker söyleyecegim: 
++- tekli ürün ekleme
++- featured blog posts (eklenmis blog postlar carousel olarak gözükecek. blogpostlarin icine görsel de eklenecek görsel title ve text gözükecek acilabilecek)
++- newsletter abone olma container i. mailchim, klavio, brevo ya da baska bir sey entegre edecegim ve entegre calisacak.
++ 
+
+-- sayfanin altindan acilip bar olarak gözükecek bir cookie kabul etme, reddetme, yönetme sistemi yap shop icin.
+-- siteye trustpilot entegre edelim. sayfadaki yapilan yorumlar trustpilot ile entegre olsun. oraya da eklensin yorumlar ve ürünlerin altinda gözüken yorumlar trustpilot tasariminda gözüksün. trustpilot oldugu belli olsun yani.
 -- styles altinda ekledigimiz bilesenleri ayarlayabilelim bence. scroll up buton style ve rengi, top bar stili ve rengi, header stili ve rengi, second nav stili ve rengi, websitesi yazi tipi fontu rengi boyutu nerede nasil olacagi, h1 nasil h2 nasil secenekleri, birkac farkli buton tasarimi var onlar ayri ayri ayarlansin, footer arka plan rengi. bunlari güzelce kodda teplateleri kategorize et ancak koda sikisip kalmasin bu tarz seyler. sellercentralde yönetilebilsin tabii.
 
 -- seller olarak giris yaptim ve users & permissions sayfasindan bir emaile davet attim. smtp bagli olmadigi icin tabii ki email gelmedi. ancak o email adresi ile register yaptim, store adina ayni store adini girdim ve yeni bir seller hesabi olusturdu. 

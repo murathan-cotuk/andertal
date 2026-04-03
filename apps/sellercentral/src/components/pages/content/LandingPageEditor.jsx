@@ -18,6 +18,7 @@ import {
   Divider,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 
@@ -41,6 +42,56 @@ const TEXT_POSITION_OPTIONS = [
   { label: "Unten Rechts", value: "bottom-right" },
 ];
 
+// Parse a CSS padding shorthand into [top, right, bottom, left]
+function parsePadding(val) {
+  const parts = (val || "0px").trim().split(/\s+/);
+  if (parts.length === 1) return [parts[0], parts[0], parts[0], parts[0]];
+  if (parts.length === 2) return [parts[0], parts[1], parts[0], parts[1]];
+  if (parts.length === 3) return [parts[0], parts[1], parts[2], parts[1]];
+  return [parts[0], parts[1], parts[2], parts[3]];
+}
+
+// horizontalOnly=true: only shows Rechts/Links fields (vertical spacing comes from ContainerSpacingEditor)
+function PaddingEditor({ label = "Seitenabstand", value, onChange, defaultValue = "0px 0px 0px 0px", horizontalOnly = false }) {
+  const [t, r, b, l] = parsePadding(value || defaultValue);
+  const emit = (top, right, bottom, left) => onChange(`${top} ${right} ${bottom} ${left}`);
+  const fieldStyle = { flex: 1, minWidth: 0 };
+  if (horizontalOnly) {
+    return (
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "#202223", marginBottom: 6 }}>{label}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={fieldStyle}>
+            <TextField label="Rechts" value={r} onChange={(v) => emit("0px", v, "0px", l)} autoComplete="off" placeholder="0px" />
+          </div>
+          <div style={fieldStyle}>
+            <TextField label="Links" value={l} onChange={(v) => emit("0px", r, "0px", v)} autoComplete="off" placeholder="0px" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 500, color: "#202223", marginBottom: 6 }}>{label}</div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <div style={fieldStyle}>
+          <TextField label="Oben" value={t} onChange={(v) => emit(v, r, b, l)} autoComplete="off" placeholder="0px" />
+        </div>
+        <div style={fieldStyle}>
+          <TextField label="Rechts" value={r} onChange={(v) => emit(t, v, b, l)} autoComplete="off" placeholder="0px" />
+        </div>
+        <div style={fieldStyle}>
+          <TextField label="Unten" value={b} onChange={(v) => emit(t, r, v, l)} autoComplete="off" placeholder="0px" />
+        </div>
+        <div style={fieldStyle}>
+          <TextField label="Links" value={l} onChange={(v) => emit(t, r, b, v)} autoComplete="off" placeholder="0px" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const CONTAINER_TYPES = [
   { type: "hero_banner",         label: "Hero Banner / Slider",  description: "Vollbild-Slider mit mehreren Bildern (3000×1000 px empfohlen)" },
   { type: "text_block",          label: "Text-Block",            description: "Überschrift, Fließtext (HTML) und optionaler Button" },
@@ -51,6 +102,9 @@ const CONTAINER_TYPES = [
   { type: "collections_carousel", label: "Kollektionen-Karussell", description: "Mehrere Kollektionen als anklickbare Karten nebeneinander" },
   { type: "accordion",           label: "Accordion (FAQ)",       description: "Aufklappbare Frage-Antwort-Sektionen, ideal für FAQs" },
   { type: "tabs",                label: "Tabs (Registerkarten)", description: "Inhalte in wechselbaren Reitern anzeigen" },
+  { type: "single_product",     label: "Einzelnes Produkt",     description: "Ein hervorgehobenes Produkt (Karte mit Warenkorb)" },
+  { type: "blog_carousel",      label: "Blog-Beiträge (Karussell)", description: "Manuelle Beiträge mit Bild, Text und ausklappbarem Inhalt" },
+  { type: "newsletter",         label: "Newsletter-Anmeldung",  description: "Formular (Mailchimp, Brevo, Klaviyo u. a.) per action-URL" },
 ];
 
 function newContainer(type) {
@@ -75,6 +129,39 @@ function newContainer(type) {
       return { ...base, title: "", items: [{ question: "Frage 1", answer: "" }, { question: "Frage 2", answer: "" }], bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", border_color: "#e5e7eb", icon_color: "#111827" };
     case "tabs":
       return { ...base, tabs: [{ label: "Tab 1", content: "" }, { label: "Tab 2", content: "" }], bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", tab_style: "underline", active_color: "#ff971c", tab_bg: "#f3f4f6" };
+    case "single_product":
+      return { ...base, title: "", product_id: "", product_handle: "", bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px" };
+    case "blog_carousel":
+      return {
+        ...base,
+        title: "Blog",
+        posts: [
+          { id: Math.random().toString(36).slice(2), title: "Beitrag 1", excerpt: "Kurzer Teaser …", image: "", href: "", body: "" },
+        ],
+        items_per_row: 3,
+        bg_color: "#ffffff",
+        text_color: "#111827",
+        padding: "40px 24px",
+      };
+    case "newsletter":
+      return {
+        ...base,
+        title: "Newsletter",
+        subtitle: "Exklusive Angebote und Neuigkeiten.",
+        button_text: "Anmelden",
+        email_placeholder: "E-Mail-Adresse",
+        provider: "other",
+        form_action: "",
+        form_method: "post",
+        email_field_name: "EMAIL",
+        hidden_fields: [],
+        privacy_note: "",
+        bg_color: "#f3f4f6",
+        text_color: "#111827",
+        btn_bg: "#111827",
+        btn_color: "#ffffff",
+        padding: "48px 24px",
+      };
     default:
       return base;
   }
@@ -236,7 +323,7 @@ function HeroBannerEditor({ container, onChange }) {
                 <TextField label="Untertitel-Größe" value={slide.subtitle_size || "clamp(14px,2vw,22px)"} onChange={(v) => updateSlide(idx, "subtitle_size", v)} autoComplete="off" helpText="z.B. 20px" />
               </div>
               <div style={{ flex: 1 }}>
-                <TextField label="Inhalts-Padding" value={slide.content_padding || "32px 48px"} onChange={(v) => updateSlide(idx, "content_padding", v)} autoComplete="off" helpText="z.B. 32px 48px" />
+                <PaddingEditor label="Inhalts-Padding" value={slide.content_padding || "32px 48px 32px 48px"} onChange={(v) => updateSlide(idx, "content_padding", v)} defaultValue="32px 48px 32px 48px" />
               </div>
             </InlineStack>
 
@@ -288,7 +375,7 @@ function TextBlockEditor({ container, onChange }) {
           <ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} />
         </div>
         <div style={{ flex: 1 }}>
-          <TextField label="Padding" value={container.padding || "48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" />
+          <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
         </div>
       </InlineStack>
       <InlineStack gap="400" wrap={false}>
@@ -340,7 +427,7 @@ function ImageTextEditor({ container, onChange }) {
           <ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} />
         </div>
         <div style={{ flex: 1 }}>
-          <TextField label="Padding" value={container.padding || "48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" />
+          <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
         </div>
       </InlineStack>
       <InlineStack gap="400" wrap={false}>
@@ -376,7 +463,7 @@ function ImageGridEditor({ container, onChange }) {
     images[idx] = { ...images[idx], [key]: val };
     onChange({ ...container, images });
   };
-  const addImg = () => onChange({ ...container, images: [...(container.images || []), { url: "", link: "", aspect_ratio: "1/1" }] });
+  const addImg = () => onChange({ ...container, images: [...(container.images || []), { url: "", link: "", aspect_ratio: "1/1", title: "", text: "" }] });
   const removeImg = (idx) => onChange({ ...container, images: (container.images || []).filter((_, i) => i !== idx) });
 
   return (
@@ -392,7 +479,7 @@ function ImageGridEditor({ container, onChange }) {
           <TextField label="Abstand (px)" type="number" value={String(container.gap || 16)} onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })} autoComplete="off" />
         </div>
         <div style={{ flex: 1 }}>
-          <TextField label="Padding" value={container.padding || "32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" />
+          <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
         </div>
       </InlineStack>
 
@@ -414,6 +501,8 @@ function ImageGridEditor({ container, onChange }) {
                 <Select label="Seitenverhältnis" options={ASPECT_RATIO_OPTIONS} value={img.aspect_ratio || "1/1"} onChange={(v) => updateImg(idx, "aspect_ratio", v)} />
               </div>
             </InlineStack>
+            <TextField label="Titel (optional)" value={img.title || ""} onChange={(v) => updateImg(idx, "title", v)} autoComplete="off" placeholder="z. B. Neuheiten" />
+            <TextField label="Text (optional)" value={img.text || ""} onChange={(v) => updateImg(idx, "text", v)} autoComplete="off" placeholder="Kurze Beschreibung unter dem Bild" multiline={2} />
           </BlockStack>
         </Card>
       ))}
@@ -447,7 +536,7 @@ function BannerCtaEditor({ container, onChange }) {
           <ColorField label="Textfarbe" value={container.text_color || "#ffffff"} onChange={(v) => onChange({ ...container, text_color: v })} />
         </div>
         <div style={{ flex: 1 }}>
-          <TextField label="Padding" value={container.padding || "40px 48px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" />
+          <PaddingEditor label="Seitenabstand" value={container.padding || "40px 48px 40px 48px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="40px 48px 40px 48px" horizontalOnly />
         </div>
       </InlineStack>
       <InlineStack gap="400" wrap={false}>
@@ -506,7 +595,7 @@ function CollectionCarouselEditor({ container, onChange }) {
           />
         </div>
         <div style={{ flex: 1 }}>
-          <TextField label="Padding" value={container.padding || "32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" />
+          <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
         </div>
       </InlineStack>
     </BlockStack>
@@ -519,7 +608,7 @@ function CollectionsCarouselEditor({ container, onChange }) {
   const [selectedId, setSelectedId] = useState("");
 
   useEffect(() => {
-    client.getCollections({ adminHub: true })
+    client.getMedusaCollections({ adminHub: true })
       .then((r) => {
         setCollections(Array.isArray(r?.collections) ? r.collections : []);
       })
@@ -604,7 +693,7 @@ function CollectionsCarouselEditor({ container, onChange }) {
           />
         </div>
         <div style={{ flex: 1 }}>
-          <TextField label="Padding" value={container.padding || "32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" />
+          <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
         </div>
       </InlineStack>
 
@@ -666,7 +755,7 @@ function AccordionEditor({ container, onChange }) {
             <div style={{ flex: 1 }}><ColorField label="Rahmenfarbe" value={container.border_color || "#e5e7eb"} onChange={(v) => onChange({ ...container, border_color: v })} /></div>
             <div style={{ flex: 1 }}><ColorField label="Icon-Farbe (+/−)" value={container.icon_color || "#111827"} onChange={(v) => onChange({ ...container, icon_color: v })} /></div>
           </InlineStack>
-          <TextField label="Padding" value={container.padding || "48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" />
+          <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
         </BlockStack>
       </Card>
 
@@ -743,7 +832,7 @@ function TabsEditor({ container, onChange }) {
           <InlineStack gap="400" wrap={false}>
             <div style={{ flex: 1 }}><ColorField label="Seiten-Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
             <div style={{ flex: 1 }}><ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
-            <div style={{ flex: 1 }}><TextField label="Padding" value={container.padding || "48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} autoComplete="off" helpText="oben/unten links/rechts" /></div>
+            <div style={{ flex: 1 }}><PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly /></div>
           </InlineStack>
         </BlockStack>
       </Card>
@@ -778,27 +867,290 @@ function TabsEditor({ container, onChange }) {
   );
 }
 
+function SingleProductEditor({ container, onChange }) {
+  const client = getMedusaAdminClient();
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    client.getAdminHubProducts({ limit: 500 }).then((r) => {
+      setProducts(Array.isArray(r?.products) ? r.products : []);
+    }).catch(() => {});
+  }, [client]);
+
+  const opts = [
+    { label: "— Produkt wählen —", value: "" },
+    ...products.map((p) => ({ label: `${p.title || p.handle || p.id}`, value: p.id })),
+  ];
+
+  return (
+    <BlockStack gap="400">
+      <TextField label="Überschrift (optional)" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
+      <Select
+        label="Produkt"
+        options={opts}
+        value={container.product_id || ""}
+        onChange={(id) => {
+          const pr = products.find((p) => p.id === id);
+          onChange({
+            ...container,
+            product_id: id,
+            product_handle: pr?.handle || "",
+          });
+        }}
+      />
+      <Text as="p" variant="bodySm" tone="subdued">
+        Es wird im Shop per Handle/ID geladen. Nur veröffentlichte Produkte erscheinen.
+      </Text>
+      <InlineStack gap="400" wrap={false}>
+        <div style={{ flex: 1 }}><ColorField label="Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
+        <div style={{ flex: 1 }}><ColorField label="Titelfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
+        <div style={{ flex: 1 }}>
+          <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
+        </div>
+      </InlineStack>
+    </BlockStack>
+  );
+}
+
+function BlogCarouselEditor({ container, onChange }) {
+  const posts = Array.isArray(container.posts) ? container.posts : [];
+  const [pickerIdx, setPickerIdx] = useState(null);
+
+  const updatePost = (idx, key, val) => {
+    const next = posts.map((p, i) => (i === idx ? { ...p, [key]: val } : p));
+    onChange({ ...container, posts: next });
+  };
+  const addPost = () => {
+    onChange({
+      ...container,
+      posts: [...posts, { id: Math.random().toString(36).slice(2), title: "", excerpt: "", image: "", href: "", body: "" }],
+    });
+  };
+  const removePost = (idx) => onChange({ ...container, posts: posts.filter((_, i) => i !== idx) });
+  const movePost = (idx, dir) => {
+    const next = [...posts];
+    const t = idx + dir;
+    if (t < 0 || t >= next.length) return;
+    [next[idx], next[t]] = [next[t], next[idx]];
+    onChange({ ...container, posts: next });
+  };
+
+  return (
+    <BlockStack gap="400">
+      {pickerIdx !== null && (
+        <MediaPickerModal
+          open
+          multiple={false}
+          onClose={() => setPickerIdx(null)}
+          onSelect={(urls) => {
+            if (urls[0]) updatePost(pickerIdx, "image", urls[0]);
+            setPickerIdx(null);
+          }}
+        />
+      )}
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">Karussell</Text>
+          <TextField label="Titel" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}>
+              <Select
+                label="Karten pro Reihe"
+                options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+                value={String(container.items_per_row || 3)}
+                onChange={(v) => onChange({ ...container, items_per_row: Number(v) })}
+              />
+            </div>
+            <div style={{ flex: 1 }}><ColorField label="Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
+            <div style={{ flex: 1 }}>
+              <PaddingEditor label="Seitenabstand" value={container.padding || "40px 24px 40px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="40px 24px 40px 24px" horizontalOnly />
+            </div>
+          </InlineStack>
+        </BlockStack>
+      </Card>
+
+      {posts.map((post, idx) => (
+        <Card key={post.id || idx}>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingSm">Beitrag {idx + 1}</Text>
+              <InlineStack gap="200">
+                <Button size="slim" disabled={idx === 0} onClick={() => movePost(idx, -1)}>↑</Button>
+                <Button size="slim" disabled={idx === posts.length - 1} onClick={() => movePost(idx, 1)}>↓</Button>
+                {posts.length > 1 && <Button size="slim" tone="critical" onClick={() => removePost(idx)}>Entfernen</Button>}
+              </InlineStack>
+            </InlineStack>
+            <ImageField label="Bild" value={post.image} onPick={() => setPickerIdx(idx)} onClear={() => updatePost(idx, "image", "")} />
+            <TextField label="Titel" value={post.title || ""} onChange={(v) => updatePost(idx, "title", v)} autoComplete="off" />
+            <TextField label="Kurztext / Teaser" value={post.excerpt || ""} onChange={(v) => updatePost(idx, "excerpt", v)} multiline={3} autoComplete="off" />
+            <TextField label="Link (optional, intern /de/... oder https://)" value={post.href || ""} onChange={(v) => updatePost(idx, "href", v)} autoComplete="off" />
+            <div>
+              <Text as="span" variant="bodyMd" fontWeight="medium">Ausklappbarer Inhalt (HTML)</Text>
+              <Box paddingBlockStart="100">
+                <RichTextEditor value={post.body || ""} onChange={(v) => updatePost(idx, "body", v)} />
+              </Box>
+            </div>
+          </BlockStack>
+        </Card>
+      ))}
+
+      <InlineStack>
+        <Button onClick={addPost}>+ Beitrag</Button>
+      </InlineStack>
+    </BlockStack>
+  );
+}
+
+function NewsletterEditor({ container, onChange }) {
+  const hidden = Array.isArray(container.hidden_fields) ? container.hidden_fields : [];
+
+  const setHidden = (next) => onChange({ ...container, hidden_fields: next });
+  const updateHidden = (idx, key, val) => {
+    const next = hidden.map((h, i) => (i === idx ? { ...h, [key]: val } : h));
+    setHidden(next);
+  };
+  const addHidden = () => setHidden([...hidden, { name: "", value: "" }]);
+  const removeHidden = (idx) => setHidden(hidden.filter((_, i) => i !== idx));
+
+  return (
+    <BlockStack gap="400">
+      <Banner tone="info">
+        Trage die <strong>form action URL</strong> deines Anbieters ein (Mailchimp-Formular, Brevo, Klaviyo Hosted Form o. ä.).
+        Versteckte Felder (z. B. u, id bei Mailchimp) unten ergänzen.
+      </Banner>
+      <TextField label="Titel" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
+      <TextField label="Untertitel" value={container.subtitle || ""} onChange={(v) => onChange({ ...container, subtitle: v })} multiline={2} autoComplete="off" />
+      <TextField label="Button-Text" value={container.button_text || ""} onChange={(v) => onChange({ ...container, button_text: v })} autoComplete="off" />
+      <TextField label="E-Mail-Placeholder" value={container.email_placeholder || ""} onChange={(v) => onChange({ ...container, email_placeholder: v })} autoComplete="off" />
+      <Select
+        label="Anbieter (Hinweis)"
+        options={[
+          { label: "Mailchimp", value: "mailchimp" },
+          { label: "Klaviyo", value: "klaviyo" },
+          { label: "Brevo (Sendinblue)", value: "brevo" },
+          { label: "Andere / eigene URL", value: "other" },
+        ]}
+        value={container.provider || "other"}
+        onChange={(v) => onChange({ ...container, provider: v })}
+      />
+      <TextField
+        label="Form action URL"
+        value={container.form_action || ""}
+        onChange={(v) => onChange({ ...container, form_action: v })}
+        autoComplete="off"
+        helpText="Vollständige URL des Ziels beim Absenden"
+      />
+      <Select
+        label="Methode"
+        options={[{ label: "POST", value: "post" }, { label: "GET", value: "get" }]}
+        value={container.form_method || "post"}
+        onChange={(v) => onChange({ ...container, form_method: v })}
+      />
+      <TextField
+        label="Name des E-Mail-Feldes"
+        value={container.email_field_name || "EMAIL"}
+        onChange={(v) => onChange({ ...container, email_field_name: v })}
+        autoComplete="off"
+        helpText="z. B. EMAIL (Mailchimp), email"
+      />
+      <TextField label="Datenschutz-Hinweis (optional)" value={container.privacy_note || ""} onChange={(v) => onChange({ ...container, privacy_note: v })} multiline={2} autoComplete="off" />
+      <InlineStack gap="400" wrap={false}>
+        <div style={{ flex: 1 }}><ColorField label="Hintergrund" value={container.bg_color || "#f3f4f6"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
+        <div style={{ flex: 1 }}><ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
+        <div style={{ flex: 1 }}><ColorField label="Button-Hintergrund" value={container.btn_bg || "#111827"} onChange={(v) => onChange({ ...container, btn_bg: v })} /></div>
+        <div style={{ flex: 1 }}><ColorField label="Button-Text" value={container.btn_color || "#ffffff"} onChange={(v) => onChange({ ...container, btn_color: v })} /></div>
+      </InlineStack>
+      <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
+
+      <Text as="h3" variant="headingSm">Versteckte Felder</Text>
+      {hidden.map((h, idx) => (
+        <InlineStack key={idx} gap="300" wrap={false} blockAlign="center">
+          <div style={{ flex: 1 }}><TextField label="Name" value={h.name || ""} onChange={(v) => updateHidden(idx, "name", v)} autoComplete="off" /></div>
+          <div style={{ flex: 1 }}><TextField label="Wert" value={h.value || ""} onChange={(v) => updateHidden(idx, "value", v)} autoComplete="off" /></div>
+          <Button size="slim" tone="critical" onClick={() => removeHidden(idx)}>✕</Button>
+        </InlineStack>
+      ))}
+      <Button size="slim" onClick={addHidden}>+ Hidden field</Button>
+    </BlockStack>
+  );
+}
+
+function ContainerSpacingEditor({ container, onChange }) {
+  const m = container.margin || {};
+  const set = (k, v) => {
+    const next = { ...m };
+    const trimmed = v != null ? String(v).trim() : "";
+    if (trimmed === "") delete next[k];
+    else next[k] = v;
+    const keys = Object.keys(next);
+    onChange({ ...container, margin: keys.length ? next : undefined });
+  };
+  const fields = [
+    { key: "top",    label: "Oben" },
+    { key: "bottom", label: "Unten" },
+    { key: "left",   label: "Links" },
+    { key: "right",  label: "Rechts" },
+  ];
+  return (
+    <div>
+      <Divider />
+      <Box paddingBlockStart="400">
+        <Text variant="headingSm" as="h3">Außenabstand (Margin)</Text>
+        <Box paddingBlockStart="300">
+          <InlineStack gap="300" wrap={false}>
+            {fields.map(({ key, label }) => (
+              <div key={key} style={{ flex: 1 }}>
+                <TextField
+                  label={label}
+                  value={m[key] !== undefined ? String(m[key]) : ""}
+                  onChange={(v) => set(key, v)}
+                  autoComplete="off"
+                  placeholder="0px"
+                  helpText=" "
+                />
+              </div>
+            ))}
+          </InlineStack>
+        </Box>
+      </Box>
+    </div>
+  );
+}
+
 function ContainerEditor({ container, onChange }) {
+  let editor = null;
   switch (container.type) {
-    case "hero_banner":         return <HeroBannerEditor container={container} onChange={onChange} />;
-    case "text_block":          return <TextBlockEditor container={container} onChange={onChange} />;
-    case "image_text":          return <ImageTextEditor container={container} onChange={onChange} />;
-    case "image_grid":          return <ImageGridEditor container={container} onChange={onChange} />;
-    case "banner_cta":          return <BannerCtaEditor container={container} onChange={onChange} />;
-    case "collection_carousel": return <CollectionCarouselEditor container={container} onChange={onChange} />;
-    case "collections_carousel": return <CollectionsCarouselEditor container={container} onChange={onChange} />;
-    case "accordion":           return <AccordionEditor container={container} onChange={onChange} />;
-    case "tabs":                return <TabsEditor container={container} onChange={onChange} />;
+    case "hero_banner":          editor = <HeroBannerEditor container={container} onChange={onChange} />; break;
+    case "text_block":           editor = <TextBlockEditor container={container} onChange={onChange} />; break;
+    case "image_text":           editor = <ImageTextEditor container={container} onChange={onChange} />; break;
+    case "image_grid":           editor = <ImageGridEditor container={container} onChange={onChange} />; break;
+    case "banner_cta":           editor = <BannerCtaEditor container={container} onChange={onChange} />; break;
+    case "collection_carousel":  editor = <CollectionCarouselEditor container={container} onChange={onChange} />; break;
+    case "collections_carousel": editor = <CollectionsCarouselEditor container={container} onChange={onChange} />; break;
+    case "accordion":            editor = <AccordionEditor container={container} onChange={onChange} />; break;
+    case "tabs":                 editor = <TabsEditor container={container} onChange={onChange} />; break;
+    case "single_product":       editor = <SingleProductEditor container={container} onChange={onChange} />; break;
+    case "blog_carousel":        editor = <BlogCarouselEditor container={container} onChange={onChange} />; break;
+    case "newsletter":           editor = <NewsletterEditor container={container} onChange={onChange} />; break;
     default: return null;
   }
+  return (
+    <BlockStack gap="0">
+      {editor}
+      <ContainerSpacingEditor container={container} onChange={onChange} />
+    </BlockStack>
+  );
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function LandingPageEditor() {
   const client = getMedusaAdminClient();
+  const unsaved = useUnsavedChanges();
   const [pages, setPages] = useState([]);
   const [selectedPageId, setSelectedPageId] = useState("");
   const [containers, setContainers] = useState([]);
+  const [isDirty, setIsDirty] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -843,7 +1195,7 @@ export default function LandingPageEditor() {
     else setContainers([]);
   }, [selectedPageId, loadContainers]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!selectedPageId) return;
     setSaving(true);
     setErr("");
@@ -858,22 +1210,45 @@ export default function LandingPageEditor() {
         await client.saveLandingPageContainers(selectedPageId, containers);
       }
       setSaved(true);
+      setIsDirty(false);
       setTimeout(() => setSaved(false), 4000);
     } catch (e) {
       setErr(e?.message || "Fehler beim Speichern");
     }
     setSaving(false);
-  };
+  }, [selectedPageId, containers, client]);
+
+  const handleDiscard = useCallback(async () => {
+    setIsDirty(false);
+    if (selectedPageId) await loadContainers(selectedPageId);
+  }, [selectedPageId, loadContainers]);
+
+  // Wire up top-bar Save/Discard buttons via UnsavedChanges context
+  useEffect(() => {
+    unsaved?.setDirty(isDirty);
+    if (!isDirty) {
+      unsaved?.clearHandlers();
+      return;
+    }
+    unsaved?.setHandlers({ onSave: handleSave, onDiscard: handleDiscard });
+    return () => unsaved?.clearHandlers();
+  }, [isDirty, handleSave, handleDiscard]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset dirty state when switching pages
+  useEffect(() => {
+    setIsDirty(false);
+  }, [selectedPageId]);
 
   const addContainer = (type) => {
     const c = newContainer(type);
     setContainers((prev) => [...prev, c]);
     setExpandedId(c.id);
     setAddModalOpen(false);
+    setIsDirty(true);
   };
 
-  const updateContainer = (id, updated) => setContainers((prev) => prev.map((c) => c.id === id ? updated : c));
-  const removeContainer = (id) => { setContainers((prev) => prev.filter((c) => c.id !== id)); if (expandedId === id) setExpandedId(null); };
+  const updateContainer = (id, updated) => { setContainers((prev) => prev.map((c) => c.id === id ? updated : c)); setIsDirty(true); };
+  const removeContainer = (id) => { setContainers((prev) => prev.filter((c) => c.id !== id)); if (expandedId === id) setExpandedId(null); setIsDirty(true); };
   const moveContainer = (id, dir) => {
     setContainers((prev) => {
       const idx = prev.findIndex((c) => c.id === id);
@@ -884,6 +1259,7 @@ export default function LandingPageEditor() {
       [next[idx], next[target]] = [next[target], next[idx]];
       return next;
     });
+    setIsDirty(true);
   };
 
   const typeInfo = (type) => CONTAINER_TYPES.find((t) => t.type === type) || { label: type };
@@ -897,7 +1273,6 @@ export default function LandingPageEditor() {
     <Page
       title="Landing Page"
       subtitle="Gestalte Seiten deines Shops mit Containern"
-      primaryAction={selectedPageId ? { content: saving ? "Speichern…" : "Speichern", onAction: handleSave, loading: saving } : undefined}
     >
       <Layout>
         {err && <Layout.Section><Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner></Layout.Section>}
@@ -949,7 +1324,7 @@ export default function LandingPageEditor() {
                               <Text as="span" variant="bodySm" tone="subdued">#{idx + 1}</Text>
                             </InlineStack>
                             <InlineStack gap="200" blockAlign="center">
-                              <Button size="slim" onClick={() => updateContainer(c.id, { ...c, visible: !c.visible })}>{c.visible ? "Verstecken" : "Einblenden"}</Button>
+                              <Button size="slim" onClick={() => { updateContainer(c.id, { ...c, visible: !c.visible }); }}>{c.visible ? "Verstecken" : "Einblenden"}</Button>
                               <Button size="slim" disabled={idx === 0} onClick={() => moveContainer(c.id, -1)}>↑</Button>
                               <Button size="slim" disabled={idx === containers.length - 1} onClick={() => moveContainer(c.id, 1)}>↓</Button>
                               <Button size="slim" tone="critical" onClick={() => { if (confirm("Container entfernen?")) removeContainer(c.id); }}>Entfernen</Button>

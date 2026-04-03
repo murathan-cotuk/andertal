@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Link } from "@/i18n/navigation";
 import { getMedusaClient } from "@/lib/medusa-client";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
@@ -13,9 +14,41 @@ function resolveUrl(url) {
   return `${BACKEND_URL}/uploads/${url}`;
 }
 
+function parsePaddingParts(val) {
+  const parts = (val || "0px").trim().split(/\s+/);
+  if (parts.length === 1) return [parts[0], parts[0], parts[0], parts[0]];
+  if (parts.length === 2) return [parts[0], parts[1], parts[0], parts[1]];
+  if (parts.length === 3) return [parts[0], parts[1], parts[2], parts[1]];
+  return [parts[0], parts[1], parts[2], parts[3]];
+}
+
+function marginValueMeaningful(v) {
+  if (v === undefined || v === null) return false;
+  return String(v).trim() !== "";
+}
+
+// Returns padding style for a container.
+// If container.margin has a non-empty top or bottom, inner vertical padding is cleared
+// so margin is the only vertical inset (avoids fighting horizontal-only padding editor).
+function getContainerPadding(container, defaultPad) {
+  const [t, r, b, l] = parsePaddingParts(container.padding || defaultPad || "0px");
+  const m = container.margin;
+  const hasVerticalMargin =
+    m != null && (marginValueMeaningful(m.top) || marginValueMeaningful(m.bottom));
+  if (hasVerticalMargin) return { paddingTop: "0px", paddingRight: r, paddingBottom: "0px", paddingLeft: l };
+  return { paddingTop: t, paddingRight: r, paddingBottom: b, paddingLeft: l };
+}
+
 function collectionHref(handle) {
   const value = String(handle || "").trim();
   return value ? `/kollektion/${value}` : "#";
+}
+
+function sanitizeBlogHtml(html) {
+  if (!html) return "";
+  return String(html)
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/\son\w+\s*=/gi, " data-removed=");
 }
 
 function getPositionStyle(pos) {
@@ -154,10 +187,9 @@ function HeroBanner({ container }) {
 // ── Text Block ────────────────────────────────────────────────────────────────
 function TextBlock({ container }) {
   const align = container.align || "center";
-  const pad = container.padding || "48px 24px";
   const posStyle = getPositionStyle(container.text_position || `center-${align === "left" ? "left" : align === "right" ? "right" : "center"}`);
   return (
-    <div style={{ background: container.bg_color || "#fff", padding: pad }}>
+    <div style={{ background: container.bg_color || "#fff", ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ maxWidth: 800, margin: "0 auto", textAlign: align }}>
         {container.title && (
           <h2 style={{ fontSize: "clamp(20px,3vw,36px)", fontWeight: 800, color: container.text_color || "#111827", margin: "0 0 16px" }}>
@@ -191,10 +223,9 @@ function TextBlock({ container }) {
 function ImageText({ container }) {
   const imageLeft = container.image_side !== "right";
   const imgSrc = resolveUrl(container.image);
-  const pad = container.padding || "48px 24px";
   const textAlign = container.text_align || "left";
   return (
-    <div style={{ background: container.bg_color || "#fff", padding: pad }}>
+    <div style={{ background: container.bg_color || "#fff", ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: imageLeft ? "row" : "row-reverse", gap: 40, alignItems: "center", flexWrap: "wrap" }}>
         {imgSrc && (
           <div style={{ flex: "0 0 auto", width: "min(45%, 480px)" }}>
@@ -235,16 +266,24 @@ function ImageText({ container }) {
 function ImageGrid({ container }) {
   const cols = container.cols || 2;
   const gap = container.gap || 16;
-  const pad = container.padding || "32px 24px";
   const images = (container.images || []).filter((i) => i.url);
   if (!images.length) return null;
   return (
-    <div style={{ padding: pad, background: "#fff" }}>
+    <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap }}>
         {images.map((img, i) => {
           const ratio = img.aspect_ratio || "1/1";
-          const el = <img src={resolveUrl(img.url)} alt="" style={{ width: "100%", aspectRatio: ratio, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />;
-          return img.link ? <a key={i} href={img.link} style={{ display: "block" }}>{el}</a> : <div key={i}>{el}</div>;
+          const imgEl = <img src={resolveUrl(img.url)} alt={img.title || ""} style={{ width: "100%", aspectRatio: ratio, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />;
+          const caption = (img.title || img.text) ? (
+            <div style={{ paddingTop: 10 }}>
+              {img.title && <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.3 }}>{img.title}</div>}
+              {img.text && <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4, lineHeight: 1.5 }}>{img.text}</div>}
+            </div>
+          ) : null;
+          const inner = <>{imgEl}{caption}</>;
+          return img.link
+            ? <a key={i} href={img.link} style={{ display: "block", textDecoration: "none" }}>{inner}</a>
+            : <div key={i}>{inner}</div>;
         })}
       </div>
     </div>
@@ -254,9 +293,8 @@ function ImageGrid({ container }) {
 // ── Banner CTA ────────────────────────────────────────────────────────────────
 function BannerCta({ container }) {
   const posStyle = getPositionStyle(container.text_position || "center");
-  const pad = container.padding || "40px 48px";
   return (
-    <div style={{ background: container.bg_color || "#ff971c", padding: pad, display: "flex", flexDirection: "column", ...posStyle }}>
+    <div style={{ background: container.bg_color || "#ff971c", ...getContainerPadding(container, "40px 48px"), display: "flex", flexDirection: "column", ...posStyle }}>
       {container.title && (
         <h2 style={{ fontSize: "clamp(20px,3vw,36px)", fontWeight: 900, color: container.text_color || "#fff", margin: "0 0 8px" }}>
           {container.title}
@@ -291,7 +329,6 @@ function BannerCta({ container }) {
 function CollectionCarousel({ container }) {
   const [products, setProducts] = useState([]);
   const itemsPerRow = container.items_per_row || 4;
-  const pad = container.padding || "32px 24px";
 
   useEffect(() => {
     if (!container.collection_id && !container.collection_handle) return;
@@ -307,13 +344,14 @@ function CollectionCarousel({ container }) {
   if (!products.length) return null;
 
   return (
-    <div style={{ padding: pad, background: "#fff" }}>
+    <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
       <Carousel
-        title={container.title || "Kollektion"}
+        contained={false}
+        title={container.title?.trim() ? container.title : undefined}
         visibleCount={itemsPerRow}
         navOnSides
         gap={16}
-        ariaLabel={container.title || "Collection carousel"}
+        ariaLabel={container.title?.trim() || "Collection carousel"}
       >
         {products.map((product, i) => (
           <ProductCard key={product.id || i} product={product} />
@@ -326,19 +364,19 @@ function CollectionCarousel({ container }) {
 function CollectionsCarousel({ container }) {
   const collections = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
   const itemsPerRow = container.items_per_row || 4;
-  const pad = container.padding || "32px 24px";
   const ratio = container.card_aspect_ratio || "4/5";
 
   if (!collections.length) return null;
 
   return (
-    <div style={{ padding: pad, background: "#fff" }}>
+    <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
       <Carousel
-        title={container.title || "Kollektionen"}
+        contained={false}
+        title={container.title?.trim() ? container.title : undefined}
         visibleCount={itemsPerRow}
         navOnSides
         gap={16}
-        ariaLabel={container.title || "Collections carousel"}
+        ariaLabel={container.title?.trim() || "Collections carousel"}
       >
         {collections.map((collection, i) => {
           const href = collectionHref(collection.handle);
@@ -391,6 +429,216 @@ function CollectionsCarousel({ container }) {
   );
 }
 
+// ── Single featured product ───────────────────────────────────────────────────
+function SingleProduct({ container }) {
+  const [product, setProduct] = useState(null);
+  const idOrHandle = (container.product_handle || container.product_id || "").toString().trim();
+
+  useEffect(() => {
+    if (!idOrHandle) return;
+    fetch(`${BACKEND_URL}/store/products/${encodeURIComponent(idOrHandle)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setProduct(d?.product || null))
+      .catch(() => setProduct(null));
+  }, [idOrHandle]);
+
+  if (!idOrHandle || !product) return null;
+
+  const wrapBg = container.bg_color || "#fff";
+  const title = container.title;
+
+  return (
+    <div style={{ ...getContainerPadding(container, "48px 24px"), background: wrapBg }}>
+      <div style={{ maxWidth: 420, margin: "0 auto" }}>
+        {title ? (
+          <h2 style={{
+            fontSize: "clamp(20px,3vw,28px)",
+            fontWeight: 800,
+            color: container.text_color || "#111827",
+            marginBottom: 20,
+            textAlign: "center",
+          }}>
+            {title}
+          </h2>
+        ) : null}
+        <ProductCard product={product} />
+      </div>
+    </div>
+  );
+}
+
+// ── Featured blog posts (manual entries, carousel + expand) ──────────────────
+function BlogCarousel({ container }) {
+  const posts = Array.isArray(container.posts) ? container.posts.filter((p) => p && (p.title || p.image || p.excerpt)) : [];
+  const [openId, setOpenId] = useState(null);
+  const itemsPerRow = container.items_per_row || 3;
+  const gap = 16;
+
+  if (!posts.length) return null;
+
+  const bg = container.bg_color || "#fff";
+  const textColor = container.text_color || "#111827";
+
+  return (
+    <div style={{ ...getContainerPadding(container, "40px 24px"), background: bg }}>
+      <Carousel
+        contained={false}
+        title={container.title?.trim() ? container.title : undefined}
+        visibleCount={Math.min(itemsPerRow, posts.length)}
+        navOnSides
+        gap={gap}
+        fadeBgColor={bg}
+        ariaLabel={container.title?.trim() || "Blog"}
+      >
+        {posts.map((post, i) => {
+          const id = post.id || `post-${i}`;
+          const img = resolveUrl(post.image);
+          const open = openId === id;
+          const href = (post.href || "").trim();
+          const CardInner = (
+            <div
+              style={{
+                border: "1px solid #e5e7eb",
+                borderRadius: 16,
+                overflow: "hidden",
+                background: "#fafafa",
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {img ? (
+                <div style={{ aspectRatio: "16/10", overflow: "hidden", background: "#eee" }}>
+                  <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </div>
+              ) : null}
+              <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column" }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: textColor, lineHeight: 1.25, marginBottom: 8 }}>
+                  {post.title || `Post ${i + 1}`}
+                </div>
+                {post.excerpt ? (
+                  <p style={{ margin: 0, fontSize: 14, color: "#4b5563", lineHeight: 1.5, flex: 1 }}>
+                    {post.excerpt}
+                  </p>
+                ) : null}
+                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                  {post.body ? (
+                    <button
+                      type="button"
+                      onClick={() => setOpenId(open ? null : id)}
+                      style={{
+                        border: "none",
+                        background: "#111827",
+                        color: "#fff",
+                        padding: "8px 14px",
+                        borderRadius: 8,
+                        fontWeight: 600,
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {open ? "Schließen" : "Weiterlesen"}
+                    </button>
+                  ) : null}
+                  {href ? (
+                    href.startsWith("http") ? (
+                      <a href={href} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>
+                        Zum Artikel →
+                      </a>
+                    ) : (
+                      <Link href={`/${href.replace(/^\//, "")}`} style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>
+                        Zum Artikel →
+                      </Link>
+                    )
+                  ) : null}
+                </div>
+                {open && post.body ? (
+                  <div
+                    style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #e5e7eb", fontSize: 14, color: "#374151", lineHeight: 1.6 }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeBlogHtml(post.body) }}
+                  />
+                ) : null}
+              </div>
+            </div>
+          );
+          return <div key={id} style={{ height: "100%" }}>{CardInner}</div>;
+        })}
+      </Carousel>
+    </div>
+  );
+}
+
+// ── Newsletter (form POST to Mailchimp / Brevo / Klaviyo action URL) ─────────
+function NewsletterSignup({ container }) {
+  const action = (container.form_action || "").trim();
+  const method = (container.form_method || "post").toLowerCase() === "get" ? "get" : "post";
+  const emailName = (container.email_field_name || "EMAIL").trim() || "EMAIL";
+  const hiddenFields = Array.isArray(container.hidden_fields) ? container.hidden_fields : [];
+  const bg = container.bg_color || "#f3f4f6";
+  const textColor = container.text_color || "#111827";
+  const btnBg = container.btn_bg || "#111827";
+  const btnColor = container.btn_color || "#fff";
+
+  if (!action) return null;
+
+  return (
+    <div style={{ ...getContainerPadding(container, "48px 24px"), background: bg }}>
+      <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
+        {container.title ? (
+          <h2 style={{ fontSize: "clamp(20px,3vw,28px)", fontWeight: 800, color: textColor, margin: "0 0 8px" }}>
+            {container.title}
+          </h2>
+        ) : null}
+        {container.subtitle ? (
+          <p style={{ margin: "0 0 20px", fontSize: 15, color: "#4b5563", lineHeight: 1.5 }}>
+            {container.subtitle}
+          </p>
+        ) : null}
+        <form action={action} method={method} target="_blank" style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "stretch" }}>
+          {hiddenFields.map((f, i) => (
+            f && f.name ? <input key={i} type="hidden" name={String(f.name)} value={String(f.value ?? "")} /> : null
+          ))}
+          <input
+            type="email"
+            name={emailName}
+            required
+            placeholder={container.email_placeholder || "E-Mail"}
+            autoComplete="email"
+            style={{
+              padding: "14px 16px",
+              borderRadius: 10,
+              border: "1px solid #d1d5db",
+              fontSize: 16,
+              width: "100%",
+              boxSizing: "border-box",
+            }}
+          />
+          <button
+            type="submit"
+            style={{
+              padding: "14px 20px",
+              borderRadius: 10,
+              border: "none",
+              background: btnBg,
+              color: btnColor,
+              fontWeight: 700,
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            {container.button_text || "Abonnieren"}
+          </button>
+        </form>
+        {container.privacy_note ? (
+          <p style={{ marginTop: 14, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>
+            {container.privacy_note}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 // ── Accordion ─────────────────────────────────────────────────────────────────
 function Accordion({ container }) {
   const [openIdx, setOpenIdx] = useState(null);
@@ -401,7 +649,7 @@ function Accordion({ container }) {
   const iconColor = container.icon_color || "#111827";
 
   return (
-    <div style={{ background: bg, padding: container.padding || "48px 24px" }}>
+    <div style={{ background: bg, ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ maxWidth: 860, margin: "0 auto" }}>
         {container.title && (
           <h2 style={{ fontSize: "clamp(20px,3vw,32px)", fontWeight: 700, color: textColor, marginBottom: 28, textAlign: "center" }}>
@@ -474,7 +722,7 @@ function Tabs({ container }) {
   const activeTab = tabs[activeIdx] || tabs[0];
 
   return (
-    <div style={{ background: bg, padding: container.padding || "48px 24px" }}>
+    <div style={{ background: bg, ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ maxWidth: 900, margin: "0 auto" }}>
         {/* Tab bar */}
         <div style={{
@@ -506,18 +754,31 @@ function Tabs({ container }) {
 // ── Renderer ──────────────────────────────────────────────────────────────────
 function renderContainer(c) {
   if (!c.visible) return null;
+  let inner = null;
   switch (c.type) {
-    case "hero_banner":         return <HeroBanner key={c.id} container={c} />;
-    case "text_block":          return <TextBlock key={c.id} container={c} />;
-    case "image_text":          return <ImageText key={c.id} container={c} />;
-    case "image_grid":          return <ImageGrid key={c.id} container={c} />;
-    case "banner_cta":          return <BannerCta key={c.id} container={c} />;
-    case "collection_carousel": return <CollectionCarousel key={c.id} container={c} />;
-    case "collections_carousel": return <CollectionsCarousel key={c.id} container={c} />;
-    case "accordion":           return <Accordion key={c.id} container={c} />;
-    case "tabs":                return <Tabs key={c.id} container={c} />;
+    case "hero_banner":          inner = <HeroBanner container={c} />; break;
+    case "text_block":           inner = <TextBlock container={c} />; break;
+    case "image_text":           inner = <ImageText container={c} />; break;
+    case "image_grid":           inner = <ImageGrid container={c} />; break;
+    case "banner_cta":           inner = <BannerCta container={c} />; break;
+    case "collection_carousel":  inner = <CollectionCarousel container={c} />; break;
+    case "collections_carousel": inner = <CollectionsCarousel container={c} />; break;
+    case "accordion":            inner = <Accordion container={c} />; break;
+    case "tabs":                 inner = <Tabs container={c} />; break;
+    case "single_product":       inner = <SingleProduct container={c} />; break;
+    case "blog_carousel":        inner = <BlogCarousel container={c} />; break;
+    case "newsletter":           inner = <NewsletterSignup container={c} />; break;
     default: return null;
   }
+  const m = c.margin || {};
+  const marginStyle = {
+    ...(m.top    ? { marginTop:    m.top }    : {}),
+    ...(m.bottom ? { marginBottom: m.bottom } : {}),
+    ...(m.left   ? { marginLeft:   m.left }   : {}),
+    ...(m.right  ? { marginRight:  m.right }  : {}),
+  };
+  const hasMargin = Object.keys(marginStyle).length > 0;
+  return <div key={c.id} style={hasMargin ? marginStyle : undefined}>{inner}</div>;
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────

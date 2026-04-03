@@ -18,9 +18,20 @@ const CATALOG = [
   { name: "Google Analytics", slug: "google-analytics", logo: "📊", category: "analytics", description: "Web-Analyse" },
   { name: "Slack", slug: "slack", logo: "💬", category: "communication", description: "Team-Kommunikation" },
   { name: "Zapier", slug: "zapier", logo: "⚡", category: "automation", description: "Workflow-Automatisierung" },
+  {
+    name: "Trustpilot", slug: "trustpilot", logo: "⭐", category: "reviews",
+    description: "Bewertungsplattform — zeige Trustpilot-Widgets in deinem Shop",
+    fieldLabels: {
+      api_key: "Business Unit ID",
+      api_key_placeholder: "z.B. 64a1b2c3d4e5f6a7b8c9d0e1",
+      api_secret: "API Secret (optional, für zukünftige Anbindung)",
+      api_secret_placeholder: "Trustpilot API Secret …",
+    },
+    helpText: "Business Unit ID: Trustpilot → Einstellungen → Unternehmensprofil. Optional: In der DB-Spalte `config` (JSON) z. B. {\"template_id\":\"DEIN_TEMPLATE_UUID\"} setzen — sonst Standard-Widget. Shop lädt /store/trustpilot-config.",
+  },
 ];
 
-const CATEGORIES = { erp: "ERP & Warenwirtschaft", marketplace: "Marktplätze", payment: "Zahlungen", marketing: "Marketing", analytics: "Analytics", automation: "Automatisierung", communication: "Kommunikation" };
+const CATEGORIES = { erp: "ERP & Warenwirtschaft", marketplace: "Marktplätze", payment: "Zahlungen", marketing: "Marketing", analytics: "Analytics", reviews: "Bewertungen", automation: "Automatisierung", communication: "Kommunikation" };
 
 export default function IntegrationsSettingsPage() {
   const [integrations, setIntegrations] = useState([]);
@@ -162,9 +173,22 @@ export default function IntegrationsSettingsPage() {
               <button onClick={() => setModal(null)} style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>×</button>
             </div>
             <div style={{ padding: 24, display: "grid", gap: 14 }}>
-              <div><label style={lbl}>API-Schlüssel</label><input style={inp} type="password" value={form.api_key} onChange={e => setForm(f => ({ ...f, api_key: e.target.value }))} placeholder={modal.integration ? "Neuen Key eingeben zum Ändern…" : "API Key eingeben…"} /></div>
-              <div><label style={lbl}>API-Geheimnis / Secret</label><input style={inp} type="password" value={form.api_secret} onChange={e => setForm(f => ({ ...f, api_secret: e.target.value }))} placeholder={modal.integration ? "Neues Secret eingeben zum Ändern…" : "API Secret eingeben…"} /></div>
-              <div><label style={lbl}>Webhook-URL <span style={{ color: "#9ca3af" }}>(optional)</span></label><input style={inp} value={form.webhook_url} onChange={e => setForm(f => ({ ...f, webhook_url: e.target.value }))} placeholder="https://..." /></div>
+              {modal.app.helpText && (
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 7, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>
+                  ℹ️ {modal.app.helpText}
+                </div>
+              )}
+              <div>
+                <label style={lbl}>{modal.app.fieldLabels?.api_key || "API-Schlüssel"}</label>
+                <input style={inp} type={modal.app.slug === "trustpilot" ? "text" : "password"} value={form.api_key} onChange={e => setForm(f => ({ ...f, api_key: e.target.value }))} placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.api_key_placeholder || "API Key eingeben…")} />
+              </div>
+              <div>
+                <label style={lbl}>{modal.app.fieldLabels?.api_secret || "API-Geheimnis / Secret"}</label>
+                <input style={inp} type="password" value={form.api_secret} onChange={e => setForm(f => ({ ...f, api_secret: e.target.value }))} placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.api_secret_placeholder || "API Secret eingeben…")} />
+              </div>
+              {!modal.app.fieldLabels && (
+                <div><label style={lbl}>Webhook-URL <span style={{ color: "#9ca3af" }}>(optional)</span></label><input style={inp} value={form.webhook_url} onChange={e => setForm(f => ({ ...f, webhook_url: e.target.value }))} placeholder="https://..." /></div>
+              )}
               {modal.integration && (
                 <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 7, padding: "10px 14px", fontSize: 12, color: "#6b7280" }}>
                   ✓ Bereits verbunden. Felder leer lassen um bestehende Zugangsdaten zu behalten.

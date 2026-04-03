@@ -350,12 +350,13 @@ export default function Carousel({
 
   const navInHeader = showNav && !useSideNav;
 
+  const hasTitle = title != null && String(title).trim() !== "";
   const content = (
     <>
-      {(title != null || header != null || navInHeader) && (
+      {(hasTitle || header != null || navInHeader) && (
         <TitleRow>
           <TitleRowLeft>
-            {header != null ? header : title != null ? <Title>{title}</Title> : null}
+            {header != null ? header : hasTitle ? <Title>{title}</Title> : null}
           </TitleRowLeft>
           {navInHeader && (
             <div style={{ display: "flex", gap: 10 }} role="group" aria-label="Carousel navigation">

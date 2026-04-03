@@ -23,6 +23,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { Lightbox } from "@/components/Lightbox";
 import ToCartButton from "@/components/ui/To Cart Button";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
+import TrustpilotTrustBox, { TrustpilotWordmark } from "@/components/TrustpilotTrustBox";
 
 const Container = styled.div`
   max-width: 100%;
@@ -1268,36 +1269,63 @@ export default function ProductTemplate() {
 
 
       <ReviewsSection id="reviews">
-        <SectionTitle>
-          Kundenbewertungen {reviewCount > 0 && `(${reviewCount})`}
-        </SectionTitle>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+          <SectionTitle style={{ marginBottom: 0 }}>
+            Kundenbewertungen {reviewCount > 0 && `(${reviewCount})`}
+          </SectionTitle>
+          <a
+            href="https://www.trustpilot.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: "none" }}
+            aria-label="Trustpilot"
+          >
+            <TrustpilotWordmark />
+          </a>
+        </div>
+        <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>
+          Bewertungen stammen aus diesem Shop. Darstellung im Trustpilot-Stil. Vollständiges Profil siehe Widget unten.
+        </p>
         <StarRating average={reviewAvg} count={reviewCount} />
         {productReviews.length > 0 ? (
           <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 16 }}>
             {productReviews.map((rv) => (
-              <div key={rv.id} style={{ padding: "16px 20px", background: "#f9fafb", borderRadius: 10, border: "1px solid #e5e7eb" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
-                  <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>
-                    {rv.customer_name || [rv.first_name, rv.last_name].filter(Boolean).join(" ") || "Kunde"}
+              <div
+                key={rv.id}
+                style={{
+                  padding: "18px 20px",
+                  background: "#fff",
+                  borderRadius: 4,
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 1px 2px rgba(25,25,25,0.06)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+                  <span style={{ fontWeight: 600, fontSize: 14, color: "#191919" }}>
+                    {rv.customer_name || [rv.first_name, rv.last_name].filter(Boolean).join(" ") || "Verifizierter Kauf"}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 16, letterSpacing: 1 }}>
-                      {[1,2,3,4,5].map((n) => (
-                        <span key={n} style={{ color: rv.rating >= n ? "#f59e0b" : "#d1d5db" }}>★</span>
+                    <span style={{ fontSize: 16, letterSpacing: 1 }} aria-hidden>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <span key={n} style={{ color: rv.rating >= n ? "#00B67A" : "#dcdce6" }}>★</span>
                       ))}
                     </span>
-                    <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                    <span style={{ fontSize: 12, color: "#6b7280" }}>
                       {new Date(rv.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
                     </span>
                   </div>
                 </div>
-                {rv.comment && <p style={{ margin: 0, fontSize: 14, color: "#374151", lineHeight: 1.6 }}>{rv.comment}</p>}
+                {rv.comment ? <p style={{ margin: 0, fontSize: 14, color: "#191919", lineHeight: 1.65 }}>{rv.comment}</p> : null}
               </div>
             ))}
           </div>
         ) : reviewCount === 0 ? (
           <p className="text-gray-500 text-sm mt-2">Noch keine Bewertungen vorhanden.</p>
         ) : null}
+        <TrustpilotTrustBox
+          locale={locale === "en" ? "en-US" : "de-DE"}
+          style={{ marginTop: 28 }}
+        />
       </ReviewsSection>
 
       {/* Full width below */}
