@@ -1,9 +1,154 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { Card, Button, Input } from "@belucha/ui";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+
+/** Build nested tree from flat array using parent_id */
+function buildTree(flat) {
+  const map = {};
+  flat.forEach(c => { map[c.id] = { ...c, children: [] }; });
+  const roots = [];
+  flat.forEach(c => {
+    if (c.parent_id && map[c.parent_id]) {
+      map[c.parent_id].children.push(map[c.id]);
+    } else {
+      roots.push(map[c.id]);
+    }
+  });
+  return roots;
+}
+
+function CategoryTreeNode({ node, depth = 0, onDelete, allOpen }) {
+  const [open, setOpen] = useState(allOpen);
+  const hasChildren = node.children && node.children.length > 0;
+  const indent = depth * 20;
+
+  // sync with allOpen toggle
+  useEffect(() => { setOpen(allOpen); }, [allOpen]);
+
+  return (
+    <div>
+      <TreeRow style={{ paddingLeft: 16 + indent }}>
+        <TreeToggle onClick={() => hasChildren && setOpen(o => !o)} $hasChildren={hasChildren}>
+          {hasChildren ? (
+            <ChevronIcon $open={open}>›</ChevronIcon>
+          ) : (
+            <DotIcon>·</DotIcon>
+          )}
+        </TreeToggle>
+        <TreeInfo>
+          <TreeName>{node.name}</TreeName>
+          <TreeMeta>
+            <span style={{ fontFamily: "monospace", fontSize: 11 }}>{node.slug}</span>
+            {node.is_visible && <Badge $color="#dbeafe" $text="#1e40af">Nav</Badge>}
+            {node.has_collection && <Badge $color="#d1fae5" $text="#065f46">Collection</Badge>}
+            {!node.active && <Badge $color="#fee2e2" $text="#991b1b">Pasif</Badge>}
+            {hasChildren && <Badge $color="#fef3c7" $text="#92400e">{node.children.length} alt</Badge>}
+          </TreeMeta>
+        </TreeInfo>
+        <TreeActions>
+          <DeleteBtn onClick={() => onDelete(node)} title="Sil">✕</DeleteBtn>
+        </TreeActions>
+      </TreeRow>
+      {hasChildren && open && (
+        <div>
+          {node.children.map(child => (
+            <CategoryTreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} allOpen={allOpen} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const TreeRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  padding-right: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f3f4f6;
+  &:hover { background: #f9fafb; }
+`;
+
+const TreeToggle = styled.button`
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ${p => p.$hasChildren ? "pointer" : "default"};
+`;
+
+const ChevronIcon = styled.span`
+  font-size: 16px;
+  color: #6b7280;
+  display: inline-block;
+  transform: rotate(${p => p.$open ? "90deg" : "0deg"});
+  transition: transform 0.18s ease;
+  line-height: 1;
+`;
+
+const DotIcon = styled.span`
+  font-size: 18px;
+  color: #d1d5db;
+  line-height: 1;
+`;
+
+const TreeInfo = styled.div`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+`;
+
+const TreeName = styled.span`
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+`;
+
+const TreeMeta = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+`;
+
+const Badge = styled.span`
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: ${p => p.$color};
+  color: ${p => p.$text};
+`;
+
+const TreeActions = styled.div`
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+`;
+
+const DeleteBtn = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  &:hover { color: #ef4444; background: #fee2e2; }
+`;
 
 const Container = styled.div`
   max-width: 1400px;
@@ -86,31 +231,6 @@ const ErrorMessage = styled.div`
   color: #991b1b;
 `;
 
-const CategoryList = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 16px;
-  margin-top: 24px;
-`;
-
-const CategoryCard = styled(Card)`
-  padding: 16px;
-  border-left: 4px solid #0ea5e9;
-  position: relative;
-`;
-
-const CategoryName = styled.h3`
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 8px;
-`;
-
-const CategoryHandle = styled.div`
-  font-size: 12px;
-  color: #6b7280;
-  font-family: 'Courier New', monospace;
-`;
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState([]);
@@ -118,7 +238,8 @@ export default function AdminCategoriesPage() {
   const [message, setMessage] = useState({ type: "", text: "" });
   const [bulkJson, setBulkJson] = useState("");
   const [creating, setCreating] = useState(false);
-  
+  const [allOpen, setAllOpen] = useState(false);
+
   const [singleCategory, setSingleCategory] = useState({
     name: "",
     slug: "",
@@ -135,7 +256,7 @@ export default function AdminCategoriesPage() {
     try {
       setLoading(true);
       const client = getMedusaAdminClient();
-      const data = await client.getAdminHubCategories();
+      const data = await client.getAdminHubCategories({ all: true });
       setCategories(data.categories || []);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -144,6 +265,17 @@ export default function AdminCategoriesPage() {
       setLoading(false);
     }
   };
+
+  const handleDelete = useCallback(async (cat) => {
+    if (!confirm(`"${cat.name}" kategorisini silmek istediğinize emin misiniz?`)) return;
+    try {
+      const client = getMedusaAdminClient();
+      await client.deleteAdminHubCategory(cat.id);
+      setCategories(prev => prev.filter(c => c.id !== cat.id));
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || "Silme işlemi başarısız" });
+    }
+  }, []);
 
   const handleSingleCreate = async (e) => {
     e.preventDefault();
@@ -356,35 +488,37 @@ export default function AdminCategoriesPage() {
       </Section>
 
       <Section>
-        <h2 style={{ marginBottom: "16px", fontSize: "20px", fontWeight: "600" }}>
-          Existing Categories ({categories.length})
-        </h2>
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "40px" }}>
-            <i className="fas fa-spinner fa-spin" style={{ fontSize: "32px", color: "#0ea5e9" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>
+            Kategoriler ({categories.length})
+          </h2>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setAllOpen(true)}
+              style={{ fontSize: 12, padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#374151" }}
+            >
+              Tümünü Aç
+            </button>
+            <button
+              onClick={() => setAllOpen(false)}
+              style={{ fontSize: 12, padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#374151" }}
+            >
+              Tümünü Kapat
+            </button>
           </div>
+        </div>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>Yükleniyor…</div>
         ) : categories.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-            No categories found. Add categories using the form above.
+            Henüz kategori yok. Yukarıdaki formdan ekleyin.
           </div>
         ) : (
-          <CategoryList>
-            {categories.map((category) => (
-              <CategoryCard key={category.id}>
-                <CategoryName>{category.name}</CategoryName>
-                <CategoryHandle>URL: /collections/{category.slug || "N/A"}</CategoryHandle>
-                {category.description && (
-                  <div style={{ fontSize: "14px", color: "#4b5563", marginTop: "8px" }}>
-                    {category.description}
-                  </div>
-                )}
-                <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px", display: "flex", gap: "12px" }}>
-                  {category.is_visible && <span>👁️ Navigation</span>}
-                  {category.has_collection && <span>📦 Collection</span>}
-                </div>
-              </CategoryCard>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+            {buildTree(categories).map(node => (
+              <CategoryTreeNode key={node.id} node={node} depth={0} onDelete={handleDelete} allOpen={allOpen} />
             ))}
-          </CategoryList>
+          </div>
         )}
       </Section>
     </Container>

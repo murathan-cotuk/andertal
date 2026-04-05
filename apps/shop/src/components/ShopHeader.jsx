@@ -33,7 +33,6 @@ import { getShippableCountries } from "@/lib/countries";
 
 const SCROLL_THRESHOLD = 60;
 const SCROLL_DELTA = 8; /* px; only toggle direction after this much scroll to avoid jitter */
-const MINIMAL_BAR_HEIGHT = 74;
 const MIDDLE_BAR_BG = "#1b8880";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -71,18 +70,26 @@ function menuItemHref(item) {
   return value ? `/${String(value).replace(/^\//, "")}` : "#";
 }
 
-const HeaderWrap = styled(motion.header)`
+const HeaderWrap = styled.header`
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 200;
-  background: rgba(255, 255, 255, 0.92);
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  transition: transform 0.25s ease-out;
+  will-change: transform;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: visible;
-  visibility: ${(p) => (p.$visible ? "visible" : "hidden")};
+`;
+
+/* TopBar wrapper — always in DOM, slides up smoothly when not at top */
+const TopBarWrap = styled.div`
+  overflow: hidden;
+  max-height: ${(p) => (p.$visible ? "60px" : "0px")};
+  opacity: ${(p) => (p.$visible ? 1 : 0)};
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
   pointer-events: ${(p) => (p.$visible ? "auto" : "none")};
 `;
 
@@ -474,17 +481,13 @@ const UserDropdownBtn = styled.button`
 
 const SubNavWrap = styled.div`
   width: 100%;
-  min-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 44px)")};
-  max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 44px)")};
-  background: ${(p) => (p.$hide ? "transparent" : "var(--second-nav-bg, #f0f0f0)")};
-  border-top: ${(p) => (p.$hide ? "none" : "1px solid rgba(0, 0, 0, 0.06)")};
-  border-bottom: ${(p) => (p.$hide ? "none" : "1px solid rgba(0, 0, 0, 0.08)")};
+  max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 50px)")};
+  background: var(--second-nav-bg, #f0f0f0);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   overflow: hidden;
   opacity: ${(p) => (p.$hide ? 0 : 1)};
-  visibility: ${(p) => (p.$hide ? "hidden" : "visible")};
-  clip-path: ${(p) => (p.$hide ? "inset(0 0 100% 0)" : "none")};
-  transition: max-height ${tokens.transition.base}, min-height ${tokens.transition.base}, opacity ${tokens.transition.base};
-  box-shadow: none;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
   display: flex;
   align-items: center;
   color: var(--second-nav-text, #374151);
@@ -522,8 +525,7 @@ const SecondLink = styled(Link)`
 `;
 
 const HeaderSpacer = styled.div`
-  height: ${(p) => (p.$visible ? (p.$atTop ? "132px" : `${MINIMAL_BAR_HEIGHT}px`) : "0")};
-  transition: height 0.25s ease-out;
+  height: ${(p) => p.$height}px;
   flex-shrink: 0;
 `;
 
@@ -628,6 +630,8 @@ export default function ShopHeader() {
   const [scrollY, setScrollY] = useState(0);
   const [scrollingDown, setScrollingDown] = useState(false);
   const lastScrollYRef = useRef(0);
+  const headerRef = useRef(null);
+  const [headerHeight, setHeaderHeight] = useState(116);
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
@@ -714,6 +718,19 @@ export default function ShopHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Track actual header height so the spacer is always accurate
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setHeaderHeight(Math.round(entry.contentRect.height));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     const close = () => {
       setMainMenuOpen(false);
@@ -727,7 +744,8 @@ export default function ShopHeader() {
   }, []);
 
   const atTop = scrollY <= SCROLL_THRESHOLD;
-  const showSubNav = atTop && !scrollingDown;
+  /* Show sub-nav (categories/collections bar) whenever header is visible, not only at top */
+  const showSubNav = !scrollingDown;
   /* Header only visible when scrolling up (or initial load when scrollingDown is false) */
   const showHeader = !scrollingDown;
 
@@ -741,8 +759,10 @@ export default function ShopHeader() {
 
   return (
     <>
-      <HeaderWrap $atTop={atTop} $visible={showHeader} style={{ transform: showHeader ? undefined : "translateY(-100%)" }}>
-        {atTop && <TopBar />}
+      <HeaderWrap ref={headerRef} style={{ transform: showHeader ? "translateY(0)" : "translateY(-100%)" }}>
+        <TopBarWrap $visible={atTop}>
+          <TopBar />
+        </TopBarWrap>
         <MiddleBarWrap className="shop-header-main">
           <MiddleBarInner>
             <MiddleBarLeft>
@@ -935,7 +955,7 @@ export default function ShopHeader() {
         </SubNavWrap>
       </HeaderWrap>
 
-      <HeaderSpacer $atTop={atTop} $visible={showHeader} />
+      <HeaderSpacer $height={headerHeight} />
     </>
   );
 }

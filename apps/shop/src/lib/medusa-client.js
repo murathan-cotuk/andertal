@@ -80,7 +80,9 @@ class MedusaClient {
   }
 
   async getProduct(id) {
-    const res = await this.request(`/store/products/${id}`)
+    const key = String(id ?? '').trim()
+    if (!key) return { product: null }
+    const res = await this.request(`/store/products/${encodeURIComponent(key)}`)
     if (res?.__error) return { product: null }
     return res
   }

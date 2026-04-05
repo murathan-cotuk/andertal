@@ -284,6 +284,15 @@ const FilterGroupTitle = styled.button`
   text-align: left;
 `;
 
+const FilterGroupHeading = styled.h4`
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+`;
+
 const FilterGroupBody = styled.div`
   display: ${(p) => (p.$open ? "block" : "none")};
   padding: 0 0 12px;
@@ -972,12 +981,12 @@ export default function CollectionPage() {
               {Object.entries(facets).map(([key, vals]) => (
                 <FilterGroup key={key}>
                   <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                    <span>{({
+                    <FilterGroupHeading>{({
                       brand_name: "Marke", farbe: "Farbe", colour: "Colour", color: "Color",
                       material: "Material", size: "Größe", groesse: "Größe",
                       typ: "Typ", style: "Style", gender: "Gender",
                       age_group: "Altersgruppe", season: "Saison",
-                    })[key] ?? key.replace(/_/g, " ")}</span>
+                    })[key] ?? key.replace(/_/g, " ")}</FilterGroupHeading>
                     <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
                   </FilterGroupTitle>
                   <FilterGroupBody $open={!!openFilterGroups[key]}>

@@ -66,11 +66,22 @@ function collectionHref(handle) {
   return value ? `/kollektion/${value}` : "#";
 }
 
-function sanitizeBlogHtml(html) {
-  if (!html) return "";
-  return String(html)
+function blogBodyToPlainSnippet(html, maxLen = 400) {
+  const t = String(html || "")
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/\son\w+\s*=/gi, " data-removed=");
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) return "";
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, Math.max(0, maxLen - 1))}…`;
+}
+
+function blogCardPreviewText(post) {
+  const ex = (post.excerpt || "").trim();
+  if (ex) return ex;
+  return blogBodyToPlainSnippet(post.body, 400);
 }
 
 function getPositionStyle(pos) {
@@ -489,14 +500,22 @@ function CollectionsCarousel({ container }) {
 // ── Single featured product ───────────────────────────────────────────────────
 function SingleProduct({ container }) {
   const [product, setProduct] = useState(null);
-  const idOrHandle = (container.product_handle || container.product_id || "").toString().trim();
+  // Prefer stable product_id (UUID); handle can change and break lookups.
+  const idOrHandle = (container.product_id || container.product_handle || "").toString().trim();
 
   useEffect(() => {
-    if (!idOrHandle) return;
-    fetch(`${BACKEND_URL}/store/products/${encodeURIComponent(idOrHandle)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setProduct(d?.product || null))
-      .catch(() => setProduct(null));
+    if (!idOrHandle) {
+      setProduct(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { product: p } = await getMedusaClient().getProduct(idOrHandle);
+      if (!cancelled) setProduct(p || null);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [idOrHandle]);
 
   if (!idOrHandle || !product) return null;
@@ -524,12 +543,11 @@ function SingleProduct({ container }) {
   );
 }
 
-// ── Featured blog posts (manual entries, carousel + expand) ──────────────────
+// ── Featured blog posts (carousel: teaser ~3 lines + link to full post) ───────
 function BlogCarousel({ container }) {
   const posts = Array.isArray(container.posts)
     ? container.posts.filter((p) => p && (p.title || p.image || p.excerpt || p.body))
     : [];
-  const [openId, setOpenId] = useState(null);
   const itemsPerRow = container.items_per_row || 3;
   const gap = 16;
 
@@ -537,6 +555,20 @@ function BlogCarousel({ container }) {
 
   const bg = container.bg_color || "#fff";
   const textColor = container.text_color || "#111827";
+
+  const previewClampStyle = {
+    margin: 0,
+    fontSize: 14,
+    color: "#4b5563",
+    lineHeight: 1.55,
+    flex: 1,
+    minHeight: 0,
+    display: "-webkit-box",
+    WebkitLineClamp: 3,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
+    wordBreak: "break-word",
+  };
 
   return (
     <div style={{ ...getContainerPadding(container, "40px 24px"), background: bg }}>
@@ -553,8 +585,14 @@ function BlogCarousel({ container }) {
           {posts.map((post, i) => {
           const id = post.id || `post-${i}`;
           const img = resolveUrl(post.image);
-          const open = openId === id;
           const href = (post.href || "").trim();
+          const preview = blogCardPreviewText(post);
+          const blogLink = href
+            ? href.startsWith("http")
+              ? { external: true, to: href }
+              : { external: false, to: `/${href.replace(/^\//, "")}` }
+            : null;
+
           const CardInner = (
             <div
               style={{
@@ -572,51 +610,59 @@ function BlogCarousel({ container }) {
                   <img src={img} alt={post.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 </div>
               ) : null}
-              <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column" }}>
-                <div style={{ fontSize: 17, fontWeight: 800, color: textColor, lineHeight: 1.25, marginBottom: 8 }}>
+              <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: textColor, lineHeight: 1.25 }}>
                   {post.title || `Post ${i + 1}`}
                 </div>
-                {post.excerpt ? (
-                  <p style={{ margin: 0, fontSize: 14, color: "#4b5563", lineHeight: 1.5, flex: 1 }}>
-                    {post.excerpt}
-                  </p>
-                ) : null}
-                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                  {post.body ? (
-                    <button
-                      type="button"
-                      onClick={() => setOpenId(open ? null : id)}
+                {preview ? (
+                  <p style={previewClampStyle}>{preview}</p>
+                ) : (
+                  <div style={{ flex: 1, minHeight: 8 }} />
+                )}
+                {blogLink ? (
+                  blogLink.external ? (
+                    <a
+                      href={blogLink.to}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       style={{
+                        alignSelf: "flex-start",
+                        marginTop: "auto",
+                        display: "inline-block",
                         border: "none",
                         background: "#111827",
                         color: "#fff",
-                        padding: "8px 14px",
+                        padding: "10px 16px",
                         borderRadius: 8,
                         fontWeight: 600,
                         fontSize: 13,
+                        textDecoration: "none",
                         cursor: "pointer",
                       }}
                     >
-                      {open ? "Schließen" : "Weiterlesen"}
-                    </button>
-                  ) : null}
-                  {href ? (
-                    href.startsWith("http") ? (
-                      <a href={href} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>
-                        Zum Artikel →
-                      </a>
-                    ) : (
-                      <Link href={`/${href.replace(/^\//, "")}`} style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>
-                        Zum Artikel →
-                      </Link>
-                    )
-                  ) : null}
-                </div>
-                {open && post.body ? (
-                  <div
-                    style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #e5e7eb", fontSize: 14, color: "#374151", lineHeight: 1.6 }}
-                    dangerouslySetInnerHTML={{ __html: sanitizeBlogHtml(post.body) }}
-                  />
+                      Zum Blog →
+                    </a>
+                  ) : (
+                    <Link
+                      href={blogLink.to}
+                      style={{
+                        alignSelf: "flex-start",
+                        marginTop: "auto",
+                        display: "inline-block",
+                        border: "none",
+                        background: "#111827",
+                        color: "#fff",
+                        padding: "10px 16px",
+                        borderRadius: 8,
+                        fontWeight: 600,
+                        fontSize: 13,
+                        textDecoration: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Zum Blog →
+                    </Link>
+                  )
                 ) : null}
               </div>
             </div>

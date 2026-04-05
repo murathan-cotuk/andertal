@@ -1,144 +1,128 @@
 "use client";
 
-/**
- * Categories Page - READ ONLY
- * 
- * Kategoriler sadece görüntülenir, ekleme/düzenleme yapılamaz.
- * Kategoriler Medusa Admin Panel'den veya Super Admin Panel'den yönetilir.
- */
-
 import React, { useState, useEffect } from "react";
-import styled from "styled-components";
 import { Card } from "@belucha/ui";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import DashboardLayout from "@/components/DashboardLayout";
 
-const Container = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
-`;
+function CategoryTreeNode({ node, depth, initialOpen }) {
+  const [open, setOpen] = useState(!!initialOpen);
+  const hasChildren = Array.isArray(node.children) && node.children.length > 0;
 
-const Title = styled.h1`
-  font-size: 32px;
-  font-weight: 700;
-  margin-bottom: 32px;
-  color: #1f2937;
-`;
+  return (
+    <div>
+      <div
+        onClick={() => hasChildren && setOpen(o => !o)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          paddingTop: 9,
+          paddingBottom: 9,
+          paddingRight: 16,
+          paddingLeft: 16 + depth * 24,
+          borderBottom: "1px solid #f3f4f6",
+          cursor: hasChildren ? "pointer" : "default",
+          background: "#fff",
+          userSelect: "none",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = "#f9fafb"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
+      >
+        <span style={{
+          display: "inline-block",
+          width: 16,
+          flexShrink: 0,
+          fontSize: 16,
+          fontWeight: 700,
+          color: "#6b7280",
+          textAlign: "center",
+          transition: "transform 0.15s",
+          transform: open ? "rotate(90deg)" : "rotate(0deg)",
+          visibility: hasChildren ? "visible" : "hidden",
+        }}>›</span>
 
-const Section = styled(Card)`
-  padding: 24px;
-  margin-bottom: 24px;
-`;
+        <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{node.name}</span>
+        <span style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{node.slug}</span>
 
-const InfoBox = styled.div`
-  background-color: #eff6ff;
-  border: 1px solid #3b82f6;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 24px;
-  color: #1e40af;
-`;
+        {node.is_visible && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 20, background: "#dbeafe", color: "#1e40af" }}>Nav</span>}
+        {node.has_collection && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 20, background: "#d1fae5", color: "#065f46" }}>Collection</span>}
+        {!node.active && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 20, background: "#fee2e2", color: "#991b1b" }}>Pasif</span>}
+        {hasChildren && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>{node.children.length} alt</span>}
+      </div>
 
-const CategoryList = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 16px;
-  margin-top: 24px;
-`;
+      {hasChildren && open && node.children.map(child => (
+        <CategoryTreeNode key={child.id} node={child} depth={depth + 1} initialOpen={initialOpen} />
+      ))}
+    </div>
+  );
+}
 
-const CategoryCard = styled(Card)`
-  padding: 16px;
-  border-left: 4px solid #0ea5e9;
-`;
-
-const CategoryName = styled.h3`
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 8px;
-`;
-
-const CategoryHandle = styled.div`
-  font-size: 12px;
-  color: #6b7280;
-  font-family: 'Courier New', monospace;
-`;
-
-const CategoryDescription = styled.div`
-  font-size: 14px;
-  color: #4b5563;
-  margin-top: 8px;
-`;
+function countNodes(arr) {
+  return arr.reduce((s, n) => s + 1 + countNodes(n.children || []), 0);
+}
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState([]);
+  const [tree, setTree] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [expandAll, setExpandAll] = useState(false);
+  const [treeKey, setTreeKey] = useState(0);
 
-  const medusaClient = getMedusaAdminClient();
-
-  // Kategorileri yükle
   useEffect(() => {
-    fetchCategories();
+    (async () => {
+      try {
+        setLoading(true);
+        const client = getMedusaAdminClient();
+        // { all: true } skips the active=true filter, tree:'true' triggers ?tree=true on backend
+        const data = await client.getAdminHubCategories({ all: true, tree: "true" });
+        // client returns { categories: data.tree } when backend sends { tree: [...] }
+        const nodes = data.categories || [];
+        setTree(nodes);
+        setTotal(countNodes(nodes));
+      } catch (e) {
+        console.error(e);
+        setError("Kategoriler yüklenemedi");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await medusaClient.getAdminHubCategories();
-      setCategories(data.categories || []);
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-      setError("Kategoriler yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleExpandAll = () => { setExpandAll(true);  setTreeKey(k => k + 1); };
+  const handleCollapseAll = () => { setExpandAll(false); setTreeKey(k => k + 1); };
+
+  const btnStyle = { fontSize: 12, padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#374151" };
 
   return (
     <DashboardLayout>
-      <Container>
-        <Title>Categories</Title>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 24, color: "#1f2937" }}>Kategoriler</h1>
+        <Card style={{ padding: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>{total} kategori</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={btnStyle} onClick={handleExpandAll}>Tümünü Aç</button>
+              <button style={btnStyle} onClick={handleCollapseAll}>Tümünü Kapat</button>
+            </div>
+          </div>
 
-        <InfoBox>
-          <strong>ℹ️ Read Only:</strong> Kategoriler sadece görüntülenir.
-          <br />
-          Kategori eklemek/düzenlemek için Medusa Admin Panel veya Super Admin Panel kullanın.
-        </InfoBox>
-
-        <Section>
-          <h2 style={{ marginBottom: "16px", fontSize: "20px", fontWeight: "600" }}>
-            Available Categories ({categories.length})
-          </h2>
           {loading ? (
-            <div style={{ textAlign: "center", padding: "40px" }}>
-              <i className="fas fa-spinner fa-spin" style={{ fontSize: "32px", color: "#0ea5e9" }} />
-            </div>
+            <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Yükleniyor…</div>
           ) : error ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "#ef4444" }}>
-              {error}
-            </div>
-          ) : categories.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-              No categories found. Categories will appear here once added from Admin Panel.
-            </div>
+            <div style={{ padding: 40, textAlign: "center", color: "#ef4444" }}>{error}</div>
+          ) : tree.length === 0 ? (
+            <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Henüz kategori yok.</div>
           ) : (
-            <CategoryList>
-              {categories.map((category) => (
-                <CategoryCard key={category.id}>
-                  <CategoryName>{category.name}</CategoryName>
-                  <CategoryHandle>URL: /collections/{category.slug || "N/A"}</CategoryHandle>
-                  {category.description && (
-                    <CategoryDescription>{category.description}</CategoryDescription>
-                  )}
-                </CategoryCard>
+            <div key={treeKey} style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+              {tree.map(node => (
+                <CategoryTreeNode key={node.id} node={node} depth={0} initialOpen={expandAll} />
               ))}
-            </CategoryList>
+            </div>
           )}
-        </Section>
-      </Container>
+        </Card>
+      </div>
     </DashboardLayout>
   );
 }

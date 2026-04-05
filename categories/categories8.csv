@@ -1,0 +1,284 @@
+name;slug;description;parent_id;active;sort_order;is_visible
+Dishwashers;appliances-dishwashers;;da34ee7d-1460-4d30-8bb5-33b637b3a561;True;0;True
+Laundry Appliances;appliances-laundry-appliances;;da34ee7d-1460-4d30-8bb5-33b637b3a561;True;0;True
+Parts & Accessories;appliances-parts-accessories;;da34ee7d-1460-4d30-8bb5-33b637b3a561;True;0;True
+Ranges, Ovens & Cooktops;appliances-ranges-ovens-cooktops;;da34ee7d-1460-4d30-8bb5-33b637b3a561;True;0;True
+Refrigerators, Freezers & Ice Makers;appliances-refrigerators-freezers-?ce-makers;;da34ee7d-1460-4d30-8bb5-33b637b3a561;True;0;True
+Arts, Crafts & Sewing Storage;arts-crafts-sewing-arts-crafts-sewing-storage;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Beading & Jewelry Making;arts-crafts-sewing-beading-jewelry-making;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Craft & Hobby Fabric;arts-crafts-sewing-craft-hobby-fabric;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Craft Supplies & Materials;arts-crafts-sewing-craft-supplies-materials;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Fabric Decorating;arts-crafts-sewing-fabric-decorating;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Knitting & Crochet Supplies;arts-crafts-sewing-knitting-crochet-supplies;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Model & Hobby Building;arts-crafts-sewing-model-hobby-building;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Needlework Supplies;arts-crafts-sewing-needlework-supplies;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Painting, Drawing & Art Supplies;arts-crafts-sewing-painting-drawing-art-supplies;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Printmaking Supplies;arts-crafts-sewing-printmaking-supplies;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Scrapbooking & Stamping Supplies;arts-crafts-sewing-scrapbooking-stamping-supplies;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Sewing Products;arts-crafts-sewing-sewing-products;;b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;True;0;True
+Automotive Enthusiast Merchandise;automotive-automotive-enthusiast-merchandise;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Automotive Exterior Accessories;automotive-automotive-exterior-accessories;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Automotive Interior Accessories;automotive-automotive-?nterior-accessories;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Automotive Paint & Paint Supplies;automotive-automotive-paint-paint-supplies;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Automotive Performance Parts & Accessories;automotive-automotive-performance-parts-accessories;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Automotive Replacement Parts;automotive-automotive-replacement-parts;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Automotive Tires & Wheels;automotive-automotive-tires-wheels;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Automotive Tools & Equipment;automotive-automotive-tools-equipment;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Car Care;automotive-car-care;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Heavy Duty & Commercial Vehicle Equipment;automotive-heavy-duty-commercial-vehicle-equipment;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Lights, Bulbs & Indicators;automotive-lights-bulbs-?ndicators;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Motorcycle & Powersports;automotive-motorcycle-powersports;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Oils & Fluids;automotive-oils-fluids;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+RV Parts & Accessories;automotive-rv-parts-accessories;;918d87af-5484-4c36-a278-0e29b73e8b3a;True;0;True
+Baby & Toddler Feeding  Supplies;baby-products-baby-toddler-feeding--supplies;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Baby Activity & Entertainment Products;baby-products-baby-activity-entertainment-products;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Baby Bathing & Skin Care;baby-products-baby-bathing-skin-care;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Baby Care Products;baby-products-baby-care-products;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Baby Diapering Products;baby-products-baby-diapering-products;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Baby Gifts;baby-products-baby-gifts;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Baby Health & Care Products;baby-products-baby-health-care-products;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Baby Safety Products;baby-products-baby-safety-products;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Baby Stationery;baby-products-baby-stationery;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Baby Strollers & Accessories;baby-products-baby-strollers-accessories;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Baby Travel Gear;baby-products-baby-travel-gear;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Child Safety Car Seats & Accessories;baby-products-child-safety-car-seats-accessories;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Nursery Furniture, Bedding & Decor;baby-products-nursery-furniture-bedding-decor;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Pregnancy & Maternity Products;baby-products-pregnancy-maternity-products;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Toilet Training Products;baby-products-toilet-training-products;;d498c3d1-3b6e-4c29-b80d-763360552855;True;0;True
+Beauty Tools & Accessories;beauty-personal-care-beauty-tools-accessories;;3f6ff319-6208-4485-b743-ce3c5e9e8cff;True;0;True
+Foot, Hand & Nail Care Products;beauty-personal-care-foot-hand-nail-care-products;;3f6ff319-6208-4485-b743-ce3c5e9e8cff;True;0;True
+Hair Care Products;beauty-personal-care-hair-care-products;;3f6ff319-6208-4485-b743-ce3c5e9e8cff;True;0;True
+Makeup;beauty-personal-care-makeup;;3f6ff319-6208-4485-b743-ce3c5e9e8cff;True;0;True
+Oral Care Products;beauty-personal-care-oral-care-products;;3f6ff319-6208-4485-b743-ce3c5e9e8cff;True;0;True
+Perfumes & Fragrances;beauty-personal-care-perfumes-fragrances;;3f6ff319-6208-4485-b743-ce3c5e9e8cff;True;0;True
+Personal Care Products;beauty-personal-care-personal-care-products;;3f6ff319-6208-4485-b743-ce3c5e9e8cff;True;0;True
+Shaving & Hair Removal Products;beauty-personal-care-shaving-hair-removal-products;;3f6ff319-6208-4485-b743-ce3c5e9e8cff;True;0;True
+Skin Care Products;beauty-personal-care-skin-care-products;;3f6ff319-6208-4485-b743-ce3c5e9e8cff;True;0;True
+Arts & Photography;books-arts-photography;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Biographies;books-biographies;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Business & Money;books-business-money;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Calendars;books-calendars;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Children's Books;books-children's-books;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Christian Books & Bibles;books-christian-books-bibles;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Comics & Graphic Novels;books-comics-graphic-novels;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Computers & Technology;books-computers-technology;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Cookbooks, Food & Wine;books-cookbooks-food-wine;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Crafts, Hobbies & Home;books-crafts-hobbies-home;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Education & Teaching;books-education-teaching;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Engineering & Transportation;books-engineering-transportation;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Health, Fitness & Dieting;books-health-fitness-dieting;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+History;books-history;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Humor & Entertainment;books-humor-entertainment;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Law;books-law;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+LGBTQ+ Books;books-lgbtq-books;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Literature & Fiction;books-literature-fiction;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Medical Books;books-medical-books;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Mystery, Thriller & Suspense;books-mystery-thriller-suspense;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Parenting & Relationships;books-parenting-relationships;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Politics & Social Sciences;books-politics-social-sciences;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Reference;books-reference;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Religion & Spirituality;books-religion-spirituality;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Romance;books-romance;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Science & Math;books-science-math;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Science Fiction & Fantasy;books-science-fiction-fantasy;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Self-Help;books-self-help;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Specialty Boutique;books-specialty-boutique;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Sports & Outdoors;books-sports-outdoors;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Teen & Young Adult Books;books-teen-young-adult-books;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Test Preparation;books-test-preparation;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Travel;books-travel;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True
+Music Styles;cds-vinyl-music-styles;;6a8ffdaf-aca6-4c82-b4bb-6f966d235a68;True;0;True
+Cell Phone Accessories;cell-phones-accessories-cell-phone-accessories;;07e844ad-065a-4810-988f-1a25ba4cfbb5;True;0;True
+Cell Phone Cases & Covers;cell-phones-accessories-cell-phone-cases-covers;;07e844ad-065a-4810-988f-1a25ba4cfbb5;True;0;True
+Cell Phone SIM Cards & Prepaid Minutes;cell-phones-accessories-cell-phone-s?m-cards-prepaid-minutes;;07e844ad-065a-4810-988f-1a25ba4cfbb5;True;0;True
+Cell Phones;cell-phones-accessories-cell-phones;;07e844ad-065a-4810-988f-1a25ba4cfbb5;True;0;True
+Baby Clothing & Shoes;clothing-shoes-jewelry-baby-clothing-shoes;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Boys' Fashion;clothing-shoes-jewelry-boys-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Costumes & Accessories;clothing-shoes-jewelry-costumes-accessories;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Girls' Fashion;clothing-shoes-jewelry-girls-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Luggage & Travel Gear;clothing-shoes-jewelry-luggage-travel-gear;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Men's Fashion;clothing-shoes-jewelry-mens-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Novelty & More;clothing-shoes-jewelry-novelty-more;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Shoe, Jewelry & Watch Accessories;clothing-shoes-jewelry-shoe-jewelry-watch-accessories;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Sport Specific Clothing;clothing-shoes-jewelry-sport-specific-clothing;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Uniforms, Work & Safety;clothing-shoes-jewelry-uniforms-work-safety;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Women's Fashion;clothing-shoes-jewelry-women's-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True
+Audio Headphones;electronics-audio-headphones;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Camera & Photo;electronics-camera-photo;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Cell Phones & Accessories;electronics-cell-phones-accessories;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Computers & Accessories;electronics-computers-accessories;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+eBook Readers & Accessories;electronics-ebook-readers-accessories;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Electronics Accessories & Supplies;electronics-electronics-accessories-supplies;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+GPS, Finders & Accessories;electronics-gps-finders-accessories;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Headphones, Earbuds & Accessories;electronics-headphones-earbuds-accessories;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Home Audio & Theater Products;electronics-home-audio-theater-products;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Household Batteries, Chargers & Accessories;electronics-household-batteries-chargers-accessories;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Portable Audio & Video;electronics-portable-audio-video;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Power Accessories;electronics-power-accessories;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Security & Surveillance Equipment;electronics-security-surveillance-equipment;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Televisions & Video Products;electronics-televisions-video-products;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Vehicle Electronics;electronics-vehicle-electronics;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Video Game Consoles & Accessories;electronics-video-game-consoles-accessories;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Video Projectors;electronics-video-projectors;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Wearable Technology;electronics-wearable-technology;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True
+Alcoholic Beverages;grocery-gourmet-food-alcoholic-beverages;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Beverages;grocery-gourmet-food-beverages;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Breads & Bakery;grocery-gourmet-food-breads-bakery;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Breakfast Foods;grocery-gourmet-food-breakfast-foods;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Candy & Chocolate;grocery-gourmet-food-candy-chocolate;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Dairy, Cheese & Eggs;grocery-gourmet-food-dairy-cheese-eggs;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Deli & Prepared Foods;grocery-gourmet-food-deli-prepared-foods;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Deli Foods;grocery-gourmet-food-deli-foods;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Dried Beans, Grains & Rice;grocery-gourmet-food-dried-beans-grains-rice;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Food & Beverage Gifts;grocery-gourmet-food-food-beverage-gifts;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Fresh Flowers & Live Indoor Plants;grocery-gourmet-food-fresh-flowers-live-?ndoor-plants;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Fresh Meal Ingredient Kits;grocery-gourmet-food-fresh-meal-?ngredient-kits;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Fresh Produce;grocery-gourmet-food-fresh-produce;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Frozen Foods;grocery-gourmet-food-frozen-foods;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Home Brewing & Winemaking;grocery-gourmet-food-home-brewing-winemaking;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Meat & Seafood;grocery-gourmet-food-meat-seafood;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Meat Substitutes;grocery-gourmet-food-meat-substitutes;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Pantry Staples;grocery-gourmet-food-pantry-staples;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Snack Foods;grocery-gourmet-food-snack-foods;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Snacks & Sweets;grocery-gourmet-food-snacks-sweets;;637efea1-7674-4fd2-b93e-7ac382ae6bda;True;0;True
+Baby & Child Care Products;health-household-baby-child-care-products;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Health Care Products;health-household-health-care-products;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Home Use Medical Supplies & Equipment;health-household-home-use-medical-supplies-equipment;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Household Supplies;health-household-household-supplies;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Sexual Wellness Products;health-household-sexual-wellness-products;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Sports Nutrition Products;health-household-sports-nutrition-products;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Stationery & Gift Wrapping Supplies;health-household-stationery-gift-wrapping-supplies;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Vision Products;health-household-vision-products;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Vitamins & Dietary Supplements;health-household-vitamins-dietary-supplements;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Vitamins, Minerals & Supplements;health-household-vitamins-minerals-supplements;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Wellness & Relaxation Products;health-household-wellness-relaxation-products;;f4d351cd-6624-4ae2-9656-3f424e5d11b1;True;0;True
+Artwork;home-kitchen-artwork;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Bath Products;home-kitchen-bath-products;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Bedding;home-kitchen-bedding;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Event & Party Supplies;home-kitchen-event-party-supplies;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Furniture;home-kitchen-furniture;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Heating, Cooling & Air Quality;home-kitchen-heating-cooling-air-quality;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Home Decor Products;home-kitchen-home-decor-products;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Home Storage & Organization;home-kitchen-home-storage-organization;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Household Cleaning Supplies;home-kitchen-household-cleaning-supplies;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Ironing Products;home-kitchen-?roning-products;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Kids' Home Store;home-kitchen-kids'-home-store;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Kitchen & Dining;home-kitchen-kitchen-dining;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Seasonal Decor;home-kitchen-seasonal-decor;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Vacuum Cleaners & Floor Care;home-kitchen-vacuum-cleaners-floor-care;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True
+Abrasive & Finishing Products;industrial-scientific-abrasive-finishing-products;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Additive Manufacturing Products;industrial-scientific-additive-manufacturing-products;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Commercial Door Products;industrial-scientific-commercial-door-products;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Cutting Tools;industrial-scientific-cutting-tools;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Digital Signage Equipment;industrial-scientific-digital-signage-equipment;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Electronic Components;industrial-scientific-electronic-components;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Fasteners;industrial-scientific-fasteners;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Filtration;industrial-scientific-filtration;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Food Service Equipment & Supplies;industrial-scientific-food-service-equipment-supplies;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Hydraulics, Pneumatics & Plumbing;industrial-scientific-hydraulics-pneumatics-plumbing;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Industrial Adhesives, Sealants & Lubricants;industrial-scientific-?ndustrial-adhesives-sealants-lubricants;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Industrial Hardware;industrial-scientific-?ndustrial-hardware;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Industrial Materials;industrial-scientific-?ndustrial-materials;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Industrial Power & Hand Tools;industrial-scientific-?ndustrial-power-hand-tools;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Janitorial & Sanitation Supplies;industrial-scientific-janitorial-sanitation-supplies;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Lab & Scientific Products;industrial-scientific-lab-scientific-products;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Material Handling Products;industrial-scientific-material-handling-products;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Occupational Health & Safety Products;industrial-scientific-occupational-health-safety-products;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Packaging & Shipping Supplies;industrial-scientific-packaging-shipping-supplies;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Power Transmission Products;industrial-scientific-power-transmission-products;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Professional Dental Supplies;industrial-scientific-professional-dental-supplies;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Professional Medical Supplies;industrial-scientific-professional-medical-supplies;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Retail Store Fixtures & Equipment;industrial-scientific-retail-store-fixtures-equipment;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Robotics;industrial-scientific-robotics;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Science Education Supplies;industrial-scientific-science-education-supplies;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Test, Measure & Inspect;industrial-scientific-test-measure-?nspect;;ab4ef772-952a-4596-ba19-c65f076666dc;True;0;True
+Movies & Films;movies-tv-movies-films;;0304f340-c01f-4b51-aef2-e0d4862de6c4;True;0;True
+Specialty Stores;movies-tv-specialty-stores;;0304f340-c01f-4b51-aef2-e0d4862de6c4;True;0;True
+TV Shows;movies-tv-tv-shows;;0304f340-c01f-4b51-aef2-e0d4862de6c4;True;0;True
+Band & Orchestra Musical Instruments;musical-instruments-band-orchestra-musical-?nstruments;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Bass Guitars;musical-instruments-bass-guitars;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Drums & Percussion;musical-instruments-drums-percussion;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Electronic Music, DJ & Karaoke;musical-instruments-electronic-music-dj-karaoke;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Guitars;musical-instruments-guitars;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Music Recording Equipment;musical-instruments-music-recording-equipment;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Musical Instrument Accessories;musical-instruments-musical-?nstrument-accessories;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Musical Instrument Amplifiers & Effects;musical-instruments-musical-?nstrument-amplifiers-effects;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Musical Instrument Keyboards & MIDI;musical-instruments-musical-?nstrument-keyboards-m?d?;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Recording Microphones & Accessories;musical-instruments-recording-microphones-accessories;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Stage & Sound Equipment;musical-instruments-stage-sound-equipment;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Stringed Musical Instruments;musical-instruments-stringed-musical-?nstruments;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Ukuleles, Mandolins & Banjos;musical-instruments-ukuleles-mandolins-banjos;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Wind & Woodwind Musical Instruments;musical-instruments-wind-woodwind-musical-?nstruments;;baa4ab47-d39f-4d2c-a1d7-906fedf46464;True;0;True
+Office & School Supplies;office-products-office-school-supplies;;81919bdc-4b54-4e32-a7df-7cb34b45e7cb;True;0;True
+Office Electronics Products;office-products-office-electronics-products;;81919bdc-4b54-4e32-a7df-7cb34b45e7cb;True;0;True
+Office Furniture & Lighting;office-products-office-furniture-lighting;;81919bdc-4b54-4e32-a7df-7cb34b45e7cb;True;0;True
+Farming & Urban Agriculture;patio-lawn-garden-farming-urban-agriculture;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Gardening & Lawn Care;patio-lawn-garden-gardening-lawn-care;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Outdoor Cooking;patio-lawn-garden-outdoor-cooking;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Outdoor Decor;patio-lawn-garden-outdoor-decor;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Outdoor Generators & Portable Power;patio-lawn-garden-outdoor-generators-portable-power;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Outdoor Heating & Cooling;patio-lawn-garden-outdoor-heating-cooling;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Outdoor Power & Lawn Equipment;patio-lawn-garden-outdoor-power-lawn-equipment;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Outdoor Storage & Housing;patio-lawn-garden-outdoor-storage-housing;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Patio Furniture & Accessories;patio-lawn-garden-patio-furniture-accessories;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Pest Control Products;patio-lawn-garden-pest-control-products;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Pools, Hot Tubs & Supplies;patio-lawn-garden-pools-hot-tubs-supplies;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Snow Removal Tools;patio-lawn-garden-snow-removal-tools;;37e5b2ee-6028-4136-8e9d-17612e638b80;True;0;True
+Cat Supplies;pet-supplies-cat-supplies;;4a7c195a-6e81-47d1-b269-3298908a70b0;True;0;True
+Dog Supplies;pet-supplies-dog-supplies;;4a7c195a-6e81-47d1-b269-3298908a70b0;True;0;True
+Fish & Aquatic Pets;pet-supplies-fish-aquatic-pets;;4a7c195a-6e81-47d1-b269-3298908a70b0;True;0;True
+Horse Supplies;pet-supplies-horse-supplies;;4a7c195a-6e81-47d1-b269-3298908a70b0;True;0;True
+Pet Bird Supplies;pet-supplies-pet-bird-supplies;;4a7c195a-6e81-47d1-b269-3298908a70b0;True;0;True
+Reptiles & Amphibian Supplies;pet-supplies-reptiles-amphibian-supplies;;4a7c195a-6e81-47d1-b269-3298908a70b0;True;0;True
+Small Animal Supplies;pet-supplies-small-animal-supplies;;4a7c195a-6e81-47d1-b269-3298908a70b0;True;0;True
+Athletic Clothing;sports-outdoors-athletic-clothing;;bc683b9c-45c5-47fb-91a1-fb5da1de6e4b;True;0;True
+Outdoor Recreation;sports-outdoors-outdoor-recreation;;bc683b9c-45c5-47fb-91a1-fb5da1de6e4b;True;0;True
+Sports & Fitness;sports-outdoors-sports-fitness;;bc683b9c-45c5-47fb-91a1-fb5da1de6e4b;True;0;True
+Sports Fan Shop;sports-outdoors-sports-fan-shop;;bc683b9c-45c5-47fb-91a1-fb5da1de6e4b;True;0;True
+Building Supplies;tools-home-improvement-building-supplies;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Electrical Equipment;tools-home-improvement-electrical-equipment;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Hardware;tools-home-improvement-hardware;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Home Appliances;tools-home-improvement-home-appliances;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Kitchen & Bath Fixtures;tools-home-improvement-kitchen-bath-fixtures;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Light Bulbs;tools-home-improvement-light-bulbs;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Lighting & Ceiling Fans;tools-home-improvement-lighting-ceiling-fans;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Measuring & Layout;tools-home-improvement-measuring-layout;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Paint, Wall Treatments & Supplies;tools-home-improvement-paint-wall-treatments-supplies;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Power Tools & Hand Tools;tools-home-improvement-power-tools-hand-tools;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Pumps & Plumbing Equipment;tools-home-improvement-pumps-plumbing-equipment;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Safety & Security;tools-home-improvement-safety-security;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Welding & Soldering;tools-home-improvement-welding-soldering;;4b121490-0826-42fc-bd5f-38edd38db6fe;True;0;True
+Arts & Crafts Supplies;toys-games-arts-crafts-supplies;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Baby & Toddler Toys;toys-games-baby-toddler-toys;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Building Toys;toys-games-building-toys;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Collectible Toys;toys-games-collectible-toys;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Dolls & Accessories;toys-games-dolls-accessories;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Dress Up & Pretend Play;toys-games-dress-up-pretend-play;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Games & Accessories;toys-games-games-accessories;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Hobbies;toys-games-hobbies;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Kids' Electronics;toys-games-kids'-electronics;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Kids' Furniture & Decor;toys-games-kids'-furniture-decor;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Kids' Party Supplies;toys-games-kids'-party-supplies;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Learning & Education Toys;toys-games-learning-education-toys;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Play Vehicles;toys-games-play-vehicles;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Puppets & Puppet Theaters;toys-games-puppets-puppet-theaters;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Puzzles;toys-games-puzzles;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Sports & Outdoor Play Toys;toys-games-sports-outdoor-play-toys;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Stuffed Animals & Plush Toys;toys-games-stuffed-animals-plush-toys;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Toy Figures & Playsets;toys-games-toy-figures-playsets;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Toy Vehicles;toys-games-toy-vehicles;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Toys & Games Activities & Amusements;toys-games-toys-games-activities-amusements;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Tricycles, Scooters & Wagons;toys-games-tricycles-scooters-wagons;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True
+Legacy Systems;video-games-legacy-systems;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+Mac Games & Accessories;video-games-mac-games-accessories;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+Microconsoles;video-games-microconsoles;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+Nintendo 3DS & 2DS Consoles, Games & Accessories;video-games-nintendo-3ds-2ds-consoles-games-accessories;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+Nintendo Switch Consoles, Games & Accessories;video-games-nintendo-switch-consoles-games-accessories;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+Online Video Game Services;video-games-online-video-game-services;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+PC Games & Accessories;video-games-pc-games-accessories;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+PlayStation 4 Games, Consoles & Accessories;video-games-playstation-4-games-consoles-accessories;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+PlayStation 5 Consoles, Games & Accessories;video-games-playstation-5-consoles-games-accessories;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+PlayStation Vita Games, Consoles & Accessories;video-games-playstation-vita-games-consoles-accessories;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+Virtual Reality Hardware & Accessories;video-games-virtual-reality-hardware-accessories;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+Xbox One Games, Consoles & Accessories;video-games-xbox-one-games-consoles-accessories;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True
+Xbox Series X & S Consoles, Games & Accessories;video-games-xbox-series-x-s-consoles-games-accessories;;7712f845-12b5-410a-a87e-48a38a27e164;True;0;True

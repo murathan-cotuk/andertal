@@ -114,23 +114,33 @@ function newContainer(type) {
     case "hero_banner":
       return { ...base, slides: [{ image: "", title: "", subtitle: "", btn_text: "", btn_url: "", overlay: 0, text_color: "#ffffff", text_position: "center", title_size: "clamp(24px,4vw,56px)", subtitle_size: "clamp(14px,2vw,22px)", content_padding: "32px 48px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8 }], height: "500px", autoplay: true, delay: 4000 };
     case "text_block":
-      return { ...base, title: "", body: "", btn_text: "", btn_url: "", align: "center", bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8 };
+      return { ...base, title: "", body: "", btn_text: "", btn_url: "", align: "center", bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "image_text":
-      return { ...base, image: "", title: "", body: "", btn_text: "", btn_url: "", image_side: "left", bg_color: "#ffffff", text_color: "#111827", text_align: "left", padding: "48px 24px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8 };
+      return { ...base, image: "", title: "", body: "", btn_text: "", btn_url: "", image_side: "left", bg_color: "#ffffff", text_color: "#111827", text_align: "left", padding: "48px 24px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "image_grid":
-      return { ...base, images: [{ url: "", link: "", aspect_ratio: "1/1" }, { url: "", link: "", aspect_ratio: "1/1" }], cols: 2, gap: 16, padding: "32px 24px" };
+      return { ...base, images: [{ url: "", link: "", aspect_ratio: "1/1" }, { url: "", link: "", aspect_ratio: "1/1" }], cols: 2, gap: 16, padding: "32px 24px", content_layout: "full" };
     case "banner_cta":
-      return { ...base, title: "", subtitle: "", btn_text: "", btn_url: "", bg_color: "#ff971c", text_color: "#ffffff", text_position: "center", padding: "32px 48px 40px 48px", btn_bg: "#ffffff", btn_color: "#111827", btn_border: "2px solid #000", btn_radius: 8 };
+      return { ...base, title: "", subtitle: "", btn_text: "", btn_url: "", bg_color: "#ff971c", text_color: "#ffffff", text_position: "center", padding: "32px 48px 40px 48px", btn_bg: "#ffffff", btn_color: "#111827", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "collection_carousel":
-      return { ...base, title: "", collection_id: "", collection_handle: "", items_per_row: 4, padding: "32px 24px" };
+      return { ...base, title: "", collection_id: "", collection_handle: "", items_per_row: 4, padding: "32px 24px", content_layout: "full" };
     case "collections_carousel":
-      return { ...base, title: "", collections: [], items_per_row: 4, padding: "32px 24px", card_aspect_ratio: "4/5" };
+      return { ...base, title: "", collections: [], items_per_row: 4, padding: "32px 24px", card_aspect_ratio: "4/5", content_layout: "full" };
     case "accordion":
-      return { ...base, title: "", items: [{ question: "Frage 1", answer: "" }, { question: "Frage 2", answer: "" }], bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", border_color: "#e5e7eb", icon_color: "#111827" };
+      return {
+        ...base,
+        title: "",
+        items: [{ question: "Frage 1", answer: "" }, { question: "Frage 2", answer: "" }],
+        bg_color: "#ffffff",
+        text_color: "#111827",
+        padding: "48px 24px",
+        border_color: "#e5e7eb",
+        icon_color: "#111827",
+        content_layout: "full",
+      };
     case "tabs":
-      return { ...base, tabs: [{ label: "Tab 1", content: "" }, { label: "Tab 2", content: "" }], bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", tab_style: "underline", active_color: "#ff971c", tab_bg: "#f3f4f6" };
+      return { ...base, tabs: [{ label: "Tab 1", content: "" }, { label: "Tab 2", content: "" }], bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", tab_style: "underline", active_color: "#ff971c", tab_bg: "#f3f4f6", content_layout: "full" };
     case "single_product":
-      return { ...base, title: "", product_id: "", product_handle: "", bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px" };
+      return { ...base, title: "", product_id: "", product_handle: "", bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", content_layout: "full" };
     case "blog_carousel":
       return {
         ...base,
@@ -140,6 +150,7 @@ function newContainer(type) {
         bg_color: "#ffffff",
         text_color: "#111827",
         padding: "40px 24px",
+        content_layout: "full",
       };
     case "newsletter":
       return {
@@ -159,6 +170,7 @@ function newContainer(type) {
         btn_bg: "#111827",
         btn_color: "#ffffff",
         padding: "48px 24px",
+        content_layout: "full",
       };
     default:
       return base;
@@ -376,6 +388,7 @@ function TextBlockEditor({ container, onChange }) {
           <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
         </div>
       </InlineStack>
+      <ContainerLayoutEditor container={container} onChange={onChange} />
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}>
           <ColorField label="Button-Hintergrund" value={container.btn_bg || "#ff971c"} onChange={(v) => onChange({ ...container, btn_bg: v })} />
@@ -428,6 +441,7 @@ function ImageTextEditor({ container, onChange }) {
           <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
         </div>
       </InlineStack>
+      <ContainerLayoutEditor container={container} onChange={onChange} />
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}>
           <ColorField label="Button-Hintergrund" value={container.btn_bg || "#ff971c"} onChange={(v) => onChange({ ...container, btn_bg: v })} />
@@ -480,6 +494,7 @@ function ImageGridEditor({ container, onChange }) {
           <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
         </div>
       </InlineStack>
+      <ContainerLayoutEditor container={container} onChange={onChange} />
 
       {(container.images || []).map((img, idx) => (
         <Card key={idx}>
@@ -540,6 +555,7 @@ function BannerCtaEditor({ container, onChange }) {
             Innenabstand: oben/unten = Abstand Text/Button zum Banner-Rand; links/rechts = seitlich. Außenabstand zwischen Containern weiter unter „Außenabstand (Margin)“.
           </Text>
           <PaddingEditor label="Innenabstand (Padding)" value={container.padding || "32px 48px 40px 48px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 48px 40px 48px" />
+          <ContainerLayoutEditor container={container} onChange={onChange} />
         </BlockStack>
       </Card>
       <InlineStack gap="400" wrap={false}>
@@ -601,6 +617,7 @@ function CollectionCarouselEditor({ container, onChange }) {
           <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
         </div>
       </InlineStack>
+      <ContainerLayoutEditor container={container} onChange={onChange} />
     </BlockStack>
   );
 }
@@ -699,6 +716,7 @@ function CollectionsCarouselEditor({ container, onChange }) {
           <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
         </div>
       </InlineStack>
+      <ContainerLayoutEditor container={container} onChange={onChange} />
 
       {chosen.length === 0 ? (
         <Card>
@@ -759,6 +777,7 @@ function AccordionEditor({ container, onChange }) {
             <div style={{ flex: 1 }}><ColorField label="Icon-Farbe (+/−)" value={container.icon_color || "#111827"} onChange={(v) => onChange({ ...container, icon_color: v })} /></div>
           </InlineStack>
           <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
+          <ContainerLayoutEditor container={container} onChange={onChange} />
         </BlockStack>
       </Card>
 
@@ -837,6 +856,7 @@ function TabsEditor({ container, onChange }) {
             <div style={{ flex: 1 }}><ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
             <div style={{ flex: 1 }}><PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly /></div>
           </InlineStack>
+          <ContainerLayoutEditor container={container} onChange={onChange} />
         </BlockStack>
       </Card>
 
@@ -911,6 +931,7 @@ function SingleProductEditor({ container, onChange }) {
           <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
         </div>
       </InlineStack>
+      <ContainerLayoutEditor container={container} onChange={onChange} />
     </BlockStack>
   );
 }
@@ -988,6 +1009,7 @@ function BlogCarouselEditor({ container, onChange }) {
               <PaddingEditor label="Seitenabstand" value={container.padding || "40px 24px 40px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="40px 24px 40px 24px" horizontalOnly />
             </div>
           </InlineStack>
+          <ContainerLayoutEditor container={container} onChange={onChange} />
         </BlockStack>
       </Card>
 
@@ -1096,6 +1118,7 @@ function NewsletterEditor({ container, onChange }) {
         <div style={{ flex: 1 }}><ColorField label="Button-Text" value={container.btn_color || "#ffffff"} onChange={(v) => onChange({ ...container, btn_color: v })} /></div>
       </InlineStack>
       <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
+      <ContainerLayoutEditor container={container} onChange={onChange} />
 
       <Text as="h3" variant="headingSm">Versteckte Felder</Text>
       {hidden.map((h, idx) => (
@@ -1220,9 +1243,6 @@ function ContainerEditor({ container, onChange }) {
   return (
     <BlockStack gap="0">
       {editor}
-      {container.type !== "hero_banner" ? (
-        <ContainerLayoutEditor container={container} onChange={onChange} />
-      ) : null}
       <ContainerSpacingEditor container={container} onChange={onChange} />
     </BlockStack>
   );
@@ -1447,12 +1467,16 @@ export default function LandingPageEditor() {
             <BlockStack gap="300">
               {CONTAINER_TYPES.map((t) => (
                 <Box key={t.type} padding="400" borderWidth="025" borderColor="border" borderRadius="200" background="bg-surface">
-                  <InlineStack align="space-between" blockAlign="center" gap="300">
-                    <BlockStack gap="100">
-                      <Text as="p" variant="bodyMd" fontWeight="semibold">{t.label}</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">{t.description}</Text>
-                    </BlockStack>
-                    <Button variant="primary" size="slim" onClick={() => addContainer(t.type)}>Auswählen</Button>
+                  <InlineStack align="space-between" blockAlign="center" gap="300" wrap={false}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <BlockStack gap="100">
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">{t.label}</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">{t.description}</Text>
+                      </BlockStack>
+                    </div>
+                    <div style={{ flexShrink: 0 }}>
+                      <Button variant="primary" size="slim" onClick={() => addContainer(t.type)}>Auswählen</Button>
+                    </div>
                   </InlineStack>
                 </Box>
               ))}

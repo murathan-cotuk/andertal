@@ -1,0 +1,24 @@
+id;name;slug;description;parent_id;active;sort_order;is_visible
+da34ee7d-1460-4d30-8bb5-33b637b3a561;Appliances;appliances;;;True;0;True
+b5c2c1af-9312-4aa5-b50d-4969b2af0ad9;Arts, Crafts & Sewing;arts-crafts-sewing;;;True;0;True
+918d87af-5484-4c36-a278-0e29b73e8b3a;Automotive;automotive;;;True;0;True
+d498c3d1-3b6e-4c29-b80d-763360552855;Baby Products;baby-products;;;True;0;True
+3f6ff319-6208-4485-b743-ce3c5e9e8cff;Beauty & Personal Care;beauty-personal-care;;;True;0;True
+7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;Books;books;;;True;0;True
+6a8ffdaf-aca6-4c82-b4bb-6f966d235a68;CDs & Vinyl;cds-vinyl;;;True;0;True
+07e844ad-065a-4810-988f-1a25ba4cfbb5;Cell Phones & Accessories;cell-phones-accessories;;;True;0;True
+c137dbb2-810e-4c54-a610-80babc5e176a;Clothing, Shoes & Jewelry;clothing-shoes-jewelry;;;True;0;True
+637efea1-7674-4fd2-b93e-7ac382ae6bda;Grocery & Gourmet Food;grocery-gourmet-food;;;True;0;True
+f4d351cd-6624-4ae2-9656-3f424e5d11b1;Health & Household;health-household;;;True;0;True
+505da24c-3ab4-407a-bd0b-fb0b90ddc321;Home & Kitchen;home-kitchen;;;True;0;True
+ab4ef772-952a-4596-ba19-c65f076666dc;Industrial & Scientific;industrial-scientific;;;True;0;True
+0304f340-c01f-4b51-aef2-e0d4862de6c4;Movies & TV;movies-tv;;;True;0;True
+baa4ab47-d39f-4d2c-a1d7-906fedf46464;Musical Instruments;musical-instruments;;;True;0;True
+81919bdc-4b54-4e32-a7df-7cb34b45e7cb;Office Products;office-products;;;True;0;True
+37e5b2ee-6028-4136-8e9d-17612e638b80;Patio, Lawn & Garden;patio-lawn-garden;;;True;0;True
+4a7c195a-6e81-47d1-b269-3298908a70b0;Pet Supplies;pet-supplies;;;True;0;True
+bc683b9c-45c5-47fb-91a1-fb5da1de6e4b;Sports & Outdoors;sports-outdoors;;;True;0;True
+4b121490-0826-42fc-bd5f-38edd38db6fe;Tools & Home Improvement;tools-home-improvement;;;True;0;True
+2cb6145b-ab4c-42b7-942c-c2e2c4029367;Toys & Games;toys-games;;;True;0;True
+7712f845-12b5-410a-a87e-48a38a27e164;Video Games;video-games;;;True;0;True
+5ef4ac23-1072-4ba1-baa5-31f7bca89909;Electronics;electronics;;;True;0;True

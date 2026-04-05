@@ -17,6 +17,17 @@ import {
   DataTable,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import MediaPickerModal from "@/components/MediaPickerModal";
+import RichTextEditor from "@/components/RichTextEditor";
+
+const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
+
+function resolveFeaturedImageUrl(url) {
+  if (!url || typeof url !== "string") return "";
+  const u = url.trim();
+  if (u.startsWith("http://") || u.startsWith("https://") || u.startsWith("/")) return u;
+  return `${BACKEND_URL}/uploads/${u}`;
+}
 
 function slugFromTitle(title) {
   if (!title || typeof title !== "string") return "";
@@ -39,6 +50,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
   const [saving, setSaving] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [pageToDelete, setPageToDelete] = useState(null);
+  const [blogImagePickerOpen, setBlogImagePickerOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
     slug: "",
@@ -258,7 +270,10 @@ export default function ContentPagesPage({ blogOnly = false }) {
       <Modal
         open={modalOpen}
         onClose={() => {
-          if (!saving) setModalOpen(false);
+          if (!saving) {
+            setBlogImagePickerOpen(false);
+            setModalOpen(false);
+          }
         }}
         title={editingId ? (blogOnly ? "Blog-Beitrag bearbeiten" : "Edit page") : (blogOnly ? "Blog-Beitrag" : "Add page")}
         primaryAction={{
@@ -294,23 +309,76 @@ export default function ContentPagesPage({ blogOnly = false }) {
                   autoComplete="off"
                   helpText="Kurzer Text auf der Karte; wenn leer, wird aus dem Inhalt gekürzt."
                 />
-                <TextField
-                  label="Beitragsbild (URL)"
-                  value={form.featured_image}
-                  onChange={(value) => setForm((prev) => ({ ...prev, featured_image: value }))}
-                  autoComplete="off"
-                  helpText="Bild-URL aus der Mediathek oder volle https-Adresse"
-                />
+                <BlockStack gap="200">
+                  <Text as="span" variant="bodyMd" fontWeight="medium">Beitragsbild</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Wie bei Landing-Page-Bildern: aus der Mediathek wählen, per Drag-and-Drop hochladen oder im Medien-Dialog eine https-URL eintragen.
+                  </Text>
+                  <InlineStack gap="300" blockAlign="center" wrap={false}>
+                    {resolveFeaturedImageUrl(form.featured_image) ? (
+                      <img
+                        src={resolveFeaturedImageUrl(form.featured_image)}
+                        alt=""
+                        style={{
+                          width: 80,
+                          height: 80,
+                          objectFit: "cover",
+                          borderRadius: 8,
+                          border: "1px solid var(--p-color-border)",
+                          display: "block",
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 80,
+                          height: 80,
+                          background: "var(--p-color-bg-surface-secondary)",
+                          borderRadius: 8,
+                          border: "1px dashed var(--p-color-border)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Text as="span" variant="bodySm" tone="subdued">Kein Bild</Text>
+                      </div>
+                    )}
+                    <BlockStack gap="100">
+                      <Button size="slim" onClick={() => setBlogImagePickerOpen(true)}>
+                        {form.featured_image ? "Bild ändern" : "Aus Mediathek / Upload"}
+                      </Button>
+                      {form.featured_image ? (
+                        <Button size="slim" tone="critical" onClick={() => setForm((prev) => ({ ...prev, featured_image: "" }))}>
+                          Entfernen
+                        </Button>
+                      ) : null}
+                    </BlockStack>
+                  </InlineStack>
+                </BlockStack>
               </>
             )}
-            <TextField
-              label="Body (HTML)"
-              value={form.body}
-              onChange={(value) => setForm((prev) => ({ ...prev, body: value }))}
-              multiline={6}
-              autoComplete="off"
-              placeholder="Page content (plain text or HTML)"
-            />
+            {blogOnly ? (
+              <RichTextEditor
+                label="Beitragstext"
+                value={form.body}
+                onChange={(html) => setForm((prev) => ({ ...prev, body: html }))}
+                minHeight="260px"
+                placeholder="Text eingeben…"
+                helpText="Visuell bearbeiten oder über „HTML“-Ansicht direkt HTML einfügen. Im Shop wird der Inhalt formatiert angezeigt."
+              />
+            ) : (
+              <TextField
+                label="Body (HTML)"
+                value={form.body}
+                onChange={(value) => setForm((prev) => ({ ...prev, body: value }))}
+                multiline={6}
+                autoComplete="off"
+                placeholder="Page content (plain text or HTML)"
+              />
+            )}
             {blogOnly && (
               <BlockStack gap="300">
                 <Text as="h3" variant="headingSm">SEO</Text>
@@ -344,6 +412,19 @@ export default function ContentPagesPage({ blogOnly = false }) {
           </BlockStack>
         </Modal.Section>
       </Modal>
+
+      {blogOnly ? (
+        <MediaPickerModal
+          open={blogImagePickerOpen}
+          onClose={() => setBlogImagePickerOpen(false)}
+          title="Beitragsbild"
+          multiple={false}
+          onSelect={(urls) => {
+            if (urls[0]) setForm((prev) => ({ ...prev, featured_image: urls[0] }));
+            setBlogImagePickerOpen(false);
+          }}
+        />
+      ) : null}
 
       <Modal
         open={deleteModalOpen}
