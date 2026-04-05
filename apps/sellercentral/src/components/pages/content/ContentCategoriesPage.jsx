@@ -16,12 +16,10 @@ import {
   Checkbox,
   Modal,
   Select,
-  IndexTable,
-  useIndexResourceState,
   Badge,
   DropZone,
 } from "@shopify/polaris";
-import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
+import { EditIcon, DeleteIcon, ChevronDownIcon, ChevronRightIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 
@@ -87,13 +85,78 @@ function buildTree(flatList) {
   return roots;
 }
 
-function flattenTree(tree, level = 0) {
-  let out = [];
-  for (const node of tree) {
-    out.push({ ...node, _level: level });
-    if (node.children?.length) out = out.concat(flattenTree(node.children, level + 1));
-  }
-  return out;
+function TreeNode({ node, depth, onEdit, onDelete, categories }) {
+  const [open, setOpen] = useState(false);
+  const hasKids = node.children && node.children.length > 0;
+
+  return (
+    <div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          paddingTop: 10,
+          paddingBottom: 10,
+          paddingLeft: 16 + depth * 24,
+          paddingRight: 16,
+          borderBottom: "1px solid #f1f1f1",
+          background: depth === 0 ? "#fafafa" : "#fff",
+          gap: 8,
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = "#f6f6f7"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = depth === 0 ? "#fafafa" : "#fff"; }}
+      >
+        {/* chevron */}
+        <button
+          type="button"
+          onClick={() => hasKids && setOpen(v => !v)}
+          style={{ background: "none", border: "none", padding: 0, cursor: hasKids ? "pointer" : "default", display: "flex", alignItems: "center", flexShrink: 0, width: 20, height: 20, color: "#637381" }}
+        >
+          {hasKids ? (open ? <ChevronDownIcon /> : <ChevronRightIcon />) : <span style={{ width: 20 }} />}
+        </button>
+
+        {/* name */}
+        <div style={{ flex: "0 0 240px", minWidth: 0 }}>
+          <Text as="span" variant="bodyMd" fontWeight={depth === 0 ? "semibold" : "regular"}>
+            {node.name}
+          </Text>
+          {hasKids && (
+            <Text as="span" variant="bodySm" tone="subdued"> ({node.children.length})</Text>
+          )}
+        </div>
+
+        {/* slug */}
+        <div style={{ flex: "0 0 180px", minWidth: 0 }}>
+          <Text as="span" variant="bodySm" tone="subdued">/{node.slug}</Text>
+        </div>
+
+        {/* collection */}
+        <div style={{ flex: "0 0 100px" }}>
+          {node.has_collection ? <Badge tone="success">Collection</Badge> : <Text as="span" tone="subdued">—</Text>}
+        </div>
+
+        {/* status */}
+        <div style={{ flex: "0 0 140px", display: "flex", gap: 6 }}>
+          <Badge tone={node.active ? "success" : "critical"}>{node.active ? "Active" : "Inactive"}</Badge>
+          {node.is_visible && <Badge>Visible</Badge>}
+        </div>
+
+        {/* actions */}
+        <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+          <Button size="slim" variant="plain" tone="subdued" accessibilityLabel="Edit" icon={EditIcon} onClick={() => onEdit(node)} />
+          <Button size="slim" variant="plain" tone="critical" accessibilityLabel="Delete" icon={DeleteIcon} onClick={() => onDelete(node.id)} />
+        </div>
+      </div>
+
+      {hasKids && open && (
+        <div style={{ borderLeft: "3px solid #e5e7eb", marginLeft: 16 + depth * 24 + 20 }}>
+          {node.children.map(child => (
+            <TreeNode key={child.id} node={child} depth={depth + 1} onEdit={onEdit} onDelete={onDelete} categories={categories} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const getDefaultBaseUrl = () => {
@@ -296,11 +359,8 @@ export default function ContentCategoriesPage() {
   };
 
   const tree = buildTree(categories);
-  const flatRows = flattenTree(tree);
   const parentOptions = [{ label: "— None (top level) —", value: "" }, ...categories.filter((c) => !editId || c.id !== editId).map((c) => ({ label: c.name, value: c.id }))];
 
-  const resourceName = { singular: "category", plural: "categories" };
-  const { selectedResources, allResourcesSelected, handleSelectionChange } = useIndexResourceState(flatRows);
 
   return (
     <Page
@@ -356,69 +416,18 @@ export default function ContentCategoriesPage() {
                   </BlockStack>
                 </Box>
               ) : (
-                <IndexTable
-                  resourceName={resourceName}
-                  itemCount={flatRows.length}
-                  selectable={false}
-                  headings={[
-                    { title: "Name" },
-                    { title: "Slug" },
-                    { title: "Parent" },
-                    { title: "Collection" },
-                    { title: "Status" },
-                    { title: "" },
-                  ]}
-                >
-                  {flatRows.map((row, index) => (
-                    <IndexTable.Row id={row.id} key={row.id} position={index}>
-                      <IndexTable.Cell>
-                        <Box paddingInlineStart={row._level ? `${row._level * 24 + 8}px` : "0"}>
-                          <Text as="span" variant="bodyMd" fontWeight="medium">
-                            {row._level ? `↳ ${row.name}` : row.name}
-                          </Text>
-                        </Box>
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        <Text as="span" variant="bodySm" tone="subdued">
-                          /{row.slug || "—"}
-                        </Text>
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        <Text as="span" variant="bodySm">
-                          {row.parent_id ? categories.find((c) => c.id === row.parent_id)?.name || "—" : "—"}
-                        </Text>
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        {row.has_collection ? (
-                          <Badge tone="success">Yes</Badge>
-                        ) : (
-                          <Text as="span" tone="subdued">
-                            —
-                          </Text>
-                        )}
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        <InlineStack gap="200">
-                          {row.active && (
-                            <Badge tone="success">Active</Badge>
-                          )}
-                          {!row.active && (
-                            <Badge tone="critical">Inactive</Badge>
-                          )}
-                          {row.is_visible && (
-                            <Badge>Visible</Badge>
-                          )}
-                        </InlineStack>
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        <InlineStack gap="200">
-                          <Button size="slim" variant="plain" tone="subdued" accessibilityLabel="Edit" icon={EditIcon} onClick={() => openEdit(row)} />
-                          <Button size="slim" variant="plain" tone="critical" accessibilityLabel="Delete" icon={DeleteIcon} onClick={() => setDeleteId(row.id)} />
-                        </InlineStack>
-                      </IndexTable.Cell>
-                    </IndexTable.Row>
+                <div style={{ border: "1px solid #e1e3e5", borderRadius: 8, overflow: "hidden" }}>
+                  {/* header */}
+                  <div style={{ display: "flex", alignItems: "center", padding: "8px 16px 8px 60px", background: "#f6f6f7", borderBottom: "1px solid #e1e3e5", gap: 8 }}>
+                    <div style={{ flex: "0 0 240px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Name</Text></div>
+                    <div style={{ flex: "0 0 180px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Slug</Text></div>
+                    <div style={{ flex: "0 0 100px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Collection</Text></div>
+                    <div style={{ flex: "0 0 140px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Status</Text></div>
+                  </div>
+                  {tree.map(node => (
+                    <TreeNode key={node.id} node={node} depth={0} onEdit={openEdit} onDelete={setDeleteId} categories={categories} />
                   ))}
-                </IndexTable>
+                </div>
               )}
             </BlockStack>
           </Card>

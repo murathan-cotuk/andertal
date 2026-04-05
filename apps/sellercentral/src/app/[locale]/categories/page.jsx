@@ -1,127 +1,133 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Card } from "@belucha/ui";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import DashboardLayout from "@/components/DashboardLayout";
 
-function CategoryTreeNode({ node, depth, initialOpen }) {
-  const [open, setOpen] = useState(!!initialOpen);
-  const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+/* Build tree from flat list using parent_id */
+function buildTree(flat) {
+  const map = {};
+  flat.forEach(c => (map[c.id] = { ...c, _children: [] }));
+  const roots = [];
+  flat.forEach(c => {
+    if (c.parent_id && map[c.parent_id]) {
+      map[c.parent_id]._children.push(map[c.id]);
+    } else {
+      roots.push(map[c.id]);
+    }
+  });
+  return roots;
+}
+
+function Node({ cat, depth }) {
+  const [open, setOpen] = useState(false);
+  const kids = cat._children || [];
+  const hasKids = kids.length > 0;
 
   return (
-    <div>
+    <div style={{ marginLeft: depth * 20 }}>
+      {/* row */}
       <div
-        onClick={() => hasChildren && setOpen(o => !o)}
+        onClick={() => hasKids && setOpen(v => !v)}
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          paddingTop: 9,
-          paddingBottom: 9,
-          paddingRight: 16,
-          paddingLeft: 16 + depth * 24,
-          borderBottom: "1px solid #f3f4f6",
-          cursor: hasChildren ? "pointer" : "default",
-          background: "#fff",
+          gap: 6,
+          padding: "8px 12px",
+          borderRadius: 6,
+          cursor: hasKids ? "pointer" : "default",
+          background: depth === 0 ? "#f8fafc" : "#fff",
+          border: "1px solid #e5e7eb",
+          marginBottom: 4,
           userSelect: "none",
         }}
-        onMouseEnter={e => { e.currentTarget.style.background = "#f9fafb"; }}
-        onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
       >
+        {/* toggle arrow */}
         <span style={{
-          display: "inline-block",
-          width: 16,
-          flexShrink: 0,
-          fontSize: 16,
-          fontWeight: 700,
-          color: "#6b7280",
+          fontSize: 13,
+          width: 18,
           textAlign: "center",
-          transition: "transform 0.15s",
+          color: "#6b7280",
+          display: "inline-block",
           transform: open ? "rotate(90deg)" : "rotate(0deg)",
-          visibility: hasChildren ? "visible" : "hidden",
-        }}>›</span>
+          transition: "transform .15s",
+          opacity: hasKids ? 1 : 0,
+        }}>▶</span>
 
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{node.name}</span>
-        <span style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{node.slug}</span>
+        <span style={{ fontWeight: depth === 0 ? 700 : 500, fontSize: 14, color: "#111827" }}>
+          {cat.name}
+        </span>
 
-        {node.is_visible && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 20, background: "#dbeafe", color: "#1e40af" }}>Nav</span>}
-        {node.has_collection && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 20, background: "#d1fae5", color: "#065f46" }}>Collection</span>}
-        {!node.active && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 20, background: "#fee2e2", color: "#991b1b" }}>Pasif</span>}
-        {hasChildren && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>{node.children.length} alt</span>}
+        <span style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>
+          /{cat.slug}
+        </span>
+
+        {hasKids && (
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "#6b7280" }}>
+            {kids.length} alt kategori
+          </span>
+        )}
       </div>
 
-      {hasChildren && open && node.children.map(child => (
-        <CategoryTreeNode key={child.id} node={child} depth={depth + 1} initialOpen={initialOpen} />
-      ))}
+      {/* children */}
+      {hasKids && open && (
+        <div style={{ marginLeft: 20, marginBottom: 4, borderLeft: "2px solid #e5e7eb", paddingLeft: 8 }}>
+          {kids.map(k => <Node key={k.id} cat={k} depth={depth + 1} />)}
+        </div>
+      )}
     </div>
   );
 }
 
-function countNodes(arr) {
-  return arr.reduce((s, n) => s + 1 + countNodes(n.children || []), 0);
-}
-
 export default function CategoriesPage() {
-  const [tree, setTree] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [roots, setRoots] = useState(null); // null = loading
+  const [flat, setFlat] = useState([]);
   const [error, setError] = useState(null);
-  const [expandAll, setExpandAll] = useState(false);
-  const [treeKey, setTreeKey] = useState(0);
+  const [allOpen, setAllOpen] = useState(false);
+  const [key, setKey] = useState(0);
 
   useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const client = getMedusaAdminClient();
-        // { all: true } skips the active=true filter, tree:'true' triggers ?tree=true on backend
-        const data = await client.getAdminHubCategories({ all: true, tree: "true" });
-        // client returns { categories: data.tree } when backend sends { tree: [...] }
-        const nodes = data.categories || [];
-        setTree(nodes);
-        setTotal(countNodes(nodes));
-      } catch (e) {
-        console.error(e);
-        setError("Kategoriler yüklenemedi");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    getMedusaAdminClient()
+      .getAdminHubCategories({ all: true })
+      .then(d => {
+        const list = d.categories || [];
+        setFlat(list);
+        setRoots(buildTree(list));
+      })
+      .catch(e => setError(String(e)));
   }, []);
 
-  const handleExpandAll = () => { setExpandAll(true);  setTreeKey(k => k + 1); };
-  const handleCollapseAll = () => { setExpandAll(false); setTreeKey(k => k + 1); };
-
-  const btnStyle = { fontSize: 12, padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#374151" };
+  const toggle = (open) => { setAllOpen(open); setKey(k => k + 1); };
 
   return (
     <DashboardLayout>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 24, color: "#1f2937" }}>Kategoriler</h1>
-        <Card style={{ padding: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>{total} kategori</span>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button style={btnStyle} onClick={handleExpandAll}>Tümünü Aç</button>
-              <button style={btnStyle} onClick={handleCollapseAll}>Tümünü Kapat</button>
-            </div>
-          </div>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 8, color: "#111827" }}>Kategoriler</h1>
 
-          {loading ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Yükleniyor…</div>
-          ) : error ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#ef4444" }}>{error}</div>
-          ) : tree.length === 0 ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Henüz kategori yok.</div>
-          ) : (
-            <div key={treeKey} style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-              {tree.map(node => (
-                <CategoryTreeNode key={node.id} node={node} depth={0} initialOpen={expandAll} />
-              ))}
-            </div>
-          )}
-        </Card>
+        {error && <p style={{ color: "red" }}>{error}</p>}
+
+        {/* debug satırı — veriyi kontrol etmek için */}
+        {roots !== null && (
+          <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
+            Toplam: {flat.length} &nbsp;|&nbsp; Ana kategori: {roots.length} &nbsp;|&nbsp;
+            Alt kategorisi olan: {flat.filter(c => c.parent_id).length}
+          </p>
+        )}
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <button onClick={() => toggle(true)}  style={{ padding: "5px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 13 }}>Tümünü Aç</button>
+          <button onClick={() => toggle(false)} style={{ padding: "5px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 13 }}>Tümünü Kapat</button>
+        </div>
+
+        {roots === null ? (
+          <p style={{ color: "#6b7280" }}>Yükleniyor…</p>
+        ) : roots.length === 0 ? (
+          <p style={{ color: "#6b7280" }}>Kategori bulunamadı.</p>
+        ) : (
+          <div key={key}>
+            {roots.map(r => <Node key={r.id} cat={r} depth={0} initialOpen={allOpen} />)}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
