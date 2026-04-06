@@ -122,7 +122,11 @@ export default function SellerDetailPage({ sellerId }) {
   const [savingPayout, setSavingPayout] = useState(false);
 
   const load = useCallback(() => {
-    if (!sellerId) return;
+    if (!sellerId) {
+      setLoading(false);
+      setError("Keine Verkäufer-ID");
+      return;
+    }
     setLoading(true);
     client.getSellerById(sellerId)
       .then((r) => {

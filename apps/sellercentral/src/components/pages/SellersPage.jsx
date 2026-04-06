@@ -27,6 +27,12 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("de-DE");
 }
 
+/** API / DB may return boolean or string */
+function isSellerSuperuser(s) {
+  const v = s?.is_superuser;
+  return v === true || v === "true" || v === 1 || v === "1";
+}
+
 // ── Status dot ────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const meta = STATUS_META[status] || { label: status, tone: "info" };
@@ -40,6 +46,58 @@ function StatCard({ label, value, sub }) {
       <Text as="p" variant="bodySm" tone="subdued">{label}</Text>
       <Text as="p" variant="headingMd" fontWeight="bold">{value}</Text>
       {sub && <Text as="p" variant="bodySm" tone="subdued">{sub}</Text>}
+    </div>
+  );
+}
+
+const TABLE_HEADERS = ["Shop-Name", "E-Mail", "Firma", "Status", "Produkte", "Umsatz", "Provision", "IBAN", "Beigetreten", ""];
+
+function SellerTable({ rows, router }) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
+            {TABLE_HEADERS.map((h, i) => (
+              <th key={i} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#6d7175", whiteSpace: "nowrap" }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((seller, i) => (
+            <tr
+              key={seller.id}
+              style={{ borderBottom: "1px solid #f1f1f1", background: i % 2 === 0 ? "#fff" : "#fafafa", cursor: "pointer" }}
+              onClick={() => router.push(`/sellers/${seller.id}`)}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#f0f5ff"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa"; }}
+            >
+              <td style={{ padding: "10px 12px", fontWeight: 600 }}>
+                {seller.store_name || <span style={{ color: "#9ca3af" }}>—</span>}
+              </td>
+              <td style={{ padding: "10px 12px", color: "#374151" }}>{seller.email}</td>
+              <td style={{ padding: "10px 12px", color: "#6b7280" }}>{seller.company_name || "—"}</td>
+              <td style={{ padding: "10px 12px" }}><StatusBadge status={seller.approval_status || "registered"} /></td>
+              <td style={{ padding: "10px 12px", textAlign: "right" }}>{seller.product_count ?? 0}</td>
+              <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(seller.revenue_cents)}</td>
+              <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(seller.commission_cents)}</td>
+              <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 11, color: "#6b7280" }}>
+                {seller.iban ? seller.iban.replace(/(.{4})/g, "$1 ").trim() : "—"}
+              </td>
+              <td style={{ padding: "10px 12px", color: "#9ca3af", whiteSpace: "nowrap" }}>{fmtDate(seller.created_at)}</td>
+              <td style={{ padding: "10px 12px" }}>
+                <Button
+                  size="slim"
+                  variant="secondary"
+                  onClick={(e) => { e.stopPropagation(); router.push(`/sellers/${seller.id}`); }}
+                >
+                  Details
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -85,6 +143,11 @@ export default function SellersPage() {
   const totalCommission = sellers.reduce((a, s) => a + (s.commission_cents || 0), 0);
   const approvedCount = sellers.filter((s) => s.approval_status === "approved").length;
   const pendingCount = sellers.filter((s) => ["pending_approval", "documents_submitted"].includes(s.approval_status)).length;
+  const superuserCount = sellers.filter((s) => isSellerSuperuser(s)).length;
+  const sellerOnlyCount = sellers.filter((s) => !isSellerSuperuser(s)).length;
+
+  const superusersFiltered = filtered.filter((s) => isSellerSuperuser(s));
+  const sellersFiltered = filtered.filter((s) => !isSellerSuperuser(s));
 
   return (
     <Page
@@ -96,7 +159,7 @@ export default function SellersPage() {
 
         {/* Summary stats */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <StatCard label="Gesamt Verkäufer" value={sellers.length} />
+          <StatCard label="Gesamt Verkäufer" value={sellers.length} sub={`Superuser: ${superuserCount} · Verkäufer: ${sellerOnlyCount}`} />
           <StatCard label="Aktiv / Genehmigt" value={approvedCount} />
           <StatCard label="Warten auf Genehmigung" value={pendingCount} />
           <StatCard label="Gesamtumsatz" value={fmtCents(totalRevenue)} />
@@ -143,51 +206,42 @@ export default function SellersPage() {
                 <Text as="p" tone="subdued" alignment="center">Keine Verkäufer gefunden.</Text>
               </Box>
             ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
-                      {["Shop-Name", "E-Mail", "Firma", "Status", "Produkte", "Umsatz", "Provision", "IBAN", "Beigetreten", ""].map((h, i) => (
-                        <th key={i} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#6d7175", whiteSpace: "nowrap" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((seller, i) => (
-                      <tr
-                        key={seller.id}
-                        style={{ borderBottom: "1px solid #f1f1f1", background: i % 2 === 0 ? "#fff" : "#fafafa", cursor: "pointer" }}
-                        onClick={() => router.push(`/sellers/${seller.id}`)}
-                        onMouseEnter={(e) => e.currentTarget.style.background = "#f0f5ff"}
-                        onMouseLeave={(e) => e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa"}
-                      >
-                        <td style={{ padding: "10px 12px", fontWeight: 600 }}>
-                          {seller.store_name || <span style={{ color: "#9ca3af" }}>—</span>}
-                        </td>
-                        <td style={{ padding: "10px 12px", color: "#374151" }}>{seller.email}</td>
-                        <td style={{ padding: "10px 12px", color: "#6b7280" }}>{seller.company_name || "—"}</td>
-                        <td style={{ padding: "10px 12px" }}><StatusBadge status={seller.approval_status || "registered"} /></td>
-                        <td style={{ padding: "10px 12px", textAlign: "right" }}>{seller.product_count ?? 0}</td>
-                        <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(seller.revenue_cents)}</td>
-                        <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(seller.commission_cents)}</td>
-                        <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 11, color: "#6b7280" }}>
-                          {seller.iban ? seller.iban.replace(/(.{4})/g, "$1 ").trim() : "—"}
-                        </td>
-                        <td style={{ padding: "10px 12px", color: "#9ca3af", whiteSpace: "nowrap" }}>{fmtDate(seller.created_at)}</td>
-                        <td style={{ padding: "10px 12px" }}>
-                          <Button
-                            size="slim"
-                            variant="secondary"
-                            onClick={(e) => { e.stopPropagation(); router.push(`/sellers/${seller.id}`); }}
-                          >
-                            Details
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <BlockStack gap="500">
+                <div>
+                  <Text as="h2" variant="headingSm" fontWeight="semibold">
+                    Superuser ({superusersFiltered.length})
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Plattform-Administratoren mit Vollzugriff
+                  </Text>
+                  <Box paddingBlockStart="300">
+                    {superusersFiltered.length === 0 ? (
+                      <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                        <Text as="p" tone="subdued" alignment="center">Keine Superuser für diese Filter.</Text>
+                      </Box>
+                    ) : (
+                      <SellerTable rows={superusersFiltered} router={router} />
+                    )}
+                  </Box>
+                </div>
+                <div>
+                  <Text as="h2" variant="headingSm" fontWeight="semibold">
+                    Verkäufer ({sellersFiltered.length})
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Reguläre Shop-Betreiber
+                  </Text>
+                  <Box paddingBlockStart="300">
+                    {sellersFiltered.length === 0 ? (
+                      <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                        <Text as="p" tone="subdued" alignment="center">Keine Verkäufer für diese Filter.</Text>
+                      </Box>
+                    ) : (
+                      <SellerTable rows={sellersFiltered} router={router} />
+                    )}
+                  </Box>
+                </div>
+              </BlockStack>
             )}
           </BlockStack>
         </Card>

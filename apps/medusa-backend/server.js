@@ -7912,7 +7912,20 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        await client.query(`UPDATE store_messages SET is_read_by_seller = true WHERE id = $1::uuid`, [id])
+        // Support channel: seller reads support-side msgs (sender_type seller); support reads seller msgs (sender_type customer).
+        // Customer channel: seller marks customer msgs read (existing behavior).
+        await client.query(
+          `UPDATE store_messages SET
+            is_read_by_seller = CASE
+              WHEN channel = 'support' AND sender_type = 'seller' THEN true
+              WHEN channel = 'customer' OR channel IS NULL THEN true
+              ELSE is_read_by_seller END,
+            is_read_by_support = CASE
+              WHEN channel = 'support' AND sender_type = 'customer' THEN true
+              ELSE is_read_by_support END
+          WHERE id = $1::uuid`,
+          [id]
+        )
         await client.end()
         res.json({ success: true })
       } catch (e) {
@@ -7929,12 +7942,26 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const { seller_id, mark_as } = req.body || {}
+        const { seller_id, mark_as, subject_thread } = req.body || {}
         if (!seller_id) { await client.end(); return res.status(400).json({ message: 'seller_id required' }) }
+        const subj = (subject_thread === undefined || subject_thread === null) ? null : String(subject_thread).trim()
+        const subjectClause =
+          subj === null
+            ? ''
+            : subj === ''
+              ? ` AND (subject IS NULL OR TRIM(subject) = '')`
+              : ` AND TRIM(COALESCE(subject, '')) = $2`
+        const params = subj === null || subj === '' ? [seller_id] : [seller_id, subj]
         if (mark_as === 'support') {
-          await client.query(`UPDATE store_messages SET is_read_by_support = true WHERE channel = 'support' AND seller_id = $1 AND sender_type = 'customer'`, [seller_id])
+          await client.query(
+            `UPDATE store_messages SET is_read_by_support = true WHERE channel = 'support' AND seller_id = $1 AND sender_type = 'customer'${subjectClause}`,
+            params
+          )
         } else {
-          await client.query(`UPDATE store_messages SET is_read_by_seller = true WHERE channel = 'support' AND seller_id = $1 AND sender_type = 'seller'`, [seller_id])
+          await client.query(
+            `UPDATE store_messages SET is_read_by_seller = true WHERE channel = 'support' AND seller_id = $1 AND sender_type = 'seller'${subjectClause}`,
+            params
+          )
         }
         await client.end()
         res.json({ success: true })

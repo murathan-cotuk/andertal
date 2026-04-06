@@ -71,6 +71,45 @@ function groupBySeller(messages) {
     });
 }
 
+/** Normalized subject key for grouping (empty string = no subject / legacy). */
+function normalizeSupportSubjectKey(subject) {
+  if (subject == null) return "";
+  return String(subject).trim();
+}
+
+function supportSubjectTitle(subjectKey) {
+  return subjectKey ? subjectKey : "Allgemein";
+}
+
+function replySubjectForSupportThread(messages) {
+  const sorted = [...messages].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
+  for (const m of sorted) {
+    const t = m.subject != null && String(m.subject).trim();
+    if (t) return String(m.subject).trim();
+  }
+  return null;
+}
+
+function groupBySupportSubject(messages) {
+  const map = {};
+  for (const m of messages) {
+    const key = normalizeSupportSubjectKey(m.subject);
+    if (!map[key]) map[key] = { subject_key: key, messages: [] };
+    map[key].messages.push(m);
+  }
+  return Object.values(map)
+    .map((t) => ({
+      ...t,
+      messages: [...t.messages].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "")),
+      reply_subject: replySubjectForSupportThread(t.messages),
+    }))
+    .sort((a, b) => {
+      const aLast = a.messages[a.messages.length - 1]?.created_at || "";
+      const bLast = b.messages[b.messages.length - 1]?.created_at || "";
+      return bLast.localeCompare(aLast);
+    });
+}
+
 // ── Customer tab (original inbox) ──────────────────────────────────────────
 
 function CustomerInbox({ client }) {
@@ -338,89 +377,186 @@ function CustomerInbox({ client }) {
 }
 
 // ── Support / Sellers tab ───────────────────────────────────────────────────
-// Superusers: see all sellers grouped by seller_id (left panel = seller list)
-// Regular sellers: see their single thread with support team
+// Superusers: sellers (left) → subjects per seller (middle) → messages (right)
+// Regular sellers: subjects (left, by Betreff) → messages (right), like Kunden/orders
 
-function SupportInbox({ client, isSuperuser, mySellerID, sellerNames }) {
-  const [threads, setThreads] = useState([]);   // for superuser: list of seller threads
+function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUserIds }) {
+  const [rawMessages, setRawMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
+  const [selectedSellerId, setSelectedSellerId] = useState(null);
+  /** `null` = none; `""` = legacy / no subject */
+  const [selectedSubjectKey, setSelectedSubjectKey] = useState(null);
+  const [isNewSubject, setIsNewSubject] = useState(false);
+  const [newSubject, setNewSubject] = useState("");
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const bottomRef = useRef(null);
 
+  const sellerThreads = isSuperuser ? groupBySeller(rawMessages) : [];
+  const selectedSellerThread = selectedSellerId
+    ? sellerThreads.find((t) => t.seller_id === selectedSellerId) || null
+    : null;
+
+  const subjectThreadsForSeller = selectedSellerThread
+    ? groupBySupportSubject(selectedSellerThread.messages)
+    : [];
+
+  const subjectThreadsRegular = !isSuperuser ? groupBySupportSubject(rawMessages) : [];
+
+  const subjectList = isSuperuser ? subjectThreadsForSeller : subjectThreadsRegular;
+  const selectedSubjectThread =
+    selectedSubjectKey !== null
+      ? subjectList.find((t) => t.subject_key === selectedSubjectKey) || null
+      : null;
+
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
       const data = await client.getSupportMessages();
-      if (!data?.__error) {
-        const msgs = data?.messages || [];
-        if (isSuperuser) {
-          setThreads(groupBySeller(msgs));
-        } else {
-          // Regular seller: single thread
-          const sorted = [...msgs].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
-          const singleThread = { seller_id: mySellerID, messages: sorted };
-          setThreads([singleThread]);
-          setSelected(singleThread);
-        }
-      }
+      if (!data?.__error) setRawMessages(data?.messages || []);
     } finally {
       setLoading(false);
     }
-  }, [client, isSuperuser, mySellerID]);
+  }, [client]);
 
   useEffect(() => { fetchMessages(); }, [fetchMessages]);
 
   useEffect(() => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
-  }, [selected?.messages?.length]);
+  }, [selectedSubjectThread?.messages?.length, isNewSubject, reply]);
 
-  const handleSelectSellerThread = async (thread) => {
-    setSelected(thread);
+  const unreadForSubjectThread = (subThread) => {
+    if (isSuperuser) {
+      return subThread.messages.filter((m) => m.sender_type === "customer" && !m.is_read_by_support).length;
+    }
+    return subThread.messages.filter((m) => m.sender_type === "seller" && !m.is_read_by_seller).length;
+  };
+
+  const unreadForSellerThread = (sellerThread) => {
+    return groupBySupportSubject(sellerThread.messages).reduce((n, st) => n + unreadForSubjectThread(st), 0);
+  };
+
+  const getSellerLabel = (seller_id) => {
+    if (!seller_id) return "Unbekannt";
+    const key = String(seller_id);
+    const fallback = key.length > 18 ? `${key.slice(0, 18)}…` : key;
+    return sellerNames[key] || sellerNames[seller_id] || fallback;
+  };
+
+  const getSellerProfileHref = (seller_id) => {
+    if (!seller_id) return null;
+    const key = String(seller_id);
+    const userId = sellerUserIds[key] || sellerUserIds[seller_id];
+    return userId ? `/sellers/${userId}` : null;
+  };
+
+  const handleSelectSeller = (thread) => {
+    setSelectedSellerId(thread.seller_id);
+    setSelectedSubjectKey(null);
+    setIsNewSubject(false);
+    setNewSubject("");
     setReply("");
     setErr("");
-    // Mark seller messages as read by support
-    if (isSuperuser && thread.seller_id) {
-      client.markSupportMessagesRead(thread.seller_id, "support").catch(() => {});
+  };
+
+  const handleSelectSubject = (subThread) => {
+    setSelectedSubjectKey(subThread.subject_key);
+    setIsNewSubject(false);
+    setNewSubject("");
+    setReply("");
+    setErr("");
+    const threadIds = new Set(subThread.messages.map((m) => m.id));
+    if (isSuperuser && selectedSellerId) {
+      client.markSupportMessagesRead(selectedSellerId, "support", subThread.subject_key).catch(() => {});
+      setRawMessages((prev) => prev.map((m) => {
+        if (!threadIds.has(m.id)) return m;
+        if (m.sender_type === "customer") return { ...m, is_read_by_support: true };
+        return m;
+      }));
+    } else if (!isSuperuser) {
+      for (const m of subThread.messages) {
+        if (m.sender_type === "seller" && !m.is_read_by_seller) {
+          client.markMessageRead(m.id).catch(() => {});
+        }
+      }
+      setRawMessages((prev) => prev.map((m) => {
+        if (!threadIds.has(m.id)) return m;
+        if (m.sender_type === "seller") return { ...m, is_read_by_seller: true };
+        return m;
+      }));
     }
   };
 
+  const startNewSubject = () => {
+    setSelectedSubjectKey(null);
+    setIsNewSubject(true);
+    setNewSubject("");
+    setReply("");
+    setErr("");
+  };
+
+  const headerTitle = () => {
+    if (isSuperuser) {
+      if (!selectedSellerThread) return "Support";
+      if (isNewSubject) return `Neues Thema · ${getSellerLabel(selectedSellerThread.seller_id)}`;
+      if (selectedSubjectThread) {
+        return `${supportSubjectTitle(selectedSubjectThread.subject_key)} · ${getSellerLabel(selectedSellerThread.seller_id)}`;
+      }
+      return getSellerLabel(selectedSellerThread.seller_id);
+    }
+    if (isNewSubject) return "Neues Thema";
+    if (selectedSubjectThread) return supportSubjectTitle(selectedSubjectThread.subject_key);
+    return "Support Team";
+  };
+
+  const canSend = () => {
+    if (!reply.trim()) return false;
+    if (isSuperuser && !selectedSellerThread) return false;
+    if (isNewSubject) return !!newSubject.trim();
+    if (!selectedSubjectThread) return false;
+    return true;
+  };
+
   const handleSend = async () => {
-    if (!reply.trim() || !selected) return;
+    if (!canSend()) return;
     setSending(true);
     setErr("");
     try {
+      const subjectForApi = isNewSubject
+        ? newSubject.trim()
+        : (() => {
+          const t = selectedSubjectThread;
+          if (!t) return null;
+          if (t.reply_subject) return t.reply_subject;
+          return t.subject_key !== "" ? t.subject_key : null;
+        })();
+
       if (isSuperuser) {
-        // Superuser replies as support team to a seller
         await client.sendSupportMessage({
           body: reply.trim(),
-          target_seller_id: selected.seller_id,
-          sender_seller_id: null, // null = support side
+          target_seller_id: selectedSellerThread.seller_id,
+          sender_seller_id: null,
+          subject: subjectForApi || undefined,
         });
       } else {
-        // Regular seller sends to support team
         await client.sendSupportMessage({
           body: reply.trim(),
           sender_seller_id: mySellerID,
+          subject: subjectForApi || undefined,
         });
       }
       setReply("");
+      if (isNewSubject) {
+        setNewSubject("");
+        setIsNewSubject(false);
+      }
       const data = await client.getSupportMessages();
       if (!data?.__error) {
         const msgs = data?.messages || [];
-        if (isSuperuser) {
-          const updated = groupBySeller(msgs);
-          setThreads(updated);
-          const upd = updated.find((t) => t.seller_id === selected.seller_id);
-          if (upd) setSelected(upd);
-        } else {
-          const sorted = [...msgs].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
-          const singleThread = { seller_id: mySellerID, messages: sorted };
-          setThreads([singleThread]);
-          setSelected(singleThread);
-        }
+        setRawMessages(msgs);
+        const sk = normalizeSupportSubjectKey(subjectForApi);
+        setSelectedSubjectKey(sk);
       }
     } catch (e) {
       setErr(e?.message || "Fehler beim Senden");
@@ -428,46 +564,36 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames }) {
     setSending(false);
   };
 
-  const unreadForThread = (thread) => {
-    if (isSuperuser) {
-      // Superuser: unread = seller messages not yet read by support
-      return thread.messages.filter((m) => m.sender_type === "customer" && !m.is_read_by_support).length;
-    } else {
-      // Seller: unread = support messages not yet read by seller
-      return thread.messages.filter((m) => m.sender_type === "seller" && !m.is_read_by_seller).length;
-    }
-  };
+  const activeMessages = selectedSubjectThread?.messages || [];
+  const showComposer =
+    isSuperuser
+      ? !!selectedSellerThread && (isNewSubject || !!selectedSubjectThread)
+      : isNewSubject || !!selectedSubjectThread;
 
-  const getSellerLabel = (seller_id) => {
-    if (!seller_id) return "Unbekannt";
-    return sellerNames[seller_id] || seller_id.slice(0, 12) + "…";
-  };
-
-  // For superusers: show left panel with seller list. For sellers: just show the thread.
-  const showLeftPanel = isSuperuser;
+  const gridCols = isSuperuser ? "280px 260px 1fr" : "280px 1fr";
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: showLeftPanel ? "280px 1fr" : "1fr", gap: 12, height: "calc(100vh - 220px)", minHeight: 500 }}>
+    <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 12, height: "calc(100vh - 220px)", minHeight: 500 }}>
 
-      {/* Left panel: seller list (superuser only) */}
-      {showLeftPanel && (
+      {isSuperuser && (
         <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-300)", background: "var(--p-color-bg-surface)" }}>
           <Box padding="300" borderBlockEndWidth="025" borderColor="border">
             <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Verkäufer</Text>
           </Box>
           <div style={{ flex: 1, overflowY: "auto" }}>
             {loading && <Box padding="400"><InlineStack align="center"><Spinner size="small" /></InlineStack></Box>}
-            {!loading && threads.length === 0 && (
+            {!loading && sellerThreads.length === 0 && (
               <Box padding="400"><Text as="p" variant="bodySm" tone="subdued" alignment="center">Keine Nachrichten</Text></Box>
             )}
-            {threads.map((thread) => {
+            {sellerThreads.map((thread) => {
               const last = thread.messages[thread.messages.length - 1];
-              const unread = unreadForThread(thread);
-              const isActive = selected?.seller_id === thread.seller_id;
+              const unread = unreadForSellerThread(thread);
+              const isActive = selectedSellerThread?.seller_id === thread.seller_id;
               return (
                 <div key={thread.seller_id || "__unknown__"} style={{ borderBottom: "1px solid #e1e3e5" }}>
                   <button
-                    onClick={() => handleSelectSellerThread(thread)}
+                    type="button"
+                    onClick={() => handleSelectSeller(thread)}
                     style={{
                       width: "100%", textAlign: "left", padding: "10px 14px",
                       background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
@@ -480,7 +606,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames }) {
                       <Text as="span" variant="bodySm" fontWeight="bold">{getSellerLabel(thread.seller_id)}</Text>
                       <InlineStack gap="100" blockAlign="center">
                         {unread > 0 && (
-                          <span style={{ background: "var(--p-color-bg-fill-critical)", color: "#fff", borderRadius: "50%", fontSize: 10, fontWeight: 800, width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <span style={{ background: "var(--p-color-bg-fill-critical)", color: "#fff", borderRadius: "50%", fontSize: 10, fontWeight: 800, minWidth: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: "0 4px" }}>
                             {unread}
                           </span>
                         )}
@@ -498,41 +624,105 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames }) {
         </div>
       )}
 
-      {/* Message thread */}
+      {/* Subject column: superuser (per seller) or regular seller */}
       <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-300)", background: "var(--p-color-bg-surface)" }}>
-        {!selected ? (
+        <Box padding="300" borderBlockEndWidth="025" borderColor="border">
+          <InlineStack align="space-between" blockAlign="center" gap="200">
+            <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Themen</Text>
+            {(!isSuperuser || selectedSellerThread) && (
+              <Button variant="plain" size="slim" onClick={startNewSubject} disabled={isSuperuser && !selectedSellerThread}>
+                + Neu
+              </Button>
+            )}
+          </InlineStack>
+        </Box>
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {isSuperuser && !selectedSellerThread && (
+            <Box padding="400"><Text as="p" variant="bodySm" tone="subdued" alignment="center">Verkäufer wählen</Text></Box>
+          )}
+          {(isSuperuser ? !!selectedSellerThread : true) && loading && (
+            <Box padding="400"><InlineStack align="center"><Spinner size="small" /></InlineStack></Box>
+          )}
+          {((isSuperuser && selectedSellerThread) || !isSuperuser) && !loading && subjectList.length === 0 && !isNewSubject && (
+            <Box padding="400">
+              <Text as="p" variant="bodySm" tone="subdued" alignment="center">Noch keine Konversationen</Text>
+            </Box>
+          )}
+          {subjectList.map((thread) => {
+            const last = thread.messages[thread.messages.length - 1];
+            const unread = unreadForSubjectThread(thread);
+            const isActive = !isNewSubject && selectedSubjectKey !== null && selectedSubjectKey === thread.subject_key;
+            return (
+              <div key={`${isSuperuser ? selectedSellerThread?.seller_id : "me"}-${thread.subject_key || "__"}`} style={{ borderBottom: "1px solid #e1e3e5" }}>
+                <button
+                  type="button"
+                  onClick={() => handleSelectSubject(thread)}
+                  style={{
+                    width: "100%", textAlign: "left", padding: "10px 14px",
+                    background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
+                    borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : "3px solid transparent",
+                    borderTop: "none", borderRight: "none", borderBottom: "none",
+                    cursor: "pointer", display: "block",
+                  }}
+                >
+                  <InlineStack align="space-between" blockAlign="start" gap="100">
+                    <Text as="span" variant="bodySm" fontWeight="bold">{supportSubjectTitle(thread.subject_key)}</Text>
+                    <InlineStack gap="100" blockAlign="center">
+                      {unread > 0 && (
+                        <span style={{ background: "var(--p-color-bg-fill-critical)", color: "#fff", borderRadius: "50%", fontSize: 10, fontWeight: 800, minWidth: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: "0 4px" }}>
+                          {unread}
+                        </span>
+                      )}
+                      <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at)}</Text>
+                    </InlineStack>
+                  </InlineStack>
+                  <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {last?.body?.slice(0, 48) || "—"}
+                  </div>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-300)", background: "var(--p-color-bg-surface)" }}>
+        {!showComposer ? (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Text as="p" variant="bodySm" tone="subdued">Verkäufer auswählen</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              {isSuperuser && !selectedSellerThread ? "Verkäufer auswählen" : "Thema auswählen oder „Neu“"}
+            </Text>
           </div>
         ) : (
           <>
             <Box padding="300" borderBlockEndWidth="025" borderColor="border">
-              <InlineStack gap="200" blockAlign="center">
-                <Text as="p" variant="bodyMd" fontWeight="semibold">
-                  {isSuperuser ? getSellerLabel(selected.seller_id) : "Support Team"}
-                </Text>
-                {isSuperuser && selected.seller_id && (
-                  <Button variant="plain" size="slim" url={`/sellers/${selected.seller_id}`}>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">{headerTitle()}</Text>
+                {isSuperuser && selectedSellerThread?.seller_id && getSellerProfileHref(selectedSellerThread.seller_id) && (
+                  <Button variant="plain" size="slim" url={getSellerProfileHref(selectedSellerThread.seller_id)}>
                     Profil →
                   </Button>
                 )}
               </InlineStack>
             </Box>
 
-            {loading && !selected.messages?.length ? (
+            {loading && activeMessages.length === 0 && !isNewSubject ? (
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Spinner size="small" />
               </div>
             ) : (
               <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-                {selected.messages.length === 0 && (
+                {isNewSubject && (
+                  <Box paddingBlockEnd="200">
+                    <Text as="p" variant="bodySm" tone="subdued">Erste Nachricht mit Betreff — danach erscheint das Thema in der Liste.</Text>
+                  </Box>
+                )}
+                {activeMessages.length === 0 && !isNewSubject && (
                   <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Text as="p" variant="bodySm" tone="subdued">Noch keine Nachrichten. Schreib etwas!</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">Noch keine Nachrichten in diesem Thema.</Text>
                   </div>
                 )}
-                {selected.messages.map((m) => {
-                  // isSuperuser: 'seller' sender_type = support side (right), 'customer' = seller side (left)
-                  // regular seller: 'customer' = seller side (right), 'seller' = support side (left)
+                {activeMessages.map((m) => {
                   const isMe = isSuperuser ? m.sender_type === "seller" : m.sender_type === "customer";
                   const senderLabel = isMe ? null : (isSuperuser ? "Verkäufer" : "Support Team");
                   return (
@@ -563,6 +753,9 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames }) {
             <Box padding="300" borderBlockStartWidth="025" borderColor="border">
               <BlockStack gap="200">
                 {err && <Text as="p" variant="bodySm" tone="critical">{err}</Text>}
+                {isNewSubject && (
+                  <TextField label="Betreff" value={newSubject} onChange={setNewSubject} autoComplete="off" placeholder="z. B. Frage zu Auszahlung" />
+                )}
                 <InlineStack gap="200" blockAlign="end">
                   <div style={{ flex: 1 }}>
                     <TextField
@@ -574,7 +767,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames }) {
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                     />
                   </div>
-                  <Button variant="primary" onClick={handleSend} disabled={sending || !reply.trim()} loading={sending}>
+                  <Button variant="primary" onClick={handleSend} disabled={sending || !canSend()} loading={sending}>
                     Senden
                   </Button>
                 </InlineStack>
@@ -594,6 +787,7 @@ export default function InboxPage() {
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [mySellerID, setMySellerID] = useState(null);
   const [sellerNames, setSellerNames] = useState({});
+  const [sellerUserIds, setSellerUserIds] = useState({});
   const client = getMedusaAdminClient();
 
   useEffect(() => {
@@ -601,17 +795,29 @@ export default function InboxPage() {
     const sid = typeof window !== "undefined" ? localStorage.getItem("sellerId") : null;
     setIsSuperuser(su);
     setMySellerID(sid);
-    // If superuser, prefetch seller display names
+    // Superuser: map business seller_id → store name (support threads group by seller_id, not user UUID)
     if (su) {
       client.getSellers().then((data) => {
         const names = {};
+        const userIds = {};
         for (const s of data?.sellers || []) {
-          names[s.id] = s.store_name || s.email || s.id;
+          const label =
+            (s.store_name && String(s.store_name).trim()) ||
+            s.email ||
+            s.company_name ||
+            s.seller_id ||
+            s.id;
+          if (s.seller_id) {
+            names[String(s.seller_id)] = label;
+            if (s.id) userIds[String(s.seller_id)] = s.id;
+          }
+          if (s.id) names[String(s.id)] = label;
         }
         setSellerNames(names);
+        setSellerUserIds(userIds);
       }).catch(() => {});
     }
-  }, []);
+  }, [client]);
 
   const tabs = [
     { id: "customer", content: "Kunden" },
@@ -631,6 +837,7 @@ export default function InboxPage() {
             isSuperuser={isSuperuser}
             mySellerID={mySellerID}
             sellerNames={sellerNames}
+            sellerUserIds={sellerUserIds}
           />
         )}
       </div>

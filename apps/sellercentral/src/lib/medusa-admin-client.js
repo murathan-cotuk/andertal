@@ -799,8 +799,10 @@ class MedusaAdminClient {
   async markMessageRead(id) {
     return this.request(`/admin-hub/v1/messages/${id}/read`, { method: 'PATCH' })
   }
-  async markSupportMessagesRead(seller_id, mark_as) {
-    return this.request('/admin-hub/v1/messages/support/mark-read', { method: 'PATCH', body: JSON.stringify({ seller_id, mark_as }) })
+  async markSupportMessagesRead(seller_id, mark_as, subject_thread) {
+    const payload = { seller_id, mark_as };
+    if (subject_thread !== undefined) payload.subject_thread = subject_thread;
+    return this.request('/admin-hub/v1/messages/support/mark-read', { method: 'PATCH', body: JSON.stringify(payload) })
   }
   async getSmtpSettings() {
     return this.request('/admin-hub/v1/smtp-settings')
