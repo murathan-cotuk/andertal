@@ -57,13 +57,26 @@ const SeeAll = styled(Link)`
   padding: 8px 12px;
 `;
 
-function productSalesScore(product) {
-  const meta = product?.metadata || {};
-  return Number(meta.sold_last_month || meta.sold || meta.sales_count || 0) || 0;
+function getProductBasePriceCents(product) {
+  const firstVariantPrice = product?.variants?.[0]?.prices?.[0]?.amount;
+  if (firstVariantPrice != null) return Number(firstVariantPrice) || 0;
+  if (product?.price != null) return Math.round(Number(product.price) * 100) || 0;
+  return 0;
 }
 
-function isBestSellerProduct(product) {
-  return productSalesScore(product) > 0;
+function isDiscountedProduct(product) {
+  const base = getProductBasePriceCents(product);
+  const sale = product?.metadata?.rabattpreis_cents != null ? Number(product.metadata.rabattpreis_cents) : null;
+  return sale != null && sale > 0 && sale < base;
+}
+
+function productPerfScore(product) {
+  const meta = product?.metadata || {};
+  const sold = Number(meta.sold_last_month || meta.sold || 0) || 0;
+  const views = Number(meta.view_count || meta.views || 0) || 0;
+  const reviewCount = Number(meta.review_count || 0) || 0;
+  const reviewAvg = Number(meta.review_avg || 0) || 0;
+  return sold * 1000 + views * 10 + reviewAvg * reviewCount * 5;
 }
 
 function productCategoryKeys(product) {
@@ -72,6 +85,7 @@ function productCategoryKeys(product) {
   const collectionHandle = product?.collection?.handle || product?.metadata?.collection_handle || null;
   if (collectionId) out.push(`id:${String(collectionId)}`);
   if (collectionHandle) out.push(`handle:${String(collectionHandle).toLowerCase()}`);
+
   const ids = product?.metadata?.collection_ids;
   if (Array.isArray(ids)) {
     ids.forEach((id) => {
@@ -81,7 +95,7 @@ function productCategoryKeys(product) {
   return [...new Set(out)];
 }
 
-export default function BestsellersPage() {
+export default function SalesPage() {
   const locale = useLocale();
   const [collections, setCollections] = useState([]);
   const [products, setProducts] = useState([]);
@@ -116,14 +130,14 @@ export default function BestsellersPage() {
   }, []);
 
   const copy = useMemo(() => {
-    if (locale === "de") return { title: "Bestsellers", text: "Meistverkaufte Produkte nach Kategorien", seeAll: "Alle ansehen", empty: "Keine Bestseller gefunden." };
-    if (locale === "tr") return { title: "Cok Satanlar", text: "Kategorilere gore en cok satilan urunler", seeAll: "Tumunu gor", empty: "Cok satan urun bulunamadi." };
-    return { title: "Bestsellers", text: "Top-selling products by category", seeAll: "See all", empty: "No bestsellers found." };
+    if (locale === "de") return { title: "Sales", text: "Alle Kategorien mit reduzierten Produkten", seeAll: "Alle ansehen", empty: "Keine reduzierten Produkte gefunden." };
+    if (locale === "tr") return { title: "Indirimler", text: "Indirimli urun bulunan tum kategoriler", seeAll: "Tumunu gor", empty: "Indirimli urun bulunamadi." };
+    return { title: "Sales", text: "Categories with discounted products", seeAll: "See all", empty: "No discounted products found." };
   }, [locale]);
 
   const rows = useMemo(() => {
-    const bestsellers = products.filter((p) => isBestSellerProduct(p));
-    if (!bestsellers.length) return [];
+    const discounted = products.filter(isDiscountedProduct);
+    if (!discounted.length) return [];
 
     const byCollection = new Map();
     const byKey = new Map();
@@ -132,7 +146,7 @@ export default function BestsellersPage() {
       if (c?.handle) byKey.set(`handle:${String(c.handle).toLowerCase()}`, c);
     });
 
-    bestsellers.forEach((p) => {
+    discounted.forEach((p) => {
       const keys = productCategoryKeys(p);
       const key = keys.find((k) => byKey.has(k));
       if (!key) return;
@@ -146,7 +160,7 @@ export default function BestsellersPage() {
     const list = [...byCollection.values()]
       .map((entry) => ({
         collection: entry.collection,
-        products: entry.products.sort((a, b) => productSalesScore(b) - productSalesScore(a)),
+        products: entry.products.sort((a, b) => productPerfScore(b) - productPerfScore(a)),
       }))
       .filter((entry) => entry.products.length > 0)
       .sort((a, b) => b.products.length - a.products.length);
@@ -176,13 +190,13 @@ export default function BestsellersPage() {
             navOnSides
             gap={16}
             visibleCount={5}
-            ariaLabel={collection.title || collection.name || collection.handle || "Bestsellers category"}
+            ariaLabel={collection.title || collection.name || collection.handle || "Sales category"}
             header={(
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
                 <h2 className="shop-typo-h2" style={{ margin: 0 }}>
                   {collection.title || collection.name || collection.handle}
                 </h2>
-                <SeeAll href={`/${collection.handle}?bestseller=1`}>{copy.seeAll} →</SeeAll>
+                <SeeAll href={`/${collection.handle}?sale=1`}>{copy.seeAll} →</SeeAll>
               </div>
             )}
           >
@@ -194,32 +208,6 @@ export default function BestsellersPage() {
       </Main>
       <Footer />
     </PageWrap>
-  );
-}
-
-"use client";
-
-import ShopHeader from "@/components/ShopHeader";
-import Footer from "@/components/Footer";
-import { ProductGrid } from "@/components/ProductGrid";
-
-export default function BestsellersPage() {
-  return (
-    <div className="min-h-screen flex flex-col">
-      <ShopHeader />
-      <main className="flex-grow">
-        <div style={{ padding: "48px 24px", textAlign: "center" }}>
-          <h1 style={{ fontSize: "36px", fontWeight: 700, marginBottom: "16px", letterSpacing: "0.05em" }}>
-            Bestsellers
-          </h1>
-          <p style={{ fontSize: "18px", color: "#6b7280", marginBottom: "32px" }}>
-            Unsere meistverkauften Produkte
-          </p>
-        </div>
-        <ProductGrid products={[]} />
-      </main>
-      <Footer />
-    </div>
   );
 }
 

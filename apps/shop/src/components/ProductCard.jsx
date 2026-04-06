@@ -10,6 +10,8 @@ import { resolveImageUrl } from "@/lib/image-url";
 import { localizedProductMediaList, variantImageUrlForLocale } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
+import BestsellerBadge from "@/components/BestsellerBadge";
+import { isBestsellerMetadata } from "@/lib/bestseller";
 import styled from "styled-components";
 
 /* ─────────────────────────────────────────────────────────── *
@@ -423,6 +425,7 @@ export function ProductCard({ product, activeFilters = {} }) {
     product.metadata?.badge === "new";
   const publishDate = product.metadata?.publish_date ? new Date(product.metadata.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
+  const isBestseller = isBestsellerMetadata(product.metadata || {});
   const managesInventory = variant?.manage_inventory === true;
   const inventoryQty = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity;
   const outOfStock = managesInventory && typeof inventoryQty === "number" && inventoryQty <= 0;
@@ -505,6 +508,7 @@ export function ProductCard({ product, activeFilters = {} }) {
 
         {/* Badges */}
         <Badges>
+          {isBestseller && !isComingSoon && <BestsellerBadge />}
           {isComingSoon && <Badge $comingSoon>Pek yakında</Badge>}
           {hasSale && !isComingSoon && <Badge $sale>Sale</Badge>}
           {isNew && !hasSale && !isComingSoon && <Badge>New</Badge>}

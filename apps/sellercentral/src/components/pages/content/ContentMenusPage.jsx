@@ -35,7 +35,15 @@ const LINK_TYPES = [
   { label: "Blog", value: "blog" },
   { label: "Blog post", value: "blog_post" },
   { label: "Policy", value: "policy" },
+  { label: "API", value: "api" },
   { label: "URL", value: "url" },
+];
+
+const API_FUNCTION_OPTIONS = [
+  { label: "Marke", value: "brand" },
+  { label: "Sales", value: "sales" },
+  { label: "Neuheiten", value: "neuheiten" },
+  { label: "Bestsellers", value: "bestsellers" },
 ];
 
 const TAB_SIZE = 28;
@@ -152,6 +160,7 @@ function MenuEditorPanel(props) {
     products,
     pages,
     LINK_TYPES,
+    API_FUNCTION_OPTIONS,
     getLinkDisplay,
     TAB_SIZE,
     buildMenuTree,
@@ -195,7 +204,7 @@ function MenuEditorPanel(props) {
   const tree = buildMenuTree(items);
   const openInlineAdd = (parentId) => {
     setAddUnderParentId(parentId ?? null);
-    setItemForm({ label: "", slug: "", link_type: "url", link_value: "", parent_id: parentId ?? "", collection_id: "", product_id: "", page_id: "", custom_slug: "" });
+    setItemForm({ label: "", slug: "", link_type: "url", link_value: "", parent_id: parentId ?? "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" });
     setInlineNewOpen(true);
     setEditingItemId(null);
   };
@@ -435,6 +444,7 @@ function MenuEditorPanel(props) {
                               products={products}
                               pages={pages}
                               LINK_TYPES={LINK_TYPES}
+                              apiFunctionOptions={API_FUNCTION_OPTIONS}
                               flatItems={flatItems}
                               parentOptionsForForm={parentOptionsForForm}
                               onSave={async () => { await handleSaveItem(); setInlineEditingId(null); }}
@@ -603,10 +613,11 @@ function MenuEditorPanel(props) {
                             collections={collections}
                             products={products}
                             LINK_TYPES={LINK_TYPES}
+                            apiFunctionOptions={API_FUNCTION_OPTIONS}
                             flatItems={flatItems}
                             parentOptionsForForm={parentOptionsForForm}
                             onSave={inlineSaveItem}
-                            onCancel={() => { setInlineNewOpen(false); setItemForm({ label: "", slug: "", link_type: "url", link_value: "", parent_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "" }); }}
+                            onCancel={() => { setInlineNewOpen(false); setItemForm({ label: "", slug: "", link_type: "url", link_value: "", parent_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" }); }}
                             saving={saving}
                           />
                         </div>
@@ -629,7 +640,7 @@ function MenuEditorPanel(props) {
   );
 }
 
-function InlineItemRow({ itemForm, setItemForm, collections, products, pages, LINK_TYPES, flatItems, parentOptionsForForm, onSave, onCancel, saving }) {
+function InlineItemRow({ itemForm, setItemForm, collections, products, pages, LINK_TYPES, apiFunctionOptions, flatItems, parentOptionsForForm, onSave, onCancel, saving }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr auto", gap: "16px", padding: "14px 20px", alignItems: "center", background: "var(--p-color-bg-surface-secondary)", borderRadius: "8px", margin: "8px 12px" }}>
       <span />
@@ -666,6 +677,15 @@ function InlineItemRow({ itemForm, setItemForm, collections, products, pages, LI
         )}
         {itemForm.link_type === "page" && (
           <Select label="Page" labelHidden options={[{ label: "— Select page —", value: "" }, ...(pages || []).map((pg) => ({ label: pg.title || pg.slug, value: String(pg.id) }))]} value={itemForm.page_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, page_id: v }))} />
+        )}
+        {itemForm.link_type === "api" && (
+          <Select
+            label="API function"
+            labelHidden
+            options={apiFunctionOptions}
+            value={itemForm.api_function || "brand"}
+            onChange={(v) => setItemForm((p) => ({ ...p, api_function: v }))}
+          />
         )}
         {(itemForm.link_type === "url" || itemForm.link_type === "policy" || itemForm.link_type === "blog" || itemForm.link_type === "blog_post") && (
           <TextField label="URL/Path" value={itemForm.link_value} onChange={(v) => setItemForm((p) => ({ ...p, link_value: v }))} placeholder={itemForm.link_type === "url" ? "https://…" : "/path"} labelHidden />
@@ -709,6 +729,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
     product_id: "",
     page_id: "",
     custom_slug: "",
+    api_function: "brand",
   });
   const [saving, setSaving] = useState(false);
   const [popoverActiveId, setPopoverActiveId] = useState(null);
@@ -949,6 +970,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       product_id: "",
       page_id: "",
       custom_slug: "",
+      api_function: "brand",
     });
     setItemModalOpen(true);
   };
@@ -979,6 +1001,13 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
         if (v && v.label_slug) custom_slug = v.label_slug;
       } catch (_) {}
     }
+    let api_function = "brand";
+    if (item.link_type === "api" && item.link_value) {
+      try {
+        const v = JSON.parse(item.link_value);
+        api_function = v?.function || v?.api_function || "brand";
+      } catch (_) {}
+    }
     setItemForm({
       label: item.label || "",
       slug: item.slug || custom_slug || normalizeItemSlug(item.label || ""),
@@ -989,6 +1018,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       product_id,
       page_id,
       custom_slug,
+      api_function,
     });
     setItemModalOpen(true);
   };
@@ -1012,6 +1042,15 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
 
   const getLinkDisplay = (item) => {
     if (!item.link_type || item.link_type === "url") return item.link_value || "—";
+    if (item.link_type === "api") {
+      try {
+        const v = typeof item.link_value === "string" ? JSON.parse(item.link_value) : item.link_value;
+        const fn = v?.function || v?.api_function || "brand";
+        return `API: ${fn}`;
+      } catch {
+        return "API";
+      }
+    }
     try {
       const v = typeof item.link_value === "string" ? JSON.parse(item.link_value) : item.link_value;
       if (v && v.title) return v.title;
@@ -1042,6 +1081,8 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       const pg = pages.find((x) => String(x.id) === itemForm.page_id);
       const labelSlug = normalizeItemSlug(itemForm.custom_slug || itemSlug || label);
       link_value = JSON.stringify({ id: pg?.id, title: pg?.title, slug: pg?.slug, label_slug: labelSlug });
+    } else if (itemForm.link_type === "api") {
+      link_value = JSON.stringify({ function: itemForm.api_function || "brand" });
     } else if (itemForm.link_type !== "url") {
       link_value = itemForm.link_value || "";
     }
@@ -1292,6 +1333,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
               products={products}
               pages={pages}
               LINK_TYPES={LINK_TYPES}
+              API_FUNCTION_OPTIONS={API_FUNCTION_OPTIONS}
               getLinkDisplay={getLinkDisplay}
               TAB_SIZE={TAB_SIZE}
               buildMenuTree={buildMenuTree}
@@ -1654,6 +1696,14 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
                   helpText="Leer lassen = automatisch aus dem Label generiert"
                 />
               </>
+            )}
+            {itemForm.link_type === "api" && (
+              <Select
+                label="API function"
+                options={API_FUNCTION_OPTIONS}
+                value={itemForm.api_function || "brand"}
+                onChange={(value) => setItemForm((prev) => ({ ...prev, api_function: value }))}
+              />
             )}
             {(itemForm.link_type === "url" || itemForm.link_type === "policy" || itemForm.link_type === "blog" || itemForm.link_type === "blog_post") && (
               <TextField

@@ -10,6 +10,8 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
 import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
+import BestsellerBadge from "@/components/BestsellerBadge";
+import { isBestsellerMetadata } from "@/lib/bestseller";
 
 const Overlay = styled.div`
   position: fixed;
@@ -134,6 +136,10 @@ const ItemTitle = styled.div`
   color: #1f2937;
   margin-bottom: 4px;
   line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 `;
 
 const ItemPrice = styled.div`
@@ -356,6 +362,9 @@ export default function CartSidebar() {
                   >
                     {getLocalizedCartLineTitle(item, locale) || "Artikel"}
                   </Link>
+                  {isBestsellerMetadata(item?.product_metadata || {}) && (
+                    <BestsellerBadge style={{ marginLeft: 8, verticalAlign: "middle" }} />
+                  )}
                 </ItemTitle>
                 <ItemPrice>{formatPriceCents(item.unit_price_cents || 0)}</ItemPrice>
                 <QtyRow>

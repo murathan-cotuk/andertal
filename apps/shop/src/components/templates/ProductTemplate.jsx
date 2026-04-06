@@ -24,6 +24,8 @@ import { Lightbox } from "@/components/Lightbox";
 import ToCartButton from "@/components/ui/To Cart Button";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import TrustpilotTrustBox, { TrustpilotWordmark } from "@/components/TrustpilotTrustBox";
+import BestsellerBadge from "@/components/BestsellerBadge";
+import { isBestsellerMetadata } from "@/lib/bestseller";
 
 const Container = styled.div`
   max-width: 100%;
@@ -898,6 +900,7 @@ export default function ProductTemplate() {
     ? productReviews.reduce((s, r) => s + Number(r.rating || 0), 0) / productReviews.length
     : (meta.review_avg != null ? Number(meta.review_avg) : 0);
   const soldLastMonth = meta.sold_last_month != null ? Number(meta.sold_last_month) : null;
+  const isBestseller = isBestsellerMetadata(meta);
   const inventory = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity ?? 0;
   const inventorySafe =
     variant?.inventory_quantity ??
@@ -1052,6 +1055,7 @@ export default function ProductTemplate() {
 
         {/* Center: Title, brand, reviews, price, variants, bullets, meta */}
         <CenterCol>
+          {isBestseller && <BestsellerBadge style={{ alignSelf: "flex-start", marginBottom: 2 }} />}
           <Title>{titleDisplay}</Title>
           {/* ── Review row — always visible ── */}
           <a

@@ -28,6 +28,8 @@ import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold
 import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 import { normalizeIsoCountryCode } from "@/lib/iso-country";
 import { CHECKOUT_SHIPPING_COUNTRY_LS, CHECKOUT_SHIPPING_MARKET_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
+import BestsellerBadge from "@/components/BestsellerBadge";
+import { isBestsellerMetadata } from "@/lib/bestseller";
 
 const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
 
@@ -163,6 +165,10 @@ const SummaryItemTitle = styled.div`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 `;
 
 const SummaryItemQty = styled.div`
@@ -1210,7 +1216,10 @@ export default function CheckoutPage() {
                       )}
                     </SummaryThumb>
                     <SummaryItemDetails>
-                      <SummaryItemTitle>{lineTitle}</SummaryItemTitle>
+                      <SummaryItemTitle>
+                        <span>{lineTitle}</span>
+                        {isBestsellerMetadata(item?.product_metadata || {}) && <BestsellerBadge />}
+                      </SummaryItemTitle>
                       <SummaryItemQty>× {item.quantity}</SummaryItemQty>
                     </SummaryItemDetails>
                     <SummaryItemPrice>

@@ -26,6 +26,7 @@ import {
   SettingsIcon,
   ListBulletedIcon,
   ImportIcon,
+  StoreIcon,
 } from "@shopify/polaris-icons";
 import dynamic from "next/dynamic";
 import en from "@shopify/polaris/locales/en.json";
@@ -43,8 +44,8 @@ const GroupedDropdownSearch = dynamic(
   { ssr: false, loading: () => <div style={{ width: "100%", maxWidth: 400, height: 36 }} /> }
 );
 
-function getMenuItemsMain(t) {
-  return [
+function getMenuItemsMain(t, isSuperuser = false) {
+  const items = [
     { url: "/dashboard", label: t("home"), icon: HomeIcon },
     {
       url: "/orders",
@@ -72,10 +73,23 @@ function getMenuItemsMain(t) {
       icon: ProfileIcon,
       subNavigationItems: [
         { url: "/customers", label: "Liste" },
-        { url: "/orders/abandoned-checkouts", label: t("abandonedCheckouts") },
         { url: "/customers/reviews", label: "Bewertungen" },
       ],
     },
+  ];
+
+  if (isSuperuser) {
+    items.push({
+      url: "/sellers-menu",
+      label: "Verkäufer",
+      icon: StoreIcon,
+      subNavigationItems: [
+        { url: "/sellers", label: "Ansicht" },
+      ],
+    });
+  }
+
+  items.push(
     {
       url: "/marketing",
       label: t("marketing"),
@@ -114,7 +128,8 @@ function getMenuItemsMain(t) {
       ],
     },
     { url: "/import-export", label: t("importExport"), icon: ImportIcon },
-  ];
+  );
+  return items;
 }
 
 function getMenuItemsSettings(t, isSuperuser = false) {
@@ -127,7 +142,7 @@ function getMenuItemsSettings(t, isSuperuser = false) {
 
 // Parent nav URLs that should expand/collapse sub-menus on click (no page navigation)
 const PARENT_NAV_URLS = new Set([
-  "/products", "/marketing", "/content", "/analytics", "/customers-menu",
+  "/products", "/marketing", "/content", "/analytics", "/customers-menu", "/sellers-menu",
 ]);
 
 const NextLink = forwardRef(function NextLink({ url, children, external, onClick, ...rest }, ref) {
@@ -230,6 +245,7 @@ export default function PolarisLayout({ children }) {
 
   // Routes blocked for non-superuser sellers
   const SELLER_BLOCKED_ROUTES = new Set([
+    "/sellers",
     "/products/collections",
     "/products/collections/new",
     "/content/menus",
@@ -548,7 +564,7 @@ export default function PolarisLayout({ children }) {
       });
   };
 
-  const menuMain = filterNavForRole(getMenuItemsMain(t));
+  const menuMain = filterNavForRole(getMenuItemsMain(t, isSuperuser));
   const menuSettings = getMenuItemsSettings(t, isSuperuser);
   const navLocation = pathname && pathname !== "" ? pathname : "/";
 

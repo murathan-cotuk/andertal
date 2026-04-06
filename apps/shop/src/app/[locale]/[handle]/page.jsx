@@ -6,8 +6,9 @@ import LandingContainers from "@/components/landing/LandingContainers";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { useParams, notFound } from "next/navigation";
+import { useParams, useSearchParams, notFound } from "next/navigation";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
+import { getMedusaClient } from "@/lib/medusa-client";
 import styled, { keyframes } from "styled-components";
 
 /* ─────────────────────────────────────────────────────────── */
@@ -328,6 +329,23 @@ const CheckRow = styled.label`
   &:hover { color: #111; }
 `;
 
+const SubcategoryGroup = styled.div`
+  border-bottom: 1px solid #eceae7;
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+`;
+
+const SubcategoryLink = styled(Link)`
+  display: block;
+  padding: 6px 0;
+  font-size: 12.5px;
+  color: ${(p) => (p.$active ? "#111" : "#555")};
+  font-weight: ${(p) => (p.$active ? "700" : "500")};
+  text-decoration: none;
+  transition: color 0.12s;
+  &:hover { color: #111; }
+`;
+
 const ClearAllBtn = styled.button`
   background: none;
   border: 1px solid #ccc;
@@ -422,6 +440,42 @@ function inferFacetKeyFromValue(value, fallbackKey = "") {
   if (colorTokens.has(lower)) return "farbe";
 
   return normalizeFacetKey(fallbackKey);
+}
+
+function getProductBasePriceCents(product) {
+  const firstVariantPrice = product?.variants?.[0]?.prices?.[0]?.amount;
+  if (firstVariantPrice != null) return Number(firstVariantPrice) || 0;
+  if (product?.price != null) return Math.round(Number(product.price) * 100) || 0;
+  return 0;
+}
+
+function isDiscountedProduct(product) {
+  const base = getProductBasePriceCents(product);
+  const sale = product?.metadata?.rabattpreis_cents != null ? Number(product.metadata.rabattpreis_cents) : null;
+  return sale != null && sale > 0 && sale < base;
+}
+
+function isRecentProduct(product, months = 2) {
+  const now = new Date();
+  const threshold = new Date(now);
+  threshold.setMonth(threshold.getMonth() - months);
+  const candidates = [
+    product?.created_at,
+    product?.metadata?.publish_date,
+    product?.metadata?.created_at,
+    product?.updated_at,
+  ];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) return d >= threshold;
+  }
+  return false;
+}
+
+function productSalesScore(product) {
+  const meta = product?.metadata || {};
+  return Number(meta.sold_last_month || meta.sold || meta.sales_count || 0) || 0;
 }
 
 /* ─── Pagination ─────────────────────────────────────────── */
@@ -542,9 +596,13 @@ const PER_PAGE = 24;
  * ─────────────────────────────────────────────────────────── */
 export default function CollectionPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const locale = params?.locale ?? "en";
   const handle = params?.handle ? String(params.handle) : undefined;
+  const saleOnly = (searchParams?.get("sale") || "").trim() === "1";
+  const neuOnly = (searchParams?.get("neu") || "").trim() === "1";
+  const bestsellerOnly = (searchParams?.get("bestseller") || "").trim() === "1";
 
   const [collection,  setCollection]  = useState(null);
   const [cmsPage,     setCmsPage]     = useState(null);
@@ -558,6 +616,7 @@ export default function CollectionPage() {
   const [panelOpen,   setPanelOpen]   = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
   const [recommendedProducts, setRecommendedProducts] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
 
   const bodyRef = useRef(null);
 
@@ -568,6 +627,23 @@ export default function CollectionPage() {
       router.replace("/favorites");
     }
   }, [handle, router]);
+
+  const findCategoryByCollection = (nodes, col) => {
+    if (!Array.isArray(nodes) || !col) return null;
+    for (const node of nodes) {
+      const meta = node?.metadata && typeof node.metadata === "object" ? node.metadata : {};
+      const linkedCollectionId = meta.collection_id ? String(meta.collection_id) : "";
+      if (
+        (linkedCollectionId && col.id && linkedCollectionId === String(col.id)) ||
+        (node?.slug && col.handle && String(node.slug).toLowerCase() === String(col.handle).toLowerCase())
+      ) {
+        return node;
+      }
+      const nested = findCategoryByCollection(node?.children || [], col);
+      if (nested) return nested;
+    }
+    return null;
+  };
 
   /* ── Fetch ── */
   useEffect(() => {
@@ -621,6 +697,28 @@ export default function CollectionPage() {
       }
     })();
   }, [handle]);
+
+  useEffect(() => {
+    if (!collection?.id && !collection?.handle) {
+      setSubcategories([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getMedusaClient().getCategories({ tree: true, is_visible: true });
+        const tree = data?.tree || data?.categories || [];
+        const currentCategory = findCategoryByCollection(tree, collection);
+        const children = Array.isArray(currentCategory?.children) ? currentCategory.children : [];
+        if (!cancelled) setSubcategories(children.filter((c) => c?.active !== false));
+      } catch {
+        if (!cancelled) setSubcategories([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [collection?.id, collection?.handle]);
 
   /* ── Recommended products (from collection.recommended_product_ids) ── */
   useEffect(() => {
@@ -782,6 +880,15 @@ export default function CollectionPage() {
   };
 
   let filtered = [...products];
+  if (saleOnly) {
+    filtered = filtered.filter((p) => isDiscountedProduct(p));
+  }
+  if (neuOnly) {
+    filtered = filtered.filter((p) => isRecentProduct(p, 2));
+  }
+  if (bestsellerOnly) {
+    filtered = filtered.filter((p) => productSalesScore(p) > 0);
+  }
   Object.entries(filters).forEach(([k, vals]) => {
     if (!vals?.length) return;
     filtered = filtered.filter(p => {
@@ -813,6 +920,9 @@ export default function CollectionPage() {
 
   /* ── Sort ── */
   const sorted = [...filtered];
+  if (bestsellerOnly && sort === "default") {
+    sorted.sort((a, b) => productSalesScore(b) - productSalesScore(a));
+  }
   if (sort === "newest")     sorted.sort((a,b) => {
     const da = a.metadata?.publish_date ? new Date(a.metadata.publish_date).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
     const db = b.metadata?.publish_date ? new Date(b.metadata.publish_date).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
@@ -977,6 +1087,23 @@ export default function CollectionPage() {
                   </ClearAllBtn>
                 )}
               </div>
+
+              {subcategories.length > 0 && (
+                <SubcategoryGroup>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 6 }}>
+                    Subkategorien
+                  </div>
+                  {subcategories.map((sub) => (
+                    <SubcategoryLink
+                      key={sub.id || sub.slug}
+                      href={`/${sub.slug}`}
+                      $active={String(sub.slug || "").toLowerCase() === String(handle || "").toLowerCase()}
+                    >
+                      {sub.name || sub.slug}
+                    </SubcategoryLink>
+                  ))}
+                </SubcategoryGroup>
+              )}
 
               {Object.entries(facets).map(([key, vals]) => (
                 <FilterGroup key={key}>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Page,
   Layout,
@@ -17,11 +17,12 @@ import {
   Modal,
   Select,
   Badge,
-  DropZone,
 } from "@shopify/polaris";
 import { EditIcon, DeleteIcon, ChevronDownIcon, ChevronRightIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
+import MediaPickerModal from "@/components/MediaPickerModal";
+import RichTextEditor from "@/components/RichTextEditor";
 
 function slugFromName(name) {
   return titleToHandle(name || "");
@@ -173,6 +174,12 @@ const emptyForm = {
   active: true,
   is_visible: true,
   collection_id: "",
+  display_title: "",
+  meta_title: "",
+  meta_description: "",
+  keywords: "",
+  richtext: "",
+  image_url: "",
   banner_image_url: "",
 };
 const initialSlugTouched = false;
@@ -194,6 +201,8 @@ export default function ContentCategoriesPage() {
   const [importCsvFile, setImportCsvFile] = useState(null);
   const [importProgress, setImportProgress] = useState(null); // { total, done, error } | null
   const [bannerUploading, setBannerUploading] = useState(false);
+  const [mainImgPickerOpen, setMainImgPickerOpen] = useState(false);
+  const [bannerImgPickerOpen, setBannerImgPickerOpen] = useState(false);
   const client = getMedusaAdminClient();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
 
@@ -230,28 +239,9 @@ export default function ContentCategoriesPage() {
   const openCreate = () => {
     setEditId(null);
     setSlugManuallyEdited(false);
-    setForm({ ...emptyForm, parent_id: "", banner_image_url: "" });
+    setForm({ ...emptyForm, parent_id: "", image_url: "", banner_image_url: "" });
     setModalOpen(true);
   };
-
-  const handleBannerDrop = useCallback(
-    (files) => {
-      setBannerUploading(true);
-      const file = Array.isArray(files) ? files[0] : files;
-      if (!file) return setBannerUploading(false);
-      const fd = new FormData();
-      fd.append("file", file);
-      client
-        .uploadMedia(fd)
-        .then((r) => {
-          const url = r?.url || null;
-          if (url) setForm((prev) => ({ ...prev, banner_image_url: url }));
-        })
-        .catch(() => setError("Banner upload failed"))
-        .finally(() => setBannerUploading(false));
-    },
-    [client]
-  );
 
   const openEdit = (cat) => {
     setEditId(cat.id);
@@ -265,6 +255,12 @@ export default function ContentCategoriesPage() {
       active: !!cat.active,
       is_visible: !!cat.is_visible,
       collection_id: (cat.metadata && cat.metadata.collection_id) || "",
+      display_title: (cat.metadata && cat.metadata.display_title) || "",
+      meta_title: cat.seo_title || (cat.metadata && cat.metadata.meta_title) || "",
+      meta_description: cat.seo_description || (cat.metadata && cat.metadata.meta_description) || "",
+      keywords: (cat.metadata && cat.metadata.keywords) || "",
+      richtext: cat.long_content || (cat.metadata && cat.metadata.richtext) || "",
+      image_url: (cat.metadata && cat.metadata.image_url) || "",
       banner_image_url: cat.banner_image_url ?? "",
     });
     setModalOpen(true);
@@ -300,8 +296,20 @@ export default function ContentCategoriesPage() {
       has_collection: !!form.has_collection,
       active: !!form.active,
       is_visible: !!form.is_visible,
-      metadata: form.collection_id ? { collection_id: form.collection_id } : undefined,
+      seo_title: (form.meta_title || "").trim() || null,
+      seo_description: (form.meta_description || "").trim() || null,
+      long_content: (form.richtext || "").trim() || null,
       banner_image_url: (form.banner_image_url || "").trim() || null,
+      metadata: {
+        ...(form.collection_id ? { collection_id: form.collection_id } : {}),
+        display_title: (form.display_title || "").trim() || null,
+        meta_title: (form.meta_title || "").trim() || null,
+        meta_description: (form.meta_description || "").trim() || null,
+        keywords: (form.keywords || "").trim() || null,
+        richtext: (form.richtext || "").trim() || null,
+        image_url: (form.image_url || "").trim() || null,
+        banner_image_url: (form.banner_image_url || "").trim() || null,
+      },
     };
 
     try {
@@ -559,6 +567,61 @@ export default function ContentCategoriesPage() {
               multiline={2}
               autoComplete="off"
             />
+            <TextField
+              label="Display title (h1 on category page)"
+              value={form.display_title}
+              onChange={(value) => setForm((prev) => ({ ...prev, display_title: value }))}
+              autoComplete="off"
+              placeholder="Optional custom title"
+            />
+            <TextField
+              label="Meta title"
+              value={form.meta_title}
+              onChange={(value) => setForm((prev) => ({ ...prev, meta_title: value }))}
+              autoComplete="off"
+            />
+            <TextField
+              label="Meta description"
+              value={form.meta_description}
+              onChange={(value) => setForm((prev) => ({ ...prev, meta_description: value }))}
+              autoComplete="off"
+              multiline={2}
+            />
+            <TextField
+              label="Keywords"
+              value={form.keywords}
+              onChange={(value) => setForm((prev) => ({ ...prev, keywords: value }))}
+              autoComplete="off"
+              placeholder="comma-separated"
+            />
+            <Box>
+              <Text as="span" variant="bodyMd" fontWeight="medium">Main image (menus / dropdown)</Text>
+              <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
+                {form.image_url ? (
+                  <div style={{ width: 100, aspectRatio: 1, borderRadius: 8, overflow: "hidden", background: "var(--p-color-bg-fill-secondary)", position: "relative" }}>
+                    <img
+                      src={form.image_url.startsWith("http") || form.image_url.startsWith("data:") ? form.image_url : `${baseUrl}${form.image_url}`}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, image_url: "" }))}
+                      style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, border: "none", borderRadius: "50%", background: "rgba(0,0,0,0.5)", color: "#fff", cursor: "pointer", fontSize: 14 }}
+                      aria-label="Remove"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : null}
+                <div
+                  onClick={() => setMainImgPickerOpen(true)}
+                  style={{ width: 100, aspectRatio: 1, borderRadius: 8, border: "2px dashed var(--p-color-border)", background: "var(--p-color-bg-fill-secondary)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                >
+                  <span style={{ fontSize: 24, color: "var(--p-color-icon)" }}>+</span>
+                </div>
+              </div>
+            </Box>
             <Box>
               <Text as="span" variant="bodyMd" fontWeight="medium">Category banner (shop category page)</Text>
               <div style={{ marginTop: 8 }}>
@@ -580,12 +643,38 @@ export default function ContentCategoriesPage() {
                   </div>
                 ) : null}
                 {!form.banner_image_url && (
-                  <DropZone accept="image/*" type="image" onDropAccepted={handleBannerDrop} allowMultiple={false}>
-                    <DropZone.FileUpload actionHint={bannerUploading ? "Uploading…" : "Upload banner image"} />
-                  </DropZone>
+                  <div
+                    onClick={() => setBannerImgPickerOpen(true)}
+                    style={{ width: 200, height: 50, borderRadius: 8, border: "2px dashed var(--p-color-border)", background: "var(--p-color-bg-fill-secondary)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                  >
+                    <span style={{ fontSize: 18, color: "var(--p-color-icon)" }}>+ Banner</span>
+                  </div>
                 )}
               </div>
             </Box>
+            <RichTextEditor
+              label="Richtext (below products on category page)"
+              value={form.richtext || ""}
+              onChange={(value) => setForm((prev) => ({ ...prev, richtext: value }))}
+              minHeight="180px"
+              helpText="Supports visual editing and HTML mode."
+            />
+            <MediaPickerModal
+              open={mainImgPickerOpen}
+              onClose={() => setMainImgPickerOpen(false)}
+              title="Ana görsel seç"
+              multiple={false}
+              onUploadingChange={setBannerUploading}
+              onSelect={(urls) => { if (urls[0]) setForm((prev) => ({ ...prev, image_url: urls[0] })); }}
+            />
+            <MediaPickerModal
+              open={bannerImgPickerOpen}
+              onClose={() => setBannerImgPickerOpen(false)}
+              title="Banner görseli seç"
+              multiple={false}
+              onUploadingChange={setBannerUploading}
+              onSelect={(urls) => { if (urls[0]) setForm((prev) => ({ ...prev, banner_image_url: urls[0] })); }}
+            />
             <Checkbox
               label="Has collection (create or link collection page)"
               checked={form.has_collection}

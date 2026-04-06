@@ -281,6 +281,14 @@ function menuItemHref(item) {
     const labelSlug = itemSlug || parsed?.label_slug || slugify(item.label);
     return labelSlug ? `/${labelSlug}` : "#";
   }
+  if (item.link_type === "api") {
+    const fn = String(parsed?.function || parsed?.api_function || value || "").trim().toLowerCase();
+    if (fn === "brand" || fn === "marke" || fn === "brands") return "/brands";
+    if (fn === "sales") return "/sales";
+    if (fn === "neuheiten") return "/neuheiten";
+    if (fn === "bestsellers") return "/bestsellers";
+    return "#";
+  }
   if (parsed) {
     if (itemSlug) value = itemSlug;
     else if (parsed.handle) value = parsed.handle;

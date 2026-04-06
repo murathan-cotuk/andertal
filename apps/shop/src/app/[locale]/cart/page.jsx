@@ -15,6 +15,8 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
 import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
+import BestsellerBadge from "@/components/BestsellerBadge";
+import { isBestsellerMetadata } from "@/lib/bestseller";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -84,6 +86,10 @@ const ItemTitle = styled.div`
   font-weight: 500;
   color: #111827;
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 `;
 
 const ItemPrice = styled.div`
@@ -350,6 +356,7 @@ export default function CartPage() {
                           return m ? m[1] : lineTitle;
                         })()}
                       </Link>
+                      {isBestsellerMetadata(item?.product_metadata || {}) && <BestsellerBadge />}
                     </ItemTitle>
                     {(() => {
                       const lineTitle = getLocalizedCartLineTitle(item, locale);

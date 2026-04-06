@@ -1,12 +1,12 @@
 "use client";
 
 import DashboardLayout from "@/components/DashboardLayout";
-import AdminCategoriesPage from "@/components/pages/settings/CategoriesPage";
+import ContentCategoriesPage from "@/components/pages/content/ContentCategoriesPage";
 
 export default function CategoriesSettingsPage() {
   return (
     <DashboardLayout>
-      <AdminCategoriesPage />
+      <ContentCategoriesPage />
     </DashboardLayout>
   );
 }

@@ -621,6 +621,23 @@ async function start() {
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS sub_of_seller_id varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS first_name varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS last_name varchar(255) DEFAULT NULL;`).catch(() => {})
+        // Message channel support (customer vs support)
+        await client.query(`ALTER TABLE store_messages ADD COLUMN IF NOT EXISTS channel varchar(20) DEFAULT 'customer';`).catch(() => {})
+        await client.query(`ALTER TABLE store_messages ADD COLUMN IF NOT EXISTS seller_id varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE store_messages ADD COLUMN IF NOT EXISTS is_read_by_support boolean NOT NULL DEFAULT false;`).catch(() => {})
+        // Seller onboarding / approval fields
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS approval_status varchar(30) DEFAULT 'registered';`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS company_name varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS tax_id varchar(100) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS vat_id varchar(100) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS business_address jsonb DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS warehouse_address jsonb DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS phone varchar(100) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS website varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS documents jsonb DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS rejection_reason text DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS approved_at timestamp DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS approved_by varchar(255) DEFAULT NULL;`).catch(() => {})
         // Normalize store_name: convert empty string to NULL so sub-users don't conflict
         await client.query(`UPDATE seller_users SET store_name = NULL WHERE store_name = ''`).catch(() => {})
         await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS first_name varchar(255) DEFAULT NULL;`).catch(() => {})
@@ -939,8 +956,33 @@ async function start() {
           is_visible: b.is_visible !== undefined ? b.is_visible : true,
           has_collection: b.has_collection !== undefined ? b.has_collection : false,
           sort_order: b.sort_order || 0,
+          seo_title: b.seo_title || null,
+          seo_description: b.seo_description || null,
+          long_content: b.long_content || null,
+          banner_image_url: b.banner_image_url || null,
           metadata: b.metadata,
         })
+        const syncCategoryCmsToCollection = async (cat, body) => {
+          try {
+            const meta = (body && typeof body.metadata === 'object' && body.metadata) || {}
+            const linkedId = (meta.collection_id || '').toString().trim()
+            if (!linkedId) return
+            const patchMeta = {
+              ...(meta.display_title !== undefined ? { display_title: meta.display_title || null } : {}),
+              ...(meta.meta_title !== undefined ? { meta_title: meta.meta_title || null } : {}),
+              ...(meta.meta_description !== undefined ? { meta_description: meta.meta_description || null } : {}),
+              ...(meta.keywords !== undefined ? { keywords: meta.keywords || null } : {}),
+              ...(meta.richtext !== undefined ? { richtext: meta.richtext || null } : {}),
+              ...(meta.image_url !== undefined ? { image_url: meta.image_url || null } : {}),
+              ...(meta.banner_image_url !== undefined ? { banner_image_url: meta.banner_image_url || null } : {}),
+            }
+            if (Object.keys(patchMeta).length === 0) return
+            await updateAdminHubCollectionDb(linkedId, null, null, patchMeta)
+          } catch (e) {
+            console.warn('syncCategoryCmsToCollection (POST):', e && e.message)
+          }
+        }
+        await syncCategoryCmsToCollection(category, b)
         res.status(201).json({ category })
       } catch (err) {
         console.error('Admin Hub Categories POST error:', err)
@@ -980,7 +1022,29 @@ async function start() {
       const adminHubService = resolveAdminHub()
       if (!adminHubService) return res.status(503).json({ message: 'Admin Hub service not available', code: 'ADMIN_HUB_NOT_LOADED' })
       try {
-        const category = await adminHubService.updateCategory(req.params.id, req.body || {})
+        const body = req.body || {}
+        const category = await adminHubService.updateCategory(req.params.id, body)
+        try {
+          const meta = (body && typeof body.metadata === 'object' && body.metadata) || {}
+          const categoryMeta = (category && category.metadata && typeof category.metadata === 'object') ? category.metadata : {}
+          const linkedId = (meta.collection_id || categoryMeta.collection_id || '').toString().trim()
+          if (linkedId) {
+            const patchMeta = {
+              ...(meta.display_title !== undefined ? { display_title: meta.display_title || null } : {}),
+              ...(meta.meta_title !== undefined ? { meta_title: meta.meta_title || body.seo_title || null } : {}),
+              ...(meta.meta_description !== undefined ? { meta_description: meta.meta_description || body.seo_description || null } : {}),
+              ...(meta.keywords !== undefined ? { keywords: meta.keywords || null } : {}),
+              ...(meta.richtext !== undefined ? { richtext: meta.richtext || body.long_content || null } : {}),
+              ...(meta.image_url !== undefined ? { image_url: meta.image_url || null } : {}),
+              ...(meta.banner_image_url !== undefined ? { banner_image_url: meta.banner_image_url || body.banner_image_url || null } : {}),
+            }
+            if (Object.keys(patchMeta).length > 0) {
+              await updateAdminHubCollectionDb(linkedId, null, null, patchMeta)
+            }
+          }
+        } catch (e) {
+          console.warn('syncCategoryCmsToCollection (PUT):', e && e.message)
+        }
         res.json({ category })
       } catch (err) {
         console.error('Admin Hub Category PUT error:', err)
@@ -3015,6 +3079,47 @@ async function start() {
       }
     }
     const isUuidLike = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test((s || '').trim())
+    const BESTSELLER_CACHE_TTL_MS = 5 * 60 * 1000
+    let bestsellerCache = { expiresAt: 0, ids: new Set() }
+    const salesScoreFromMetadata = (metadata) => {
+      const m = metadata && typeof metadata === 'object' ? metadata : {}
+      const soldLastMonth = Number(m.sold_last_month ?? 0)
+      if (Number.isFinite(soldLastMonth) && soldLastMonth > 0) return soldLastMonth
+      const sold = Number(m.sold ?? m.sales_count ?? 0)
+      return Number.isFinite(sold) && sold > 0 ? sold : 0
+    }
+    const productCollectionKeys = (p) => {
+      const keys = []
+      if (p && p.collection_id) keys.push(String(p.collection_id).trim().toLowerCase())
+      const metaIds = Array.isArray(p?.metadata?.collection_ids) ? p.metadata.collection_ids : []
+      for (const id of metaIds) {
+        if (id == null) continue
+        keys.push(String(id).trim().toLowerCase())
+      }
+      return [...new Set(keys.filter(Boolean))]
+    }
+    const getBestsellerProductIds = async () => {
+      const now = Date.now()
+      if (bestsellerCache.expiresAt > now && bestsellerCache.ids && bestsellerCache.ids.size > 0) {
+        return bestsellerCache.ids
+      }
+      let all = await listAdminHubProductsDb({ limit: 5000 })
+      all = all.filter((p) => (p.status || '').toLowerCase() === 'published')
+      const byCollection = new Map()
+      for (const p of all) {
+        const score = salesScoreFromMetadata(p.metadata)
+        if (!(score > 0)) continue
+        const keys = productCollectionKeys(p)
+        if (!keys.length) continue
+        for (const key of keys) {
+          const prev = byCollection.get(key)
+          if (!prev || score > prev.score) byCollection.set(key, { id: String(p.id), score })
+        }
+      }
+      const ids = new Set(Array.from(byCollection.values()).map((x) => String(x.id)))
+      bestsellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids }
+      return ids
+    }
     const storeProductsFromAdminHubGET = async (req, res) => {
       try {
         const query = req.query || {}
@@ -3065,6 +3170,7 @@ async function start() {
         const brandIds = [...new Set(list.map((p) => (p.metadata && p.metadata.brand_id) || null).filter(Boolean))]
         const brandsById = {}
         await Promise.all(brandIds.map(async (bid) => { const b = await getBrandById(bid); if (b) brandsById[bid] = b }))
+        const bestsellerIds = await getBestsellerProductIds()
         const products = list.map((p) => {
           const mapped = mapAdminHubToStoreProduct(p)
           const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
@@ -3076,6 +3182,9 @@ async function start() {
           if (brandId && brandsById[brandId]) {
             const b = brandsById[brandId]
             mapped.metadata = { ...(mapped.metadata || {}), brand_name: b.name, brand_logo: b.logo_image || null, brand_handle: b.handle || null }
+          }
+          if (bestsellerIds.has(String(p.id))) {
+            mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
           }
           return mapped
         })
@@ -3134,6 +3243,10 @@ async function start() {
             mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
           }
         }
+        const bestsellerIds = await getBestsellerProductIds()
+        if (bestsellerIds.has(String(product.id))) {
+          mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+        }
         res.json({ product: mapped })
       } catch (err) {
         console.error('Store product by id GET (admin hub):', err)
@@ -3142,6 +3255,33 @@ async function start() {
     }
     httpApp.get('/store/products', storeProductsFromAdminHubGET)
     httpApp.get('/store/products/:idOrHandle', storeProductByIdFromAdminHubGET)
+    httpApp.get('/store/brands', async (_req, res) => {
+      const client = getBrandsDbClient()
+      if (!client) return res.status(500).json({ message: 'Database unavailable' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `SELECT id, name, handle, logo_image, banner_image, address
+           FROM admin_hub_brands
+           WHERE handle IS NOT NULL AND LENGTH(TRIM(handle)) > 0
+           ORDER BY LOWER(name), created_at DESC`
+        )
+        await client.end()
+        const brands = (r.rows || []).map((row) => ({
+          id: row.id,
+          name: row.name,
+          handle: row.handle,
+          logo_image: row.logo_image || null,
+          banner_image: row.banner_image || null,
+          address: row.address || null,
+        }))
+        res.json({ brands, count: brands.length })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        console.error('Store brands list GET:', e)
+        res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+      }
+    })
     httpApp.get('/store/brands/:handle', async (req, res) => {
       const handle = (req.params.handle || '').trim().toLowerCase()
       if (!handle) return res.status(400).json({ message: 'handle required' })
@@ -3159,6 +3299,7 @@ async function start() {
         const sellerIds = [...new Set(list.map((p) => (p.seller_id || 'default').toString().trim()).filter(Boolean))]
         const storeNamesBySeller = {}
         await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))
+        const bestsellerIds = await getBestsellerProductIds()
         const products = list.map((p) => {
           const mapped = mapAdminHubToStoreProduct(p)
           const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
@@ -3167,6 +3308,9 @@ async function start() {
             mapped.metadata = { ...(mapped.metadata || {}), seller_name: storeName, shop_name: storeName }
           }
           mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
+          if (bestsellerIds.has(String(p.id))) {
+            mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+          }
           return mapped
         })
         res.json({ brand, products, count: products.length })
@@ -3175,7 +3319,7 @@ async function start() {
         res.status(500).json({ message: (e && e.message) || 'Internal server error' })
       }
     })
-    console.log('Store routes: GET /store/products, GET /store/products/:idOrHandle, GET /store/brands/:handle (from Admin Hub)')
+    console.log('Store routes: GET /store/products, GET /store/products/:idOrHandle, GET /store/brands, GET /store/brands/:handle (from Admin Hub)')
 
     // --- Store Carts (session cart: create, get, add/update/remove line-items) ---
     const productIdFromVariantId = (variantId) => {
@@ -3261,6 +3405,7 @@ async function start() {
          WHERE ci.cart_id = $1 ORDER BY ci.created_at`,
         [cartId]
       )
+      const bestsellerIds = await getBestsellerProductIds().catch(() => new Set())
       const items = (itemsRes.rows || []).map((r) => {
         let pm = r.product_metadata
         if (pm != null && typeof pm === 'string') {
@@ -3270,6 +3415,10 @@ async function start() {
             pm = null
           }
         }
+        const isBestseller = bestsellerIds.has(String(r.product_id || '')) || (pm && bestsellerIds.has(String(pm.id || '')))
+        const metadataOut = pm && typeof pm === 'object'
+          ? (isBestseller ? { ...pm, is_bestseller: true } : pm)
+          : (isBestseller ? { is_bestseller: true } : null)
         return {
           id: r.id,
           variant_id: r.variant_id,
@@ -3281,7 +3430,7 @@ async function start() {
           product_handle: r.product_handle,
           shipping_group_id: r.shipping_group_id || null,
           product_title: r.product_title || null,
-          product_metadata: pm && typeof pm === 'object' ? pm : null,
+          product_metadata: metadataOut,
         }
       })
       return {
@@ -7635,6 +7784,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.connect()
         const orderId = req.query.order_id || null
         const sellerId = (req.query.seller_id || '').trim()
+        // channel: 'customer' (default) = customer<->seller msgs, 'support' = seller<->support team msgs
+        const channel = (req.query.channel || 'customer').trim()
         let q = `SELECT m.*,
           o.order_number, o.status AS order_status, o.order_status AS order_order_status,
           o.total_cents AS order_total_cents, o.first_name AS order_first_name,
@@ -7642,13 +7793,35 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           FROM store_messages m LEFT JOIN store_orders o ON o.id = m.order_id`
         const params = []
         const conditions = []
-        if (orderId) { params.push(orderId); conditions.push(`m.order_id = $${params.length}::uuid`) }
-        if (sellerId) { params.push(sellerId); conditions.push(`o.seller_id = $${params.length}`) }
+        if (channel === 'support') {
+          // Support channel: messages where seller_id matches (seller talking to support team)
+          if (sellerId) { params.push(sellerId); conditions.push(`m.seller_id = $${params.length}`) }
+          conditions.push(`m.channel = 'support'`)
+        } else {
+          // Customer channel: classic customer<->seller messages
+          conditions.push(`(m.channel = 'customer' OR m.channel IS NULL)`)
+          if (orderId) { params.push(orderId); conditions.push(`m.order_id = $${params.length}::uuid`) }
+          if (sellerId) { params.push(sellerId); conditions.push(`o.seller_id = $${params.length}`) }
+        }
         if (conditions.length) q += ' WHERE ' + conditions.join(' AND ')
         q += ' ORDER BY m.created_at ASC LIMIT 200'
         const r = await client.query(q, params)
-        const unreadWhere = sellerId ? `AND m2.order_id IN (SELECT id FROM store_orders WHERE seller_id = $1)` : ''
-        const unreadR = await client.query(`SELECT COUNT(*)::int AS c FROM store_messages m2 WHERE m2.sender_type = 'customer' AND m2.is_read_by_seller = false ${unreadWhere}`, sellerId ? [sellerId] : [])
+        // Unread count depends on channel
+        let unreadR
+        if (channel === 'support') {
+          const unreadParams = sellerId ? [sellerId] : []
+          const unreadWhere = sellerId ? `AND m2.seller_id = $1` : ''
+          unreadR = await client.query(
+            `SELECT COUNT(*)::int AS c FROM store_messages m2 WHERE m2.channel = 'support' AND m2.sender_type = 'customer' AND m2.is_read_by_seller = false ${unreadWhere}`,
+            unreadParams
+          )
+        } else {
+          const unreadWhere = sellerId ? `AND m2.order_id IN (SELECT id FROM store_orders WHERE seller_id = $1)` : ''
+          unreadR = await client.query(
+            `SELECT COUNT(*)::int AS c FROM store_messages m2 WHERE (m2.channel = 'customer' OR m2.channel IS NULL) AND m2.sender_type = 'customer' AND m2.is_read_by_seller = false ${unreadWhere}`,
+            sellerId ? [sellerId] : []
+          )
+        }
         await client.end()
         res.json({
           messages: r.rows.map(row => ({
@@ -7671,11 +7844,32 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const { order_id, body, subject } = req.body || {}
+        const { order_id, body, subject, channel, sender_seller_id } = req.body || {}
         if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
         // Get seller from_email
         const smtpR = await client.query(`SELECT from_email, from_name FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
         const sellerEmail = smtpR.rows[0]?.from_email || ''
+
+        if (channel === 'support') {
+          // Support channel: seller <-> support team (superusers)
+          // sender_seller_id: if set, sender is a seller; if null, sender is support team
+          const isSupportSide = !sender_seller_id
+          const senderType = isSupportSide ? 'seller' : 'customer' // 'customer' = seller side, 'seller' = support side
+          const msgSellerId = sender_seller_id || req.body.target_seller_id || null
+          const r = await client.query(
+            `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, channel, seller_id, is_read_by_seller, is_read_by_support, is_read_by_customer)
+             VALUES ($1, $2, $3, $4, $5, $6, 'support', $7, $8, $9, false) RETURNING *`,
+            [
+              null, senderType, sellerEmail, null, subject || null, body, msgSellerId,
+              isSupportSide ? true : false, // is_read_by_seller: support side msgs are auto-read by support
+              isSupportSide ? false : true,  // is_read_by_support: seller side msgs need to be read by support
+            ]
+          )
+          await client.end()
+          return res.status(201).json({ message: r.rows[0] })
+        }
+
+        // Customer channel (default)
         // Get order's customer email
         let recipientEmail = null
         if (order_id) {
@@ -7683,8 +7877,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           recipientEmail = oR.rows[0]?.email || null
         }
         const r = await client.query(
-          `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, is_read_by_seller, is_read_by_customer)
-           VALUES ($1, 'seller', $2, $3, $4, $5, true, false) RETURNING *`,
+          `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, channel, is_read_by_seller, is_read_by_customer)
+           VALUES ($1, 'seller', $2, $3, $4, $5, 'customer', true, false) RETURNING *`,
           [order_id || null, sellerEmail, recipientEmail, subject || null, body]
         )
         const msg = r.rows[0]
@@ -7719,6 +7913,29 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         await client.query(`UPDATE store_messages SET is_read_by_seller = true WHERE id = $1::uuid`, [id])
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // Mark all support-channel messages for a seller as read by support team
+    const adminHubSupportMessagesMarkReadPATCH = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const { seller_id, mark_as } = req.body || {}
+        if (!seller_id) { await client.end(); return res.status(400).json({ message: 'seller_id required' }) }
+        if (mark_as === 'support') {
+          await client.query(`UPDATE store_messages SET is_read_by_support = true WHERE channel = 'support' AND seller_id = $1 AND sender_type = 'customer'`, [seller_id])
+        } else {
+          await client.query(`UPDATE store_messages SET is_read_by_seller = true WHERE channel = 'support' AND seller_id = $1 AND sender_type = 'seller'`, [seller_id])
+        }
         await client.end()
         res.json({ success: true })
       } catch (e) {
@@ -7864,6 +8081,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.post('/admin-hub/v1/notifications/mark-seen', adminHubNotificationsMarkSeenPOST)
     httpApp.get('/admin-hub/v1/messages', adminHubMessagesGET)
     httpApp.post('/admin-hub/v1/messages', adminHubMessagesPOST)
+    httpApp.patch('/admin-hub/v1/messages/support/mark-read', adminHubSupportMessagesMarkReadPATCH)
     httpApp.patch('/admin-hub/v1/messages/:id/read', adminHubMessageMarkReadPATCH)
     httpApp.get('/store/messages', storeMessagesGET)
     httpApp.post('/store/messages', storeMessagesPOST)
@@ -8397,6 +8615,271 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.patch('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserUpdatePATCH)
     httpApp.delete('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserDeleteDELETE)
     httpApp.delete('/admin-hub/v1/pending-invites/:id', requireSellerAuth, adminHubPendingInviteDeleteDELETE)
+
+    // ── SELLER MANAGEMENT (superuser) ─────────────────────────────────────────
+    const SELLER_SELECT = `
+      id, email, store_name, seller_id, is_superuser, created_at, updated_at,
+      iban, commission_rate, first_name, last_name,
+      approval_status, company_name, tax_id, vat_id,
+      business_address, warehouse_address, phone, website,
+      documents, rejection_reason, approved_at, approved_by
+    `
+
+    // GET /admin-hub/v1/sellers — list all sellers (superuser only)
+    const adminHubSellersGET = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const client = getDbClient ? getDbClient() : getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `SELECT ${SELLER_SELECT} FROM seller_users WHERE sub_of_seller_id IS NULL ORDER BY created_at DESC`
+        )
+        // For each seller, count products and aggregate revenue
+        const sellerIds = r.rows.map(s => s.seller_id).filter(Boolean)
+        let productCounts = {}
+        let revenueTotals = {}
+        if (sellerIds.length > 0) {
+          // product counts
+          try {
+            const pc = await client.query(
+              `SELECT seller_id, COUNT(*) as cnt FROM product WHERE seller_id = ANY($1) GROUP BY seller_id`,
+              [sellerIds]
+            )
+            pc.rows.forEach(row => { productCounts[row.seller_id] = parseInt(row.cnt) })
+          } catch (_) {}
+          // revenue totals (paid orders)
+          try {
+            const rv = await client.query(
+              `SELECT seller_id, SUM(total) as total_cents, COUNT(*) as order_cnt
+               FROM store_orders WHERE seller_id = ANY($1) AND payment_status = 'bezahlt'
+               GROUP BY seller_id`,
+              [sellerIds]
+            )
+            rv.rows.forEach(row => {
+              revenueTotals[row.seller_id] = {
+                total_cents: parseInt(row.total_cents) || 0,
+                order_count: parseInt(row.order_cnt) || 0,
+              }
+            })
+          } catch (_) {}
+        }
+        await client.end()
+        const sellers = r.rows.map(s => ({
+          ...s,
+          product_count: productCounts[s.seller_id] || 0,
+          revenue_cents: revenueTotals[s.seller_id]?.total_cents || 0,
+          order_count: revenueTotals[s.seller_id]?.order_count || 0,
+          commission_cents: Math.round((revenueTotals[s.seller_id]?.total_cents || 0) * (parseFloat(s.commission_rate) || 0.1)),
+        }))
+        res.json({ sellers, count: sellers.length })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // GET /admin-hub/v1/sellers/:id — single seller detail (superuser only)
+    const adminHubSellerByIdGET = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const { id } = req.params
+      const client = getDbClient ? getDbClient() : getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(`SELECT ${SELLER_SELECT} FROM seller_users WHERE id = $1`, [id])
+        if (!r.rows[0]) { await client.end(); return res.status(404).json({ message: 'Seller not found' }) }
+        const seller = r.rows[0]
+        const sellerId = seller.seller_id
+
+        // Products by category
+        let productsByCategory = []
+        try {
+          const pc = await client.query(
+            `SELECT metadata->>'category_slug' as category_slug, COUNT(*) as cnt
+             FROM product WHERE seller_id = $1 GROUP BY metadata->>'category_slug'`,
+            [sellerId]
+          )
+          productsByCategory = pc.rows.map(r => ({ category: r.category_slug || 'Uncategorized', count: parseInt(r.cnt) }))
+        } catch (_) {}
+
+        // Monthly revenue (last 12 months)
+        let monthlyRevenue = []
+        try {
+          const mv = await client.query(
+            `SELECT DATE_TRUNC('month', created_at) as month, SUM(total) as total_cents, COUNT(*) as order_cnt
+             FROM store_orders WHERE seller_id = $1 AND payment_status = 'bezahlt'
+             AND created_at >= NOW() - INTERVAL '12 months'
+             GROUP BY 1 ORDER BY 1`,
+            [sellerId]
+          )
+          monthlyRevenue = mv.rows.map(r => ({
+            month: r.month,
+            total_cents: parseInt(r.total_cents) || 0,
+            order_count: parseInt(r.order_cnt) || 0,
+          }))
+        } catch (_) {}
+
+        // Payout summary
+        let payoutSummary = { total_paid_cents: 0, total_pending_cents: 0 }
+        try {
+          const ps = await client.query(
+            `SELECT status, SUM(payout_cents) as total FROM seller_payouts WHERE seller_id = $1 GROUP BY status`,
+            [sellerId]
+          )
+          ps.rows.forEach(r => {
+            if (r.status === 'bezahlt') payoutSummary.total_paid_cents += parseInt(r.total) || 0
+            else payoutSummary.total_pending_cents += parseInt(r.total) || 0
+          })
+        } catch (_) {}
+
+        // Recent payouts
+        let payouts = []
+        try {
+          const po = await client.query(
+            `SELECT * FROM seller_payouts WHERE seller_id = $1 ORDER BY period_start DESC LIMIT 12`,
+            [sellerId]
+          )
+          payouts = po.rows
+        } catch (_) {}
+
+        await client.end()
+        res.json({ seller: { ...seller, products_by_category: productsByCategory, monthly_revenue: monthlyRevenue, payout_summary: payoutSummary, payouts } })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // PATCH /admin-hub/v1/sellers/:id — update seller fields (superuser only)
+    const adminHubSellerPATCH = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const { id } = req.params
+      const body = req.body || {}
+      const allowed = ['commission_rate', 'iban', 'store_name', 'company_name', 'tax_id', 'vat_id',
+        'business_address', 'warehouse_address', 'phone', 'website', 'documents', 'rejection_reason']
+      const updates = []; const params = []; let n = 1
+      for (const key of allowed) {
+        if (body[key] !== undefined) { updates.push(`${key} = $${n}`); params.push(body[key]); n++ }
+      }
+      if (updates.length === 0) return res.status(400).json({ message: 'No fields to update' })
+      updates.push(`updated_at = now()`)
+      params.push(id)
+      const client = getDbClient ? getDbClient() : getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(`UPDATE seller_users SET ${updates.join(', ')} WHERE id = $${n} RETURNING ${SELLER_SELECT}`, params)
+        await client.end()
+        if (!r.rows[0]) return res.status(404).json({ message: 'Seller not found' })
+        res.json({ seller: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // PATCH /admin-hub/v1/sellers/:id/approve — approve or reject seller (superuser only)
+    const adminHubSellerApprovePATCH = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const { id } = req.params
+      const { status, rejection_reason } = req.body || {}
+      const validStatuses = ['registered', 'documents_submitted', 'pending_approval', 'approved', 'rejected', 'suspended']
+      if (!validStatuses.includes(status)) return res.status(400).json({ message: `status must be one of: ${validStatuses.join(', ')}` })
+      const client = getDbClient ? getDbClient() : getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const extraSets = []
+        const extraParams = []
+        if (status === 'approved') {
+          extraSets.push(`approved_at = now()`, `approved_by = '${req.sellerUser.seller_id}'`)
+        }
+        if (status === 'rejected' && rejection_reason) {
+          extraSets.push(`rejection_reason = $${extraParams.length + 3}`)
+          extraParams.push(rejection_reason)
+        }
+        const allSets = [`approval_status = $1`, `updated_at = now()`, ...extraSets].join(', ')
+        const r = await client.query(
+          `UPDATE seller_users SET ${allSets} WHERE id = $2 RETURNING ${SELLER_SELECT}`,
+          [status, id, ...extraParams]
+        )
+        if (!r.rows[0]) { await client.end(); return res.status(404).json({ message: 'Seller not found' }) }
+        const seller = r.rows[0]
+
+        // If approved: publish all their draft products
+        if (status === 'approved' && seller.seller_id) {
+          try {
+            await client.query(
+              `UPDATE product SET status = 'published' WHERE seller_id = $1 AND status = 'draft'`,
+              [seller.seller_id]
+            )
+          } catch (e2) {
+            console.warn('Could not auto-publish products for seller:', e2?.message)
+          }
+        }
+        // If rejected/suspended: unpublish their products
+        if ((status === 'rejected' || status === 'suspended') && seller.seller_id) {
+          try {
+            await client.query(
+              `UPDATE product SET status = 'draft' WHERE seller_id = $1 AND status = 'published'`,
+              [seller.seller_id]
+            )
+          } catch (e2) {
+            console.warn('Could not unpublish products for seller:', e2?.message)
+          }
+        }
+
+        await client.end()
+        res.json({ seller })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // PATCH /admin-hub/v1/seller/company-info — seller updates own company info
+    const adminHubSellerCompanyInfoPATCH = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const body = req.body || {}
+      const allowed = ['company_name', 'tax_id', 'vat_id', 'business_address', 'warehouse_address', 'phone', 'website']
+      const updates = []; const params = []; let n = 1
+      for (const key of allowed) {
+        if (body[key] !== undefined) { updates.push(`${key} = $${n}`); params.push(body[key]); n++ }
+      }
+      // Allow submitting documents
+      if (body.documents !== undefined) { updates.push(`documents = $${n}`); params.push(body.documents); n++ }
+      // Auto-advance status if submitting docs
+      if (body.documents !== undefined) {
+        updates.push(`approval_status = CASE WHEN approval_status = 'registered' THEN 'documents_submitted' ELSE approval_status END`)
+      }
+      if (updates.length === 0) return res.status(400).json({ message: 'No fields to update' })
+      updates.push(`updated_at = now()`)
+      params.push(sellerId)
+      const client = getDbClient ? getDbClient() : getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `UPDATE seller_users SET ${updates.join(', ')} WHERE seller_id = $${n} RETURNING ${SELLER_SELECT}`,
+          params
+        )
+        await client.end()
+        if (!r.rows[0]) return res.status(404).json({ message: 'Seller not found' })
+        res.json({ seller: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    httpApp.get('/admin-hub/v1/sellers', requireSellerAuth, adminHubSellersGET)
+    httpApp.get('/admin-hub/v1/sellers/:id', requireSellerAuth, adminHubSellerByIdGET)
+    httpApp.patch('/admin-hub/v1/sellers/:id', requireSellerAuth, adminHubSellerPATCH)
+    httpApp.patch('/admin-hub/v1/sellers/:id/approve', requireSellerAuth, adminHubSellerApprovePATCH)
+    httpApp.patch('/admin-hub/v1/seller/company-info', requireSellerAuth, adminHubSellerCompanyInfoPATCH)
+    console.log('Seller mgmt routes: GET/PATCH /admin-hub/v1/sellers, PATCH /admin-hub/v1/sellers/:id/approve')
 
     httpApp.listen(PORT, HOST, () => {
       console.log(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)

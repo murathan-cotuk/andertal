@@ -782,11 +782,25 @@ class MedusaAdminClient {
     const qs = Object.keys(p).length ? '?' + new URLSearchParams(p).toString() : '';
     return this.request(`/admin-hub/v1/messages${qs}`)
   }
+  async getSupportMessages(params = {}) {
+    const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';
+    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+    const p = { ...params, channel: 'support' };
+    if (!isSuperuser && sellerId && !p.seller_id) p.seller_id = sellerId;
+    const qs = Object.keys(p).length ? '?' + new URLSearchParams(p).toString() : '';
+    return this.request(`/admin-hub/v1/messages${qs}`)
+  }
   async sendMessage(data) {
     return this.request('/admin-hub/v1/messages', { method: 'POST', body: JSON.stringify(data) })
   }
+  async sendSupportMessage(data) {
+    return this.request('/admin-hub/v1/messages', { method: 'POST', body: JSON.stringify({ ...data, channel: 'support' }) })
+  }
   async markMessageRead(id) {
     return this.request(`/admin-hub/v1/messages/${id}/read`, { method: 'PATCH' })
+  }
+  async markSupportMessagesRead(seller_id, mark_as) {
+    return this.request('/admin-hub/v1/messages/support/mark-read', { method: 'PATCH', body: JSON.stringify({ seller_id, mark_as }) })
   }
   async getSmtpSettings() {
     return this.request('/admin-hub/v1/smtp-settings')
@@ -884,6 +898,31 @@ class MedusaAdminClient {
       method: 'PATCH',
       body: JSON.stringify({ is_superuser: isSuperuser }),
     });
+  }
+
+  // ── Seller Management (superuser) ─────────────────────────────────────────
+  async getSellers(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/sellers${qs}`)
+  }
+
+  async getSellerById(id) {
+    return this.request(`/admin-hub/v1/sellers/${id}`)
+  }
+
+  async updateSellerById(id, data) {
+    return this.request(`/admin-hub/v1/sellers/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+  }
+
+  async approveSellerById(id, status, rejectionReason) {
+    return this.request(`/admin-hub/v1/sellers/${id}/approve`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, rejection_reason: rejectionReason }),
+    })
+  }
+
+  async updateSellerCompanyInfo(data) {
+    return this.request('/admin-hub/v1/seller/company-info', { method: 'PATCH', body: JSON.stringify(data) })
   }
 }
 
