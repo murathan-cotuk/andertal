@@ -1,4 +1,4 @@
-id;name;slug;description;parent_id;active;sort_order;is_visible;
+id;name;slug;description;parent_id;active;sort_order;is_visible;b
 7f5a550d-b079-48fb-81f0-adfcdb219781;Dishwashers;appliances-dishwashers;;da34ee7d-1460-4d30-8bb5-33b637b3a561;True;0;True;7f5a550d-b079-48fb-81f0-adfcdb219781
 fe331ee7-45fe-46a2-9635-40c8f6d24319;Laundry Appliances;appliances-laundry-appliances;;da34ee7d-1460-4d30-8bb5-33b637b3a561;True;0;True;fe331ee7-45fe-46a2-9635-40c8f6d24319
 91968a26-ae12-48d0-ab6f-515f701b4afa;Parts & Accessories;appliances-parts-accessories;;da34ee7d-1460-4d30-8bb5-33b637b3a561;True;0;True;91968a26-ae12-48d0-ab6f-515f701b4afa
@@ -58,7 +58,7 @@ a5ccf0d8-ce4c-4d84-b4ae-281d9bb8a936;Shaving & Hair Removal Products;beauty-pers
 95b334dc-b5b7-4447-a01a-90afb1b8e734;Biographies;books-biographies;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True;95b334dc-b5b7-4447-a01a-90afb1b8e734
 2b3a09dd-5b98-4389-90cc-2fd7e014072d;Business & Money;books-business-money;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True;2b3a09dd-5b98-4389-90cc-2fd7e014072d
 bacf70fb-4c57-4357-9116-3902efa78f0b;Calendars;books-calendars;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True;bacf70fb-4c57-4357-9116-3902efa78f0b
-9d9b88d9-1041-4539-aa52-822e966871b1;Children's Books;books-children's-books;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True;9d9b88d9-1041-4539-aa52-822e966871b1
+9d9b88d9-1041-4539-aa52-822e966871b1;Childrens Books;books-childrens-books;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True;9d9b88d9-1041-4539-aa52-822e966871b1
 b7677f19-c19b-4dd6-aba3-b0d1e4f5bbab;Christian Books & Bibles;books-christian-books-bibles;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True;b7677f19-c19b-4dd6-aba3-b0d1e4f5bbab
 ec15d615-fd60-479f-b0e8-3e892f52cb9f;Comics & Graphic Novels;books-comics-graphic-novels;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True;ec15d615-fd60-479f-b0e8-3e892f52cb9f
 fad8bf61-9057-4962-8310-5083387b61ec;Computers & Technology;books-computers-technology;;7e0e1e9d-fd3e-4f85-a8af-9fd287d2b7cf;True;0;True;fad8bf61-9057-4962-8310-5083387b61ec
@@ -93,16 +93,16 @@ d7534e89-8036-4ccc-b475-b16a68baeb98;Cell Phone Accessories;cell-phones-accessor
 9a3a6779-7c4e-4a3f-b37a-85aeddc14f71;Cell Phone SIM Cards & Prepaid Minutes;cell-phones-accessories-cell-phone-s?m-cards-prepaid-minutes;;07e844ad-065a-4810-988f-1a25ba4cfbb5;True;0;True;9a3a6779-7c4e-4a3f-b37a-85aeddc14f71
 55e5bae6-8dd4-4b53-8da1-420da87501e9;Cell Phones;cell-phones-accessories-cell-phones;;07e844ad-065a-4810-988f-1a25ba4cfbb5;True;0;True;55e5bae6-8dd4-4b53-8da1-420da87501e9
 278f6565-dc43-4e87-9343-6c383e8b55ea;Baby Clothing & Shoes;clothing-shoes-jewelry-baby-clothing-shoes;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;278f6565-dc43-4e87-9343-6c383e8b55ea
-5196eef4-7b4f-4599-a234-97eeb06c69e5;Boys' Fashion;clothing-shoes-jewelry-boys-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;5196eef4-7b4f-4599-a234-97eeb06c69e5
+5196eef4-7b4f-4599-a234-97eeb06c69e5;Boys Fashion;clothing-shoes-jewelry-boys-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;5196eef4-7b4f-4599-a234-97eeb06c69e5
 054ed228-ba98-4482-9807-8150989f6e7d;Costumes & Accessories;clothing-shoes-jewelry-costumes-accessories;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;054ed228-ba98-4482-9807-8150989f6e7d
-958a2ea0-9da6-4d04-a0a4-229781f30050;Girls' Fashion;clothing-shoes-jewelry-girls-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;958a2ea0-9da6-4d04-a0a4-229781f30050
+958a2ea0-9da6-4d04-a0a4-229781f30050;Girls Fashion;clothing-shoes-jewelry-girls-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;958a2ea0-9da6-4d04-a0a4-229781f30050
 2a2a2451-50ff-4039-af52-c0fc24c831ad;Luggage & Travel Gear;clothing-shoes-jewelry-luggage-travel-gear;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;2a2a2451-50ff-4039-af52-c0fc24c831ad
-c9e86c53-7918-4bdc-bac5-e3262281533b;Men's Fashion;clothing-shoes-jewelry-mens-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;c9e86c53-7918-4bdc-bac5-e3262281533b
+c9e86c53-7918-4bdc-bac5-e3262281533b;Mens Fashion;clothing-shoes-jewelry-mens-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;c9e86c53-7918-4bdc-bac5-e3262281533b
 8bae4769-2584-4f19-b931-fa6354f40327;Novelty & More;clothing-shoes-jewelry-novelty-more;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;8bae4769-2584-4f19-b931-fa6354f40327
 cf1db97d-9580-4d56-ac5b-5dbb2536990a;Shoe, Jewelry & Watch Accessories;clothing-shoes-jewelry-shoe-jewelry-watch-accessories;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;cf1db97d-9580-4d56-ac5b-5dbb2536990a
 ffc44d38-ac3f-446f-8342-63347504a2c9;Sport Specific Clothing;clothing-shoes-jewelry-sport-specific-clothing;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;ffc44d38-ac3f-446f-8342-63347504a2c9
 2a069e41-f166-47e5-a9ef-0ee19d750d8b;Uniforms, Work & Safety;clothing-shoes-jewelry-uniforms-work-safety;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;2a069e41-f166-47e5-a9ef-0ee19d750d8b
-d212ce38-2005-40ed-b46a-a5f8782e4e84;Women's Fashion;clothing-shoes-jewelry-women's-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;d212ce38-2005-40ed-b46a-a5f8782e4e84
+d212ce38-2005-40ed-b46a-a5f8782e4e84;Womens Fashion;clothing-shoes-jewelry-womens-fashion;;c137dbb2-810e-4c54-a610-80babc5e176a;True;0;True;d212ce38-2005-40ed-b46a-a5f8782e4e84
 e900c401-5dc8-4fdd-b226-67ecc4ee2025;Audio Headphones;electronics-audio-headphones;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True;e900c401-5dc8-4fdd-b226-67ecc4ee2025
 218f00d8-3b5d-4c04-93d3-f42d5c94cfe1;Camera & Photo;electronics-camera-photo;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True;218f00d8-3b5d-4c04-93d3-f42d5c94cfe1
 3ac63027-17b7-4490-b7a1-982e6478c10e;Cell Phones & Accessories;electronics-cell-phones-accessories;;5ef4ac23-1072-4ba1-baa5-31f7bca89909;True;0;True;3ac63027-17b7-4490-b7a1-982e6478c10e
@@ -162,7 +162,7 @@ bd15f438-3fc4-430b-9d62-52ebc40fa63d;Home Decor Products;home-kitchen-home-decor
 2885921e-319f-414b-8295-f0805e86f097;Home Storage & Organization;home-kitchen-home-storage-organization;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True;2885921e-319f-414b-8295-f0805e86f097
 7862ee2b-cb67-4494-8f68-1a11cbef05f9;Household Cleaning Supplies;home-kitchen-household-cleaning-supplies;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True;7862ee2b-cb67-4494-8f68-1a11cbef05f9
 d74f42ac-14c5-4ef2-ab34-1a55fabfa6f8;Ironing Products;home-kitchen-?roning-products;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True;d74f42ac-14c5-4ef2-ab34-1a55fabfa6f8
-0530d9bd-65ae-41e0-b96a-8577a27f4b38;Kids' Home Store;home-kitchen-kids'-home-store;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True;0530d9bd-65ae-41e0-b96a-8577a27f4b38
+0530d9bd-65ae-41e0-b96a-8577a27f4b38;Kids Home Store;home-kitchen-kids-home-store;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True;0530d9bd-65ae-41e0-b96a-8577a27f4b38
 dd91ceee-b78d-4881-8948-09e711168ca3;Kitchen & Dining;home-kitchen-kitchen-dining;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True;dd91ceee-b78d-4881-8948-09e711168ca3
 f682d077-a645-4b45-bf76-6134db59dc83;Seasonal Decor;home-kitchen-seasonal-decor;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True;f682d077-a645-4b45-bf76-6134db59dc83
 07392aa3-b842-4083-a914-d9dcbcfac076;Vacuum Cleaners & Floor Care;home-kitchen-vacuum-cleaners-floor-care;;505da24c-3ab4-407a-bd0b-fb0b90ddc321;True;0;True;07392aa3-b842-4083-a914-d9dcbcfac076
@@ -256,9 +256,9 @@ cff5079f-8e3f-4174-90bf-750ba1228dd1;Dolls & Accessories;toys-games-dolls-access
 0be4bc77-3fc9-4600-b308-bd06718fe0f8;Dress Up & Pretend Play;toys-games-dress-up-pretend-play;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;0be4bc77-3fc9-4600-b308-bd06718fe0f8
 c89b59b3-f6d5-4592-87e8-5530d4a3e435;Games & Accessories;toys-games-games-accessories;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;c89b59b3-f6d5-4592-87e8-5530d4a3e435
 3b358310-9fcb-4e4a-aa3d-5d863ae80bb3;Hobbies;toys-games-hobbies;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;3b358310-9fcb-4e4a-aa3d-5d863ae80bb3
-5040b3d0-e6d6-41a8-900c-e8991f56cec6;Kids' Electronics;toys-games-kids'-electronics;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;5040b3d0-e6d6-41a8-900c-e8991f56cec6
-5c0cb5d3-0341-4d7a-bccf-b1c97d825561;Kids' Furniture & Decor;toys-games-kids'-furniture-decor;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;5c0cb5d3-0341-4d7a-bccf-b1c97d825561
-b40e51fe-aa32-461c-9ee1-02b46355f7a0;Kids' Party Supplies;toys-games-kids'-party-supplies;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;b40e51fe-aa32-461c-9ee1-02b46355f7a0
+5040b3d0-e6d6-41a8-900c-e8991f56cec6;Kids Electronics;toys-games-kids-electronics;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;5040b3d0-e6d6-41a8-900c-e8991f56cec6
+5c0cb5d3-0341-4d7a-bccf-b1c97d825561;Kids Furniture & Decor;toys-games-kids-furniture-decor;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;5c0cb5d3-0341-4d7a-bccf-b1c97d825561
+b40e51fe-aa32-461c-9ee1-02b46355f7a0;Kids Party Supplies;toys-games-kids-party-supplies;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;b40e51fe-aa32-461c-9ee1-02b46355f7a0
 4a6ca209-9af8-4f1e-9b30-f5b922c9dce7;Learning & Education Toys;toys-games-learning-education-toys;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;4a6ca209-9af8-4f1e-9b30-f5b922c9dce7
 75fa63dd-a338-460a-9ae1-11face25cee1;Play Vehicles;toys-games-play-vehicles;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;75fa63dd-a338-460a-9ae1-11face25cee1
 9810ccc3-abaa-4a3e-a8d4-cf200b672005;Puppets & Puppet Theaters;toys-games-puppets-puppet-theaters;;2cb6145b-ab4c-42b7-942c-c2e2c4029367;True;0;True;9810ccc3-abaa-4a3e-a8d4-cf200b672005

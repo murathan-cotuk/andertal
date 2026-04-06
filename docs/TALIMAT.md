@@ -1,5 +1,6 @@
 03.04.
 
+-- sellercentralden logo ve faviconlari ekleyip düzenleyebilmek istiyorum. hem shop icin hem sellercentral icin farkli logolar ve faviconlar belirlenmeli. Bunu sellercentraldeki content/styles sayfasindan yapabilelim bence
 -- sellecentralde superuserlarin görebildigi content/landing-page safasinda eklenecek konteynerlere yenilerini ekleyelim. yeni konteynerlar teker teker söyleyecegim: 
 +- tekli ürün ekleme
 +- featured blog posts (eklenmis blog postlar carousel olarak gözükecek. blogpostlarin icine görsel de eklenecek görsel title ve text gözükecek acilabilecek)
