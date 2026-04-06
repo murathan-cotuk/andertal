@@ -214,7 +214,7 @@ export default function MetaobjectsPage() {
                             </Button>
                           </InlineStack>
                         </InlineStack>
-                      BlockStack>
+                      </BlockStack>
                     </Box>
                   ))}
                 </BlockStack>
