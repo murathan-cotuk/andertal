@@ -45,7 +45,7 @@ function generatePeriods(count = 12) {
 }
 
 const PERIODS = generatePeriods(12);
-const COMMISSION_RATE = 0.10;
+const COMMISSION_RATE = 0.12;
 
 // Badge color for payout status
 const statusTone = (s) => {

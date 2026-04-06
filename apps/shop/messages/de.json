@@ -13,13 +13,16 @@
     "product": "Produkt",
     "bestsellers": "Bestseller",
     "sale": "Angebote",
-    "recommended": "Empfohlen"
+    "recommended": "Empfohlen",
+    "categoryMenuEmpty": "Keine Kategorien mit Produkten",
+    "categoryPendingHint": "{label} — Tippen Sie auf das Lupen-Symbol, um diese Kategorie zu öffnen."
   },
   "home": {
     "title": "Belucha - Ihr Marktplatz",
     "description": "Entdecken Sie Produkte von unabhängigen Verkäufern",
     "loading": "Laden…",
-    "error": "Produkte derzeit nicht verfügbar."
+    "error": "Produkte derzeit nicht verfügbar.",
+    "categoryBrowseHint": "Im Menü oben werden nur übergeordnete Kategorien angezeigt, in denen mindestens ein Produkt verfügbar ist. Wählen Sie eine Kategorie und tippen Sie anschließend auf die Lupe, um die zugehörige Katalogseite zu öffnen. Unterkategorien erscheinen auf der linken Seite über den Filtern."
   },
   "locale": {
     "label": "Sprache & Währung",

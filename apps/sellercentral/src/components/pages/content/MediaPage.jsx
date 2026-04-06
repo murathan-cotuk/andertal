@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import {
@@ -80,7 +80,7 @@ function CopyBtn({ url, size = "md" }) {
 }
 
 /* ── Lightbox / Detail panel ── */
-function DetailPanel({ item, folders, onClose, onDelete, onMoveToFolder }) {
+function DetailPanel({ item, folders, onClose, onDelete, onMoveToFolder, isSuperuser }) {
   const [movingFolderId, setMovingFolderId] = useState(item.folder_id || "");
   const [saving, setSaving] = useState(false);
   const url = resolveUrl(item.url);
@@ -165,6 +165,15 @@ function DetailPanel({ item, folders, onClose, onDelete, onMoveToFolder }) {
               <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.05em" }}>Filename</div>
               <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", wordBreak: "break-all" }}>{item.filename || "—"}</div>
             </div>
+
+            {isSuperuser ? (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.05em" }}>Seller / store</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>
+                  {item.seller_id ? (item.seller_store_name || item.seller_id) : "Platform / admin"}
+                </div>
+              </div>
+            ) : null}
 
             {/* Metadata row */}
             <div style={{ display: "flex", gap: 16 }}>
@@ -262,7 +271,9 @@ export default function MediaPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [items, setItems] = useState([]);
+  const [rawMedia, setRawMedia] = useState([]);
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  const [sellerFilter, setSellerFilter] = useState(""); // "" = all, "__null" = platform-only, else seller_id
   const [folders, setFolders] = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null); // null=all, {id,name}=folder, "none"=no folder
   const [loading, setLoading] = useState(true);
@@ -300,6 +311,34 @@ export default function MediaPage() {
     setTimeout(() => setToast(null), 2400);
   };
 
+  useEffect(() => {
+    setIsSuperuser(typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
+
+  const items = useMemo(() => {
+    if (!isSuperuser || !sellerFilter) return rawMedia;
+    if (sellerFilter === "__null") return rawMedia.filter((i) => !i.seller_id);
+    return rawMedia.filter((i) => i.seller_id === sellerFilter);
+  }, [rawMedia, isSuperuser, sellerFilter]);
+
+  const sellerBuckets = useMemo(() => {
+    const map = new Map();
+    for (const i of rawMedia) {
+      const sid = i.seller_id;
+      if (!sid) {
+        if (!map.has("__null")) map.set("__null", { key: "__null", label: "Platform / admin", count: 0 });
+        map.get("__null").count++;
+      } else {
+        if (!map.has(sid)) {
+          const label = (i.seller_store_name || "").trim() || sid;
+          map.set(sid, { key: sid, label, count: 0 });
+        }
+        map.get(sid).count++;
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [rawMedia]);
+
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
@@ -307,7 +346,7 @@ export default function MediaPage() {
         client.getMedia({ limit: 1000 }),
         client.getMediaFolders().catch(() => ({ folders: [] })),
       ]);
-      setItems(mediaRes.media || []);
+      setRawMedia(mediaRes.media || []);
       setFolders(foldersRes.folders || []);
     } catch (err) {
       setError(err?.message || "Failed to load media");
@@ -316,7 +355,9 @@ export default function MediaPage() {
     }
   }, [client]);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
   // Sync currentFolder from URL when folders are loaded
   useEffect(() => {
@@ -549,7 +590,7 @@ export default function MediaPage() {
       await client.updateMedia(itemId, { folder_id: folderId || null });
       showToast("Moved");
       // Update local state too
-      setItems((prev) =>
+      setRawMedia((prev) =>
         prev.map((i) =>
           i.id === itemId
             ? {
@@ -732,6 +773,34 @@ export default function MediaPage() {
 
         {/* ── Sidebar ── */}
         <div style={{ width: 200, flexShrink: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 8px", position: "sticky", top: 16 }}>
+          {isSuperuser && sellerBuckets.length > 0 ? (
+            <>
+              <div style={{ marginBottom: 6, padding: "0 4px" }}>
+                <Text as="p" variant="bodySm" tone="subdued" fontWeight="semibold">SELLERS</Text>
+              </div>
+              <BlockStack gap="050">
+                <button
+                  type="button"
+                  onClick={() => setSellerFilter("")}
+                  style={{ width: "100%", textAlign: "left", padding: "8px 10px", border: "none", borderRadius: 6, background: sellerFilter === "" ? "#fef3c7" : "transparent", cursor: "pointer", fontSize: 13, fontWeight: sellerFilter === "" ? 600 : 400, color: sellerFilter === "" ? "#b45309" : "#374151" }}
+                >
+                  All sellers <span style={{ color: "#9ca3af", fontWeight: 400 }}>({rawMedia.length})</span>
+                </button>
+                {sellerBuckets.map((b) => (
+                  <button
+                    key={b.key}
+                    type="button"
+                    onClick={() => setSellerFilter(b.key)}
+                    style={{ width: "100%", textAlign: "left", padding: "8px 10px", border: "none", borderRadius: 6, background: sellerFilter === b.key ? "#fef3c7" : "transparent", cursor: "pointer", fontSize: 13, fontWeight: sellerFilter === b.key ? 600 : 400, color: sellerFilter === b.key ? "#b45309" : "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    title={b.label}
+                  >
+                    🏪 {b.label} <span style={{ color: "#9ca3af", fontWeight: 400 }}>({b.count})</span>
+                  </button>
+                ))}
+              </BlockStack>
+              <div style={{ height: 1, background: "#f0f0f0", margin: "12px 0" }} />
+            </>
+          ) : null}
           <div style={{ marginBottom: 6, padding: "0 4px" }}>
             <Text as="p" variant="bodySm" tone="subdued" fontWeight="semibold">FOLDERS</Text>
           </div>
@@ -997,6 +1066,7 @@ export default function MediaPage() {
         <DetailPanel
           item={activeItem}
           folders={folders}
+          isSuperuser={isSuperuser}
           onClose={() => setActiveItem(null)}
           onDelete={(item) => { setDeleteTarget(item); setActiveItem(null); }}
           onMoveToFolder={handleMoveToFolder}

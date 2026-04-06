@@ -276,6 +276,26 @@ const BuyboxInner = styled.div`
   padding: 16px;
 `;
 
+const OtherSellersCard = styled.div`
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  padding: 14px 16px 10px;
+`;
+
+const OtherSellerRow = styled.div`
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #e5e7eb;
+  &:last-child {
+    border-bottom: none;
+    padding-bottom: 2px;
+  }
+`;
+
 const PriceTop = styled.div`
   display: flex;
   align-items: flex-start;
@@ -722,6 +742,7 @@ export default function ProductTemplate() {
   const [sellerStoreName, setSellerStoreName] = useState("");
   const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
   const [productReviews, setProductReviews] = useState([]);
+  const [multiOffer, setMultiOffer] = useState(null);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
@@ -757,10 +778,12 @@ export default function ProductTemplate() {
         const res = await fetch(`/api/store-products/${encodeURIComponent(slug)}`);
         const data = await res.json();
         if (res.status === 404 || !data?.product) {
+          setMultiOffer(null);
           setProduct(null);
           setError(res.status === 404 ? "Produkt nicht gefunden." : "Produkt konnte nicht geladen werden.");
           return;
         }
+        setMultiOffer(data.multi_offer || null);
         setProduct(data.product);
       } catch (err) {
         console.error("Failed to fetch product:", err);
@@ -827,10 +850,18 @@ export default function ProductTemplate() {
 
   useEffect(() => {
     if (!product?.id) return;
-    getMedusaClient().request(`/store/reviews?product_id=${encodeURIComponent(product.id)}`).then((res) => {
-      if (res?.reviews?.length) setProductReviews(res.reviews);
-    }).catch(() => {});
-  }, [product?.id]);
+    const reviewQs =
+      multiOffer?.review_product_ids?.length > 0
+        ? `product_ids=${multiOffer.review_product_ids.map((id) => encodeURIComponent(String(id))).join(",")}`
+        : `product_id=${encodeURIComponent(product.id)}`;
+    setProductReviews([]);
+    getMedusaClient()
+      .request(`/store/reviews?${reviewQs}`)
+      .then((res) => {
+        if (res?.reviews?.length) setProductReviews(res.reviews);
+      })
+      .catch(() => {});
+  }, [product?.id, multiOffer?.review_product_ids]);
 
   if (loading) return <Container>Laden…</Container>;
   if (error) return <Container>Fehler: {error}</Container>;
@@ -1231,6 +1262,26 @@ export default function ProductTemplate() {
         <RightCol>
           <BuyboxCard>
             <BuyboxInner>
+              {multiOffer?.canonical_ean ? (
+                <p style={{ fontSize: 12, color: "#047857", margin: "0 0 10px", fontWeight: 600, lineHeight: 1.35 }}>
+                  {locale === "tr"
+                    ? "Öne çıkan teklif: en iyi fiyat ve mağaza puanı kombinasyonu."
+                    : locale === "de"
+                      ? "Empfohlenes Angebot: beste Kombination aus Preis und Verkäuferbewertung."
+                      : "Featured offer: best combination of price and seller rating."}
+                  {multiOffer.landed_product_id &&
+                  product?.id &&
+                  String(multiOffer.landed_product_id) !== String(product.id) ? (
+                    <span style={{ display: "block", fontWeight: 500, color: "#6b7280", marginTop: 4 }}>
+                      {locale === "tr"
+                        ? "Ziyaret ettiğiniz listeleme farklı bir satıcıya ait; sepete eklenen ürün öne çıkan tekliftendir."
+                        : locale === "de"
+                          ? "Sie haben eine andere Verkäufer-URL aufgerufen; Ihr Warenkorb nutzt das empfohlene Angebot."
+                          : "You opened another seller’s listing; checkout uses the featured offer."}
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
               <PriceTop>
                 <PriceStack>
                   <PriceMainRow>
@@ -1318,6 +1369,62 @@ export default function ProductTemplate() {
               </InfoList>
             </BuyboxInner>
           </BuyboxCard>
+
+          {multiOffer?.other_sellers?.length > 0 ? (
+            <OtherSellersCard>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, color: "#111827" }}>
+                {locale === "tr" ? "Diğer satıcılar" : locale === "de" ? "Weitere Angebote" : "Other sellers"}
+              </div>
+              <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 4px", lineHeight: 1.35 }}>
+                {locale === "tr"
+                  ? "Aynı EAN için diğer mağazalar. Mağaza puanları tüm ürün yorumlarından türetilir."
+                  : locale === "de"
+                    ? "Weitere Händler mit derselben EAN. Verkäufersterne aus allen Produktbewertungen."
+                    : "More sellers for this EAN. Seller scores combine all their product reviews."}
+              </p>
+              {multiOffer.other_sellers.map((o) => (
+                <OtherSellerRow key={o.product_id}>
+                  {o.thumbnail ? (
+                    <img
+                      src={resolveImageUrl(o.thumbnail) || o.thumbnail}
+                      alt=""
+                      width={44}
+                      height={44}
+                      style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8, background: "#e5e7eb" }}
+                    />
+                  ) : (
+                    <div style={{ width: 44, height: 44, borderRadius: 8, background: "#e5e7eb" }} aria-hidden />
+                  )}
+                  <div style={{ minWidth: 0 }}>
+                    <Link
+                      href={`/produkt/${encodeURIComponent(o.handle)}`}
+                      prefetch={false}
+                      style={{ fontWeight: 600, fontSize: 13, color: "#111827", textDecoration: "none", display: "block" }}
+                    >
+                      {o.store_name}
+                    </Link>
+                    <div style={{ marginTop: 4, fontSize: 11, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      {o.seller_review_count > 0 && Number(o.seller_review_avg) > 0 ? (
+                        <StarRating average={Number(o.seller_review_avg) || 0} count={Number(o.seller_review_count) || 0} />
+                      ) : (
+                        <span>{locale === "tr" ? "Mağaza yorumu yok" : locale === "de" ? "Keine Verkäuferbewertungen" : "No seller reviews yet"}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>
+                      {formatPriceCents(Number(o.price_cents) || 0)} €
+                    </div>
+                    {!o.in_stock ? (
+                      <div style={{ fontSize: 11, color: "#b91c1c", marginTop: 2 }}>
+                        {locale === "tr" ? "Stokta yok" : locale === "de" ? "Ausverkauft" : "Out of stock"}
+                      </div>
+                    ) : null}
+                  </div>
+                </OtherSellerRow>
+              ))}
+            </OtherSellersCard>
+          ) : null}
         </RightCol>
       </ThreeCol>
 

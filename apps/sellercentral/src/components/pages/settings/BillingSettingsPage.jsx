@@ -63,7 +63,7 @@ export default function BillingSettingsPage() {
                 Free Plan
               </h3>
               <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>
-                10% commission on each sale • No monthly fees
+                12% commission on each sale • No monthly fees
               </p>
             </div>
             <Button variant="outline">

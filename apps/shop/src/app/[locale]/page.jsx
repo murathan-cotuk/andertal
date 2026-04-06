@@ -5,7 +5,6 @@ import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import {
   HeroSection,
-  CategoryShowcase,
   FlashSaleSection,
   FeaturedCollections,
   SellerHighlight,
@@ -16,16 +15,16 @@ import LandingContainers from "@/components/landing/LandingContainers";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useMedusaProducts } from "@/hooks/useMedusa";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import { useTranslations } from "next-intl";
 
 export default function Home() {
+  const tHome = useTranslations("home");
   const { products, loading, error } = useMedusaProducts();
   const [collections, setCollections] = useState([]);
-  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     const client = getMedusaClient();
     client.getCollections().then((r) => setCollections(r.collections || []));
-    client.getCategories().then((r) => setCategories(r.categories || []));
   }, []);
 
   const saleProducts = (products || []).filter(
@@ -39,9 +38,9 @@ export default function Home() {
       <main className="flex-grow bg-white">
         <LandingContainers />
         <HeroSection collections={collections} />
-        <CategoryShowcase
-          categories={categories.length ? categories : collections}
-        />
+        <div className="max-w-3xl mx-auto px-4 py-6 text-center text-sm text-gray-600 leading-relaxed">
+          {tHome("categoryBrowseHint")}
+        </div>
         <FlashSaleSection
           products={saleProducts.length ? saleProducts : products || []}
           endDate={null}

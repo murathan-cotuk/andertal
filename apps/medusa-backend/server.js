@@ -631,7 +631,9 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS notifications_seen_at timestamp;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS iban text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT NULL;`).catch(() => {})
-        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS commission_rate numeric(5,4) NOT NULL DEFAULT 0.10;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS commission_rate numeric(5,4) NOT NULL DEFAULT 0.12;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ALTER COLUMN commission_rate SET DEFAULT 0.12`).catch(() => {})
+        await client.query(`UPDATE seller_users SET commission_rate = 0.12 WHERE commission_rate = 0.10`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS sub_of_seller_id varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS first_name varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS last_name varchar(255) DEFAULT NULL;`).catch(() => {})
@@ -652,6 +654,72 @@ async function start() {
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS rejection_reason text DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS approved_at timestamp DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS approved_by varchar(255) DEFAULT NULL;`).catch(() => {})
+
+        // ── Ranking infrastructure ──────────────────────────────────────────────
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS product_events (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            event_type varchar(30) NOT NULL,
+            product_id text NOT NULL,
+            seller_id varchar(255),
+            category_id text,
+            strategy varchar(50) DEFAULT 'default',
+            session_id varchar(255),
+            position integer,
+            created_at timestamp DEFAULT now()
+          )
+        `).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_product_events_product ON product_events(product_id, created_at)`).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_product_events_type_at ON product_events(event_type, created_at)`).catch(() => {})
+
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS product_ranking_features (
+            product_id text PRIMARY KEY,
+            seller_id varchar(255),
+            collection_id text,
+            sales_7d integer DEFAULT 0,
+            sales_30d integer DEFAULT 0,
+            sales_90d integer DEFAULT 0,
+            gmv_30d_cents bigint DEFAULT 0,
+            impressions_30d integer DEFAULT 0,
+            clicks_30d integer DEFAULT 0,
+            ctr_30d numeric(6,4) DEFAULT 0,
+            add_to_cart_30d integer DEFAULT 0,
+            review_avg numeric(3,2) DEFAULT 0,
+            review_count integer DEFAULT 0,
+            return_count_30d integer DEFAULT 0,
+            price_cents integer DEFAULT 0,
+            compare_at_price_cents integer DEFAULT 0,
+            discount_pct numeric(5,2) DEFAULT 0,
+            inventory integer DEFAULT 0,
+            content_score numeric(4,3) DEFAULT 0,
+            published_at timestamp,
+            popularity_score numeric(8,6) DEFAULT 0,
+            freshness_score numeric(8,6) DEFAULT 0,
+            velocity_score numeric(8,6) DEFAULT 0,
+            final_score numeric(8,6) DEFAULT 0,
+            updated_at timestamp DEFAULT now()
+          )
+        `).catch(() => {})
+
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS ranking_config (
+            strategy varchar(50) PRIMARY KEY,
+            config jsonb NOT NULL DEFAULT '{}',
+            updated_at timestamp DEFAULT now()
+          )
+        `).catch(() => {})
+
+        await client.query(`
+          INSERT INTO ranking_config (strategy, config) VALUES
+            ('default',     '{"w_popularity":0.45,"w_freshness":0.15,"w_content":0.10,"w_discount":0.15,"w_seller":0.10,"w_velocity":0.05,"freshness_halflife_days":30,"exploration_k":0.25,"diversity_max_consecutive":3,"urgency_threshold":5}'),
+            ('neuheiten',   '{"w_popularity":0.15,"w_freshness":0.55,"w_content":0.10,"w_discount":0.08,"w_seller":0.07,"w_velocity":0.05,"freshness_halflife_days":14,"exploration_k":0.40,"diversity_max_consecutive":3,"urgency_threshold":5}'),
+            ('bestsellers', '{"w_popularity":0.65,"w_freshness":0.00,"w_content":0.05,"w_discount":0.12,"w_seller":0.15,"w_velocity":0.03,"freshness_halflife_days":90,"exploration_k":0.10,"diversity_max_consecutive":2,"urgency_threshold":5}'),
+            ('sales',       '{"w_popularity":0.25,"w_freshness":0.08,"w_content":0.05,"w_discount":0.48,"w_seller":0.09,"w_velocity":0.05,"freshness_halflife_days":21,"exploration_k":0.15,"diversity_max_consecutive":4,"urgency_threshold":5}'),
+            ('search',      '{"w_popularity":0.35,"w_freshness":0.10,"w_content":0.08,"w_discount":0.15,"w_seller":0.12,"w_velocity":0.20,"freshness_halflife_days":30,"exploration_k":0.10,"diversity_max_consecutive":5,"urgency_threshold":5}')
+          ON CONFLICT (strategy) DO NOTHING
+        `).catch(() => {})
+
         // Normalize store_name: convert empty string to NULL so sub-users don't conflict
         await client.query(`UPDATE seller_users SET store_name = NULL WHERE store_name = ''`).catch(() => {})
         await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS first_name varchar(255) DEFAULT NULL;`).catch(() => {})
@@ -861,6 +929,25 @@ async function start() {
         `).catch(() => {})
         await client.query('CREATE INDEX IF NOT EXISTS idx_store_product_reviews_product ON store_product_reviews(product_id)').catch(() => {})
         await client.query('CREATE INDEX IF NOT EXISTS idx_store_product_reviews_customer ON store_product_reviews(customer_id)').catch(() => {})
+        await client.query(`ALTER TABLE store_product_reviews ADD COLUMN IF NOT EXISTS seller_id varchar(255)`).catch(() => {})
+        await client.query('CREATE INDEX IF NOT EXISTS idx_store_product_reviews_seller ON store_product_reviews(seller_id)').catch(() => {})
+        await client.query(`UPDATE store_product_reviews r SET seller_id = p.seller_id FROM admin_hub_products p WHERE r.seller_id IS NULL AND p.id::text = r.product_id`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS review_avg numeric(4,2)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS review_count integer NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`
+          INSERT INTO admin_hub_seller_settings (seller_id, review_avg, review_count, updated_at)
+          SELECT r.seller_id,
+                 ROUND(AVG(r.rating)::numeric, 2)::float,
+                 COUNT(*)::int,
+                 now()
+          FROM store_product_reviews r
+          WHERE r.seller_id IS NOT NULL AND TRIM(COALESCE(r.seller_id, '')) <> ''
+          GROUP BY r.seller_id
+          ON CONFLICT (seller_id) DO UPDATE SET
+            review_avg = EXCLUDED.review_avg,
+            review_count = EXCLUDED.review_count,
+            updated_at = now()
+        `).catch(() => {})
         await client.query(`
   CREATE TABLE IF NOT EXISTS admin_hub_landing_page (
     id INTEGER PRIMARY KEY DEFAULT 1,
@@ -2435,11 +2522,17 @@ async function start() {
       if (!client) return []
       try {
         await client.connect()
-        const limit = Math.min(parseInt(query.limit, 10) || 100, 200)
+        const categoryQ = (query.category || query.category_slug || '').toString().trim()
+        const collScope = (query.collection_id || '').toString().trim()
+        const hasScope = !!(categoryQ || collScope)
+        const rawLimit = parseInt(query.limit, 10) || (hasScope ? 3000 : 100)
+        const maxCap = hasScope || rawLimit > 200 ? 5000 : 200
+        const limit = Math.min(Math.max(rawLimit, 1), maxCap)
         const offset = parseInt(query.offset, 10) || 0
         const sellerId = (query.seller_id || query.seller || '').trim()
         const status = (query.status || '').trim()
         const collectionId = (query.collection_id || '').toString().trim()
+        const skuFilter = (query.sku || '').toString().trim()
         let sql = 'SELECT id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, created_at, updated_at FROM admin_hub_products'
         const params = []
         const where = []
@@ -2466,6 +2559,10 @@ async function start() {
             ')'
           )
           params.push(collectionId)
+        }
+        if (skuFilter) {
+          where.push('LOWER(TRIM(sku)) = LOWER($' + (params.length + 1) + ')')
+          params.push(skuFilter)
         }
         if (where.length) sql += ' WHERE ' + where.join(' AND ')
         sql += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2)
@@ -3090,8 +3187,23 @@ async function start() {
         }
         // Sub-users use parent's seller_id for data access
         const effectiveSellerId = user.sub_of_seller_id || user.seller_id
-        const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: user.store_name || '' })
-        res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: user.store_name || '', permissions: user.permissions || null } })
+        let displayStoreName = (user.store_name || '').trim()
+        if (user.sub_of_seller_id) {
+          const pr = await client.query(
+            `SELECT COALESCE(NULLIF(TRIM(ss.store_name), ''), NULLIF(TRIM(su.store_name), '')) AS sn
+             FROM seller_users su
+             LEFT JOIN admin_hub_seller_settings ss ON ss.seller_id = su.seller_id
+             WHERE su.seller_id = $1 LIMIT 1`,
+            [user.sub_of_seller_id]
+          )
+          displayStoreName = (pr.rows[0]?.sn || '').trim()
+        }
+        if (!displayStoreName && effectiveSellerId) {
+          const ss = await client.query('SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1', [effectiveSellerId])
+          displayStoreName = (ss.rows[0]?.store_name || '').trim()
+        }
+        const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName })
+        res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName, permissions: user.permissions || null } })
       } catch (err) {
         try { await client.end() } catch (_) {}
         console.error('sellerAuthLoginPOST:', err)
@@ -3485,6 +3597,9 @@ async function start() {
         variation_groups: variationGroups,
         variants,
       }
+      if (p.seller_id != null && String(p.seller_id).trim() !== '') {
+        out.seller_id = String(p.seller_id).trim()
+      }
       if (p.collection) {
         out.collection = p.collection
       }
@@ -3551,11 +3666,62 @@ async function start() {
       bestsellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids }
       return ids
     }
+    const collectCategorySubtreeIdsBySlug = (tree, slug) => {
+      const norm = (s) => String(s || '').replace(/^\//, '').toLowerCase().trim()
+      const target = norm(slug)
+      const findNode = (nodes) => {
+        for (const n of nodes || []) {
+          if (!n) continue
+          if (norm(n.slug) === target || norm(n.handle) === target) return n
+          const x = findNode(n.children)
+          if (x) return x
+        }
+        return null
+      }
+      const ids = new Set()
+      const addTree = (n) => {
+        if (!n || n.id == null) return
+        ids.add(String(n.id).trim().toLowerCase())
+        for (const c of n.children || []) addTree(c)
+      }
+      const roots = Array.isArray(tree) ? tree : []
+      const node = findNode(roots)
+      if (!node) return null
+      addTree(node)
+      return ids
+    }
+    const storeProductCategoryIds = (p) => {
+      const meta = p?.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+      const out = []
+      const push = (x) => {
+        if (x == null) return
+        const s = String(x).trim().toLowerCase()
+        if (s) out.push(s)
+      }
+      push(meta.admin_category_id)
+      push(meta.category_id)
+      if (Array.isArray(meta.category_ids)) meta.category_ids.forEach(push)
+      if (Array.isArray(p?.categories)) p.categories.forEach((c) => push(c?.id))
+      return out
+    }
     const storeProductsFromAdminHubGET = async (req, res) => {
       try {
         const query = req.query || {}
         const searchQ = (query.q || '').toString().trim().toLowerCase()
         const limitForSearch = searchQ ? 8 : (parseInt(query.limit, 10) || 100)
+        const categorySlugFilter = (query.category || query.category_slug || '').toString().trim()
+        let allowedCategoryIds = null
+        if (categorySlugFilter) {
+          const ah = resolveAdminHub()
+          if (ah) {
+            try {
+              const tree = await ah.getCategoryTree({ is_visible: true })
+              allowedCategoryIds = collectCategorySubtreeIdsBySlug(tree, categorySlugFilter)
+            } catch (_) {
+              allowedCategoryIds = null
+            }
+          }
+        }
         let collectionId = (query.collection_id || '').toString().trim()
         const collectionHandle = (query.collection_handle || query.collection || '').toString().trim()
         if (collectionId && !isUuidLike(collectionId)) {
@@ -3567,7 +3733,11 @@ async function start() {
           if (resolvedId) collectionId = resolvedId
         }
         const queryWithId = collectionId ? { ...query, collection_id: collectionId } : query
-        let list = await listAdminHubProductsDb({ ...queryWithId, limit: searchQ ? 200 : (query.limit || 100) })
+        let list = await listAdminHubProductsDb({
+          ...queryWithId,
+          limit: searchQ ? 200 : (categorySlugFilter ? Math.max(parseInt(query.limit, 10) || 3000, 500) : (query.limit || 100)),
+          category: categorySlugFilter || undefined,
+        })
         if (collectionId) {
           const norm = (s) => (s || '').toString().trim().toLowerCase()
           const cidNorm = norm(collectionId)
@@ -3662,7 +3832,7 @@ async function start() {
           mapped.metadata = meta
         }
         const bestsellerIds = await getBestsellerProductIds()
-        const products = list.map((p) => {
+        let products = list.map((p) => {
           const mapped = mapAdminHubToStoreProduct(p)
           mergeCategoryIdsFromCollections(p, mapped)
           const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
@@ -3680,6 +3850,16 @@ async function start() {
           }
           return mapped
         })
+        if (categorySlugFilter) {
+          if (!allowedCategoryIds || allowedCategoryIds.size === 0) {
+            products = []
+          } else {
+            products = products.filter((p) => {
+              const ids = storeProductCategoryIds(p)
+              return ids.some((id) => allowedCategoryIds.has(id))
+            })
+          }
+        }
         res.json({ products, count: products.length })
       } catch (err) {
         console.error('Store products GET (admin hub):', err)
@@ -3704,6 +3884,159 @@ async function start() {
         try { if (client) await client.end() } catch (_) {}
       }
     }
+
+    const normalizeStoreEan = (raw) => {
+      if (raw == null || raw === '') return ''
+      const d = String(raw).replace(/\D/g, '')
+      return d.length >= 8 ? d : ''
+    }
+    const parseVariantsArray = (p) => {
+      const v = p && p.variants
+      if (Array.isArray(v)) return v
+      if (typeof v === 'string' && v) {
+        try {
+          const j = JSON.parse(v)
+          return Array.isArray(j) ? j : []
+        } catch (_) {
+          return []
+        }
+      }
+      return []
+    }
+    const extractEanFromHubProductRow = (p) => {
+      if (!p) return ''
+      const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+      let e = normalizeStoreEan(meta.ean)
+      if (e) return e
+      for (const row of parseVariantsArray(p)) {
+        e = normalizeStoreEan(row && row.ean)
+        if (e) return e
+      }
+      return ''
+    }
+    const primaryPriceCentsHubProduct = (p) => {
+      const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+      const prices = meta.prices && typeof meta.prices === 'object' ? meta.prices : {}
+      const pick = prices.DE || prices.AT || prices.CH || Object.values(prices)[0]
+      if (pick && typeof pick === 'object') {
+        const sale = pick.sale_cents != null ? Number(pick.sale_cents) : null
+        const brut = pick.brutto_cents != null ? Number(pick.brutto_cents) : null
+        const c = sale != null && sale > 0 ? sale : brut
+        if (c != null && c > 0) return Math.round(c)
+      }
+      for (const v of parseVariantsArray(p)) {
+        if (v && v.price_cents != null && Number(v.price_cents) > 0) return Math.round(Number(v.price_cents))
+      }
+      if (p.price_cents != null && Number(p.price_cents) > 0) return Math.round(Number(p.price_cents))
+      if (p.price != null && Number(p.price) > 0) return Math.round(Number(p.price) * 100)
+      return 0
+    }
+    const totalInventoryHubProduct = (p) => {
+      const vars = parseVariantsArray(p)
+      if (vars.length) {
+        return vars.reduce((s, v) => s + (parseInt(v && v.inventory, 10) || 0), 0)
+      }
+      return parseInt(p.inventory, 10) || 0
+    }
+    const computeBuyBoxScore = (priceCents, sellerAvg, sellerCount, inv) => {
+      const p = Number(priceCents) || 0
+      const priceScore = p > 0 ? 10000000 / p : 0
+      const ratingScore = (Number(sellerAvg) || 0) * 2500
+      const countScore = Math.log1p(Math.max(0, Number(sellerCount) || 0)) * 200
+      const stockScore = inv > 0 ? 1200 : -8000
+      return priceScore + ratingScore + countScore + stockScore
+    }
+    const loadSellerReviewStatsBatch = async (sellerIds) => {
+      const ids = [...new Set((sellerIds || []).map((s) => String(s || '').trim()).filter(Boolean))]
+      if (!ids.length) return new Map()
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl || !dbUrl.startsWith('postgres')) return new Map()
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const r = await client.query(
+          `SELECT seller_id,
+                  ROUND(AVG(rating)::numeric, 2)::float AS avg,
+                  COUNT(*)::int AS cnt
+           FROM store_product_reviews
+           WHERE seller_id = ANY($1::text[])
+           GROUP BY seller_id`,
+          [ids]
+        )
+        await client.end()
+        client = null
+        const m = new Map()
+        for (const row of r.rows || []) {
+          m.set(String(row.seller_id).trim(), { avg: parseFloat(row.avg || 0), count: row.cnt || 0 })
+        }
+        for (const id of ids) {
+          if (!m.has(id)) m.set(id, { avg: 0, count: 0 })
+        }
+        return m
+      } catch (_) {
+        try { if (client) await client.end() } catch (__) {}
+        return new Map()
+      }
+    }
+    const findEanOffersFromHub = async (canonicalEan, approvedSellerIds) => {
+      const ean = normalizeStoreEan(canonicalEan)
+      if (!ean) return []
+      let list = await listAdminHubProductsDb({ limit: 5000 })
+      list = list.filter((row) => (row.status || '').toLowerCase() === 'published' && isStoreVisibleSellerProduct(row, approvedSellerIds))
+      return list.filter((row) => extractEanFromHubProductRow(row) === ean)
+    }
+    const enrichMappedStoreProduct = async (productRow, mapped) => {
+      const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
+      if (!existingSeller && productRow.seller_id) {
+        const storeName = await getSellerStoreName(productRow.seller_id)
+        if (storeName) {
+          mapped.metadata = { ...(mapped.metadata || {}), seller_name: storeName, shop_name: storeName }
+        }
+      }
+      const brandId = mapped.metadata && mapped.metadata.brand_id
+      if (brandId) {
+        const brand = await getBrandById(brandId)
+        if (brand) {
+          mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
+        }
+      }
+      const bestsellerIds = await getBestsellerProductIds()
+      if (bestsellerIds.has(String(productRow.id))) {
+        mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+      }
+      const sid = String(productRow.seller_id || '').trim()
+      if (sid) {
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        if (dbUrl && dbUrl.startsWith('postgres')) {
+          let client
+          try {
+            const { Client } = require('pg')
+            client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+            await client.connect()
+            const sr = await client.query(
+              'SELECT review_avg, review_count FROM admin_hub_seller_settings WHERE seller_id = $1',
+              [sid]
+            )
+            await client.end()
+            client = null
+            const row = sr.rows && sr.rows[0]
+            if (row && (Number(row.review_count) > 0 || row.review_avg != null)) {
+              mapped.metadata = {
+                ...(mapped.metadata || {}),
+                seller_review_avg: row.review_avg != null ? parseFloat(row.review_avg) : null,
+                seller_review_count: row.review_count != null ? Number(row.review_count) : 0,
+              }
+            }
+          } catch (_) {
+            try { if (client) await client.end() } catch (__) {}
+          }
+        }
+      }
+      return mapped
+    }
+
     const storeProductByIdFromAdminHubGET = async (req, res) => {
       try {
         const idOrHandle = (req.params.idOrHandle || req.params.id || '').toString().trim()
@@ -3711,36 +4044,72 @@ async function start() {
           res.status(400).json({ message: 'Product id or handle required' })
           return
         }
-        const product = await getAdminHubProductByIdOrHandleDb(idOrHandle)
+        const landed = await getAdminHubProductByIdOrHandleDb(idOrHandle)
         const approvedSellerIds = await getApprovedSellerIdsSet()
-        if (!product || (product.status || '').toLowerCase() !== 'published' || !isStoreVisibleSellerProduct(product, approvedSellerIds)) {
+        if (!landed || (landed.status || '').toLowerCase() !== 'published' || !isStoreVisibleSellerProduct(landed, approvedSellerIds)) {
           res.status(404).json({ message: 'Product not found' })
           return
         }
-        if (product.collection_id) {
-          const collection = await getAdminHubCollectionById(product.collection_id)
-          if (collection) product.collection = collection
-        }
-        const mapped = mapAdminHubToStoreProduct(product)
-        const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
-        if (!existingSeller && product.seller_id) {
-          const storeName = await getSellerStoreName(product.seller_id)
-          if (storeName) {
-            mapped.metadata = { ...(mapped.metadata || {}), seller_name: storeName, shop_name: storeName }
+        const canonicalEan = extractEanFromHubProductRow(landed)
+        let winnerRow = landed
+        let multiOffer = null
+
+        if (canonicalEan) {
+          const offers = await findEanOffersFromHub(canonicalEan, approvedSellerIds)
+          if (offers.length > 1) {
+            const sellerKeys = offers.map((p) => String(p.seller_id || 'default').trim() || 'default')
+            const statsMap = await loadSellerReviewStatsBatch(sellerKeys)
+            const scored = offers.map((p) => {
+              const sid = String(p.seller_id || 'default').trim() || 'default'
+              const st = statsMap.get(sid) || { avg: 0, count: 0 }
+              const price = primaryPriceCentsHubProduct(p)
+              const inv = totalInventoryHubProduct(p)
+              const score = computeBuyBoxScore(price, st.avg, st.count, inv)
+              return { p, score, price, inv, stats: st, sid }
+            })
+            scored.sort((a, b) => b.score - a.score)
+            winnerRow = scored[0].p
+            const uniqueSellers = [...new Set(scored.map((x) => x.sid))]
+            const storeNames = {}
+            await Promise.all(uniqueSellers.map(async (sid) => {
+              storeNames[sid] = (await getSellerStoreName(sid)) || sid
+            }))
+            const reviewProductIds = offers.map((p) => String(p.id))
+            const otherSellers = scored.slice(1).map(({ p, price, stats, sid }) => {
+              const m = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+              const media = m.media
+              const rawMediaList = Array.isArray(media) ? media : (typeof media === 'string' && media ? [media] : [])
+              const thumb = resolveUploadUrl((typeof rawMediaList[0] === 'string' ? rawMediaList[0] : (rawMediaList[0] && rawMediaList[0].url) || null) || m.thumbnail || null)
+              return {
+                product_id: String(p.id),
+                handle: p.handle,
+                title: p.title || '',
+                seller_id: sid,
+                store_name: storeNames[sid] || sid,
+                price_cents: price,
+                seller_review_avg: stats.avg,
+                seller_review_count: stats.count,
+                in_stock: totalInventoryHubProduct(p) > 0,
+                thumbnail: thumb || null,
+              }
+            })
+            multiOffer = {
+              canonical_ean: canonicalEan,
+              review_product_ids: reviewProductIds,
+              landed_product_id: String(landed.id),
+              buy_box_product_id: String(winnerRow.id),
+              other_sellers: otherSellers,
+            }
           }
         }
-        const brandId = mapped.metadata && mapped.metadata.brand_id
-        if (brandId) {
-          const brand = await getBrandById(brandId)
-          if (brand) {
-            mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
-          }
+
+        if (winnerRow.collection_id) {
+          const collection = await getAdminHubCollectionById(winnerRow.collection_id)
+          if (collection) winnerRow.collection = collection
         }
-        const bestsellerIds = await getBestsellerProductIds()
-        if (bestsellerIds.has(String(product.id))) {
-          mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
-        }
-        res.json({ product: mapped })
+        const mapped = mapAdminHubToStoreProduct(winnerRow)
+        await enrichMappedStoreProduct(winnerRow, mapped)
+        res.json({ product: mapped, multi_offer: multiOffer })
       } catch (err) {
         console.error('Store product by id GET (admin hub):', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -3851,6 +4220,14 @@ async function start() {
 
     const bonusPointsEarnedFromOrderPaidCents = (paidCents) =>
       Math.ceil(Number(paidCents || 0) / 100)
+
+    /** Seller commission/payout basis: merchandise at list price (subtotal), before bonus discount. Bonus is platform-funded. */
+    const sellerOrderRevenueBasisCents = (row) => {
+      const sub = row.subtotal_cents != null ? Number(row.subtotal_cents) : NaN
+      if (Number.isFinite(sub) && sub > 0) return Math.round(sub)
+      const tot = row.total_cents != null ? Number(row.total_cents) : 0
+      return Math.max(0, Math.round(tot))
+    }
 
     const clampCartBonusRedemption = (requestedPoints, balance, subtotalCents) => {
       let p = Math.max(0, Math.min(Number(requestedPoints) || 0, Number(balance) || 0))
@@ -4607,12 +4984,25 @@ async function start() {
           )
           wishlist_product_ids = (wr.rows || []).map((x) => x.product_id)
         } catch (_) {}
+        let bonus_ledger = []
+        try {
+          const lr = await client.query(
+            `SELECT id, occurred_at, points_delta, description, source, order_id, created_at
+             FROM store_customer_bonus_ledger
+             WHERE customer_id = $1::uuid
+             ORDER BY occurred_at DESC NULLS LAST, id DESC
+             LIMIT 200`,
+            [payload.id],
+          )
+          bonus_ledger = lr.rows || []
+        } catch (_) {}
         await client.end()
         res.json({
           customer: {
             ...row,
             customer_number: row.customer_number ? Number(row.customer_number) : null,
             bonus_points: Number(row.bonus_points || 0),
+            bonus_ledger,
             addresses,
             wishlist_product_ids,
           },
@@ -4623,25 +5013,40 @@ async function start() {
       }
     }
 
-    // GET /store/reviews?product_id=... — public product reviews
+    // GET /store/reviews?product_id=... or ?product_ids=id1,id2 (same EAN / multi-seller PDP)
     const storeReviewsGET = async (req, res) => {
       const productId = (req.query.product_id || '').trim()
-      if (!productId) return res.json({ reviews: [] })
+      const idsRaw = (req.query.product_ids || '').toString().trim()
+      const productIds = idsRaw ? idsRaw.split(',').map((s) => s.trim()).filter(Boolean) : []
+      if (!productId && !productIds.length) return res.json({ reviews: [] })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const r = await client.query(
-          `SELECT r.id, r.product_id, r.rating, r.comment, r.customer_name, r.created_at,
-                  COALESCE(c.first_name, '') as first_name, COALESCE(c.last_name, '') as last_name
-           FROM store_product_reviews r
-           LEFT JOIN store_customers c ON c.id = r.customer_id
-           WHERE r.product_id = $1
-           ORDER BY r.created_at DESC`,
-          [productId]
-        )
+        let r
+        if (productIds.length > 0) {
+          r = await client.query(
+            `SELECT r.id, r.product_id, r.rating, r.comment, r.customer_name, r.created_at, r.seller_id,
+                    COALESCE(c.first_name, '') as first_name, COALESCE(c.last_name, '') as last_name
+             FROM store_product_reviews r
+             LEFT JOIN store_customers c ON c.id = r.customer_id
+             WHERE r.product_id = ANY($1::text[])
+             ORDER BY r.created_at DESC`,
+            [productIds]
+          )
+        } else {
+          r = await client.query(
+            `SELECT r.id, r.product_id, r.rating, r.comment, r.customer_name, r.created_at, r.seller_id,
+                    COALESCE(c.first_name, '') as first_name, COALESCE(c.last_name, '') as last_name
+             FROM store_product_reviews r
+             LEFT JOIN store_customers c ON c.id = r.customer_id
+             WHERE r.product_id = $1
+             ORDER BY r.created_at DESC`,
+            [productId]
+          )
+        }
         await client.end()
         res.json({ reviews: r.rows || [] })
       } catch (e) {
@@ -4679,12 +5084,18 @@ async function start() {
         const custR = await client.query('SELECT first_name, last_name FROM store_customers WHERE id = $1', [payload.id])
         const cust = custR.rows[0]
         const customer_name = cust ? [cust.first_name, cust.last_name].filter(Boolean).join(' ') || null : null
+        const pid = String(product_id || '').trim()
+        const pr = await client.query('SELECT seller_id FROM admin_hub_products WHERE id::text = $1 LIMIT 1', [pid])
+        const sellerIdForReview =
+          pr.rows && pr.rows[0] && pr.rows[0].seller_id != null && String(pr.rows[0].seller_id).trim() !== ''
+            ? String(pr.rows[0].seller_id).trim()
+            : null
         const r = await client.query(
-          `INSERT INTO store_product_reviews (order_id, product_id, customer_id, rating, comment, customer_name)
-           VALUES ($1::uuid, $2, $3::uuid, $4, $5, $6)
-           ON CONFLICT (order_id, product_id) DO UPDATE SET rating=$4, comment=$5, customer_name=$6, updated_at=now()
+          `INSERT INTO store_product_reviews (order_id, product_id, customer_id, rating, comment, customer_name, seller_id)
+           VALUES ($1::uuid, $2, $3::uuid, $4, $5, $6, $7)
+           ON CONFLICT (order_id, product_id) DO UPDATE SET rating=$4, comment=$5, customer_name=$6, seller_id=$7, updated_at=now()
            RETURNING *`,
-          [order_id, product_id, payload.id, ratingNum, comment?.trim() || null, customer_name]
+          [order_id, product_id, payload.id, ratingNum, comment?.trim() || null, customer_name, sellerIdForReview]
         )
         const statsR = await client.query(
           `SELECT COUNT(*)::int as cnt, ROUND(AVG(rating)::numeric, 2)::float as avg FROM store_product_reviews WHERE product_id = $1`,
@@ -4695,6 +5106,24 @@ async function start() {
           `UPDATE admin_hub_products SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb WHERE id::text = $2`,
           [JSON.stringify({ review_count: stats.cnt, review_avg: parseFloat(stats.avg || 0) }), product_id]
         ).catch(() => {})
+        if (sellerIdForReview) {
+          const aggR = await client.query(
+            `SELECT ROUND(AVG(rating)::numeric, 2)::float as avg, COUNT(*)::int as cnt FROM store_product_reviews WHERE seller_id = $1`,
+            [sellerIdForReview]
+          )
+          const ar = aggR.rows && aggR.rows[0]
+          const savg = ar && ar.avg != null ? parseFloat(ar.avg) : 0
+          const scnt = ar && ar.cnt != null ? Number(ar.cnt) : 0
+          await client.query(
+            `INSERT INTO admin_hub_seller_settings (seller_id, review_avg, review_count, updated_at)
+             VALUES ($1, $2, $3, now())
+             ON CONFLICT (seller_id) DO UPDATE SET
+               review_avg = EXCLUDED.review_avg,
+               review_count = EXCLUDED.review_count,
+               updated_at = now()`,
+            [sellerIdForReview, scnt > 0 ? savg : null, scnt]
+          ).catch(() => {})
+        }
         await client.end()
         res.json({ review: r.rows[0] })
       } catch (e) {
@@ -4713,14 +5142,26 @@ async function start() {
         await client.connect()
         const isSuperuser = req.sellerUser?.is_superuser || false
         const callerSellerId = req.sellerUser?.seller_id
-        const sellerFilter = !isSuperuser && callerSellerId ? `WHERE g.seller_id = '${callerSellerId}'` : ''
-        const groups = await client.query(`
+        let groups
+        if (!isSuperuser && callerSellerId) {
+          groups = await client.query(
+            `
           SELECT g.*, c.name AS carrier_name
           FROM store_shipping_groups g
           LEFT JOIN store_shipping_carriers c ON c.id = g.carrier_id
-          ${sellerFilter}
+          WHERE g.seller_id IS NULL OR g.seller_id = $1
+          ORDER BY g.created_at ASC
+        `,
+            [String(callerSellerId).trim()]
+          )
+        } else {
+          groups = await client.query(`
+          SELECT g.*, c.name AS carrier_name
+          FROM store_shipping_groups g
+          LEFT JOIN store_shipping_carriers c ON c.id = g.carrier_id
           ORDER BY g.created_at ASC
         `)
+        }
         const prices = await client.query('SELECT * FROM store_shipping_prices ORDER BY country_code')
         await client.end()
         const pricesByGroup = {}
@@ -5810,7 +6251,7 @@ async function start() {
           }
         }
         if (!isGuest && customerId) {
-          const earned = bonusPointsEarnedFromOrderPaidCents(merchandiseAfterDiscount)
+          const earned = bonusPointsEarnedFromOrderPaidCents(orderPaidTotalCents)
           if (earned > 0) {
             await client.query(
               `UPDATE store_customers SET bonus_points = COALESCE(bonus_points, 0) + $1, updated_at = NOW() WHERE id = $2::uuid`,
@@ -5820,7 +6261,7 @@ async function start() {
               await appendBonusLedger(client, {
                 customerId,
                 pointsDelta: earned,
-                description: `Bestellung #${orderNumber} — Punkte aus Zahlungsbetrag (+${earned} Punkte)`,
+                description: `Bestellung #${orderNumber} — Punkte aus gezahltem Betrag inkl. Versand (+${earned} Punkte)`,
                 source: 'order_earn',
                 orderId,
                 skipBalanceUpdate: true,
@@ -6253,17 +6694,70 @@ async function start() {
       const isRender = dbUrl.includes('render.com')
       return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
     }
+    const sanitizeSellerMediaFolderSegment = (storeName, sellerId) => {
+      const raw = (storeName || '').trim()
+      let s = raw
+        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^_+|_+$/g, '')
+      if (!s) {
+        const id = String(sellerId || 'seller').replace(/[^a-zA-Z0-9_-]+/g, '_')
+        return (id || 'seller').slice(0, 120)
+      }
+      return s.slice(0, 120)
+    }
+    const resolveSellerMediaFolderSegment = async (sellerUser) => {
+      if (!sellerUser) return 'unknown'
+      if (sellerUser.is_superuser) return '_platform'
+      const client = getDbClient()
+      if (!client) return sanitizeSellerMediaFolderSegment(sellerUser.store_name || '', sellerUser.seller_id)
+      try {
+        await client.connect()
+        const s1 = await client.query('SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerUser.seller_id])
+        let sn = (s1.rows[0]?.store_name || '').trim()
+        if (!sn) {
+          const s2 = await client.query(
+            'SELECT store_name FROM seller_users WHERE seller_id = $1 LIMIT 1',
+            [sellerUser.seller_id]
+          )
+          sn = (s2.rows[0]?.store_name || '').trim()
+        }
+        if (!sn) sn = (sellerUser.store_name || '').trim()
+        return sanitizeSellerMediaFolderSegment(sn, sellerUser.seller_id)
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const prepareSellerMediaUploadPath = async (req, res, next) => {
+      try {
+        req._sellerMediaFolderSegment = await resolveSellerMediaFolderSegment(req.sellerUser)
+        next()
+      } catch (e) {
+        console.error('prepareSellerMediaUploadPath:', e)
+        next(e)
+      }
+    }
     const multer = require('multer')
-    const storage = useS3
+    const uploadStorage = useS3
       ? multer.memoryStorage()
       : multer.diskStorage({
-          destination: (req, file, cb) => cb(null, uploadDir),
+          destination: (req, file, cb) => {
+            const seg = req._sellerMediaFolderSegment || '_misc'
+            const dest = path.join(uploadDir, 'media', seg)
+            try {
+              fs.mkdirSync(dest, { recursive: true })
+              cb(null, dest)
+            } catch (err) {
+              cb(err)
+            }
+          },
           filename: (req, file, cb) => {
             const safe = (file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_')
             cb(null, `${Date.now()}-${safe}`)
           },
         })
-    const upload = multer({ storage })
+    const upload = multer({ storage: uploadStorage })
 
     const mediaListGET = async (req, res) => {
       const client = getDbClient()
@@ -6289,7 +6783,7 @@ async function start() {
       if (!u) return false
       if (u.is_superuser) return true
       const sid = row?.seller_id
-      if (sid == null || String(sid).trim() === '') return true
+      if (sid == null || String(sid).trim() === '') return false
       return String(sid) === String(u.seller_id)
     }
 
@@ -6297,13 +6791,14 @@ async function start() {
       if (!req.file) return res.status(400).json({ message: 'No file uploaded' })
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
+      const mediaSeg = req._sellerMediaFolderSegment || '_misc'
       let fileUrl
       if (useS3 && req.file.buffer && process.env.S3_UPLOAD_BUCKET) {
         try {
           const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
           const bucket = process.env.S3_UPLOAD_BUCKET
           const region = process.env.S3_UPLOAD_REGION || 'eu-central-1'
-          const key = `uploads/${Date.now()}-${(req.file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_')}`
+          const key = `media/${mediaSeg}/${Date.now()}-${(req.file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_')}`
           const s3 = new S3Client({
             region,
             ...(process.env.S3_UPLOAD_ENDPOINT && { endpoint: process.env.S3_UPLOAD_ENDPOINT }),
@@ -6325,7 +6820,7 @@ async function start() {
           return res.status(500).json({ message: 'Upload to storage failed' })
         }
       } else {
-        fileUrl = `/uploads/${req.file.filename}`
+        fileUrl = `/uploads/media/${mediaSeg}/${req.file.filename}`
       }
       const alt = (req.body && req.body.alt) || null
       const folderId = (req.body && req.body.folder_id) || null
@@ -6492,14 +6987,34 @@ async function start() {
         const u = req.sellerUser
         if (u && !u.is_superuser) {
           params.push(u.seller_id)
-          where.push(`(m.seller_id IS NULL OR m.seller_id = $${params.length})`)
+          where.push(`m.seller_id = $${params.length}`)
+        } else if (u?.is_superuser) {
+          const filterSid = (req.query.seller_id || '').trim()
+          if (filterSid === '__null') {
+            where.push('m.seller_id IS NULL')
+          } else if (filterSid) {
+            params.push(filterSid)
+            where.push(`m.seller_id = $${params.length}`)
+          }
         }
         const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : ''
         const r = await client.query(
-          `SELECT m.id, m.filename, m.url, m.source_url, m.mime_type, m.size, m.alt, m.folder_id, m.seller_id, f.name AS folder_name, m.created_at FROM admin_hub_media m LEFT JOIN admin_hub_media_folders f ON f.id = m.folder_id ${whereClause} ORDER BY m.created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,
+          `SELECT m.id, m.filename, m.url, m.source_url, m.mime_type, m.size, m.alt, m.folder_id, m.seller_id,
+            sh.store_name AS seller_store_name,
+            f.name AS folder_name, m.created_at
+           FROM admin_hub_media m
+           LEFT JOIN admin_hub_media_folders f ON f.id = m.folder_id
+           LEFT JOIN admin_hub_seller_settings sh ON sh.seller_id = m.seller_id
+           ${whereClause} ORDER BY m.created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,
           [...params, limit, offset]
         )
-        const countRes = await client.query(`SELECT COUNT(*)::int AS c FROM admin_hub_media m ${whereClause}`, params)
+        const countRes = await client.query(
+          `SELECT COUNT(*)::int AS c FROM admin_hub_media m
+           LEFT JOIN admin_hub_media_folders f ON f.id = m.folder_id
+           LEFT JOIN admin_hub_seller_settings sh ON sh.seller_id = m.seller_id
+           ${whereClause}`,
+          params
+        )
         res.json({ media: r.rows, count: countRes.rows[0].c })
       } catch (err) {
         console.error('Media list error:', err)
@@ -6510,7 +7025,7 @@ async function start() {
     }
 
     httpApp.get('/admin-hub/v1/media', requireSellerAuth, mediaListWithFolderGET)
-    httpApp.post('/admin-hub/v1/media', requireSellerAuth, upload.single('file'), mediaUploadPOST)
+    httpApp.post('/admin-hub/v1/media', requireSellerAuth, prepareSellerMediaUploadPath, upload.single('file'), mediaUploadPOST)
     httpApp.get('/admin-hub/v1/media/folders', requireSellerAuth, mediaFoldersGET)
     httpApp.post('/admin-hub/v1/media/folders', requireSellerAuth, mediaFoldersPOST)
     httpApp.delete('/admin-hub/v1/media/folders/:id', requireSellerAuth, mediaFolderDELETE)
@@ -6976,6 +7491,7 @@ async function start() {
     }
 
     const adminHubCustomerPOST = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       let client
       try {
@@ -7000,6 +7516,7 @@ async function start() {
     }
 
     const adminHubCustomerPATCH = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const id = (req.params.id || '').trim()
       if (!id) return res.status(400).json({ message: 'id required' })
@@ -7033,6 +7550,7 @@ async function start() {
     }
 
     const adminHubCustomerDELETE = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const id = (req.params.id || '').trim()
       if (!id) return res.status(400).json({ message: 'id required' })
@@ -7061,6 +7579,7 @@ async function start() {
     }
 
     const adminHubCustomerDiscountPOST = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const customerId = (req.params.id || '').trim()
       if (!customerId) return res.status(400).json({ message: 'id required' })
@@ -7086,6 +7605,7 @@ async function start() {
     }
 
     const adminHubCustomerDiscountDELETE = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { customerId, discountId } = req.params
       let client
@@ -7103,6 +7623,7 @@ async function start() {
     }
 
     const adminHubCustomerBonusLedgerPOST = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const customerId = (req.params.id || '').trim()
       if (!customerId) return res.status(400).json({ message: 'id required' })
@@ -7160,6 +7681,7 @@ async function start() {
     }
 
     const adminHubCustomerBonusLedgerPATCH = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const customerId = (req.params.customerId || '').trim()
       const entryId = (req.params.entryId || '').trim()
@@ -7238,6 +7760,7 @@ async function start() {
     }
 
     const adminHubCustomerBonusLedgerDELETE = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const customerId = (req.params.customerId || '').trim()
       const entryId = (req.params.entryId || '').trim()
@@ -7275,6 +7798,8 @@ async function start() {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const id = (req.params.id || '').trim()
       if (!id) return res.status(400).json({ message: 'id required' })
+      const isSuperuser = req.sellerUser?.is_superuser || false
+      const sellerSellerId = req.sellerUser?.seller_id || null
       let client
       try {
         const { Client } = require('pg')
@@ -7293,12 +7818,29 @@ async function start() {
         )
         if (!custR.rows || !custR.rows[0]) { await client.end(); return res.status(404).json({ message: 'Customer not found' }) }
         const row = custR.rows[0]
-        const ordersR = await client.query(
-          `SELECT id, order_number, order_status, payment_status, delivery_status,
+        if (!isSuperuser && sellerSellerId) {
+          const acc = await client.query(
+            `SELECT 1 FROM store_customers c
+             WHERE c.id = $1::uuid AND EXISTS (
+               SELECT 1 FROM store_orders o WHERE LOWER(o.email) = LOWER(c.email) AND o.seller_id = $2
+             )`,
+            [id, sellerSellerId],
+          )
+          if (!acc.rows?.[0]) {
+            await client.end()
+            return res.status(404).json({ message: 'Customer not found' })
+          }
+        }
+        let ordersQ = `SELECT id, order_number, order_status, payment_status, delivery_status,
                   total_cents, currency, newsletter_opted_in, created_at
-           FROM store_orders WHERE LOWER(email) = LOWER($1) ORDER BY created_at DESC`,
-          [row.email]
-        )
+           FROM store_orders WHERE LOWER(email) = LOWER($1)`
+        const ordersParams = [row.email]
+        if (!isSuperuser && sellerSellerId) {
+          ordersParams.push(sellerSellerId)
+          ordersQ += ` AND seller_id = $2`
+        }
+        ordersQ += ' ORDER BY created_at DESC'
+        const ordersR = await client.query(ordersQ, ordersParams)
         const orders = (ordersR.rows || []).map(r => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null }))
         const newsletterOptedIn = orders.some(o => o.newsletter_opted_in)
         const discountsR = await client.query(
@@ -7308,40 +7850,44 @@ async function start() {
         )
         const discounts = discountsR.rows || []
         let bonus_ledger = []
-        try {
-          const ledR = await client.query(
-            `SELECT id, occurred_at, points_delta, description, source, order_id, created_at, updated_at
-             FROM store_customer_bonus_ledger WHERE customer_id = $1::uuid
-             ORDER BY occurred_at DESC NULLS LAST, created_at DESC`,
-            [id],
-          )
-          bonus_ledger = (ledR.rows || []).map((e) => ({
-            id: e.id,
-            occurred_at: e.occurred_at,
-            points_delta: Number(e.points_delta),
-            description: e.description,
-            source: e.source,
-            order_id: e.order_id,
-            created_at: e.created_at,
-            updated_at: e.updated_at,
-          }))
-        } catch (_) {
-          bonus_ledger = []
+        if (isSuperuser) {
+          try {
+            const ledR = await client.query(
+              `SELECT id, occurred_at, points_delta, description, source, order_id, created_at, updated_at
+               FROM store_customer_bonus_ledger WHERE customer_id = $1::uuid
+               ORDER BY occurred_at DESC NULLS LAST, created_at DESC`,
+              [id],
+            )
+            bonus_ledger = (ledR.rows || []).map((e) => ({
+              id: e.id,
+              occurred_at: e.occurred_at,
+              points_delta: Number(e.points_delta),
+              description: e.description,
+              source: e.source,
+              order_id: e.order_id,
+              created_at: e.created_at,
+              updated_at: e.updated_at,
+            }))
+          } catch (_) {
+            bonus_ledger = []
+          }
         }
         await client.end()
-        res.json({
-          customer: {
-            ...row,
-            customer_number: row.customer_number ? Number(row.customer_number) : null,
-            is_registered: row.is_registered === true || row.is_registered === 't',
-            newsletter_opted_in: newsletterOptedIn,
-            bonus_points: Number(row.bonus_points || 0),
-            birth_date: row.birth_date || null,
-            orders,
-            discounts,
-            bonus_ledger,
-          }
-        })
+        const { bonus_points: _rowBonus, ...rowWithoutBonus } = row
+        const customerBase = {
+          ...rowWithoutBonus,
+          customer_number: row.customer_number ? Number(row.customer_number) : null,
+          is_registered: row.is_registered === true || row.is_registered === 't',
+          newsletter_opted_in: newsletterOptedIn,
+          birth_date: row.birth_date || null,
+          orders,
+          discounts,
+        }
+        if (isSuperuser) {
+          customerBase.bonus_points = Number(row.bonus_points || 0)
+          customerBase.bonus_ledger = bonus_ledger
+        }
+        res.json({ customer: customerBase })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -7761,15 +8307,15 @@ async function start() {
     httpApp.patch('/admin-hub/v1/orders/:id', adminHubOrderPATCH)
     httpApp.delete('/admin-hub/v1/orders/:id', adminHubOrderDELETE)
     httpApp.get('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomersGET)
-    httpApp.post('/admin-hub/v1/customers', adminHubCustomerPOST)
-    httpApp.patch('/admin-hub/v1/customers/:id', adminHubCustomerPATCH)
-    httpApp.delete('/admin-hub/v1/customers/:id', adminHubCustomerDELETE)
-    httpApp.get('/admin-hub/v1/customers/:id', adminHubCustomerByIdGET)
-    httpApp.post('/admin-hub/v1/customers/:id/discounts', adminHubCustomerDiscountPOST)
-    httpApp.delete('/admin-hub/v1/customers/:customerId/discounts/:discountId', adminHubCustomerDiscountDELETE)
-    httpApp.post('/admin-hub/v1/customers/:id/bonus-ledger', adminHubCustomerBonusLedgerPOST)
-    httpApp.patch('/admin-hub/v1/customers/:customerId/bonus-ledger/:entryId', adminHubCustomerBonusLedgerPATCH)
-    httpApp.delete('/admin-hub/v1/customers/:customerId/bonus-ledger/:entryId', adminHubCustomerBonusLedgerDELETE)
+    httpApp.post('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomerPOST)
+    httpApp.patch('/admin-hub/v1/customers/:id', requireSellerAuth, adminHubCustomerPATCH)
+    httpApp.delete('/admin-hub/v1/customers/:id', requireSellerAuth, adminHubCustomerDELETE)
+    httpApp.get('/admin-hub/v1/customers/:id', requireSellerAuth, adminHubCustomerByIdGET)
+    httpApp.post('/admin-hub/v1/customers/:id/discounts', requireSellerAuth, adminHubCustomerDiscountPOST)
+    httpApp.delete('/admin-hub/v1/customers/:customerId/discounts/:discountId', requireSellerAuth, adminHubCustomerDiscountDELETE)
+    httpApp.post('/admin-hub/v1/customers/:id/bonus-ledger', requireSellerAuth, adminHubCustomerBonusLedgerPOST)
+    httpApp.patch('/admin-hub/v1/customers/:customerId/bonus-ledger/:entryId', requireSellerAuth, adminHubCustomerBonusLedgerPATCH)
+    httpApp.delete('/admin-hub/v1/customers/:customerId/bonus-ledger/:entryId', requireSellerAuth, adminHubCustomerBonusLedgerDELETE)
     httpApp.get('/admin-hub/v1/shipping-carriers', adminHubCarriersGET)
     httpApp.post('/admin-hub/v1/shipping-carriers', adminHubCarrierPOST)
     httpApp.patch('/admin-hub/v1/shipping-carriers/:id', adminHubCarrierPATCH)
@@ -8465,27 +9011,68 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.connect()
         const orderId = req.query.order_id || null
         const sellerId = (req.query.seller_id || '').trim()
+        const searchRaw = (req.query.q || req.query.search || '').trim()
         // channel: 'customer' (default) = customer<->seller msgs, 'support' = seller<->support team msgs
         const channel = (req.query.channel || 'customer').trim()
-        let q = `SELECT m.*,
-          o.order_number, o.status AS order_status, o.order_status AS order_order_status,
-          o.total_cents AS order_total_cents, o.first_name AS order_first_name,
-          o.last_name AS order_last_name, o.email AS order_email
-          FROM store_messages m LEFT JOIN store_orders o ON o.id = m.order_id`
+        const lim = Math.min(Math.max(parseInt(req.query.limit, 10) || (searchRaw ? 600 : 400), 1), 1000)
+        let q
         const params = []
         const conditions = []
         if (channel === 'support') {
-          // Support channel: messages where seller_id matches (seller talking to support team)
+          q = `SELECT m.*,
+            sh.store_name AS seller_store_name
+            FROM store_messages m
+            LEFT JOIN admin_hub_seller_settings sh ON sh.seller_id = m.seller_id`
           if (sellerId) { params.push(sellerId); conditions.push(`m.seller_id = $${params.length}`) }
           conditions.push(`m.channel = 'support'`)
+          if (searchRaw) {
+            const term = `%${searchRaw.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
+            params.push(term)
+            const n = params.length
+            conditions.push(`(
+              m.body ILIKE $${n} ESCAPE '\\'
+              OR COALESCE(m.subject, '') ILIKE $${n} ESCAPE '\\'
+              OR COALESCE(m.seller_id, '') ILIKE $${n} ESCAPE '\\'
+              OR COALESCE(sh.store_name, '') ILIKE $${n} ESCAPE '\\'
+            )`)
+          }
         } else {
-          // Customer channel: classic customer<->seller messages
+          q = `SELECT m.*,
+            o.order_number, o.status AS order_status, o.order_status AS order_order_status,
+            o.total_cents AS order_total_cents, o.first_name AS order_first_name,
+            o.last_name AS order_last_name, o.email AS order_email,
+            o.seller_id AS order_seller_id,
+            c.customer_number AS customer_number,
+            sh.store_name AS seller_store_name
+            FROM store_messages m
+            LEFT JOIN store_orders o ON o.id = m.order_id
+            LEFT JOIN store_customers c ON c.email IS NOT NULL AND o.email IS NOT NULL
+              AND LOWER(TRIM(c.email)) = LOWER(TRIM(o.email))
+            LEFT JOIN admin_hub_seller_settings sh ON sh.seller_id = o.seller_id`
           conditions.push(`(m.channel = 'customer' OR m.channel IS NULL)`)
           if (orderId) { params.push(orderId); conditions.push(`m.order_id = $${params.length}::uuid`) }
           if (sellerId) { params.push(sellerId); conditions.push(`o.seller_id = $${params.length}`) }
+          if (searchRaw) {
+            const term = `%${searchRaw.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
+            params.push(term)
+            const n = params.length
+            conditions.push(`(
+              m.body ILIKE $${n} ESCAPE '\\'
+              OR COALESCE(m.subject, '') ILIKE $${n} ESCAPE '\\'
+              OR CAST(o.order_number AS TEXT) ILIKE $${n} ESCAPE '\\'
+              OR CAST(c.customer_number AS TEXT) ILIKE $${n} ESCAPE '\\'
+              OR COALESCE(o.first_name, '') ILIKE $${n} ESCAPE '\\'
+              OR COALESCE(o.last_name, '') ILIKE $${n} ESCAPE '\\'
+              OR TRIM(COALESCE(o.first_name, '') || ' ' || COALESCE(o.last_name, '')) ILIKE $${n} ESCAPE '\\'
+              OR COALESCE(o.email, '') ILIKE $${n} ESCAPE '\\'
+              OR COALESCE(m.sender_email, '') ILIKE $${n} ESCAPE '\\'
+              OR COALESCE(sh.store_name, '') ILIKE $${n} ESCAPE '\\'
+              OR COALESCE(o.seller_id, '') ILIKE $${n} ESCAPE '\\'
+            )`)
+          }
         }
         if (conditions.length) q += ' WHERE ' + conditions.join(' AND ')
-        q += ' ORDER BY m.created_at ASC LIMIT 200'
+        q += ` ORDER BY m.created_at ASC LIMIT ${lim}`
         const r = await client.query(q, params)
         // Unread count depends on channel
         let unreadR
@@ -8509,6 +9096,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             ...row,
             order_number: row.order_number ? Number(row.order_number) : null,
             order_total_cents: row.order_total_cents != null ? Number(row.order_total_cents) : null,
+            customer_number: row.customer_number != null ? Number(row.customer_number) : null,
           })),
           unread: unreadR.rows[0]?.c || 0,
         })
@@ -8854,7 +9442,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (filterSellerId) { params.push(filterSellerId); where.push(`o.seller_id = $${params.length}`) }
         const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
         const r = await client.query(
-          `SELECT o.id, o.order_number, o.seller_id, o.total_cents, o.shipping_cents, o.discount_cents,
+          `SELECT o.id, o.order_number, o.seller_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents,
                   o.payment_status, o.delivery_status, o.delivery_date, o.created_at,
                   o.first_name, o.last_name, o.email, o.currency,
                   s.store_name, s.commission_rate, s.iban,
@@ -8867,16 +9455,18 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           params
         )
         const transactions = r.rows.map(row => {
-          const commRate = parseFloat(row.commission_rate ?? 0.10)
-          const total = row.total_cents || 0
-          const commission = Math.round(total * commRate)
-          const payout = total - commission
+          const commRate = parseFloat(row.commission_rate ?? 0.12)
+          const sellerBasis = sellerOrderRevenueBasisCents(row)
+          const customerPaid = Number(row.total_cents || 0)
+          const commission = Math.round(sellerBasis * commRate)
+          const payout = sellerBasis - commission
           return {
             id: row.id,
             order_number: row.order_number,
             seller_id: row.seller_id,
             store_name: row.store_name || row.seller_id,
-            total_cents: total,
+            total_cents: sellerBasis,
+            customer_paid_cents: customerPaid,
             shipping_cents: row.shipping_cents || 0,
             discount_cents: row.discount_cents || 0,
             commission_rate: commRate,
@@ -9035,10 +9625,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (period_end) params.push(period_end)
         const r = await client.query(
           `SELECT
-             COALESCE(SUM(o.total_cents), 0) AS total_cents,
+             COALESCE(SUM(o.subtotal_cents), 0) AS total_cents,
              COALESCE(SUM(o.shipping_cents), 0) AS shipping_cents,
              COUNT(*) FILTER (WHERE o.payment_status = 'bezahlt') AS paid_count,
-             COALESCE(SUM(o.total_cents) FILTER (WHERE o.refund_status = 'refunded'), 0) AS refund_cents
+             COALESCE(SUM(o.subtotal_cents) FILTER (WHERE o.refund_status = 'refunded'), 0) AS refund_cents
            FROM store_orders o
            WHERE o.seller_id = $1 AND o.payment_status = 'bezahlt' ${dateFilter}`,
           params
@@ -9086,10 +9676,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
              o.seller_id,
              s.store_name,
              s.email,
-             COALESCE(SUM(o.total_cents), 0) AS total_cents,
+             COALESCE(SUM(o.subtotal_cents), 0) AS total_cents,
              COUNT(*) AS order_count,
-             ROUND(COALESCE(SUM(o.total_cents), 0) * 0.10) AS commission_cents,
-             ROUND(COALESCE(SUM(o.total_cents), 0) * 0.90) AS payout_cents
+             ROUND((COALESCE(SUM(o.subtotal_cents), 0)::numeric * COALESCE(MAX(s.commission_rate), 0.12)))::bigint AS commission_cents,
+             ROUND((COALESCE(SUM(o.subtotal_cents), 0)::numeric * (1 - COALESCE(MAX(s.commission_rate), 0.12))))::bigint AS payout_cents
            FROM store_orders o
            LEFT JOIN seller_users s ON s.seller_id = o.seller_id
            WHERE o.payment_status = 'bezahlt'
@@ -9180,9 +9770,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const summary = await client.query(
           `SELECT
              o.seller_id,
-             ROUND(COALESCE(SUM(o.total_cents), 0)) AS total_cents,
-             ROUND(COALESCE(SUM(o.total_cents), 0) * 0.10) AS commission_cents,
-             ROUND(COALESCE(SUM(o.total_cents), 0) * 0.90) AS payout_cents
+             ROUND(COALESCE(SUM(o.subtotal_cents), 0)) AS total_cents,
+             ROUND((COALESCE(SUM(o.subtotal_cents), 0)::numeric * COALESCE(MAX(s.commission_rate), 0.12)))::bigint AS commission_cents,
+             ROUND((COALESCE(SUM(o.subtotal_cents), 0)::numeric * (1 - COALESCE(MAX(s.commission_rate), 0.12))))::bigint AS payout_cents
            FROM store_orders o
            LEFT JOIN seller_users s ON s.seller_id = o.seller_id
            WHERE o.payment_status = 'bezahlt'
@@ -9560,7 +10150,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           // revenue totals (paid orders)
           try {
             const rv = await client.query(
-              `SELECT seller_id, SUM(total) as total_cents, COUNT(*) as order_cnt
+              `SELECT seller_id, SUM(subtotal_cents) AS total_cents, COUNT(*) AS order_cnt
                FROM store_orders WHERE seller_id = ANY($1) AND payment_status = 'bezahlt'
                GROUP BY seller_id`,
               [sellerIds]
@@ -9579,7 +10169,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           product_count: productCounts[s.seller_id] || 0,
           revenue_cents: revenueTotals[s.seller_id]?.total_cents || 0,
           order_count: revenueTotals[s.seller_id]?.order_count || 0,
-          commission_cents: Math.round((revenueTotals[s.seller_id]?.total_cents || 0) * (parseFloat(s.commission_rate) || 0.1)),
+          commission_cents: Math.round((revenueTotals[s.seller_id]?.total_cents || 0) * (parseFloat(s.commission_rate) || 0.12)),
         }))
         res.json({ sellers, count: sellers.length })
       } catch (e) {
@@ -9636,7 +10226,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         let monthlyRevenue = []
         try {
           const mv = await client.query(
-            `SELECT DATE_TRUNC('month', created_at) as month, SUM(total) as total_cents, COUNT(*) as order_cnt
+            `SELECT DATE_TRUNC('month', created_at) AS month, SUM(subtotal_cents) AS total_cents, COUNT(*) AS order_cnt
              FROM store_orders WHERE seller_id = $1 AND payment_status = 'bezahlt'
              AND created_at >= NOW() - INTERVAL '12 months'
              GROUP BY 1 ORDER BY 1`,
@@ -9809,6 +10399,564 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.patch('/admin-hub/v1/sellers/:id/approve', requireSellerAuth, adminHubSellerApprovePATCH)
     httpApp.patch('/admin-hub/v1/seller/company-info', requireSellerAuth, adminHubSellerCompanyInfoPATCH)
     console.log('Seller mgmt routes: GET/PATCH /admin-hub/v1/sellers, PATCH /admin-hub/v1/sellers/:id/approve')
+
+    // ── Ranking API ─────────────────────────────────────────────────────────
+
+    // Core compute function — re-usable, called by scheduler + manual trigger
+    async function computeRankingFeatures() {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await client.connect()
+        const now = new Date()
+
+        // 1. Aggregate raw signals from orders + events
+        await client.query(`
+          INSERT INTO product_ranking_features (
+            product_id, seller_id, collection_id,
+            sales_7d, sales_30d, sales_90d, gmv_30d_cents,
+            impressions_30d, clicks_30d, add_to_cart_30d,
+            review_avg, review_count, return_count_30d,
+            price_cents, compare_at_price_cents, discount_pct,
+            inventory, content_score, published_at,
+            updated_at
+          )
+          SELECT
+            p.id::text AS product_id,
+            p.seller_id,
+            p.collection_id::text,
+            COALESCE(s7.cnt, 0) AS sales_7d,
+            COALESCE(s30.cnt, 0) AS sales_30d,
+            COALESCE(s90.cnt, 0) AS sales_90d,
+            COALESCE(s30.gmv, 0) AS gmv_30d_cents,
+            COALESCE(ev_imp.cnt, 0) AS impressions_30d,
+            COALESCE(ev_clk.cnt, 0) AS clicks_30d,
+            COALESCE(ev_atc.cnt, 0) AS add_to_cart_30d,
+            COALESCE(rv.avg_rating, 0) AS review_avg,
+            COALESCE(rv.cnt, 0) AS review_count,
+            COALESCE(ret30.cnt, 0) AS return_count_30d,
+            COALESCE(p.price_cents, 0) AS price_cents,
+            COALESCE((p.metadata->>'compare_at_price_cents')::int, 0) AS compare_at_price_cents,
+            CASE
+              WHEN COALESCE((p.metadata->>'compare_at_price_cents')::int, 0) > COALESCE(p.price_cents, 0)
+              THEN ROUND(((COALESCE((p.metadata->>'compare_at_price_cents')::int, 0) - COALESCE(p.price_cents, 0))::numeric
+                   / NULLIF((p.metadata->>'compare_at_price_cents')::int, 0)::numeric) * 100, 2)
+              ELSE 0
+            END AS discount_pct,
+            COALESCE(p.inventory, 0) AS inventory,
+            -- Content score: title(0.25) + description(0.25) + price(0.25) + image(0.25)
+            (
+              CASE WHEN p.title IS NOT NULL AND p.title != '' THEN 0.25 ELSE 0 END +
+              CASE WHEN p.description IS NOT NULL AND LENGTH(p.description) > 20 THEN 0.25 ELSE 0 END +
+              CASE WHEN COALESCE(p.price_cents, 0) > 0 THEN 0.25 ELSE 0 END +
+              CASE WHEN p.metadata->>'images' IS NOT NULL OR p.metadata->>'thumbnail' IS NOT NULL THEN 0.25 ELSE 0 END
+            ) AS content_score,
+            p.created_at AS published_at,
+            NOW() AS updated_at
+          FROM admin_hub_products p
+          LEFT JOIN LATERAL (
+            SELECT SUM(oi.quantity)::int AS cnt
+            FROM store_order_items oi
+            JOIN store_orders o ON o.id = oi.order_id
+            WHERE oi.product_id = p.id::text
+              AND o.created_at >= NOW() - INTERVAL '7 days'
+              AND o.order_status NOT IN ('cancelled')
+          ) s7 ON true
+          LEFT JOIN LATERAL (
+            SELECT SUM(oi.quantity)::int AS cnt, SUM(oi.quantity * oi.unit_price_cents)::bigint AS gmv
+            FROM store_order_items oi
+            JOIN store_orders o ON o.id = oi.order_id
+            WHERE oi.product_id = p.id::text
+              AND o.created_at >= NOW() - INTERVAL '30 days'
+              AND o.order_status NOT IN ('cancelled')
+          ) s30 ON true
+          LEFT JOIN LATERAL (
+            SELECT SUM(oi.quantity)::int AS cnt
+            FROM store_order_items oi
+            JOIN store_orders o ON o.id = oi.order_id
+            WHERE oi.product_id = p.id::text
+              AND o.created_at >= NOW() - INTERVAL '90 days'
+              AND o.order_status NOT IN ('cancelled')
+          ) s90 ON true
+          LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS cnt FROM product_events
+            WHERE product_id = p.id::text AND event_type = 'impression'
+              AND created_at >= NOW() - INTERVAL '30 days'
+          ) ev_imp ON true
+          LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS cnt FROM product_events
+            WHERE product_id = p.id::text AND event_type = 'click'
+              AND created_at >= NOW() - INTERVAL '30 days'
+          ) ev_clk ON true
+          LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS cnt FROM product_events
+            WHERE product_id = p.id::text AND event_type = 'add_to_cart'
+              AND created_at >= NOW() - INTERVAL '30 days'
+          ) ev_atc ON true
+          LEFT JOIN LATERAL (
+            SELECT ROUND(AVG(rating)::numeric, 2) AS avg_rating, COUNT(*)::int AS cnt
+            FROM store_product_reviews WHERE product_id = p.id::text
+          ) rv ON true
+          LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS cnt
+            FROM store_returns sr
+            JOIN store_order_items oi ON oi.order_id = sr.order_id
+            WHERE oi.product_id = p.id::text
+              AND sr.created_at >= NOW() - INTERVAL '30 days'
+          ) ret30 ON true
+          WHERE p.status = 'published'
+          ON CONFLICT (product_id) DO UPDATE SET
+            seller_id           = EXCLUDED.seller_id,
+            collection_id       = EXCLUDED.collection_id,
+            sales_7d            = EXCLUDED.sales_7d,
+            sales_30d           = EXCLUDED.sales_30d,
+            sales_90d           = EXCLUDED.sales_90d,
+            gmv_30d_cents       = EXCLUDED.gmv_30d_cents,
+            impressions_30d     = EXCLUDED.impressions_30d,
+            clicks_30d          = EXCLUDED.clicks_30d,
+            add_to_cart_30d     = EXCLUDED.add_to_cart_30d,
+            review_avg          = EXCLUDED.review_avg,
+            review_count        = EXCLUDED.review_count,
+            return_count_30d    = EXCLUDED.return_count_30d,
+            price_cents         = EXCLUDED.price_cents,
+            compare_at_price_cents = EXCLUDED.compare_at_price_cents,
+            discount_pct        = EXCLUDED.discount_pct,
+            inventory           = EXCLUDED.inventory,
+            content_score       = EXCLUDED.content_score,
+            published_at        = EXCLUDED.published_at,
+            updated_at          = EXCLUDED.updated_at
+        `)
+
+        // 2. Normalize signals and compute scores
+        // Get max values for normalization
+        const maxR = await client.query(`
+          SELECT
+            GREATEST(MAX(sales_30d), 1)   AS max_sales,
+            GREATEST(MAX(gmv_30d_cents), 1) AS max_gmv,
+            GREATEST(MAX(clicks_30d), 1)  AS max_clicks,
+            GREATEST(MAX(review_avg * LN(1 + review_count)), 0.001) AS max_review,
+            GREATEST(MAX(sales_7d), 1)    AS max_sales_7d
+          FROM product_ranking_features
+        `)
+        const mx = maxR.rows[0]
+
+        await client.query(`
+          UPDATE product_ranking_features SET
+            -- CTR (avoid div/0)
+            ctr_30d = CASE WHEN impressions_30d > 0 THEN ROUND((clicks_30d::numeric / impressions_30d), 4) ELSE 0 END,
+            -- Popularity: weighted combination of normalized signals
+            popularity_score = ROUND((
+              0.40 * (LN(1 + sales_30d) / LN(1 + $1)) +
+              0.30 * (LN(1 + gmv_30d_cents) / LN(1 + $2)) +
+              0.20 * (LN(1 + clicks_30d) / LN(1 + $3)) +
+              0.10 * (review_avg * LN(1 + review_count) / $4)
+            )::numeric, 6),
+            -- Freshness: exponential decay, half-life = 30d (overridden per strategy at query time)
+            freshness_score = ROUND(EXP(-0.693 * GREATEST(0, EXTRACT(EPOCH FROM (NOW() - published_at)) / 86400) / 30.0)::numeric, 6),
+            -- Velocity: recent 7d acceleration vs 30d baseline (trend signal)
+            velocity_score = ROUND(CASE
+              WHEN sales_30d > 0 THEN LEAST((sales_7d::numeric / sales_30d) / (7.0/30.0), 3.0) / 3.0
+              WHEN sales_7d > 0 THEN 1.0
+              ELSE 0.0
+            END::numeric, 6),
+            updated_at = NOW()
+          WHERE true
+        `, [mx.max_sales, mx.max_gmv, mx.max_clicks, mx.max_review])
+
+        await client.end()
+        console.log('[Ranking] Features computed for', (await (async () => {
+          const c2 = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await c2.connect()
+          const r = await c2.query('SELECT COUNT(*) FROM product_ranking_features')
+          await c2.end()
+          return r.rows[0].count
+        })()), 'products at', new Date().toISOString())
+      } catch (e) {
+        console.error('[Ranking] Compute error:', e.message)
+        try { await client.end() } catch (_) {}
+      }
+    }
+
+    // GET /store/products/ranked — used by storefront to get sorted product IDs
+    const storeProductsRankedGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const strategy = (req.query.strategy || 'default').replace(/[^a-z_]/g, '')
+        const category_id = req.query.category_id || null
+        const seller_id = req.query.seller_id || null
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200)
+        const offset = parseInt(req.query.offset) || 0
+
+        // Load strategy config
+        const cfgR = await client.query(`SELECT config FROM ranking_config WHERE strategy = $1`, [strategy])
+        const cfg = cfgR.rows[0]?.config || {}
+        const w_pop     = parseFloat(cfg.w_popularity  ?? 0.45)
+        const w_fresh   = parseFloat(cfg.w_freshness   ?? 0.15)
+        const w_content = parseFloat(cfg.w_content     ?? 0.10)
+        const w_disc    = parseFloat(cfg.w_discount    ?? 0.15)
+        const w_seller  = parseFloat(cfg.w_seller      ?? 0.10)
+        const w_vel     = parseFloat(cfg.w_velocity    ?? 0.05)
+        const hl        = parseFloat(cfg.freshness_halflife_days ?? 30)
+        const expl_k    = parseFloat(cfg.exploration_k ?? 0.25)
+        const urgency_t = parseInt(cfg.urgency_threshold ?? 5)
+        const diversity = parseInt(cfg.diversity_max_consecutive ?? 3)
+
+        // Seller performance index (avg rating across their products)
+        const sellerPerfR = await client.query(`
+          SELECT seller_id,
+            ROUND(AVG(review_avg) / 5.0, 4) AS perf
+          FROM product_ranking_features
+          WHERE review_count > 0
+          GROUP BY seller_id
+        `)
+        const sellerPerf = {}
+        for (const row of sellerPerfR.rows) sellerPerf[row.seller_id] = parseFloat(row.perf)
+
+        // Build conditions
+        const conditions = [`f.product_id IS NOT NULL`]
+        const params = []
+        if (category_id) { params.push(category_id); conditions.push(`f.collection_id = $${params.length}`) }
+        if (seller_id)   { params.push(seller_id);   conditions.push(`f.seller_id = $${params.length}`) }
+        // Strategy-specific filter: sales = must have discount
+        if (strategy === 'sales') conditions.push(`f.discount_pct > 0`)
+
+        const whereClause = conditions.join(' AND ')
+
+        // Compute final score inline with strategy weights + freshness half-life override
+        params.push(hl); const hlIdx = params.length
+        params.push(expl_k); const exklIdx = params.length
+        params.push(urgency_t); const urgIdx = params.length
+
+        const r = await client.query(`
+          SELECT
+            f.product_id,
+            f.seller_id,
+            f.collection_id,
+            f.sales_30d,
+            f.gmv_30d_cents,
+            f.review_avg,
+            f.review_count,
+            f.price_cents,
+            f.discount_pct,
+            f.inventory,
+            f.content_score,
+            f.published_at,
+            f.popularity_score,
+            f.velocity_score,
+            -- Recompute freshness with strategy half-life
+            ROUND(EXP(-0.693 * GREATEST(0, EXTRACT(EPOCH FROM (NOW() - f.published_at)) / 86400) / $${hlIdx})::numeric, 6) AS freshness,
+            -- Exploration bonus: decays exponentially, stronger for newer products
+            ROUND(($${exklIdx} * EXP(-0.693 * GREATEST(0, EXTRACT(EPOCH FROM (NOW() - f.published_at)) / 86400) / ($${hlIdx} * 0.5)))::numeric, 6) AS exploration_bonus,
+            -- Low-stock urgency: tiny boost when near-selling-out
+            CASE WHEN f.inventory > 0 AND f.inventory <= $${urgIdx} THEN 0.03 ELSE 0 END AS urgency_bonus,
+            -- Return penalty
+            CASE WHEN f.sales_30d > 0 THEN LEAST(f.return_count_30d::numeric / f.sales_30d, 0.5) * 0.15 ELSE 0 END AS return_penalty
+          FROM product_ranking_features f
+          JOIN admin_hub_products p ON p.id::text = f.product_id AND p.status = 'published'
+          WHERE ${whereClause}
+        `, params)
+
+        // Score, apply seller performance, then diversity re-rank
+        const rows = r.rows.map((row) => {
+          const sp = sellerPerf[row.seller_id] ?? 0.5
+          const score =
+            w_pop     * parseFloat(row.popularity_score) +
+            w_fresh   * parseFloat(row.freshness) +
+            w_content * parseFloat(row.content_score) +
+            w_disc    * Math.min(parseFloat(row.discount_pct) / 60.0, 1.0) +
+            w_seller  * sp +
+            w_vel     * parseFloat(row.velocity_score) +
+            parseFloat(row.exploration_bonus) +
+            parseFloat(row.urgency_bonus) -
+            parseFloat(row.return_penalty)
+          return { ...row, _score: score }
+        })
+        rows.sort((a, b) => b._score - a._score)
+
+        // Diversity pass: smooth seller tax (not hard cap)
+        const ranked = []
+        const sellerConsec = {}
+        for (const row of rows) {
+          const sid = row.seller_id || '__none__'
+          const consec = sellerConsec[sid] || 0
+          // Apply diversity penalty: each additional consecutive slot from same seller = 15% score reduction
+          const diversityPenalty = Math.max(0, consec - (diversity - 1)) * 0.15
+          ranked.push({ ...row, _final_score: row._score - diversityPenalty })
+          sellerConsec[sid] = consec + 1
+          // Reset other sellers' consecutive count
+          for (const k of Object.keys(sellerConsec)) {
+            if (k !== sid) sellerConsec[k] = 0
+          }
+        }
+        // Re-sort after diversity pass
+        ranked.sort((a, b) => b._final_score - a._final_score)
+
+        const paged = ranked.slice(offset, offset + limit)
+        await client.end()
+        res.json({
+          strategy,
+          total: ranked.length,
+          offset,
+          limit,
+          products: paged.map((r) => ({
+            product_id: r.product_id,
+            seller_id: r.seller_id,
+            score: parseFloat(r._final_score.toFixed(6)),
+          })),
+        })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // GET /admin-hub/v1/ranking/products — ranked list with full breakdown (admin only)
+    const adminRankingProductsGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const strategy = (req.query.strategy || 'default').replace(/[^a-z_]/g, '')
+        const sellerId = req.sellerUser?.seller_id
+        const isSuperuser = req.sellerUser?.is_superuser
+
+        const cfgR = await client.query(`SELECT config FROM ranking_config WHERE strategy = $1`, [strategy])
+        const cfg = cfgR.rows[0]?.config || {}
+        const hl = parseFloat(cfg.freshness_halflife_days ?? 30)
+        const expl_k = parseFloat(cfg.exploration_k ?? 0.25)
+
+        const conditions = ['p.status = \'published\'']
+        const params = [hl, expl_k]
+        if (!isSuperuser && sellerId) { params.push(sellerId); conditions.push(`f.seller_id = $${params.length}`) }
+
+        const r = await client.query(`
+          SELECT
+            f.*,
+            p.title,
+            p.handle,
+            p.status,
+            ROUND(EXP(-0.693 * GREATEST(0, EXTRACT(EPOCH FROM (NOW() - f.published_at)) / 86400) / $1)::numeric, 6) AS freshness_override,
+            ROUND(($2 * EXP(-0.693 * GREATEST(0, EXTRACT(EPOCH FROM (NOW() - f.published_at)) / 86400) / ($1 * 0.5)))::numeric, 6) AS exploration_bonus,
+            CASE WHEN f.inventory > 0 AND f.inventory <= 5 THEN 0.03 ELSE 0 END AS urgency_bonus,
+            CASE WHEN f.sales_30d > 0 THEN LEAST(f.return_count_30d::numeric / f.sales_30d, 0.5) * 0.15 ELSE 0 END AS return_penalty
+          FROM product_ranking_features f
+          JOIN admin_hub_products p ON p.id::text = f.product_id
+          WHERE ${conditions.join(' AND ')}
+          ORDER BY f.final_score DESC
+          LIMIT 500
+        `, params)
+
+        await client.end()
+        res.json({ strategy, config: cfg, products: r.rows })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // GET /admin-hub/v1/ranking/products/:id/breakdown — why is this product at this rank?
+    const adminRankingBreakdownGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const productId = req.params.id
+        const strategy = (req.query.strategy || 'default').replace(/[^a-z_]/g, '')
+
+        const cfgR = await client.query(`SELECT config FROM ranking_config WHERE strategy = $1`, [strategy])
+        const cfg = cfgR.rows[0]?.config || {}
+
+        const r = await client.query(`
+          SELECT f.*, p.title, p.handle
+          FROM product_ranking_features f
+          JOIN admin_hub_products p ON p.id::text = f.product_id
+          WHERE f.product_id = $1
+        `, [productId])
+        if (!r.rows.length) { await client.end(); return res.status(404).json({ message: 'Product not found in ranking features. Compute first.' }) }
+        const f = r.rows[0]
+
+        // Rank position: how many products score higher?
+        const hl = parseFloat(cfg.freshness_halflife_days ?? 30)
+        const expl_k = parseFloat(cfg.exploration_k ?? 0.25)
+        const w_pop = parseFloat(cfg.w_popularity ?? 0.45)
+        const w_fresh = parseFloat(cfg.w_freshness ?? 0.15)
+        const w_content = parseFloat(cfg.w_content ?? 0.10)
+        const w_disc = parseFloat(cfg.w_discount ?? 0.15)
+        const w_seller = parseFloat(cfg.w_seller ?? 0.10)
+        const w_vel = parseFloat(cfg.w_velocity ?? 0.05)
+
+        const daysSince = Math.max(0, (Date.now() - new Date(f.published_at)) / 86400000)
+        const freshness = Math.exp(-0.693 * daysSince / hl)
+        const exploration_bonus = expl_k * Math.exp(-0.693 * daysSince / (hl * 0.5))
+        const urgency_bonus = (f.inventory > 0 && f.inventory <= 5) ? 0.03 : 0
+        const return_penalty = f.sales_30d > 0 ? Math.min(f.return_count_30d / f.sales_30d, 0.5) * 0.15 : 0
+        const discount_score = Math.min(parseFloat(f.discount_pct) / 60.0, 1.0)
+
+        // Seller perf
+        const spR = await client.query(`SELECT ROUND(AVG(review_avg)/5.0,4) AS perf FROM product_ranking_features WHERE seller_id=$1 AND review_count>0`, [f.seller_id])
+        const seller_perf = parseFloat(spR.rows[0]?.perf ?? 0.5)
+
+        const rankR = await client.query(`
+          SELECT COUNT(*)::int AS rank
+          FROM product_ranking_features f2
+          JOIN admin_hub_products p2 ON p2.id::text = f2.product_id AND p2.status = 'published'
+          WHERE f2.final_score > (SELECT final_score FROM product_ranking_features WHERE product_id = $1)
+        `, [productId])
+
+        await client.end()
+        res.json({
+          product_id: productId,
+          title: f.title,
+          strategy,
+          config: cfg,
+          rank_position: (rankR.rows[0]?.rank ?? 0) + 1,
+          signals: {
+            sales_7d: f.sales_7d,
+            sales_30d: f.sales_30d,
+            sales_90d: f.sales_90d,
+            gmv_30d_cents: f.gmv_30d_cents,
+            impressions_30d: f.impressions_30d,
+            clicks_30d: f.clicks_30d,
+            ctr_30d: f.ctr_30d,
+            add_to_cart_30d: f.add_to_cart_30d,
+            review_avg: f.review_avg,
+            review_count: f.review_count,
+            return_count_30d: f.return_count_30d,
+            discount_pct: f.discount_pct,
+            inventory: f.inventory,
+            days_since_published: parseFloat(daysSince.toFixed(1)),
+          },
+          scores: {
+            popularity: parseFloat(f.popularity_score),
+            freshness: parseFloat(freshness.toFixed(6)),
+            content: parseFloat(f.content_score),
+            velocity: parseFloat(f.velocity_score),
+            seller_performance: parseFloat(seller_perf),
+            discount: parseFloat(discount_score.toFixed(4)),
+          },
+          bonuses: {
+            exploration_bonus: parseFloat(exploration_bonus.toFixed(6)),
+            urgency_bonus,
+          },
+          penalties: {
+            return_penalty: parseFloat(return_penalty.toFixed(6)),
+          },
+          weighted_contributions: {
+            popularity: parseFloat((w_pop * parseFloat(f.popularity_score)).toFixed(6)),
+            freshness: parseFloat((w_fresh * freshness).toFixed(6)),
+            content: parseFloat((w_content * parseFloat(f.content_score)).toFixed(6)),
+            discount: parseFloat((w_disc * discount_score).toFixed(6)),
+            seller: parseFloat((w_seller * seller_perf).toFixed(6)),
+            velocity: parseFloat((w_vel * parseFloat(f.velocity_score)).toFixed(6)),
+            exploration_bonus: parseFloat(exploration_bonus.toFixed(6)),
+            urgency_bonus,
+            return_penalty: parseFloat((-return_penalty).toFixed(6)),
+          },
+          final_score: parseFloat(f.final_score),
+        })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // POST /admin-hub/v1/ranking/compute — manual trigger (superuser only)
+    const adminRankingComputePOST = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
+      res.json({ ok: true, message: 'Computation started in background' })
+      computeRankingFeatures().catch((e) => console.error('[Ranking] Manual compute error:', e.message))
+    }
+
+    // GET/PATCH /admin-hub/v1/ranking/config
+    const adminRankingConfigGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const r = await client.query(`SELECT strategy, config, updated_at FROM ranking_config ORDER BY strategy`)
+        await client.end()
+        res.json({ configs: r.rows })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+    const adminRankingConfigPATCH = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const { strategy, config } = req.body || {}
+        if (!strategy || !config) { await client.end(); return res.status(400).json({ message: 'strategy and config required' }) }
+        await client.query(`
+          INSERT INTO ranking_config (strategy, config, updated_at)
+          VALUES ($1, $2::jsonb, NOW())
+          ON CONFLICT (strategy) DO UPDATE SET config = $2::jsonb, updated_at = NOW()
+        `, [strategy, JSON.stringify(config)])
+        await client.end()
+        res.json({ ok: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // POST /store/events — storefront event logging (impression, click, add_to_cart)
+    const storeEventsPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const events = Array.isArray(req.body) ? req.body : [req.body]
+        const allowed = ['impression', 'click', 'add_to_cart']
+        for (const ev of events) {
+          const { event_type, product_id, seller_id, category_id, strategy, session_id, position } = ev || {}
+          if (!event_type || !product_id || !allowed.includes(event_type)) continue
+          await client.query(
+            `INSERT INTO product_events (event_type, product_id, seller_id, category_id, strategy, session_id, position)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [event_type, product_id, seller_id || null, category_id || null, strategy || 'default', session_id || null, position ?? null]
+          )
+        }
+        await client.end()
+        res.json({ ok: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(200).json({ ok: true }) // never fail event logging
+      }
+    }
+
+    // Register ranking routes
+    httpApp.get('/store/products/ranked', storeProductsRankedGET)
+    httpApp.post('/store/events', storeEventsPOST)
+    httpApp.get('/admin-hub/v1/ranking/config', requireSellerAuth, adminRankingConfigGET)
+    httpApp.patch('/admin-hub/v1/ranking/config', requireSellerAuth, adminRankingConfigPATCH)
+    httpApp.get('/admin-hub/v1/ranking/products', requireSellerAuth, adminRankingProductsGET)
+    httpApp.post('/admin-hub/v1/ranking/compute', requireSellerAuth, adminRankingComputePOST)
+    httpApp.get('/admin-hub/v1/ranking/products/:id/breakdown', requireSellerAuth, adminRankingBreakdownGET)
+    console.log('Ranking routes registered: /store/products/ranked, /store/events, /admin-hub/v1/ranking/*')
+
+    // Auto-compute ranking features every 2 hours
+    setTimeout(() => {
+      computeRankingFeatures().catch(() => {})
+      setInterval(() => computeRankingFeatures().catch(() => {}), 2 * 60 * 60 * 1000)
+    }, 30 * 1000) // 30s delay after startup
 
     httpApp.listen(PORT, HOST, () => {
       console.log(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)

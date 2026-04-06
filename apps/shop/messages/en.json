@@ -13,13 +13,16 @@
     "product": "Product",
     "bestsellers": "Bestsellers",
     "sale": "Sale",
-    "recommended": "Recommended"
+    "recommended": "Recommended",
+    "categoryMenuEmpty": "No categories with products",
+    "categoryPendingHint": "{label} — Tap the search icon to open this category."
   },
   "home": {
     "title": "Belucha - Your Marketplace",
     "description": "Discover amazing products from independent sellers",
     "loading": "Loading…",
-    "error": "Products temporarily unavailable."
+    "error": "Products temporarily unavailable.",
+    "categoryBrowseHint": "Only parent categories that contain at least one product are shown in the menu above. Choose a category, then tap the search icon to open its catalog page. Subcategories appear on the left, above the filters."
   },
   "locale": {
     "label": "Language & currency",

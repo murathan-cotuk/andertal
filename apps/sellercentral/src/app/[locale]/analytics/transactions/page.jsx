@@ -14,7 +14,7 @@ const fmt = (cents, currency = "EUR") =>
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
 
-const COMMISSION_RATE = 0.10;
+const COMMISSION_RATE = 0.12;
 
 /** Generate 15-day settlement periods, newest first */
 function generatePeriods(count = 14) {

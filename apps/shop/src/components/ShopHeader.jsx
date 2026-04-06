@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter as useNextRouter } from "next/navigation";
-import { Link, usePathname } from "@/i18n/navigation";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import styled from "styled-components";
 import { motion } from "framer-motion";
@@ -72,8 +72,12 @@ function menuItemHref(item) {
   }
   if (item.link_type === "url" && value) return String(value).startsWith("http") ? value : `/${String(value).replace(/^\//, "")}`;
   if (item.link_type === "product" && value) return `/produkt/${value}`;
-  if (item.link_type === "category" || item.link_type === "collection") {
-    return value ? `/${value}` : "#";
+  if (item.link_type === "category") {
+    const slug = value ? String(value).replace(/^\//, "").trim() : "";
+    return slug ? `/category/${slug}` : "#";
+  }
+  if (item.link_type === "collection") {
+    return value ? `/${String(value).replace(/^\//, "")}` : "#";
   }
   return value ? `/${String(value).replace(/^\//, "")}` : "#";
 }
@@ -104,21 +108,6 @@ function menuItemCategoryId(item) {
   return "";
 }
 
-function productCategoryIds(product) {
-  const out = [];
-  const meta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
-  const push = (value) => {
-    if (value == null) return;
-    const s = String(value).trim();
-    if (s) out.push(s);
-  };
-  push(meta.admin_category_id);
-  push(meta.category_id);
-  if (Array.isArray(meta.category_ids)) meta.category_ids.forEach(push);
-  if (Array.isArray(product?.categories)) product.categories.forEach((c) => push(c?.id));
-  return out;
-}
-
 /** Map category slug → id from /store/categories tree (for menu items that only store slug). */
 function walkCategorySlugMap(nodes, outMap) {
   if (!Array.isArray(nodes)) return;
@@ -146,6 +135,27 @@ function resolveMenuCategoryId(item, slugToCategoryId) {
   if (!slug || !(slugToCategoryId instanceof Map)) return "";
   const id = slugToCategoryId.get(slug.toLowerCase());
   return id ? String(id).trim().toLowerCase() : "";
+}
+
+/** Slug for /category/[slug] from a main-menu item. */
+function resolveMenuCategorySlug(item, slugToCategoryId) {
+  if (!item) return "";
+  const parsed = parseJsonMaybe(item.link_value);
+  if (parsed && typeof parsed === "object") {
+    const s = (parsed.slug || parsed.handle || "").toString().trim();
+    if (s) return s.replace(/^\//, "");
+  }
+  const itemSlug = String(item.slug || "").trim();
+  if (itemSlug) return itemSlug.replace(/^\//, "");
+  const raw = String(item.link_value || "").trim();
+  if (raw && !raw.startsWith("{") && !UUID_REGEX.test(raw)) return raw.replace(/^\//, "");
+  const cid = resolveMenuCategoryId(item, slugToCategoryId);
+  if (cid && slugToCategoryId instanceof Map) {
+    for (const [sl, id] of slugToCategoryId.entries()) {
+      if (String(id).toLowerCase() === cid) return sl;
+    }
+  }
+  return "";
 }
 
 function menuItemDepth(item, idToItem) {
@@ -412,9 +422,14 @@ const CategoriesPanel = styled(motion.div)`
   display: ${(p) => (p.$open ? "block" : "none")};
 `;
 
-const CategoryItem = styled(Link)`
+const CategoryRow = styled.button`
   display: block;
+  width: 100%;
+  text-align: left;
   padding: 8px 14px;
+  border: none;
+  background: none;
+  cursor: pointer;
   text-decoration: none;
   transition: background ${tokens.transition.base}, color ${tokens.transition.base};
   font-family: var(--menu-catalog-ff);
@@ -703,6 +718,7 @@ export default function ShopHeader() {
   const marketParsed =
     parseMarketPath(pathname) || (ctxPrefix ? parseMarketPath(ctxPrefix) : null);
   const nextRouter = useNextRouter();
+  const router = useRouter();
   const [scrollY, setScrollY] = useState(0);
   const [scrollingDown, setScrollingDown] = useState(false);
   const lastScrollYRef = useRef(0);
@@ -715,6 +731,8 @@ export default function ShopHeader() {
   const [secondMenuItems, setSecondMenuItems] = useState([]);
   const [categoryIdsWithProducts, setCategoryIdsWithProducts] = useState(() => new Set());
   const [categorySlugToId, setCategorySlugToId] = useState(() => new Map());
+  const [categoryTree, setCategoryTree] = useState([]);
+  const [pendingBrowseCategory, setPendingBrowseCategory] = useState(null);
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
 
@@ -741,6 +759,7 @@ export default function ShopHeader() {
     setLocaleDropdownOpen(false);
   };
   const tLocale = useTranslations("locale");
+  const tNav = useTranslations("nav");
   const locale = useLocale();
 
   useEffect(() => {
@@ -785,8 +804,10 @@ export default function ShopHeader() {
           client.getCategories({ tree: true, is_visible: true }).catch(() => ({ tree: [] })),
         ]);
         if (cancelled) return;
+        const tree = catRes.tree || [];
+        setCategoryTree(tree);
         const slugMap = new Map();
-        walkCategorySlugMap(catRes.tree || [], slugMap);
+        walkCategorySlugMap(tree, slugMap);
         setCategorySlugToId(slugMap);
         if (!res.ok) {
           setCategoryIdsWithProducts(new Set());
@@ -794,19 +815,20 @@ export default function ShopHeader() {
         }
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
-        const ids = new Set();
+        const leafIds = new Set();
         const products = Array.isArray(data?.products) ? data.products : [];
         products.forEach((p) => {
           productCategoryIds(p).forEach((id) => {
-            const k = String(id).trim().toLowerCase();
-            if (k) ids.add(k);
+            const k = normCatId(id);
+            if (k) leafIds.add(k);
           });
         });
-        setCategoryIdsWithProducts(ids);
+        setCategoryIdsWithProducts(expandCategoryIdsWithAncestors(tree, leafIds));
       } catch {
         if (!cancelled) {
           setCategoryIdsWithProducts(new Set());
           setCategorySlugToId(new Map());
+          setCategoryTree([]);
         }
       }
     };
@@ -836,6 +858,10 @@ export default function ShopHeader() {
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    setPendingBrowseCategory(null);
+  }, [pathname]);
 
   // Track actual header height so the spacer is always accurate
   useEffect(() => {
@@ -875,7 +901,7 @@ export default function ShopHeader() {
     url: "handle",
     image: "thumbnail",
   };
-  /* „Kategorien“: alle Menüzeilen (inkl. Unterkategorien), die auf eine Kategorie zeigen und mindestens ein sichtbares Shop-Produkt haben. */
+  /* Nur Parent-Menüzeilen (Tiefe 0) mit mindestens einem Produkt in dieser Kategorie oder einer Unterkategorie. */
   const mainCategories = useMemo(() => {
     const idToItem = new Map(mainMenuAllItems.map((i) => [String(i.id), i]));
     const ordered = [...mainMenuAllItems].sort(
@@ -884,14 +910,38 @@ export default function ShopHeader() {
     return ordered
       .filter((item) => {
         if (String(item?.link_type || "").toLowerCase() !== "category") return false;
+        if (menuItemDepth(item, idToItem) !== 0) return false;
         const cid = resolveMenuCategoryId(item, categorySlugToId);
         return Boolean(cid && categoryIdsWithProducts.has(cid));
       })
       .map((item) => ({
         ...item,
-        _depth: menuItemDepth(item, idToItem),
+        _depth: 0,
       }));
   }, [mainMenuAllItems, categoryIdsWithProducts, categorySlugToId]);
+
+  /** Fallback wenn das Menü keine Kategorie-Parents enthält: Wurzelkategorien aus der DB mit Produkten. */
+  const browseRootsFromTree = useMemo(() => {
+    if (!Array.isArray(categoryTree) || categoryTree.length === 0 || categoryIdsWithProducts.size === 0) return [];
+    return categoryTree
+      .filter((n) => n && categoryIdsWithProducts.has(normCatId(n.id)))
+      .map((n) => ({
+        key: String(n.id),
+        label: n.name || n.slug || "",
+        slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
+      }))
+      .filter((r) => r.slug)
+      .sort((a, b) => String(a.label).localeCompare(String(b.label), locale));
+  }, [categoryTree, categoryIdsWithProducts, locale]);
+
+  const categoryPanelRows =
+    mainCategories.length > 0
+      ? mainCategories.map((item) => ({
+          key: String(item.id),
+          label: item.label || "",
+          slug: resolveMenuCategorySlug(item, categorySlugToId),
+        }))
+      : browseRootsFromTree.map((r) => ({ key: r.key, label: r.label, slug: r.slug }));
 
   return (
     <>
@@ -913,24 +963,45 @@ export default function ShopHeader() {
                   </svg>
                 </CategoriesButton>
                 <CategoriesPanel $open={mainMenuOpen}>
-                  {mainCategories.length === 0 && (
-                    <div style={{ padding: 12, color: tokens.dark[500], fontSize: 14 }}>Keine Kategorien</div>
+                  {categoryPanelRows.length === 0 && (
+                    <div style={{ padding: 12, color: tokens.dark[500], fontSize: 14 }}>
+                      {tNav("categoryMenuEmpty")}
+                    </div>
                   )}
-                  {mainCategories.map((item) => (
-                    <CategoryItem
-                      key={item.id}
-                      href={menuItemHref(item)}
-                      onClick={() => setMainMenuOpen(false)}
-                      style={{ paddingLeft: 14 + (item._depth || 0) * 16 }}
-                    >
-                      {item.label}
-                    </CategoryItem>
-                  ))}
+                  {pendingBrowseCategory?.slug ? (
+                    <div style={{ padding: "6px 14px 10px", fontSize: 12, color: tokens.dark[600], borderBottom: `1px solid ${tokens.border.light}` }}>
+                      {tNav("categoryPendingHint", { label: pendingBrowseCategory.label })}
+                    </div>
+                  ) : null}
+                  {categoryPanelRows.map((row) =>
+                    row.slug ? (
+                      <CategoryRow
+                        key={row.key}
+                        type="button"
+                        style={{ paddingLeft: 14 }}
+                        onClick={() => {
+                          setPendingBrowseCategory({ slug: row.slug, label: row.label });
+                          setMainMenuOpen(false);
+                        }}
+                      >
+                        {row.label}
+                      </CategoryRow>
+                    ) : null,
+                  )}
                 </CategoriesPanel>
               </CategoriesDropdown>
               <MiddleBarSearch>
                 <SearchBarForm role="search">
-                  <SearchBarButton type="button" aria-label="Suchen">
+                  <SearchBarButton
+                    type="button"
+                    aria-label="Suchen"
+                    onClick={() => {
+                      if (pendingBrowseCategory?.slug) {
+                        router.push(`/category/${pendingBrowseCategory.slug}`);
+                        setPendingBrowseCategory(null);
+                      }
+                    }}
+                  >
                     <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" style={{ minWidth: 20, height: 20 }}>
                       <path d="M17.545 15.467l-3.779-3.779c0.57-0.935 0.898-2.035 0.898-3.21 0-3.417-2.961-6.377-6.378-6.377s-6.186 2.769-6.186 6.186c0 3.416 2.961 6.377 6.377 6.377 1.137 0 2.2-0.309 3.115-0.844l3.799 3.801c0.372 0.371 0.975 0.371 1.346 0l0.943-0.943c0.371-0.371 0.236-0.84-0.135-1.211zM4.004 8.287c0-2.366 1.917-4.283 4.282-4.283s4.474 2.107 4.474 4.474c0 2.365-1.918 4.283-4.283 4.283s-4.473-2.109-4.473-4.474z" />
                     </svg>

@@ -169,7 +169,7 @@ export default function SellerDetailPage({ sellerId }) {
     client.getSellerById(sellerId)
       .then((r) => {
         setSeller(r.seller);
-        setCommissionVal(((r.seller?.commission_rate || 0.1) * 100).toFixed(1));
+        setCommissionVal(((r.seller?.commission_rate || 0.12) * 100).toFixed(1));
         setError(null);
       })
       .catch((e) => setError(e?.message || "Fehler beim Laden"))
@@ -281,7 +281,7 @@ ${s.tax_id ? `USt-IdNr.: ${s.tax_id}` : ""}
 Abrechnungszeitraum: ${fmtDate(payout.period_start)} – ${fmtDate(payout.period_end)}
 
 Gesamtumsatz (Brutto):    ${fmtCents(payout.total_cents)}
-Provision (${((seller.commission_rate || 0.1) * 100).toFixed(1)}%):       ${fmtCents(payout.commission_cents)}
+Provision (${((seller.commission_rate || 0.12) * 100).toFixed(1)}%):       ${fmtCents(payout.commission_cents)}
 ${"─".repeat(40)}
 Auszahlungsbetrag:        ${fmtCents(payout.payout_cents)}
 
@@ -311,10 +311,10 @@ ${"=".repeat(50)}
 
   const status = seller.approval_status || "registered";
   const statusMeta = STATUS_META[status] || { label: status, tone: "info" };
-  const commissionPct = ((parseFloat(seller.commission_rate) || 0.1) * 100).toFixed(1);
+  const commissionPct = ((parseFloat(seller.commission_rate) || 0.12) * 100).toFixed(1);
   const totalRevenue = (seller.monthly_revenue || []).reduce((a, m) => a + m.total_cents, 0);
   const totalOrders = (seller.monthly_revenue || []).reduce((a, m) => a + m.order_count, 0);
-  const commissionTotal = Math.round(totalRevenue * (parseFloat(seller.commission_rate) || 0.1));
+  const commissionTotal = Math.round(totalRevenue * (parseFloat(seller.commission_rate) || 0.12));
   const payoutTotal = totalRevenue - commissionTotal;
 
   const tabs = [
@@ -675,7 +675,7 @@ ${"=".repeat(50)}
             max="100"
             suffix="%"
             autoComplete="off"
-            helpText="Standard: 10%. Gültige Werte: 0–100."
+            helpText="Standard: 12%. Gültige Werte: 0–100."
           />
         </Modal.Section>
       </Modal>

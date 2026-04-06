@@ -30,9 +30,9 @@ export const stripe = new Proxy({}, {
   }
 });
 
-// Calculate commission (10% of order total)
+// Calculate commission (12% of order total)
 export const calculateCommission = (amount) => {
-  return Math.round(amount * 0.1);
+  return Math.round(amount * 0.12);
 };
 
 // Create payout to seller (after commission)

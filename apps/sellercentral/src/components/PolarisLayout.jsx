@@ -125,6 +125,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
         { url: "/analytics/reports", label: t("reports") },
         { url: "/analytics/transactions", label: "Transactions" },
         { url: "/analytics/live-view", label: t("liveView") },
+        { url: "/analytics/ranking", label: "Sıralama Algoritması" },
       ],
     },
     { url: "/import-export", label: t("importExport"), icon: ImportIcon },

@@ -13,13 +13,16 @@
     "product": "Produit",
     "bestsellers": "Meilleures ventes",
     "sale": "Promotions",
-    "recommended": "Recommandés"
+    "recommended": "Recommandés",
+    "categoryMenuEmpty": "Aucune catégorie avec des produits",
+    "categoryPendingHint": "{label} — Appuyez sur l’icône de recherche pour ouvrir cette catégorie."
   },
   "home": {
     "title": "Belucha - Votre marketplace",
     "description": "Découvrez des produits de vendeurs indépendants",
     "loading": "Chargement…",
-    "error": "Produits temporairement indisponibles."
+    "error": "Produits temporairement indisponibles.",
+    "categoryBrowseHint": "Seules les catégories parentes contenant au moins un produit s’affichent dans le menu. Choisissez une catégorie, puis appuyez sur la loupe pour ouvrir le catalogue. Les sous-catégories apparaissent à gauche, au-dessus des filtres."
   },
   "locale": {
     "label": "Langue et devise",

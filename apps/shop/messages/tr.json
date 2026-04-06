@@ -13,13 +13,16 @@
     "product": "Ürün",
     "bestsellers": "Çok Satanlar",
     "sale": "İndirimler",
-    "recommended": "Önerilenler"
+    "recommended": "Önerilenler",
+    "categoryMenuEmpty": "Ürünü olan kategori yok",
+    "categoryPendingHint": "{label} — Bu kategoriyi açmak için büyüteç simgesine dokunun."
   },
   "home": {
     "title": "Belucha - Pazar Yeriniz",
     "description": "Bağımsız satıcılardan ürünler keşfedin",
     "loading": "Yükleniyor…",
-    "error": "Ürünler şu an kullanılamıyor."
+    "error": "Ürünler şu an kullanılamıyor.",
+    "categoryBrowseHint": "Üst menüde yalnızca en az bir ürün içeren üst kategoriler gösterilir. Bir kategori seçin, ardından katalog sayfası için büyütece dokunun. Alt kategoriler solda, filtrelerin üzerinde görünür."
   },
   "locale": {
     "label": "Dil ve para birimi",

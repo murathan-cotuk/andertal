@@ -14,6 +14,7 @@ import {
   filterProductsByFacets,
   applyCatalogSort,
 } from "@/lib/catalog-listing";
+import { productCategoryIds, normCatId } from "@/lib/category-product-ids";
 import LandingContainers from "@/components/landing/LandingContainers";
 
 const HEADER_H = 112;
@@ -541,16 +542,26 @@ export default function CategoryTemplate() {
         } else {
           subs = visibleSubcats(current?.children);
         }
-        setSubcategories(subs);
-
-        const pr = await fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=500`)
+        const pr = await fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`)
           .then((r) => r.json())
           .catch(() => ({ products: [] }));
-        if (!cancelled) setProducts(pr?.products ?? []);
+        if (cancelled) return;
+        setProducts(pr?.products ?? []);
+        const prodCatIds = new Set();
+        (pr?.products || []).forEach((p) => {
+          productCategoryIds(p).forEach((id) => {
+            const k = normCatId(id);
+            if (k) prodCatIds.add(k);
+          });
+        });
+        subs = subs.filter((s) => s && prodCatIds.has(normCatId(s.id)));
+        setSubcategories(subs);
+
       } catch (err) {
         if (!cancelled) {
           setError(err?.message || "Failed to load category");
           setProducts([]);
+          setSubcategories([]);
         }
       } finally {
         if (!cancelled) setLoading(false);

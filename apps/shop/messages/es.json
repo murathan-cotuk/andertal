@@ -13,13 +13,16 @@
     "product": "Producto",
     "bestsellers": "Más vendidos",
     "sale": "Ofertas",
-    "recommended": "Recomendados"
+    "recommended": "Recomendados",
+    "categoryMenuEmpty": "No hay categorías con productos",
+    "categoryPendingHint": "{label} — Pulsa el icono de búsqueda para abrir esta categoría."
   },
   "home": {
     "title": "Belucha - Tu marketplace",
     "description": "Descubre productos de vendedores independientes",
     "loading": "Cargando…",
-    "error": "Productos no disponibles temporalmente."
+    "error": "Productos no disponibles temporalmente.",
+    "categoryBrowseHint": "En el menú superior solo se muestran las categorías principales con al menos un producto. Elige una categoría y pulsa la lupa para abrir su catálogo. Las subcategorías aparecen a la izquierda, encima de los filtros."
   },
   "locale": {
     "label": "Idioma y moneda",

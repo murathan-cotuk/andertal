@@ -18,10 +18,11 @@ function isImage(mime) {
   return !mime || mime.startsWith("image/");
 }
 
-function isOwnMediaItem(item, mySellerId) {
-  const s = String(item?.seller_id || "").trim();
-  if (!s) return true;
-  return s === String(mySellerId || "").trim();
+/** Superuser top section: platform uploads (no seller) or same seller_id as the logged-in account. */
+function isSuperuserPlatformOrSelfItem(item, mySellerId) {
+  const s = item?.seller_id;
+  if (s == null || String(s).trim() === "") return true;
+  return String(s) === String(mySellerId || "").trim();
 }
 
 function sortMediaList(list, sortKey) {
@@ -596,7 +597,10 @@ export default function MediaPage() {
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     {filteredSellerMediaGroups.map(({ sellerId, items }) => {
-                      const label = sellerLabelById[sellerId] || sellerId;
+                      const label =
+                        sellerLabelById[sellerId] ||
+                        (items[0] && items[0].seller_store_name) ||
+                        sellerId;
                       const open = mediaSellerSectionsOpen[sellerId] !== false;
                       const sorted = sortMediaList(items, mediaSort);
                       return (

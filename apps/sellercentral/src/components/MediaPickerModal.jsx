@@ -54,20 +54,18 @@ export default function MediaPickerModal({
   const [selected, setSelected] = useState(new Set()); // Set of resolved URLs
   const [urlInput, setUrlInput] = useState("");
 
-  // Load library when opened
+  // Load library when opened (always refetch so visibility matches current user)
   useEffect(() => {
     if (!open) return;
     setSelected(new Set());
     setUrlInput("");
-    if (library.length === 0) {
-      setLoadingLib(true);
-      client
-        .getMedia({ limit: 1000 })
-        .then((r) => setLibrary(r.media || []))
-        .catch(() => {})
-        .finally(() => setLoadingLib(false));
-    }
-  }, [open]);
+    setLoadingLib(true);
+    client
+      .getMedia({ limit: 1000 })
+      .then((r) => setLibrary(r.media || []))
+      .catch(() => setLibrary([]))
+      .finally(() => setLoadingLib(false));
+  }, [open, client]);
 
   const toggle = (url) => {
     const resolved = resolveUrl(url);

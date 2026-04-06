@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Page, Text, Button, Badge, BlockStack, InlineStack,
   Box, Divider, Spinner, TextField, Tabs,
@@ -39,6 +39,9 @@ function groupByOrder(messages) {
         order_first_name: m.order_first_name,
         order_last_name: m.order_last_name,
         order_email: m.order_email,
+        order_seller_id: m.order_seller_id,
+        seller_store_name: m.seller_store_name,
+        customer_number: m.customer_number,
         messages: [],
       };
     }
@@ -51,6 +54,37 @@ function groupByOrder(messages) {
       const bLast = b.messages[b.messages.length - 1]?.created_at || "";
       return bLast.localeCompare(aLast);
     });
+}
+
+/** Superuser Kunden-Tab: oben Plattform/allgemein (ohne Bestellung oder ohne Verkäufer), darunter nach Verkäufer gruppiert. */
+function partitionSuperuserCustomerThreads(threads, sellerNames) {
+  const platform = [];
+  const bySeller = new Map();
+  const threadLast = (t) => t.messages[t.messages.length - 1]?.created_at || "";
+  for (const t of threads) {
+    const sid =
+      t.order_seller_id != null && String(t.order_seller_id).trim() !== ""
+        ? String(t.order_seller_id)
+        : null;
+    if (!t.order_id || !sid) {
+      platform.push(t);
+    } else {
+      if (!bySeller.has(sid)) bySeller.set(sid, []);
+      bySeller.get(sid).push(t);
+    }
+  }
+  platform.sort((a, b) => threadLast(b).localeCompare(threadLast(a)));
+  const sellerGroups = Array.from(bySeller.entries())
+    .map(([sellerId, ths]) => ({
+      sellerId,
+      label:
+        (ths[0]?.seller_store_name && String(ths[0].seller_store_name).trim()) ||
+        sellerNames[sellerId] ||
+        sellerId,
+      threads: [...ths].sort((a, b) => threadLast(b).localeCompare(threadLast(a))),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  return { platformThreads: platform, sellerGroups };
 }
 
 function groupBySeller(messages) {
@@ -112,7 +146,7 @@ function groupBySupportSubject(messages) {
 
 // ── Customer tab (original inbox) ──────────────────────────────────────────
 
-function CustomerInbox({ client }) {
+function CustomerInbox({ client, isSuperuser, sellerNames }) {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -120,19 +154,34 @@ function CustomerInbox({ client }) {
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
+  const [searchQ, setSearchQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const bottomRef = useRef(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(searchQ.trim()), 320);
+    return () => clearTimeout(t);
+  }, [searchQ]);
+
+  const partitioned = useMemo(() => {
+    if (!isSuperuser) return null;
+    return partitionSuperuserCustomerThreads(threads, sellerNames || {});
+  }, [threads, isSuperuser, sellerNames]);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await client.getMessages();
+      const params = debouncedQ ? { q: debouncedQ } : {};
+      const data = await client.getMessages(params);
       if (!data?.__error) setThreads(groupByOrder(data?.messages || []));
     } finally {
       setLoading(false);
     }
-  }, [client]);
+  }, [client, debouncedQ]);
 
-  useEffect(() => { fetchMessages(); }, [fetchMessages]);
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
 
   useEffect(() => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
@@ -169,7 +218,7 @@ function CustomerInbox({ client }) {
         subject: selected.order_number ? `Re: Bestellung #${selected.order_number}` : "Nachricht",
       });
       setReply("");
-      const data = await client.getMessages();
+      const data = await client.getMessages(debouncedQ ? { q: debouncedQ } : {});
       if (!data?.__error) {
         const updated = groupByOrder(data?.messages || []);
         setThreads(updated);
@@ -186,56 +235,103 @@ function CustomerInbox({ client }) {
   const unreadCount = (thread) =>
     thread.messages.filter((m) => m.sender_type === "customer" && !m.is_read_by_seller).length;
 
+  const renderThreadRow = (thread, keySuffix = "") => {
+    const last = thread.messages[thread.messages.length - 1];
+    const unread = unreadCount(thread);
+    const isActive = selected && (selected.order_id || "__no_order__") === (thread.order_id || "__no_order__");
+    const customerName = [thread.order_first_name, thread.order_last_name].filter(Boolean).join(" ") || thread.order_email || "Kunde";
+    const custNo = thread.customer_number != null ? ` · Kd.Nr. ${thread.customer_number}` : "";
+    return (
+      <div key={`${thread.order_id || "__no_order__"}${keySuffix}`} style={{ borderBottom: "1px solid #e1e3e5" }}>
+        <button
+          type="button"
+          onClick={() => handleSelectThread(thread)}
+          style={{
+            width: "100%", textAlign: "left", padding: "10px 14px",
+            background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
+            borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : "3px solid transparent",
+            borderTop: "none", borderRight: "none", borderBottom: "none",
+            cursor: "pointer", display: "block",
+          }}
+        >
+          <InlineStack align="space-between" blockAlign="start" gap="100">
+            <Text as="span" variant="bodySm" fontWeight="bold">{customerName}</Text>
+            <InlineStack gap="100" blockAlign="center">
+              {unread > 0 && (
+                <span style={{ background: "var(--p-color-bg-fill-critical)", color: "#fff", borderRadius: "50%", fontSize: 10, fontWeight: 800, width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {unread}
+                </span>
+              )}
+              <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at)}</Text>
+            </InlineStack>
+          </InlineStack>
+          <Text as="p" variant="bodySm" tone="subdued">
+            {thread.order_number ? `Bestellung #${thread.order_number}` : "Allgemein"}
+            {custNo}
+          </Text>
+          <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {last?.body?.slice(0, 55) || "—"}
+          </div>
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "280px 1fr 260px", gap: 12, height: "calc(100vh - 220px)", minHeight: 500 }}>
       {/* Thread list */}
       <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-300)", background: "var(--p-color-bg-surface)" }}>
         <Box padding="300" borderBlockEndWidth="025" borderColor="border">
-          <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Konversationen</Text>
+          <BlockStack gap="200">
+            <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Konversationen</Text>
+            <TextField
+              label="Suche"
+              labelHidden
+              placeholder="Bestellnr., Kundennr., Name, E-Mail…"
+              value={searchQ}
+              onChange={setSearchQ}
+              autoComplete="off"
+              clearButton
+              onClearButtonClick={() => setSearchQ("")}
+            />
+            {isSuperuser && (
+              <Text as="p" variant="bodySm" tone="subdued">
+                Oben: Plattform / ohne Verkäufer · Unten: Kundenkontakte pro Verkäufer
+              </Text>
+            )}
+          </BlockStack>
         </Box>
         <div style={{ flex: 1, overflowY: "auto" }}>
           {loading && <Box padding="400"><InlineStack align="center"><Spinner size="small" /></InlineStack></Box>}
           {!loading && threads.length === 0 && (
             <Box padding="400"><Text as="p" variant="bodySm" tone="subdued" alignment="center">Keine Nachrichten</Text></Box>
           )}
-          {threads.map((thread) => {
-            const last = thread.messages[thread.messages.length - 1];
-            const unread = unreadCount(thread);
-            const isActive = selected && (selected.order_id || "__no_order__") === (thread.order_id || "__no_order__");
-            const customerName = [thread.order_first_name, thread.order_last_name].filter(Boolean).join(" ") || thread.order_email || "Kunde";
-            return (
-              <div key={thread.order_id || "__no_order__"} style={{ borderBottom: "1px solid #e1e3e5" }}>
-                <button
-                  onClick={() => handleSelectThread(thread)}
-                  style={{
-                    width: "100%", textAlign: "left", padding: "10px 14px",
-                    background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
-                    borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : "3px solid transparent",
-                    borderTop: "none", borderRight: "none", borderBottom: "none",
-                    cursor: "pointer", display: "block",
-                  }}
-                >
-                  <InlineStack align="space-between" blockAlign="start" gap="100">
-                    <Text as="span" variant="bodySm" fontWeight="bold">{customerName}</Text>
-                    <InlineStack gap="100" blockAlign="center">
-                      {unread > 0 && (
-                        <span style={{ background: "var(--p-color-bg-fill-critical)", color: "#fff", borderRadius: "50%", fontSize: 10, fontWeight: 800, width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          {unread}
-                        </span>
-                      )}
-                      <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at)}</Text>
-                    </InlineStack>
-                  </InlineStack>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {thread.order_number ? `#${thread.order_number}` : "Allgemein"}
-                  </Text>
-                  <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {last?.body?.slice(0, 55) || "—"}
+          {!loading && !isSuperuser && threads.map((thread) => renderThreadRow(thread))}
+          {!loading && isSuperuser && partitioned && (
+            <>
+              {partitioned.platformThreads.length > 0 && (
+                <>
+                  <Box paddingInline="300" paddingBlockStart="200" paddingBlockEnd="100">
+                    <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Plattform / allgemein</Text>
+                  </Box>
+                  {partitioned.platformThreads.map((thread) => renderThreadRow(thread, "-pf"))}
+                </>
+              )}
+              {partitioned.sellerGroups.map((grp) => (
+                <div key={grp.sellerId}>
+                  <div style={{ padding: "12px 14px", background: "var(--p-color-bg-surface-secondary, #f3f4f6)", borderBottom: "1px solid var(--p-color-border)" }}>
+                    <Text as="p" variant="bodySm" fontWeight="bold">
+                      Verkäufer: {grp.label}
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {grp.sellerId}
+                    </Text>
                   </div>
-                </button>
-              </div>
-            );
-          })}
+                  {grp.threads.map((thread) => renderThreadRow(thread, `-${grp.sellerId}`))}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -333,6 +429,14 @@ function CustomerInbox({ client }) {
                   {selected.order_email && (
                     <Text as="p" variant="bodySm" tone="subdued">{selected.order_email}</Text>
                   )}
+                  {selected.customer_number != null && (
+                    <Text as="p" variant="bodySm" tone="subdued">Kundennr. {selected.customer_number}</Text>
+                  )}
+                  {isSuperuser && selected.order_seller_id && (
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Verkäufer: {selected.seller_store_name || sellerNames?.[selected.order_seller_id] || selected.order_seller_id}
+                    </Text>
+                  )}
                 </BlockStack>
                 <Divider />
                 <InlineStack gap="300">
@@ -382,9 +486,20 @@ function CustomerInbox({ client }) {
 // Superusers: sellers (left) → subjects per seller (middle) → messages (right)
 // Regular sellers: subjects (left, by Betreff) → messages (right), like Kunden/orders
 
+function unreadTotalForSellerSupportThread(sellerThread, isSuperuser) {
+  return groupBySupportSubject(sellerThread.messages).reduce((n, st) => {
+    if (isSuperuser) {
+      return n + st.messages.filter((m) => m.sender_type === "customer" && !m.is_read_by_support).length;
+    }
+    return n + st.messages.filter((m) => m.sender_type === "seller" && !m.is_read_by_seller).length;
+  }, 0);
+}
+
 function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUserIds }) {
   const [rawMessages, setRawMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [supportSearchQ, setSupportSearchQ] = useState("");
+  const [supportDebouncedQ, setSupportDebouncedQ] = useState("");
   const [selectedSellerId, setSelectedSellerId] = useState(null);
   /** `null` = none; `""` = legacy / no subject */
   const [selectedSubjectKey, setSelectedSubjectKey] = useState(null);
@@ -415,14 +530,17 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await client.getSupportMessages();
+      const params = supportDebouncedQ ? { q: supportDebouncedQ } : {};
+      const data = await client.getSupportMessages(params);
       if (!data?.__error) setRawMessages(data?.messages || []);
     } finally {
       setLoading(false);
     }
-  }, [client]);
+  }, [client, supportDebouncedQ]);
 
-  useEffect(() => { fetchMessages(); }, [fetchMessages]);
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
 
   useEffect(() => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
@@ -435,9 +553,8 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
     return subThread.messages.filter((m) => m.sender_type === "seller" && !m.is_read_by_seller).length;
   };
 
-  const unreadForSellerThread = (sellerThread) => {
-    return groupBySupportSubject(sellerThread.messages).reduce((n, st) => n + unreadForSubjectThread(st), 0);
-  };
+  const unreadForSellerThread = (sellerThread) =>
+    unreadTotalForSellerSupportThread(sellerThread, isSuperuser);
 
   const getSellerLabel = (seller_id) => {
     if (!seller_id) return "Unbekannt";
@@ -561,7 +678,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
         setNewSubject("");
         setIsNewSubject(false);
       }
-      const data = await client.getSupportMessages();
+      const data = await client.getSupportMessages(supportDebouncedQ ? { q: supportDebouncedQ } : {});
       if (!data?.__error) {
         const msgs = data?.messages || [];
         setRawMessages(msgs);
@@ -588,7 +705,22 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
       {isSuperuser && (
         <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-300)", background: "var(--p-color-bg-surface)" }}>
           <Box padding="300" borderBlockEndWidth="025" borderColor="border">
-            <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Verkäufer</Text>
+            <BlockStack gap="200">
+              <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Verkäufer</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Oben: ungelesene Nachrichten an Sie (Support). Store-Name und ID pro Zeile.
+              </Text>
+              <TextField
+                label="Suche Support"
+                labelHidden
+                placeholder="Verkäufer, Betreff, Nachricht…"
+                value={supportSearchQ}
+                onChange={setSupportSearchQ}
+                autoComplete="off"
+                clearButton
+                onClearButtonClick={() => setSupportSearchQ("")}
+              />
+            </BlockStack>
           </Box>
           <div style={{ flex: 1, overflowY: "auto" }}>
             {loading && <Box padding="400"><InlineStack align="center"><Spinner size="small" /></InlineStack></Box>}
@@ -599,6 +731,9 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
               const last = thread.messages[thread.messages.length - 1];
               const unread = unreadForSellerThread(thread);
               const isActive = selectedSellerThread?.seller_id === thread.seller_id;
+              const rowStore =
+                thread.messages.find((m) => m.seller_store_name && String(m.seller_store_name).trim())?.seller_store_name || null;
+              const title = (rowStore && String(rowStore).trim()) || getSellerLabel(thread.seller_id);
               return (
                 <div key={thread.seller_id || "__unknown__"} style={{ borderBottom: "1px solid #e1e3e5" }}>
                   <button
@@ -607,13 +742,16 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                     style={{
                       width: "100%", textAlign: "left", padding: "10px 14px",
                       background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
-                      borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : "3px solid transparent",
+                      borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : (unread > 0 ? "3px solid #f59e0b" : "3px solid transparent"),
                       borderTop: "none", borderRight: "none", borderBottom: "none",
                       cursor: "pointer", display: "block",
                     }}
                   >
                     <InlineStack align="space-between" blockAlign="start" gap="100">
-                      <Text as="span" variant="bodySm" fontWeight="bold">{getSellerLabel(thread.seller_id)}</Text>
+                      <BlockStack gap="050">
+                        <Text as="span" variant="bodySm" fontWeight="bold">{title}</Text>
+                        <Text as="span" variant="bodySm" tone="subdued">{thread.seller_id || "—"}</Text>
+                      </BlockStack>
                       <InlineStack gap="100" blockAlign="center">
                         {unread > 0 && (
                           <span style={{ background: "var(--p-color-bg-fill-critical)", color: "#fff", borderRadius: "50%", fontSize: 10, fontWeight: 800, minWidth: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: "0 4px" }}>
@@ -637,14 +775,28 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
       {/* Subject column: superuser (per seller) or regular seller */}
       <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-300)", background: "var(--p-color-bg-surface)" }}>
         <Box padding="300" borderBlockEndWidth="025" borderColor="border">
-          <InlineStack align="space-between" blockAlign="center" gap="200">
-            <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Themen</Text>
-            {(!isSuperuser || selectedSellerThread) && (
-              <Button variant="plain" size="slim" onClick={startNewSubject} disabled={isSuperuser && !selectedSellerThread}>
-                + Neu
-              </Button>
+          <BlockStack gap="200">
+            <InlineStack align="space-between" blockAlign="center" gap="200">
+              <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Themen</Text>
+              {(!isSuperuser || selectedSellerThread) && (
+                <Button variant="plain" size="slim" onClick={startNewSubject} disabled={isSuperuser && !selectedSellerThread}>
+                  + Neu
+                </Button>
+              )}
+            </InlineStack>
+            {!isSuperuser && (
+              <TextField
+                label="Suche"
+                labelHidden
+                placeholder="Betreff, Nachricht…"
+                value={supportSearchQ}
+                onChange={setSupportSearchQ}
+                autoComplete="off"
+                clearButton
+                onClearButtonClick={() => setSupportSearchQ("")}
+              />
             )}
-          </InlineStack>
+          </BlockStack>
         </Box>
         <div style={{ flex: 1, overflowY: "auto" }}>
           {isSuperuser && !selectedSellerThread && (
@@ -840,7 +992,9 @@ export default function InboxPage() {
         <Tabs tabs={tabs} selected={activeTab} onSelect={setActiveTab} fitted={false} />
       </div>
       <div style={{ marginTop: 12 }}>
-        {activeTab === 0 && <CustomerInbox client={client} />}
+        {activeTab === 0 && (
+          <CustomerInbox client={client} isSuperuser={isSuperuser} sellerNames={sellerNames} />
+        )}
         {activeTab === 1 && (
           <SupportInbox
             client={client}

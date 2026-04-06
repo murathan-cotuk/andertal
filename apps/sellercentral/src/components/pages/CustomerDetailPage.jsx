@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Modal, BlockStack, TextField, Text, Button, InlineStack } from "@shopify/polaris";
 import { EditIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { CustomerFormModal } from "@/components/CustomerFormModal";
 
 function fmtCents(c) {
   return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
@@ -298,6 +299,7 @@ export default function CustomerDetailPage() {
   const [ledgerEdit, setLedgerEdit] = useState(null);
   const [returnsMap, setReturnsMap] = useState({});
   const [reviews, setReviews] = useState([]);
+  const [editCustomerModal, setEditCustomerModal] = useState(false);
 
   const loadCustomer = async () => {
     try {
@@ -422,19 +424,32 @@ export default function CustomerDetailPage() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1320, margin: "0 auto", boxSizing: "border-box" }}>
-      {showDiscountModal && (
+      {isSuperuser && showDiscountModal && (
         <DiscountModal
           customerId={id}
           onClose={() => setShowDiscountModal(false)}
           onAdded={() => { loadCustomer(); }}
         />
       )}
-      <BonusLedgerAddModal
-        open={showBonusLedgerModal}
-        onClose={() => setShowBonusLedgerModal(false)}
-        customerId={id}
-        onAdded={handleBonusLedgerAdded}
-      />
+      {isSuperuser && (
+        <BonusLedgerAddModal
+          open={showBonusLedgerModal}
+          onClose={() => setShowBonusLedgerModal(false)}
+          customerId={id}
+          onAdded={handleBonusLedgerAdded}
+        />
+      )}
+      {isSuperuser && editCustomerModal && customer && (
+        <CustomerFormModal
+          initial={customer}
+          onClose={() => setEditCustomerModal(false)}
+          onSave={async (form) => {
+            const client = getMedusaAdminClient();
+            await client.updateCustomer(id, form);
+            await loadCustomer();
+          }}
+        />
+      )}
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
@@ -465,9 +480,10 @@ export default function CustomerDetailPage() {
             </div>
           )}
         </div>
-        {customer && (
+        {customer && isSuperuser && (
           <button
-            onClick={() => router.push(`/${locale}/customers/${id}/edit`)}
+            type="button"
+            onClick={() => setEditCustomerModal(true)}
             style={{ padding: "7px 16px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff", flexShrink: 0 }}
           >
             Bearbeiten
@@ -487,12 +503,12 @@ export default function CustomerDetailPage() {
           {/* LEFT COLUMN */}
           <div>
             {/* Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isSuperuser ? "repeat(4, 1fr)" : "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
               {[
                 { label: "Gesamtumsatz", value: fmtCents(totalSpent), icon: "💰" },
                 { label: "Bestellungen", value: orders.length, icon: "📦" },
                 { label: "Ø Bestellwert", value: fmtCents(avgOrder), icon: "📊" },
-                { label: "Bonuspunkte", value: customer.bonus_points || 0, icon: "⭐", editable: true, onEdit: () => { setBonusVal(String(customer.bonus_points || 0)); setEditBonus(true); } },
+                ...(isSuperuser ? [{ label: "Bonuspunkte", value: customer.bonus_points ?? 0, icon: "⭐", editable: true, onEdit: () => { setBonusVal(String(customer.bonus_points || 0)); setEditBonus(true); } }] : []),
               ].map((s, i) => (
                 <div key={i} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
@@ -640,7 +656,11 @@ export default function CustomerDetailPage() {
                             {d.expires_at ? fmtDateShort(d.expires_at) : "—"}
                           </td>
                           <td style={{ padding: "8px 0", textAlign: "right" }}>
-                            <button onClick={() => handleDeleteDiscount(d.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 12 }}>Löschen</button>
+                            {isSuperuser ? (
+                              <button type="button" onClick={() => handleDeleteDiscount(d.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 12 }}>Löschen</button>
+                            ) : (
+                              <span style={{ color: "#9ca3af", fontSize: 12 }}>—</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -653,13 +673,13 @@ export default function CustomerDetailPage() {
             {/* Notes */}
             <Card
               title="Notizen"
-              action={!editNotes && (
+              action={isSuperuser && !editNotes && (
                 <Button size="slim" onClick={() => setEditNotes(true)}>
                   Bearbeiten
                 </Button>
               )}
             >
-              {editNotes ? (
+              {isSuperuser && editNotes ? (
                 <div style={{ paddingTop: 8 }}>
                   <textarea
                     value={notesVal}
@@ -684,7 +704,8 @@ export default function CustomerDetailPage() {
               )}
             </Card>
 
-            {/* Bonus ledger */}
+            {/* Bonus ledger (superuser only) */}
+            {isSuperuser && (
             <Card
               title="Bonuspunkte — Verlauf"
               action={
@@ -778,6 +799,8 @@ export default function CustomerDetailPage() {
                 </div>
               )}
             </Card>
+            )}
+
           </div>
 
           {/* RIGHT COLUMN */}

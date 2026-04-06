@@ -855,6 +855,24 @@ class MedusaAdminClient {
     if (subject_thread !== undefined) payload.subject_thread = subject_thread;
     return this.request('/admin-hub/v1/messages/support/mark-read', { method: 'PATCH', body: JSON.stringify(payload) })
   }
+  // ── Ranking ──────────────────────────────────────────────────────────────
+  async getRankingConfig() {
+    return this.request('/admin-hub/v1/ranking/config')
+  }
+  async updateRankingConfig(strategy, config) {
+    return this.request('/admin-hub/v1/ranking/config', { method: 'PATCH', body: JSON.stringify({ strategy, config }) })
+  }
+  async getRankingProducts(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/ranking/products${qs}`)
+  }
+  async getRankingBreakdown(productId, strategy = 'default') {
+    return this.request(`/admin-hub/v1/ranking/products/${productId}/breakdown?strategy=${strategy}`)
+  }
+  async triggerRankingCompute() {
+    return this.request('/admin-hub/v1/ranking/compute', { method: 'POST' })
+  }
+  // ─────────────────────────────────────────────────────────────────────────
   async getSmtpSettings() {
     return this.request('/admin-hub/v1/smtp-settings')
   }
