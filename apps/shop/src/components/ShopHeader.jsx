@@ -4,7 +4,7 @@
  * Navbar — At top: full header. Scroll down: header hides completely. Scroll up: header shows.
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter as useNextRouter } from "next/navigation";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -17,7 +17,6 @@ import DropdownSearch from "@/components/DropdownSearch";
 import TopBar from "@/components/TopBar";
 import { tokens } from "@/design-system/tokens";
 import { routing } from "@/i18n/routing";
-import { resolveImageUrl } from "@/lib/image-url";
 import {
   parseMarketPath,
   marketPrefix,
@@ -29,6 +28,7 @@ import {
   isValidCurrency,
 } from "@/lib/shop-market";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { useLandingChrome } from "@/context/LandingChromeContext";
 import { getShippableCountries } from "@/lib/countries";
 
 const SCROLL_THRESHOLD = 60;
@@ -78,12 +78,53 @@ function menuItemHref(item) {
   return value ? `/${String(value).replace(/^\//, "")}` : "#";
 }
 
+function parseJsonMaybe(value) {
+  if (!value || typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text.startsWith("{") && !text.startsWith("[")) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function menuItemCategoryId(item) {
+  if (!item) return "";
+  if (item.category_id != null && String(item.category_id).trim()) {
+    return String(item.category_id).trim();
+  }
+  const parsed = parseJsonMaybe(item.link_value);
+  if (parsed && typeof parsed === "object") {
+    const fromJson = parsed.id ?? parsed.category_id ?? parsed.categoryId;
+    if (fromJson != null && String(fromJson).trim()) return String(fromJson).trim();
+  }
+  const raw = String(item.link_value || "").trim();
+  if (UUID_REGEX.test(raw)) return raw;
+  return "";
+}
+
+function productCategoryIds(product) {
+  const out = [];
+  const meta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
+  const push = (value) => {
+    if (value == null) return;
+    const s = String(value).trim();
+    if (s) out.push(s);
+  };
+  push(meta.admin_category_id);
+  push(meta.category_id);
+  if (Array.isArray(meta.category_ids)) meta.category_ids.forEach(push);
+  if (Array.isArray(product?.categories)) product.categories.forEach((c) => push(c?.id));
+  return out;
+}
+
 const HeaderWrap = styled.header`
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 1000;
+  z-index: 2147483600;
   background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -345,22 +386,6 @@ const CategoryItem = styled(Link)`
   &:hover {
     background: ${tokens.background.soft};
     color: var(--shop-primary, ${tokens.primary.DEFAULT});
-  }
-`;
-
-const CategoryItemBanner = styled.div`
-  width: 100%;
-  height: 48px;
-  margin: -6px -14px 6px -14px;
-  padding: 0;
-  overflow: hidden;
-  border-radius: 12px 12px 0 0;
-  background: transparent;
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
   }
 `;
 
@@ -630,6 +655,7 @@ const SHOP_CCY_LABELS = {
 };
 
 export default function ShopHeader() {
+  const { showHeaderFilterBar } = useLandingChrome();
   const ctxPrefix = useMarketPrefix();
   const pathname = usePathname() || "/";
   const marketParsed =
@@ -645,6 +671,7 @@ export default function ShopHeader() {
   const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
   const [mainMenuItems, setMainMenuItems] = useState([]);
   const [secondMenuItems, setSecondMenuItems] = useState([]);
+  const [categoryIdsWithProducts, setCategoryIdsWithProducts] = useState(() => new Set());
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
 
@@ -706,6 +733,30 @@ export default function ShopHeader() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadCategoryIdsWithProducts = async () => {
+      try {
+        const res = await fetch("/api/store-products?limit=500", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        const ids = new Set();
+        const products = Array.isArray(data?.products) ? data.products : [];
+        products.forEach((p) => {
+          productCategoryIds(p).forEach((id) => ids.add(id));
+        });
+        setCategoryIdsWithProducts(ids);
+      } catch {
+        if (!cancelled) setCategoryIdsWithProducts(new Set());
+      }
+    };
+    loadCategoryIdsWithProducts();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     let ticking = false;
     const handleScroll = () => {
       if (ticking) return;
@@ -764,6 +815,14 @@ export default function ShopHeader() {
     url: "handle",
     image: "thumbnail",
   };
+  /* Burger „Kategorien“: nur sichtbare Kategorien mit mindestens einem freigegebenen Shop-Produkt (admin_category_id). */
+  const mainCategories = useMemo(() => {
+    return mainMenuItems.filter((item) => {
+      if (String(item?.link_type || "").toLowerCase() !== "category") return false;
+      const cid = menuItemCategoryId(item);
+      return Boolean(cid && categoryIdsWithProducts.has(cid));
+    });
+  }, [mainMenuItems, categoryIdsWithProducts]);
 
   return (
     <>
@@ -778,9 +837,6 @@ export default function ShopHeader() {
             </MiddleBarLeft>
 
             <MiddleBarCenter>
-              {/*
-                Geçici: Arama solundaki Kategorien-Hamburger menü.
-                Tekrar açmak için bu yorum bloğunu kaldırın.
               <CategoriesDropdown data-categories-dropdown>
                 <CategoriesButton type="button" onClick={() => { setLocaleDropdownOpen(false); setUserMenuOpen(false); setMainMenuOpen((v) => !v); }} aria-expanded={mainMenuOpen} aria-label="Kategorien">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -788,22 +844,16 @@ export default function ShopHeader() {
                   </svg>
                 </CategoriesButton>
                 <CategoriesPanel $open={mainMenuOpen}>
-                  {mainMenuItems.length === 0 && (
+                  {mainCategories.length === 0 && (
                     <div style={{ padding: 12, color: tokens.dark[500], fontSize: 14 }}>Keine Kategorien</div>
                   )}
-                  {mainMenuItems.map((item) => (
+                  {mainCategories.map((item) => (
                     <CategoryItem key={item.id} href={menuItemHref(item)} onClick={() => setMainMenuOpen(false)}>
-                      {item.banner_url && (
-                        <CategoryItemBanner>
-                          <img src={resolveImageUrl(item.banner_url)} alt="" />
-                        </CategoryItemBanner>
-                      )}
                       {item.label}
                     </CategoryItem>
                   ))}
                 </CategoriesPanel>
               </CategoriesDropdown>
-              */}
               <MiddleBarSearch>
                 <SearchBarForm role="search">
                   <SearchBarButton type="button" aria-label="Suchen">
@@ -954,7 +1004,7 @@ export default function ShopHeader() {
             </MiddleBarRight>
           </MiddleBarInner>
         </MiddleBarWrap>
-        <SubNavWrap id="subnav" className="second-nav" $hide={!showSubNav}>
+        <SubNavWrap id="subnav" className="second-nav" $hide={!showSubNav || !showHeaderFilterBar}>
           <SecondMenuRowInner>
             {secondMenuItems.map((item) => (
               <SecondLink key={item.id} href={menuItemHref(item)}>{item.label}</SecondLink>

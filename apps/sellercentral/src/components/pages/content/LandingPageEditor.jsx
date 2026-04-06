@@ -16,6 +16,8 @@ import {
   Select,
   Badge,
   Divider,
+  Tabs as PolarisTabs,
+  Checkbox,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
@@ -106,6 +108,35 @@ const CONTAINER_TYPES = [
   { type: "blog_carousel",      label: "Blog-Beiträge (Karussell)", description: "Veröffentlichte Blog-Seiten aus „Content → Blog-Beiträge“ auswählen (Bild, Teaser, Text & SEO kommen aus dem Beitrag)" },
   { type: "newsletter",         label: "Newsletter-Anmeldung",  description: "Formular (Mailchimp, Brevo, Klaviyo u. a.) per action-URL" },
 ];
+
+const CAT_HEADING = "__heading_categories__";
+const PAGE_HEADING = "__heading_cms_pages__";
+
+function flattenCategoriesForSelect(nodes, depth = 0, acc = []) {
+  if (!Array.isArray(nodes)) return acc;
+  for (const n of nodes) {
+    if (!n?.id) continue;
+    const pad = depth > 0 ? `${"\u00A0\u00A0".repeat(depth)}\u2022 ` : "";
+    acc.push({
+      label: `${pad}${n.name || n.slug || n.id}`,
+      value: `cat:${n.id}`,
+    });
+    if (Array.isArray(n.children) && n.children.length) {
+      flattenCategoriesForSelect(n.children, depth + 1, acc);
+    }
+  }
+  return acc;
+}
+
+/** Normalisiert gespeicherte Landing-Settings inkl. Shop-Subnav / Filterleiste. */
+function normalizeLandingPageSettings(raw) {
+  const s = raw && typeof raw === "object" ? raw : {};
+  return {
+    ...s,
+    show_submenu_left: s.show_submenu_left === true,
+    show_filter_bar: s.show_filter_bar !== false,
+  };
+}
 
 function newContainer(type) {
   const id = Math.random().toString(36).slice(2);
@@ -1249,11 +1280,13 @@ function ContainerEditor({ container, onChange }) {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+const DEFAULT_PAGE_ID = "__default__"; // shop homepage (legacy single-row table)
+
 export default function LandingPageEditor() {
   const client = getMedusaAdminClient();
   const unsaved = useUnsavedChanges();
   const [pages, setPages] = useState([]);
-  const [selectedPageId, setSelectedPageId] = useState("");
+  const [selectedPageId, setSelectedPageId] = useState(DEFAULT_PAGE_ID);
   const [containers, setContainers] = useState([]);
   const [isDirty, setIsDirty] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1262,20 +1295,25 @@ export default function LandingPageEditor() {
   const [err, setErr] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
-
-  const DEFAULT_PAGE_ID = "__default__"; // shop ana sayfası — eski tek-satır tablo
+  const [activeTab, setActiveTab] = useState(0);
+  const [categoryRows, setCategoryRows] = useState([]);
+  const [categorySettings, setCategorySettings] = useState({ show_submenu_left: false });
 
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
-    fetch(`${backendUrl}/admin-hub/v1/pages`)
-      .then((r) => r.json())
-      .then((r) => {
+    Promise.all([
+      fetch(`${backendUrl}/admin-hub/v1/pages`).then((r) => r.json()).catch(() => ({ pages: [] })),
+      client.getAdminHubCategories({ all: true }).catch(() => ({ categories: [] })),
+    ])
+      .then(([r, catRes]) => {
         const list = Array.isArray(r?.pages) ? r.pages : [];
         setPages(list);
-        setSelectedPageId(DEFAULT_PAGE_ID); // Varsayılan: ana sayfa
+        const tree = catRes?.tree || catRes?.categories || [];
+        const flat = flattenCategoriesForSelect(Array.isArray(tree) ? tree : []);
+        setCategoryRows(flat);
       })
       .catch((e) => setErr("Sayfalar yüklenemedi: " + (e?.message || "Bağlantı hatası")));
-  }, []);
+  }, [client]);
 
   const loadContainers = useCallback(async (pageId) => {
     if (!pageId) return;
@@ -1285,12 +1323,19 @@ export default function LandingPageEditor() {
       let data;
       if (pageId === DEFAULT_PAGE_ID) {
         data = await client.request("/admin-hub/landing-page");
+        setCategorySettings(normalizeLandingPageSettings(data?.settings));
+      } else if (String(pageId).startsWith("cat:")) {
+        const cid = String(pageId).slice(4);
+        data = await client.getLandingPageCategoryContainers(cid);
+        setCategorySettings(normalizeLandingPageSettings(data?.settings));
       } else {
         data = await client.getLandingPageContainers(pageId);
+        setCategorySettings(normalizeLandingPageSettings(data?.settings));
       }
       setContainers(Array.isArray(data?.containers) ? data.containers : []);
     } catch (_) {
       setContainers([]);
+      setCategorySettings({ show_submenu_left: false, show_filter_bar: true });
     }
     setLoading(false);
   }, [client]);
@@ -1309,10 +1354,13 @@ export default function LandingPageEditor() {
       if (selectedPageId === DEFAULT_PAGE_ID) {
         await client.request("/admin-hub/landing-page", {
           method: "PUT",
-          body: JSON.stringify({ containers }),
+          body: JSON.stringify({ containers, settings: categorySettings }),
         });
+      } else if (String(selectedPageId).startsWith("cat:")) {
+        const cid = String(selectedPageId).slice(4);
+        await client.saveLandingPageCategoryContainers(cid, { containers, settings: categorySettings });
       } else {
-        await client.saveLandingPageContainers(selectedPageId, containers);
+        await client.saveLandingPageContainers(selectedPageId, { containers, settings: categorySettings });
       }
       setSaved(true);
       setIsDirty(false);
@@ -1321,7 +1369,7 @@ export default function LandingPageEditor() {
       setErr(e?.message || "Fehler beim Speichern");
     }
     setSaving(false);
-  }, [selectedPageId, containers, client]);
+  }, [selectedPageId, containers, categorySettings, client]);
 
   const handleDiscard = useCallback(async () => {
     setIsDirty(false);
@@ -1369,9 +1417,19 @@ export default function LandingPageEditor() {
 
   const typeInfo = (type) => CONTAINER_TYPES.find((t) => t.type === type) || { label: type };
   const pageOptions = [
-    { label: "— Sayfa seç —", value: "" },
-    { label: "Ana Sayfa (Shop Anasayfa)", value: "__default__" },
-    ...pages.map((p) => ({ label: `${p.title || "Sayfa"} (/${p.slug || p.id})`, value: String(p.id) })),
+    { label: "— Auswählen —", value: "" },
+    { label: "Startseite (Shop)", value: "__default__" },
+    { label: "—— Kategorien ——", value: CAT_HEADING, disabled: true },
+    ...(categoryRows.length
+      ? categoryRows
+      : [{ label: "(Keine Kategorien)", value: "__no_cat__", disabled: true }]),
+    { label: "—— CMS-Seiten ——", value: PAGE_HEADING, disabled: true },
+    ...pages.map((p) => ({ label: `${p.title || "Seite"} (/${p.slug || p.id})`, value: String(p.id) })),
+  ];
+  const isCategorySelection = String(selectedPageId).startsWith("cat:");
+  const editorTabs = [
+    { id: "containers", content: "Container" },
+    { id: "category", content: "Kategorie" },
   ];
 
   return (
@@ -1391,74 +1449,126 @@ export default function LandingPageEditor() {
                 Wähle eine Seite aus, für die du die Inhalte gestalten möchtest.{" "}
                 <a href="/content/pages" style={{ color: "var(--p-color-text-emphasis)" }}>Seiten verwalten →</a>
               </Text>
-              <Select label="Seite" labelHidden options={pageOptions} value={selectedPageId} onChange={(v) => { setSelectedPageId(v); setExpandedId(null); }} />
+              <Select
+                label="Seite"
+                labelHidden
+                options={pageOptions}
+                value={selectedPageId}
+                onChange={(v) => {
+                  if (!v || v === CAT_HEADING || v === PAGE_HEADING || v === "__no_cat__") return;
+                  setSelectedPageId(v);
+                  setExpandedId(null);
+                  setActiveTab(0);
+                }}
+              />
             </BlockStack>
           </Card>
         </Layout.Section>
 
         {selectedPageId && (
           <Layout.Section>
-            {loading ? (
-              <Card><Box paddingBlock="600"><Text as="p" tone="subdued" alignment="center">Laden…</Text></Box></Card>
-            ) : (
-              <BlockStack gap="400">
-                {containers.length === 0 && (
-                  <Card>
-                    <Box paddingBlock="800">
-                      <BlockStack gap="300" align="center">
-                        <Text as="p" variant="bodyLg" tone="subdued" alignment="center">Noch keine Container</Text>
-                        <InlineStack align="center">
-                          <Button variant="primary" onClick={() => setAddModalOpen(true)}>Container hinzufügen</Button>
-                        </InlineStack>
-                      </BlockStack>
-                    </Box>
-                  </Card>
-                )}
+            <Card>
+              <PolarisTabs tabs={editorTabs} selected={activeTab} onSelect={setActiveTab}>
+                <Box paddingBlockStart="400">
+                  {activeTab === 1 && (
+                    <BlockStack gap="400">
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Für jede Auswahl unter „Seite auswählen“ (Startseite, CMS-Seiten, Kategorien) können Sie steuern, ob auf der zugehörigen <strong>Kollektionsseite</strong> (mit gleicher verknüpfter Kategorie) links die Unterkategorien erscheinen. Nur wenn das Kästchen <strong>aktiv</strong> ist, wird die Navigation angezeigt.
+                      </Text>
+                      <Checkbox
+                        label="Unterkategorien links anzeigen"
+                        helpText={
+                          isCategorySelection
+                            ? "Gilt für die Kollektionsseite dieser Kategorie (wenn Unterkategorien existieren)."
+                            : "Wert wird für diese Seite gespeichert. Im Shop wirkt die Anzeige auf Kollektionsseiten über die Einstellung der jeweiligen Kategorie — wählen Sie dazu oben unter „Kategorien“ dieselbe Kategorie und aktivieren Sie dort dieses Kästchen."
+                        }
+                        checked={categorySettings.show_submenu_left === true}
+                        onChange={(checked) => {
+                          setCategorySettings((prev) => ({ ...prev, show_submenu_left: checked }));
+                          setIsDirty(true);
+                        }}
+                      />
+                      <Checkbox
+                        label="Filterleiste im Shop anzeigen (zweite Navigationszeile)"
+                        helpText="Die horizontale Menüzeile direkt unter der Hauptnavigation (Subnav). Gilt auf allen Shop-Seiten, die diese Landing Page laden (Startseite, zugehörige CMS-Seite oder Kategorie). Wenn deaktiviert, wird sie dort ausgeblendet."
+                        checked={categorySettings.show_filter_bar !== false}
+                        onChange={(checked) => {
+                          setCategorySettings((prev) => ({ ...prev, show_filter_bar: checked }));
+                          setIsDirty(true);
+                        }}
+                      />
+                    </BlockStack>
+                  )}
 
-                {containers.map((c, idx) => {
-                  const info = typeInfo(c.type);
-                  const isExpanded = expandedId === c.id;
-                  return (
-                    <Card key={c.id}>
-                      <BlockStack gap="0">
-                        <Box paddingBlockEnd={isExpanded ? "400" : "0"}>
-                          <InlineStack align="space-between" blockAlign="center" gap="300">
-                            <InlineStack gap="300" blockAlign="center">
-                              <Text as="h3" variant="headingSm">{info.label}</Text>
-                              <Badge tone={c.visible ? "success" : undefined}>{c.visible ? "Sichtbar" : "Versteckt"}</Badge>
-                              <Text as="span" variant="bodySm" tone="subdued">#{idx + 1}</Text>
-                            </InlineStack>
-                            <InlineStack gap="200" blockAlign="center">
-                              <Button size="slim" onClick={() => { updateContainer(c.id, { ...c, visible: !c.visible }); }}>{c.visible ? "Verstecken" : "Einblenden"}</Button>
-                              <Button size="slim" disabled={idx === 0} onClick={() => moveContainer(c.id, -1)}>↑</Button>
-                              <Button size="slim" disabled={idx === containers.length - 1} onClick={() => moveContainer(c.id, 1)}>↓</Button>
-                              <Button size="slim" tone="critical" onClick={() => { if (confirm("Container entfernen?")) removeContainer(c.id); }}>Entfernen</Button>
-                              <Button size="slim" variant={isExpanded ? "primary" : "secondary"} onClick={() => setExpandedId(isExpanded ? null : c.id)}>
-                                {isExpanded ? "Einklappen" : "Bearbeiten"}
-                              </Button>
-                            </InlineStack>
-                          </InlineStack>
-                        </Box>
-                        {isExpanded && (
-                          <>
-                            <Divider />
-                            <Box paddingBlockStart="400">
-                              <ContainerEditor container={c} onChange={(updated) => updateContainer(c.id, updated)} />
+                  {activeTab === 0 && (
+                    <>
+                      {loading ? (
+                        <Box paddingBlock="600"><Text as="p" tone="subdued" alignment="center">Laden…</Text></Box>
+                      ) : (
+                        <BlockStack gap="400">
+                          {isCategorySelection && (
+                            <Banner tone="success">Container gelten für diese Kategorie auf der zugehörigen Kollektionsseite im Shop (über dem Katalog).</Banner>
+                          )}
+                          {containers.length === 0 && (
+                            <Box paddingBlock="600">
+                              <BlockStack gap="300" align="center">
+                                <Text as="p" variant="bodyLg" tone="subdued" alignment="center">Noch keine Container</Text>
+                                <InlineStack align="center">
+                                  <Button variant="primary" onClick={() => setAddModalOpen(true)}>Container hinzufügen</Button>
+                                </InlineStack>
+                              </BlockStack>
                             </Box>
-                          </>
-                        )}
-                      </BlockStack>
-                    </Card>
-                  );
-                })}
+                          )}
 
-                {containers.length > 0 && (
-                  <InlineStack>
-                    <Button onClick={() => setAddModalOpen(true)}>+ Container hinzufügen</Button>
-                  </InlineStack>
-                )}
-              </BlockStack>
-            )}
+                          {containers.map((c, idx) => {
+                            const info = typeInfo(c.type);
+                            const isExpanded = expandedId === c.id;
+                            return (
+                              <Card key={c.id}>
+                                <BlockStack gap="0">
+                                  <Box paddingBlockEnd={isExpanded ? "400" : "0"}>
+                                    <InlineStack align="space-between" blockAlign="center" gap="300">
+                                      <InlineStack gap="300" blockAlign="center">
+                                        <Text as="h3" variant="headingSm">{info.label}</Text>
+                                        <Badge tone={c.visible ? "success" : undefined}>{c.visible ? "Sichtbar" : "Versteckt"}</Badge>
+                                        <Text as="span" variant="bodySm" tone="subdued">#{idx + 1}</Text>
+                                      </InlineStack>
+                                      <InlineStack gap="200" blockAlign="center">
+                                        <Button size="slim" onClick={() => { updateContainer(c.id, { ...c, visible: !c.visible }); }}>{c.visible ? "Verstecken" : "Einblenden"}</Button>
+                                        <Button size="slim" disabled={idx === 0} onClick={() => moveContainer(c.id, -1)}>↑</Button>
+                                        <Button size="slim" disabled={idx === containers.length - 1} onClick={() => moveContainer(c.id, 1)}>↓</Button>
+                                        <Button size="slim" tone="critical" onClick={() => { if (confirm("Container entfernen?")) removeContainer(c.id); }}>Entfernen</Button>
+                                        <Button size="slim" variant={isExpanded ? "primary" : "secondary"} onClick={() => setExpandedId(isExpanded ? null : c.id)}>
+                                          {isExpanded ? "Einklappen" : "Bearbeiten"}
+                                        </Button>
+                                      </InlineStack>
+                                    </InlineStack>
+                                  </Box>
+                                  {isExpanded && (
+                                    <>
+                                      <Divider />
+                                      <Box paddingBlockStart="400">
+                                        <ContainerEditor container={c} onChange={(updated) => updateContainer(c.id, updated)} />
+                                      </Box>
+                                    </>
+                                  )}
+                                </BlockStack>
+                              </Card>
+                            );
+                          })}
+
+                          {containers.length > 0 && (
+                            <InlineStack>
+                              <Button onClick={() => setAddModalOpen(true)}>+ Container hinzufügen</Button>
+                            </InlineStack>
+                          )}
+                        </BlockStack>
+                      )}
+                    </>
+                  )}
+                </Box>
+              </PolarisTabs>
+            </Card>
           </Layout.Section>
         )}
 

@@ -12,7 +12,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 const fmt = (cents, currency = "EUR") =>
   ((cents || 0) / 100).toLocaleString("de-DE", { style: "currency", currency });
 
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("de-DE") : "—";
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
 
 const COMMISSION_RATE = 0.10;
 

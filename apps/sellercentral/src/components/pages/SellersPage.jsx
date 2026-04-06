@@ -24,7 +24,7 @@ function fmtCents(c) {
 
 function fmtDate(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE");
+  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 /** API / DB may return boolean or string */

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button, InlineStack } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
@@ -33,6 +33,12 @@ function getVatInfo(country) {
   if (!country) return { rate: 19, label: "MwSt." };
   const c = String(country).toUpperCase().trim().slice(0, 2);
   return COUNTRY_VAT[c] || { rate: 19, label: "MwSt." };
+}
+
+function isOwnSellerOrder(order, mySellerId) {
+  const s = String(order?.seller_id ?? "default").trim();
+  if (!s || s === "default") return true;
+  return s === String(mySellerId || "").trim();
 }
 
 const STATUS_COLORS = {
@@ -493,6 +499,30 @@ export default function OrdersPage() {
   const [allReviews, setAllReviews] = useState([]); // all product reviews
   const [reviewPopupOrderId, setReviewPopupOrderId] = useState(null);
   const [returnsMap, setReturnsMap] = useState({}); // order_id → has active return
+  const [mySellerId, setMySellerId] = useState("");
+  const [sellerLabelById, setSellerLabelById] = useState({});
+  const [sellerSearchFilter, setSellerSearchFilter] = useState("");
+  const [sellerSectionOpen, setSellerSectionOpen] = useState({});
+  const [sellerGroupSort, setSellerGroupSort] = useState("created_at_desc");
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !isSuperuser) return;
+    setMySellerId(localStorage.getItem("sellerId") || "");
+  }, [isSuperuser]);
+
+  useEffect(() => {
+    if (!isSuperuser) return;
+    getMedusaAdminClient()
+      .getSellers()
+      .then((d) => {
+        const m = {};
+        for (const s of d.sellers || []) {
+          if (s.seller_id) m[s.seller_id] = s.store_name || s.company_name || s.email || s.seller_id;
+        }
+        setSellerLabelById(m);
+      })
+      .catch(() => {});
+  }, [isSuperuser]);
 
   const fetchReviews = useCallback(async () => {
     try {
@@ -604,6 +634,46 @@ export default function OrdersPage() {
 
   const COLS = ["☐", "", "Bestellnummer", "Kunde", "Adresse", "Betrag", "Bestellstatus", "Zahlungsstatus", "Lieferstatus", "Datum", "Land", "Bewertung", ""];
 
+  const visibleOrders = useMemo(
+    () => orders.filter((o) => filterOrderStatus !== "retoure" || returnsMap[o.id]),
+    [orders, filterOrderStatus, returnsMap]
+  );
+
+  const { ownOrdersList, sellerOrderGroups } = useMemo(() => {
+    const own = [];
+    const g = new Map();
+    for (const o of visibleOrders) {
+      if (isOwnSellerOrder(o, mySellerId)) own.push(o);
+      else {
+        const sid = String(o.seller_id || "unknown");
+        if (!g.has(sid)) g.set(sid, []);
+        g.get(sid).push(o);
+      }
+    }
+    const keys = [...g.keys()].sort((a, b) =>
+      (sellerLabelById[a] || a).localeCompare(sellerLabelById[b] || b, undefined, { sensitivity: "base" })
+    );
+    return { ownOrdersList: own, sellerOrderGroups: keys.map((k) => ({ sellerId: k, items: g.get(k) })) };
+  }, [visibleOrders, mySellerId, sellerLabelById]);
+
+  const filteredSellerOrderGroups = useMemo(() => {
+    const q = sellerSearchFilter.trim().toLowerCase();
+    if (!q) return sellerOrderGroups;
+    return sellerOrderGroups.filter(({ sellerId }) => {
+      const label = (sellerLabelById[sellerId] || sellerId || "").toLowerCase();
+      return label.includes(q) || sellerId.toLowerCase().includes(q);
+    });
+  }, [sellerOrderGroups, sellerSearchFilter, sellerLabelById]);
+
+  const sortOrdersClient = (list) => {
+    const arr = [...(list || [])];
+    if (sellerGroupSort === "created_at_asc") arr.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    else if (sellerGroupSort === "total_desc") arr.sort((a, b) => (b.total_cents || 0) - (a.total_cents || 0));
+    else if (sellerGroupSort === "total_asc") arr.sort((a, b) => (a.total_cents || 0) - (b.total_cents || 0));
+    else arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return arr;
+  };
+
   const allSelected = orders.length > 0 && orders.every(o => selected.has(o.id));
   const toggleAll = () => {
     if (allSelected) setSelected(new Set());
@@ -611,6 +681,117 @@ export default function OrdersPage() {
   };
   const toggleOne = (id) => setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const selectedOrders = orders.filter(o => selected.has(o.id));
+
+  const renderOrderRows = (list) =>
+    sortOrdersClient(list).map((order) => (
+      <React.Fragment key={order.id}>
+        <tr style={{ borderBottom: "1px solid #f3f4f6", cursor: "default", background: selected.has(order.id) ? "#f6f6f7" : "" }}
+          onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fafafa"; }}
+          onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = ""; }}
+        >
+          <td style={{ padding: "10px 8px 10px 12px", width: 32 }} onClick={e => e.stopPropagation()}>
+            <input type="checkbox" checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} style={{ cursor: "pointer" }} />
+          </td>
+          <td style={{ padding: "10px 8px 10px 0", width: 32 }}>
+            <button onClick={() => toggleExpand(order)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#6b7280", padding: 0 }}>
+              {loadingItems[order.id] ? "…" : expanded[order.id] ? "▼" : "▶"}
+            </button>
+          </td>
+          <td style={{ padding: "10px 12px", fontWeight: 600, fontSize: 13 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/${order.id}`); }}
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#111827", textDecoration: "underline" }}
+              >
+                #{order.order_number || "—"}
+              </button>
+            </div>
+          </td>
+          <td style={{ padding: "10px 12px", minWidth: 240, maxWidth: 280 }}>
+            <CustomerCell order={order} locale={locale} router={router} isSuperuser={isSuperuser} />
+          </td>
+          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12, lineHeight: 1.5 }}>
+            {order.address_line1 ? (
+              <>
+                <div>{order.address_line1}</div>
+                <div>{[order.postal_code, order.city].filter(Boolean).join(" ")}</div>
+                {order.country && <div>{order.country}</div>}
+              </>
+            ) : "—"}
+          </td>
+          <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
+            {(() => {
+              const vat = getVatInfo(order.country);
+              const brutto = order.total_cents || 0;
+              const netto = vat.rate > 0 ? Math.round(brutto / (1 + vat.rate / 100)) : brutto;
+              return (
+                <>
+                  <div>{fmtCents(brutto)}</div>
+                  {vat.rate > 0 && (
+                    <div style={{ fontSize: 10, fontWeight: 400, color: "#9ca3af", lineHeight: 1.3 }}>
+                      {fmtCents(netto)} netto<br />
+                      +{vat.rate}% {vat.label}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </td>
+          <td style={{ padding: "10px 12px", textAlign: "center" }}>
+            {returnsMap[order.id] ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
+                Retoure
+              </span>
+            ) : (
+              <StatusBadge value={order.order_status} />
+            )}
+          </td>
+          <td style={{ padding: "10px 12px", textAlign: "center" }}>
+            <StatusBadge value={order.payment_status} />
+          </td>
+          <td style={{ padding: "10px 12px", textAlign: "center" }}>
+            <StatusBadge value={order.delivery_status} />
+          </td>
+          <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+            {fmtDate(order.created_at)}
+          </td>
+          <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 500 }}>
+            {order.country || "—"}
+          </td>
+          <td style={{ padding: "10px 12px", textAlign: "center" }}>
+            {(() => {
+              const orderReviews = allReviews.filter((r) => r.order_id === order.id);
+              if (orderReviews.length === 0) return <span style={{ color: "#d1d5db", fontSize: 14 }}>★★★★★</span>;
+              const avg = orderReviews.reduce((s, r) => s + Number(r.rating || 0), 0) / orderReviews.length;
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setReviewPopupOrderId(order.id); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                  title={`${orderReviews.length} Bewertung${orderReviews.length !== 1 ? "en" : ""}`}
+                >
+                  <MiniStars rating={avg} />
+                </button>
+              );
+            })()}
+          </td>
+          <td style={{ padding: "10px 8px", textAlign: "right" }}>
+            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
+              {order.delivery_status !== "versendet" && order.delivery_status !== "zugestellt" && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Button size="slim" variant="primary" onClick={() => setVersendModal([order])}>
+                    Versenden
+                  </Button>
+                </div>
+              )}
+              <ActionMenu order={order} onUpdate={handleUpdate} onDelete={handleDelete} onVersenden={() => setVersendModal([order])} />
+            </div>
+          </td>
+        </tr>
+        {expanded[order.id] && <ExpandedRow order={order} locale={locale} />}
+      </React.Fragment>
+    ));
 
   return (
     <div style={{ padding: 24, background: "#fff", minHeight: "100%" }}>
@@ -702,6 +883,23 @@ export default function OrdersPage() {
         </select>
       </div>
 
+      {isSuperuser && (
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <select value={sellerGroupSort} onChange={(e) => setSellerGroupSort(e.target.value)} style={selStyle}>
+            <option value="created_at_desc">Sortierung: Neu zuerst</option>
+            <option value="created_at_asc">Sortierung: Älteste zuerst</option>
+            <option value="total_desc">Sortierung: Betrag ↓</option>
+            <option value="total_asc">Sortierung: Betrag ↑</option>
+          </select>
+          <input
+            placeholder="Verkäufer suchen (Name)…"
+            value={sellerSearchFilter}
+            onChange={(e) => setSellerSearchFilter(e.target.value)}
+            style={{ flex: 1, minWidth: 200, padding: "7px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13 }}
+          />
+        </div>
+      )}
+
       {/* Table */}
       <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -739,128 +937,94 @@ export default function OrdersPage() {
             {!loading && orders.length === 0 && (
               <tr><td colSpan={13} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Keine Bestellungen gefunden</td></tr>
             )}
-            {orders.filter(o => filterOrderStatus !== "retoure" || returnsMap[o.id]).map((order) => (
-              <React.Fragment key={order.id}>
-                <tr style={{ borderBottom: "1px solid #f3f4f6", cursor: "default", background: selected.has(order.id) ? "#f6f6f7" : "" }}
-                  onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fafafa"; }}
-                  onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = ""; }}
-                >
-                  {/* Checkbox */}
-                  <td style={{ padding: "10px 8px 10px 12px", width: 32 }} onClick={e => e.stopPropagation()}>
-                    <input type="checkbox" checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} style={{ cursor: "pointer" }} />
-                  </td>
-                  {/* Expand toggle */}
-                  <td style={{ padding: "10px 8px 10px 0", width: 32 }}>
-                    <button onClick={() => toggleExpand(order)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#6b7280", padding: 0 }}>
-                      {loadingItems[order.id] ? "…" : expanded[order.id] ? "▼" : "▶"}
-                    </button>
-                  </td>
-                  {/* Order number */}
-                  <td style={{ padding: "10px 12px", fontWeight: 600, fontSize: 13 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/${order.id}`); }}
-                        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#111827", textDecoration: "underline" }}
-                      >
-                        #{order.order_number || "—"}
-                      </button>
-                    </div>
-                  </td>
-                  {/* Customer */}
-                  <td style={{ padding: "10px 12px", minWidth: 240, maxWidth: 280 }}>
-                    <CustomerCell order={order} locale={locale} router={router} isSuperuser={isSuperuser} />
-                  </td>
-                  {/* Address */}
-                  <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12, lineHeight: 1.5 }}>
-                    {order.address_line1 ? (
-                      <>
-                        <div>{order.address_line1}</div>
-                        <div>{[order.postal_code, order.city].filter(Boolean).join(" ")}</div>
-                        {order.country && <div>{order.country}</div>}
-                      </>
-                    ) : "—"}
-                  </td>
-                  {/* Amount with VAT breakdown */}
-                  <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
-                    {(() => {
-                      const vat = getVatInfo(order.country);
-                      const brutto = order.total_cents || 0;
-                      const netto = vat.rate > 0 ? Math.round(brutto / (1 + vat.rate / 100)) : brutto;
-                      return (
-                        <>
-                          <div>{fmtCents(brutto)}</div>
-                          {vat.rate > 0 && (
-                            <div style={{ fontSize: 10, fontWeight: 400, color: "#9ca3af", lineHeight: 1.3 }}>
-                              {fmtCents(netto)} netto<br />
-                              +{vat.rate}% {vat.label}
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </td>
-                  {/* Order status */}
-                  <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                    {returnsMap[order.id] ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
-                        Retoure
-                      </span>
-                    ) : (
-                      <StatusBadge value={order.order_status} />
-                    )}
-                  </td>
-                  {/* Payment status */}
-                  <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                    <StatusBadge value={order.payment_status} />
-                  </td>
-                  {/* Delivery status */}
-                  <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                    <StatusBadge value={order.delivery_status} />
-                  </td>
-                  {/* Date */}
-                  <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
-                    {fmtDate(order.created_at)}
-                  </td>
-                  {/* Country */}
-                  <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 500 }}>
-                    {order.country || "—"}
-                  </td>
-                  {/* Review stars */}
-                  <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                    {(() => {
-                      const orderReviews = allReviews.filter((r) => r.order_id === order.id);
-                      if (orderReviews.length === 0) return <span style={{ color: "#d1d5db", fontSize: 14 }}>★★★★★</span>;
-                      const avg = orderReviews.reduce((s, r) => s + Number(r.rating || 0), 0) / orderReviews.length;
-                      return (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setReviewPopupOrderId(order.id); }}
-                          style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                          title={`${orderReviews.length} Bewertung${orderReviews.length !== 1 ? "en" : ""}`}
-                        >
-                          <MiniStars rating={avg} />
-                        </button>
-                      );
-                    })()}
-                  </td>
-                  {/* Actions */}
-                  <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
-                      {order.delivery_status !== "versendet" && order.delivery_status !== "zugestellt" && (
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Button size="slim" variant="primary" onClick={() => setVersendModal([order])}>
-                            Versenden
-                          </Button>
-                        </div>
-                      )}
-                      <ActionMenu order={order} onUpdate={handleUpdate} onDelete={handleDelete} onVersenden={() => setVersendModal([order])} />
-                    </div>
+            {!loading && orders.length > 0 && !isSuperuser && renderOrderRows(visibleOrders)}
+            {!loading && orders.length > 0 && isSuperuser && (
+              <>
+                <tr>
+                  <td
+                    colSpan={13}
+                    style={{
+                      padding: "12px 16px",
+                      background: "#eef2ff",
+                      borderBottom: "1px solid #c7d2fe",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      color: "#3730a3",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    Ihr Superuser-Bereich — eigene Konto-Bestellungen und ohne Verkäufer-Zuordnung ({ownOrdersList.length})
                   </td>
                 </tr>
-                {expanded[order.id] && <ExpandedRow order={order} locale={locale} />}
-              </React.Fragment>
-            ))}
+                {ownOrdersList.length === 0 ? (
+                  <tr>
+                    <td colSpan={13} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
+                      Keine Bestellungen in diesem Bereich.
+                    </td>
+                  </tr>
+                ) : (
+                  renderOrderRows(ownOrdersList)
+                )}
+                <tr>
+                  <td
+                    colSpan={13}
+                    style={{
+                      padding: "12px 16px",
+                      background: "#f3f4f6",
+                      borderBottom: "1px solid #e5e7eb",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      color: "#374151",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    Verkäufer-Bestellungen
+                  </td>
+                </tr>
+                {filteredSellerOrderGroups.length === 0 ? (
+                  <tr>
+                    <td colSpan={13} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
+                      Keine weiteren Verkäufer-Bestellungen{sellerSearchFilter.trim() ? " (Filter)" : ""}.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredSellerOrderGroups.flatMap(({ sellerId, items }) => {
+                    const label = sellerLabelById[sellerId] || sellerId;
+                    const open = sellerSectionOpen[sellerId] !== false;
+                    const headerRow = (
+                      <tr key={`h-${sellerId}`}>
+                        <td colSpan={13} style={{ padding: 0, background: "#fafafa", borderBottom: "1px solid #e5e7eb" }}>
+                          <button
+                            type="button"
+                            onClick={() => setSellerSectionOpen((prev) => ({ ...prev, [sellerId]: !open }))}
+                            style={{
+                              width: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "10px 16px",
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              font: "inherit",
+                              textAlign: "left",
+                            }}
+                          >
+                            <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{label}</span>
+                            <span style={{ fontSize: 12, color: "#6b7280" }}>
+                              {open ? "▾" : "▸"} {items.length} Bestellung{items.length !== 1 ? "en" : ""}
+                            </span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                    return open ? [headerRow, ...renderOrderRows(items)] : [headerRow];
+                  })
+                )}
+              </>
+            )}
           </tbody>
         </table>
       </div>

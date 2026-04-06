@@ -17,7 +17,16 @@ export async function GET(request) {
       return NextResponse.json({ products: [], count: 0 }, { status: 200 });
     }
     const data = await res.json();
-    return NextResponse.json(data);
+    const list = Array.isArray(data?.products) ? data.products : [];
+    const approvedRes = await fetch(`${base}/store/approved-seller-ids`, { cache: "no-store" }).catch(() => null);
+    const approvedData = approvedRes && approvedRes.ok ? await approvedRes.json().catch(() => ({ seller_ids: [] })) : { seller_ids: [] };
+    const approved = new Set((approvedData?.seller_ids || []).map((s) => String(s || "").trim()).filter(Boolean));
+    const filtered = list.filter((p) => {
+      const sid = String(p?.seller_id || "").trim();
+      if (!sid || sid === "default") return true;
+      return approved.has(sid);
+    });
+    return NextResponse.json({ ...data, products: filtered, count: filtered.length });
   } catch {
     return NextResponse.json({ products: [], count: 0 }, { status: 200 });
   }

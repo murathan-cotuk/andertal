@@ -17,6 +17,7 @@ import {
   DataTable,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { titleToHandle, sanitizeSeoHandleInput } from "@/lib/slugify";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 
@@ -51,6 +52,8 @@ export default function ContentPagesPage({ blogOnly = false }) {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [pageToDelete, setPageToDelete] = useState(null);
   const [blogImagePickerOpen, setBlogImagePickerOpen] = useState(false);
+  /** User edited slug manually — stop syncing from title (new page only). */
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [form, setForm] = useState({
     title: "",
     slug: "",
@@ -89,6 +92,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
 
   const openCreate = () => {
     setEditingId(null);
+    setSlugManuallyEdited(false);
     setForm({
       title: "",
       slug: "",
@@ -106,6 +110,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
 
   const openEdit = async (page) => {
     setEditingId(page.id);
+    setSlugManuallyEdited(true);
     setForm({
       title: page.title || "",
       slug: page.slug || "",
@@ -125,13 +130,16 @@ export default function ContentPagesPage({ blogOnly = false }) {
     setForm((prev) => ({
       ...prev,
       title: value,
-      slug: editingId ? prev.slug : (prev.slug || slugFromTitle(value)),
+      slug:
+        editingId || slugManuallyEdited
+          ? prev.slug
+          : pageSlugFromTitle(value),
     }));
   };
 
   const payloadFromForm = () => {
     const title = (form.title || "").trim();
-    const slug = (form.slug || "").trim() || slugFromTitle(title);
+    const slug = (form.slug || "").trim() || pageSlugFromTitle(title);
     return {
       title,
       slug,
@@ -294,10 +302,24 @@ export default function ContentPagesPage({ blogOnly = false }) {
             <TextField
               label="Slug"
               value={form.slug}
-              onChange={(value) => setForm((prev) => ({ ...prev, slug: value }))}
+              onChange={(value) => {
+                if (!editingId && !value.trim()) {
+                  setSlugManuallyEdited(false);
+                  setForm((prev) => ({
+                    ...prev,
+                    slug: pageSlugFromTitle(prev.title),
+                  }));
+                  return;
+                }
+                setSlugManuallyEdited(true);
+                setForm((prev) => ({
+                  ...prev,
+                  slug: sanitizeSeoHandleInput(value.toLowerCase()),
+                }));
+              }}
               autoComplete="off"
               placeholder="e.g. about-us"
-              helpText="URL: /pages/[slug]"
+              helpText="Wird aus dem Titel erzeugt; Sie können ihn anpassen."
             />
             {blogOnly && (
               <>

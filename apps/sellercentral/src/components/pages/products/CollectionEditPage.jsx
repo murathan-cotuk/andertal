@@ -13,7 +13,6 @@ import {
   InlineStack,
   Box,
   Banner,
-  Select,
   Button,
   Divider,
 } from "@shopify/polaris";
@@ -21,6 +20,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
+import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -40,32 +40,6 @@ const META_DESC_MAX = 160;
 
 function slugFromTitle(title) {
   return titleToHandle(title || "");
-}
-
-function buildTree(flatList) {
-  if (!Array.isArray(flatList)) return [];
-  const byId = new Map(flatList.map((c) => [c.id, { ...c, children: [] }]));
-  const roots = [];
-  for (const c of flatList) {
-    const node = byId.get(c.id);
-    if (!c.parent_id) roots.push(node);
-    else {
-      const parent = byId.get(c.parent_id);
-      if (parent) parent.children.push(node);
-      else roots.push(node);
-    }
-  }
-  return roots;
-}
-
-function flattenTree(tree, level = 0) {
-  if (!Array.isArray(tree)) return [];
-  let out = [];
-  for (const node of tree) {
-    out.push({ ...node, _level: level });
-    if (node.children?.length) out = out.concat(flattenTree(node.children, level + 1));
-  }
-  return out;
 }
 
 function getProductCollectionIds(product) {
@@ -125,7 +99,10 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
       const nextForm = {
         title: initialCollection.title ?? "",
         handle: initialCollection.handle ?? "",
-        category_id: "",
+        category_id:
+          initialCollection.category_id != null && String(initialCollection.category_id).trim() !== ""
+            ? String(initialCollection.category_id)
+            : "",
         display_title: initialCollection.display_title ?? initialCollection.title ?? "",
         meta_title: initialCollection.meta_title ?? "",
         meta_description: initialCollection.meta_description ?? "",
@@ -282,7 +259,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
         await client.updateCollection(collection.id, {
           title,
           handle: handle || slugFromTitle(title),
-          ...(form.category_id !== undefined && { category_id: form.category_id || undefined }),
+          category_id: form.category_id ? form.category_id : null,
           display_title: form.display_title,
           meta_title: form.meta_title,
           meta_description: form.meta_description,
@@ -336,14 +313,6 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
       unsaved.setDirty(false);
     };
   }, [unsaved]);
-
-  const categoryOptions = [
-    { label: "— None —", value: "" },
-    ...flattenTree(buildTree(categories)).map((c) => ({
-      label: (c._level ? "  ".repeat(c._level) + "↳ " : "") + (c.name || c.slug || c.id),
-      value: c.id,
-    })),
-  ];
 
   return (
     <Page
@@ -405,11 +374,12 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                 autoComplete="off"
                 helpText="URL: /collections/[handle]"
               />
-              <Select
+              <CategoryDrilldownSelect
                 label="Link to category (optional)"
-                options={categoryOptions}
+                categories={categories || []}
                 value={form.category_id}
                 onChange={(value) => setForm((prev) => ({ ...prev, category_id: value }))}
+                placeholder="Select category"
               />
             </BlockStack>
           </Card>

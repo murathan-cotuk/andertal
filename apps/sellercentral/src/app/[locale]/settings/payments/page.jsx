@@ -11,7 +11,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 const fmt = (cents) =>
   (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("de-DE") : "—";
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
 
 /** Generate the last N 15-day settlement periods, newest first */
 function generatePeriods(count = 12) {

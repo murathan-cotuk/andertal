@@ -597,7 +597,7 @@ export default function UsersPermissionsPage() {
                         </Text>
                       )}
                       <Text variant="bodySm" tone="subdued">
-                        Erstellt: {new Date(user.created_at).toLocaleDateString("de-DE")}
+                        Erstellt: {new Date(user.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
                       </Text>
                     </div>
                     <InlineStack gap="200">
@@ -661,7 +661,7 @@ export default function UsersPermissionsPage() {
                     </Text>
                     <Text variant="bodySm" tone="subdued">{user.email}</Text>
                     <Text variant="bodySm" tone="subdued">
-                      {user.permissions ? `${user.permissions.length} Zugriffsrechte` : "Standard-Berechtigungen"} · Hinzugefügt: {new Date(user.created_at).toLocaleDateString("de-DE")}
+                      {user.permissions ? `${user.permissions.length} Zugriffsrechte` : "Standard-Berechtigungen"} · Hinzugefügt: {new Date(user.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
                     </Text>
                   </div>
                   <InlineStack gap="200">
@@ -699,7 +699,7 @@ export default function UsersPermissionsPage() {
                       <Badge tone="warning">Ausstehend</Badge>
                     </InlineStack>
                     <Text variant="bodySm" tone="subdued">
-                      {invite.email} · Läuft ab: {new Date(invite.expires_at).toLocaleDateString("de-DE")}
+                      {invite.email} · Läuft ab: {new Date(invite.expires_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
                     </Text>
                   </div>
                   <Button size="slim" tone="critical" variant="secondary"

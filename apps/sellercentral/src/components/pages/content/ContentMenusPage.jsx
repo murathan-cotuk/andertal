@@ -27,8 +27,10 @@ const CheckIcon = () => (
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
+import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 
 const LINK_TYPES = [
+  { label: "Category", value: "category" },
   { label: "Collection", value: "collection" },
   { label: "Product", value: "product" },
   { label: "Page", value: "page" },
@@ -85,6 +87,56 @@ function flattenMenuTree(nodes, level = 0) {
     if (node.children?.length) out = out.concat(flattenMenuTree(node.children, level + 1));
   }
   return out;
+}
+
+/** Normalizes API categories (flat parent_id list or tree with children) to root nodes with nested children. */
+function normalizeCategoryTree(list) {
+  if (!Array.isArray(list) || !list.length) return [];
+  if (list.some((c) => Array.isArray(c.children) && c.children.length)) return list;
+  const byId = new Map(list.map((c) => [c.id, { ...c, children: [] }]));
+  const roots = [];
+  for (const c of list) {
+    const node = byId.get(c.id);
+    if (!c.parent_id) roots.push(node);
+    else {
+      const parent = byId.get(c.parent_id);
+      if (parent) parent.children.push(node);
+      else roots.push(node);
+    }
+  }
+  const sort = (arr) =>
+    arr.sort(
+      (a, b) =>
+        (a.sort_order || 0) - (b.sort_order || 0) ||
+        String(a.name || a.slug || "").localeCompare(String(b.name || b.slug || ""))
+    );
+  const sortDeep = (arr) => {
+    sort(arr);
+    arr.forEach((r) => {
+      if (r.children?.length) sortDeep(r.children);
+    });
+  };
+  sortDeep(roots);
+  return roots;
+}
+
+function collectCategoriesDepthFirst(roots) {
+  const acc = [];
+  const walk = (nodes) => {
+    for (const c of nodes || []) {
+      acc.push(c);
+      if (c.children?.length) walk(c.children);
+    }
+  };
+  walk(roots);
+  return acc;
+}
+
+function findCategoryById(list, id) {
+  if (!id || !Array.isArray(list)) return null;
+  const roots = normalizeCategoryTree(list);
+  const all = collectCategoriesDepthFirst(roots);
+  return all.find((c) => String(c.id) === String(id)) || null;
 }
 
 /** Parse semicolon-separated hierarchical CSV (e.g. Main Category;Subcategory 1;...) into a flat create list preserving hierarchy and order. */
@@ -157,6 +209,7 @@ function MenuEditorPanel(props) {
     setSaving,
     client,
     collections,
+    categories,
     products,
     pages,
     LINK_TYPES,
@@ -204,7 +257,7 @@ function MenuEditorPanel(props) {
   const tree = buildMenuTree(items);
   const openInlineAdd = (parentId) => {
     setAddUnderParentId(parentId ?? null);
-    setItemForm({ label: "", slug: "", link_type: "url", link_value: "", parent_id: parentId ?? "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" });
+    setItemForm({ label: "", slug: "", link_type: "url", link_value: "", parent_id: parentId ?? "", category_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" });
     setInlineNewOpen(true);
     setEditingItemId(null);
   };
@@ -297,6 +350,89 @@ function MenuEditorPanel(props) {
     setInlineNewOpen(false);
   };
 
+  const categoryLinkedCollectionId = (cat) => {
+    if (!cat) return "";
+    if (cat.collection_id != null) return String(cat.collection_id).trim();
+    let meta = cat.metadata && typeof cat.metadata === "object" ? cat.metadata : {};
+    if (typeof cat.metadata === "string") {
+      try {
+        meta = JSON.parse(cat.metadata);
+      } catch {
+        meta = {};
+      }
+    }
+    return meta?.collection_id != null ? String(meta.collection_id).trim() : "";
+  };
+
+  const collectProductCollectionIds = (list) => {
+    const set = new Set();
+    (list || []).forEach((p) => {
+      if (p?.collection_id != null) set.add(String(p.collection_id));
+      const meta = p?.metadata && typeof p.metadata === "object" ? p.metadata : {};
+      if (meta.collection_id != null) set.add(String(meta.collection_id));
+      if (Array.isArray(meta.collection_ids)) {
+        meta.collection_ids.forEach((id) => {
+          if (id != null && String(id).trim()) set.add(String(id));
+        });
+      }
+    });
+    return set;
+  };
+
+  const handleCategoriesWithProducts = async () => {
+    const menuId = effectiveMenuId ?? selectedMenuId;
+    if (!menuId) return;
+    const roots = normalizeCategoryTree(categories).filter((c) => !c?.parent_id);
+    const collectionIdsWithProducts = collectProductCollectionIds(products);
+    const parentCategories = roots.filter((cat) => {
+      if (cat?.active === false) return false;
+      const linkedCollectionId = categoryLinkedCollectionId(cat);
+      if (!linkedCollectionId) return false;
+      return collectionIdsWithProducts.has(linkedCollectionId);
+    });
+
+    if (parentCategories.length === 0) {
+      setMoreActionsOpen(false);
+      setError("No parent categories with products found.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError(null);
+      const existing = [...flattenMenuTree(buildMenuTree(items))].reverse();
+      for (const it of existing) {
+        await client.deleteMenuItem(menuId, it.id);
+      }
+
+      for (let i = 0; i < parentCategories.length; i++) {
+        const cat = parentCategories[i];
+        const catSlug = String(cat?.slug || normalizeItemSlug(cat?.name || "")).trim();
+        if (!catSlug) continue;
+        await client.createMenuItem(menuId, {
+          label: cat?.name || catSlug,
+          slug: `category/${catSlug}`,
+          link_type: "category",
+          link_value: JSON.stringify({
+            id: cat?.id,
+            title: cat?.name || catSlug,
+            slug: catSlug,
+            handle: `category/${catSlug}`,
+          }),
+          parent_id: null,
+          sort_order: i,
+        });
+      }
+
+      await fetchItems(menuId);
+      setMoreActionsOpen(false);
+    } catch (err) {
+      setError(err?.message || "Failed to build categories with products");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
       <style>{`
@@ -364,6 +500,7 @@ function MenuEditorPanel(props) {
                   <ActionList
                     actionRole="menuitem"
                     items={[
+                      { content: "Categories with products", onAction: () => { setMoreActionsOpen(false); handleCategoriesWithProducts(); } },
                       { content: "Delete", destructive: true, onAction: () => { setMoreActionsOpen(false); handleDeleteMenu(null, panelMenu || { id: panelMenuId, name: localMenuName }); } },
                     ]}
                   />
@@ -441,6 +578,7 @@ function MenuEditorPanel(props) {
                               itemForm={itemForm}
                               setItemForm={setItemForm}
                               collections={collections}
+                              categories={categories}
                               products={products}
                               pages={pages}
                               LINK_TYPES={LINK_TYPES}
@@ -611,13 +749,15 @@ function MenuEditorPanel(props) {
                             itemForm={itemForm}
                             setItemForm={setItemForm}
                             collections={collections}
+                            categories={categories}
                             products={products}
+                            pages={pages}
                             LINK_TYPES={LINK_TYPES}
                             apiFunctionOptions={API_FUNCTION_OPTIONS}
                             flatItems={flatItems}
                             parentOptionsForForm={parentOptionsForForm}
                             onSave={inlineSaveItem}
-                            onCancel={() => { setInlineNewOpen(false); setItemForm({ label: "", slug: "", link_type: "url", link_value: "", parent_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" }); }}
+                            onCancel={() => { setInlineNewOpen(false); setItemForm({ label: "", slug: "", link_type: "url", link_value: "", parent_id: "", category_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" }); }}
                             saving={saving}
                           />
                         </div>
@@ -640,7 +780,7 @@ function MenuEditorPanel(props) {
   );
 }
 
-function InlineItemRow({ itemForm, setItemForm, collections, products, pages, LINK_TYPES, apiFunctionOptions, flatItems, parentOptionsForForm, onSave, onCancel, saving }) {
+function InlineItemRow({ itemForm, setItemForm, collections, categories, products, pages, LINK_TYPES, apiFunctionOptions, flatItems, parentOptionsForForm, onSave, onCancel, saving }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr auto", gap: "16px", padding: "14px 20px", alignItems: "center", background: "var(--p-color-bg-surface-secondary)", borderRadius: "8px", margin: "8px 12px" }}>
       <span />
@@ -669,6 +809,19 @@ function InlineItemRow({ itemForm, setItemForm, collections, products, pages, LI
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <Select label="Link type" options={LINK_TYPES} value={itemForm.link_type} onChange={(v) => setItemForm((p) => ({ ...p, link_type: v }))} labelHidden />
+        {itemForm.link_type === "category" && (
+          <div style={{ minWidth: 280, flex: 1 }}>
+            <CategoryDrilldownSelect
+              label="Category"
+              labelHidden
+              categories={categories || []}
+              value={itemForm.category_id || ""}
+              onChange={(v) => setItemForm((p) => ({ ...p, category_id: v }))}
+              placeholder="Select category"
+              noneLabel="— Select —"
+            />
+          </div>
+        )}
         {itemForm.link_type === "collection" && (
           <Select label="Collection" labelHidden options={[{ label: "— Select —", value: "" }, ...collections.map((c) => ({ label: c.title || c.handle, value: c.id }))]} value={itemForm.collection_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, collection_id: v }))} />
         )}
@@ -715,6 +868,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   const [editingItemId, setEditingItemId] = useState(null);
   const [addUnderParentId, setAddUnderParentId] = useState(null);
   const [collections, setCollections] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [pages, setPages] = useState([]);
   const [menuForm, setMenuForm] = useState({ name: "", slug: "", location: "main" });
@@ -725,6 +879,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
     link_type: "url",
     link_value: "",
     parent_id: "",
+    category_id: "",
     collection_id: "",
     product_id: "",
     page_id: "",
@@ -852,6 +1007,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
 
   useEffect(() => {
     client.getMedusaCollections({ adminHub: true }).then((r) => setCollections(r.collections || [])).catch(() => setCollections([]));
+    client.getAdminHubCategories({ all: true }).then((r) => setCategories(r.categories || [])).catch(() => setCategories([]));
     client.getAdminHubProducts().then((r) => {
       const list = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
       setProducts(list);
@@ -966,6 +1122,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       link_type: "url",
       link_value: "",
       parent_id: parentId || "",
+      category_id: "",
       collection_id: "",
       product_id: "",
       page_id: "",
@@ -978,9 +1135,16 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   const openEditItem = (item) => {
     setEditingItemId(item.id);
     setAddUnderParentId(null);
+    let category_id = "";
     let collection_id = "";
     let product_id = "";
     let page_id = "";
+    if (item.link_type === "category" && item.link_value) {
+      try {
+        const v = JSON.parse(item.link_value);
+        if (v && v.id) category_id = String(v.id);
+      } catch (_) {}
+    }
     if (item.link_type === "collection" && item.link_value) {
       try {
         const v = JSON.parse(item.link_value);
@@ -1014,6 +1178,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       link_type: item.link_type || "url",
       link_value: item.link_type === "url" || item.link_type === "policy" || item.link_type === "blog" || item.link_type === "blog_post" ? (item.link_value || "") : "",
       parent_id: item.parent_id || "",
+      category_id,
       collection_id,
       product_id,
       page_id,
@@ -1071,7 +1236,16 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
     const menuId = effectiveMenuId ?? selectedMenuId;
     if (!menuId) return;
     let link_value = itemForm.link_value;
-    if (itemForm.link_type === "collection" && itemForm.collection_id) {
+    if (itemForm.link_type === "category" && itemForm.category_id) {
+      const cat = findCategoryById(categories, itemForm.category_id);
+      const slug = (cat?.slug || "").trim();
+      link_value = JSON.stringify({
+        id: cat?.id,
+        title: cat?.name || cat?.title,
+        slug,
+        handle: slug,
+      });
+    } else if (itemForm.link_type === "collection" && itemForm.collection_id) {
       const c = collections.find((x) => x.id === itemForm.collection_id);
       link_value = JSON.stringify({ id: c?.id, title: c?.title, handle: c?.handle });
     } else if (itemForm.link_type === "product" && itemForm.product_id) {
@@ -1330,6 +1504,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
               setSaving={setSaving}
               client={client}
               collections={collections}
+              categories={categories}
               products={products}
               pages={pages}
               LINK_TYPES={LINK_TYPES}
@@ -1652,6 +1827,16 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
               value={itemForm.link_type}
               onChange={(value) => setItemForm((prev) => ({ ...prev, link_type: value }))}
             />
+            {itemForm.link_type === "category" && (
+              <CategoryDrilldownSelect
+                label="Category"
+                categories={categories || []}
+                value={itemForm.category_id || ""}
+                onChange={(value) => setItemForm((prev) => ({ ...prev, category_id: value }))}
+                placeholder="Select category"
+                noneLabel="— Select category —"
+              />
+            )}
             {itemForm.link_type === "collection" && (
               <Select
                 label="Collection"

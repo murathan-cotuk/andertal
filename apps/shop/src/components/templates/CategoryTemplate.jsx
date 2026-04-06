@@ -1,124 +1,417 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { ProductGrid } from "@/components/ProductGrid";
-import Breadcrumbs from "@/components/Breadcrumbs";
 import { Link } from "@/i18n/navigation";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
+import {
+  SORT_OPTIONS,
+  PER_PAGE,
+  buildFacetsFromProducts,
+  filterProductsByFacets,
+  applyCatalogSort,
+} from "@/lib/catalog-listing";
+import LandingContainers from "@/components/landing/LandingContainers";
 
-const BannerWrapper = styled.div`
-  width: 100%;
-  margin-bottom: 0;
-  flex-shrink: 0;
+const HEADER_H = 112;
+
+const shimmer = keyframes`
+  0%   { background-position: -800px 0; }
+  100% { background-position:  800px 0; }
+`;
+const Bone = styled.div`
+  background: linear-gradient(90deg, #efefed 25%, #e5e5e3 50%, #efefed 75%);
+  background-size: 800px 100%;
+  animation: ${shimmer} 1.5s infinite linear;
 `;
 
-const BannerImage = styled.img`
+const HeroBanner = styled.div`
   width: 100%;
-  max-height: 160px;
-  min-height: 120px;
-  object-fit: cover;
-  display: block;
-  vertical-align: middle;
+  aspect-ratio: 21 / 6;
+  min-height: 160px;
+  max-height: 320px;
+  overflow: hidden;
+  position: relative;
+  background: #f4f4f2;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    opacity: 1;
+  }
 `;
 
-const ContentRow = styled.div`
+const HeroText = styled.div`
+  position: absolute;
+  inset: 0;
   display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 24px 32px;
+
+  h1 {
+    margin: 0 0 4px;
+  }
+`;
+
+const ColHeader = styled.div`
+  padding: 28px 32px 0;
+  max-width: 1440px;
+  margin: 0 auto;
   width: 100%;
-  margin: 0;
+  box-sizing: border-box;
+
+  h1 {
+    margin: 0;
+  }
+
+  @media (max-width: 600px) { padding: 20px 16px 0; }
 `;
 
-const FilterSidebar = styled.aside`
-  width: 260px;
+const Breadcrumb = styled.nav`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #999;
+  letter-spacing: 0.02em;
+
+  a { color: #999; text-decoration: none; transition: color 0.12s; &:hover { color: #111; } }
+  b { color: #444; font-weight: 500; }
+`;
+
+const SortBar = styled.div`
+  position: sticky;
+  top: ${HEADER_H}px;
+  z-index: 20;
+  background: #fff;
+  border-top: 1px solid #e8e8e6;
+  border-bottom: 1px solid #e8e8e6;
+`;
+
+const SortBarInner = styled.div`
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+
+  @media (max-width: 600px) { padding: 0 16px; }
+`;
+
+const SortBarLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex: 1;
+`;
+
+const FilterBtn = styled.button`
+  display: none;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: ${(p) => (p.$active ? "#111" : "#666")};
+  cursor: pointer;
+  transition: color 0.12s;
+  border-bottom: 2px solid ${(p) => (p.$active ? "#111" : "transparent")};
+  margin-bottom: -1px;
+
+  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  &:hover { color: #111; }
+
+  @media (max-width: 767px) { display: inline-flex; }
+`;
+
+const SortWrap = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #666;
+`;
+
+const SortLabel = styled.span`
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #999;
+  white-space: nowrap;
+
+  @media (max-width: 480px) { display: none; }
+`;
+
+const SortSelect = styled.select`
+  appearance: none;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #111;
+  cursor: pointer;
+  outline: none;
+  padding: 12px 20px 12px 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+`;
+
+const ContentWrap = styled.div`
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 14px 32px 80px;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+
+  @media (max-width: 767px) { padding: 10px 16px 60px; }
+`;
+
+const Sidebar = styled.aside`
+  width: 220px;
   flex-shrink: 0;
-  position: fixed;
-  left: 0;
-  top: 72px;
-  bottom: 0;
-  padding: 24px 20px 48px 24px;
-  border-right: 1px solid #e5e7eb;
-  background: #fafafa;
+  position: sticky;
+  top: ${HEADER_H + 68}px;
+  max-height: calc(100vh - ${HEADER_H + 68}px);
   overflow-y: auto;
-  z-index: 10;
+
+  @media (max-width: 767px) {
+    position: fixed;
+    top: 0;
+    left: ${(p) => (p.$open ? "0" : "-260px")};
+    width: 250px;
+    height: 100vh;
+    max-height: 100vh;
+    z-index: 100;
+    background: #fff;
+    box-shadow: 4px 0 16px rgba(0,0,0,0.12);
+    transition: left 0.3s ease;
+    padding: 16px;
+    box-sizing: border-box;
+  }
 `;
 
-const ContentColumn = styled.div`
+const SidebarOverlay = styled.div`
+  display: none;
+  @media (max-width: 767px) {
+    display: ${(p) => (p.$open ? "block" : "none")};
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 99;
+  }
+`;
+
+const SidebarHead = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8e8e6;
+
+  @media (min-width: 768px) { display: none; }
+`;
+
+const FilterGroup = styled.div`
+  border-bottom: 1px solid #eceae7;
+`;
+
+const FilterGroupTitle = styled.button`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #111;
+  cursor: pointer;
+  text-align: left;
+`;
+
+const FilterGroupHeading = styled.h4`
+  margin: 0;
+  padding: 0;
+  font: inherit;
   flex: 1;
   min-width: 0;
-  padding: 20px 24px 48px 32px;
-  margin-left: 260px;
+  text-align: left;
 `;
 
-const FilterTitle = styled.div`
+const FilterGroupBody = styled.div`
+  display: ${(p) => (p.$open ? "block" : "none")};
+  padding: 0 0 12px;
+`;
+
+const FilterChevron = styled.span`
   font-size: 14px;
-  font-weight: 700;
-  color: #374151;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 16px;
+  line-height: 1;
+  color: #666;
+  transform: rotate(${(p) => (p.$open ? "180deg" : "0deg")});
+  transition: transform 0.18s ease;
 `;
 
-const FilterList = styled.ul`
-  list-style: none;
-  margin: 0;
-  padding: 0;
+const CheckRow = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: ${(p) => (p.$on ? "#111" : "#555")};
+  font-weight: ${(p) => (p.$on ? "600" : "400")};
+  transition: color 0.12s;
+
+  input {
+    width: 13px;
+    height: 13px;
+    accent-color: #111;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  &:hover { color: #111; }
 `;
 
-const FilterItem = styled.li`
-  margin: 0;
-  padding: 0;
+const SubcategoryGroup = styled.div`
+  border-bottom: 1px solid #eceae7;
+  padding-bottom: 10px;
+  margin-bottom: 6px;
 `;
 
-const FilterLink = styled(Link)`
+const SubcategoryLink = styled(Link)`
   display: block;
   padding: 10px 12px;
-  font-size: 15px;
+  font-size: 14px;
   color: ${(p) => (p.$active ? "#111827" : "#4b5563")};
   font-weight: ${(p) => (p.$active ? 600 : 400)};
   text-decoration: none;
   border-radius: 8px;
   background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
   margin-bottom: 2px;
+  transition: background 0.12s, color 0.12s;
+
   &:hover {
     background: #e5e7eb;
     color: #111827;
   }
 `;
 
-const BreadcrumbWrap = styled.div`
-  text-align: left;
-  margin-bottom: 12px;
+const ClearAllBtn = styled.button`
+  background: none;
+  border: 1px solid #ccc;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #555;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+
+  &:hover { border-color: #111; color: #111; }
 `;
 
-const CategoryHeader = styled.div`
-  text-align: left;
-  margin-bottom: 20px;
-  margin-top: 0;
+const Body = styled.div`
+  flex: 1;
+  min-width: 0;
 `;
 
-const CategoryTitle = styled.h1.attrs({ className: "shop-typo-catalog-title" })`
-  margin: 0 0 8px 0;
+const ChipBar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 0 0;
 `;
 
-const CategoryDescription = styled.p`
-  font-size: 16px;
-  color: #6b7280;
-  max-width: 800px;
-  margin: 0;
+const Chip = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: #111;
+  color: #fff;
+  border: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.12s;
+
+  &:hover { background: #333; }
 `;
 
-const LongContent = styled.div`
-  max-width: 800px;
-  margin: 0 0 32px 0;
-  color: var(--body-color, #4b5563);
-  line-height: var(--body-lh, 1.6);
-  font-size: var(--body-fs, 1rem);
+const ResultBar = styled.div`
+  padding: 16px 0 12px;
+  font-size: 11.5px;
+  color: #999;
+  letter-spacing: 0.04em;
+`;
+
+const Pager = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding-top: 48px;
+`;
+
+const PBtn = styled.button`
+  min-width: 36px;
+  height: 36px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid ${(p) => (p.$on ? "#111" : "#ddd")};
+  background: ${(p) => (p.$on ? "#111" : "#fff")};
+  color: ${(p) => (p.$on ? "#fff" : "#555")};
+  font-size: 12.5px;
+  font-weight: ${(p) => (p.$on ? "700" : "400")};
+  cursor: ${(p) => (p.disabled ? "not-allowed" : "pointer")};
+  opacity: ${(p) => (p.disabled ? "0.3" : "1")};
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+
+  &:not(:disabled):hover {
+    border-color: #111;
+    color: ${(p) => (p.$on ? "#fff" : "#111")};
+  }
+`;
+
+const Desc = styled.div`
+  margin-top: 56px;
+  padding-top: 28px;
+  border-top: 1px solid #e8e8e6;
+  font-size: var(--body-fs);
+  line-height: var(--body-lh);
+  color: var(--body-color);
   font-family: var(--body-font);
-  border: 1px solid #000;
-  border-radius: 8px;
-  padding: 24px;
+  max-width: 700px;
 
   & h1 {
     font-family: var(--h1-ff);
@@ -150,72 +443,9 @@ const LongContent = styled.div`
     line-height: var(--h3-lh);
     margin: 1em 0 0.4em;
   }
-  & h4 {
-    font-family: var(--h4-ff);
-    font-size: var(--h4-fs);
-    font-weight: var(--h4-fw);
-    font-style: var(--h4-style);
-    color: var(--h4-color);
-    letter-spacing: var(--h4-ls);
-    line-height: var(--h4-lh);
-    margin: 0.85em 0 0.35em;
-  }
-  & h5 {
-    font-family: var(--h5-ff);
-    font-size: var(--h5-fs);
-    font-weight: var(--h5-fw);
-    font-style: var(--h5-style);
-    color: var(--h5-color);
-    letter-spacing: var(--h5-ls);
-    line-height: var(--h5-lh);
-    margin: 0.85em 0 0.35em;
-  }
-  & h6 {
-    font-family: var(--h5-ff);
-    font-size: var(--h5-fs);
-    font-weight: var(--h5-fw);
-    font-style: var(--h5-style);
-    color: var(--h5-color);
-    letter-spacing: var(--h5-ls);
-    line-height: var(--h5-lh);
-    margin: 0.85em 0 0.35em;
-  }
-  & h1:first-child,
-  & h2:first-child,
-  & h3:first-child,
-  & h4:first-child,
-  & h5:first-child,
-  & h6:first-child {
-    margin-top: 0;
-  }
-  & p { margin: 0 0 1em; }
-  & p:last-child { margin-bottom: 0; }
-  & ul, & ol { margin: 0.5em 0 1em 1.5em; padding-left: 1.5em; }
-  & ul { list-style-type: disc; }
-  & ol { list-style-type: decimal; }
-  & li { margin-bottom: 0.35em; }
-  & strong { font-weight: 600; color: #374151; }
-  & em { font-style: italic; }
-  & a { color: #0ea5e9; text-decoration: underline; }
-  & a:hover { text-decoration: none; }
-  & blockquote { margin: 1em 0; padding-left: 1em; border-left: 4px solid #e5e7eb; color: #6b7280; }
-  & hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.25em 0; }
+  & p { margin: 0 0 0.75em; }
+  a { color: var(--shop-primary, #111); text-decoration: underline; }
 `;
-
-const Container = styled.div`
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 48px 24px;
-`;
-
-function flattenCategories(cats, out = []) {
-  if (!Array.isArray(cats)) return out;
-  for (const c of cats) {
-    if (c && (c.slug || c.id)) out.push({ slug: c.slug || c.id, name: c.name || c.slug || "Category" });
-    if (Array.isArray(c.children) && c.children.length) flattenCategories(c.children, out);
-  }
-  return out;
-}
 
 function sanitizeHtml(html) {
   if (!html || typeof html !== "string") return "";
@@ -224,120 +454,441 @@ function sanitizeHtml(html) {
     .replace(/\s*on\w+=["'][^"']*["']/gi, "");
 }
 
+function parseCategoryMetadata(category) {
+  let m = category?.metadata;
+  if (typeof m === "string") {
+    try {
+      m = JSON.parse(m);
+    } catch {
+      m = {};
+    }
+  }
+  return m && typeof m === "object" ? m : {};
+}
+
+function findCategoryNodeBySlug(nodes, slug) {
+  const norm = String(slug || "").replace(/^\//, "");
+  for (const n of nodes || []) {
+    if (!n) continue;
+    const s = String(n.slug || n.handle || "").replace(/^\//, "");
+    if (s === norm) return n;
+    const child = findCategoryNodeBySlug(n.children, slug);
+    if (child) return child;
+  }
+  return null;
+}
+
+function findCategoryNodeById(nodes, id) {
+  const nid = String(id || "");
+  for (const n of nodes || []) {
+    if (!n) continue;
+    if (String(n.id) === nid) return n;
+    const child = findCategoryNodeById(n.children, id);
+    if (child) return child;
+  }
+  return null;
+}
+
+function visibleSubcats(children) {
+  return (children || []).filter((c) => c && c.active !== false && c.is_visible !== false);
+}
+
 export default function CategoryTemplate() {
   const params = useParams();
-  const slug = params?.slug;
+  const slug = params?.slug ? String(params.slug) : "";
+  const locale = params?.locale ? String(params.locale) : "de";
+
   const [category, setCategory] = useState(null);
-  const [linkedCollection, setLinkedCollection] = useState(null);
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sort, setSort] = useState("default");
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({});
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [openFilterGroups, setOpenFilterGroups] = useState({});
+
+  const bodyRef = useRef(null);
 
   useEffect(() => {
     if (!slug) return;
-    const fetchData = async () => {
+    let cancelled = false;
+    (async () => {
       try {
         setLoading(true);
         setError(null);
-        setLinkedCollection(null);
         const client = getMedusaClient();
-        const [cat, prodRes, catRes] = await Promise.all([
+        const [cat, catRes] = await Promise.all([
           client.getCategoryBySlug(slug).catch(() => null),
-          client.getProducts({ category: slug }),
-          client.getCategories({ tree: true }).catch(() => ({ categories: [], tree: [] })),
+          client.getCategories({ tree: true, is_visible: true }).catch(() => ({ tree: [] })),
         ]);
+        if (cancelled) return;
         setCategory(cat || null);
-        setProducts(prodRes.products || []);
-        const tree = catRes.tree || catRes.categories || [];
-        setCategories(flattenCategories(Array.isArray(tree) ? tree : [tree]));
-        if (cat?.collection_id) {
-          const colRes = await fetch(`/api/store-collections?handle=${encodeURIComponent(cat.collection_id)}`);
-          if (colRes.ok) {
-            const colData = await colRes.json();
-            if (colData?.collection) setLinkedCollection(colData.collection);
-          }
+        if (!cat) {
+          setProducts([]);
+          setSubcategories([]);
+          setLoading(false);
+          return;
         }
+        const tree = catRes.tree || catRes.categories || [];
+        const roots = Array.isArray(tree) ? tree : [tree];
+        const current = findCategoryNodeBySlug(roots, slug);
+        let subs = [];
+        if (current?.parent_id) {
+          const parent = findCategoryNodeById(roots, current.parent_id);
+          subs = visibleSubcats(parent?.children);
+        } else {
+          subs = visibleSubcats(current?.children);
+        }
+        setSubcategories(subs);
+
+        const pr = await fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=500`)
+          .then((r) => r.json())
+          .catch(() => ({ products: [] }));
+        if (!cancelled) setProducts(pr?.products ?? []);
       } catch (err) {
-        setError(err?.message || "Failed to load category");
-        setProducts([]);
+        if (!cancelled) {
+          setError(err?.message || "Failed to load category");
+          setProducts([]);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    fetchData();
   }, [slug]);
+
+  const meta = parseCategoryMetadata(category);
+  const displayTitle =
+    (meta.display_title && String(meta.display_title).trim()) ||
+    category?.name ||
+    slug ||
+    "Category";
+  const rawBanner = category?.banner_image_url || null;
+  const bannerUrl = rawBanner ? resolveImageUrl(rawBanner) : "";
+  const richtextHtml = category?.long_content
+    ? sanitizeHtml(rewriteImageUrlsInHtml(category.long_content))
+    : "";
+
+  useEffect(() => {
+    if (!category || typeof document === "undefined") return;
+    const m = parseCategoryMetadata(category);
+    const dt =
+      (m.display_title && String(m.display_title).trim()) ||
+      category.name ||
+      slug ||
+      "Category";
+    const docTitle =
+      (category.seo_title && String(category.seo_title).trim()) ||
+      (m.meta_title && String(m.meta_title).trim()) ||
+      dt;
+    document.title = docTitle;
+    const desc =
+      (category.seo_description && String(category.seo_description).trim()) ||
+      (m.meta_description && String(m.meta_description).trim()) ||
+      "";
+    if (desc) {
+      let el = document.querySelector('meta[name="description"]');
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute("name", "description");
+        document.head.appendChild(el);
+      }
+      el.setAttribute("content", desc);
+    }
+  }, [category, slug]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !slug) return;
+    let el = document.querySelector('link[rel="canonical"]');
+    if (!el) {
+      el = document.createElement("link");
+      el.rel = "canonical";
+      document.head.appendChild(el);
+    }
+    el.href = `${window.location.origin}${window.location.pathname}`;
+  }, [slug, locale]);
+
+  const facets = buildFacetsFromProducts(products);
+  const hasFacets = Object.keys(facets).length > 0;
+  const hasSubcategories = subcategories.length > 0;
+  const showCatalogSidebar = hasFacets || hasSubcategories;
+
+  useEffect(() => {
+    const facetKeys = Object.keys(facets);
+    setOpenFilterGroups((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      facetKeys.forEach((key) => {
+        if (!(key in next)) {
+          next[key] = Boolean(filters[key]?.length);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [facets, filters]);
+
+  const toggle = (key, val) => {
+    setFilters((prev) => {
+      const cur = prev[key] || [];
+      const next = cur.includes(val) ? cur.filter((x) => x !== val) : [...cur, val];
+      if (!next.length) {
+        const u = { ...prev };
+        delete u[key];
+        return u;
+      }
+      return { ...prev, [key]: next };
+    });
+    setPage(1);
+  };
+
+  let filtered = filterProductsByFacets([...products], filters);
+  const sorted = applyCatalogSort(filtered, sort, { bestsellerOnly: false });
+  const total = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const curPage = Math.min(page, totalPages);
+  const paginated = sorted.slice((curPage - 1) * PER_PAGE, curPage * PER_PAGE);
+  const activeCount = Object.values(filters).reduce((n, v) => n + (v?.length || 0), 0);
 
   if (loading) {
     return (
-      <Container>
-        <div style={{ textAlign: "center", padding: "48px", color: "#6b7280" }}>Loading category…</div>
-      </Container>
+      <>
+        <Bone style={{ height: 220 }} />
+        <ContentWrap>
+          <Body>
+            <Bone style={{ height: 13, width: 200, margin: "24px 0 32px" }} />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 1,
+                background: "#e8e8e6",
+              }}
+            >
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Bone key={i} style={{ aspectRatio: "3/4" }} />
+              ))}
+            </div>
+          </Body>
+        </ContentWrap>
+      </>
     );
   }
 
   if (error) {
     return (
-      <Container>
-        <div style={{ padding: "24px", backgroundColor: "#fef2f2", borderRadius: "8px", color: "#991b1b" }}>{error}</div>
-      </Container>
+      <div style={{ padding: "48px 32px", color: "#b91c1c", fontSize: 14 }}>{error}</div>
     );
   }
 
-  const title = category?.name || (slug ? `Category: ${slug}` : "Category");
-  const rawBanner =
-    linkedCollection?.banner ||
-    linkedCollection?.banner_image_url ||
-    linkedCollection?.image_url ||
-    category?.banner_image_url ||
-    category?.banner ||
-    null;
-  const bannerUrl = rawBanner ? resolveImageUrl(rawBanner) : null;
-  const richtextHtml =
-    linkedCollection?.description
-      ? sanitizeHtml(rewriteImageUrlsInHtml(linkedCollection.description))
-      : category?.long_content
-        ? sanitizeHtml(rewriteImageUrlsInHtml(category.long_content))
-        : "";
+  if (!category) {
+    return (
+      <div style={{ padding: "48px 32px", color: "#6b7280", fontSize: 14 }}>
+        Kategorie nicht gefunden.
+      </div>
+    );
+  }
 
   return (
     <>
-      {bannerUrl && (
-        <BannerWrapper>
-          <BannerImage src={bannerUrl} alt={title} />
-        </BannerWrapper>
+      {bannerUrl ? (
+        <HeroBanner>
+          <img src={bannerUrl} alt={displayTitle} />
+          <HeroText>
+            <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">{displayTitle}</h1>
+          </HeroText>
+        </HeroBanner>
+      ) : (
+        <ColHeader>
+          <h1 className="shop-typo-catalog-title">{displayTitle}</h1>
+        </ColHeader>
       )}
-      <ContentRow>
-        <FilterSidebar>
-          <FilterTitle>Kategorien</FilterTitle>
-          <FilterList>
-            {categories.length === 0 ? (
-              <li style={{ fontSize: 14, color: "#6b7280" }}>Keine Kategorien</li>
-            ) : (
-              categories.map((c) => (
-                <FilterItem key={c.slug}>
-                  <FilterLink href={"/category/" + c.slug} $active={c.slug === slug}>
-                    {c.name}
-                  </FilterLink>
-                </FilterItem>
-              ))
+
+      {category?.id ? <LandingContainers categoryId={String(category.id)} /> : null}
+
+      <SortBar>
+        <SortBarInner>
+          <SortBarLeft>
+            {showCatalogSidebar && (
+              <FilterBtn
+                type="button"
+                $active={panelOpen || activeCount > 0}
+                onClick={() => setPanelOpen((o) => !o)}
+                aria-expanded={panelOpen}
+              >
+                <svg viewBox="0 0 16 12">
+                  <line x1="0" y1="2" x2="16" y2="2" />
+                  <line x1="0" y1="6" x2="16" y2="6" />
+                  <line x1="0" y1="10" x2="16" y2="10" />
+                  <circle cx="5" cy="2" r="1.5" fill="#111" stroke="none" />
+                  <circle cx="11" cy="6" r="1.5" fill="#111" stroke="none" />
+                  <circle cx="5" cy="10" r="1.5" fill="#111" stroke="none" />
+                </svg>
+                Navigation {activeCount > 0 ? `(${activeCount})` : ""}
+              </FilterBtn>
             )}
-          </FilterList>
-        </FilterSidebar>
-        <ContentColumn>
-          <BreadcrumbWrap>
-            <Breadcrumbs title={title} />
-          </BreadcrumbWrap>
-          <CategoryHeader>
-            <CategoryTitle>{title}</CategoryTitle>
-            {category?.description && <CategoryDescription>{category.description}</CategoryDescription>}
-          </CategoryHeader>
-          <ProductGrid products={products} maxColumns={4} />
-          {richtextHtml && (
-            <LongContent dangerouslySetInnerHTML={{ __html: richtextHtml }} />
+            <Breadcrumb aria-label="Breadcrumb">
+              <Link href={`/${locale}`}>Home</Link>
+              <span style={{ color: "#ccc" }}>/</span>
+              <b>{displayTitle}</b>
+            </Breadcrumb>
+          </SortBarLeft>
+          <SortWrap>
+            <SortLabel>Sort:</SortLabel>
+            <SortSelect value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} aria-label="Sort products">
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </SortSelect>
+          </SortWrap>
+        </SortBarInner>
+      </SortBar>
+
+      {showCatalogSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
+      <ContentWrap ref={bodyRef}>
+        {showCatalogSidebar && (
+          <Sidebar $open={panelOpen}>
+            <SidebarHead>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                Navigation
+              </span>
+              <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555", lineHeight: 1 }}>×</button>
+            </SidebarHead>
+
+            {hasSubcategories && (
+              <SubcategoryGroup style={{ marginTop: 0 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 6 }}>
+                  Subkategorien
+                </div>
+                {subcategories.map((sub) => {
+                  const subSlug = String(sub?.slug || sub?.handle || "").replace(/^\//, "");
+                  if (!subSlug) return null;
+                  return (
+                    <SubcategoryLink
+                      key={sub.id || subSlug}
+                      href={`/category/${subSlug}`}
+                      $active={subSlug === slug}
+                    >
+                      {sub.name || subSlug}
+                    </SubcategoryLink>
+                  );
+                })}
+              </SubcategoryGroup>
+            )}
+
+            {hasFacets && (
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 20, paddingBottom: 12, borderBottom: "1px solid #e8e8e6" }}>
+                Filter
+                {activeCount > 0 && (
+                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
+                    Clear
+                  </ClearAllBtn>
+                )}
+              </div>
+            )}
+
+            {Object.entries(facets).map(([key, vals]) => (
+              <FilterGroup key={key}>
+                <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
+                  <FilterGroupHeading>{({
+                    brand_name: "Marke", farbe: "Farbe", colour: "Colour", color: "Color",
+                    material: "Material", size: "Größe", groesse: "Größe",
+                    typ: "Typ", style: "Style", gender: "Gender",
+                    age_group: "Altersgruppe", season: "Saison",
+                  })[key] ?? key.replace(/_/g, " ")}</FilterGroupHeading>
+                  <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
+                </FilterGroupTitle>
+                <FilterGroupBody $open={!!openFilterGroups[key]}>
+                  {vals.map((val) => {
+                    const on = (filters[key] || []).includes(val);
+                    return (
+                      <CheckRow key={val} $on={on}>
+                        <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
+                        {val}
+                      </CheckRow>
+                    );
+                  })}
+                </FilterGroupBody>
+              </FilterGroup>
+            ))}
+
+            {activeCount > 0 && (
+              <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
+                Clear all filters
+              </ClearAllBtn>
+            )}
+          </Sidebar>
+        )}
+
+        <Body>
+          {activeCount > 0 && (
+            <ChipBar>
+              {Object.entries(filters).flatMap(([k, vals]) =>
+                (vals || []).map((v) => (
+                  <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
+                    {v} ×
+                  </Chip>
+                )),
+              )}
+            </ChipBar>
           )}
-        </ContentColumn>
-      </ContentRow>
+
+          <ResultBar>
+            {total} {total === 1 ? "product" : "products"}
+          </ResultBar>
+
+          {paginated.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "80px 0", color: "#bbb", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              No products match your filters.
+            </div>
+          ) : (
+            <ProductGrid products={paginated} maxColumns={4} activeFilters={filters} />
+          )}
+
+          {totalPages > 1 && (
+            <Pager>
+              <PBtn
+                type="button"
+                disabled={curPage <= 1}
+                onClick={() => { setPage((p) => p - 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+              >‹</PBtn>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - curPage) <= 2)
+                .reduce((acc, p, idx, arr) => {
+                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…"
+                    ? <span key={`d${i}`} style={{ width: 36, textAlign: "center", color: "#bbb", fontSize: 12 }}>…</span>
+                    : (
+                      <PBtn
+                        key={p}
+                        type="button"
+                        $on={p === curPage}
+                        onClick={() => { setPage(p); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                      >
+                        {p}
+                      </PBtn>
+                    ))}
+              <PBtn
+                type="button"
+                disabled={curPage >= totalPages}
+                onClick={() => { setPage((p) => p + 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+              >›</PBtn>
+            </Pager>
+          )}
+
+          {richtextHtml ? (
+            <Desc dangerouslySetInnerHTML={{ __html: richtextHtml }} />
+          ) : null}
+        </Body>
+      </ContentWrap>
     </>
   );
 }

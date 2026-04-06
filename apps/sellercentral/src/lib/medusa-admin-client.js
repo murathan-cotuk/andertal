@@ -184,11 +184,31 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/landing-page/${encodeURIComponent(pageId)}`);
   }
 
-  /** PUT /admin-hub/landing-page/:pageId */
-  async saveLandingPageContainers(pageId, containers) {
+  /** PUT /admin-hub/landing-page/:pageId — body: { containers, settings? } */
+  async saveLandingPageContainers(pageId, payload) {
+    const body =
+      payload && typeof payload === 'object' && !Array.isArray(payload) && 'containers' in payload
+        ? payload
+        : { containers: payload, settings: {} };
     return this.request(`/admin-hub/landing-page/${encodeURIComponent(pageId)}`, {
       method: 'PUT',
-      body: JSON.stringify({ containers }),
+      body: JSON.stringify({
+        containers: body.containers || [],
+        settings: body.settings && typeof body.settings === 'object' ? body.settings : {},
+      }),
+    });
+  }
+
+  /** GET /admin-hub/landing-page/category/:categoryId */
+  async getLandingPageCategoryContainers(categoryId) {
+    return this.request(`/admin-hub/landing-page/category/${encodeURIComponent(categoryId)}`);
+  }
+
+  /** PUT /admin-hub/landing-page/category/:categoryId — body: { containers, settings } */
+  async saveLandingPageCategoryContainers(categoryId, payload) {
+    return this.request(`/admin-hub/landing-page/category/${encodeURIComponent(categoryId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
     });
   }
 
@@ -389,7 +409,7 @@ class MedusaAdminClient {
     const body = {}
     if (data.title !== undefined) body.title = data.title
     if (data.handle !== undefined) body.handle = data.handle
-    if (data.category_id !== undefined) body.category_id = data.category_id
+    if (Object.prototype.hasOwnProperty.call(data, 'category_id')) body.category_id = data.category_id
     if (data.display_title !== undefined) body.display_title = data.display_title
     if (data.meta_title !== undefined) body.meta_title = data.meta_title
     if (data.meta_description !== undefined) body.meta_description = data.meta_description
@@ -519,10 +539,11 @@ class MedusaAdminClient {
   async uploadMedia(formData) {
     const base = this.baseURL || getDefaultBaseUrl()
     const url = `${base}/admin-hub/v1/media`
+    const token = typeof window !== 'undefined' ? localStorage.getItem('sellerToken') : null
     const res = await fetch(url, {
       method: 'POST',
       body: formData,
-      headers: {},
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: res.statusText }))
@@ -533,9 +554,10 @@ class MedusaAdminClient {
 
   async registerMediaUrl(data) {
     const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
+    const token = typeof window !== 'undefined' ? localStorage.getItem('sellerToken') : null
     const res = await fetch(`${base}/admin-hub/v1/media/add-url`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify(data),
     })
     if (!res.ok) { const e = await res.json().catch(() => ({ message: res.statusText })); throw new Error(e.message || `HTTP ${res.status}`) }
@@ -548,16 +570,20 @@ class MedusaAdminClient {
 
   async getMediaFolders() {
     const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
-    const res = await fetch(`${base}/admin-hub/v1/media/folders`)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('sellerToken') : null
+    const res = await fetch(`${base}/admin-hub/v1/media/folders`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
     if (!res.ok) return { folders: [] }
     return res.json()
   }
 
   async createMediaFolder(name) {
     const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
+    const token = typeof window !== 'undefined' ? localStorage.getItem('sellerToken') : null
     const res = await fetch(`${base}/admin-hub/v1/media/folders`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({ name }),
     })
     if (!res.ok) { const e = await res.json().catch(() => ({ message: res.statusText })); throw new Error(e.message || `HTTP ${res.status}`) }

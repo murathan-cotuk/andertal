@@ -9,6 +9,16 @@ import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useParams, useSearchParams, notFound } from "next/navigation";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
 import { getMedusaClient } from "@/lib/medusa-client";
+import {
+  SORT_OPTIONS,
+  PER_PAGE,
+  buildFacetsFromProducts,
+  filterProductsByFacets,
+  applyCatalogSort,
+  isDiscountedProduct,
+  isRecentProduct,
+  productSalesScore,
+} from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
 
 /* ─────────────────────────────────────────────────────────── */
@@ -329,23 +339,6 @@ const CheckRow = styled.label`
   &:hover { color: #111; }
 `;
 
-const SubcategoryGroup = styled.div`
-  border-bottom: 1px solid #eceae7;
-  padding-bottom: 10px;
-  margin-bottom: 6px;
-`;
-
-const SubcategoryLink = styled(Link)`
-  display: block;
-  padding: 6px 0;
-  font-size: 12.5px;
-  color: ${(p) => (p.$active ? "#111" : "#555")};
-  font-weight: ${(p) => (p.$active ? "700" : "500")};
-  text-decoration: none;
-  transition: color 0.12s;
-  &:hover { color: #111; }
-`;
-
 const ClearAllBtn = styled.button`
   background: none;
   border: 1px solid #ccc;
@@ -401,82 +394,6 @@ const ResultBar = styled.div`
   color: #999;
   letter-spacing: 0.04em;
 `;
-
-function normalizeFacetKey(key) {
-  const raw = String(key || "").trim().toLowerCase().replace(/\s+/g, "_");
-  if (!raw) return "";
-  if (["farbe", "color", "colour", "farben"].includes(raw)) return "farbe";
-  if (["groesse", "größe", "size", "sizes"].includes(raw)) return "groesse";
-  if (["material", "materials", "stoff"].includes(raw)) return "material";
-  return raw;
-}
-
-function variationGroupFacetKey(group, fallbackIndex) {
-  const raw = group?.key || group?.name || group?.title || `option_${fallbackIndex + 1}`;
-  return normalizeFacetKey(raw);
-}
-
-function inferFacetKeyFromValue(value, fallbackKey = "") {
-  const s = String(value || "").trim();
-  const lower = s.toLowerCase();
-  if (!s) return normalizeFacetKey(fallbackKey);
-
-  const sizeTokens = new Set([
-    "xxs", "xs", "s", "m", "l", "xl", "xxl", "xxxl",
-    "2xs", "3xs", "2xl", "3xl", "4xl", "5xl",
-  ]);
-  const colorTokens = new Set([
-    "blue", "green", "pink", "red", "yellow", "orange", "purple", "violet",
-    "black", "white", "grey", "gray", "brown", "beige", "navy", "gold",
-    "silver", "rose", "rosa", "pinke", "pembe", "blau", "gruen", "grün",
-    "rot", "gelb", "orange", "lila", "schwarz", "weiss", "weiß", "grau",
-    "braun", "beige", "marine", "gold", "silber",
-  ]);
-
-  if (sizeTokens.has(lower)) return "groesse";
-  if (/^\d{1,3}$/.test(s)) return "groesse";
-  if (/^\d{1,3}([.,]\d+)?\s?(cm|mm|kg|g|ml|l|eu|us|uk)$/.test(lower)) return "groesse";
-  if (/^\d{2,3}\/\d{2,3}$/.test(s)) return "groesse";
-  if (colorTokens.has(lower)) return "farbe";
-
-  return normalizeFacetKey(fallbackKey);
-}
-
-function getProductBasePriceCents(product) {
-  const firstVariantPrice = product?.variants?.[0]?.prices?.[0]?.amount;
-  if (firstVariantPrice != null) return Number(firstVariantPrice) || 0;
-  if (product?.price != null) return Math.round(Number(product.price) * 100) || 0;
-  return 0;
-}
-
-function isDiscountedProduct(product) {
-  const base = getProductBasePriceCents(product);
-  const sale = product?.metadata?.rabattpreis_cents != null ? Number(product.metadata.rabattpreis_cents) : null;
-  return sale != null && sale > 0 && sale < base;
-}
-
-function isRecentProduct(product, months = 2) {
-  const now = new Date();
-  const threshold = new Date(now);
-  threshold.setMonth(threshold.getMonth() - months);
-  const candidates = [
-    product?.created_at,
-    product?.metadata?.publish_date,
-    product?.metadata?.created_at,
-    product?.updated_at,
-  ];
-  for (const raw of candidates) {
-    if (!raw) continue;
-    const d = new Date(raw);
-    if (!Number.isNaN(d.getTime())) return d >= threshold;
-  }
-  return false;
-}
-
-function productSalesScore(product) {
-  const meta = product?.metadata || {};
-  return Number(meta.sold_last_month || meta.sold || meta.sales_count || 0) || 0;
-}
 
 /* ─── Pagination ─────────────────────────────────────────── */
 const Pager = styled.div`
@@ -579,18 +496,6 @@ const Desc = styled.div`
   a { color: var(--shop-primary, #111); text-decoration: underline; }
 `;
 
-/* ─────────────────────────────────────────────────────────── */
-const SORT_OPTIONS = [
-  { value: "default",      label: "Featured"          },
-  { value: "newest",       label: "Newest"            },
-  { value: "price_asc",    label: "Price: Low → High"  },
-  { value: "price_desc",   label: "Price: High → Low"  },
-  { value: "title_asc",    label: "Name A–Z"           },
-  { value: "title_desc",   label: "Name Z–A"           },
-];
-
-const PER_PAGE = 24;
-
 /* ─────────────────────────────────────────────────────────── *
  *  Page
  * ─────────────────────────────────────────────────────────── */
@@ -616,7 +521,7 @@ export default function CollectionPage() {
   const [panelOpen,   setPanelOpen]   = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
   const [recommendedProducts, setRecommendedProducts] = useState([]);
-  const [subcategories, setSubcategories] = useState([]);
+  const [linkedCategoryId, setLinkedCategoryId] = useState(null);
 
   const bodyRef = useRef(null);
 
@@ -628,15 +533,22 @@ export default function CollectionPage() {
     }
   }, [handle, router]);
 
+  /** Nur explizit verknüpfte Kategorien (metadata.collection_id === Collection-UUID): keine Slug-Heuristik,
+   * damit freistehende Kollektionen (z. B. „Sales“ ohne Kategorie) keine fremden Subkategorien anzeigen. */
   const findCategoryByCollection = (nodes, col) => {
-    if (!Array.isArray(nodes) || !col) return null;
+    if (!Array.isArray(nodes) || !col?.id) return null;
+    const colId = String(col.id);
     for (const node of nodes) {
-      const meta = node?.metadata && typeof node.metadata === "object" ? node.metadata : {};
-      const linkedCollectionId = meta.collection_id ? String(meta.collection_id) : "";
-      if (
-        (linkedCollectionId && col.id && linkedCollectionId === String(col.id)) ||
-        (node?.slug && col.handle && String(node.slug).toLowerCase() === String(col.handle).toLowerCase())
-      ) {
+      let meta = node?.metadata && typeof node.metadata === "object" ? node.metadata : {};
+      if (typeof node?.metadata === "string") {
+        try {
+          meta = JSON.parse(node.metadata);
+        } catch {
+          meta = {};
+        }
+      }
+      const linkedCollectionId = meta?.collection_id != null ? String(meta.collection_id).trim() : "";
+      if (linkedCollectionId && linkedCollectionId === colId) {
         return node;
       }
       const nested = findCategoryByCollection(node?.children || [], col);
@@ -700,7 +612,7 @@ export default function CollectionPage() {
 
   useEffect(() => {
     if (!collection?.id && !collection?.handle) {
-      setSubcategories([]);
+      setLinkedCategoryId(null);
       return;
     }
     let cancelled = false;
@@ -709,10 +621,11 @@ export default function CollectionPage() {
         const data = await getMedusaClient().getCategories({ tree: true, is_visible: true });
         const tree = data?.tree || data?.categories || [];
         const currentCategory = findCategoryByCollection(tree, collection);
-        const children = Array.isArray(currentCategory?.children) ? currentCategory.children : [];
-        if (!cancelled) setSubcategories(children.filter((c) => c?.active !== false));
+        if (!cancelled) {
+          setLinkedCategoryId(currentCategory?.id ? String(currentCategory.id) : null);
+        }
       } catch {
-        if (!cancelled) setSubcategories([]);
+        if (!cancelled) setLinkedCategoryId(null);
       }
     })();
     return () => {
@@ -742,114 +655,10 @@ export default function CollectionPage() {
     el.href = `${window.location.origin}/${locale}/${collection.handle}`;
   }, [locale, collection?.handle]);
 
-  /* ── Facets ── */
-  const facets = (() => {
-    // System/internal keys — never shown as filters
-    const SKIP = new Set([
-      "media", "image_url", "image", "thumbnail",
-      "review_count", "review_avg", "sold_last_month",
-      "rabattpreis_cents", "uvp_cents", "price_cents", "compare_at_price_cents", "sale_price_cents",
-      "is_new", "badge", "sale",
-      "ean", "sku",
-      "bullet_points", "translations", "variation_groups", "metafields",
-      "shipping_group_id",
-      "collection_id", "collection_ids", "admin_category_id", "category_id",
-      "seller_id", "product_id",
-      "brand", "brand_id", "brand_logo", "brand_handle",
-      "shop_name", "store_name", "seller_name",
-      "hersteller", "hersteller_information", "verantwortliche_person_information",
-      "seo_keywords", "seo_meta_title", "seo_meta_description",
-      "publish_date", "return_days", "return_cost", "return_kostenlos",
-      "related_product_ids",
-      "dimensions", "dimensions_length", "dimensions_width", "dimensions_height",
-      "weight", "weight_grams", "unit_type", "unit_value", "unit_reference",
-      "shipping_info", "versand",
-    ]);
-
-    const isCleanValue = (s) => {
-      if (!s || s.length > 80) return false;
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return false;
-      if (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("/uploads/")) return false;
-      return true;
-    };
-
-    const addValue = (f, key, rawVal) => {
-      const normalizedKey = normalizeFacetKey(key);
-      if (!normalizedKey || SKIP.has(normalizedKey) || normalizedKey.startsWith("_")) return;
-      const vals = Array.isArray(rawVal) ? rawVal : [rawVal];
-      vals.forEach(x => {
-        if (x == null || typeof x === "object") return;
-        const s = String(x).trim();
-        if (!isCleanValue(s)) return;
-        if (!f[normalizedKey]) f[normalizedKey] = new Set();
-        f[normalizedKey].add(s);
-      });
-    };
-
-    const f = {};
-    products.forEach(p => {
-      const meta = typeof p.metadata === "object" && p.metadata ? p.metadata : {};
-
-      // 1. Flat metadata keys
-      Object.entries(meta).forEach(([k, v]) => {
-        const nk = normalizeFacetKey(k);
-        if (SKIP.has(nk) || nk.startsWith("_")) return;
-        if (Array.isArray(v) && v.length > 0 && typeof v[0] === "object") return; // skip arrays of objects
-        if (v !== null && typeof v === "object" && !Array.isArray(v)) return; // skip plain objects
-        addValue(f, nk, v);
-      });
-
-      // 2. metafields array: [{key, value}, ...]
-      if (Array.isArray(meta.metafields)) {
-        meta.metafields.forEach(({ key, value } = {}) => {
-          const nk = normalizeFacetKey(key);
-          if (!nk || value == null || value === "") return;
-          if (SKIP.has(nk) || nk.startsWith("_")) return;
-          addValue(f, nk, value);
-        });
-      }
-
-      // 3. variant metadata + variant metafields + option values
-      if (Array.isArray(p.variants)) {
-        p.variants.forEach((variant) => {
-          const variantMeta = typeof variant?.metadata === "object" && variant.metadata ? variant.metadata : {};
-
-          Object.entries(variantMeta).forEach(([k, v]) => {
-            const nk = normalizeFacetKey(k);
-            if (SKIP.has(nk) || nk.startsWith("_")) return;
-            if (Array.isArray(v) && v.length > 0 && typeof v[0] === "object") return;
-            if (v !== null && typeof v === "object" && !Array.isArray(v)) return;
-            addValue(f, nk, v);
-          });
-
-          if (Array.isArray(variantMeta.metafields)) {
-            variantMeta.metafields.forEach(({ key, value } = {}) => {
-              const nk = normalizeFacetKey(key);
-              if (!nk || value == null || value === "") return;
-              if (SKIP.has(nk) || nk.startsWith("_")) return;
-              addValue(f, nk, value);
-            });
-          }
-
-          if (Array.isArray(variant?.option_values)) {
-            const groups = Array.isArray(p.variation_groups) ? p.variation_groups : [];
-            variant.option_values.forEach((value, idx) => {
-              const groupKey = inferFacetKeyFromValue(value, variationGroupFacetKey(groups[idx], idx));
-              addValue(f, groupKey, value);
-            });
-          }
-        });
-      }
-    });
-
-    return Object.fromEntries(
-      Object.entries(f)
-        .map(([k, s]) => [k, [...s].sort()])
-        .filter(([, v]) => v.length > 0 && v.length <= 50)
-    );
-  })();
+  const facets = buildFacetsFromProducts(products);
 
   const hasFacets = Object.keys(facets).length > 0;
+  const showCatalogSidebar = hasFacets;
 
   useEffect(() => {
     const facetKeys = Object.keys(facets);
@@ -889,49 +698,9 @@ export default function CollectionPage() {
   if (bestsellerOnly) {
     filtered = filtered.filter((p) => productSalesScore(p) > 0);
   }
-  Object.entries(filters).forEach(([k, vals]) => {
-    if (!vals?.length) return;
-    filtered = filtered.filter(p => {
-      const meta = p.metadata || {};
-      const normalizedKey = normalizeFacetKey(k);
-      // 1. Direct metadata key
-      const direct = meta[k];
-      if (direct != null && (Array.isArray(direct) ? direct : [direct]).some(x => vals.includes(String(x).trim()))) return true;
-      const directNormalized = meta[normalizedKey];
-      if (directNormalized != null && (Array.isArray(directNormalized) ? directNormalized : [directNormalized]).some(x => vals.includes(String(x).trim()))) return true;
-      // 2. metafields array [{key, value}, ...]
-      if (Array.isArray(meta.metafields) && meta.metafields.some(mf => mf?.key === k && vals.includes(String(mf.value ?? "").trim()))) return true;
-      if (Array.isArray(meta.metafields) && meta.metafields.some(mf => normalizeFacetKey(mf?.key) === normalizedKey && vals.includes(String(mf.value ?? "").trim()))) return true;
-      // 3. variant metadata + option_values
-      if (Array.isArray(p.variants) && p.variants.some(v => {
-        const variantMeta = typeof v?.metadata === "object" && v.metadata ? v.metadata : {};
-        const directVariant = variantMeta[k];
-        if (directVariant != null && (Array.isArray(directVariant) ? directVariant : [directVariant]).some(x => vals.includes(String(x).trim()))) return true;
-        const directVariantNormalized = variantMeta[normalizedKey];
-        if (directVariantNormalized != null && (Array.isArray(directVariantNormalized) ? directVariantNormalized : [directVariantNormalized]).some(x => vals.includes(String(x).trim()))) return true;
-        if (Array.isArray(variantMeta.metafields) && variantMeta.metafields.some(mf => normalizeFacetKey(mf?.key) === normalizedKey && vals.includes(String(mf.value ?? "").trim()))) return true;
-        const ov = Array.isArray(v.option_values) ? v.option_values : [];
-        const groups = Array.isArray(p.variation_groups) ? p.variation_groups : [];
-        return ov.some((x, idx) => inferFacetKeyFromValue(x, variationGroupFacetKey(groups[idx], idx)) === normalizedKey && vals.includes(String(x).trim()));
-      })) return true;
-      return false;
-    });
-  });
+  filtered = filterProductsByFacets(filtered, filters);
 
-  /* ── Sort ── */
-  const sorted = [...filtered];
-  if (bestsellerOnly && sort === "default") {
-    sorted.sort((a, b) => productSalesScore(b) - productSalesScore(a));
-  }
-  if (sort === "newest")     sorted.sort((a,b) => {
-    const da = a.metadata?.publish_date ? new Date(a.metadata.publish_date).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
-    const db = b.metadata?.publish_date ? new Date(b.metadata.publish_date).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
-    return db - da;
-  });
-  if (sort === "price_asc")  sorted.sort((a,b) => (a.variants?.[0]?.prices?.[0]?.amount ?? 0) - (b.variants?.[0]?.prices?.[0]?.amount ?? 0));
-  if (sort === "price_desc") sorted.sort((a,b) => (b.variants?.[0]?.prices?.[0]?.amount ?? 0) - (a.variants?.[0]?.prices?.[0]?.amount ?? 0));
-  if (sort === "title_asc")  sorted.sort((a,b) => (a.title||"").localeCompare(b.title||""));
-  if (sort === "title_desc") sorted.sort((a,b) => (b.title||"").localeCompare(a.title||""));
+  const sorted = applyCatalogSort(filtered, sort, { bestsellerOnly });
 
   const total      = sorted.length;
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
@@ -1021,12 +790,14 @@ export default function CollectionPage() {
           <ColHeader><h1 className="shop-typo-catalog-title">{title}</h1></ColHeader>
         )}
 
+        {linkedCategoryId ? <LandingContainers categoryId={linkedCategoryId} /> : null}
+
         {/* ── Sort bar (sticky) ── */}
         <SortBar>
           <SortBarInner>
             <SortBarLeft>
               {/* Mobile filter toggle */}
-              {hasFacets && (
+              {showCatalogSidebar && (
                 <FilterBtn
                   type="button"
                   $active={panelOpen || activeCount > 0}
@@ -1041,7 +812,9 @@ export default function CollectionPage() {
                     <circle cx="11" cy="6"  r="1.5" fill="#111" stroke="none"/>
                     <circle cx="5"  cy="10" r="1.5" fill="#111" stroke="none"/>
                   </svg>
-                  Filter {activeCount > 0 ? `(${activeCount})` : ""}
+                  <>
+                    Filter {activeCount > 0 ? `(${activeCount})` : ""}
+                  </>
                 </FilterBtn>
               )}
               <Breadcrumb aria-label="Breadcrumb">
@@ -1066,19 +839,20 @@ export default function CollectionPage() {
         </SortBar>
 
         {/* ── Sidebar + content ── */}
-        {hasFacets && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
+        {showCatalogSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
         <ContentWrap ref={bodyRef}>
 
           {/* Left filter sidebar */}
-          {hasFacets && (
+          {showCatalogSidebar && (
             <Sidebar $open={panelOpen}>
               {/* Mobile header */}
               <SidebarHead>
-                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>Filter</span>
+                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                  Filter
+                </span>
                 <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555", lineHeight: 1 }}>×</button>
               </SidebarHead>
 
-              {/* Desktop title */}
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 20, paddingBottom: 12, borderBottom: "1px solid #e8e8e6" }}>
                 Filter
                 {activeCount > 0 && (
@@ -1087,23 +861,6 @@ export default function CollectionPage() {
                   </ClearAllBtn>
                 )}
               </div>
-
-              {subcategories.length > 0 && (
-                <SubcategoryGroup>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 6 }}>
-                    Subkategorien
-                  </div>
-                  {subcategories.map((sub) => (
-                    <SubcategoryLink
-                      key={sub.id || sub.slug}
-                      href={`/${sub.slug}`}
-                      $active={String(sub.slug || "").toLowerCase() === String(handle || "").toLowerCase()}
-                    >
-                      {sub.name || sub.slug}
-                    </SubcategoryLink>
-                  ))}
-                </SubcategoryGroup>
-              )}
 
               {Object.entries(facets).map(([key, vals]) => (
                 <FilterGroup key={key}>

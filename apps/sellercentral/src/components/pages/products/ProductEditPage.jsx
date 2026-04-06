@@ -23,12 +23,14 @@ import {
   Modal,
   Checkbox,
   Tag,
+  Collapsible,
 } from "@shopify/polaris";
 import { ProductIcon, MenuHorizontalIcon, ViewIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle, sanitizeSeoHandleInput } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
+import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import { routing } from "@/i18n/routing";
 import { encodeVariantPathKey } from "@/lib/variant-path-key";
 
@@ -63,6 +65,22 @@ function sanitizePriceDraftString(s) {
     }
   }
   return out;
+}
+
+/** Breadcrumb path from flat category list (parent_id links) for compact summaries. */
+function categoryBreadcrumbFromFlatList(flatCategories, categoryId) {
+  if (!categoryId || !Array.isArray(flatCategories) || flatCategories.length === 0) return "";
+  const byId = new Map(flatCategories.map((c) => [String(c.id), c]));
+  const parts = [];
+  let cur = byId.get(String(categoryId));
+  const seen = new Set();
+  while (cur && !seen.has(String(cur.id))) {
+    seen.add(String(cur.id));
+    parts.unshift(String(cur.name || cur.slug || cur.id).trim());
+    const pid = cur.parent_id != null ? String(cur.parent_id) : "";
+    cur = pid && byId.has(pid) ? byId.get(pid) : null;
+  }
+  return parts.filter(Boolean).join(" › ");
 }
 
 /** Per-locale variant image; no leaking another locale’s image into DE when `image_urls` is set. */
@@ -227,6 +245,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionPopoverOpen, setCollectionPopoverOpen] = useState(false);
+  const [isSuperuser, setIsSuperuser] = useState(false);
   const [relatedProductsList, setRelatedProductsList] = useState([]);
   const [relatedProductSearch, setRelatedProductSearch] = useState("");
   const [relatedProductPopoverOpen, setRelatedProductPopoverOpen] = useState(false);
@@ -263,6 +282,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   /** Katalogdaki tüm tanımlar yerine: değeri olan veya kullanıcının eklediği metafield satırları */
   const [extraVisibleMetaDefKeys, setExtraVisibleMetaDefKeys] = useState({});
   const [addMetaDefPopoverOpen, setAddMetaDefPopoverOpen] = useState(false);
+  const [classificationOpen, setClassificationOpen] = useState(false);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -270,6 +290,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     else document.body.classList.remove("belucha-collections-dropdown-open");
     return () => document.body.classList.remove("belucha-collections-dropdown-open");
   }, [collectionPopoverOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
 
   // Sync from server when we switch product (id/handle) or locale. Merge translations[locale] into title/description.
   const initialProductId = initialProduct?.id ?? initialProduct?.handle ?? "";
@@ -790,6 +815,26 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const collectionIds = Array.isArray(meta.collection_ids) ? meta.collection_ids : (meta.collection_id != null ? [meta.collection_id] : (product?.collection_id != null ? [product.collection_id] : []));
   const relatedProductIds = Array.isArray(meta.related_product_ids) ? meta.related_product_ids : [];
 
+  const categorySummaryPath = categoryBreadcrumbFromFlatList(categories, getMeta(product, "category_id"));
+  const brandIdSummary = getMeta(product, "brand_id");
+  const brandSummaryLabel = brandIdSummary
+    ? (brands || []).find((b) => String(b.id) === String(brandIdSummary))?.name || ""
+    : "";
+  const shipIdSummary = meta.shipping_group_id;
+  const shipSummaryLabel = shipIdSummary
+    ? shippingGroupsList.find((g) => String(g.id) === String(shipIdSummary))?.name || ""
+    : "";
+  const classificationChips = [];
+  if (categorySummaryPath) classificationChips.push({ key: "cat", text: categorySummaryPath });
+  if (brandSummaryLabel) classificationChips.push({ key: "brand", text: brandSummaryLabel });
+  if (shipSummaryLabel) classificationChips.push({ key: "ship", text: `Versand: ${shipSummaryLabel}` });
+  if (isSuperuser && collectionIds.length > 0) {
+    classificationChips.push({
+      key: "coll",
+      text: `${collectionIds.length} Kollektion${collectionIds.length !== 1 ? "en" : ""}`,
+    });
+  }
+
   // ─── Variation Engine ────────────────────────────────────────────────────────
 
   /** Cartesian product of arrays: [["Red","Black"],["S","M"]] → [["Red","S"],["Red","M"],...] */
@@ -1246,39 +1291,155 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               </InlineStack>
 
               <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Category & Brand & Versand</Text>
-              <InlineStack gap="300" wrap>
-                <Box minWidth="220px" flex="1">
-                  <Select
-                    label="Category"
-                    labelHidden
-                    options={[{ label: "— None —", value: "" }, ...(categories || []).map((c) => ({ label: c.name, value: c.id }))]}
-                    value={getMeta(product, "category_id")}
-                    onChange={(v) => updateMeta("category_id", v)}
-                  />
-                </Box>
-                <Box minWidth="220px" flex="1">
-                  <Select
-                    label="Brand"
-                    labelHidden
-                    options={[{ label: "— None —", value: "" }, ...(brands || []).map((b) => ({ label: b.name, value: b.id }))]}
-                    value={getMeta(product, "brand_id") || ""}
-                    onChange={(v) => updateMeta("brand_id", v || undefined)}
-                  />
-                </Box>
-                <Box minWidth="220px" flex="1">
-                  <Select
-                    label="Versandgruppe"
-                    labelHidden
-                    options={[
-                      { label: "— Keine Versandgruppe —", value: "" },
-                      ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
-                    ]}
-                    value={meta.shipping_group_id ?? ""}
-                    onChange={(v) => updateMeta("shipping_group_id", v || undefined)}
-                  />
-                </Box>
-              </InlineStack>
+              <Box padding="400" background="bg-surface-secondary" borderRadius="300" borderWidth="025" borderColor="border">
+                <BlockStack gap="300">
+                  <InlineStack align="space-between" blockAlign="start" gap="400" wrap>
+                    <BlockStack gap="150">
+                      <Text as="h2" variant="headingSm">Shop-Zuordnung</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Kategorie, Marke, Versandgruppe{isSuperuser ? " und Kollektionen" : ""} — steuern Katalog und Shop-Navigation.
+                      </Text>
+                      {!classificationOpen && (
+                        classificationChips.length > 0 ? (
+                          <InlineStack gap="150" wrap blockAlign="center">
+                            {classificationChips.map((c) => (
+                              <Tag key={c.key}>{c.text}</Tag>
+                            ))}
+                          </InlineStack>
+                        ) : (
+                          <Text as="p" variant="bodySm" tone="subdued">Noch nicht zugeordnet — „Bearbeiten“ öffnen.</Text>
+                        )
+                      )}
+                    </BlockStack>
+                    <Box flexShrink={0}>
+                      <Button
+                        onClick={() => setClassificationOpen((o) => !o)}
+                        disclosure={classificationOpen ? "up" : "down"}
+                        variant={classificationOpen ? "plain" : "primary"}
+                      >
+                        {classificationOpen ? "Einklappen" : "Bearbeiten"}
+                      </Button>
+                    </Box>
+                  </InlineStack>
+
+                  <Collapsible
+                    open={classificationOpen}
+                    id="product-classification-collapsible"
+                    transition={{ duration: "220ms", timingFunction: "ease" }}
+                  >
+                    <BlockStack gap="400">
+                      <Divider />
+                      <InlineStack gap="500" wrap>
+                        <Box minWidth="240px" flex="1">
+                          <Text as="p" variant="bodySm" fontWeight="semibold">Kategorie</Text>
+                          <Box paddingBlockStart="150">
+                            <CategoryDrilldownSelect
+                              label="Category"
+                              labelHidden
+                              categories={categories || []}
+                              value={getMeta(product, "category_id")}
+                              onChange={(v) => updateMeta("category_id", v)}
+                              placeholder="Kategorie wählen"
+                            />
+                          </Box>
+                        </Box>
+                        <Box minWidth="240px" flex="1">
+                          <Select
+                            label="Marke"
+                            options={[{ label: "— Keine —", value: "" }, ...(brands || []).map((b) => ({ label: b.name, value: b.id }))]}
+                            value={getMeta(product, "brand_id") || ""}
+                            onChange={(v) => updateMeta("brand_id", v || undefined)}
+                          />
+                        </Box>
+                        <Box minWidth="240px" flex="1">
+                          <Select
+                            label="Versandgruppe"
+                            options={[
+                              { label: "— Keine —", value: "" },
+                              ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
+                            ]}
+                            value={meta.shipping_group_id ?? ""}
+                            onChange={(v) => updateMeta("shipping_group_id", v || undefined)}
+                          />
+                        </Box>
+                      </InlineStack>
+
+                      {isSuperuser && (
+                        <>
+                          <Divider />
+                          <BlockStack gap="300">
+                            <Text as="p" variant="bodySm" fontWeight="semibold">Kollektionen</Text>
+                            <Text as="p" variant="bodySm" tone="subdued">Produkt kann mehreren Kollektionen zugeordnet werden (z. B. Sale, Saison).</Text>
+                            <div className={`collection-dropdown-card-wrap ${collectionPopoverOpen ? "collections-open" : ""}`} style={{ position: "relative", zIndex: collectionPopoverOpen ? 10000 : undefined, overflow: "visible", maxWidth: "100%" }}>
+                              <div className="collection-dropdown-wrap">
+                                <TextField
+                                  label="Kollektionen durchsuchen"
+                                  labelHidden
+                                  value={collectionSearch}
+                                  onChange={setCollectionSearch}
+                                  onFocus={() => setCollectionPopoverOpen(true)}
+                                  placeholder="Kollektion suchen…"
+                                  autoComplete="off"
+                                />
+                                <div className={`collection-dropdown-panel ${collectionPopoverOpen ? "open" : ""}`}>
+                                  {(collections || [])
+                                    .filter((c) => !collectionSearch.trim() || (c.title || c.handle || "").toLowerCase().includes(collectionSearch.toLowerCase()))
+                                    .map((c) => (
+                                      <button
+                                        key={c.id}
+                                        type="button"
+                                        className="collection-dropdown-item"
+                                        onClick={() => {
+                                          const next = collectionIds.includes(c.id) ? collectionIds.filter((id) => id !== c.id) : [...collectionIds, c.id];
+                                          updateMeta("collection_ids", next);
+                                        }}
+                                      >
+                                        <span className="checkbox-container" style={{ pointerEvents: "none" }}>
+                                          <input type="checkbox" checked={collectionIds.includes(c.id)} readOnly tabIndex={-1} />
+                                          <svg viewBox="0 0 64 64" height="1.25em" width="1.25em">
+                                            <path d="M 0 16 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 16 L 32 48 L 64 16 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 16" pathLength="575.0541381835938" className="checkbox-path" />
+                                          </svg>
+                                        </span>
+                                        <span>{c.title || c.handle || c.id}</span>
+                                      </button>
+                                    ))}
+                                </div>
+                              </div>
+                              {collectionPopoverOpen && <div style={{ position: "fixed", inset: 0, zIndex: 10001 }} onClick={() => setCollectionPopoverOpen(false)} aria-hidden />}
+                              {collectionIds.length > 0 && (
+                                <InlineStack gap="100" wrap>
+                                  {collectionIds.map((id) => {
+                                    const c = (collections || []).find((x) => x.id === id);
+                                    const collLabel = c ? (c.title || c.handle || id) : id;
+                                    return (
+                                      <span
+                                        key={id}
+                                        style={{
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          gap: 4,
+                                          padding: "4px 8px",
+                                          background: "var(--p-color-bg-fill-secondary)",
+                                          borderRadius: 6,
+                                          fontSize: 12,
+                                          color: "var(--p-color-text-subdued)",
+                                        }}
+                                      >
+                                        {collLabel || "—"}
+                                        <button type="button" onClick={() => updateMeta("collection_ids", collectionIds.filter((x) => x !== id))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Remove">×</button>
+                                      </span>
+                                    );
+                                  })}
+                                </InlineStack>
+                              )}
+                            </div>
+                          </BlockStack>
+                        </>
+                      )}
+                    </BlockStack>
+                  </Collapsible>
+                </BlockStack>
+              </Box>
 
               <Divider />
               <BlockStack gap="200">
@@ -2160,77 +2321,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     helpText="İleri tarih + saat seçilirse shop’ta “Pek yakında” gösterilir."
                   />
                 </BlockStack>
-
-                <Divider />
-
-                <div className={`collection-dropdown-card-wrap ${collectionPopoverOpen ? "collections-open" : ""}`} style={{ position: "relative", zIndex: collectionPopoverOpen ? 10000 : undefined, overflow: "visible" }}>
-                  <BlockStack gap="200">
-                    <Text as="h2" variant="bodyMd" fontWeight="regular">Collections</Text>
-                    <div className="collection-dropdown-wrap">
-                      <TextField
-                        label=""
-                        labelHidden
-                        value={collectionSearch}
-                        onChange={setCollectionSearch}
-                        onFocus={() => setCollectionPopoverOpen(true)}
-                        placeholder="Search collections…"
-                        autoComplete="off"
-                      />
-                      <div className={`collection-dropdown-panel ${collectionPopoverOpen ? "open" : ""}`}>
-                        {(collections || [])
-                          .filter((c) => !collectionSearch.trim() || (c.title || c.handle || "").toLowerCase().includes(collectionSearch.toLowerCase()))
-                          .map((c) => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              className="collection-dropdown-item"
-                              onClick={() => {
-                                const next = collectionIds.includes(c.id) ? collectionIds.filter((id) => id !== c.id) : [...collectionIds, c.id];
-                                updateMeta("collection_ids", next);
-                              }}
-                            >
-                              <span className="checkbox-container" style={{ pointerEvents: "none" }}>
-                                <input type="checkbox" checked={collectionIds.includes(c.id)} readOnly tabIndex={-1} />
-                                <svg viewBox="0 0 64 64" height="1.25em" width="1.25em">
-                                  <path d="M 0 16 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 16 L 32 48 L 64 16 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 16" pathLength="575.0541381835938" className="checkbox-path" />
-                                </svg>
-                              </span>
-                              <span>{c.title || c.handle || c.id}</span>
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                    {collectionPopoverOpen && <div style={{ position: "fixed", inset: 0, zIndex: 10001 }} onClick={() => setCollectionPopoverOpen(false)} aria-hidden />}
-                    {collectionIds.length > 0 && (
-                      <InlineStack gap="100" wrap>
-                        {collectionIds.map((id) => {
-                          const c = (collections || []).find((x) => x.id === id);
-                          const label = c ? (c.title || c.handle || id) : id;
-                          return (
-                            <span
-                              key={id}
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 4,
-                                padding: "4px 8px",
-                                background: "var(--p-color-bg-fill-secondary)",
-                                borderRadius: 6,
-                                fontSize: 12,
-                                color: "var(--p-color-text-subdued)",
-                              }}
-                            >
-                              {label || "—"}
-                              <button type="button" onClick={() => updateMeta("collection_ids", collectionIds.filter((x) => x !== id))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Remove">×</button>
-                            </span>
-                          );
-                        })}
-                      </InlineStack>
-                    )}
-                  </BlockStack>
-                </div>
-
-                <Divider />
 
                 <div style={{ position: "relative", zIndex: relatedProductPopoverOpen ? 10000 : undefined, overflow: "visible" }}>
                   <BlockStack gap="200">

@@ -27,7 +27,7 @@ function fmtCents(c) {
 
 function fmtDate(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE");
+  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function fmtMonth(d) {
@@ -35,6 +35,41 @@ function fmtMonth(d) {
   const dt = new Date(d);
   return dt.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
 }
+
+function toIsoDate(d) {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "";
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function generatePayoutPeriods(count = 12) {
+  const periods = [];
+  let year = new Date().getFullYear();
+  let month = new Date().getMonth();
+  for (let i = 0; i < count; i++) {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    periods.push({
+      key: `${year}-${String(month + 1).padStart(2, "0")}-H2`,
+      label: `16.${String(month + 1).padStart(2, "0")}.${year} – ${String(daysInMonth).padStart(2, "0")}.${String(month + 1).padStart(2, "0")}.${year}`,
+      start: new Date(year, month, 16),
+      end: new Date(year, month, daysInMonth, 23, 59, 59, 999),
+    });
+    periods.push({
+      key: `${year}-${String(month + 1).padStart(2, "0")}-H1`,
+      label: `01.${String(month + 1).padStart(2, "0")}.${year} – 15.${String(month + 1).padStart(2, "0")}.${year}`,
+      start: new Date(year, month, 1),
+      end: new Date(year, month, 15, 23, 59, 59, 999),
+    });
+    month -= 1;
+    if (month < 0) { month = 11; year -= 1; }
+  }
+  return periods;
+}
+
+const PAYOUT_PERIODS = generatePayoutPeriods(12);
 
 // ── Stat card ─────────────────────────────────────────────────────────────
 function Stat({ label, value, sub, tone }) {
@@ -120,6 +155,9 @@ export default function SellerDetailPage({ sellerId }) {
   const [payoutModal, setPayoutModal] = useState(false);
   const [payoutForm, setPayoutForm] = useState({ period_start: "", period_end: "", total_cents: "", commission_cents: "", payout_cents: "", notes: "" });
   const [savingPayout, setSavingPayout] = useState(false);
+  const [periodKey, setPeriodKey] = useState(PAYOUT_PERIODS[0]?.key || "");
+  const [periodTransactions, setPeriodTransactions] = useState([]);
+  const [periodTransactionsLoading, setPeriodTransactionsLoading] = useState(false);
 
   const load = useCallback(() => {
     if (!sellerId) {
@@ -139,6 +177,23 @@ export default function SellerDetailPage({ sellerId }) {
   }, [sellerId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!seller?.seller_id) return;
+    const selected = PAYOUT_PERIODS.find((p) => p.key === periodKey) || PAYOUT_PERIODS[0];
+    if (!selected) return;
+    setPeriodTransactionsLoading(true);
+    client.getTransactions({ seller_id: seller.seller_id, include_pending: "true" })
+      .then((r) => {
+        const list = (r?.transactions || []).filter((t) => {
+          const dt = new Date(t.created_at);
+          return !Number.isNaN(dt.getTime()) && dt >= selected.start && dt <= selected.end;
+        });
+        setPeriodTransactions(list);
+      })
+      .catch(() => setPeriodTransactions([]))
+      .finally(() => setPeriodTransactionsLoading(false));
+  }, [client, seller?.seller_id, periodKey]);
 
   const handleApprove = async () => {
     if (!newStatus) return;
@@ -213,7 +268,7 @@ export default function SellerDetailPage({ sellerId }) {
   // Generate invoice text (simple text-based)
   const generateInvoice = (payout) => {
     const s = seller;
-    const today = new Date().toLocaleDateString("de-DE");
+    const today = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
     const text = `PROVISIONSNOTE\n${"=".repeat(50)}\n
 Aussteller: Belucha GmbH
 Datum: ${today}
@@ -268,6 +323,11 @@ ${"=".repeat(50)}
     { id: "products", content: "Produkte" },
     { id: "company", content: "Firmendaten" },
   ];
+  const selectedPeriod = PAYOUT_PERIODS.find((p) => p.key === periodKey) || PAYOUT_PERIODS[0];
+  const periodTotalCents = periodTransactions.reduce((sum, t) => sum + (t.total_cents || 0), 0);
+  const periodCommissionCents = periodTransactions.reduce((sum, t) => sum + (t.commission_cents || 0), 0);
+  const periodPayoutCents = periodTransactions.reduce((sum, t) => sum + (t.payout_cents || 0), 0);
+  const periodEligibleCount = periodTransactions.filter((t) => t.payout_eligible).length;
 
   return (
     <Page
@@ -353,10 +413,87 @@ ${"=".repeat(50)}
               {/* ── FINANCE TAB ──────────────────────────────────── */}
               {activeTab === 1 && (
                 <BlockStack gap="400">
-                  <InlineStack gap="300" blockAlign="center">
-                    <Text as="h3" variant="headingSm">Auszahlungshistorie</Text>
-                    <Button size="slim" onClick={() => setPayoutModal(true)}>+ Neue Auszahlung</Button>
+                  <Banner tone="info">
+                    Automatische Auszahlungen werden am 01. und 15. eines Monats vorbereitet (Status: <strong>processing</strong>) und vom Superuser-Konto abgewickelt.
+                  </Banner>
+                  <InlineStack gap="300" blockAlign="center" align="space-between">
+                    <Text as="h3" variant="headingSm">Auszahlungshistorie & Abrechnungsdetails</Text>
+                    <InlineStack gap="200" blockAlign="center">
+                      <div style={{ minWidth: 320 }}>
+                        <Select
+                          label=""
+                          labelHidden
+                          options={PAYOUT_PERIODS.map((p) => ({ label: p.label, value: p.key }))}
+                          value={periodKey}
+                          onChange={setPeriodKey}
+                        />
+                      </div>
+                      <Button
+                        size="slim"
+                        onClick={() => {
+                          if (!selectedPeriod) return;
+                          setPayoutForm((p) => ({
+                            ...p,
+                            period_start: toIsoDate(selectedPeriod.start),
+                            period_end: toIsoDate(selectedPeriod.end),
+                            total_cents: (periodTotalCents / 100).toFixed(2),
+                            commission_cents: (periodCommissionCents / 100).toFixed(2),
+                            payout_cents: (periodPayoutCents / 100).toFixed(2),
+                            notes: p.notes || `Periode ${selectedPeriod.label}`,
+                          }));
+                          setPayoutModal(true);
+                        }}
+                      >
+                        + Auszahlung erstellen
+                      </Button>
+                    </InlineStack>
                   </InlineStack>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(160px, 1fr))", gap: 10 }}>
+                    <Stat label="Umsatz (Periode)" value={fmtCents(periodTotalCents)} />
+                    <Stat label="Provision (Periode)" value={fmtCents(periodCommissionCents)} />
+                    <Stat label="Auszahlung (Periode)" value={fmtCents(periodPayoutCents)} tone="success" />
+                    <Stat label="Orders (eligible / total)" value={`${periodEligibleCount} / ${periodTransactions.length}`} />
+                  </div>
+
+                  <Card>
+                    <BlockStack gap="200">
+                      <Text as="h3" variant="headingSm">Transaktionen in gewählter Periode</Text>
+                      {periodTransactionsLoading ? (
+                        <Text as="p" variant="bodySm" tone="subdued">Laden…</Text>
+                      ) : periodTransactions.length === 0 ? (
+                        <Text as="p" variant="bodySm" tone="subdued">Keine Transaktionen in dieser Periode.</Text>
+                      ) : (
+                        <div style={{ overflowX: "auto" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                            <thead>
+                              <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
+                                {["Bestellung", "Kunde", "Datum", "Umsatz", "Provision", "Auszahlung", "Lieferung", "Eligible"].map((h) => (
+                                  <th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "#6d7175", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {periodTransactions.map((t) => (
+                                <tr key={t.id} style={{ borderBottom: "1px solid #f1f1f1" }}>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>#{t.order_number || "—"}</td>
+                                  <td style={{ padding: "8px 10px" }}>{[t.first_name, t.last_name].filter(Boolean).join(" ") || "—"}</td>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{fmtDate(t.created_at)}</td>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{fmtCents(t.total_cents || 0)}</td>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap", color: "#dc2626" }}>{fmtCents(t.commission_cents || 0)}</td>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap", color: "#16a34a" }}>{fmtCents(t.payout_cents || 0)}</td>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{fmtDate(t.delivery_date)}</td>
+                                  <td style={{ padding: "8px 10px" }}>
+                                    <Badge tone={t.payout_eligible ? "success" : "warning"}>{t.payout_eligible ? "Ja" : "Nein"}</Badge>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </BlockStack>
+                  </Card>
 
                   {!seller.payouts || seller.payouts.length === 0 ? (
                     <Box padding="600" background="bg-surface-secondary" borderRadius="200">

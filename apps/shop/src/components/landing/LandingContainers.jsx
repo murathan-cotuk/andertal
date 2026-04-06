@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "@/i18n/navigation";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { useLandingChrome } from "@/context/LandingChromeContext";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 
@@ -399,7 +400,7 @@ function CollectionCarousel({ container }) {
     const param = container.collection_id
       ? `collection_id=${encodeURIComponent(container.collection_id)}`
       : `collection_handle=${encodeURIComponent(container.collection_handle)}`;
-    fetch(`${BACKEND_URL}/store/products?${param}&limit=20`)
+    fetch(`/api/store-products?${param}&limit=20`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setProducts(Array.isArray(d?.products) ? d.products : []))
       .catch(() => {});
@@ -1055,17 +1056,31 @@ function renderContainer(c) {
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
-export default function LandingContainers({ pageId }) {
+export default function LandingContainers({ pageId, categoryId }) {
   const [containers, setContainers] = useState(null);
+  const { setLandingHeaderFilterBar } = useLandingChrome();
 
   useEffect(() => {
-    const endpoint = pageId
-      ? `/store/landing-page/${encodeURIComponent(pageId)}`
-      : "/store/landing-page";
-    getMedusaClient().request(endpoint).then((data) => {
-      if (Array.isArray(data?.containers)) setContainers(data.containers);
-    }).catch(() => {});
-  }, [pageId]);
+    let endpoint = "/store/landing-page";
+    if (categoryId) {
+      endpoint = `/store/landing-page/category/${encodeURIComponent(categoryId)}`;
+    } else if (pageId) {
+      endpoint = `/store/landing-page/${encodeURIComponent(pageId)}`;
+    }
+    setContainers(null);
+    getMedusaClient()
+      .request(endpoint)
+      .then((data) => {
+        const showBar = data?.settings?.show_filter_bar !== false;
+        setLandingHeaderFilterBar(showBar);
+        if (Array.isArray(data?.containers)) setContainers(data.containers);
+        else setContainers([]);
+      })
+      .catch(() => {
+        setLandingHeaderFilterBar(true);
+        setContainers([]);
+      });
+  }, [pageId, categoryId, setLandingHeaderFilterBar]);
 
   if (!containers || containers.length === 0) return null;
 

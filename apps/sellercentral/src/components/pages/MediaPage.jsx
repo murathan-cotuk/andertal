@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 /* ───────── helpers ───────── */
@@ -16,6 +16,66 @@ function fmtDate(d) {
 }
 function isImage(mime) {
   return !mime || mime.startsWith("image/");
+}
+
+function isOwnMediaItem(item, mySellerId) {
+  const s = String(item?.seller_id || "").trim();
+  if (!s) return true;
+  return s === String(mySellerId || "").trim();
+}
+
+function sortMediaList(list, sortKey) {
+  const arr = [...(list || [])];
+  if (sortKey === "name_asc") {
+    arr.sort((a, b) => (a.filename || "").localeCompare(b.filename || "", undefined, { sensitivity: "base" }));
+  } else if (sortKey === "name_desc") {
+    arr.sort((a, b) => (b.filename || "").localeCompare(a.filename || "", undefined, { sensitivity: "base" }));
+  } else if (sortKey === "size_desc") {
+    arr.sort((a, b) => (Number(b.size) || 0) - (Number(a.size) || 0));
+  } else if (sortKey === "size_asc") {
+    arr.sort((a, b) => (Number(a.size) || 0) - (Number(b.size) || 0));
+  } else if (sortKey === "date_asc") {
+    arr.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+  } else {
+    arr.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  }
+  return arr;
+}
+
+function MediaTile({ item, onSelect }) {
+  return (
+    <div
+      onClick={() => onSelect(item)}
+      style={{
+        background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb",
+        overflow: "hidden", cursor: "pointer", transition: "box-shadow .15s",
+        position: "relative",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.12)"; e.currentTarget.style.borderColor = "#d1d5db"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = "#e5e7eb"; }}
+    >
+      <div style={{ height: 130, background: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        {isImage(item.mime_type)
+          ? <img src={item.url} alt={item.alt || ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
+          : <div style={{ fontSize: 36 }}>📄</div>
+        }
+      </div>
+      <div
+        style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity .15s" }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = "0"; }}
+        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.url); }}
+      >
+        <span style={{ color: "#fff", fontSize: 11, fontWeight: 600, background: "rgba(0,0,0,.4)", padding: "4px 10px", borderRadius: 20 }}>URL kopieren</span>
+      </div>
+      <div style={{ padding: "8px 10px" }}>
+        <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151" }} title={item.filename}>
+          {item.filename}
+        </div>
+        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{fmtSize(item.size)} · {fmtDate(item.created_at)}</div>
+      </div>
+    </div>
+  );
 }
 
 /* ───────── AddUrlModal ───────── */
@@ -209,6 +269,59 @@ export default function MediaPage() {
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  const [mySellerId, setMySellerId] = useState("");
+  const [sellerLabelById, setSellerLabelById] = useState({});
+  const [sellerSearchFilter, setSellerSearchFilter] = useState("");
+  const [mediaSellerSectionsOpen, setMediaSellerSectionsOpen] = useState({});
+  const [mediaSort, setMediaSort] = useState("date_desc");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+    setMySellerId(localStorage.getItem("sellerId") || "");
+  }, []);
+
+  useEffect(() => {
+    if (!isSuperuser) return;
+    const client = getMedusaAdminClient();
+    client
+      .getSellers()
+      .then((d) => {
+        const m = {};
+        for (const s of d.sellers || []) {
+          if (s.seller_id) m[s.seller_id] = s.store_name || s.company_name || s.email || s.seller_id;
+        }
+        setSellerLabelById(m);
+      })
+      .catch(() => {});
+  }, [isSuperuser]);
+
+  const { ownMedia, sellerMediaGroups } = useMemo(() => {
+    const own = [];
+    const g = new Map();
+    for (const m of media) {
+      if (isOwnMediaItem(m, mySellerId)) own.push(m);
+      else {
+        const sid = String(m.seller_id || "unknown");
+        if (!g.has(sid)) g.set(sid, []);
+        g.get(sid).push(m);
+      }
+    }
+    const keys = [...g.keys()].sort((a, b) =>
+      (sellerLabelById[a] || a).localeCompare(sellerLabelById[b] || b, undefined, { sensitivity: "base" })
+    );
+    return { ownMedia: own, sellerMediaGroups: keys.map((k) => ({ sellerId: k, items: g.get(k) })) };
+  }, [media, mySellerId, sellerLabelById]);
+
+  const filteredSellerMediaGroups = useMemo(() => {
+    const q = sellerSearchFilter.trim().toLowerCase();
+    if (!q) return sellerMediaGroups;
+    return sellerMediaGroups.filter(({ sellerId }) => {
+      const label = (sellerLabelById[sellerId] || sellerId || "").toLowerCase();
+      return label.includes(q) || sellerId.toLowerCase().includes(q);
+    });
+  }, [sellerMediaGroups, sellerSearchFilter, sellerLabelById]);
 
   const load = useCallback(async (folder = activeFolder, q = search) => {
     setLoading(true);
@@ -347,7 +460,25 @@ export default function MediaPage() {
         {/* Top bar */}
         <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "12px 20px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#111" }}>{folderLabel}</div>
-          <span style={{ fontSize: 12, color: "#9ca3af" }}>{totalCount} Dateien</span>
+          <span style={{ fontSize: 12, color: "#9ca3af" }}>
+            {isSuperuser
+              ? `${ownMedia.length} eigene / Plattform · ${totalCount - ownMedia.length} Verkäufer (${totalCount} gesamt)`
+              : `${totalCount} Dateien`}
+          </span>
+          {isSuperuser && (
+            <select
+              value={mediaSort}
+              onChange={(e) => setMediaSort(e.target.value)}
+              style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, color: "#374151", background: "#fff" }}
+            >
+              <option value="date_desc">Datum: neu zuerst</option>
+              <option value="date_asc">Datum: alt zuerst</option>
+              <option value="name_asc">Name A–Z</option>
+              <option value="name_desc">Name Z–A</option>
+              <option value="size_desc">Größe ↓</option>
+              <option value="size_asc">Größe ↑</option>
+            </select>
+          )}
           <div style={{ flex: 1 }} />
           {/* Search */}
           <form onSubmit={handleSearch} style={{ display: "flex", gap: 0 }}>
@@ -396,43 +527,121 @@ export default function MediaPage() {
               <div style={{ fontSize: 13 }}>Bilder hochladen oder per URL hinzufügen</div>
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
-            {media.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => setSelected(item)}
-                style={{
-                  background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb",
-                  overflow: "hidden", cursor: "pointer", transition: "box-shadow .15s",
-                  position: "relative",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.12)"; e.currentTarget.style.borderColor = "#d1d5db"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = "#e5e7eb"; }}
-              >
-                <div style={{ height: 130, background: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                  {isImage(item.mime_type)
-                    ? <img src={item.url} alt={item.alt || ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
-                    : <div style={{ fontSize: 36 }}>📄</div>
-                  }
-                </div>
-                {/* Hover overlay: copy URL */}
+          {!loading && media.length > 0 && !isSuperuser && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+              {media.map((item) => (
+                <MediaTile key={item.id} item={item} onSelect={setSelected} />
+              ))}
+            </div>
+          )}
+          {!loading && media.length > 0 && isSuperuser && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+              <div>
                 <div
-                  style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity .15s" }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = "1"}
-                  onMouseLeave={e => e.currentTarget.style.opacity = "0"}
-                  onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(item.url); }}
+                  style={{
+                    padding: "10px 14px",
+                    marginBottom: 12,
+                    background: "#eef2ff",
+                    borderRadius: 8,
+                    border: "1px solid #c7d2fe",
+                    fontWeight: 700,
+                    fontSize: 12,
+                    color: "#3730a3",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                  }}
                 >
-                  <span style={{ color: "#fff", fontSize: 11, fontWeight: 600, background: "rgba(0,0,0,.4)", padding: "4px 10px", borderRadius: 20 }}>URL kopieren</span>
+                  Ihr Superuser-Bereich — eigene und plattformweite Medien ({ownMedia.length})
                 </div>
-                <div style={{ padding: "8px 10px" }}>
-                  <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151" }} title={item.filename}>
-                    {item.filename}
+                {ownMedia.length === 0 ? (
+                  <div style={{ color: "#9ca3af", fontSize: 13, padding: "8px 4px" }}>Keine Medien in diesem Bereich.</div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+                    {sortMediaList(ownMedia, mediaSort).map((item) => (
+                      <MediaTile key={item.id} item={item} onSelect={setSelected} />
+                    ))}
                   </div>
-                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{fmtSize(item.size)} · {fmtDate(item.created_at)}</div>
-                </div>
+                )}
               </div>
-            ))}
-          </div>
+              <div>
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    marginBottom: 10,
+                    background: "#f3f4f6",
+                    borderRadius: 8,
+                    border: "1px solid #e5e7eb",
+                    fontWeight: 700,
+                    fontSize: 12,
+                    color: "#374151",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  Verkäufer-Medien
+                </div>
+                <input
+                  value={sellerSearchFilter}
+                  onChange={(e) => setSellerSearchFilter(e.target.value)}
+                  placeholder="Verkäufer suchen (Store-Name)…"
+                  style={{
+                    width: "100%", maxWidth: 360, padding: "8px 12px", marginBottom: 14,
+                    border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, boxSizing: "border-box",
+                  }}
+                />
+                {filteredSellerMediaGroups.length === 0 ? (
+                  <div style={{ color: "#9ca3af", fontSize: 13 }}>
+                    Keine Verkäufer-Medien{sellerSearchFilter.trim() ? " (Filter)" : ""}.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {filteredSellerMediaGroups.map(({ sellerId, items }) => {
+                      const label = sellerLabelById[sellerId] || sellerId;
+                      const open = mediaSellerSectionsOpen[sellerId] !== false;
+                      const sorted = sortMediaList(items, mediaSort);
+                      return (
+                        <div
+                          key={sellerId}
+                          style={{ background: "#fafafa", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setMediaSellerSectionsOpen((prev) => ({ ...prev, [sellerId]: !open }))}
+                            style={{
+                              width: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "12px 16px",
+                              background: "#fff",
+                              border: "none",
+                              cursor: "pointer",
+                              font: "inherit",
+                              textAlign: "left",
+                            }}
+                          >
+                            <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{label}</span>
+                            <span style={{ fontSize: 12, color: "#6b7280" }}>
+                              {open ? "▾" : "▸"} {sorted.length} Datei{sorted.length !== 1 ? "en" : ""}
+                            </span>
+                          </button>
+                          {open && (
+                            <div style={{ padding: "0 12px 14px" }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+                                {sorted.map((item) => (
+                                  <MediaTile key={item.id} item={item} onSelect={setSelected} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

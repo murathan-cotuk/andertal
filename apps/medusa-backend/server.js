@@ -662,6 +662,16 @@ async function start() {
           );
         `).catch(() => {})
         await client.query(`
+          CREATE TABLE IF NOT EXISTS seller_payout_auto_runs (
+            run_key varchar(64) PRIMARY KEY,
+            period_start date NOT NULL,
+            period_end date NOT NULL,
+            executed_at timestamp NOT NULL DEFAULT now(),
+            source_iban text,
+            created_count integer NOT NULL DEFAULT 0
+          );
+        `).catch(() => {})
+        await client.query(`
           CREATE TABLE IF NOT EXISTS seller_invitations (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
             email varchar(255) UNIQUE NOT NULL,
@@ -851,6 +861,16 @@ async function start() {
     updated_at TIMESTAMPTZ DEFAULT NOW()
   );
 `).catch(() => {})
+        await client.query(`
+  CREATE TABLE IF NOT EXISTS admin_hub_landing_categories (
+    category_id varchar(255) PRIMARY KEY,
+    containers JSONB NOT NULL DEFAULT '[]',
+    settings JSONB NOT NULL DEFAULT '{}',
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  );
+`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_landing_page ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}'::jsonb`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_landing_pages ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}'::jsonb`).catch(() => {})
         await client.query(`
   CREATE TABLE IF NOT EXISTS admin_hub_styles (
     key varchar(50) PRIMARY KEY,
@@ -1288,6 +1308,7 @@ async function start() {
           id: r.id,
           title: r.title,
           handle: r.handle,
+          category_id: meta.linked_category_id != null && String(meta.linked_category_id).trim() !== '' ? String(meta.linked_category_id).trim() : null,
           display_title: meta.display_title,
           meta_title: meta.meta_title,
           meta_description: meta.meta_description,
@@ -1379,8 +1400,16 @@ async function start() {
             if (categoryId) {
               try {
                 const adminHub = resolveAdminHub()
-                if (adminHub) await adminHub.updateCategory(categoryId, { has_collection: true, metadata: { collection_id: row.id } })
-              } catch (_) {}
+                if (adminHub) {
+                  const cat = await adminHub.getCategoryById(categoryId)
+                  const prevMeta = cat && cat.metadata && typeof cat.metadata === 'object' ? { ...cat.metadata } : {}
+                  const collIdStr = row.id != null ? String(row.id).trim() : row.id
+                  await adminHub.updateCategory(categoryId, { has_collection: true, metadata: { ...prevMeta, collection_id: collIdStr } })
+                  await updateAdminHubCollectionDb(collIdStr, undefined, undefined, { linked_category_id: categoryId })
+                }
+              } catch (e) {
+                console.warn('createAdminHubCollection link category:', e && e.message)
+              }
             }
             const idForClient = row.id != null ? String(row.id).trim() : row.id
             return res.status(201).json({ collection: { id: idForClient, title: row.title, handle: row.handle } })
@@ -1535,18 +1564,55 @@ async function start() {
           }
         }
         if (!updated) return res.status(404).json({ message: 'Collection not found (only standalone collections can be updated here)' })
-        if (categoryId) {
+        const collUuid = String((updated && updated.id) ? updated.id : collectionId).trim()
+        const adminHubForLink = resolveAdminHub()
+        const hadCategoryLink = (b && Object.prototype.hasOwnProperty.call(b, 'category_id'))
+        if (adminHubForLink) {
           try {
-            const adminHub = resolveAdminHub()
-            if (adminHub) await adminHub.updateCategory(categoryId, { has_collection: true, metadata: { collection_id: id } })
-          } catch (_) {}
+            if (categoryId) {
+              const rowBeforeLink = await getAdminHubCollectionByIdDb(collUuid)
+              const previousCatId = rowBeforeLink && rowBeforeLink.category_id
+              if (previousCatId && String(previousCatId) !== String(categoryId)) {
+                try {
+                  const prevCat = await adminHubForLink.getCategoryById(previousCatId)
+                  const pm = prevCat && prevCat.metadata && typeof prevCat.metadata === 'object' ? { ...prevCat.metadata } : {}
+                  delete pm.collection_id
+                  await adminHubForLink.updateCategory(previousCatId, { has_collection: false, metadata: pm })
+                } catch (_) {}
+              }
+              const cat = await adminHubForLink.getCategoryById(categoryId)
+              const prevMeta = cat && cat.metadata && typeof cat.metadata === 'object' ? { ...cat.metadata } : {}
+              await adminHubForLink.updateCategory(categoryId, {
+                has_collection: true,
+                metadata: { ...prevMeta, collection_id: collUuid },
+              })
+              await updateAdminHubCollectionDb(collUuid, undefined, undefined, { linked_category_id: categoryId })
+            } else if (hadCategoryLink && (b.category_id === null || b.category_id === '')) {
+              const rowBeforeUnlink = await getAdminHubCollectionByIdDb(collUuid)
+              const oldCatId = rowBeforeUnlink && rowBeforeUnlink.category_id
+              if (oldCatId) {
+                try {
+                  const oldCat = await adminHubForLink.getCategoryById(oldCatId)
+                  const om = oldCat && oldCat.metadata && typeof oldCat.metadata === 'object' ? { ...oldCat.metadata } : {}
+                  delete om.collection_id
+                  await adminHubForLink.updateCategory(oldCatId, { has_collection: false, metadata: om })
+                } catch (_) {}
+              }
+              await updateAdminHubCollectionDb(collUuid, undefined, undefined, { linked_category_id: null })
+            }
+          } catch (e) {
+            console.warn('adminCollectionByIdPATCH category link:', e && e.message)
+          }
         }
+        const finalRow = await getAdminHubCollectionByIdDb(collUuid)
+        if (finalRow) return res.json({ collection: { ...finalRow } })
         const meta = (updated.metadata && typeof updated.metadata === 'object') ? updated.metadata : {}
-        res.json({
+        return res.json({
           collection: {
             id: collectionId,
             title: updated.title,
             handle: updated.handle,
+            category_id: meta.linked_category_id || null,
             display_title: meta.display_title,
             meta_title: meta.meta_title,
             meta_description: meta.meta_description,
@@ -1554,6 +1620,7 @@ async function start() {
             richtext: meta.richtext,
             image_url: meta.image_url,
             banner_image_url: meta.banner_image_url,
+            recommended_product_ids: Array.isArray(meta.recommended_product_ids) ? meta.recommended_product_ids : [],
           }
         })
       } catch (err) {
@@ -2517,6 +2584,39 @@ async function start() {
         return null
       }
     }
+    const getApprovedSellerIdsSet = async () => {
+      const client = getProductsDbClient()
+      if (!client) return new Set()
+      try {
+        await client.connect()
+        const res = await client.query(
+          `SELECT seller_id
+           FROM seller_users
+           WHERE seller_id IS NOT NULL
+             AND LENGTH(TRIM(seller_id)) > 0
+             AND LOWER(COALESCE(approval_status, '')) = 'approved'`
+        )
+        await client.end()
+        return new Set((res.rows || []).map((r) => String(r.seller_id || '').trim()).filter(Boolean))
+      } catch (_) {
+        try { await client.end() } catch (_) {}
+        return new Set()
+      }
+    }
+    const isStoreVisibleSellerProduct = (product, approvedSellerIds) => {
+      const sid = String(product?.seller_id || '').trim()
+      if (!sid || sid === 'default') return true
+      return approvedSellerIds.has(sid)
+    }
+    const approvedSellerIdsStoreGET = async (_req, res) => {
+      try {
+        const approvedSellerIds = await getApprovedSellerIdsSet()
+        return res.json({ seller_ids: [...approvedSellerIds] })
+      } catch (_) {
+        return res.json({ seller_ids: [] })
+      }
+    }
+    httpApp.get('/store/approved-seller-ids', approvedSellerIdsStoreGET)
     const sellerSettingsGET = async (req, res) => {
       try {
         const sellerId = (req.query.seller_id || 'default').toString().trim() || 'default'
@@ -3103,8 +3203,9 @@ async function start() {
       if (bestsellerCache.expiresAt > now && bestsellerCache.ids && bestsellerCache.ids.size > 0) {
         return bestsellerCache.ids
       }
+      const approvedSellerIds = await getApprovedSellerIdsSet()
       let all = await listAdminHubProductsDb({ limit: 5000 })
-      all = all.filter((p) => (p.status || '').toLowerCase() === 'published')
+      all = all.filter((p) => (p.status || '').toLowerCase() === 'published' && isStoreVisibleSellerProduct(p, approvedSellerIds))
       const byCollection = new Map()
       for (const p of all) {
         const score = salesScoreFromMetadata(p.metadata)
@@ -3148,8 +3249,9 @@ async function start() {
             return primaryMatch || metaIds.includes(cidNorm)
           })
         }
-        // Only published products visible in store
-        list = list.filter((p) => (p.status || '').toLowerCase() === 'published')
+        // Only published products from approved sellers are visible in store
+        const approvedSellerIds = await getApprovedSellerIdsSet()
+        list = list.filter((p) => (p.status || '').toLowerCase() === 'published' && isStoreVisibleSellerProduct(p, approvedSellerIds))
         if (searchQ) {
           list = list.filter((p) => {
             const t = (p.title || '').toLowerCase()
@@ -3220,7 +3322,8 @@ async function start() {
           return
         }
         const product = await getAdminHubProductByIdOrHandleDb(idOrHandle)
-        if (!product || (product.status || '').toLowerCase() !== 'published') {
+        const approvedSellerIds = await getApprovedSellerIdsSet()
+        if (!product || (product.status || '').toLowerCase() !== 'published' || !isStoreVisibleSellerProduct(product, approvedSellerIds)) {
           res.status(404).json({ message: 'Product not found' })
           return
         }
@@ -3259,6 +3362,15 @@ async function start() {
       const client = getBrandsDbClient()
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {
+        const approvedSellerIds = await getApprovedSellerIdsSet()
+        let visibleProducts = await listAdminHubProductsDb({ limit: 5000 })
+        visibleProducts = visibleProducts.filter((p) => (p.status || '').toLowerCase() === 'published' && isStoreVisibleSellerProduct(p, approvedSellerIds))
+        const visibleBrandIds = new Set(
+          visibleProducts
+            .map((p) => p?.metadata?.brand_id != null ? String(p.metadata.brand_id).trim() : '')
+            .filter(Boolean)
+        )
+        if (visibleBrandIds.size === 0) return res.json({ brands: [], count: 0 })
         await client.connect()
         const r = await client.query(
           `SELECT id, name, handle, logo_image, banner_image, address
@@ -3267,7 +3379,9 @@ async function start() {
            ORDER BY LOWER(name), created_at DESC`
         )
         await client.end()
-        const brands = (r.rows || []).map((row) => ({
+        const brands = (r.rows || [])
+          .filter((row) => visibleBrandIds.has(String(row.id)))
+          .map((row) => ({
           id: row.id,
           name: row.name,
           handle: row.handle,
@@ -3294,8 +3408,15 @@ async function start() {
         const brand = r.rows && r.rows[0]
         if (!brand) return res.status(404).json({ message: 'Brand not found' })
         // Fetch products for this brand
-        let list = await listAdminHubProductsDb({ limit: 200 })
-        list = list.filter((p) => (p.status || '').toLowerCase() === 'published' && p.metadata && String(p.metadata.brand_id) === String(brand.id))
+        const approvedSellerIds = await getApprovedSellerIdsSet()
+        let list = await listAdminHubProductsDb({ limit: 5000 })
+        list = list.filter((p) =>
+          (p.status || '').toLowerCase() === 'published' &&
+          isStoreVisibleSellerProduct(p, approvedSellerIds) &&
+          p.metadata &&
+          String(p.metadata.brand_id) === String(brand.id)
+        )
+        if (!list.length) return res.status(404).json({ message: 'Brand not found' })
         const sellerIds = [...new Set(list.map((p) => (p.seller_id || 'default').toString().trim()).filter(Boolean))]
         const storeNamesBySeller = {}
         await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))
@@ -5725,6 +5846,14 @@ async function start() {
         await client.end().catch(() => {})
       }
     }
+    const mediaRowVisibleToUser = (row, u) => {
+      if (!u) return false
+      if (u.is_superuser) return true
+      const sid = row?.seller_id
+      if (sid == null || String(sid).trim() === '') return true
+      return String(sid) === String(u.seller_id)
+    }
+
     const mediaUploadPOST = async (req, res) => {
       if (!req.file) return res.status(400).json({ message: 'No file uploaded' })
       const client = getDbClient()
@@ -5761,12 +5890,13 @@ async function start() {
       }
       const alt = (req.body && req.body.alt) || null
       const folderId = (req.body && req.body.folder_id) || null
+      const uploadSellerId = req.sellerUser?.is_superuser ? null : (req.sellerUser?.seller_id || null)
       try {
         await client.connect()
         const r = await client.query(
-          `INSERT INTO admin_hub_media (filename, url, mime_type, size, alt, folder_id) VALUES ($1, $2, $3, $4, $5, $6)
-           RETURNING id, filename, url, mime_type, size, alt, folder_id, created_at`,
-          [req.file.originalname || req.file.filename, fileUrl, req.file.mimetype || null, req.file.size || 0, alt, folderId]
+          `INSERT INTO admin_hub_media (filename, url, mime_type, size, alt, folder_id, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id, filename, url, mime_type, size, alt, folder_id, seller_id, created_at`,
+          [req.file.originalname || req.file.filename, fileUrl, req.file.mimetype || null, req.file.size || 0, alt, folderId, uploadSellerId]
         )
         const row = r.rows[0]
         res.status(201).json({ id: row.id, url: row.url, filename: row.filename, mime_type: row.mime_type, size: row.size, folder_id: row.folder_id, created_at: row.created_at })
@@ -5783,10 +5913,11 @@ async function start() {
       try {
         await client.connect()
         const r = await client.query(
-          'SELECT id, filename, url, mime_type, size, alt, created_at, updated_at FROM admin_hub_media WHERE id = $1',
+          'SELECT id, filename, url, mime_type, size, alt, folder_id, seller_id, created_at, updated_at FROM admin_hub_media WHERE id = $1',
           [req.params.id]
         )
         if (r.rows.length === 0) return res.status(404).json({ message: 'Media not found' })
+        if (!mediaRowVisibleToUser(r.rows[0], req.sellerUser)) return res.status(403).json({ message: 'Forbidden' })
         res.json(r.rows[0])
       } catch (err) {
         console.error('Media get error:', err)
@@ -5800,8 +5931,9 @@ async function start() {
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
-        const r = await client.query('SELECT url FROM admin_hub_media WHERE id = $1', [req.params.id])
+        const r = await client.query('SELECT url, seller_id FROM admin_hub_media WHERE id = $1', [req.params.id])
         if (r.rows.length === 0) return res.status(404).json({ message: 'Media not found' })
+        if (!mediaRowVisibleToUser(r.rows[0], req.sellerUser)) return res.status(403).json({ message: 'Forbidden' })
         const urlPath = r.rows[0].url
         await client.query('DELETE FROM admin_hub_media WHERE id = $1', [req.params.id])
         if (urlPath && urlPath.startsWith('/uploads/')) {
@@ -5829,6 +5961,7 @@ async function start() {
         )`).catch(() => {})
         await mediaFolderMigrClient.query(`ALTER TABLE admin_hub_media ADD COLUMN IF NOT EXISTS folder_id uuid REFERENCES admin_hub_media_folders(id) ON DELETE SET NULL`).catch(() => {})
         await mediaFolderMigrClient.query(`ALTER TABLE admin_hub_media ADD COLUMN IF NOT EXISTS source_url text`).catch(() => {}) // for URL-added images
+        await mediaFolderMigrClient.query(`ALTER TABLE admin_hub_media ADD COLUMN IF NOT EXISTS seller_id varchar(255)`).catch(() => {})
         await mediaFolderMigrClient.end().catch(() => {})
       }).catch(() => {})
     }
@@ -5870,6 +6003,9 @@ async function start() {
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
+        const chk = await client.query('SELECT id, seller_id FROM admin_hub_media WHERE id = $1', [req.params.id])
+        if (!chk.rows.length) return res.status(404).json({ message: 'Media not found' })
+        if (!mediaRowVisibleToUser(chk.rows[0], req.sellerUser)) return res.status(403).json({ message: 'Forbidden' })
         const sets = []; const params = []
         if (folder_id !== undefined) { params.push(folder_id || null); sets.push(`folder_id = $${params.length}`) }
         if (alt !== undefined) { params.push(alt || null); sets.push(`alt = $${params.length}`) }
@@ -5890,9 +6026,10 @@ async function start() {
       try {
         await client.connect()
         const name = filename || url.split('/').pop()?.split('?')[0] || 'image'
+        const urlSellerId = req.sellerUser?.is_superuser ? null : (req.sellerUser?.seller_id || null)
         const r = await client.query(
-          `INSERT INTO admin_hub_media (filename, url, source_url, mime_type, size, alt, folder_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-          [name, url, url, null, 0, alt || null, folder_id || null]
+          `INSERT INTO admin_hub_media (filename, url, source_url, mime_type, size, alt, folder_id, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+          [name, url, url, null, 0, alt || null, folder_id || null, urlSellerId]
         )
         res.status(201).json({ media: r.rows[0] })
       } catch (e) { res.status(500).json({ message: e?.message }) } finally { await client.end().catch(() => {}) }
@@ -5913,9 +6050,14 @@ async function start() {
         if (folderId === 'none') { where.push('m.folder_id IS NULL') }
         else if (folderId) { params.push(folderId); where.push(`m.folder_id = $${params.length}`) }
         if (search) { params.push(`%${search}%`); where.push(`m.filename ILIKE $${params.length}`) }
+        const u = req.sellerUser
+        if (u && !u.is_superuser) {
+          params.push(u.seller_id)
+          where.push(`(m.seller_id IS NULL OR m.seller_id = $${params.length})`)
+        }
         const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : ''
         const r = await client.query(
-          `SELECT m.id, m.filename, m.url, m.source_url, m.mime_type, m.size, m.alt, m.folder_id, f.name AS folder_name, m.created_at FROM admin_hub_media m LEFT JOIN admin_hub_media_folders f ON f.id = m.folder_id ${whereClause} ORDER BY m.created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,
+          `SELECT m.id, m.filename, m.url, m.source_url, m.mime_type, m.size, m.alt, m.folder_id, m.seller_id, f.name AS folder_name, m.created_at FROM admin_hub_media m LEFT JOIN admin_hub_media_folders f ON f.id = m.folder_id ${whereClause} ORDER BY m.created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,
           [...params, limit, offset]
         )
         const countRes = await client.query(`SELECT COUNT(*)::int AS c FROM admin_hub_media m ${whereClause}`, params)
@@ -5928,15 +6070,15 @@ async function start() {
       }
     }
 
-    httpApp.get('/admin-hub/v1/media', mediaListWithFolderGET)
-    httpApp.post('/admin-hub/v1/media', upload.single('file'), mediaUploadPOST)
-    httpApp.get('/admin-hub/v1/media/folders', mediaFoldersGET)
-    httpApp.post('/admin-hub/v1/media/folders', mediaFoldersPOST)
-    httpApp.delete('/admin-hub/v1/media/folders/:id', mediaFolderDELETE)
-    httpApp.get('/admin-hub/v1/media/:id', mediaByIdGET)
-    httpApp.patch('/admin-hub/v1/media/:id', mediaPATCH)
-    httpApp.post('/admin-hub/v1/media/add-url', mediaAddByUrlPOST)
-    httpApp.delete('/admin-hub/v1/media/:id', mediaByIdDELETE)
+    httpApp.get('/admin-hub/v1/media', requireSellerAuth, mediaListWithFolderGET)
+    httpApp.post('/admin-hub/v1/media', requireSellerAuth, upload.single('file'), mediaUploadPOST)
+    httpApp.get('/admin-hub/v1/media/folders', requireSellerAuth, mediaFoldersGET)
+    httpApp.post('/admin-hub/v1/media/folders', requireSellerAuth, mediaFoldersPOST)
+    httpApp.delete('/admin-hub/v1/media/folders/:id', requireSellerAuth, mediaFolderDELETE)
+    httpApp.get('/admin-hub/v1/media/:id', requireSellerAuth, mediaByIdGET)
+    httpApp.patch('/admin-hub/v1/media/:id', requireSellerAuth, mediaPATCH)
+    httpApp.post('/admin-hub/v1/media/add-url', requireSellerAuth, mediaAddByUrlPOST)
+    httpApp.delete('/admin-hub/v1/media/:id', requireSellerAuth, mediaByIdDELETE)
     console.log('Admin Hub routes: GET/POST /admin-hub/v1/media, GET/DELETE /admin-hub/v1/media/:id')
 
     // ── Admin Hub Orders ──────────────────────────────────────────
@@ -7558,9 +7700,11 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
-        const r = await client.query('SELECT containers, updated_at FROM admin_hub_landing_page WHERE id = 1')
+        const r = await client.query('SELECT containers, settings, updated_at FROM admin_hub_landing_page WHERE id = 1')
         const containers = await enrichLandingContainers(r.rows[0]?.containers || [], client)
-        res.json({ containers, updated_at: r.rows[0]?.updated_at || null })
+        const settings =
+          r.rows[0]?.settings && typeof r.rows[0].settings === 'object' ? r.rows[0].settings : {}
+        res.json({ containers, settings, updated_at: r.rows[0]?.updated_at || null })
       } catch (err) {
         console.error('Landing page GET error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -7574,12 +7718,13 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       try {
         await client.connect()
         const containers = Array.isArray(req.body?.containers) ? req.body.containers : []
+        const settings = req.body?.settings && typeof req.body.settings === 'object' ? req.body.settings : {}
         await client.query(
-          `INSERT INTO admin_hub_landing_page (id, containers, updated_at) VALUES (1, $1, NOW())
-           ON CONFLICT (id) DO UPDATE SET containers = $1, updated_at = NOW()`,
-          [JSON.stringify(containers)]
+          `INSERT INTO admin_hub_landing_page (id, containers, settings, updated_at) VALUES (1, $1, $2, NOW())
+           ON CONFLICT (id) DO UPDATE SET containers = $1, settings = $2, updated_at = NOW()`,
+          [JSON.stringify(containers), JSON.stringify(settings)]
         )
-        res.json({ ok: true, containers })
+        res.json({ ok: true, containers, settings })
       } catch (err) {
         console.error('Landing page PUT error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -7591,6 +7736,62 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.put('/admin-hub/landing-page', landingPagePUT)
     httpApp.get('/store/landing-page', landingPageGET)
 
+    // ── Landing layout by category (containers + settings; must register before /landing-page/:pageId)
+    const landingCategoryGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      const categoryId = (req.params.categoryId || '').trim()
+      if (!categoryId) return res.json({ containers: [], settings: {}, updated_at: null })
+      try {
+        await client.connect()
+        const r = await client.query(
+          'SELECT containers, settings, updated_at FROM admin_hub_landing_categories WHERE category_id = $1',
+          [categoryId]
+        )
+        if (!r.rows[0]) {
+          return res.json({ containers: [], settings: {}, updated_at: null })
+        }
+        const rawSettings = r.rows[0].settings && typeof r.rows[0].settings === 'object' ? r.rows[0].settings : {}
+        const containers = await enrichLandingContainers(r.rows[0].containers || [], client)
+        res.json({
+          containers,
+          settings: rawSettings,
+          updated_at: r.rows[0].updated_at || null,
+        })
+      } catch (err) {
+        console.error('Landing category GET error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    const landingCategoryPUT = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      const categoryId = (req.params.categoryId || '').trim()
+      if (!categoryId) return res.status(400).json({ message: 'categoryId required' })
+      try {
+        await client.connect()
+        const containers = Array.isArray(req.body?.containers) ? req.body.containers : []
+        const settings = req.body?.settings && typeof req.body.settings === 'object' ? req.body.settings : {}
+        await client.query(
+          `INSERT INTO admin_hub_landing_categories (category_id, containers, settings, updated_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (category_id) DO UPDATE SET containers = $2, settings = $3, updated_at = NOW()`,
+          [categoryId, JSON.stringify(containers), JSON.stringify(settings)]
+        )
+        res.json({ ok: true, containers, settings })
+      } catch (err) {
+        console.error('Landing category PUT error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+    httpApp.get('/admin-hub/landing-page/category/:categoryId', landingCategoryGET)
+    httpApp.put('/admin-hub/landing-page/category/:categoryId', landingCategoryPUT)
+    httpApp.get('/store/landing-page/category/:categoryId', landingCategoryGET)
+
     // ── Landing page by page_id ──────────────────────────────────────────────
     const landingPageByIdGET = async (req, res) => {
       const client = getDbClient()
@@ -7598,24 +7799,28 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       try {
         await client.connect()
         const pageId = req.params.pageId
-        const r = await client.query('SELECT containers, updated_at FROM admin_hub_landing_pages WHERE page_id = $1', [pageId])
+        const r = await client.query('SELECT containers, settings, updated_at FROM admin_hub_landing_pages WHERE page_id = $1', [pageId])
         if (r.rows[0]) {
           const containers = await enrichLandingContainers(r.rows[0].containers || [], client)
-          return res.json({ containers, updated_at: r.rows[0].updated_at || null })
+          const settings =
+            r.rows[0].settings && typeof r.rows[0].settings === 'object' ? r.rows[0].settings : {}
+          return res.json({ containers, settings, updated_at: r.rows[0].updated_at || null })
         }
         // One-time fallback: only for the oldest page when new table is completely empty
         const newCount = await client.query('SELECT COUNT(*) FROM admin_hub_landing_pages')
         if (parseInt(newCount.rows[0].count) === 0) {
           const firstPage = await client.query('SELECT id FROM admin_hub_pages ORDER BY id ASC LIMIT 1')
           if (firstPage.rows[0] && String(firstPage.rows[0].id) === String(pageId)) {
-            const old = await client.query('SELECT containers FROM admin_hub_landing_page WHERE id = 1')
+            const old = await client.query('SELECT containers, settings FROM admin_hub_landing_page WHERE id = 1')
             if (old.rows[0]?.containers?.length) {
               const containers = await enrichLandingContainers(old.rows[0].containers, client)
-              return res.json({ containers, updated_at: null, _migrated: true })
+              const settings =
+                old.rows[0].settings && typeof old.rows[0].settings === 'object' ? old.rows[0].settings : {}
+              return res.json({ containers, settings, updated_at: null, _migrated: true })
             }
           }
         }
-        res.json({ containers: [], updated_at: null })
+        res.json({ containers: [], settings: {}, updated_at: null })
       } catch (err) {
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
       } finally {
@@ -7629,12 +7834,13 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.connect()
         const pageId = req.params.pageId
         const containers = Array.isArray(req.body?.containers) ? req.body.containers : []
+        const settings = req.body?.settings && typeof req.body.settings === 'object' ? req.body.settings : {}
         await client.query(
-          `INSERT INTO admin_hub_landing_pages (page_id, containers, updated_at) VALUES ($1, $2, NOW())
-           ON CONFLICT (page_id) DO UPDATE SET containers = $2, updated_at = NOW()`,
-          [pageId, JSON.stringify(containers)]
+          `INSERT INTO admin_hub_landing_pages (page_id, containers, settings, updated_at) VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (page_id) DO UPDATE SET containers = $2, settings = $3, updated_at = NOW()`,
+          [pageId, JSON.stringify(containers), JSON.stringify(settings)]
         )
-        res.json({ ok: true, containers })
+        res.json({ ok: true, containers, settings })
       } catch (err) {
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
       } finally {
@@ -8451,6 +8657,135 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    const autoPayoutPeriodForDate = (d = new Date()) => {
+      const now = new Date(d)
+      const day = now.getDate()
+      const y = now.getFullYear()
+      const m = now.getMonth()
+      if (day === 1) {
+        const prevMonthDate = new Date(y, m - 1, 1)
+        const py = prevMonthDate.getFullYear()
+        const pm = prevMonthDate.getMonth()
+        const endDay = new Date(py, pm + 1, 0).getDate()
+        return {
+          runKey: `AUTO-${y}-${String(m + 1).padStart(2, '0')}-01`,
+          periodStart: `${py}-${String(pm + 1).padStart(2, '0')}-16`,
+          periodEnd: `${py}-${String(pm + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`,
+        }
+      }
+      if (day === 15) {
+        return {
+          runKey: `AUTO-${y}-${String(m + 1).padStart(2, '0')}-15`,
+          periodStart: `${y}-${String(m + 1).padStart(2, '0')}-01`,
+          periodEnd: `${y}-${String(m + 1).padStart(2, '0')}-15`,
+        }
+      }
+      return null
+    }
+
+    const runAutomaticPayoutsIfDue = async () => {
+      const period = autoPayoutPeriodForDate(new Date())
+      if (!period) return
+      const client = getDbClient()
+      if (!client) return
+      try {
+        await client.connect()
+        const already = await client.query('SELECT run_key FROM seller_payout_auto_runs WHERE run_key = $1 LIMIT 1', [period.runKey])
+        if (already.rows.length) { await client.end(); return }
+        const su = await client.query(
+          `SELECT iban FROM seller_users
+           WHERE is_superuser = true
+             AND iban IS NOT NULL
+             AND LENGTH(TRIM(iban)) > 0
+           ORDER BY created_at ASC
+           LIMIT 1`
+        )
+        const sourceIban = su.rows[0]?.iban ? String(su.rows[0].iban).trim() : null
+        if (!sourceIban) { await client.end(); return }
+        const summary = await client.query(
+          `SELECT
+             o.seller_id,
+             ROUND(COALESCE(SUM(o.total_cents), 0)) AS total_cents,
+             ROUND(COALESCE(SUM(o.total_cents), 0) * 0.10) AS commission_cents,
+             ROUND(COALESCE(SUM(o.total_cents), 0) * 0.90) AS payout_cents
+           FROM store_orders o
+           LEFT JOIN seller_users s ON s.seller_id = o.seller_id
+           WHERE o.payment_status = 'bezahlt'
+             AND o.delivery_date IS NOT NULL
+             AND o.delivery_date <= now() - interval '14 days'
+             AND o.created_at >= $1::date
+             AND o.created_at < ($2::date + interval '1 day')
+             AND LOWER(COALESCE(s.approval_status, '')) = 'approved'
+           GROUP BY o.seller_id`,
+          [period.periodStart, period.periodEnd]
+        )
+        let createdCount = 0
+        for (const row of summary.rows || []) {
+          const sellerId = String(row.seller_id || '').trim()
+          if (!sellerId) continue
+          const existing = await client.query(
+            `SELECT id, status FROM seller_payouts
+             WHERE seller_id = $1 AND period_start = $2::date AND period_end = $3::date
+             ORDER BY created_at DESC LIMIT 1`,
+            [sellerId, period.periodStart, period.periodEnd]
+          )
+          if (existing.rows.length) {
+            const keepPaid = ['bezahlt', 'paid'].includes(String(existing.rows[0].status || '').toLowerCase())
+            await client.query(
+              `UPDATE seller_payouts
+               SET total_cents = $1, commission_cents = $2, payout_cents = $3,
+                   iban = COALESCE(iban, $4),
+                   notes = COALESCE(notes, $5),
+                   status = $6,
+                   updated_at = now()
+               WHERE id = $7`,
+              [
+                parseInt(row.total_cents) || 0,
+                parseInt(row.commission_cents) || 0,
+                parseInt(row.payout_cents) || 0,
+                sourceIban,
+                `AUTO-PAYOUT ${period.periodStart}..${period.periodEnd}`,
+                keepPaid ? existing.rows[0].status : 'processing',
+                existing.rows[0].id,
+              ]
+            )
+          } else {
+            await client.query(
+              `INSERT INTO seller_payouts
+               (seller_id, period_start, period_end, total_cents, commission_cents, payout_cents, iban, notes, status)
+               VALUES ($1, $2::date, $3::date, $4, $5, $6, $7, $8, 'processing')`,
+              [
+                sellerId,
+                period.periodStart,
+                period.periodEnd,
+                parseInt(row.total_cents) || 0,
+                parseInt(row.commission_cents) || 0,
+                parseInt(row.payout_cents) || 0,
+                sourceIban,
+                `AUTO-PAYOUT ${period.periodStart}..${period.periodEnd}`,
+              ]
+            )
+          }
+          createdCount += 1
+        }
+        await client.query(
+          `INSERT INTO seller_payout_auto_runs (run_key, period_start, period_end, source_iban, created_count)
+           VALUES ($1, $2::date, $3::date, $4, $5)`,
+          [period.runKey, period.periodStart, period.periodEnd, sourceIban, createdCount]
+        )
+        await client.end()
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        console.error('runAutomaticPayoutsIfDue:', e?.message || e)
+      }
+    }
+
+    // Fire once on boot and then hourly: creates payout records automatically on 1st and 15th.
+    runAutomaticPayoutsIfDue().catch(() => {})
+    setInterval(() => {
+      runAutomaticPayoutsIfDue().catch(() => {})
+    }, 60 * 60 * 1000)
+
     // PATCH /admin-hub/v1/seller/iban — set own IBAN
     const adminHubSellerIbanPATCH = async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
@@ -8667,13 +9002,13 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         let productCounts = {}
         let revenueTotals = {}
         if (sellerIds.length > 0) {
-          // product counts
+          // product counts (Sellercentral ürünleri admin_hub_products’ta; eski `product` tablosu bu akışta kullanılmıyor)
           try {
             const pc = await client.query(
-              `SELECT seller_id, COUNT(*) as cnt FROM product WHERE seller_id = ANY($1) GROUP BY seller_id`,
+              `SELECT seller_id, COUNT(*)::int as cnt FROM admin_hub_products WHERE seller_id = ANY($1) GROUP BY seller_id`,
               [sellerIds]
             )
-            pc.rows.forEach(row => { productCounts[row.seller_id] = parseInt(row.cnt) })
+            pc.rows.forEach(row => { productCounts[row.seller_id] = parseInt(row.cnt, 10) })
           } catch (_) {}
           // revenue totals (paid orders)
           try {
@@ -8719,15 +9054,35 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const seller = r.rows[0]
         const sellerId = seller.seller_id
 
-        // Products by category
+        // Products by category (admin_hub_products; slug veya kategori UUID üzerinden etiket)
         let productsByCategory = []
         try {
           const pc = await client.query(
-            `SELECT metadata->>'category_slug' as category_slug, COUNT(*) as cnt
-             FROM product WHERE seller_id = $1 GROUP BY metadata->>'category_slug'`,
+            `WITH base AS (
+               SELECT id,
+                 NULLIF(TRIM(COALESCE(metadata->>'category_slug', '')), '') AS slug_direct,
+                 NULLIF(TRIM(COALESCE(metadata->>'admin_category_id', metadata->>'category_id', '')), '') AS cat_id_ref
+               FROM admin_hub_products
+               WHERE seller_id = $1
+             ),
+             resolved AS (
+               SELECT b.id,
+                 COALESCE(
+                   b.slug_direct,
+                   c.slug,
+                   CASE WHEN b.cat_id_ref IS NOT NULL THEN b.cat_id_ref END,
+                   'Unkategorisiert'
+                 ) AS category
+               FROM base b
+               LEFT JOIN admin_hub_categories c ON c.id::text = b.cat_id_ref
+             )
+             SELECT category, COUNT(*)::int AS cnt
+             FROM resolved
+             GROUP BY category
+             ORDER BY cnt DESC`,
             [sellerId]
           )
-          productsByCategory = pc.rows.map(r => ({ category: r.category_slug || 'Uncategorized', count: parseInt(r.cnt) }))
+          productsByCategory = pc.rows.map((r) => ({ category: r.category, count: parseInt(r.cnt, 10) || 0 }))
         } catch (_) {}
 
         // Monthly revenue (last 12 months)

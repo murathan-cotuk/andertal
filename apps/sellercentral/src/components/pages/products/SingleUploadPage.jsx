@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Page,
@@ -16,10 +16,10 @@ import {
   Banner,
   FormLayout,
   Divider,
-  Checkbox,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import ProductDescriptionEditor from "@/components/inputs/ProductDescriptionEditor";
+import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 
 const DEFAULT_CATEGORIES = [{ id: "uncategorized", name: "Uncategorized" }];
 
@@ -60,8 +60,6 @@ export default function SingleUploadPage() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesApiFailed, setCategoriesApiFailed] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
-  const categoryDropdownRef = useRef(null);
   const medusaClient = getMedusaAdminClient();
 
   useEffect(() => {
@@ -88,39 +86,6 @@ export default function SingleUploadPage() {
     const sellerId = typeof localStorage !== "undefined" ? localStorage.getItem("sellerId") : null;
     if (sellerId) setFormData((prev) => ({ ...prev, seller: sellerId }));
   }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target)) {
-        setCategoryDropdownOpen(false);
-      }
-    };
-    if (categoryDropdownOpen) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [categoryDropdownOpen]);
-
-  const toggleCategory = (id) => {
-    const isSelected = formData.categories.includes(id);
-    setFormData((prev) => ({
-      ...prev,
-      categories: isSelected ? prev.categories.filter((x) => x !== id) : [...prev.categories, id],
-    }));
-  };
-
-  const removeCategory = (id) => {
-    setFormData((prev) => ({ ...prev, categories: prev.categories.filter((x) => x !== id) }));
-  };
-
-  const getCategoryName = (id) => categories.find((c) => c.id === id)?.name ?? "";
-
-  const groupedCategories = (Array.isArray(categories) ? categories : []).reduce((acc, cat) => {
-    const parentName = cat.parent_id
-      ? (categories.find((p) => p.id === cat.parent_id)?.name || "Subcategories")
-      : "Main Categories";
-    if (!acc[parentName]) acc[parentName] = [];
-    acc[parentName].push(cat);
-    return acc;
-  }, {});
 
   const addVariant = () => {
     setFormData((prev) => ({
@@ -328,89 +293,14 @@ export default function SingleUploadPage() {
                           </Text>
                         </Box>
                       ) : (
-                        <>
-                          <div style={{ position: "relative" }} ref={categoryDropdownRef}>
-                            <Button
-                              onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
-                              fullWidth
-                              disclosure={categoryDropdownOpen ? "up" : "down"}
-                            >
-                              {formData.categories.length > 0
-                                ? `${formData.categories.length} selected`
-                                : "Select categories"}
-                            </Button>
-                            {categoryDropdownOpen && (
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  zIndex: "var(--p-z-index-1)",
-                                  top: "100%",
-                                  left: 0,
-                                  right: 0,
-                                  marginTop: 4,
-                                  padding: "var(--p-space-200)",
-                                  background: "var(--p-color-bg-surface)",
-                                  borderRadius: "var(--p-border-radius-200)",
-                                  boxShadow: "var(--p-shadow-200)",
-                                  minWidth: "100%",
-                                  maxHeight: 320,
-                                  overflowY: "auto",
-                                }}
-                              >
-                                <BlockStack gap="100">
-                                  {Object.keys(groupedCategories).length === 0 ? (
-                                    <Text as="p" tone="subdued">
-                                      No categories
-                                    </Text>
-                                  ) : (
-                                    Object.entries(groupedCategories).map(([parentName, cats]) => (
-                                      <BlockStack key={parentName} gap="100">
-                                        <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">
-                                          {parentName}
-                                        </Text>
-                                        {cats.map((cat) => (
-                                          <Checkbox
-                                            key={cat.id}
-                                            label={cat.name}
-                                            checked={formData.categories.includes(cat.id)}
-                                            onChange={() => toggleCategory(cat.id)}
-                                          />
-                                        ))}
-                                      </BlockStack>
-                                    ))
-                                  )}
-                                </BlockStack>
-                              </div>
-                            )}
-                          </div>
-                          {formData.categories.length > 0 && (
-                            <InlineStack gap="200" blockAlign="center" wrap>
-                              {formData.categories.map((catId) => (
-                                <Box
-                                  key={catId}
-                                  paddingInline="200"
-                                  paddingBlock="100"
-                                  background="bg-fill-secondary"
-                                  borderRadius="200"
-                                >
-                                  <InlineStack gap="100" blockAlign="center">
-                                    <Text as="span" variant="bodySm">
-                                      {getCategoryName(catId)}
-                                    </Text>
-                                    <Button
-                                      variant="plain"
-                                      size="slim"
-                                      accessibilityLabel="Remove category"
-                                      onClick={() => removeCategory(catId)}
-                                    >
-                                      Remove
-                                    </Button>
-                                  </InlineStack>
-                                </Box>
-                              ))}
-                            </InlineStack>
-                          )}
-                        </>
+                        <CategoryDrilldownSelect
+                          label="Category"
+                          labelHidden
+                          categories={categories || []}
+                          value={formData.categories[0] || ""}
+                          onChange={(v) => setFormData((prev) => ({ ...prev, categories: v ? [v] : [] }))}
+                          placeholder="Select category"
+                        />
                       )}
                     </Box>
 
