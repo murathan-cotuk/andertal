@@ -472,6 +472,20 @@ async function start() {
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivery_date timestamp;`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS discount_cents integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS shipping_cents integer NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS store_platform_checkout (
+            id smallint PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+            stripe_publishable_key text,
+            stripe_secret_key text,
+            pay_card boolean NOT NULL DEFAULT true,
+            pay_paypal boolean NOT NULL DEFAULT false,
+            pay_klarna boolean NOT NULL DEFAULT false,
+            paypal_client_id text,
+            paypal_client_secret text,
+            updated_at timestamp DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query(`INSERT INTO store_platform_checkout (id) VALUES (1) ON CONFLICT (id) DO NOTHING`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS free_shipping_thresholds jsonb`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS bonus_points_redeemed integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`
@@ -1830,6 +1844,16 @@ async function start() {
       values JSONB NOT NULL DEFAULT '[]',
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )`).catch(() => {})
+    dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_metafield_pending (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      key varchar(120) NOT NULL,
+      label varchar(255),
+      proposed_values JSONB NOT NULL DEFAULT '[]',
+      seller_id varchar(255),
+      status varchar(20) NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`).catch(() => {})
+    dbQ(`CREATE INDEX IF NOT EXISTS idx_metafield_pending_status ON admin_hub_metafield_pending(status)`).catch(() => {})
 
     // GET /admin-hub/metafield-definitions
     // Returns merged: stored definitions + values found in products
@@ -1896,9 +1920,15 @@ async function start() {
       }
     })
 
-    // PUT /admin-hub/metafield-definitions/:key  — upsert values for a key
+    // PUT /admin-hub/metafield-definitions/:key  — upsert values for a key (superuser only)
     httpApp.put('/admin-hub/metafield-definitions/:key', async (req, res) => {
       try {
+        const auth = req.headers['authorization'] || ''
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+        const jwtPayload = token ? verifySellerToken(token) : null
+        if (!jwtPayload || !jwtPayload.is_superuser) {
+          return res.status(403).json({ message: 'Superuser access required' })
+        }
         const key = (req.params.key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
         if (!key) return res.status(400).json({ error: 'key required' })
         const { label, values } = req.body || {}
@@ -1917,9 +1947,15 @@ async function start() {
       }
     })
 
-    // DELETE /admin-hub/metafield-definitions/:key
+    // DELETE /admin-hub/metafield-definitions/:key (superuser only)
     httpApp.delete('/admin-hub/metafield-definitions/:key', async (req, res) => {
       try {
+        const auth = req.headers['authorization'] || ''
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+        const jwtPayload = token ? verifySellerToken(token) : null
+        if (!jwtPayload || !jwtPayload.is_superuser) {
+          return res.status(403).json({ message: 'Superuser access required' })
+        }
         await dbQ('DELETE FROM admin_hub_metafield_definitions WHERE key = $1', [req.params.key])
         res.json({ ok: true })
       } catch (err) {
@@ -1927,7 +1963,163 @@ async function start() {
       }
     })
 
-    console.log('Admin route: GET/PUT/DELETE /admin-hub/metafield-definitions')
+    const normalizeMetaKey = (raw) => (String(raw || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || '')
+    const metafieldProposalNormalizeValues = (arr) => {
+      const out = []
+      const seen = new Set()
+      for (const v of Array.isArray(arr) ? arr : []) {
+        const s = String(v ?? '').trim()
+        if (!s || s.length > 500) continue
+        if (seen.has(s.toLowerCase())) continue
+        seen.add(s.toLowerCase())
+        out.push(s)
+      }
+      return out
+    }
+
+    // GET /admin-hub/metafield-definitions/pending — superuser: all pending proposals
+    httpApp.get('/admin-hub/metafield-definitions/pending', async (req, res) => {
+      try {
+        const auth = req.headers['authorization'] || ''
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+        const jwtPayload = token ? verifySellerToken(token) : null
+        if (!jwtPayload || !jwtPayload.is_superuser) {
+          return res.status(403).json({ message: 'Superuser access required' })
+        }
+        const r = await dbQ(
+          `SELECT id, key, label, proposed_values, seller_id, status, created_at
+           FROM admin_hub_metafield_pending WHERE status = 'pending' ORDER BY created_at ASC`
+        )
+        const rows = (r.rows || []).map((row) => ({
+          id: row.id,
+          key: row.key,
+          label: row.label,
+          proposed_values: Array.isArray(row.proposed_values) ? row.proposed_values : [],
+          seller_id: row.seller_id,
+          status: row.status,
+          created_at: row.created_at,
+        }))
+        res.json({ pending: rows })
+      } catch (err) {
+        console.error('metafield-definitions pending GET:', err)
+        res.status(500).json({ error: err.message })
+      }
+    })
+
+    // POST /admin-hub/metafield-definitions/proposals — authenticated seller proposes new catalog entry; superuser applies immediately
+    httpApp.post('/admin-hub/metafield-definitions/proposals', async (req, res) => {
+      try {
+        const auth = req.headers['authorization'] || ''
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+        const jwtPayload = token ? verifySellerToken(token) : null
+        if (!jwtPayload || !jwtPayload.seller_id) {
+          return res.status(401).json({ message: 'Unauthorized' })
+        }
+        const body = req.body || {}
+        let key = normalizeMetaKey(body.key)
+        const labelIn = (body.label != null ? String(body.label) : '').trim()
+        if (!labelIn) return res.status(400).json({ message: 'label required' })
+        if (!key) key = normalizeMetaKey(labelIn.replace(/\s+/g, '_'))
+        if (!key) return res.status(400).json({ message: 'could not derive key' })
+        const proposed = metafieldProposalNormalizeValues(body.values)
+        if (proposed.length === 0) return res.status(400).json({ message: 'values required' })
+
+        if (jwtPayload.is_superuser) {
+          const exist = await dbQ('SELECT label, values FROM admin_hub_metafield_definitions WHERE key = $1', [key])
+          const prev = exist.rows[0]
+          const prevVals = Array.isArray(prev?.values) ? prev.values : []
+          const mergedVals = [...new Set([...prevVals.map(String), ...proposed])].sort()
+          const safeLabel = labelIn || prev?.label || key
+          await dbQ(
+            `INSERT INTO admin_hub_metafield_definitions (key, label, values, updated_at)
+             VALUES ($1, $2, $3, NOW())
+             ON CONFLICT (key) DO UPDATE SET label = $2, values = $3, updated_at = NOW()`,
+            [key, safeLabel, JSON.stringify(mergedVals)]
+          )
+          return res.json({ ok: true, applied: true, key, label: safeLabel, values: mergedVals })
+        }
+
+        const ins = await dbQ(
+          `INSERT INTO admin_hub_metafield_pending (key, label, proposed_values, seller_id, status)
+           VALUES ($1, $2, $3, $4, 'pending')
+           RETURNING id, key, label, proposed_values, seller_id, status, created_at`,
+          [key, labelIn, JSON.stringify(proposed), String(jwtPayload.seller_id).trim()]
+        )
+        const row = ins.rows[0]
+        res.status(201).json({
+          ok: true,
+          applied: false,
+          proposal: {
+            id: row.id,
+            key: row.key,
+            label: row.label,
+            proposed_values: Array.isArray(row.proposed_values) ? row.proposed_values : proposed,
+            seller_id: row.seller_id,
+            status: row.status,
+            created_at: row.created_at,
+          },
+        })
+      } catch (err) {
+        console.error('metafield-definitions proposals POST:', err)
+        res.status(500).json({ error: err.message })
+      }
+    })
+
+    // POST approve — merge into live definitions
+    httpApp.post('/admin-hub/metafield-definitions/pending/:id/approve', async (req, res) => {
+      try {
+        const auth = req.headers['authorization'] || ''
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+        const jwtPayload = token ? verifySellerToken(token) : null
+        if (!jwtPayload || !jwtPayload.is_superuser) {
+          return res.status(403).json({ message: 'Superuser access required' })
+        }
+        const id = String(req.params.id || '').trim()
+        if (!id) return res.status(400).json({ message: 'id required' })
+        const pr = await dbQ(`SELECT * FROM admin_hub_metafield_pending WHERE id = $1::uuid AND status = 'pending'`, [id])
+        const pending = pr.rows[0]
+        if (!pending) return res.status(404).json({ message: 'Proposal not found' })
+        const key = pending.key
+        const proposed = Array.isArray(pending.proposed_values) ? pending.proposed_values.map(String) : []
+        const exist = await dbQ('SELECT label, values FROM admin_hub_metafield_definitions WHERE key = $1', [key])
+        const prev = exist.rows[0]
+        const prevVals = Array.isArray(prev?.values) ? prev.values.map(String) : []
+        const mergedVals = [...new Set([...prevVals, ...proposed])].sort()
+        const safeLabel = (pending.label && String(pending.label).trim()) || prev?.label || key
+        await dbQ(
+          `INSERT INTO admin_hub_metafield_definitions (key, label, values, updated_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (key) DO UPDATE SET label = $2, values = $3, updated_at = NOW()`,
+          [key, safeLabel, JSON.stringify(mergedVals)]
+        )
+        await dbQ(`DELETE FROM admin_hub_metafield_pending WHERE id = $1::uuid`, [id])
+        res.json({ ok: true, key, label: safeLabel, values: mergedVals })
+      } catch (err) {
+        console.error('metafield pending approve:', err)
+        res.status(500).json({ error: err.message })
+      }
+    })
+
+    httpApp.post('/admin-hub/metafield-definitions/pending/:id/reject', async (req, res) => {
+      try {
+        const auth = req.headers['authorization'] || ''
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+        const jwtPayload = token ? verifySellerToken(token) : null
+        if (!jwtPayload || !jwtPayload.is_superuser) {
+          return res.status(403).json({ message: 'Superuser access required' })
+        }
+        const id = String(req.params.id || '').trim()
+        if (!id) return res.status(400).json({ message: 'id required' })
+        const del = await dbQ(`DELETE FROM admin_hub_metafield_pending WHERE id = $1::uuid AND status = 'pending'`, [id])
+        if (!del.rowCount) return res.status(404).json({ message: 'Proposal not found' })
+        res.json({ ok: true })
+      } catch (err) {
+        console.error('metafield pending reject:', err)
+        res.status(500).json({ error: err.message })
+      }
+    })
+
+    console.log('Admin route: GET/PUT/DELETE /admin-hub/metafield-definitions (+ pending, proposals)')
 
     // --- Admin Hub Menus (service or raw DB fallback when loader fails) ---
     const resolveMenuService = () => {
@@ -2251,7 +2443,17 @@ async function start() {
         let sql = 'SELECT id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, created_at, updated_at FROM admin_hub_products'
         const params = []
         const where = []
-        if (sellerId) { where.push('seller_id = $' + (params.length + 1)); params.push(sellerId) }
+        if (sellerId) {
+          const p = params.length + 1
+          where.push(
+            '(' +
+              'seller_id = $' + p +
+              ' OR COALESCE(NULLIF(TRIM(metadata->>\'seller_id\'), \'\'), NULL) = $' + p +
+              ' OR COALESCE(NULLIF(TRIM(metadata->>\'seller\'), \'\'), NULL) = $' + p +
+            ')'
+          )
+          params.push(sellerId)
+        }
         if (status) { where.push('status = $' + (params.length + 1)); params.push(status) }
         if (collectionId) {
           where.push(
@@ -2369,7 +2571,14 @@ async function start() {
     }
     const adminHubProductsGET = async (req, res) => {
       try {
-        const products = await listAdminHubProductsDb(req.query || {})
+        const q = { ...(req.query || {}) }
+        const auth = req.headers['authorization'] || ''
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+        const payload = token ? verifySellerToken(token) : null
+        if (payload && !payload.is_superuser && payload.seller_id) {
+          q.seller_id = String(payload.seller_id).trim()
+        }
+        const products = await listAdminHubProductsDb(q)
         res.json({ products, count: products.length })
       } catch (err) {
         console.error('Admin Hub products GET error:', err)
@@ -2378,7 +2587,16 @@ async function start() {
     }
     const adminHubProductsPOST = async (req, res) => {
       try {
-        const row = await createAdminHubProductDb(req.body || {})
+        const body = { ...(req.body || {}) }
+        const auth = req.headers['authorization'] || ''
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+        const payload = token ? verifySellerToken(token) : null
+        if (payload && !payload.is_superuser && payload.seller_id) {
+          const sid = String(payload.seller_id).trim()
+          body.seller_id = sid
+          body.seller = sid
+        }
+        const row = await createAdminHubProductDb(body)
         if (!row) {
           res.status(503).json({ message: 'Database not configured or insert failed' })
           return
@@ -3029,6 +3247,118 @@ async function start() {
     httpApp.patch('/admin-hub/users/:id/superuser', requireSellerAuth, requireSuperuser, sellerUserSuperuserPATCH)
     console.log('Admin Hub routes: seller auth + users')
 
+    const loadPlatformCheckoutRow = async (pgClient) => {
+      const r = await pgClient.query(
+        `SELECT stripe_publishable_key, stripe_secret_key, pay_card, pay_paypal, pay_klarna, paypal_client_id, paypal_client_secret
+         FROM store_platform_checkout WHERE id = 1`,
+      )
+      return r.rows?.[0] || null
+    }
+
+    const resolveStripeSecretKeyFromPlatform = (row) => {
+      const envKey = (process.env.STRIPE_SECRET_KEY || '').toString().trim()
+      if (envKey) return envKey
+      return row ? (row.stripe_secret_key || '').toString().trim() : ''
+    }
+
+    const paymentMethodTypesFromPlatformRow = (row) => {
+      const payCard = !row || row.pay_card !== false
+      const payPaypal = row && row.pay_paypal === true
+      const payKlarna = row && row.pay_klarna === true
+      const types = []
+      if (payCard) types.push('card')
+      if (payPaypal) types.push('paypal')
+      if (payKlarna) types.push('klarna')
+      if (!types.length) types.push('card')
+      return types
+    }
+
+    /** Superuser: read platform checkout / Stripe config (secrets masked in response) */
+    const platformCheckoutSettingsGET = async (req, res) => {
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const row = await loadPlatformCheckoutRow(client)
+        await client.end()
+        const sk = (row?.stripe_secret_key || '').toString()
+        const pk = (row?.stripe_publishable_key || '').toString()
+        const psec = (row?.paypal_client_secret || '').toString()
+        res.json({
+          stripe_publishable_key: pk,
+          stripe_secret_key_set: sk.length > 0,
+          stripe_secret_key_hint: sk.length >= 4 ? `…${sk.slice(-4)}` : '',
+          pay_card: row?.pay_card !== false,
+          pay_paypal: row?.pay_paypal === true,
+          pay_klarna: row?.pay_klarna === true,
+          paypal_client_id: (row?.paypal_client_id || '').toString(),
+          paypal_client_secret_set: psec.length > 0,
+          paypal_client_secret_hint: psec.length >= 4 ? `…${psec.slice(-4)}` : '',
+          env_stripe_secret: !!(process.env.STRIPE_SECRET_KEY || '').toString().trim(),
+          env_stripe_publishable:
+            !!(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || '').toString().trim(),
+        })
+      } catch (err) {
+        try { await client.end() } catch (_) {}
+        console.error('platformCheckoutSettingsGET:', err)
+        res.status(500).json({ message: (err && err.message) || 'Error' })
+      }
+    }
+
+    /** Superuser: update platform checkout — empty stripe_secret_key leaves existing value */
+    const platformCheckoutSettingsPUT = async (req, res) => {
+      const body = req.body || {}
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const cur = (await loadPlatformCheckoutRow(client)) || {}
+        const nextPk =
+          body.stripe_publishable_key !== undefined
+            ? (body.stripe_publishable_key || '').toString().trim()
+            : (cur?.stripe_publishable_key || '').toString()
+        let nextSk = (cur?.stripe_secret_key || '').toString()
+        if (Object.prototype.hasOwnProperty.call(body, 'stripe_secret_key')) {
+          const inc = (body.stripe_secret_key || '').toString().trim()
+          if (inc) nextSk = inc
+        }
+        const pay_card = body.pay_card !== undefined ? !!body.pay_card : cur?.pay_card !== false
+        const pay_paypal = body.pay_paypal !== undefined ? !!body.pay_paypal : cur?.pay_paypal === true
+        const pay_klarna = body.pay_klarna !== undefined ? !!body.pay_klarna : cur?.pay_klarna === true
+        let paypal_client_id =
+          body.paypal_client_id !== undefined ? (body.paypal_client_id || '').toString().trim() : (cur?.paypal_client_id || '').toString()
+        let paypal_client_secret = (cur?.paypal_client_secret || '').toString()
+        if (Object.prototype.hasOwnProperty.call(body, 'paypal_client_secret')) {
+          const inc = (body.paypal_client_secret || '').toString().trim()
+          if (inc) paypal_client_secret = inc
+        }
+        await client.query(
+          `INSERT INTO store_platform_checkout (id, stripe_publishable_key, stripe_secret_key, pay_card, pay_paypal, pay_klarna, paypal_client_id, paypal_client_secret, updated_at)
+           VALUES (1, $1, $2, $3, $4, $5, $6, $7, now())
+           ON CONFLICT (id) DO UPDATE SET
+             stripe_publishable_key = EXCLUDED.stripe_publishable_key,
+             stripe_secret_key = EXCLUDED.stripe_secret_key,
+             pay_card = EXCLUDED.pay_card,
+             pay_paypal = EXCLUDED.pay_paypal,
+             pay_klarna = EXCLUDED.pay_klarna,
+             paypal_client_id = EXCLUDED.paypal_client_id,
+             paypal_client_secret = EXCLUDED.paypal_client_secret,
+             updated_at = now()`,
+          [nextPk || null, nextSk || null, pay_card, pay_paypal, pay_klarna, paypal_client_id || null, paypal_client_secret || null],
+        )
+        await client.end()
+        res.json({ ok: true })
+      } catch (err) {
+        try { await client.end() } catch (_) {}
+        console.error('platformCheckoutSettingsPUT:', err)
+        res.status(500).json({ message: (err && err.message) || 'Error' })
+      }
+    }
+
+    httpApp.get('/admin-hub/v1/platform-checkout-settings', requireSellerAuth, requireSuperuser, platformCheckoutSettingsGET)
+    httpApp.put('/admin-hub/v1/platform-checkout-settings', requireSellerAuth, requireSuperuser, platformCheckoutSettingsPUT)
+    console.log('Admin Hub routes: platform-checkout-settings (superuser)')
+
     // Store API: public seller settings (store name) for "Sold by" on shop
     const storeSellerSettingsGET = async (req, res) => {
       try {
@@ -3272,9 +3602,69 @@ async function start() {
         const brandIds = [...new Set(list.map((p) => (p.metadata && p.metadata.brand_id) || null).filter(Boolean))]
         const brandsById = {}
         await Promise.all(brandIds.map(async (bid) => { const b = await getBrandById(bid); if (b) brandsById[bid] = b }))
+        const collIds = [...new Set(list.flatMap((p) => {
+          const ids = []
+          if (p.collection_id) ids.push(String(p.collection_id).trim())
+          const m = Array.isArray(p?.metadata?.collection_ids) ? p.metadata.collection_ids : []
+          for (const x of m) {
+            if (x != null && String(x).trim()) ids.push(String(x).trim())
+          }
+          return ids
+        }))].filter((id) => id && isUuidLike(id))
+        const collToLinkedCat = new Map()
+        if (collIds.length > 0) {
+          const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+          if (dbUrl && dbUrl.startsWith('postgres')) {
+            let cClient
+            try {
+              const { Client } = require('pg')
+              cClient = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+              await cClient.connect()
+              const cr = await cClient.query(
+                'SELECT id, metadata FROM admin_hub_collections WHERE id = ANY($1::uuid[])',
+                [collIds],
+              )
+              await cClient.end()
+              cClient = null
+              for (const row of cr.rows || []) {
+                const cmeta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
+                const lc = cmeta.linked_category_id != null ? String(cmeta.linked_category_id).trim() : ''
+                if (lc) collToLinkedCat.set(String(row.id).trim().toLowerCase(), lc.trim().toLowerCase())
+              }
+            } catch (e) {
+              try { if (cClient) await cClient.end() } catch (_) {}
+              console.warn('Store products: linked_category from collections:', e?.message)
+            }
+          }
+        }
+        const mergeCategoryIdsFromCollections = (p, mapped) => {
+          if (!collToLinkedCat.size) return
+          const linked = []
+          const addColl = (cid) => {
+            if (!cid) return
+            const catId = collToLinkedCat.get(String(cid).trim().toLowerCase())
+            if (catId && !linked.includes(catId)) linked.push(catId)
+          }
+          if (p.collection_id) addColl(p.collection_id)
+          if (Array.isArray(p?.metadata?.collection_ids)) {
+            for (const c of p.metadata.collection_ids) addColl(c)
+          }
+          if (!linked.length) return
+          const meta = { ...(mapped.metadata || {}) }
+          const existingArr = Array.isArray(meta.category_ids) ? meta.category_ids.map((x) => String(x).trim().toLowerCase()) : []
+          for (const catId of linked) {
+            if (!existingArr.includes(catId)) existingArr.push(catId)
+          }
+          meta.category_ids = existingArr
+          const primary = linked[0]
+          if (!meta.admin_category_id) meta.admin_category_id = primary
+          if (!meta.category_id) meta.category_id = primary
+          mapped.metadata = meta
+        }
         const bestsellerIds = await getBestsellerProductIds()
         const products = list.map((p) => {
           const mapped = mapAdminHubToStoreProduct(p)
+          mergeCategoryIdsFromCollections(p, mapped)
           const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
           if (!existingSeller && p.seller_id && storeNamesBySeller[(p.seller_id || 'default').toString().trim()]) {
             const storeName = storeNamesBySeller[(p.seller_id || 'default').toString().trim()]
@@ -3829,9 +4219,6 @@ async function start() {
       const cartId = (body.cart_id || body.cartId || '').toString().trim()
       if (!cartId) return res.status(400).json({ message: 'cart_id required' })
 
-      const secretKey = (process.env.STRIPE_SECRET_KEY || '').toString().trim()
-      if (!secretKey) return res.status(503).json({ message: 'STRIPE_SECRET_KEY not configured' })
-
       const { Client } = require('pg')
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       if (!dbUrl || !dbUrl.startsWith('postgres')) return res.status(503).json({ message: 'Database not configured' })
@@ -3841,38 +4228,53 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const cart = await getCartWithItems(client, cartId)
-        await client.end()
-        if (!cart) return res.status(404).json({ message: 'Cart not found' })
+        if (!cart) {
+          await client.end()
+          return res.status(404).json({ message: 'Cart not found' })
+        }
 
         const items = Array.isArray(cart.items) ? cart.items : []
-        if (!items.length) return res.status(400).json({ message: 'Cart is empty' })
-
+        if (!items.length) {
+          await client.end()
+          return res.status(400).json({ message: 'Cart is empty' })
+        }
+        
         const subtotalCents = items.reduce((sum, it) => sum + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0)
         const reservedPts = Number(cart.bonus_points_reserved || 0)
         const discountCents = discountCentsFromBonusPoints(reservedPts)
         const shippingCents = Math.max(0, Number(body.shipping_cents || 0))
         const payCents = Math.max(0, subtotalCents - discountCents + shippingCents)
         if (payCents <= 0) {
+          await client.end()
           return res.status(400).json({
             message:
               'Der Bestellbetrag ist 0 €. Vollständige Bezahlung nur mit Bonuspunkten ist derzeit nicht möglich — bitte Punkte reduzieren oder Artikel hinzufügen.',
           })
         }
-        const stripe = new (require('stripe'))(secretKey)
 
-        // PaymentElement uyumu için automatic_payment_methods kullanıyoruz
-        const paymentIntent = await stripe.paymentIntents.create({
+        const platformRow = await loadPlatformCheckoutRow(client)
+        const secretKeyResolved = resolveStripeSecretKeyFromPlatform(platformRow)
+        if (!secretKeyResolved) {
+          await client.end()
+          return res.status(503).json({ message: 'STRIPE_SECRET_KEY not configured (set in environment or Sellercentral → Settings → Checkout)' })
+        }
+
+        const paymentMethodTypes = paymentMethodTypesFromPlatformRow(platformRow)
+        const stripe = new (require('stripe'))(secretKeyResolved)
+        const piBody = {
           amount: payCents,
           currency: 'eur',
-          automatic_payment_methods: { enabled: true },
+          payment_method_types: paymentMethodTypes,
           metadata: {
             cart_id: cartId,
             subtotal_cents: String(subtotalCents),
             discount_cents: String(discountCents),
             bonus_points_redeemed: String(reservedPts),
           },
-        })
+        }
+        const paymentIntent = await stripe.paymentIntents.create(piBody)
 
+        await client.end()
         res.json({
           client_secret: paymentIntent.client_secret,
           payment_intent_id: paymentIntent.id,
@@ -4002,6 +4404,13 @@ async function start() {
         if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null
         return payload
       } catch { return null }
+    }
+
+    const _CUSTOMER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    function customerIdForPg(payload) {
+      if (!payload?.id) return null
+      const raw = String(payload.id).trim()
+      return _CUSTOMER_UUID_RE.test(raw) ? raw : null
     }
 
     // POST /store/customers — register customer
@@ -5052,7 +5461,7 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const custId = payload.id ? String(payload.id).trim() : null
+        const custId = customerIdForPg(payload)
         const custEmail = payload.email ? String(payload.email).trim() : ''
         const ordersR = await client.query(
           `SELECT id, order_number, order_status, payment_status, delivery_status,
@@ -5144,7 +5553,7 @@ async function start() {
              ($3::uuid IS NOT NULL AND customer_id = $3::uuid)
              OR (email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(TRIM($2)))
            )`,
-          [orderId, payload.email, payload.id || null],
+          [orderId, payload.email, customerIdForPg(payload)],
         )
         if (!orderR.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
         const order = orderR.rows[0]
@@ -5219,7 +5628,9 @@ async function start() {
         const subtotalCents = items.reduce((sum, it) => sum + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0)
         const reservedPts = Number(cart.bonus_points_reserved || 0)
         const discountCents = discountCentsFromBonusPoints(reservedPts)
-        const totalCents = Math.max(0, subtotalCents - discountCents)
+        const shippingCentsOrder = Math.max(0, Number(body.shipping_cents || 0))
+        const merchandiseAfterDiscount = Math.max(0, subtotalCents - discountCents)
+        const orderPaidTotalCents = Math.max(0, merchandiseAfterDiscount + shippingCentsOrder)
         const bonusPointsRedeemed = reservedPts
 
         let email = (body.email || '').toString().trim() || null
@@ -5292,8 +5703,9 @@ async function start() {
           }
         } catch (_) {}
 
-        // Get payment method from Stripe + verify paid amount matches cart (incl. bonus discount)
-        const secretKey = (process.env.STRIPE_SECRET_KEY || '').toString().trim()
+        // Get payment method from Stripe + verify paid amount matches cart (incl. bonus + Versand)
+        const platformRowOrders = await loadPlatformCheckoutRow(client)
+        const secretKey = resolveStripeSecretKeyFromPlatform(platformRowOrders)
         let paymentMethod = 'card'
         let stripeInst = null
         if (secretKey) {
@@ -5301,7 +5713,7 @@ async function start() {
             stripeInst = new (require('stripe'))(secretKey)
             const pi = await stripeInst.paymentIntents.retrieve(paymentIntentId, { expand: ['payment_method'] })
             const paidCents = Number(pi.amount)
-            if (paidCents !== totalCents) {
+            if (paidCents !== orderPaidTotalCents) {
               await client.end()
               return res.status(400).json({ message: 'Zahlungsbetrag stimmt nicht mit dem Warenkorb überein. Bitte Checkout neu laden.' })
             }
@@ -5316,7 +5728,7 @@ async function start() {
             await client.end()
             return res.status(400).json({ message: e?.message || 'Zahlung konnte nicht verifiziert werden' })
           }
-        } else if (totalCents > 0) {
+        } else if (orderPaidTotalCents > 0) {
           console.warn('storeOrdersPOST: STRIPE_SECRET_KEY missing — skipping PaymentIntent amount verification')
         }
 
@@ -5335,14 +5747,15 @@ async function start() {
              address_line1, address_line2, city, postal_code, country,
              billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping,
              payment_method, customer_id, is_guest, newsletter_opted_in,
-             subtotal_cents, discount_cents, bonus_points_redeemed, total_cents, currency)
-           VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,'eur')
+             order_status, payment_status,
+             subtotal_cents, discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency)
+           VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt',$23,$24,$25,$26,$27,'eur')
            RETURNING id, order_number`,
           [cartId, paymentIntentId, sellerId, email, first_name, last_name, phone,
            address_line1, address_line2, city, postal_code, country,
            billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billingSame,
            paymentMethod, customerId, isGuest, newsletter_opted_in,
-           subtotalCents, discountCents, bonusPointsRedeemed, totalCents]
+           subtotalCents, discountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents]
         )
 
         const orderId = ins.rows && ins.rows[0] ? ins.rows[0].id : null
@@ -5397,7 +5810,7 @@ async function start() {
           }
         }
         if (!isGuest && customerId) {
-          const earned = bonusPointsEarnedFromOrderPaidCents(totalCents)
+          const earned = bonusPointsEarnedFromOrderPaidCents(merchandiseAfterDiscount)
           if (earned > 0) {
             await client.query(
               `UPDATE store_customers SET bonus_points = COALESCE(bonus_points, 0) + $1, updated_at = NOW() WHERE id = $2::uuid`,
@@ -5455,12 +5868,38 @@ async function start() {
       }
     }
 
+    const storePublicPaymentConfigGET = async (_req, res) => {
+      const envPk = (process.env.STRIPE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').toString().trim()
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl || !dbUrl.startsWith('postgres')) {
+        return res.json({ stripe_publishable_key: envPk || null, payment_method_types: paymentMethodTypesFromPlatformRow(null) })
+      }
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const row = await loadPlatformCheckoutRow(client)
+        await client.end()
+        const dbPk = (row?.stripe_publishable_key || '').toString().trim()
+        res.json({
+          stripe_publishable_key: envPk || dbPk || null,
+          payment_method_types: paymentMethodTypesFromPlatformRow(row),
+        })
+      } catch (err) {
+        if (client) try { await client.end() } catch (_) {}
+        console.error('storePublicPaymentConfigGET:', err)
+        res.json({ stripe_publishable_key: envPk || null, payment_method_types: ['card'] })
+      }
+    }
+
     // Routes
+    httpApp.get('/store/public-payment-config', storePublicPaymentConfigGET)
     httpApp.post('/store/payment-intent', storePaymentIntentPOST)
     httpApp.post('/store/orders', storeOrdersPOST)
     httpApp.get('/store/orders/me', storeOrdersMeGET)
     httpApp.get('/store/orders/:id', storeOrdersGET)
-    console.log('Store routes: POST /store/payment-intent, POST /store/orders, GET /store/orders/me, GET /store/orders/:id')
+    console.log('Store routes: GET /store/public-payment-config, POST /store/payment-intent, POST /store/orders, GET /store/orders/me, GET /store/orders/:id')
 
     const storeCollectionsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -7929,10 +8368,46 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.connect()
         const seenR = await client.query(`SELECT notifications_seen_at FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`)
         const seenAt = seenR.rows[0]?.notifications_seen_at || new Date(0)
-        const [ordersR, returnsR, messagesR] = await Promise.all([
+        const sellerIdParam = (req.query.seller_id || '').toString().trim()
+        // Inbox badge: use per-message read flags only (not notifications_seen_at — that is for the bell’s orders/returns “since last open”).
+        let messagesR
+        if (sellerIdParam) {
+          messagesR = await client.query(
+            `SELECT COUNT(*)::int AS c FROM store_messages m
+             WHERE m.is_read_by_seller = false
+               AND (
+                 (
+                   (m.channel = 'customer' OR m.channel IS NULL)
+                   AND m.sender_type = 'customer'
+                   AND m.order_id IN (SELECT id FROM store_orders WHERE seller_id = $1)
+                 )
+                 OR (
+                   m.channel = 'support' AND m.seller_id = $1 AND m.sender_type = 'seller'
+                 )
+               )`,
+            [sellerIdParam],
+          )
+        } else {
+          messagesR = await client.query(
+            `SELECT COUNT(*)::int AS c FROM store_messages m
+             WHERE (
+                 (
+                   (m.channel = 'customer' OR m.channel IS NULL)
+                   AND m.sender_type = 'customer'
+                   AND m.is_read_by_seller = false
+                 )
+                 OR (
+                   m.channel = 'support' AND m.sender_type = 'seller' AND m.is_read_by_seller = false
+                 )
+                 OR (
+                   m.channel = 'support' AND m.sender_type = 'customer' AND m.is_read_by_support = false
+                 )
+               )`,
+          )
+        }
+        const [ordersR, returnsR] = await Promise.all([
           client.query(`SELECT COUNT(*)::int AS c FROM store_orders WHERE created_at > $1`, [seenAt]),
           client.query(`SELECT COUNT(*)::int AS c FROM store_returns WHERE created_at > $1`, [seenAt]),
-          client.query(`SELECT COUNT(*)::int AS c FROM store_messages WHERE created_at > $1 AND sender_type = 'customer' AND is_read_by_seller = false`, [seenAt]),
         ])
         const recentOrders = await client.query(`SELECT id, order_number, first_name, last_name, total_cents, created_at FROM store_orders WHERE created_at > $1 ORDER BY created_at DESC LIMIT 5`, [seenAt])
         const recentReturns = await client.query(`SELECT r.id, r.return_number, r.status, r.created_at, o.order_number FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.created_at > $1 ORDER BY r.created_at DESC LIMIT 5`, [seenAt])
@@ -8823,6 +9298,76 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    /** GET /admin-hub/v1/seller/account — angezeigter Benutzer exakt die eingeloggte Zeile (inkl. Team-Mitglieder) */
+    const adminHubSellerAccountGET = async (req, res) => {
+      const userId = req.sellerUser?.id
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `SELECT id, email, store_name, seller_id, is_superuser, sub_of_seller_id, first_name, last_name, created_at
+           FROM seller_users WHERE id = $1`,
+          [userId],
+        )
+        await client.end()
+        const row = r.rows?.[0]
+        if (!row) return res.status(404).json({ message: 'User not found' })
+        res.json({
+          user: {
+            id: row.id,
+            email: row.email,
+            store_name: row.store_name,
+            seller_id: row.seller_id,
+            is_superuser: row.is_superuser === true,
+            is_team_member: row.sub_of_seller_id != null && String(row.sub_of_seller_id).trim() !== '',
+            first_name: row.first_name,
+            last_name: row.last_name,
+            created_at: row.created_at,
+          },
+        })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    /** PATCH /admin-hub/v1/seller/password — eigenes Passwort (nur eingeloggter Benutzer) */
+    const adminHubSellerPasswordPATCH = async (req, res) => {
+      const userId = req.sellerUser?.id
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+      const { current_password, new_password } = req.body || {}
+      const cur = (current_password || '').toString()
+      const neu = (new_password || '').toString()
+      if (!cur || !neu) return res.status(400).json({ message: 'Aktuelles und neues Passwort sind erforderlich.' })
+      if (neu.length < 6) return res.status(400).json({ message: 'Neues Passwort muss mindestens 6 Zeichen haben.' })
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query('SELECT id, password_hash FROM seller_users WHERE id = $1', [userId])
+        const row = r.rows?.[0]
+        if (!row) {
+          await client.end()
+          return res.status(404).json({ message: 'Benutzer nicht gefunden.' })
+        }
+        if (!verifySellerPassword(cur, row.password_hash)) {
+          await client.end()
+          return res.status(400).json({ message: 'Das aktuelle Passwort ist nicht korrekt.' })
+        }
+        await client.query('UPDATE seller_users SET password_hash = $1, updated_at = now() WHERE id = $2', [
+          hashSellerPassword(neu),
+          userId,
+        ])
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     // POST /admin-hub/users/invite — invite a new seller sub-user
     const adminHubUsersInvitePOST = async (req, res) => {
       const inviterSellerId = req.sellerUser?.seller_id
@@ -8971,6 +9516,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.get('/admin-hub/v1/payout-summary', requireSellerAuth, adminHubPayoutSummaryGET)
     httpApp.get('/admin-hub/v1/payout-overview', requireSellerAuth, adminHubPayoutOverviewGET)
     httpApp.patch('/admin-hub/v1/seller/iban', requireSellerAuth, adminHubSellerIbanPATCH)
+    httpApp.get('/admin-hub/v1/seller/account', requireSellerAuth, adminHubSellerAccountGET)
+    httpApp.patch('/admin-hub/v1/seller/password', requireSellerAuth, adminHubSellerPasswordPATCH)
     httpApp.get('/admin-hub/v1/seller/profile', requireSellerAuth, adminHubSellerProfileGET)
     httpApp.post('/admin-hub/users/invite', requireSellerAuth, adminHubUsersInvitePOST)
     httpApp.get('/admin-hub/v1/subusers', requireSellerAuth, adminHubSubusersGET)

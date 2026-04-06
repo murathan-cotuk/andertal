@@ -131,12 +131,16 @@ class MedusaAdminClient {
   }
 
   async createAdminHubProduct(data) {
-    // Always tag the product with the current seller's ID
+    // Always tag the product with the current seller's ID (spread first so callers cannot overwrite seller_id)
     const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
-    const body = sellerId ? { seller_id: sellerId, seller: sellerId, ...data } : data;
+    const merged = { ...(data && typeof data === 'object' ? data : {}) };
+    if (sellerId) {
+      merged.seller_id = sellerId;
+      merged.seller = sellerId;
+    }
     const res = await this.request('/admin-hub/products', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify(merged),
     });
     return res?.product ?? res;
   }
@@ -177,6 +181,27 @@ class MedusaAdminClient {
   /** DELETE /admin-hub/metafield-definitions/:key */
   async deleteMetafieldDefinition(key) {
     return this.request(`/admin-hub/metafield-definitions/${encodeURIComponent(key)}`, { method: 'DELETE' });
+  }
+
+  /** GET /admin-hub/metafield-definitions/pending — superuser only */
+  async getMetafieldPendingProposals() {
+    return this.request('/admin-hub/metafield-definitions/pending');
+  }
+
+  /** POST — seller: queue for approval; superuser: apply to catalog immediately */
+  async submitMetafieldCatalogProposal(body) {
+    return this.request('/admin-hub/metafield-definitions/proposals', {
+      method: 'POST',
+      body: JSON.stringify(body || {}),
+    });
+  }
+
+  async approveMetafieldProposal(id) {
+    return this.request(`/admin-hub/metafield-definitions/pending/${encodeURIComponent(id)}/approve`, { method: 'POST' });
+  }
+
+  async rejectMetafieldProposal(id) {
+    return this.request(`/admin-hub/metafield-definitions/pending/${encodeURIComponent(id)}/reject`, { method: 'POST' });
   }
 
   /** GET /admin-hub/landing-page/:pageId */
@@ -867,6 +892,19 @@ class MedusaAdminClient {
   async getSellerProfile() {
     return this.request('/admin-hub/v1/seller/profile')
   }
+
+  /** Eingeloggter Benutzer (eine Zeile in seller_users — auch Team-Accounts) */
+  async getSellerAccount() {
+    return this.request('/admin-hub/v1/seller/account')
+  }
+
+  async changeSellerPassword({ current_password, new_password }) {
+    return this.request('/admin-hub/v1/seller/password', {
+      method: 'PATCH',
+      body: JSON.stringify({ current_password, new_password }),
+    })
+  }
+
   async updateSellerIban(iban) {
     return this.request('/admin-hub/v1/seller/iban', { method: 'PATCH', body: JSON.stringify({ iban }) })
   }
@@ -903,6 +941,18 @@ class MedusaAdminClient {
 
   async getSellerMe() {
     return this.request('/admin-hub/auth/me');
+  }
+
+  /** Superuser: Shop-Checkout (Stripe-Keys, Zahlarten) */
+  async getPlatformCheckoutSettings() {
+    return this.request('/admin-hub/v1/platform-checkout-settings');
+  }
+
+  async updatePlatformCheckoutSettings(data) {
+    return this.request('/admin-hub/v1/platform-checkout-settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   }
 
   async getSellerUsers() {

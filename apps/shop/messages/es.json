@@ -108,7 +108,9 @@
     "orderDate": "Fecha del pedido",
     "items": "Artículos",
     "total": "Total",
-    "continueShopping": "Seguir comprando"
+    "continueShopping": "Seguir comprando",
+    "paymentStatus": "Estado del pago",
+    "paid": "Pagado"
   },
   "pages": {
     "orders": {

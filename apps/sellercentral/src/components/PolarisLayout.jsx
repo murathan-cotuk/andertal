@@ -219,21 +219,41 @@ export default function PolarisLayout({ children }) {
       : "Seller Account"
   );
 
+  const refreshNotifications = useCallback(async () => {
+    try {
+      const d = await getMedusaAdminClient().getNotificationsUnread();
+      if (d && !d.__error) {
+        setNotifData(d);
+        setMsgUnread(d.messages || 0);
+      }
+    } catch {
+      // Backend unreachable — silently ignore
+    }
+  }, []);
+
   // Poll notifications + message unread count every 60s
   useEffect(() => {
     if (!isAuthenticated) return;
-    const fetchNotifs = async () => {
-      try {
-        const d = await getMedusaAdminClient().getNotificationsUnread();
-        if (d && !d.__error) { setNotifData(d); setMsgUnread(d.messages || 0); }
-      } catch {
-        // Backend unreachable — silently ignore
-      }
-    };
-    fetchNotifs();
-    const id = setInterval(fetchNotifs, 60000);
+    refreshNotifications();
+    const id = setInterval(refreshNotifications, 60000);
     return () => clearInterval(id);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, refreshNotifications]);
+
+  // Inbox: refresh badge immediately after messages are marked read (not only on 60s poll)
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === "undefined") return;
+    const onRefresh = () => {
+      refreshNotifications();
+    };
+    window.addEventListener("belucha-msg-unread-refresh", onRefresh);
+    return () => window.removeEventListener("belucha-msg-unread-refresh", onRefresh);
+  }, [isAuthenticated, refreshNotifications]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (!pathname || !pathname.includes("/inbox")) return;
+    refreshNotifications();
+  }, [pathname, isAuthenticated, refreshNotifications]);
 
   // Close notif dropdown on outside click
   useEffect(() => {
@@ -257,6 +277,7 @@ export default function PolarisLayout({ children }) {
     "/content/blog-posts",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
+    "/settings/checkout",
   ]);
 
   useEffect(() => {

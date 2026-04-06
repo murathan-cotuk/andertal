@@ -13,11 +13,15 @@ import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-pri
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 
+/* Above ShopHeader (2147483600) and its dropdowns (2147483647) so Warenkorb is fully usable */
+const CART_Z_OVERLAY = 2147483700;
+const CART_Z_DRAWER = 2147483701;
+
 const Overlay = styled.div`
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
-  z-index: 9998;
+  z-index: ${CART_Z_OVERLAY};
   opacity: ${(p) => (p.$open ? 1 : 0)};
   pointer-events: ${(p) => (p.$open ? "auto" : "none")};
   transition: opacity 0.2s ease;
@@ -32,7 +36,7 @@ const Drawer = styled.aside`
   height: 100vh;
   background: #fff;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
-  z-index: 9999;
+  z-index: ${CART_Z_DRAWER};
   display: flex;
   flex-direction: column;
   transform: translateX(${(p) => (p.$open ? 0 : "100%")});

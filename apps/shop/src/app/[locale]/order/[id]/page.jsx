@@ -203,6 +203,12 @@ export default function OrderConfirmationPage() {
                   <span>{order.email}</span>
                 </MetaRow>
               )}
+              {(String(order.payment_status || "").toLowerCase() === "bezahlt" || order.status === "paid") && (
+                <MetaRow>
+                  <MetaLabel>{t("paymentStatus")}</MetaLabel>
+                  <span style={{ color: "#059669", fontWeight: 600 }}>{t("paid")}</span>
+                </MetaRow>
+              )}
             </Card>
 
             {items.length > 0 && (

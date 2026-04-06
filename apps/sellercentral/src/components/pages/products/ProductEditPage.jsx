@@ -283,6 +283,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [extraVisibleMetaDefKeys, setExtraVisibleMetaDefKeys] = useState({});
   const [addMetaDefPopoverOpen, setAddMetaDefPopoverOpen] = useState(false);
   const [classificationOpen, setClassificationOpen] = useState(false);
+  /** Neues Katalog-Metafeld (Titel + Wert); Seller → Freigabe durch Superuser */
+  const [newCatalogMetaOpen, setNewCatalogMetaOpen] = useState(false);
+  const [newCatalogMetaLabel, setNewCatalogMetaLabel] = useState("");
+  const [newCatalogMetaValue, setNewCatalogMetaValue] = useState("");
+  const [newCatalogMetaKey, setNewCatalogMetaKey] = useState("");
+  const [newCatalogMetaSaving, setNewCatalogMetaSaving] = useState(false);
+  const [newCatalogMetaErr, setNewCatalogMetaErr] = useState("");
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -764,6 +771,60 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   };
 
   const metafieldsList = Array.isArray(meta.metafields) ? meta.metafields : (meta.metafields && typeof meta.metafields === "object" ? Object.entries(meta.metafields).map(([k, v]) => ({ key: k, value: v })) : []);
+
+  const normalizeCatalogMetaKey = (raw, labelFallback) => {
+    let k = String(raw || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+    if (!k && labelFallback) {
+      k = titleToHandle(String(labelFallback)).replace(/-/g, "_").replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+    }
+    return k || "";
+  };
+
+  const submitNewCatalogMetafield = async () => {
+    setNewCatalogMetaErr("");
+    const label = newCatalogMetaLabel.trim();
+    const value = newCatalogMetaValue.trim();
+    if (!label) {
+      setNewCatalogMetaErr("Bitte Titel / Anzeigename angeben.");
+      return;
+    }
+    if (!value) {
+      setNewCatalogMetaErr("Bitte Inhalt / Wert angeben.");
+      return;
+    }
+    const key = normalizeCatalogMetaKey(newCatalogMetaKey, label);
+    if (!key) {
+      setNewCatalogMetaErr("Ungültiger Key.");
+      return;
+    }
+    setNewCatalogMetaSaving(true);
+    try {
+      const others = metafieldsList.filter((m) => m.key !== key);
+      updateMeta("metafields", [...others, ...[value].map((v) => ({ key, value: v }))]);
+      setExtraVisibleMetaDefKeys((p) => ({ ...p, [key]: true }));
+      await client.submitMetafieldCatalogProposal({
+        ...(newCatalogMetaKey.trim() ? { key } : {}),
+        label,
+        values: [value],
+      });
+      const defs = await client.getMetafieldDefinitions().catch(() => null);
+      if (defs?.definitions) setMetaDefs(defs.definitions);
+      setNewCatalogMetaOpen(false);
+      setNewCatalogMetaLabel("");
+      setNewCatalogMetaValue("");
+      setNewCatalogMetaKey("");
+      setMessage({
+        type: "success",
+        text: isSuperuser
+          ? "Metafeld wurde im Katalog gespeichert."
+          : "Vorschlag eingereicht — ein Superuser kann ihn unter Content → Metaobjects freigeben. Bitte Produkt speichern.",
+      });
+    } catch (e) {
+      setNewCatalogMetaErr(e?.message || "Fehler");
+    } finally {
+      setNewCatalogMetaSaving(false);
+    }
+  };
 
   const metaDefKeysWithValues = useMemo(() => {
     const s = new Set();
@@ -1311,7 +1372,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                         )
                       )}
                     </BlockStack>
-                    <Box flexShrink={0}>
+                    <Box style={{ flexShrink: 0 }}>
                       <Button
                         onClick={() => setClassificationOpen((o) => !o)}
                         disclosure={classificationOpen ? "up" : "down"}
@@ -2091,8 +2152,20 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <Text as="p" variant="bodySm" tone="subdued">
                 Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen“ ausgewählte — werden angezeigt (nicht der gesamte Katalog).
               </Text>
+              <InlineStack gap="300" blockAlign="center" wrap>
+                <Button size="slim" variant="primary" onClick={() => { setNewCatalogMetaErr(""); setNewCatalogMetaOpen(true); }}>
+                  + Neues Metafeld (Katalog)
+                </Button>
+                {!isSuperuser ? (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Als Verkäufer: neuer Katalog-Eintrag wird vom Superuser unter Content → Metaobjects freigegeben.
+                  </Text>
+                ) : null}
+              </InlineStack>
               {Object.keys(metaDefs).length === 0 ? (
-                <Text as="p" variant="bodySm" tone="subdued">Keine Metafeld-Definitionen. Erstelle welche unter Content → Metaobjects.</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Noch keine Katalog-Definitionen — du kannst mit „Neues Metafeld (Katalog)“ Titel und Wert anlegen (Superuser: sofort aktiv; Verkäufer: Freigabe nötig).
+                </Text>
               ) : (
                 <BlockStack gap="400">
                   {visibleMetaDefEntries.length === 0 && (
@@ -2206,6 +2279,44 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 </BlockStack>
               )}
 
+              <Modal
+                open={newCatalogMetaOpen}
+                onClose={() => { if (!newCatalogMetaSaving) setNewCatalogMetaOpen(false); }}
+                title="Neues Katalog-Metafeld"
+                primaryAction={{
+                  content: isSuperuser ? "Im Katalog speichern" : "Zur Freigabe einreichen",
+                  onAction: submitNewCatalogMetafield,
+                  loading: newCatalogMetaSaving,
+                }}
+                secondaryActions={[{ content: "Abbrechen", onAction: () => { if (!newCatalogMetaSaving) setNewCatalogMetaOpen(false); } }]}
+              >
+                <Modal.Section>
+                  <BlockStack gap="400">
+                    {newCatalogMetaErr ? <Banner tone="critical" onDismiss={() => setNewCatalogMetaErr("")}>{newCatalogMetaErr}</Banner> : null}
+                    <TextField
+                      label="Titel (Anzeigename)"
+                      value={newCatalogMetaLabel}
+                      onChange={setNewCatalogMetaLabel}
+                      placeholder="z.B. Material, Zertifikat, Pflegehinweis"
+                      autoComplete="off"
+                    />
+                    <TextField
+                      label="Inhalt (Wert)"
+                      value={newCatalogMetaValue}
+                      onChange={setNewCatalogMetaValue}
+                      placeholder="z.B. Baumwolle, OEKO-TEX, Maschinenwäsche 40°"
+                      autoComplete="off"
+                    />
+                    <TextField
+                      label="Key (optional)"
+                      value={newCatalogMetaKey}
+                      onChange={(v) => setNewCatalogMetaKey(v.toLowerCase())}
+                      helpText="Leer lassen: wird aus dem Titel erzeugt (kleinbuchstaben, Unterstriche)."
+                      autoComplete="off"
+                    />
+                  </BlockStack>
+                </Modal.Section>
+              </Modal>
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">Produktsicherheitsinformationen (GPSR, optional)</Text>

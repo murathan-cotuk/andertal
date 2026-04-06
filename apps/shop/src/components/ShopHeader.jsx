@@ -119,6 +119,48 @@ function productCategoryIds(product) {
   return out;
 }
 
+/** Map category slug → id from /store/categories tree (for menu items that only store slug). */
+function walkCategorySlugMap(nodes, outMap) {
+  if (!Array.isArray(nodes)) return;
+  for (const n of nodes) {
+    if (!n) continue;
+    if (n.slug) outMap.set(String(n.slug).trim().toLowerCase(), String(n.id).trim().toLowerCase());
+    if (n.children && n.children.length) walkCategorySlugMap(n.children, outMap);
+  }
+}
+
+/** Resolve admin category UUID for a menu item (direct id, JSON, or slug lookup). */
+function resolveMenuCategoryId(item, slugToCategoryId) {
+  const direct = menuItemCategoryId(item);
+  if (direct) return String(direct).trim().toLowerCase();
+  const parsed = parseJsonMaybe(item.link_value);
+  let slug = "";
+  if (parsed && typeof parsed === "object") {
+    slug = (parsed.slug || parsed.handle || "").toString().trim();
+  }
+  if (!slug) slug = String(item.slug || "").trim();
+  if (!slug) {
+    const raw = String(item.link_value || "").trim();
+    if (raw && !raw.startsWith("{") && !UUID_REGEX.test(raw)) slug = raw;
+  }
+  if (!slug || !(slugToCategoryId instanceof Map)) return "";
+  const id = slugToCategoryId.get(slug.toLowerCase());
+  return id ? String(id).trim().toLowerCase() : "";
+}
+
+function menuItemDepth(item, idToItem) {
+  let d = 0;
+  let cur = item;
+  const seen = new Set();
+  while (cur && cur.parent_id && !seen.has(String(cur.parent_id))) {
+    seen.add(String(cur.parent_id));
+    d += 1;
+    cur = idToItem.get(String(cur.parent_id));
+    if (!cur) break;
+  }
+  return d;
+}
+
 const HeaderWrap = styled.header`
   position: fixed;
   top: 0;
@@ -669,9 +711,10 @@ export default function ShopHeader() {
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
-  const [mainMenuItems, setMainMenuItems] = useState([]);
+  const [mainMenuAllItems, setMainMenuAllItems] = useState([]);
   const [secondMenuItems, setSecondMenuItems] = useState([]);
   const [categoryIdsWithProducts, setCategoryIdsWithProducts] = useState(() => new Set());
+  const [categorySlugToId, setCategorySlugToId] = useState(() => new Map());
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
 
@@ -712,7 +755,7 @@ export default function ShopHeader() {
         menus.find((m) => norm(m?.location) === subnavSlug) ||
         menus.find((m) => norm(m?.slug) === "second-menu");
       const rootItems = (arr) => (arr || []).filter((i) => !i?.parent_id);
-      setMainMenuItems(main ? rootItems(main.items) : []);
+      setMainMenuAllItems(main ? main.items || [] : []);
       setSecondMenuItems(second ? rootItems(second.items) : []);
     };
     Promise.all([
@@ -734,23 +777,40 @@ export default function ShopHeader() {
 
   useEffect(() => {
     let cancelled = false;
-    const loadCategoryIdsWithProducts = async () => {
+    const run = async () => {
       try {
-        const res = await fetch("/api/store-products?limit=500", { cache: "no-store" });
-        if (!res.ok) return;
+        const client = getMedusaClient();
+        const [res, catRes] = await Promise.all([
+          fetch("/api/store-products?limit=5000", { cache: "no-store" }),
+          client.getCategories({ tree: true, is_visible: true }).catch(() => ({ tree: [] })),
+        ]);
+        if (cancelled) return;
+        const slugMap = new Map();
+        walkCategorySlugMap(catRes.tree || [], slugMap);
+        setCategorySlugToId(slugMap);
+        if (!res.ok) {
+          setCategoryIdsWithProducts(new Set());
+          return;
+        }
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         const ids = new Set();
         const products = Array.isArray(data?.products) ? data.products : [];
         products.forEach((p) => {
-          productCategoryIds(p).forEach((id) => ids.add(id));
+          productCategoryIds(p).forEach((id) => {
+            const k = String(id).trim().toLowerCase();
+            if (k) ids.add(k);
+          });
         });
         setCategoryIdsWithProducts(ids);
       } catch {
-        if (!cancelled) setCategoryIdsWithProducts(new Set());
+        if (!cancelled) {
+          setCategoryIdsWithProducts(new Set());
+          setCategorySlugToId(new Map());
+        }
       }
     };
-    loadCategoryIdsWithProducts();
+    run();
     return () => {
       cancelled = true;
     };
@@ -815,14 +875,23 @@ export default function ShopHeader() {
     url: "handle",
     image: "thumbnail",
   };
-  /* Burger „Kategorien“: nur sichtbare Kategorien mit mindestens einem freigegebenen Shop-Produkt (admin_category_id). */
+  /* „Kategorien“: alle Menüzeilen (inkl. Unterkategorien), die auf eine Kategorie zeigen und mindestens ein sichtbares Shop-Produkt haben. */
   const mainCategories = useMemo(() => {
-    return mainMenuItems.filter((item) => {
-      if (String(item?.link_type || "").toLowerCase() !== "category") return false;
-      const cid = menuItemCategoryId(item);
-      return Boolean(cid && categoryIdsWithProducts.has(cid));
-    });
-  }, [mainMenuItems, categoryIdsWithProducts]);
+    const idToItem = new Map(mainMenuAllItems.map((i) => [String(i.id), i]));
+    const ordered = [...mainMenuAllItems].sort(
+      (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label || "").localeCompare(String(b.label || ""), "de"),
+    );
+    return ordered
+      .filter((item) => {
+        if (String(item?.link_type || "").toLowerCase() !== "category") return false;
+        const cid = resolveMenuCategoryId(item, categorySlugToId);
+        return Boolean(cid && categoryIdsWithProducts.has(cid));
+      })
+      .map((item) => ({
+        ...item,
+        _depth: menuItemDepth(item, idToItem),
+      }));
+  }, [mainMenuAllItems, categoryIdsWithProducts, categorySlugToId]);
 
   return (
     <>
@@ -848,7 +917,12 @@ export default function ShopHeader() {
                     <div style={{ padding: 12, color: tokens.dark[500], fontSize: 14 }}>Keine Kategorien</div>
                   )}
                   {mainCategories.map((item) => (
-                    <CategoryItem key={item.id} href={menuItemHref(item)} onClick={() => setMainMenuOpen(false)}>
+                    <CategoryItem
+                      key={item.id}
+                      href={menuItemHref(item)}
+                      onClick={() => setMainMenuOpen(false)}
+                      style={{ paddingLeft: 14 + (item._depth || 0) * 16 }}
+                    >
                       {item.label}
                     </CategoryItem>
                   ))}

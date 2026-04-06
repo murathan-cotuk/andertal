@@ -31,7 +31,7 @@ import { CHECKOUT_SHIPPING_COUNTRY_LS, CHECKOUT_SHIPPING_MARKET_COUNTRY_LS } fro
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 
-const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+const STRIPE_PK_ENV = (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim();
 
 const CHECKOUT_SNAPSHOT_KEY = "belucha_checkout_snapshot";
 
@@ -661,7 +661,9 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
         });
         const data = await res.json();
         const orderId = data?.order?.id;
-        if (orderId) {
+        if (!res.ok || !orderId) {
+          setError(data?.message || t("paymentError"));
+        } else {
           if (custTok && saveNewAddress && !shipAddrId && address.value.trim()) {
             try {
               const client = getMedusaClient();
@@ -949,14 +951,6 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
   );
 }
 
-let stripePromise = null;
-function getStripe() {
-  if (!stripePromise && STRIPE_PK) {
-    stripePromise = loadStripe(STRIPE_PK);
-  }
-  return stripePromise;
-}
-
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const locale = useLocale();
@@ -1037,6 +1031,33 @@ export default function CheckoutPage() {
   const [piRefreshKey, setPiRefreshKey] = useState(0);
   const [customerToken, setCustomerToken] = useState(null);
 
+  const [stripePromiseState, setStripePromiseState] = useState(() =>
+    STRIPE_PK_ENV ? loadStripe(STRIPE_PK_ENV) : null,
+  );
+  const [stripePkLoading, setStripePkLoading] = useState(!STRIPE_PK_ENV);
+
+  useEffect(() => {
+    if (STRIPE_PK_ENV) {
+      setStripePkLoading(false);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/store-public-payment-config")
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        const pk = (d?.stripe_publishable_key || "").trim();
+        if (pk) setStripePromiseState(loadStripe(pk));
+        setStripePkLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setStripePkLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     setCustomerToken(getToken("customer"));
   }, []);
@@ -1108,7 +1129,7 @@ export default function CheckoutPage() {
   };
 
   useEffect(() => {
-    if (!cart?.id || items.length === 0 || !STRIPE_PK) return;
+    if (!cart?.id || items.length === 0 || !stripePromiseState) return;
 
     if (typeof window !== "undefined") {
       const returnedSecret = new URLSearchParams(window.location.search).get(
@@ -1146,9 +1167,7 @@ export default function CheckoutPage() {
         setPayCents(null);
       })
       .finally(() => setLoadingPI(false));
-  }, [cart?.id, subtotalCents, shippingCents, isFreeShipping, shippingCountry, t, items.length, piRefreshKey]);
-
-  const stripeInstance = getStripe();
+  }, [cart?.id, subtotalCents, shippingCents, isFreeShipping, shippingCountry, t, items.length, piRefreshKey, stripePromiseState]);
 
   return (
     <PageWrap>
@@ -1159,7 +1178,9 @@ export default function CheckoutPage() {
         </BackLink>
         <Title>{t("title")}</Title>
 
-        {!STRIPE_PK ? (
+        {stripePkLoading && items.length > 0 ? (
+          <p style={{ color: "#6b7280" }}>{t("processing")}</p>
+        ) : !stripePromiseState ? (
           <ErrorBox style={{ maxWidth: 540 }}>{t("configError")}</ErrorBox>
         ) : items.length === 0 ? (
           <div style={{ color: "#6b7280", fontSize: "1rem" }}>
@@ -1170,10 +1191,10 @@ export default function CheckoutPage() {
             <div>
               {piError && <ErrorBox style={{ marginBottom: 24 }}>{piError}</ErrorBox>}
               {loadingPI && <p style={{ color: "#6b7280" }}>{t("processing")}</p>}
-              {clientSecret && stripeInstance && (
+              {clientSecret && stripePromiseState && (
                 <Elements
                   key={cart.id}
-                  stripe={stripeInstance}
+                  stripe={stripePromiseState}
                   options={{
                     clientSecret,
                     appearance: {

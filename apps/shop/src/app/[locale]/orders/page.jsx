@@ -391,6 +391,10 @@ export default function OrdersPage() {
       return "retoure_anfrage";
     }
     if (order.order_status === "retoure" || order.order_status === "retoure_anfrage") return order.order_status;
+    const os = String(order.order_status || "").toLowerCase();
+    const ps = String(order.payment_status || "").toLowerCase();
+    const paidFlag = ps === "bezahlt" || order.status === "paid";
+    if (paidFlag && (os === "offen" || os === "")) return "bezahlt";
     return order.order_status || order.delivery_status || "offen";
   };
 

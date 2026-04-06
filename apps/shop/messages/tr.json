@@ -108,7 +108,9 @@
     "orderDate": "Sipariş tarihi",
     "items": "Ürünler",
     "total": "Toplam",
-    "continueShopping": "Alışverişe devam et"
+    "continueShopping": "Alışverişe devam et",
+    "paymentStatus": "Ödeme durumu",
+    "paid": "Ödendi"
   },
   "pages": {
     "orders": {

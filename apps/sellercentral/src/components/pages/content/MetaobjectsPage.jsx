@@ -11,10 +11,13 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 const client = getMedusaAdminClient();
 
 export default function MetaobjectsPage() {
+  const [isSuperuser, setIsSuperuser] = useState(false);
   const [definitions, setDefinitions] = useState({}); // { key: { label, values[] } }
+  const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState("");
+  const [pendingActionId, setPendingActionId] = useState("");
 
   // New definition modal
   const [newDefOpen, setNewDefOpen] = useState(false);
@@ -27,12 +30,28 @@ export default function MetaobjectsPage() {
   const [addValKey, setAddValKey] = useState("");
   const [addValText, setAddValText] = useState("");
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const res = await client.getMetafieldDefinitions();
       setDefinitions(res?.definitions || {});
+      const sup = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
+      if (sup) {
+        try {
+          const pr = await client.getMetafieldPendingProposals();
+          setPending(Array.isArray(pr?.pending) ? pr.pending : []);
+        } catch {
+          setPending([]);
+        }
+      } else {
+        setPending([]);
+      }
     } catch (e) {
       setError(e?.message || "Fehler beim Laden");
     } finally {
@@ -65,6 +84,7 @@ export default function MetaobjectsPage() {
 
   // Delete entire definition
   const deleteDef = async (key) => {
+    if (!isSuperuser) return;
     setSaving(key);
     try {
       await client.deleteMetafieldDefinition(key);
@@ -88,6 +108,7 @@ export default function MetaobjectsPage() {
 
   // Add a value to existing definition
   const handleAddValue = async () => {
+    if (!isSuperuser) return;
     const val = addValText.trim();
     if (!val || !addValKey) return;
     const def = definitions[addValKey];
@@ -100,21 +121,105 @@ export default function MetaobjectsPage() {
 
   const openAddVal = (key) => { setAddValKey(key); setAddValText(""); setAddValOpen(true); };
 
+  const approvePending = async (id) => {
+    setPendingActionId(id);
+    try {
+      await client.approveMetafieldProposal(id);
+      await load();
+    } catch (e) {
+      setError(e?.message || "Freigabe fehlgeschlagen");
+    } finally {
+      setPendingActionId("");
+    }
+  };
+
+  const rejectPending = async (id) => {
+    setPendingActionId(id);
+    try {
+      await client.rejectMetafieldProposal(id);
+      await load();
+    } catch (e) {
+      setError(e?.message || "Ablehnen fehlgeschlagen");
+    } finally {
+      setPendingActionId("");
+    }
+  };
+
   const sortedKeys = Object.keys(definitions).sort();
 
   return (
     <Page
       title="Metaobjects"
       subtitle="Definiere wiederverwendbare Attribute für deine Produkte"
-      primaryAction={{
-        content: "Neue Definition",
-        onAction: () => { setNewKey(""); setNewLabel(""); setNewKeyErr(""); setNewDefOpen(true); },
-      }}
+      primaryAction={
+        isSuperuser
+          ? {
+              content: "Neue Definition",
+              onAction: () => { setNewKey(""); setNewLabel(""); setNewKeyErr(""); setNewDefOpen(true); },
+            }
+          : undefined
+      }
     >
       <Layout>
         {error && (
           <Layout.Section>
             <Banner tone="critical" onDismiss={() => setError("")}>{error}</Banner>
+          </Layout.Section>
+        )}
+
+        {!isSuperuser && (
+          <Layout.Section>
+            <Banner tone="info">
+              Als Verkäufer kannst du neue Katalog-Metafelder in der Produktbearbeitung vorschlagen. Diese Seite zeigt den gemeinsamen Katalog; Bearbeiten und Freigaben sind für Superuser reserviert.
+            </Banner>
+          </Layout.Section>
+        )}
+
+        {isSuperuser && pending.length > 0 && (
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingSm">Ausstehende Freigaben (Verkäufer-Vorschläge)</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Nach Genehmigung erscheinen Key und Werte im Katalog und in der Produktauswahl.
+                </Text>
+                <BlockStack gap="300">
+                  {pending.map((p) => (
+                    <Box key={p.id} padding="300" background="bg-surface-secondary" borderRadius="200">
+                      <BlockStack gap="200">
+                        <InlineStack align="space-between" blockAlign="start" wrap>
+                          <BlockStack gap="100">
+                            <Text as="p" variant="bodyMd" fontWeight="semibold">{p.label || p.key}</Text>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              key: <code style={{ fontFamily: "monospace", background: "var(--p-color-bg-surface-secondary)", padding: "1px 5px", borderRadius: 3 }}>{p.key}</code>
+                              {p.seller_id ? (
+                                <> · Verkäufer: <code style={{ fontFamily: "monospace", background: "var(--p-color-bg-surface-secondary)", padding: "1px 5px", borderRadius: 3 }}>{p.seller_id}</code></>
+                              ) : null}
+                            </Text>
+                            <InlineStack gap="150" wrap>
+                              {(p.proposed_values || []).map((v) => <Tag key={v}>{v}</Tag>)}
+                            </InlineStack>
+                          </BlockStack>
+                          <InlineStack gap="200">
+                            <Button
+                              size="slim"
+                              variant="primary"
+                              loading={pendingActionId === p.id}
+                              onClick={() => approvePending(p.id)}
+                            >
+                              Genehmigen
+                            </Button>
+                            <Button size="slim" tone="critical" onClick={() => rejectPending(p.id)} disabled={pendingActionId === p.id}>
+                              Ablehnen
+                            </Button>
+                          </InlineStack>
+                        </InlineStack>
+                      BlockStack>
+                    </Box>
+                  ))}
+                </BlockStack>
+              </BlockStack>
+            </Card>
           </Layout.Section>
         )}
 
@@ -125,10 +230,18 @@ export default function MetaobjectsPage() {
             <Card>
               <EmptyState
                 heading="Noch keine Definitionen"
-                action={{ content: "Erste Definition erstellen", onAction: () => setNewDefOpen(true) }}
+                action={
+                  isSuperuser
+                    ? { content: "Erste Definition erstellen", onAction: () => setNewDefOpen(true) }
+                    : undefined
+                }
                 image=""
               >
-                <p>Erstelle Attribut-Definitionen wie "Farbe" oder "Material" und füge wiederverwendbare Werte hinzu.</p>
+                <p>
+                  {isSuperuser
+                    ? 'Erstelle Attribut-Definitionen wie "Farbe" oder "Material" und füge wiederverwendbare Werte hinzu.'
+                    : "Neue Metafelder legst du in der Produktbearbeitung an (Titel + Wert); ein Superuser gibt sie hier frei."}
+                </p>
               </EmptyState>
             </Card>
           ) : (
@@ -146,10 +259,14 @@ export default function MetaobjectsPage() {
                         </BlockStack>
                         <InlineStack gap="200">
                           <Badge>{def.values.length} {def.values.length === 1 ? "Wert" : "Werte"}</Badge>
-                          <Button size="slim" onClick={() => openAddVal(key)} disabled={isSaving}>+ Wert</Button>
-                          <Button size="slim" tone="critical" variant="plain" onClick={() => deleteDef(key)} disabled={isSaving} loading={isSaving}>
-                            Löschen
-                          </Button>
+                          {isSuperuser ? (
+                            <>
+                              <Button size="slim" onClick={() => openAddVal(key)} disabled={isSaving}>+ Wert</Button>
+                              <Button size="slim" tone="critical" variant="plain" onClick={() => deleteDef(key)} disabled={isSaving} loading={isSaving}>
+                                Löschen
+                              </Button>
+                            </>
+                          ) : null}
                         </InlineStack>
                       </InlineStack>
 
@@ -158,7 +275,12 @@ export default function MetaobjectsPage() {
                           <Divider />
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                             {def.values.map(val => (
-                              <Tag key={val} onRemove={() => removeValue(key, val)}>{val}</Tag>
+                              <Tag
+                                key={val}
+                                onRemove={isSuperuser ? () => removeValue(key, val) : undefined}
+                              >
+                                {val}
+                              </Tag>
                             ))}
                           </div>
                         </>
@@ -166,7 +288,7 @@ export default function MetaobjectsPage() {
 
                       {def.values.length === 0 && (
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Noch keine Werte. Klicke auf <strong>+ Wert</strong>, um den ersten hinzuzufügen.
+                          Noch keine Werte.{isSuperuser ? <> Klicke auf <strong>+ Wert</strong>, um den ersten hinzuzufügen.</> : null}
                         </Text>
                       )}
                     </BlockStack>

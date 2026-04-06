@@ -149,9 +149,11 @@ function CustomerInbox({ client }) {
         if (data?.order?.items) setOrderItems(data.order.items);
       } catch (_) {}
     }
-    for (const m of thread.messages) {
-      if (m.sender_type === "customer" && !m.is_read_by_seller) {
-        client.markMessageRead(m.id).catch(() => {});
+    const toMark = thread.messages.filter((m) => m.sender_type === "customer" && !m.is_read_by_seller);
+    if (toMark.length) {
+      await Promise.all(toMark.map((m) => client.markMessageRead(m.id).catch(() => {})));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("belucha-msg-unread-refresh"));
       }
     }
   };
@@ -468,18 +470,26 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
     setErr("");
     const threadIds = new Set(subThread.messages.map((m) => m.id));
     if (isSuperuser && selectedSellerId) {
-      client.markSupportMessagesRead(selectedSellerId, "support", subThread.subject_key).catch(() => {});
+      const marked = subThread.messages.filter((m) => m.sender_type === "customer" && !m.is_read_by_support);
+      Promise.resolve(
+        client.markSupportMessagesRead(selectedSellerId, "support", subThread.subject_key),
+      ).then(() => {
+        if (typeof window !== "undefined" && marked.length) {
+          window.dispatchEvent(new Event("belucha-msg-unread-refresh"));
+        }
+      }).catch(() => {});
       setRawMessages((prev) => prev.map((m) => {
         if (!threadIds.has(m.id)) return m;
         if (m.sender_type === "customer") return { ...m, is_read_by_support: true };
         return m;
       }));
     } else if (!isSuperuser) {
-      for (const m of subThread.messages) {
-        if (m.sender_type === "seller" && !m.is_read_by_seller) {
-          client.markMessageRead(m.id).catch(() => {});
+      const toMark = subThread.messages.filter((m) => m.sender_type === "seller" && !m.is_read_by_seller);
+      Promise.all(toMark.map((m) => client.markMessageRead(m.id).catch(() => {}))).then(() => {
+        if (typeof window !== "undefined" && toMark.length) {
+          window.dispatchEvent(new Event("belucha-msg-unread-refresh"));
         }
-      }
+      });
       setRawMessages((prev) => prev.map((m) => {
         if (!threadIds.has(m.id)) return m;
         if (m.sender_type === "seller") return { ...m, is_read_by_seller: true };
