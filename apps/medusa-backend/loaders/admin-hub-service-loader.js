@@ -23,11 +23,13 @@ async function adminHubServiceLoader(container) {
     const banMod = require(path.join(__dirname, '..', 'models', 'admin-hub-banner.ts'))
     const menuMod = require(path.join(__dirname, '..', 'models', 'admin-hub-menu.ts'))
     const menuItemMod = require(path.join(__dirname, '..', 'models', 'admin-hub-menu-item.ts'))
+    const brandMod = require(path.join(__dirname, '..', 'models', 'admin-hub-brand.ts'))
     const AdminHubCategory = catMod.AdminHubCategory || catMod.default || catMod
     const AdminHubBanner = banMod.AdminHubBanner || banMod.default || banMod
     const AdminHubMenu = menuMod.AdminHubMenu || menuMod.default || menuMod
     const AdminHubMenuItem = menuItemMod.AdminHubMenuItem || menuItemMod.default || menuItemMod
-    const entities = [AdminHubCategory, AdminHubBanner, AdminHubMenu, AdminHubMenuItem].filter(Boolean)
+    const AdminHubBrand = brandMod.AdminHubBrand || brandMod.default || brandMod
+    const entities = [AdminHubCategory, AdminHubBanner, AdminHubMenu, AdminHubMenuItem, AdminHubBrand].filter(Boolean)
 
     if (!AdminHubService) {
       throw new Error('AdminHubService could not be loaded from admin-hub-service.ts')

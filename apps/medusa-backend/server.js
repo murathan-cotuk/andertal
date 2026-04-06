@@ -1576,16 +1576,11 @@ async function start() {
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {
         await client.connect()
-        const isSuperuserReq = req.sellerUser?.is_superuser === true
-        const callerSellerId = req.sellerUser?.seller_id
-        let r
-        if (isSuperuserReq) {
-          r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, seller_id, created_at FROM admin_hub_brands ORDER BY name')
-        } else {
-          r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, seller_id, created_at FROM admin_hub_brands WHERE seller_id = $1 ORDER BY name', [callerSellerId])
-        }
+        // Return ALL brands so the frontend can split into "my brands" vs "other brands"
+        // seller_id is included so frontend knows ownership
+        const r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, seller_id, created_at FROM admin_hub_brands ORDER BY name')
         await client.end()
-        res.json({ brands: (r.rows || []).map((row) => ({ id: row.id, name: row.name, handle: row.handle, logo_image: row.logo_image || null, banner_image: row.banner_image || null, address: row.address || null, created_at: row.created_at })) })
+        res.json({ brands: (r.rows || []).map((row) => ({ id: row.id, name: row.name, handle: row.handle, logo_image: row.logo_image || null, banner_image: row.banner_image || null, address: row.address || null, seller_id: row.seller_id || null, created_at: row.created_at })) })
       } catch (e) {
         try { await client.end() } catch (_) {}
         console.error('Brands GET:', e)
@@ -1606,7 +1601,7 @@ async function start() {
       try {
         await client.connect()
         const r = await client.query(
-          'INSERT INTO admin_hub_brands (name, handle, logo_image, banner_image, address, seller_id) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (handle) DO UPDATE SET name = $1, logo_image = $3, banner_image = $4, address = $5, updated_at = now() RETURNING id, name, handle, logo_image, banner_image, address, created_at',
+          'INSERT INTO admin_hub_brands (name, handle, logo_image, banner_image, address, seller_id) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (handle) DO UPDATE SET name = $1, logo_image = $3, banner_image = $4, address = $5, updated_at = now() RETURNING id, name, handle, logo_image, banner_image, address, seller_id, created_at',
           [name, handle, logo_image, banner_image, address, callerSellerId]
         )
         await client.end()
@@ -1621,38 +1616,56 @@ async function start() {
     const adminBrandsPatchDelete = async (req, res, isPatch) => {
       const id = (req.params.id || '').trim()
       if (!id) return res.status(400).json({ message: 'id required' })
+      const isSuperuserReq = req.sellerUser?.is_superuser === true
+      const callerSellerId = req.sellerUser?.seller_id || null
       const client = getBrandsDbClient()
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {
         await client.connect()
+        // Fetch existing brand to check ownership
+        const existing = await client.query('SELECT id, seller_id FROM admin_hub_brands WHERE id = $1', [id])
+        if (!existing.rows || !existing.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Brand not found' })
+        }
+        const brandOwnerId = existing.rows[0].seller_id
+        const isOwner = callerSellerId && brandOwnerId === callerSellerId
+        if (!isSuperuserReq && !isOwner) {
+          await client.end()
+          return res.status(403).json({ message: 'You can only edit your own brands' })
+        }
         if (isPatch) {
           const body = req.body || {}
-          const name = (body.name || '').trim()
-          const handle = (body.handle || '').trim()
-          const logo_image = (body.logo_image || body.logo || '').trim()
-          const banner_image = typeof body.banner_image === 'string' ? body.banner_image.trim() : undefined
-          const address = (body.address || '').trim()
           const updates = []
           const params = []
           let n = 1
-          if (name) { updates.push('name = $' + n); params.push(name); n++ }
-          if (handle) { updates.push('handle = $' + n); params.push(handle); n++ }
+          // Only superusers can change name and handle
+          if (isSuperuserReq) {
+            const name = (body.name || '').trim()
+            const handle = (body.handle || '').trim()
+            if (name) { updates.push('name = $' + n); params.push(name); n++ }
+            if (handle) { updates.push('handle = $' + n); params.push(handle); n++ }
+          }
+          // Owners and superusers can change logo, banner, address
+          const logo_image = body.logo_image !== undefined ? (typeof body.logo_image === 'string' ? body.logo_image.trim() : null) : undefined
+          const banner_image = body.banner_image !== undefined ? (typeof body.banner_image === 'string' ? body.banner_image.trim() : null) : undefined
+          const address = body.address !== undefined ? (typeof body.address === 'string' ? body.address.trim() : null) : undefined
           if (logo_image !== undefined) { updates.push('logo_image = $' + n); params.push(logo_image || null); n++ }
           if (banner_image !== undefined) { updates.push('banner_image = $' + n); params.push(banner_image || null); n++ }
           if (address !== undefined) { updates.push('address = $' + n); params.push(address || null); n++ }
           if (updates.length === 0) {
-            const r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, created_at FROM admin_hub_brands WHERE id = $1', [id])
+            const r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, seller_id, created_at FROM admin_hub_brands WHERE id = $1', [id])
             await client.end()
-            if (!r.rows || !r.rows[0]) return res.status(404).json({ message: 'Brand not found' })
             return res.json({ brand: r.rows[0] })
           }
           updates.push('updated_at = now()')
           params.push(id)
-          const r = await client.query('UPDATE admin_hub_brands SET ' + updates.join(', ') + ' WHERE id = $' + n + ' RETURNING id, name, handle, logo_image, banner_image, address, created_at', params)
+          const r = await client.query('UPDATE admin_hub_brands SET ' + updates.join(', ') + ' WHERE id = $' + n + ' RETURNING id, name, handle, logo_image, banner_image, address, seller_id, created_at', params)
           await client.end()
           if (!r.rows || !r.rows[0]) return res.status(404).json({ message: 'Brand not found' })
           res.json({ brand: r.rows[0] })
         } else {
+          // Delete: only superusers or owner
           const r = await client.query('DELETE FROM admin_hub_brands WHERE id = $1 RETURNING id', [id])
           await client.end()
           if (!r.rows || !r.rows[0]) return res.status(404).json({ message: 'Brand not found' })
@@ -1664,10 +1677,10 @@ async function start() {
         res.status(500).json({ message: (e && e.message) || 'Internal server error' })
       }
     }
-    httpApp.get('/admin-hub/brands', adminBrandsGET)
-    httpApp.post('/admin-hub/brands', adminBrandsPOST)
-    httpApp.patch('/admin-hub/brands/:id', (req, res) => adminBrandsPatchDelete(req, res, true))
-    httpApp.delete('/admin-hub/brands/:id', (req, res) => adminBrandsPatchDelete(req, res, false))
+    httpApp.get('/admin-hub/brands', requireSellerAuth, adminBrandsGET)
+    httpApp.post('/admin-hub/brands', requireSellerAuth, adminBrandsPOST)
+    httpApp.patch('/admin-hub/brands/:id', requireSellerAuth, (req, res) => adminBrandsPatchDelete(req, res, true))
+    httpApp.delete('/admin-hub/brands/:id', requireSellerAuth, (req, res) => adminBrandsPatchDelete(req, res, false))
     console.log('Admin route: GET/POST /admin-hub/brands, PATCH/DELETE /admin-hub/brands/:id')
 
     // --- Metafield Definitions ---

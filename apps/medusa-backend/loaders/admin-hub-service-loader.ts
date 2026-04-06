@@ -11,6 +11,7 @@ import { MedusaContainer } from "@medusajs/framework"
 import AdminHubService from "../services/admin-hub-service"
 import { AdminHubCategory } from "../models/admin-hub-category"
 import { AdminHubBanner } from "../models/admin-hub-banner"
+import { AdminHubBrand } from "../models/admin-hub-brand"
 
 const DATABASE_URL = process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/medusa"
 const isPostgres = DATABASE_URL.startsWith("postgres")
@@ -21,7 +22,7 @@ let adminHubDataSource: DataSource | null = null
 function createAdminHubDataSource(): DataSource {
   const config: any = {
     type: isPostgres ? "postgres" : "sqlite",
-    entities: [AdminHubCategory, AdminHubBanner],
+    entities: [AdminHubCategory, AdminHubBanner, AdminHubBrand],
     synchronize: false,
     logging: false,
   }

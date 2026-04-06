@@ -8,6 +8,7 @@
 import { EntityManager, Repository } from "typeorm"
 import { AdminHubCategory } from "../models/admin-hub-category"
 import { AdminHubBanner } from "../models/admin-hub-banner"
+import { AdminHubBrand } from "../models/admin-hub-brand"
 
 type InjectedDependencies = {
   manager: EntityManager
@@ -18,12 +19,14 @@ export default class AdminHubService {
   protected readonly manager_: EntityManager
   protected readonly categoryRepository_: Repository<AdminHubCategory>
   protected readonly bannerRepository_: Repository<AdminHubBanner>
+  protected readonly brandRepository_: Repository<AdminHubBrand>
   protected readonly productCollectionService_?: any
 
   constructor(container: InjectedDependencies) {
     this.manager_ = container.manager
     this.categoryRepository_ = this.manager_.getRepository(AdminHubCategory)
     this.bannerRepository_ = this.manager_.getRepository(AdminHubBanner)
+    this.brandRepository_ = this.manager_.getRepository(AdminHubBrand)
     this.productCollectionService_ = container.productCollectionService
   }
 
@@ -438,5 +441,65 @@ export default class AdminHubService {
     }
 
     await this.bannerRepository_.remove(banner)
+  }
+
+  // ============================================
+  // BRAND METHODS
+  // ============================================
+
+  async listBrands(): Promise<AdminHubBrand[]> {
+    return await this.brandRepository_.find({
+      order: { name: "ASC" },
+    })
+  }
+
+  async getBrandById(id: string): Promise<AdminHubBrand | null> {
+    return await this.brandRepository_.findOne({ where: { id } })
+  }
+
+  async createBrand(data: {
+    name: string
+    handle: string
+    logo_image?: string | null
+    banner_image?: string | null
+    address?: string | null
+    metadata?: Record<string, any>
+  }): Promise<AdminHubBrand> {
+    const brand = this.brandRepository_.create({
+      name: data.name,
+      handle: data.handle,
+      logo_image: data.logo_image ?? null,
+      banner_image: data.banner_image ?? null,
+      address: data.address ?? null,
+      metadata: data.metadata ?? null,
+    })
+    return await this.brandRepository_.save(brand)
+  }
+
+  async updateBrand(
+    id: string,
+    data: Partial<{
+      name: string
+      handle: string
+      logo_image: string | null
+      banner_image: string | null
+      address: string | null
+      metadata: Record<string, any>
+    }>
+  ): Promise<AdminHubBrand> {
+    const brand = await this.brandRepository_.findOne({ where: { id } })
+    if (!brand) {
+      throw new Error(`Brand with id ${id} not found`)
+    }
+    Object.assign(brand, data)
+    return await this.brandRepository_.save(brand)
+  }
+
+  async deleteBrand(id: string): Promise<void> {
+    const brand = await this.brandRepository_.findOne({ where: { id } })
+    if (!brand) {
+      throw new Error(`Brand with id ${id} not found`)
+    }
+    await this.brandRepository_.remove(brand)
   }
 }
