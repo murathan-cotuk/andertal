@@ -319,7 +319,8 @@ export default function Navbar() {
         const client = getMedusaClient();
         const menuData = await client.getMenus();
         const menus = menuData.menus || [];
-        const mainMenu = menus.find((m) => (m.location || "main") === "main") || menus[0];
+        // Prefer exact location="main", fallback to first menu — never treat "" as "main"
+        const mainMenu = menus.find((m) => m.location === "main") || menus.find((m) => !m.location) || menus[0];
         if (mainMenu && mainMenu.items && mainMenu.items.length > 0) {
           setMenuItems(mainMenu.items);
           setCategories([]);

@@ -1,5 +1,6 @@
 06.04.
 
+- sellercentralde content/menus sayfasindaki Main menu (dropdown) menüsü shoptaku arama butonunun yanindaki dropdown ile bagliydi. burada secilen menü ne ise onun gözükmesi gerekiyordu shopta. ve öyleydi de. simdi Main menu (dropdown) a tanimladigim bir menü var. onun ile ilgili kararim shopta görünmüyor. ya altina menü item ekleyecegim ve o gözükecek, ya da more actions icinde categories with products secicem, menu items bos olacak ve shopta bu menüler gözükecek. ücüncüye söylüyorum bunu. bu sefer lütfen artik tamamen hallolmus olsun.
 - algoritma
 - ayni ean a sahip bir ürünü sinirsiz satici yükleyebilecek. buyboxu algoritmada en iyi puani olan satici alacak. diger saticilar buyboxun altinda "other sellers" olarak yaninda fiyatlar ve magaza puanlari seklinde gösterilecek. alinan yorumlar magazaya da isleyecek tabii ki. amazon mantigi yani.
 -- import/export sayfasindan excel yüklerken mevcut ürün skusu yazildiginda girilen bilgiler ile güncellensin sistemdeki ürün. ancak yalnizca SKU ayni olan ürünler güncellenecek. bos kalan kisimlar degismeyecek önceden nasil ise öyle kalacak. ancak doldurulan kisimlar degisecek. mesela A123 diye bir sku ekledim sisteme. excelde A123 yazarsam sku alanina ve acilama yazarsam sadece o ürünün aciklamasi degisecek. 

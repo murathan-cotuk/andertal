@@ -917,10 +917,12 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       ];
 
   const assignMenuToLocation = async (locationSlug, menuId) => {
-    const prev = menus.find((m) => (m.location || "").toLowerCase() === String(locationSlug).toLowerCase());
+    // Find previous menu at this location — match exact slug, empty string treated as unassigned (not as "main")
+    const prev = menus.find((m) => m.location === String(locationSlug).toLowerCase());
     try {
       setError(null);
-      if (prev && prev.id !== menuId) await client.updateMenu(prev.id, { name: prev.name, slug: prev.slug, location: "" });
+      // Clear previous menu's location using null (empty string causes it to be misread as "main")
+      if (prev && prev.id !== menuId) await client.updateMenu(prev.id, { name: prev.name, slug: prev.slug, location: null });
       if (menuId) {
         const menu = menus.find((m) => m.id === menuId);
         if (menu) await client.updateMenu(menuId, { name: menu.name, slug: menu.slug, location: locationSlug });

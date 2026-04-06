@@ -301,6 +301,8 @@ async function start() {
         await client.query('CREATE INDEX IF NOT EXISTS idx_admin_hub_menus_location ON admin_hub_menus(location);')
         await client.query('CREATE INDEX IF NOT EXISTS idx_admin_hub_menu_items_menu_id ON admin_hub_menu_items(menu_id);')
         await client.query('CREATE INDEX IF NOT EXISTS idx_admin_hub_menu_items_parent_id ON admin_hub_menu_items(parent_id);')
+        // Fix: normalize empty string location to NULL so they don't get misread as "main"
+        await client.query(`UPDATE admin_hub_menus SET location = NULL WHERE location = ''`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_menu_locations (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2246,7 +2248,7 @@ async function start() {
       try {
         const menusFromDb = await runWithMenuDb(async (client) => {
           const r = await client.query('SELECT id, name, slug, location FROM admin_hub_menus ORDER BY name')
-          return (r.rows || []).map((row) => ({ id: row.id, name: row.name, slug: row.slug, location: row.location || 'main' }))
+          return (r.rows || []).map((row) => ({ id: row.id, name: row.name, slug: row.slug, location: (row.location === null || row.location === undefined) ? 'main' : String(row.location).trim().toLowerCase() }))
         })
         if (menusFromDb && Array.isArray(menusFromDb)) return res.status(200).json({ menus: menusFromDb, count: menusFromDb.length })
         const svc = resolveMenuService()
@@ -2290,7 +2292,8 @@ async function start() {
     const menuByIdGET = async (req, res) => {
       let menu = await runWithMenuDb(async (client) => {
         const r = await client.query('SELECT id, name, slug, location FROM admin_hub_menus WHERE id = $1', [req.params.id])
-        return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: r.rows[0].location || 'main' } : null
+        const row = r.rows && r.rows[0]
+        return row ? { id: row.id, name: row.name, slug: row.slug, location: (row.location === null || row.location === undefined) ? 'main' : String(row.location).trim().toLowerCase() } : null
       })
       if (menu) return res.json({ menu })
       const svc = resolveMenuService()
@@ -2313,14 +2316,16 @@ async function start() {
         let n = 1
         if (body.name !== undefined) { updates.push(`name = $${n++}`); vals.push(body.name) }
         if (body.slug !== undefined) { updates.push(`slug = $${n++}`); vals.push(body.slug) }
-        if (body.location !== undefined) { updates.push(`location = $${n++}`); vals.push(body.location) }
+        // Store empty string or null as NULL so it's not misread as "main"
+        if (body.location !== undefined) { updates.push(`location = $${n++}`); vals.push(body.location === '' ? null : body.location) }
+        const normalize = (loc) => (loc === null || loc === undefined) ? 'main' : String(loc).trim().toLowerCase()
         if (updates.length === 0) {
           const r = await client.query('SELECT id, name, slug, location FROM admin_hub_menus WHERE id = $1', [req.params.id])
-          return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: r.rows[0].location || 'main' } : null
+          return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: normalize(r.rows[0].location) } : null
         }
         vals.push(req.params.id)
         const r = await client.query(`UPDATE admin_hub_menus SET ${updates.join(', ')}, updated_at = now() WHERE id = $${n} RETURNING id, name, slug, location`, vals)
-        return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: r.rows[0].location || 'main' } : null
+        return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: normalize(r.rows[0].location) } : null
       })
       if (!menu) return res.status(404).json({ message: 'Menu not found' })
       return res.json({ menu })
@@ -6455,7 +6460,8 @@ async function start() {
           id: r.id,
           name: r.name,
           slug: r.slug,
-          location: String(r.location || 'main').trim().toLowerCase() || 'main',
+          // null → 'main' (default for old records), '' → '' (explicitly unassigned — NOT treated as main)
+          location: (r.location === null || r.location === undefined) ? 'main' : String(r.location).trim().toLowerCase(),
         }))
         const menusWithItems = []
         const collectionKeys = new Set() // handle or id from link_value
@@ -6644,7 +6650,7 @@ async function start() {
           const svc = resolveMenuService()
           if (!svc) return res.status(200).json({ menus: [], count: 0 })
           let menus = await svc.listMenus()
-          if (location) menus = menus.filter((m) => (m.location || 'main') === location)
+          if (location) menus = menus.filter((m) => m.location === location)
           menusWithItems = await Promise.all(
             menus.map(async (menu) => {
               const items = await svc.listMenuItems(menu.id).catch(() => [])
@@ -6652,7 +6658,7 @@ async function start() {
             })
           )
         } else {
-          if (location) menusWithItems = menusWithItems.filter((m) => (m.location || 'main') === location)
+          if (location) menusWithItems = menusWithItems.filter((m) => m.location === location)
         }
         res.json({ menus: menusWithItems, count: menusWithItems.length })
       } catch (err) {
