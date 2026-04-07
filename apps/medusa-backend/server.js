@@ -269,6 +269,7 @@ async function start() {
             name varchar(100) NOT NULL,
             slug varchar(100) NOT NULL UNIQUE,
             location varchar(50) DEFAULT 'main',
+            categories_with_products boolean DEFAULT false,
             created_at timestamp DEFAULT now(),
             updated_at timestamp DEFAULT now()
           );
@@ -290,6 +291,11 @@ async function start() {
         await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_menus_slug ON admin_hub_menus(slug);')
         try {
           await client.query('ALTER TABLE admin_hub_menus ADD COLUMN IF NOT EXISTS location varchar(50) DEFAULT \'main\';')
+        } catch (e) {
+          if (e.code !== '42701') throw e
+        }
+        try {
+          await client.query('ALTER TABLE admin_hub_menus ADD COLUMN IF NOT EXISTS categories_with_products boolean DEFAULT false;')
         } catch (e) {
           if (e.code !== '42701') throw e
         }
@@ -1829,7 +1835,7 @@ async function start() {
       const logo_image = (body.logo_image || body.logo || '').trim() || null
       const banner_image = (body.banner_image || '').trim() || null
       const address = (body.address || '').trim() || null
-      const callerSellerId = req.sellerUser?.seller_id || null
+      const callerSellerId = req.sellerUser?.is_superuser ? null : (req.sellerUser?.seller_id || null)
       const client = getBrandsDbClient()
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {
@@ -2247,8 +2253,14 @@ async function start() {
     const menusListGET = async (req, res) => {
       try {
         const menusFromDb = await runWithMenuDb(async (client) => {
-          const r = await client.query('SELECT id, name, slug, location FROM admin_hub_menus ORDER BY name')
-          return (r.rows || []).map((row) => ({ id: row.id, name: row.name, slug: row.slug, location: (row.location === null || row.location === undefined) ? 'main' : String(row.location).trim().toLowerCase() }))
+          const r = await client.query('SELECT id, name, slug, location, categories_with_products FROM admin_hub_menus ORDER BY name')
+          return (r.rows || []).map((row) => ({
+            id: row.id,
+            name: row.name,
+            slug: row.slug,
+            location: (row.location === null || row.location === undefined) ? 'main' : String(row.location).trim().toLowerCase(),
+            categories_with_products: Boolean(row.categories_with_products),
+          }))
         })
         if (menusFromDb && Array.isArray(menusFromDb)) return res.status(200).json({ menus: menusFromDb, count: menusFromDb.length })
         const svc = resolveMenuService()
@@ -2270,10 +2282,18 @@ async function start() {
       if (!b.name || !b.slug) return res.status(400).json({ message: 'name and slug required' })
       let menu = await runWithMenuDb(async (client) => {
         const r = await client.query(
-          'INSERT INTO admin_hub_menus (name, slug, location) VALUES ($1, $2, $3) RETURNING id, name, slug, location',
-          [b.name, b.slug, b.location || 'main']
+          'INSERT INTO admin_hub_menus (name, slug, location, categories_with_products) VALUES ($1, $2, $3, $4) RETURNING id, name, slug, location, categories_with_products',
+          [b.name, b.slug, b.location || 'main', Boolean(b.categories_with_products)]
         )
-        return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: r.rows[0].location || 'main' } : null
+        return r.rows && r.rows[0]
+          ? {
+              id: r.rows[0].id,
+              name: r.rows[0].name,
+              slug: r.rows[0].slug,
+              location: r.rows[0].location || 'main',
+              categories_with_products: Boolean(r.rows[0].categories_with_products),
+            }
+          : null
       })
       if (menu) return res.status(201).json({ menu })
       const svc = resolveMenuService()
@@ -2291,9 +2311,17 @@ async function start() {
     }
     const menuByIdGET = async (req, res) => {
       let menu = await runWithMenuDb(async (client) => {
-        const r = await client.query('SELECT id, name, slug, location FROM admin_hub_menus WHERE id = $1', [req.params.id])
+        const r = await client.query('SELECT id, name, slug, location, categories_with_products FROM admin_hub_menus WHERE id = $1', [req.params.id])
         const row = r.rows && r.rows[0]
-        return row ? { id: row.id, name: row.name, slug: row.slug, location: (row.location === null || row.location === undefined) ? 'main' : String(row.location).trim().toLowerCase() } : null
+        return row
+          ? {
+              id: row.id,
+              name: row.name,
+              slug: row.slug,
+              location: (row.location === null || row.location === undefined) ? 'main' : String(row.location).trim().toLowerCase(),
+              categories_with_products: Boolean(row.categories_with_products),
+            }
+          : null
       })
       if (menu) return res.json({ menu })
       const svc = resolveMenuService()
@@ -2318,14 +2346,31 @@ async function start() {
         if (body.slug !== undefined) { updates.push(`slug = $${n++}`); vals.push(body.slug) }
         // Store empty string or null as NULL so it's not misread as "main"
         if (body.location !== undefined) { updates.push(`location = $${n++}`); vals.push(body.location === '' ? null : body.location) }
+        if (body.categories_with_products !== undefined) { updates.push(`categories_with_products = $${n++}`); vals.push(Boolean(body.categories_with_products)) }
         const normalize = (loc) => (loc === null || loc === undefined) ? 'main' : String(loc).trim().toLowerCase()
         if (updates.length === 0) {
-          const r = await client.query('SELECT id, name, slug, location FROM admin_hub_menus WHERE id = $1', [req.params.id])
-          return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: normalize(r.rows[0].location) } : null
+          const r = await client.query('SELECT id, name, slug, location, categories_with_products FROM admin_hub_menus WHERE id = $1', [req.params.id])
+          return r.rows && r.rows[0]
+            ? {
+                id: r.rows[0].id,
+                name: r.rows[0].name,
+                slug: r.rows[0].slug,
+                location: normalize(r.rows[0].location),
+                categories_with_products: Boolean(r.rows[0].categories_with_products),
+              }
+            : null
         }
         vals.push(req.params.id)
-        const r = await client.query(`UPDATE admin_hub_menus SET ${updates.join(', ')}, updated_at = now() WHERE id = $${n} RETURNING id, name, slug, location`, vals)
-        return r.rows && r.rows[0] ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: normalize(r.rows[0].location) } : null
+        const r = await client.query(`UPDATE admin_hub_menus SET ${updates.join(', ')}, updated_at = now() WHERE id = $${n} RETURNING id, name, slug, location, categories_with_products`, vals)
+        return r.rows && r.rows[0]
+          ? {
+              id: r.rows[0].id,
+              name: r.rows[0].name,
+              slug: r.rows[0].slug,
+              location: normalize(r.rows[0].location),
+              categories_with_products: Boolean(r.rows[0].categories_with_products),
+            }
+          : null
       })
       if (!menu) return res.status(404).json({ message: 'Menu not found' })
       return res.json({ menu })
@@ -2606,6 +2651,51 @@ async function start() {
       }
     }
     const BULLET_POINT_MAX_LEN = 120
+    const normalizeEanValue = (v) => {
+      if (v == null) return ''
+      return String(v).trim()
+    }
+    const collectVariantEans = (variants) => {
+      const out = []
+      if (!Array.isArray(variants)) return out
+      for (const v of variants) {
+        const e = normalizeEanValue(v && v.ean)
+        if (e) out.push(e)
+      }
+      return out
+    }
+    const validateProductEansDb = async (client, parentEan, variantEans, excludeProductId) => {
+      const values = []
+      const seen = new Set()
+      const p = normalizeEanValue(parentEan)
+      if (p) { seen.add(p); values.push(p) }
+      for (const ve of variantEans || []) {
+        const e = normalizeEanValue(ve)
+        if (!e) continue
+        if (p && e === p) return { ok: false, message: 'Variant EAN must be different from parent EAN' }
+        if (seen.has(e)) return { ok: false, message: `Duplicate EAN in request payload: ${e}` }
+        seen.add(e)
+        values.push(e)
+      }
+      if (!values.length) return { ok: true }
+      const sql =
+        'SELECT id, sku, metadata, variants FROM admin_hub_products ' +
+        (excludeProductId ? 'WHERE id <> $1' : '')
+      const params = excludeProductId ? [excludeProductId] : []
+      const res = await client.query(sql, params)
+      const dbEans = new Set()
+      for (const row of (res.rows || [])) {
+        const pm = row && row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
+        const pe = normalizeEanValue(pm.ean)
+        if (pe) dbEans.add(pe)
+        const vv = Array.isArray(row && row.variants) ? row.variants : []
+        for (const ve of collectVariantEans(vv)) dbEans.add(ve)
+      }
+      for (const e of values) {
+        if (dbEans.has(e)) return { ok: false, message: `EAN already exists: ${e}` }
+      }
+      return { ok: true }
+    }
     const normalizeProductMetadata = (meta) => {
       if (!meta || typeof meta !== 'object') return meta
       const out = { ...meta }
@@ -2625,7 +2715,13 @@ async function start() {
         const inventory = parseInt(body.inventory, 10) || 0
         const metaObj = body.metadata && typeof body.metadata === 'object' ? normalizeProductMetadata(body.metadata) : null
         const metadata = metaObj ? JSON.stringify(metaObj) : null
-        const variants = body.variants && Array.isArray(body.variants) ? JSON.stringify(body.variants) : null
+        const variantsArr = body.variants && Array.isArray(body.variants) ? body.variants : null
+        const variants = variantsArr ? JSON.stringify(variantsArr) : null
+        const eanValidation = await validateProductEansDb(client, metaObj && metaObj.ean, collectVariantEans(variantsArr || []), null)
+        if (!eanValidation.ok) {
+          await client.end()
+          return { __error: eanValidation.message || 'EAN validation failed' }
+        }
         const res = await client.query(
           `INSERT INTO admin_hub_products (title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -2693,17 +2789,80 @@ async function start() {
         const auth = req.headers['authorization'] || ''
         const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
         const payload = token ? verifySellerToken(token) : null
-        if (payload && !payload.is_superuser && payload.seller_id) {
-          const sid = String(payload.seller_id).trim()
-          body.seller_id = sid
-          body.seller = sid
+        const isSuperuserCaller = payload?.is_superuser || false
+        const callerSellerId = (!isSuperuserCaller && payload?.seller_id) ? String(payload.seller_id).trim() : null
+        if (callerSellerId) {
+          body.seller_id = callerSellerId
+          body.seller = callerSellerId
+          body.metadata = body.metadata && typeof body.metadata === 'object' ? { ...body.metadata } : {}
+          body.metadata.seller_id = callerSellerId
         }
-        const row = await createAdminHubProductDb(body)
-        if (!row) {
-          res.status(503).json({ message: 'Database not configured or insert failed' })
-          return
+
+        // EAN deduplication: check if a master product with this EAN already exists
+        const incomingMeta = body.metadata && typeof body.metadata === 'object' ? body.metadata : {}
+        const incomingEan = normalizeStoreEan(incomingMeta.ean || body.ean || '')
+        let masterProduct = null
+        let isNewMaster = true
+
+        if (incomingEan) {
+          const allProds = await listAdminHubProductsDb({ limit: 5000 })
+          masterProduct = allProds.find((p) => extractEanFromHubProductRow(p) === incomingEan) || null
         }
-        res.status(201).json({ product: row })
+
+        if (masterProduct) {
+          isNewMaster = false
+          // EAN already exists — link this seller to the master product via a listing
+          const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+          const { Client } = require('pg')
+          const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await lc.connect()
+          const effectiveSellerId = callerSellerId || (isSuperuserCaller ? null : null)
+          let listing = null
+          if (effectiveSellerId) {
+            const existListing = await lc.query(
+              'SELECT id, price_cents, inventory, status FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2',
+              [masterProduct.id, effectiveSellerId]
+            )
+            if (existListing.rows[0]) {
+              listing = existListing.rows[0]
+            } else {
+              const priceCents = typeof body.price === 'number' ? Math.round(body.price * 100) : parseInt(body.price, 10) || 0
+              const inventory = parseInt(body.inventory, 10) || 0
+              const lr = await lc.query(
+                'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+                [masterProduct.id, effectiveSellerId, priceCents || masterProduct.price_cents || 0, inventory, 'active']
+              )
+              listing = lr.rows[0]
+            }
+          }
+          await lc.end()
+          return res.status(200).json({ product: masterProduct, listing, deduplicated: true, is_new_master: false })
+        }
+
+        // New product — create master (seller_id = null → superuser-owned)
+        const masterBody = { ...body, seller_id: null, seller: null }
+        if (masterBody.metadata) masterBody.metadata.seller_id = undefined
+        const row = await createAdminHubProductDb(masterBody)
+        if (row && row.__error) return res.status(400).json({ message: row.__error })
+        if (!row) return res.status(503).json({ message: 'Database not configured or insert failed' })
+
+        // Create listing for the seller who submitted
+        let listing = null
+        if (callerSellerId && row.id) {
+          const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+          const { Client } = require('pg')
+          const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          try {
+            await lc.connect()
+            const lr = await lc.query(
+              'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING *',
+              [row.id, callerSellerId, row.price_cents || 0, row.inventory || 0, 'active']
+            )
+            listing = lr.rows[0] || null
+            await lc.end()
+          } catch (_) { try { await lc.end() } catch (__) {} }
+        }
+        res.status(201).json({ product: row, listing, deduplicated: false, is_new_master: true })
       } catch (err) {
         console.error('Admin Hub products POST error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -2793,6 +2952,14 @@ async function start() {
         if (body.metadata !== undefined && body.metadata && typeof body.metadata === 'object') {
           metadataObj = normalizeProductMetadata({ ...metadataObj, ...body.metadata })
         }
+        const nextVariantsArr = body.variants !== undefined
+          ? (Array.isArray(body.variants) ? body.variants : [])
+          : (Array.isArray(existing.variants) ? existing.variants : [])
+        const eanValidation = await validateProductEansDb(client, metadataObj && metadataObj.ean, collectVariantEans(nextVariantsArr), uuid)
+        if (!eanValidation.ok) {
+          await client.end()
+          return { __error: eanValidation.message || 'EAN validation failed' }
+        }
         const metadata = Object.keys(metadataObj).length ? JSON.stringify(metadataObj) : null
         const variants = body.variants !== undefined ? (Array.isArray(body.variants) ? JSON.stringify(body.variants) : null) : (existing.variants ? JSON.stringify(existing.variants) : null)
         const collection_id = body.collection_id !== undefined ? body.collection_id || null : existing.collection_id
@@ -2812,6 +2979,10 @@ async function start() {
     const adminHubProductByIdPUT = async (req, res) => {
       try {
         const product = await updateAdminHubProductDb(req.params.id, req.body || {})
+        if (product && product.__error) {
+          res.status(400).json({ message: product.__error })
+          return
+        }
         if (!product) {
           res.status(404).json({ message: 'Product not found' })
           return
@@ -3178,16 +3349,14 @@ async function start() {
       try {
         await client.connect()
         const r = await client.query('SELECT id, email, password_hash, store_name, seller_id, sub_of_seller_id, is_superuser, permissions FROM seller_users WHERE email = $1', [email])
-        await client.end()
         const user = r.rows[0]
-        if (!user) return res.status(401).json({ message: 'Invalid email or password' })
+        if (!user) { await client.end(); return res.status(401).json({ message: 'Invalid email or password' }) }
         // Check if email is in initial superuser list (in case they registered before the list was set)
         const shouldBeSuperuser = user.is_superuser || INITIAL_SUPERUSER_EMAILS.includes(email)
-        if (!verifySellerPassword(password, user.password_hash)) return res.status(401).json({ message: 'Invalid email or password' })
+        if (!verifySellerPassword(password, user.password_hash)) { await client.end(); return res.status(401).json({ message: 'Invalid email or password' }) }
         // Ensure superuser flag is up-to-date
         if (shouldBeSuperuser && !user.is_superuser) {
-          const c2 = getSellerDbClient()
-          try { await c2.connect(); await c2.query('UPDATE seller_users SET is_superuser = true WHERE id = $1', [user.id]); await c2.end() } catch (_) {}
+          await client.query('UPDATE seller_users SET is_superuser = true WHERE id = $1', [user.id]).catch(() => {})
           user.is_superuser = true
         }
         // Sub-users use parent's seller_id for data access
@@ -3207,6 +3376,7 @@ async function start() {
           const ss = await client.query('SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1', [effectiveSellerId])
           displayStoreName = (ss.rows[0]?.store_name || '').trim()
         }
+        await client.end()
         const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName })
         res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName, permissions: user.permissions || null } })
       } catch (err) {
@@ -3988,9 +4158,43 @@ async function start() {
     const findEanOffersFromHub = async (canonicalEan, approvedSellerIds) => {
       const ean = normalizeStoreEan(canonicalEan)
       if (!ean) return []
+      // First: legacy scan (product rows per seller, old model)
       let list = await listAdminHubProductsDb({ limit: 5000 })
       list = list.filter((row) => (row.status || '').toLowerCase() === 'published' && isStoreVisibleSellerProduct(row, approvedSellerIds))
-      return list.filter((row) => extractEanFromHubProductRow(row) === ean)
+      const legacyOffers = list.filter((row) => extractEanFromHubProductRow(row) === ean && row.seller_id)
+      // Second: listings table (new model — master product + per-seller listings)
+      const masterRow = list.find((row) => extractEanFromHubProductRow(row) === ean && !row.seller_id)
+      let listingOffers = []
+      if (masterRow) {
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        if (dbUrl && dbUrl.startsWith('postgres')) {
+          try {
+            const { Client } = require('pg')
+            const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+            await lc.connect()
+            const lr = await lc.query(
+              `SELECT seller_id, price_cents, inventory, status, orders_count FROM admin_hub_seller_listings WHERE product_id = $1 AND status = 'active'`,
+              [masterRow.id]
+            )
+            await lc.end()
+            listingOffers = (lr.rows || [])
+              .filter((l) => !approvedSellerIds || approvedSellerIds.has(l.seller_id))
+              .map((l) => ({
+                ...masterRow,
+                id: masterRow.id + '-listing-' + l.seller_id, // synthetic id for scoring
+                _listing_id: masterRow.id,
+                seller_id: l.seller_id,
+                price_cents: l.price_cents,
+                inventory: l.inventory,
+                _orders_count: l.orders_count,
+              }))
+          } catch (_) {}
+        }
+      }
+      // Merge: listings take priority over legacy rows for the same seller_id
+      const sellersCoveredByListings = new Set(listingOffers.map((o) => o.seller_id))
+      const filteredLegacy = legacyOffers.filter((o) => !sellersCoveredByListings.has(o.seller_id))
+      return [...listingOffers, ...filteredLegacy]
     }
     const enrichMappedStoreProduct = async (productRow, mapped) => {
       const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
@@ -4081,20 +4285,22 @@ async function start() {
             }))
             const reviewProductIds = offers.map((p) => String(p.id))
             const otherSellers = scored.slice(1).map(({ p, price, stats, sid }) => {
-              const m = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+              const realProductId = p._listing_id || String(p.id)
+              const masterP = p._listing_id ? (scored.find((x) => String(x.p.id) === p._listing_id)?.p || p) : p
+              const m = masterP.metadata && typeof masterP.metadata === 'object' ? masterP.metadata : {}
               const media = m.media
               const rawMediaList = Array.isArray(media) ? media : (typeof media === 'string' && media ? [media] : [])
               const thumb = resolveUploadUrl((typeof rawMediaList[0] === 'string' ? rawMediaList[0] : (rawMediaList[0] && rawMediaList[0].url) || null) || m.thumbnail || null)
               return {
-                product_id: String(p.id),
-                handle: p.handle,
-                title: p.title || '',
+                product_id: realProductId,
+                handle: masterP.handle || p.handle,
+                title: masterP.title || p.title || '',
                 seller_id: sid,
                 store_name: storeNames[sid] || sid,
                 price_cents: price,
                 seller_review_avg: stats.avg,
                 seller_review_count: stats.count,
-                in_stock: totalInventoryHubProduct(p) > 0,
+                in_stock: (p.inventory != null ? p.inventory : totalInventoryHubProduct(p)) > 0,
                 thumbnail: thumb || null,
               }
             })
@@ -4450,6 +4656,7 @@ async function start() {
       const body = req.body || {}
       const variantId = (body.variant_id || body.variantId || '').toString().trim()
       const quantity = Math.max(1, parseInt(body.quantity, 10) || 1)
+      const chosenSellerId = (body.seller_id || '').toString().trim() || null
       if (!variantId) return res.status(400).json({ message: 'variant_id required' })
       const productId = productIdFromVariantId(variantId)
       if (!productId) return res.status(400).json({ message: 'Invalid variant_id' })
@@ -4485,6 +4692,14 @@ async function start() {
             variantLabel = v.title || v.value || ''
           }
         }
+        // If a specific seller is chosen, override price from their listing
+        if (chosenSellerId) {
+          const listingRow = await client.query(
+            `SELECT price_cents FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 AND status = 'active' LIMIT 1`,
+            [String(product.id || productId), chosenSellerId]
+          )
+          if (listingRow.rows[0]) unitPriceCents = Number(listingRow.rows[0].price_cents)
+        }
         const title = (product.title || 'Product') + (variantLabel ? ` (${variantLabel})` : '')
         const handle = product.handle || product.id
         const cartExists = await client.query('SELECT id FROM store_carts WHERE id = $1', [cartId])
@@ -4492,11 +4707,11 @@ async function start() {
         const existing = await client.query('SELECT id, quantity FROM store_cart_items WHERE cart_id = $1 AND variant_id = $2', [cartId, variantId])
         if (existing.rows && existing.rows[0]) {
           const newQty = (existing.rows[0].quantity || 0) + quantity
-          await client.query('UPDATE store_cart_items SET quantity = $1, updated_at = now() WHERE id = $2', [newQty, existing.rows[0].id])
+          await client.query('UPDATE store_cart_items SET quantity = $1, seller_id = COALESCE($2, seller_id), updated_at = now() WHERE id = $3', [newQty, chosenSellerId, existing.rows[0].id])
         } else {
           await client.query(
-            'INSERT INTO store_cart_items (cart_id, variant_id, product_id, quantity, unit_price_cents, title, thumbnail, product_handle) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-            [cartId, variantId, String(product.id || productId), quantity, unitPriceCents, title, thumb, handle]
+            'INSERT INTO store_cart_items (cart_id, variant_id, product_id, quantity, unit_price_cents, title, thumbnail, product_handle, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+            [cartId, variantId, String(product.id || productId), quantity, unitPriceCents, title, thumb, handle, chosenSellerId]
           )
         }
         await clearCartBonusReserve(client, cartId)
@@ -5154,7 +5369,7 @@ async function start() {
           SELECT g.*, c.name AS carrier_name
           FROM store_shipping_groups g
           LEFT JOIN store_shipping_carriers c ON c.id = g.carrier_id
-          WHERE g.seller_id IS NULL OR g.seller_id = $1
+          WHERE g.seller_id = $1
           ORDER BY g.created_at ASC
         `,
             [String(callerSellerId).trim()]
@@ -6455,13 +6670,14 @@ async function start() {
         const isRender = dbUrl.includes('render.com')
         const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const menusRes = await client.query('SELECT id, name, slug, location FROM admin_hub_menus ORDER BY name')
+        const menusRes = await client.query('SELECT id, name, slug, location, categories_with_products FROM admin_hub_menus ORDER BY name')
         const menus = (menusRes.rows || []).map((r) => ({
           id: r.id,
           name: r.name,
           slug: r.slug,
           // null → 'main' (default for old records), '' → '' (explicitly unassigned — NOT treated as main)
           location: (r.location === null || r.location === undefined) ? 'main' : String(r.location).trim().toLowerCase(),
+          categories_with_products: Boolean(r.categories_with_products),
         }))
         const menusWithItems = []
         const collectionKeys = new Set() // handle or id from link_value
@@ -7478,7 +7694,8 @@ async function start() {
                  COALESCE(s.order_count,0) AS order_count,
                  COALESCE(s.total_spent,0) AS total_spent,
                  s.first_order, s.last_order,
-                 COALESCE(s.newsletter_opted_in, false) AS newsletter_opted_in
+                 COALESCE(s.newsletter_opted_in, false) AS newsletter_opted_in,
+                 (SELECT seller_id FROM store_orders WHERE LOWER(email) = LOWER(c.email) AND seller_id IS NOT NULL AND seller_id != 'default' ORDER BY created_at DESC LIMIT 1) AS main_seller_id
           FROM store_customers c
           LEFT JOIN (
             SELECT email, COUNT(*) AS order_count, SUM(total_cents) AS total_spent,
@@ -8188,6 +8405,48 @@ async function start() {
             `UPDATE store_orders SET order_status = 'refunded', updated_at = now() WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
             [id]
           ).catch(() => {})
+          // Auto-reverse bonus points on refund
+          try {
+            const retRow = await client.query(
+              `SELECT r.order_id, o.customer_id, o.order_number FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.id = $1::uuid`,
+              [id]
+            )
+            const rr = retRow.rows[0]
+            if (rr?.customer_id && rr?.order_id) {
+              const alreadyDone = await client.query(
+                `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_return' LIMIT 1`,
+                [rr.order_id]
+              )
+              if (!alreadyDone.rows.length) {
+                const earned = await client.query(
+                  `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_earn'`,
+                  [rr.order_id]
+                )
+                const earnedPts = Number(earned.rows[0]?.total || 0)
+                const redeemed = await client.query(
+                  `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_redeem'`,
+                  [rr.order_id]
+                )
+                const redeemedPts = Number(redeemed.rows[0]?.total || 0)
+                if (earnedPts > 0) {
+                  await appendBonusLedger(client, {
+                    customerId: rr.customer_id, pointsDelta: -earnedPts,
+                    description: `Retoure Bestellung #${rr.order_number} — Punkte zurückgebucht (−${earnedPts} Punkte)`,
+                    source: 'order_return', orderId: rr.order_id,
+                  })
+                }
+                if (redeemedPts < 0) {
+                  await appendBonusLedger(client, {
+                    customerId: rr.customer_id, pointsDelta: -redeemedPts,
+                    description: `Retoure Bestellung #${rr.order_number} — eingelöste Punkte zurückgegeben (+${-redeemedPts} Punkte)`,
+                    source: 'order_return', orderId: rr.order_id,
+                  })
+                }
+              }
+            }
+          } catch (bonusErr) {
+            console.warn('bonus reversal on return:', bonusErr?.message)
+          }
         }
         const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.id = $1::uuid`, [id])
         await client.end()
@@ -9912,7 +10171,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       try {
         await client.connect()
         const r = await client.query(
-          `SELECT id, email, store_name, seller_id, is_superuser, sub_of_seller_id, first_name, last_name, created_at
+          `SELECT id, email, store_name, seller_id, is_superuser, sub_of_seller_id, first_name, last_name, approval_status, created_at
            FROM seller_users WHERE id = $1`,
           [userId],
         )
@@ -9927,6 +10186,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             seller_id: row.seller_id,
             is_superuser: row.is_superuser === true,
             is_team_member: row.sub_of_seller_id != null && String(row.sub_of_seller_id).trim() !== '',
+            approval_status: row.approval_status || 'registered',
             first_name: row.first_name,
             last_name: row.last_name,
             created_at: row.created_at,
@@ -9984,17 +10244,44 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const { email, first_name, last_name, permissions } = req.body || {}
         if (!email) { await client.end(); return res.status(400).json({ message: 'Email required' }) }
         const normalEmail = email.trim().toLowerCase()
-        // Check if already registered
-        const existing = await client.query('SELECT id FROM seller_users WHERE email = $1', [normalEmail])
-        if (existing.rows.length) { await client.end(); return res.status(409).json({ message: 'Ein Benutzer mit dieser E-Mail existiert bereits' }) }
-        // Create/replace invitation token
+        // Check if already registered as a seller user
+        const existing = await client.query('SELECT id, sub_of_seller_id FROM seller_users WHERE email = $1', [normalEmail])
+        if (existing.rows.length) {
+          const row = existing.rows[0]
+          if (row.sub_of_seller_id && row.sub_of_seller_id !== inviterSellerId) {
+            await client.end()
+            return res.status(409).json({ message: 'Dieser Benutzer ist bereits einem anderen Verkäufer-Konto zugeordnet.' })
+          }
+          if (row.sub_of_seller_id === inviterSellerId) {
+            await client.end()
+            return res.status(409).json({ message: 'Dieser Benutzer ist bereits Mitglied Ihres Teams.' })
+          }
+          // User registered but not linked (sub_of_seller_id IS NULL) — directly link them
+          await client.query(
+            `UPDATE seller_users SET sub_of_seller_id = $1, updated_at = now() WHERE email = $2 AND sub_of_seller_id IS NULL`,
+            [inviterSellerId, normalEmail]
+          ).catch(() => {})
+          await client.end()
+          return res.json({ success: true, linked: true })
+        }
+        // Check if pending invite from a different seller already exists
+        const pendingInv = await client.query(
+          `SELECT id, invited_by_seller_id FROM seller_invitations WHERE email = $1 AND accepted_at IS NULL AND expires_at > now()`,
+          [normalEmail]
+        )
+        if (pendingInv.rows.length && pendingInv.rows[0].invited_by_seller_id !== inviterSellerId) {
+          await client.end()
+          return res.status(409).json({ message: 'Für diese E-Mail gibt es bereits eine ausstehende Einladung von einem anderen Verkäufer.' })
+        }
+        // Create/replace invitation token (upsert for same seller re-invite)
         const token = require('crypto').randomBytes(32).toString('hex')
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
         const permJson = permissions ? JSON.stringify(permissions) : null
         await client.query(
           `INSERT INTO seller_invitations (email, invited_by_seller_id, token, expires_at, first_name, last_name, permissions)
            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
-           ON CONFLICT (email) DO UPDATE SET token = $3, expires_at = $4, invited_by_seller_id = $2, accepted_at = NULL, first_name = $5, last_name = $6, permissions = $7::jsonb`,
+           ON CONFLICT (email) DO UPDATE SET token = $3, expires_at = $4, accepted_at = NULL, first_name = $5, last_name = $6, permissions = $7::jsonb
+           WHERE seller_invitations.invited_by_seller_id = $2`,
           [normalEmail, inviterSellerId, token, expiresAt, first_name || null, last_name || null, permJson]
         )
         await client.end()
@@ -10032,14 +10319,36 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
+        // Auto-link: find users who registered with an invited email but weren't linked yet
+        const pendingToLink = await client.query(
+          `SELECT si.id AS invite_id, si.email, si.permissions, si.first_name, si.last_name
+           FROM seller_invitations si
+           JOIN seller_users su ON LOWER(su.email) = LOWER(si.email) AND su.sub_of_seller_id IS NULL
+           WHERE si.invited_by_seller_id = $1 AND si.accepted_at IS NULL`,
+          [sellerId]
+        )
+        for (const row of (pendingToLink.rows || [])) {
+          await client.query(
+            `UPDATE seller_users SET sub_of_seller_id = $1, permissions = COALESCE(permissions, $2::jsonb), updated_at = now() WHERE LOWER(email) = LOWER($3) AND sub_of_seller_id IS NULL`,
+            [sellerId, row.permissions ? JSON.stringify(row.permissions) : null, row.email]
+          ).catch(() => {})
+          await client.query(
+            `UPDATE seller_invitations SET accepted_at = now() WHERE id = $1`,
+            [row.invite_id]
+          ).catch(() => {})
+        }
         // Sub-users: those whose sub_of_seller_id matches our seller_id
         const r = await client.query(
           `SELECT id, email, first_name, last_name, permissions, created_at FROM seller_users WHERE sub_of_seller_id = $1 ORDER BY created_at ASC`,
           [sellerId]
         )
-        // Pending invitations (not yet accepted)
+        // Pending invitations (not yet accepted, no matching registered user)
         const inv = await client.query(
-          `SELECT id, email, first_name, last_name, permissions, expires_at, created_at FROM seller_invitations WHERE invited_by_seller_id = $1 AND accepted_at IS NULL AND expires_at > now() ORDER BY created_at DESC`,
+          `SELECT si.id, si.email, si.first_name, si.last_name, si.permissions, si.expires_at, si.created_at
+           FROM seller_invitations si
+           WHERE si.invited_by_seller_id = $1 AND si.accepted_at IS NULL AND si.expires_at > now()
+           AND NOT EXISTS (SELECT 1 FROM seller_users su WHERE LOWER(su.email) = LOWER(si.email))
+           ORDER BY si.created_at DESC`,
           [sellerId]
         )
         await client.end()
@@ -10129,6 +10438,169 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.patch('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserUpdatePATCH)
     httpApp.delete('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserDeleteDELETE)
     httpApp.delete('/admin-hub/v1/pending-invites/:id', requireSellerAuth, adminHubPendingInviteDeleteDELETE)
+
+    // ── Seller Listings CRUD ───────────────────────────────────────────────────
+    httpApp.get('/admin-hub/v1/seller-listings', requireSellerAuth, async (req, res) => {
+      const isSuperuser = req.sellerUser?.is_superuser || false
+      const sellerId = req.sellerUser?.seller_id
+      const { product_id } = req.query
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        let rows
+        if (product_id) {
+          // Superuser: all listings for the product; Seller: only their own
+          if (isSuperuser) {
+            const r = await c.query(`SELECT l.*, p.title AS product_title FROM admin_hub_seller_listings l LEFT JOIN admin_hub_products p ON p.id = l.product_id WHERE l.product_id = $1 ORDER BY l.created_at ASC`, [product_id])
+            rows = r.rows
+          } else {
+            const r = await c.query(`SELECT l.*, p.title AS product_title FROM admin_hub_seller_listings l LEFT JOIN admin_hub_products p ON p.id = l.product_id WHERE l.product_id = $1 AND l.seller_id = $2`, [product_id, sellerId])
+            rows = r.rows
+          }
+        } else {
+          const r = await c.query(`SELECT l.*, p.title AS product_title FROM admin_hub_seller_listings l LEFT JOIN admin_hub_products p ON p.id = l.product_id WHERE l.seller_id = $1 ORDER BY l.created_at DESC`, [isSuperuser ? sellerId : sellerId])
+          rows = r.rows
+        }
+        await c.end()
+        res.json({ listings: rows || [] })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+    httpApp.put('/admin-hub/v1/seller-listings/:id', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      const { id } = req.params
+      const { price_cents, inventory, status } = req.body || {}
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        const r = await c.query(
+          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), updated_at = now() WHERE id = $4::uuid AND seller_id = $5 RETURNING *`,
+          [price_cents != null ? Number(price_cents) : null, inventory != null ? Number(inventory) : null, status || null, id, sellerId]
+        )
+        await c.end()
+        if (!r.rows[0]) return res.status(404).json({ message: 'Listing not found' })
+        res.json({ listing: r.rows[0] })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+
+    // ── Product Change Requests ────────────────────────────────────────────────
+    httpApp.get('/admin-hub/v1/product-change-requests', requireSellerAuth, async (req, res) => {
+      const isSuperuser = req.sellerUser?.is_superuser || false
+      const sellerId = req.sellerUser?.seller_id
+      const { status: statusFilter, product_id } = req.query
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        const conditions = []
+        const params = []
+        if (!isSuperuser) { params.push(sellerId); conditions.push(`cr.seller_id = $${params.length}`) }
+        if (statusFilter) { params.push(statusFilter); conditions.push(`cr.status = $${params.length}`) }
+        if (product_id) { params.push(product_id); conditions.push(`cr.product_id = $${params.length}::uuid`) }
+        const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
+        const r = await c.query(
+          `SELECT cr.*, p.title AS product_title FROM admin_hub_product_change_requests cr LEFT JOIN admin_hub_products p ON p.id = cr.product_id ${where} ORDER BY cr.created_at DESC`,
+          params
+        )
+        await c.end()
+        res.json({ change_requests: r.rows || [] })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+    httpApp.post('/admin-hub/v1/product-change-requests', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const { product_id, field_name, new_value } = req.body || {}
+      if (!product_id || !field_name || new_value == null) return res.status(400).json({ message: 'product_id, field_name, new_value required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        const prod = await c.query('SELECT title, description, metadata FROM admin_hub_products WHERE id = $1::uuid', [product_id])
+        if (!prod.rows[0]) { await c.end(); return res.status(404).json({ message: 'Product not found' }) }
+        const p = prod.rows[0]
+        let oldValue = null
+        if (field_name === 'title') oldValue = p.title
+        else if (field_name === 'description') oldValue = p.description
+        else if (field_name.startsWith('metadata.')) {
+          const metaKey = field_name.replace('metadata.', '')
+          oldValue = p.metadata ? JSON.stringify(p.metadata[metaKey]) : null
+        }
+        const r = await c.query(
+          `INSERT INTO admin_hub_product_change_requests (product_id, seller_id, field_name, old_value, new_value) VALUES ($1::uuid,$2,$3,$4,$5) RETURNING *`,
+          [product_id, sellerId, field_name, oldValue, String(new_value)]
+        )
+        await c.end()
+        res.status(201).json({ change_request: r.rows[0] })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+    httpApp.post('/admin-hub/v1/product-change-requests/:id/approve', requireSellerAuth, async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser only' })
+      const { id } = req.params
+      const { reviewer_note } = req.body || {}
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        const cr = await c.query(`SELECT * FROM admin_hub_product_change_requests WHERE id = $1::uuid AND status = 'pending'`, [id])
+        if (!cr.rows[0]) { await c.end(); return res.status(404).json({ message: 'Pending request not found' }) }
+        const req_row = cr.rows[0]
+        // Apply change to product
+        if (req_row.field_name === 'title') {
+          await c.query('UPDATE admin_hub_products SET title = $1, updated_at = now() WHERE id = $2::uuid', [req_row.new_value, req_row.product_id])
+        } else if (req_row.field_name === 'description') {
+          await c.query('UPDATE admin_hub_products SET description = $1, updated_at = now() WHERE id = $2::uuid', [req_row.new_value, req_row.product_id])
+        } else if (req_row.field_name.startsWith('metadata.')) {
+          const metaKey = req_row.field_name.replace('metadata.', '')
+          let parsedVal
+          try { parsedVal = JSON.parse(req_row.new_value) } catch (_) { parsedVal = req_row.new_value }
+          await c.query(
+            `UPDATE admin_hub_products SET metadata = jsonb_set(COALESCE(metadata,'{}'), $1, $2::jsonb, true), updated_at = now() WHERE id = $3::uuid`,
+            ['{' + metaKey + '}', JSON.stringify(parsedVal), req_row.product_id]
+          )
+        }
+        await c.query(`UPDATE admin_hub_product_change_requests SET status = 'approved', reviewer_note = $1, updated_at = now() WHERE id = $2::uuid`, [reviewer_note || null, id])
+        await c.end()
+        res.json({ success: true })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+    httpApp.post('/admin-hub/v1/product-change-requests/:id/reject', requireSellerAuth, async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser only' })
+      const { id } = req.params
+      const { reviewer_note } = req.body || {}
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        await c.query(`UPDATE admin_hub_product_change_requests SET status = 'rejected', reviewer_note = $1, updated_at = now() WHERE id = $2::uuid AND status = 'pending'`, [reviewer_note || null, id])
+        await c.end()
+        res.json({ success: true })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
 
     // ── SELLER MANAGEMENT (superuser) ─────────────────────────────────────────
     const SELLER_SELECT = `
@@ -10956,6 +11428,78 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(200).json({ ok: true }) // never fail event logging
       }
     }
+
+    // ── Marketplace tables ────────────────────────────────────────────────────
+    await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_seller_listings (
+      id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      product_id  uuid NOT NULL REFERENCES admin_hub_products(id) ON DELETE CASCADE,
+      seller_id   varchar(255) NOT NULL,
+      price_cents integer NOT NULL DEFAULT 0,
+      inventory   integer NOT NULL DEFAULT 0,
+      status      varchar(50) NOT NULL DEFAULT 'active',
+      orders_count integer NOT NULL DEFAULT 0,
+      created_at  timestamptz DEFAULT now(),
+      updated_at  timestamptz DEFAULT now(),
+      UNIQUE(product_id, seller_id)
+    )`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_product ON admin_hub_seller_listings(product_id)`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_seller  ON admin_hub_seller_listings(seller_id)`).catch(() => {})
+    await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_product_change_requests (
+      id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      product_id    uuid NOT NULL REFERENCES admin_hub_products(id) ON DELETE CASCADE,
+      seller_id     varchar(255) NOT NULL,
+      status        varchar(50) NOT NULL DEFAULT 'pending',
+      field_name    varchar(255) NOT NULL,
+      old_value     text,
+      new_value     text NOT NULL,
+      reviewer_note text,
+      created_at    timestamptz DEFAULT now(),
+      updated_at    timestamptz DEFAULT now()
+    )`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_change_requests_status ON admin_hub_product_change_requests(status)`).catch(() => {})
+    await dbQ(`ALTER TABLE store_cart_items ADD COLUMN IF NOT EXISTS seller_id varchar(255)`).catch(() => {})
+
+    // Newsletter subscriber endpoint
+    await dbQ(`CREATE TABLE IF NOT EXISTS store_newsletter_subscribers (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      email text NOT NULL,
+      source text DEFAULT 'landing_page',
+      subscribed_at timestamptz DEFAULT now(),
+      UNIQUE(email)
+    )`).catch(() => {})
+    httpApp.post('/store/newsletter-subscribe', async (req, res) => {
+      const { email } = req.body || {}
+      if (!email || !String(email).includes('@')) return res.status(400).json({ message: 'Valid email required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        await c.query(
+          `INSERT INTO store_newsletter_subscribers (email, source) VALUES ($1, 'landing_page') ON CONFLICT (email) DO NOTHING`,
+          [String(email).trim().toLowerCase()]
+        )
+        await c.end()
+        res.json({ ok: true })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+    httpApp.get('/admin-hub/v1/newsletter-subscribers', requireSellerAuth, async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        const r = await c.query('SELECT * FROM store_newsletter_subscribers ORDER BY subscribed_at DESC LIMIT 500')
+        await c.end()
+        res.json({ subscribers: r.rows })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.json({ subscribers: [] })
+      }
+    })
 
     // Register ranking routes
     httpApp.get('/store/products/ranked', storeProductsRankedGET)

@@ -315,11 +315,22 @@ export default function MediaPage() {
     setIsSuperuser(typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true");
   }, []);
 
+  useEffect(() => {
+    // Superuser defaults to platform scope to avoid mixing seller media/folders.
+    if (isSuperuser && !sellerFilter) setSellerFilter("__null");
+  }, [isSuperuser, sellerFilter]);
+
   const items = useMemo(() => {
     if (!isSuperuser || !sellerFilter) return rawMedia;
     if (sellerFilter === "__null") return rawMedia.filter((i) => !i.seller_id);
     return rawMedia.filter((i) => i.seller_id === sellerFilter);
   }, [rawMedia, isSuperuser, sellerFilter]);
+
+  const visibleFolders = useMemo(() => {
+    if (!isSuperuser || !sellerFilter) return folders;
+    if (sellerFilter === "__null") return folders.filter((f) => !f.seller_id);
+    return folders.filter((f) => f.seller_id === sellerFilter);
+  }, [folders, isSuperuser, sellerFilter]);
 
   const sellerBuckets = useMemo(() => {
     const map = new Map();
@@ -371,6 +382,12 @@ export default function MediaPage() {
       if (found) setCurrentFolder(found);
     }
   }, [folders, searchParams]);
+
+  useEffect(() => {
+    if (currentFolder && currentFolder !== "none" && !visibleFolders.some((f) => f.id === currentFolder.id)) {
+      setCurrentFolder(null);
+    }
+  }, [currentFolder, visibleFolders]);
 
   /* ── Navigate to folder (updates URL + state) ── */
   const navigateToFolder = useCallback((folder) => {
@@ -781,12 +798,13 @@ export default function MediaPage() {
               <BlockStack gap="050">
                 <button
                   type="button"
-                  onClick={() => setSellerFilter("")}
-                  style={{ width: "100%", textAlign: "left", padding: "8px 10px", border: "none", borderRadius: 6, background: sellerFilter === "" ? "#fef3c7" : "transparent", cursor: "pointer", fontSize: 13, fontWeight: sellerFilter === "" ? 600 : 400, color: sellerFilter === "" ? "#b45309" : "#374151" }}
+                  onClick={() => setSellerFilter("__null")}
+                  style={{ width: "100%", textAlign: "left", padding: "8px 10px", border: "none", borderRadius: 6, background: sellerFilter === "__null" ? "#fef3c7" : "transparent", cursor: "pointer", fontSize: 13, fontWeight: sellerFilter === "__null" ? 600 : 400, color: sellerFilter === "__null" ? "#b45309" : "#374151" }}
                 >
-                  All sellers <span style={{ color: "#9ca3af", fontWeight: 400 }}>({rawMedia.length})</span>
+                  Platform / admin <span style={{ color: "#9ca3af", fontWeight: 400 }}>({rawMedia.filter((i) => !i.seller_id).length})</span>
                 </button>
                 {sellerBuckets.map((b) => (
+                  b.key === "__null" ? null : (
                   <button
                     key={b.key}
                     type="button"
@@ -796,6 +814,7 @@ export default function MediaPage() {
                   >
                     🏪 {b.label} <span style={{ color: "#9ca3af", fontWeight: 400 }}>({b.count})</span>
                   </button>
+                  )
                 ))}
               </BlockStack>
               <div style={{ height: 1, background: "#f0f0f0", margin: "12px 0" }} />
@@ -820,11 +839,11 @@ export default function MediaPage() {
               📄 Without folder <span style={{ color: "#9ca3af", fontWeight: 400 }}>({items.filter((i) => !i.folder_id).length})</span>
             </button>
 
-            {folders.length > 0 && (
+            {visibleFolders.length > 0 && (
               <div style={{ height: 1, background: "#f0f0f0", margin: "6px 0" }} />
             )}
 
-            {folders.map((f) => (
+            {visibleFolders.map((f) => (
               <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 2 }}>
                 <button
                   type="button"

@@ -645,12 +645,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           }),
         }));
       }
-      // Top-level EAN alanı (SKU & EAN) güncellendiğinde shop tarafında doğru görünsün diye
-      // varyantlara da aynı EAN'ı uygula. (Shop önce variant.ean'ı kullanıyor.)
-      const metaEan = metadata.ean != null ? String(metadata.ean).trim() : "";
-      const variantsToSave = metaEan
-        ? (product.variants || []).map((v) => ({ ...(v || {}), ean: metaEan }))
-        : product.variants || [];
+      // Keep variant EANs independent from parent EAN.
+      // Parent EAN lives in metadata.ean; each variant must keep its own unique ean.
+      const variantsToSave = product.variants || [];
       const collectionId = (metadata.collection_ids && metadata.collection_ids[0]) || product.collection_id || null;
       // Canonical title = DE locale (for backward compat with shop)
       const canonicalTitle = metadata.translations?.de?.title || product.title || "Untitled";

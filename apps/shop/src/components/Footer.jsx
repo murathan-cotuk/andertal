@@ -162,9 +162,6 @@ export default function Footer() {
         )}
         <Bottom>
           <Copyright>© {new Date().getFullYear()} Belucha. All rights reserved.</Copyright>
-          <FooterLink href={process.env.NEXT_PUBLIC_SELLERCENTRAL_URL || "https://belucha-sellercentral.vercel.app"}>
-            Für Händler
-          </FooterLink>
         </Bottom>
       </Container>
     </FooterContainer>

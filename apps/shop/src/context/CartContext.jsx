@@ -82,7 +82,7 @@ export function CartProvider({ children }) {
       .catch(() => {});
   }, []);
 
-  const addToCart = useCallback(async (variantId, quantity = 1) => {
+  const addToCart = useCallback(async (variantId, quantity = 1, sellerId = null) => {
     setLoading(true);
     try {
       const client = getMedusaClient();
@@ -91,7 +91,7 @@ export function CartProvider({ children }) {
         c = await createCart();
         if (!c) return null;
       }
-      const res = await client.addToCart(c.id, variantId, quantity);
+      const res = await client.addToCart(c.id, variantId, quantity, sellerId);
       const updated = res?.cart;
       if (updated) setCart(updated);
       return updated;

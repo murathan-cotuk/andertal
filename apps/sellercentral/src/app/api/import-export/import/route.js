@@ -137,6 +137,7 @@ function groupRows(rows, headers) {
 
   const parents = new Map();
   const children = new Map();
+  const errors = [];
 
   for (const row of rows) {
     const type = get(row, "product_type").toLowerCase();
@@ -144,6 +145,10 @@ function groupRows(rows, headers) {
     if (!sku || sku.startsWith("#")) continue;
 
     if (type === "parent") {
+      if (parents.has(sku)) {
+        errors.push({ sku, error: `Duplicate parent SKU in Excel: "${sku}"` });
+        continue;
+      }
       parents.set(sku, row);
     } else if (type === "child") {
       const pSku = get(row, "parent_sku");
@@ -152,7 +157,18 @@ function groupRows(rows, headers) {
       children.get(pSku).push(row);
     }
   }
-  return { parents, children, idx, get };
+  for (const [pSku, childRows] of children.entries()) {
+    if (!parents.has(pSku)) {
+      for (const cRow of childRows) {
+        const cSku = get(cRow, "sku");
+        errors.push({
+          sku: cSku || pSku,
+          error: `Child row references unknown parent_sku "${pSku}"`,
+        });
+      }
+    }
+  }
+  return { parents, children, idx, get, errors };
 }
 
 /** Consecutive option1_name… option2_name…; optional empty stops */
@@ -230,6 +246,11 @@ function computeParentPresent(parentRow, idx) {
       bullet1: kp(`bullet1_${lang}`),
       bullet2: kp(`bullet2_${lang}`),
       bullet3: kp(`bullet3_${lang}`),
+      bullet4: kp(`bullet4_${lang}`),
+      bullet5: kp(`bullet5_${lang}`),
+      seo_title: kp(`seo_title_${lang}`),
+      seo_description: kp(`seo_description_${lang}`),
+      seo_keywords: kp(`seo_keywords_${lang}`),
     };
   }
   const prices = {};
@@ -282,12 +303,65 @@ function computeChildPresent(childRow, idx) {
   const kp = (k) => keyPresent(childRow, k, idx);
   const opts = {};
   for (let n = 1; n <= 40; n++) opts[n] = kp(`option${n}_value`);
+  const seo = {};
+  for (const lang of LANGS) {
+    seo[lang] = {
+      title: kp(`variant_seo_title_${lang}`),
+      description: kp(`variant_seo_description_${lang}`),
+      keywords: kp(`variant_seo_keywords_${lang}`),
+    };
+  }
+  let variantMetafieldTouched = false;
+  for (const h of Object.keys(idx)) {
+    if (/^variant_metafield_\d+_(key|value)$/i.test(h) && keyPresent(childRow, h, idx)) {
+      variantMetafieldTouched = true;
+      break;
+    }
+  }
   return {
     ean: kp("ean"),
     inventory: kp("inventory"),
     image1: kp("image_url_1"),
+    brand: kp("brand"),
+    category_slug: kp("category_slug"),
+    shipping_group: kp("shipping_group"),
+    type: kp("type"),
+    weight_grams: kp("weight_grams"),
+    dim_length: kp("dim_length_cm"),
+    dim_width: kp("dim_width_cm"),
+    dim_height: kp("dim_height_cm"),
+    unit_type: kp("unit_type"),
+    unit_value: kp("unit_value"),
+    prices: Object.fromEntries(COUNTRIES.map((c) => [c, kp(`price_brutto_${c}`) || kp(`price_uvp_${c}`) || kp(`price_sale_${c}`)])),
+    seo,
+    variantMetafieldTouched,
     opts,
   };
+}
+
+function collectVariantMetafields(row, headers, idx) {
+  const byN = new Map();
+  for (const h of headers) {
+    const key = str(h);
+    const m = key.match(/^variant_metafield_(\d+)_(key|value)$/i);
+    if (!m) continue;
+    const n = parseInt(m[1], 10);
+    if (!byN.has(n)) byN.set(n, {});
+    const col = idx[key];
+    if (col === undefined) continue;
+    const raw = row[col];
+    const val = raw == null ? "" : String(raw).trim();
+    byN.get(n)[m[2]] = val;
+  }
+  const out = [];
+  const nums = [...byN.keys()].sort((a, b) => a - b);
+  for (const n of nums) {
+    const p = byN.get(n);
+    const k = (p.key || "").trim();
+    const v = (p.value || "").trim();
+    if (k) out.push({ key: k, value: v });
+  }
+  return out.length ? out : undefined;
 }
 
 function normalizeVariants(v) {
@@ -336,6 +410,66 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
     if (pres.ean) out.ean = inv.ean;
     if (pres.inventory) out.inventory = inv.inventory ?? 0;
     if (pres.image1) out.image_urls = inv.image_urls ?? out.image_urls;
+    const commonTouched =
+      pres.brand || pres.category_slug || pres.shipping_group || pres.type ||
+      pres.weight_grams || pres.dim_length || pres.dim_width || pres.dim_height ||
+      pres.unit_type || pres.unit_value || Object.values(pres.prices || {}).some(Boolean);
+    if (commonTouched) {
+      const md = out.metadata && typeof out.metadata === "object" ? { ...out.metadata } : {};
+      const invMd = inv.metadata && typeof inv.metadata === "object" ? inv.metadata : {};
+      if (pres.brand && invMd.brand_id) md.brand_id = invMd.brand_id;
+      if (pres.category_slug && invMd.category_id) md.category_id = invMd.category_id;
+      if (pres.category_slug && invMd.category_slug) md.category_slug = invMd.category_slug;
+      if (pres.shipping_group && invMd.shipping_group_id) md.shipping_group_id = invMd.shipping_group_id;
+      if (pres.type && invMd.type) md.type = invMd.type;
+      if (pres.weight_grams && invMd.weight_grams != null) md.weight_grams = invMd.weight_grams;
+      if (pres.dim_length && invMd.dimensions_length != null) md.dimensions_length = invMd.dimensions_length;
+      if (pres.dim_width && invMd.dimensions_width != null) md.dimensions_width = invMd.dimensions_width;
+      if (pres.dim_height && invMd.dimensions_height != null) md.dimensions_height = invMd.dimensions_height;
+      if (pres.unit_type && invMd.unit_type) md.unit_type = invMd.unit_type;
+      if (pres.unit_value && invMd.unit_value != null) md.unit_value = invMd.unit_value;
+      if (invMd.prices && typeof invMd.prices === "object") {
+        md.prices = md.prices && typeof md.prices === "object" ? { ...md.prices } : {};
+        for (const c of COUNTRIES) {
+          if (!pres.prices?.[c]) continue;
+          md.prices[c] = { ...(md.prices[c] || {}), ...(invMd.prices[c] || {}) };
+        }
+      }
+      out.metadata = md;
+    }
+    const seoTouched = LANGS.some((lang) => Object.values(pres.seo?.[lang] || {}).some(Boolean));
+    if (seoTouched) {
+      const md = out.metadata && typeof out.metadata === "object" ? { ...out.metadata } : {};
+      const tr = md.translations && typeof md.translations === "object" ? { ...md.translations } : {};
+      const invTr = inv.metadata?.translations && typeof inv.metadata.translations === "object" ? inv.metadata.translations : {};
+      for (const lang of LANGS) {
+        const s = pres.seo[lang] || {};
+        if (!Object.values(s).some(Boolean)) continue;
+        const prev = { ...(tr[lang] || {}) };
+        const src = invTr[lang] || {};
+        if (s.title) prev.seo_title = src.seo_title;
+        if (s.description) prev.seo_description = src.seo_description;
+        if (s.keywords) prev.seo_keywords = src.seo_keywords;
+        tr[lang] = prev;
+      }
+      md.translations = tr;
+      out.metadata = md;
+    }
+    if (pres.variantMetafieldTouched) {
+      const md = out.metadata && typeof out.metadata === "object" ? { ...out.metadata } : {};
+      const incomingMf = Array.isArray(inv.metadata?.metafields) ? inv.metadata.metafields : [];
+      if (incomingMf.length) {
+        const arr = Array.isArray(md.metafields) ? [...md.metafields] : [];
+        for (const pair of incomingMf) {
+          if (!pair?.key || !str(pair.value)) continue;
+          const j = arr.findIndex((x) => x && x.key === pair.key);
+          if (j >= 0) arr[j] = { ...arr[j], ...pair };
+          else arr.push({ ...pair });
+        }
+        md.metafields = arr;
+      }
+      out.metadata = md;
+    }
     const touchedOpts = Object.entries(pres.opts).filter(([, on]) => on).map(([n]) => parseInt(n, 10));
     if (touchedOpts.length) {
       const nextOv = [...(Array.isArray(out.option_values) ? out.option_values : [])];
@@ -395,13 +529,27 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
       const d = G(`description_${lang}`);
       if (d) prev.description = d;
     }
-    if (tp.bullet1 || tp.bullet2 || tp.bullet3) {
+    if (tp.bullet1 || tp.bullet2 || tp.bullet3 || tp.bullet4 || tp.bullet5) {
       const next = Array.isArray(prev.bullet_points) ? [...prev.bullet_points] : [];
       if (tp.bullet1) next[0] = G(`bullet1_${lang}`);
       if (tp.bullet2) next[1] = G(`bullet2_${lang}`);
       if (tp.bullet3) next[2] = G(`bullet3_${lang}`);
+      if (tp.bullet4) next[3] = G(`bullet4_${lang}`);
+      if (tp.bullet5) next[4] = G(`bullet5_${lang}`);
       while (next.length && str(next[next.length - 1]) === "") next.pop();
       prev.bullet_points = next.length ? next : undefined;
+    }
+    if (tp.seo_title) {
+      const v = G(`seo_title_${lang}`);
+      if (v) prev.seo_title = v;
+    }
+    if (tp.seo_description) {
+      const v = G(`seo_description_${lang}`);
+      if (v) prev.seo_description = v;
+    }
+    if (tp.seo_keywords) {
+      const v = G(`seo_keywords_${lang}`);
+      if (v) prev.seo_keywords = v;
     }
     m.translations[lang] = prev;
   }
@@ -487,7 +635,12 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     const b1 = G(`bullet1_${lang}`);
     const b2 = G(`bullet2_${lang}`);
     const b3 = G(`bullet3_${lang}`);
-    if (!title && !desc && !b1 && !b2 && !b3) continue;
+    const b4 = G(`bullet4_${lang}`);
+    const b5 = G(`bullet5_${lang}`);
+    const seoTitleLang = G(`seo_title_${lang}`);
+    const seoDescLang = G(`seo_description_${lang}`);
+    const seoKeywordsLang = G(`seo_keywords_${lang}`);
+    if (!title && !desc && !b1 && !b2 && !b3 && !b4 && !b5 && !seoTitleLang && !seoDescLang && !seoKeywordsLang) continue;
     translations[lang] = {};
     if (title) translations[lang].title = title;
     if (desc) translations[lang].description = desc;
@@ -495,7 +648,12 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     if (b1) bullets.push(b1);
     if (b2) bullets.push(b2);
     if (b3) bullets.push(b3);
+    if (b4) bullets.push(b4);
+    if (b5) bullets.push(b5);
     if (bullets.length) translations[lang].bullet_points = bullets;
+    if (seoTitleLang) translations[lang].seo_title = seoTitleLang;
+    if (seoDescLang) translations[lang].seo_description = seoDescLang;
+    if (seoKeywordsLang) translations[lang].seo_keywords = seoKeywordsLang;
   }
 
   const prices = {};
@@ -523,12 +681,68 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
       const v = str(cGet(`option${n}_value`));
       if (v) option_values.push(v);
     }
+    const variantTranslations = {};
+    for (const lang of LANGS) {
+      const seoTitle = cGet(`variant_seo_title_${lang}`);
+      const seoDescription = cGet(`variant_seo_description_${lang}`);
+      const seoKeywords = cGet(`variant_seo_keywords_${lang}`);
+      if (!seoTitle && !seoDescription && !seoKeywords) continue;
+      variantTranslations[lang] = {};
+      if (seoTitle) variantTranslations[lang].seo_title = seoTitle;
+      if (seoDescription) variantTranslations[lang].seo_description = seoDescription;
+      if (seoKeywords) variantTranslations[lang].seo_keywords = seoKeywords;
+    }
+    const variantMetafields = collectVariantMetafields(cRow, headers, idx);
+    const variantMeta = {};
+    if (Object.keys(variantTranslations).length) variantMeta.translations = variantTranslations;
+    if (variantMetafields?.length) variantMeta.metafields = variantMetafields;
+    const cImage = cGet("image_url_1");
+    const cBrand = str(cGet("brand"));
+    const cBrandRef = cBrand ? brandByLowerName.get(cBrand.toLowerCase()) : null;
+    if (cBrand && !cBrandRef) {
+      return { error: `Unbekannte Marke (child row): "${cBrand}"` };
+    }
+    const cCatSlug = str(cGet("category_slug"));
+    const cCatId = cCatSlug ? slugToId.get(cCatSlug.toLowerCase()) : null;
+    if (cCatSlug && !cCatId) {
+      return { error: `Unbekannte Kategorie (child row): "${cCatSlug}"` };
+    }
+    const cShip = str(cGet("shipping_group"));
+    const cShipRef = cShip ? shipByLowerName.get(cShip.toLowerCase()) : null;
+    if (cShip && !cShipRef) {
+      return { error: `Unbekannte Versandgruppe (child row): "${cShip}"` };
+    }
+    const cPrices = {};
+    for (const country of COUNTRIES) {
+      const brutto = parseCents(cGet(`price_brutto_${country}`));
+      const uvp = parseCents(cGet(`price_uvp_${country}`));
+      const sale = parseCents(cGet(`price_sale_${country}`));
+      if (brutto == null && uvp == null && sale == null) continue;
+      cPrices[country] = {};
+      if (brutto != null) cPrices[country].brutto_cents = brutto;
+      if (uvp != null) cPrices[country].uvp_cents = uvp;
+      if (sale != null) cPrices[country].sale_cents = sale;
+    }
+    if (cBrandRef?.id) variantMeta.brand_id = cBrandRef.id;
+    if (cCatId) variantMeta.category_id = cCatId;
+    if (cCatSlug) variantMeta.category_slug = cCatSlug;
+    if (cShipRef?.id) variantMeta.shipping_group_id = cShipRef.id;
+    if (str(cGet("type"))) variantMeta.type = str(cGet("type"));
+    if (parseNum(cGet("weight_grams")) != null) variantMeta.weight_grams = parseNum(cGet("weight_grams"));
+    if (parseNum(cGet("dim_length_cm")) != null) variantMeta.dimensions_length = parseNum(cGet("dim_length_cm"));
+    if (parseNum(cGet("dim_width_cm")) != null) variantMeta.dimensions_width = parseNum(cGet("dim_width_cm"));
+    if (parseNum(cGet("dim_height_cm")) != null) variantMeta.dimensions_height = parseNum(cGet("dim_height_cm"));
+    if (str(cGet("unit_type"))) variantMeta.unit_type = str(cGet("unit_type"));
+    if (parseNum(cGet("unit_value")) != null) variantMeta.unit_value = parseNum(cGet("unit_value"));
+    if (Object.keys(cPrices).length) variantMeta.prices = cPrices;
     variants.push({
       sku: cGet("sku") || undefined,
       ean: cGet("ean") || undefined,
       inventory: parseNum(cGet("inventory")) ?? 0,
       option_values: option_values.length ? option_values : undefined,
-      image_urls: cGet("image_url_1") ? { de: cGet("image_url_1") } : undefined,
+      image_url: cImage || undefined,
+      image_urls: cImage ? Object.fromEntries(LANGS.map((l) => [l, cImage])) : undefined,
+      metadata: Object.keys(variantMeta).length ? variantMeta : undefined,
     });
   }
 
@@ -552,9 +766,11 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     ...(metafields ? { metafields } : {}),
   };
 
+  const firstTitle = LANGS.map((lang) => G(`title_${lang}`)).find(Boolean);
+  const firstDesc = LANGS.map((lang) => G(`description_${lang}`)).find(Boolean);
   const payload = {
-    title: G("title_de") || G("title_en"),
-    description: G("description_de") || G("description_en") || undefined,
+    title: firstTitle || undefined,
+    description: firstDesc || undefined,
     status: G("status") || "draft",
     sku: G("sku") || undefined,
     metadata: meta,
@@ -630,10 +846,13 @@ export async function POST(request) {
       return Response.json({ error: "No data rows found (rows must start from row 4)" }, { status: 400 });
     }
 
-    const { parents, children, idx, get } = groupRows(dataRows, headers);
+    const { parents, children, idx, get, errors: groupErrors } = groupRows(dataRows, headers);
 
     if (parents.size === 0) {
       return Response.json({ error: "No parent rows found. Add rows with product_type='parent'." }, { status: 400 });
+    }
+    if (groupErrors.length) {
+      return Response.json({ error: "Excel validation failed", errors: groupErrors }, { status: 400 });
     }
 
     const lookups = await loadImportLookups(backendUrl, sellerToken);

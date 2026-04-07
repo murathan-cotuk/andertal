@@ -89,11 +89,12 @@ function BarChart({ data }) {
   );
   const max = Math.max(...data.map((d) => d.total_cents), 1);
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 80, padding: "4px 0" }}>
+    <div style={{ width: "100%", overflowX: "auto", padding: "4px 0" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 80, minWidth: Math.max(220, data.length * 28) }}>
       {data.map((d, i) => {
         const h = Math.max(4, Math.round((d.total_cents / max) * 72));
         return (
-          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <div key={i} style={{ width: 22, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
             <div
               title={`${fmtMonth(d.month)}: ${fmtCents(d.total_cents)}`}
               style={{ width: "100%", height: h, background: "#2563eb", borderRadius: "3px 3px 0 0", transition: "height .2s" }}
@@ -102,6 +103,7 @@ function BarChart({ data }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

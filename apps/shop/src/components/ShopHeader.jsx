@@ -35,8 +35,6 @@ const SCROLL_THRESHOLD = 60;
 const SCROLL_DELTA = 8; /* px; only toggle direction after this much scroll to avoid jitter */
 const MIDDLE_BAR_BG = "#1b8880";
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 function slugify(s) {
   return (s || "")
     .replace(/[äÄ]/g, "ae").replace(/[öÖ]/g, "oe").replace(/[üÜ]/g, "ue").replace(/ß/g, "ss")
@@ -82,32 +80,6 @@ function menuItemHref(item) {
   return value ? `/${String(value).replace(/^\//, "")}` : "#";
 }
 
-function parseJsonMaybe(value) {
-  if (!value || typeof value !== "string") return null;
-  const text = value.trim();
-  if (!text.startsWith("{") && !text.startsWith("[")) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-function menuItemCategoryId(item) {
-  if (!item) return "";
-  if (item.category_id != null && String(item.category_id).trim()) {
-    return String(item.category_id).trim();
-  }
-  const parsed = parseJsonMaybe(item.link_value);
-  if (parsed && typeof parsed === "object") {
-    const fromJson = parsed.id ?? parsed.category_id ?? parsed.categoryId;
-    if (fromJson != null && String(fromJson).trim()) return String(fromJson).trim();
-  }
-  const raw = String(item.link_value || "").trim();
-  if (UUID_REGEX.test(raw)) return raw;
-  return "";
-}
-
 /** Map category slug → id from /store/categories tree (for menu items that only store slug). */
 function walkCategorySlugMap(nodes, outMap) {
   if (!Array.isArray(nodes)) return;
@@ -116,46 +88,6 @@ function walkCategorySlugMap(nodes, outMap) {
     if (n.slug) outMap.set(String(n.slug).trim().toLowerCase(), String(n.id).trim().toLowerCase());
     if (n.children && n.children.length) walkCategorySlugMap(n.children, outMap);
   }
-}
-
-/** Resolve admin category UUID for a menu item (direct id, JSON, or slug lookup). */
-function resolveMenuCategoryId(item, slugToCategoryId) {
-  const direct = menuItemCategoryId(item);
-  if (direct) return String(direct).trim().toLowerCase();
-  const parsed = parseJsonMaybe(item.link_value);
-  let slug = "";
-  if (parsed && typeof parsed === "object") {
-    slug = (parsed.slug || parsed.handle || "").toString().trim();
-  }
-  if (!slug) slug = String(item.slug || "").trim();
-  if (!slug) {
-    const raw = String(item.link_value || "").trim();
-    if (raw && !raw.startsWith("{") && !UUID_REGEX.test(raw)) slug = raw;
-  }
-  if (!slug || !(slugToCategoryId instanceof Map)) return "";
-  const id = slugToCategoryId.get(slug.toLowerCase());
-  return id ? String(id).trim().toLowerCase() : "";
-}
-
-/** Slug for /category/[slug] from a main-menu item. */
-function resolveMenuCategorySlug(item, slugToCategoryId) {
-  if (!item) return "";
-  const parsed = parseJsonMaybe(item.link_value);
-  if (parsed && typeof parsed === "object") {
-    const s = (parsed.slug || parsed.handle || "").toString().trim();
-    if (s) return s.replace(/^\//, "");
-  }
-  const itemSlug = String(item.slug || "").trim();
-  if (itemSlug) return itemSlug.replace(/^\//, "");
-  const raw = String(item.link_value || "").trim();
-  if (raw && !raw.startsWith("{") && !UUID_REGEX.test(raw)) return raw.replace(/^\//, "");
-  const cid = resolveMenuCategoryId(item, slugToCategoryId);
-  if (cid && slugToCategoryId instanceof Map) {
-    for (const [sl, id] of slugToCategoryId.entries()) {
-      if (String(id).toLowerCase() === cid) return sl;
-    }
-  }
-  return "";
 }
 
 function menuItemDepth(item, idToItem) {
@@ -728,11 +660,12 @@ export default function ShopHeader() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
   const [mainMenuAllItems, setMainMenuAllItems] = useState([]);
+  const [mainMenuConfig, setMainMenuConfig] = useState(null);
   const [secondMenuItems, setSecondMenuItems] = useState([]);
   const [categoryIdsWithProducts, setCategoryIdsWithProducts] = useState(() => new Set());
   const [categorySlugToId, setCategorySlugToId] = useState(() => new Map());
   const [categoryTree, setCategoryTree] = useState([]);
-  const [pendingBrowseCategory, setPendingBrowseCategory] = useState(null);
+  const [pendingBrowseTarget, setPendingBrowseTarget] = useState(null);
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
 
@@ -775,6 +708,7 @@ export default function ShopHeader() {
         menus.find((m) => norm(m?.slug) === "second-menu");
       const rootItems = (arr) => (arr || []).filter((i) => !i?.parent_id);
       setMainMenuAllItems(main ? main.items || [] : []);
+      setMainMenuConfig(main || null);
       setSecondMenuItems(second ? rootItems(second.items) : []);
     };
     Promise.all([
@@ -860,7 +794,7 @@ export default function ShopHeader() {
   }, []);
 
   useEffect(() => {
-    setPendingBrowseCategory(null);
+    setPendingBrowseTarget(null);
   }, [pathname]);
 
   // Track actual header height so the spacer is always accurate
@@ -901,25 +835,6 @@ export default function ShopHeader() {
     url: "handle",
     image: "thumbnail",
   };
-  /* Nur Parent-Menüzeilen (Tiefe 0) mit mindestens einem Produkt in dieser Kategorie oder einer Unterkategorie. */
-  const mainCategories = useMemo(() => {
-    const idToItem = new Map(mainMenuAllItems.map((i) => [String(i.id), i]));
-    const ordered = [...mainMenuAllItems].sort(
-      (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label || "").localeCompare(String(b.label || ""), "de"),
-    );
-    return ordered
-      .filter((item) => {
-        if (String(item?.link_type || "").toLowerCase() !== "category") return false;
-        if (menuItemDepth(item, idToItem) !== 0) return false;
-        const cid = resolveMenuCategoryId(item, categorySlugToId);
-        return Boolean(cid && categoryIdsWithProducts.has(cid));
-      })
-      .map((item) => ({
-        ...item,
-        _depth: 0,
-      }));
-  }, [mainMenuAllItems, categoryIdsWithProducts, categorySlugToId]);
-
   /** Fallback wenn das Menü keine Kategorie-Parents enthält: Wurzelkategorien aus der DB mit Produkten. */
   const browseRootsFromTree = useMemo(() => {
     if (!Array.isArray(categoryTree) || categoryTree.length === 0 || categoryIdsWithProducts.size === 0) return [];
@@ -934,14 +849,11 @@ export default function ShopHeader() {
       .sort((a, b) => String(a.label).localeCompare(String(b.label), locale));
   }, [categoryTree, categoryIdsWithProducts, locale]);
 
-  const categoryPanelRows =
-    mainCategories.length > 0
-      ? mainCategories.map((item) => ({
-          key: String(item.id),
-          label: item.label || "",
-          slug: resolveMenuCategorySlug(item, categorySlugToId),
-        }))
-      : browseRootsFromTree.map((r) => ({ key: r.key, label: r.label, slug: r.slug }));
+  const categoryPanelRows = browseRootsFromTree.map((r) => ({
+    key: r.key,
+    label: r.label,
+    href: `/category/${r.slug}`,
+  }));
 
   return (
     <>
@@ -968,19 +880,19 @@ export default function ShopHeader() {
                       {tNav("categoryMenuEmpty")}
                     </div>
                   )}
-                  {pendingBrowseCategory?.slug ? (
+                  {pendingBrowseTarget?.href ? (
                     <div style={{ padding: "6px 14px 10px", fontSize: 12, color: tokens.dark[600], borderBottom: `1px solid ${tokens.border.light}` }}>
-                      {tNav("categoryPendingHint", { label: pendingBrowseCategory.label })}
+                      {tNav("categoryPendingHint", { label: pendingBrowseTarget.label })}
                     </div>
                   ) : null}
                   {categoryPanelRows.map((row) =>
-                    row.slug ? (
+                    row.href && row.href !== "#" ? (
                       <CategoryRow
                         key={row.key}
                         type="button"
                         style={{ paddingLeft: 14 }}
                         onClick={() => {
-                          setPendingBrowseCategory({ slug: row.slug, label: row.label });
+                          setPendingBrowseTarget({ href: row.href, label: row.label });
                           setMainMenuOpen(false);
                         }}
                       >
@@ -996,9 +908,9 @@ export default function ShopHeader() {
                     type="button"
                     aria-label="Suchen"
                     onClick={() => {
-                      if (pendingBrowseCategory?.slug) {
-                        router.push(`/category/${pendingBrowseCategory.slug}`);
-                        setPendingBrowseCategory(null);
+                      if (pendingBrowseTarget?.href) {
+                        router.push(pendingBrowseTarget.href);
+                        setPendingBrowseTarget(null);
                       }
                     }}
                   >

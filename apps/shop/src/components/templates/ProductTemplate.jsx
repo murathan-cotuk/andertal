@@ -743,6 +743,7 @@ export default function ProductTemplate() {
   const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
   const [productReviews, setProductReviews] = useState([]);
   const [multiOffer, setMultiOffer] = useState(null);
+  const [selectedSellerId, setSelectedSellerId] = useState(null);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
@@ -784,6 +785,7 @@ export default function ProductTemplate() {
           return;
         }
         setMultiOffer(data.multi_offer || null);
+        setSelectedSellerId(null);
         setProduct(data.product);
       } catch (err) {
         console.error("Failed to fetch product:", err);
@@ -984,6 +986,12 @@ export default function ProductTemplate() {
     product?.metadata?.store_name ||
     product?.metadata?.seller_name ||
     "Shop";
+
+  const selectedSellerOffer = selectedSellerId
+    ? (multiOffer?.other_sellers || []).find((o) => o.seller_id === selectedSellerId) || null
+    : null;
+  const effectiveDisplayCents = selectedSellerOffer != null ? Number(selectedSellerOffer.price_cents) : displayCents;
+  const effectiveStoreName = selectedSellerOffer?.store_name || storeName;
   const returnDays = meta.return_days != null ? meta.return_days : 14;
   const returnCost = meta.return_cost === false || meta.return_kostenlos === true ? "kostenlos" : (meta.return_cost || "kostenlos");
   const titleDisplay = (effectiveTitle || displayTitle || "").slice(0, 120);
@@ -1009,7 +1017,7 @@ export default function ProductTemplate() {
     }[locale] ?? "Add to cart failed";
 
     try {
-      const ok = await addToCart(variantId, quantity);
+      const ok = await addToCart(variantId, quantity, selectedSellerId);
       if (ok) openCartSidebar();
       setCartNotice({ text: ok ? successText : errorText, visible: true });
 
@@ -1290,7 +1298,7 @@ export default function ProductTemplate() {
               <PriceTop>
                 <PriceStack>
                   <PriceMainRow>
-                    <PriceMain>{formatPriceCents(displayCents)} €</PriceMain>
+                    <PriceMain>{formatPriceCents(effectiveDisplayCents)} €</PriceMain>
                     {discountPercent != null && discountPercent > 0 && (
                       <DiscountPill>-{discountPercent}%</DiscountPill>
                     )}
@@ -1365,7 +1373,7 @@ export default function ProductTemplate() {
                 {[
                   { label: "Versand", value: shippingDisplay },
                   { label: "Rückgabe", value: `${returnDays} Tage, ${returnCost}` },
-                  { label: "Verkäufer", value: storeName },
+                  { label: "Verkäufer", value: effectiveStoreName },
                   ...((variant?.ean || meta.ean) ? [{ label: "EAN", value: variant?.ean || meta.ean }] : []),
                 ].map(({ label, value }) => (
                   <InfoRow key={label}>
@@ -1380,7 +1388,7 @@ export default function ProductTemplate() {
           {multiOffer?.other_sellers?.length > 0 ? (
             <OtherSellersCard>
               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, color: "#111827" }}>
-                {locale === "tr" ? "Diğer satıcılar" : locale === "de" ? "Weitere Angebote" : "Other sellers"}
+                {locale === "tr" ? `Diğer satıcılar (${multiOffer.other_sellers.length})` : locale === "de" ? `Weitere Angebote (${multiOffer.other_sellers.length})` : `Other sellers (${multiOffer.other_sellers.length})`}
               </div>
               <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 4px", lineHeight: 1.35 }}>
                 {locale === "tr"
@@ -1389,47 +1397,72 @@ export default function ProductTemplate() {
                     ? "Weitere Händler mit derselben EAN. Verkäufersterne aus allen Produktbewertungen."
                     : "More sellers for this EAN. Seller scores combine all their product reviews."}
               </p>
-              {multiOffer.other_sellers.map((o) => (
-                <OtherSellerRow key={o.product_id}>
-                  {o.thumbnail ? (
-                    <img
-                      src={resolveImageUrl(o.thumbnail) || o.thumbnail}
-                      alt=""
-                      width={44}
-                      height={44}
-                      style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8, background: "#e5e7eb" }}
-                    />
-                  ) : (
-                    <div style={{ width: 44, height: 44, borderRadius: 8, background: "#e5e7eb" }} aria-hidden />
-                  )}
-                  <div style={{ minWidth: 0 }}>
-                    <Link
-                      href={`/produkt/${encodeURIComponent(o.handle)}`}
-                      prefetch={false}
-                      style={{ fontWeight: 600, fontSize: 13, color: "#111827", textDecoration: "none", display: "block" }}
-                    >
-                      {o.store_name}
-                    </Link>
-                    <div style={{ marginTop: 4, fontSize: 11, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      {o.seller_review_count > 0 && Number(o.seller_review_avg) > 0 ? (
-                        <StarRating average={Number(o.seller_review_avg) || 0} count={Number(o.seller_review_count) || 0} />
-                      ) : (
-                        <span>{locale === "tr" ? "Mağaza yorumu yok" : locale === "de" ? "Keine Verkäuferbewertungen" : "No seller reviews yet"}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>
-                      {formatPriceCents(Number(o.price_cents) || 0)} €
-                    </div>
-                    {!o.in_stock ? (
-                      <div style={{ fontSize: 11, color: "#b91c1c", marginTop: 2 }}>
-                        {locale === "tr" ? "Stokta yok" : locale === "de" ? "Ausverkauft" : "Out of stock"}
+              {selectedSellerId && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "6px 10px", marginBottom: 6, fontSize: 12 }}>
+                  <span style={{ color: "#166534", fontWeight: 600 }}>
+                    {locale === "tr" ? "Seçili satıcıdan alıyorsunuz" : locale === "de" ? "Kauf beim ausgewählten Händler" : "Buying from selected seller"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSellerId(null)}
+                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#6b7280", textDecoration: "underline", padding: 0 }}
+                  >
+                    {locale === "tr" ? "Sıfırla" : locale === "de" ? "Zurücksetzen" : "Reset"}
+                  </button>
+                </div>
+              )}
+              {multiOffer.other_sellers.map((o) => {
+                const isSelected = selectedSellerId === o.seller_id;
+                return (
+                  <OtherSellerRow key={o.product_id} style={isSelected ? { background: "#f0fdf4", borderColor: "#86efac" } : {}}>
+                    {o.thumbnail ? (
+                      <img
+                        src={resolveImageUrl(o.thumbnail) || o.thumbnail}
+                        alt=""
+                        width={44}
+                        height={44}
+                        style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8, background: "#e5e7eb", flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div style={{ width: 44, height: 44, borderRadius: 8, background: "#e5e7eb", flexShrink: 0 }} aria-hidden />
+                    )}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{o.store_name}</div>
+                      <div style={{ marginTop: 4, fontSize: 11, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        {o.seller_review_count > 0 && Number(o.seller_review_avg) > 0 ? (
+                          <StarRating average={Number(o.seller_review_avg) || 0} count={Number(o.seller_review_count) || 0} />
+                        ) : (
+                          <span>{locale === "tr" ? "Mağaza yorumu yok" : locale === "de" ? "Keine Verkäuferbewertungen" : "No seller reviews yet"}</span>
+                        )}
                       </div>
-                    ) : null}
-                  </div>
-                </OtherSellerRow>
-              ))}
+                      <div style={{ marginTop: 6 }}>
+                        <button
+                          type="button"
+                          disabled={!o.in_stock}
+                          onClick={() => setSelectedSellerId(isSelected ? null : o.seller_id)}
+                          style={{
+                            fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, cursor: o.in_stock ? "pointer" : "not-allowed",
+                            background: isSelected ? "#16a34a" : o.in_stock ? "#111827" : "#d1d5db",
+                            color: isSelected || o.in_stock ? "#fff" : "#6b7280",
+                            border: "none",
+                          }}
+                        >
+                          {isSelected
+                            ? (locale === "tr" ? "Seçildi ✓" : locale === "de" ? "Ausgewählt ✓" : "Selected ✓")
+                            : !o.in_stock
+                              ? (locale === "tr" ? "Stokta yok" : locale === "de" ? "Ausverkauft" : "Out of stock")
+                              : (locale === "tr" ? "Bu satıcıdan al" : locale === "de" ? "Bei diesem Händler kaufen" : "Buy from this seller")}
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>
+                        {formatPriceCents(Number(o.price_cents) || 0)} €
+                      </div>
+                    </div>
+                  </OtherSellerRow>
+                );
+              })}
             </OtherSellersCard>
           ) : null}
         </RightCol>

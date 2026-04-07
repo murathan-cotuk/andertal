@@ -601,14 +601,29 @@ export default function CategoryTemplate() {
       (category.seo_description && String(category.seo_description).trim()) ||
       (m.meta_description && String(m.meta_description).trim()) ||
       "";
-    if (desc) {
-      let el = document.querySelector('meta[name="description"]');
+    const keywords =
+      (category.seo_keywords && String(category.seo_keywords).trim()) ||
+      (m.keywords && String(m.keywords).trim()) ||
+      "";
+    const ensureMeta = (selector, create) => {
+      let el = document.querySelector(selector);
       if (!el) {
         el = document.createElement("meta");
-        el.setAttribute("name", "description");
+        Object.entries(create).forEach(([k, v]) => el.setAttribute(k, v));
         document.head.appendChild(el);
       }
+      return el;
+    };
+    if (desc) {
+      const el = ensureMeta('meta[name="description"]', { name: "description" });
       el.setAttribute("content", desc);
+      ensureMeta('meta[property="og:description"]', { property: "og:description" }).setAttribute("content", desc);
+    }
+    if (docTitle) {
+      ensureMeta('meta[property="og:title"]', { property: "og:title" }).setAttribute("content", docTitle);
+    }
+    if (keywords) {
+      ensureMeta('meta[name="keywords"]', { name: "keywords" }).setAttribute("content", keywords);
     }
   }, [category, slug]);
 

@@ -350,84 +350,25 @@ function MenuEditorPanel(props) {
     setInlineNewOpen(false);
   };
 
-  const categoryLinkedCollectionId = (cat) => {
-    if (!cat) return "";
-    if (cat.collection_id != null) return String(cat.collection_id).trim();
-    let meta = cat.metadata && typeof cat.metadata === "object" ? cat.metadata : {};
-    if (typeof cat.metadata === "string") {
-      try {
-        meta = JSON.parse(cat.metadata);
-      } catch {
-        meta = {};
-      }
-    }
-    return meta?.collection_id != null ? String(meta.collection_id).trim() : "";
-  };
-
-  const collectProductCollectionIds = (list) => {
-    const set = new Set();
-    (list || []).forEach((p) => {
-      if (p?.collection_id != null) set.add(String(p.collection_id));
-      const meta = p?.metadata && typeof p.metadata === "object" ? p.metadata : {};
-      if (meta.collection_id != null) set.add(String(meta.collection_id));
-      if (Array.isArray(meta.collection_ids)) {
-        meta.collection_ids.forEach((id) => {
-          if (id != null && String(id).trim()) set.add(String(id));
-        });
-      }
-    });
-    return set;
-  };
-
   const handleCategoriesWithProducts = async () => {
     const menuId = effectiveMenuId ?? selectedMenuId;
     if (!menuId) return;
-    const roots = normalizeCategoryTree(categories).filter((c) => !c?.parent_id);
-    const collectionIdsWithProducts = collectProductCollectionIds(products);
-    const parentCategories = roots.filter((cat) => {
-      if (cat?.active === false) return false;
-      const linkedCollectionId = categoryLinkedCollectionId(cat);
-      if (!linkedCollectionId) return false;
-      return collectionIdsWithProducts.has(linkedCollectionId);
-    });
-
-    if (parentCategories.length === 0) {
-      setMoreActionsOpen(false);
-      setError("No parent categories with products found.");
-      return;
-    }
-
     try {
       setSaving(true);
       setError(null);
-      const existing = [...flattenMenuTree(buildMenuTree(items))].reverse();
-      for (const it of existing) {
-        await client.deleteMenuItem(menuId, it.id);
-      }
-
-      for (let i = 0; i < parentCategories.length; i++) {
-        const cat = parentCategories[i];
-        const catSlug = String(cat?.slug || normalizeItemSlug(cat?.name || "")).trim();
-        if (!catSlug) continue;
-        await client.createMenuItem(menuId, {
-          label: cat?.name || catSlug,
-          slug: `category/${catSlug}`,
-          link_type: "category",
-          link_value: JSON.stringify({
-            id: cat?.id,
-            title: cat?.name || catSlug,
-            slug: catSlug,
-            handle: `category/${catSlug}`,
-          }),
-          parent_id: null,
-          sort_order: i,
-        });
-      }
-
+      const nextValue = !Boolean(panelMenu?.categories_with_products);
+      const payload = {
+        name: localMenuName || panelMenu?.name || "",
+        slug: localMenuSlug || panelMenu?.slug || "",
+        location: localMenuLocation || panelMenu?.location || "main",
+        categories_with_products: nextValue,
+      };
+      await client.updateMenu(menuId, payload);
+      await fetchMenus();
       await fetchItems(menuId);
       setMoreActionsOpen(false);
     } catch (err) {
-      setError(err?.message || "Failed to build categories with products");
+      setError(err?.message || "Failed to update categories-with-products mode");
     } finally {
       setSaving(false);
     }
@@ -500,7 +441,7 @@ function MenuEditorPanel(props) {
                   <ActionList
                     actionRole="menuitem"
                     items={[
-                      { content: "Categories with products", onAction: () => { setMoreActionsOpen(false); handleCategoriesWithProducts(); } },
+                      { content: panelMenu?.categories_with_products ? "Disable categories with products" : "Categories with products", onAction: () => { setMoreActionsOpen(false); handleCategoriesWithProducts(); } },
                       { content: "Delete", destructive: true, onAction: () => { setMoreActionsOpen(false); handleDeleteMenu(null, panelMenu || { id: panelMenuId, name: localMenuName }); } },
                     ]}
                   />
@@ -530,9 +471,14 @@ function MenuEditorPanel(props) {
               boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
             }}
           >
+            {panelMenu?.categories_with_products ? (
+              <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--p-color-border-subdued)", background: "var(--p-color-bg-surface-secondary)" }}>
+                <Text as="p" tone="subdued">Icinde ürün olan kategoriler gösterilecek.</Text>
+              </div>
+            ) : null}
             {hasMenuId && (
               <>
-                {(() => {
+                {panelMenu?.categories_with_products ? null : (() => {
                   const addButton = (parentId, depth) => {
                     const indent = parentId != null ? (depth + 1) * 3 * TAB_SIZE : 0;
                     return (

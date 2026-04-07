@@ -106,10 +106,12 @@ class MedusaClient {
     return res
   }
 
-  async addToCart(cartId, variantId, quantity = 1) {
+  async addToCart(cartId, variantId, quantity = 1, sellerId = null) {
+    const body = { variant_id: variantId, quantity }
+    if (sellerId) body.seller_id = sellerId
     const res = await this.request(`/store/carts/${cartId}/line-items`, {
       method: 'POST',
-      body: JSON.stringify({ variant_id: variantId, quantity }),
+      body: JSON.stringify(body),
     })
     if (res?.__error) return { cart: null }
     return this.getCart(cartId)

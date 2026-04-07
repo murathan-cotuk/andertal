@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "@/i18n/navigation";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useLandingChrome } from "@/context/LandingChromeContext";
@@ -676,7 +676,7 @@ function BlogCarousel({ container }) {
   );
 }
 
-// ── Newsletter (form POST to Mailchimp / Brevo / Klaviyo action URL) ─────────
+// ── Newsletter (form POST to external URL or internal endpoint) ───────────────
 function NewsletterSignup({ container }) {
   const action = (container.form_action || "").trim();
   const method = (container.form_method || "post").toLowerCase() === "get" ? "get" : "post";
@@ -686,8 +686,45 @@ function NewsletterSignup({ container }) {
   const textColor = container.text_color || "#111827";
   const btnBg = container.btn_bg || "#111827";
   const btnColor = container.btn_color || "#fff";
+  const [internalEmail, setInternalEmail] = React.useState("");
+  const [internalState, setInternalState] = React.useState("idle"); // idle | loading | success | error
 
-  if (!action) return null;
+  const handleInternalSubmit = async (e) => {
+    e.preventDefault();
+    if (!internalEmail || !internalEmail.includes("@")) return;
+    setInternalState("loading");
+    try {
+      const backendUrl = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000");
+      const r = await fetch(`${backendUrl}/store/newsletter-subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: internalEmail.trim().toLowerCase() }),
+      });
+      if (!r.ok) throw new Error("error");
+      setInternalState("success");
+    } catch {
+      setInternalState("error");
+    }
+  };
+
+  const sharedInputStyle = {
+    padding: "14px 16px",
+    borderRadius: 10,
+    border: "1px solid #d1d5db",
+    fontSize: 16,
+    width: "100%",
+    boxSizing: "border-box",
+  };
+  const sharedBtnStyle = {
+    padding: "14px 20px",
+    borderRadius: 10,
+    border: "none",
+    background: btnBg,
+    color: btnColor,
+    fontWeight: 700,
+    fontSize: 15,
+    cursor: "pointer",
+  };
 
   return (
     <div style={{ ...getContainerPadding(container, "48px 24px"), background: bg }}>
@@ -702,41 +739,37 @@ function NewsletterSignup({ container }) {
             {container.subtitle}
           </p>
         ) : null}
-        <form action={action} method={method} target="_blank" style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "stretch" }}>
-          {hiddenFields.map((f, i) => (
-            f && f.name ? <input key={i} type="hidden" name={String(f.name)} value={String(f.value ?? "")} /> : null
-          ))}
-          <input
-            type="email"
-            name={emailName}
-            required
-            placeholder={container.email_placeholder || "E-Mail"}
-            autoComplete="email"
-            style={{
-              padding: "14px 16px",
-              borderRadius: 10,
-              border: "1px solid #d1d5db",
-              fontSize: 16,
-              width: "100%",
-              boxSizing: "border-box",
-            }}
-          />
-          <button
-            type="submit"
-            style={{
-              padding: "14px 20px",
-              borderRadius: 10,
-              border: "none",
-              background: btnBg,
-              color: btnColor,
-              fontWeight: 700,
-              fontSize: 15,
-              cursor: "pointer",
-            }}
-          >
-            {container.button_text || "Abonnieren"}
-          </button>
-        </form>
+        {action ? (
+          <form action={action} method={method} target="_blank" style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "stretch" }}>
+            {hiddenFields.map((f, i) => (
+              f && f.name ? <input key={i} type="hidden" name={String(f.name)} value={String(f.value ?? "")} /> : null
+            ))}
+            <input type="email" name={emailName} required placeholder={container.email_placeholder || "E-Mail"} autoComplete="email" style={sharedInputStyle} />
+            <button type="submit" style={sharedBtnStyle}>{container.button_text || "Abonnieren"}</button>
+          </form>
+        ) : internalState === "success" ? (
+          <p style={{ fontSize: 16, color: "#059669", fontWeight: 600, margin: "12px 0 0" }}>
+            {container.success_text || "Danke! Sie sind jetzt angemeldet."}
+          </p>
+        ) : (
+          <form onSubmit={handleInternalSubmit} style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "stretch" }}>
+            <input
+              type="email"
+              required
+              value={internalEmail}
+              onChange={(e) => setInternalEmail(e.target.value)}
+              placeholder={container.email_placeholder || "E-Mail"}
+              autoComplete="email"
+              style={sharedInputStyle}
+            />
+            <button type="submit" disabled={internalState === "loading"} style={{ ...sharedBtnStyle, opacity: internalState === "loading" ? 0.7 : 1 }}>
+              {internalState === "loading" ? "…" : (container.button_text || "Abonnieren")}
+            </button>
+            {internalState === "error" && (
+              <p style={{ fontSize: 13, color: "#ef4444", margin: 0 }}>Fehler beim Anmelden. Bitte erneut versuchen.</p>
+            )}
+          </form>
+        )}
         {container.privacy_note ? (
           <p style={{ marginTop: 14, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>
             {container.privacy_note}

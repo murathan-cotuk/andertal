@@ -117,6 +117,12 @@ function buildColumns() {
     { key: "image_url_4", label: "image_url_4", note: "Bild-URL 4", width: 40, group: "core" },
     { key: "image_url_5", label: "image_url_5", note: "Bild-URL 5", width: 40, group: "core" },
     { key: "swatch_image_url", label: "swatch_image_url", note: "Farbmuster-URL (oft Variante 1)", width: 28, group: "core" },
+    { key: "variant_seo_title_de", label: "variant_seo_title_de", note: "Child: Variant SEO Titel (DE)", width: 30, group: "core" },
+    { key: "variant_seo_description_de", label: "variant_seo_description_de", note: "Child: Variant SEO Beschreibung (DE)", width: 40, group: "core" },
+    { key: "variant_seo_keywords_de", label: "variant_seo_keywords_de", note: "Child: Variant SEO Keywords (DE)", width: 30, group: "core" },
+    { key: "variant_seo_title_en", label: "variant_seo_title_en", note: "Child: Variant SEO title (EN)", width: 30, group: "core" },
+    { key: "variant_seo_description_en", label: "variant_seo_description_en", note: "Child: Variant SEO description (EN)", width: 40, group: "core" },
+    { key: "variant_seo_keywords_en", label: "variant_seo_keywords_en", note: "Child: Variant SEO keywords (EN)", width: 30, group: "core" },
     { key: "option1_name", label: "option1_name", note: "Parent: z.B. Farbe", width: 16, group: "core" },
     { key: "option1_value", label: "option1_value", note: "Child: z.B. Rot", width: 16, group: "core" },
     { key: "option2_name", label: "option2_name", note: "Parent: z.B. Größe", width: 16, group: "core" },
@@ -140,6 +146,12 @@ function buildColumns() {
       { key: `metafield_${i}_value`, label: `metafield_${i}_value`, note: `Metafield ${i} — Wert (Text)`, width: 34, group: "metafields", outline: 1 }
     );
   }
+  for (let i = 1; i <= METAFIELD_PAIRS; i++) {
+    cols.push(
+      { key: `variant_metafield_${i}_key`, label: `variant_metafield_${i}_key`, note: `Child Variant-Metafeld ${i} — key`, width: 24, group: "metafields", outline: 1 },
+      { key: `variant_metafield_${i}_value`, label: `variant_metafield_${i}_value`, note: `Child Variant-Metafeld ${i} — value`, width: 34, group: "metafields", outline: 1 }
+    );
+  }
 
   for (const lang of LANGS) {
     cols.push(
@@ -148,6 +160,11 @@ function buildColumns() {
       { key: `bullet1_${lang}`, label: `bullet1_${lang}`, note: `Stichpunkt 1`, width: 36, group: `lang_${lang}`, outline: 1 },
       { key: `bullet2_${lang}`, label: `bullet2_${lang}`, note: `Stichpunkt 2`, width: 36, group: `lang_${lang}`, outline: 1 },
       { key: `bullet3_${lang}`, label: `bullet3_${lang}`, note: `Stichpunkt 3`, width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `bullet4_${lang}`, label: `bullet4_${lang}`, note: `Stichpunkt 4`, width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `bullet5_${lang}`, label: `bullet5_${lang}`, note: `Stichpunkt 5`, width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `seo_title_${lang}`, label: `seo_title_${lang}`, note: `SEO Titel (${LANG_LABELS[lang]})`, width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `seo_description_${lang}`, label: `seo_description_${lang}`, note: `SEO Beschreibung (${LANG_LABELS[lang]})`, width: 50, group: `lang_${lang}`, outline: 1 },
+      { key: `seo_keywords_${lang}`, label: `seo_keywords_${lang}`, note: `SEO Keywords (${LANG_LABELS[lang]})`, width: 40, group: `lang_${lang}`, outline: 1 },
     );
   }
 
@@ -277,11 +294,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
   }
   lines.push(["", ""]);
   lines.push(["", pack.brandsTitle]);
-  if (brandNames.length === 0) {
-    lines.push(["", "(—)"]);
-  } else {
-    for (const n of brandNames) lines.push(["", `• ${n}`]);
-  }
+  lines.push(["", brandNames.length ? `(${brandNames.length} Marken im Dropdown verfügbar)` : "(—)"]);
   lines.push(["", ""]);
   lines.push(["", pack.shipTitle]);
   if (shipNames.length === 0) {
@@ -483,6 +496,7 @@ async function buildWorkbook({
     description_de: "<p>Hochwertiges Basic T-Shirt.</p>",
     bullet1_de: "100% Baumwolle",
     bullet2_de: "Maschinenwaschbar",
+    bullet3_de: "Regular Fit",
     title_en: "Basic T-Shirt",
     description_en: "<p>High-quality basic T-shirt.</p>",
     price_brutto_DE: "29.99",

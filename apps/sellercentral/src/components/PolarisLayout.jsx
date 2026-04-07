@@ -219,6 +219,9 @@ export default function PolarisLayout({ children }) {
       ? localStorage.getItem("storeName") || "Seller Account"
       : "Seller Account"
   );
+  const [isSuspended, setIsSuspended] = useState(
+    typeof window !== "undefined" && localStorage.getItem("sellerApprovalStatus") === "suspended"
+  );
 
   const refreshNotifications = useCallback(async () => {
     try {
@@ -301,6 +304,11 @@ export default function PolarisLayout({ children }) {
         localStorage.setItem("sellerPermissions", perms ? JSON.stringify(perms) : "null");
         setUserPermissions(perms);
       }).catch(() => {});
+      getMedusaAdminClient().getSellerAccount().then((d) => {
+        const status = String(d?.user?.approval_status || "").toLowerCase();
+        if (status) localStorage.setItem("sellerApprovalStatus", status);
+        setIsSuspended(status === "suspended");
+      }).catch(() => {});
       // Redirect non-superusers away from blocked routes
       if (!superuser && SELLER_BLOCKED_ROUTES.has(pathname)) {
         router.replace("/dashboard");
@@ -336,6 +344,7 @@ export default function PolarisLayout({ children }) {
     localStorage.removeItem("sellerToken");
     localStorage.removeItem("sellerIsSuperuser");
     localStorage.removeItem("sellerPermissions");
+    localStorage.removeItem("sellerApprovalStatus");
     router.push("/login");
   }, [router]);
 
@@ -649,6 +658,20 @@ export default function PolarisLayout({ children }) {
         showMobileNavigation={showMobileNav}
         onNavigationDismiss={() => setShowMobileNav(false)}
       >
+        {isSuspended && (
+          <div
+            style={{
+              background: "#dc2626",
+              color: "#fff",
+              textAlign: "center",
+              fontSize: 13,
+              fontWeight: 600,
+              padding: "10px 16px",
+            }}
+          >
+            your account is suspended. please contact with support
+          </div>
+        )}
         {unsaved?.showNavigateConfirm && (
           <Modal
             open={true}

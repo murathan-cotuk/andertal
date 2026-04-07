@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter, useParams } from "next/navigation";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useRouter } from "@/i18n/navigation";
 import {
   Page,
   Layout,
@@ -108,19 +108,45 @@ function ActionMenu({ customer, onEdit, onDelete, canManage }) {
   );
 }
 
+const COLS = ["Kundennr.", "Name", "Email", "Typ", "Registriert", "Newsletter", "Land", "Bestellungen", "Gesamtumsatz", "Letzter Kauf", ""];
+
 export default function CustomersPage() {
   const router = useRouter();
-
-
 
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [modal, setModal] = useState(null); // null | { mode: "create" } | { mode: "edit", customer }
+  const [modal, setModal] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const searchDebounceRef = useRef(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
-  useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
+  const [mySellerId, setMySellerId] = useState("");
+  const [sellerLabelById, setSellerLabelById] = useState({});
+  const [sellerSectionOpen, setSellerSectionOpen] = useState({});
+  const [sellerSearchFilter, setSellerSearchFilter] = useState("");
+
+  useEffect(() => {
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !isSuperuser) return;
+    setMySellerId(localStorage.getItem("sellerId") || "");
+  }, [isSuperuser]);
+
+  useEffect(() => {
+    if (!isSuperuser) return;
+    getMedusaAdminClient()
+      .getSellers()
+      .then((d) => {
+        const m = {};
+        for (const s of d.sellers || []) {
+          if (s.seller_id) m[s.seller_id] = s.store_name || s.company_name || s.email || s.seller_id;
+        }
+        setSellerLabelById(m);
+      })
+      .catch(() => {});
+  }, [isSuperuser]);
 
   const fetchCustomers = useCallback(async (q) => {
     setLoading(true);
@@ -174,7 +200,90 @@ export default function CustomersPage() {
     setConfirmDelete(null);
   };
 
-  const COLS = ["Kundennr.", "Name", "Email", "Typ", "Registriert", "Newsletter", "Land", "Bestellungen", "Gesamtumsatz", "Letzter Kauf", ""];
+  const isOwnCustomer = (c) => {
+    const sid = c.main_seller_id;
+    return !sid || sid === "default" || sid === mySellerId;
+  };
+
+  const { ownCustomersList, sellerCustomerGroups } = useMemo(() => {
+    if (!isSuperuser) return { ownCustomersList: customers, sellerCustomerGroups: [] };
+    const own = [];
+    const g = new Map();
+    for (const c of customers) {
+      if (isOwnCustomer(c)) own.push(c);
+      else {
+        const sid = String(c.main_seller_id || "unknown");
+        if (!g.has(sid)) g.set(sid, []);
+        g.get(sid).push(c);
+      }
+    }
+    const keys = [...g.keys()].sort((a, b) =>
+      (sellerLabelById[a] || a).localeCompare(sellerLabelById[b] || b, undefined, { sensitivity: "base" })
+    );
+    return { ownCustomersList: own, sellerCustomerGroups: keys.map(k => ({ sellerId: k, items: g.get(k) })) };
+  }, [customers, isSuperuser, mySellerId, sellerLabelById]);
+
+  const filteredSellerCustomerGroups = useMemo(() => {
+    const q = sellerSearchFilter.trim().toLowerCase();
+    if (!q) return sellerCustomerGroups;
+    return sellerCustomerGroups.filter(({ sellerId }) => {
+      const label = (sellerLabelById[sellerId] || sellerId || "").toLowerCase();
+      return label.includes(q) || sellerId.toLowerCase().includes(q);
+    });
+  }, [sellerCustomerGroups, sellerSearchFilter, sellerLabelById]);
+
+  const renderCustomerRows = (list) =>
+    list.map((c, i) => {
+      const typeColor = ACCOUNT_TYPE_COLORS[c.account_type] || ACCOUNT_TYPE_COLORS.privat;
+      return (
+        <tr
+          key={c.id || i}
+          style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
+          onClick={() => c?.id && router.push(`/customers/${c.id}`)}
+          onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
+          onMouseLeave={e => e.currentTarget.style.background = ""}
+        >
+          <td style={{ padding: "10px 12px", fontWeight: 700, color: "#6b7280", fontSize: 12 }}>
+            {c.customer_number ? `#${c.customer_number}` : "—"}
+          </td>
+          <td style={{ padding: "10px 12px", fontWeight: 500 }}>
+            {[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}
+          </td>
+          <td style={{ padding: "10px 12px", color: "#6b7280" }}>{isSuperuser ? c.email : "—"}</td>
+          <td style={{ padding: "10px 12px" }}>
+            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: typeColor.bg, color: typeColor.color, fontWeight: 600 }}>
+              {accountTypeLabel(c.account_type)}
+            </span>
+          </td>
+          <td style={{ padding: "10px 12px" }}>
+            {c.is_registered ? (
+              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>Registriert</span>
+            ) : (
+              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>Gast</span>
+            )}
+          </td>
+          <td style={{ padding: "10px 12px" }}>
+            {c.newsletter_opted_in ? (
+              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#ede9fe", color: "#6d28d9", fontWeight: 600 }}>✓ Abonniert</span>
+            ) : (
+              <span style={{ fontSize: 11, color: "#9ca3af" }}>—</span>
+            )}
+          </td>
+          <td style={{ padding: "10px 12px", color: "#6b7280" }}>{c.country || "—"}</td>
+          <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600 }}>{c.order_count || 0}</td>
+          <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600 }}>{fmtCents(c.total_spent)}</td>
+          <td style={{ padding: "10px 12px", textAlign: "center", fontSize: 12, color: "#6b7280" }}>{fmtDate(c.last_order)}</td>
+          <td style={{ padding: "10px 8px", textAlign: "right" }}>
+            <ActionMenu
+              customer={c}
+              canManage={isSuperuser}
+              onEdit={(cust) => setModal({ mode: "edit", customer: cust })}
+              onDelete={(cust) => setConfirmDelete(cust)}
+            />
+          </td>
+        </tr>
+      );
+    });
 
   return (
     <Page
@@ -184,7 +293,6 @@ export default function CustomersPage() {
         onAction: () => setModal({ mode: "create" }),
       }}
     >
-      {/* Modals */}
       {modal && (
         <CustomerFormModal
           initial={modal.mode === "edit" ? modal.customer : null}
@@ -219,92 +327,139 @@ export default function CustomersPage() {
                   {customers.length} {customers.length === 1 ? "Kunde" : "Kunden"}
                 </Text>
               </InlineStack>
-              <Box maxWidth="400px">
-                <TextField
-                  label="Suche"
-                  labelHidden
-                  placeholder="Suche nach Name, Email oder #Kundennr…"
-                  value={search}
-                  onChange={onSearchChange}
-                  autoComplete="off"
-                />
-              </Box>
+              <InlineStack gap="300" wrap>
+                <Box maxWidth="400px">
+                  <TextField
+                    label="Suche"
+                    labelHidden
+                    placeholder="Suche nach Name, Email oder #Kundennr…"
+                    value={search}
+                    onChange={onSearchChange}
+                    autoComplete="off"
+                  />
+                </Box>
+                {isSuperuser && (
+                  <input
+                    placeholder="Verkäufer suchen (Name)…"
+                    value={sellerSearchFilter}
+                    onChange={(e) => setSellerSearchFilter(e.target.value)}
+                    style={{ flex: 1, minWidth: 200, padding: "7px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13 }}
+                  />
+                )}
+              </InlineStack>
               <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-              {COLS.map((c, i) => (
-                <th key={i} style={{ padding: "10px 12px", textAlign: i >= 7 && i <= 9 ? "center" : "left", fontWeight: 600, fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
-                  {c}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={11} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Laden…</td></tr>
-            )}
-            {!loading && customers.length === 0 && (
-              <tr>
-                <td colSpan={11} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
-                  <div style={{ fontSize: 40, marginBottom: 12 }}>👤</div>
-                  <div>Keine Kunden gefunden</div>
-                </td>
-              </tr>
-            )}
-            {customers.map((c, i) => {
-              const typeColor = ACCOUNT_TYPE_COLORS[c.account_type] || ACCOUNT_TYPE_COLORS.privat;
-              return (
-                <tr
-                  key={i}
-                  style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
-                  onClick={() => router.push(`/${locale}/customers/${c.id}`)}
-                  onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
-                  onMouseLeave={e => e.currentTarget.style.background = ""}
-                >
-                  <td style={{ padding: "10px 12px", fontWeight: 700, color: "#6b7280", fontSize: 12 }}>
-                    {c.customer_number ? `#${c.customer_number}` : "—"}
-                  </td>
-                  <td style={{ padding: "10px 12px", fontWeight: 500 }}>
-                    {[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}
-                  </td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280" }}>{isSuperuser ? c.email : "—"}</td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: typeColor.bg, color: typeColor.color, fontWeight: 600 }}>
-                      {accountTypeLabel(c.account_type)}
-                    </span>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    {c.is_registered ? (
-                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>Registriert</span>
-                    ) : (
-                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>Gast</span>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                      {COLS.map((c, i) => (
+                        <th key={i} style={{ padding: "10px 12px", textAlign: i >= 7 && i <= 9 ? "center" : "left", fontWeight: 600, fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
+                          {c}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading && (
+                      <tr><td colSpan={11} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Laden…</td></tr>
                     )}
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    {c.newsletter_opted_in ? (
-                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#ede9fe", color: "#6d28d9", fontWeight: 600 }}>✓ Abonniert</span>
-                    ) : (
-                      <span style={{ fontSize: 11, color: "#9ca3af" }}>—</span>
+                    {!loading && customers.length === 0 && (
+                      <tr>
+                        <td colSpan={11} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
+                          <div style={{ fontSize: 40, marginBottom: 12 }}>👤</div>
+                          <div>Keine Kunden gefunden</div>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280" }}>{c.country || "—"}</td>
-                  <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600 }}>{c.order_count || 0}</td>
-                  <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600 }}>{fmtCents(c.total_spent)}</td>
-                  <td style={{ padding: "10px 12px", textAlign: "center", fontSize: 12, color: "#6b7280" }}>{fmtDate(c.last_order)}</td>
-                  <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                    <ActionMenu
-                      customer={c}
-                      canManage={isSuperuser}
-                      onEdit={(cust) => setModal({ mode: "edit", customer: cust })}
-                      onDelete={(cust) => setConfirmDelete(cust)}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    {!loading && customers.length > 0 && !isSuperuser && renderCustomerRows(ownCustomersList)}
+                    {!loading && customers.length > 0 && isSuperuser && (
+                      <>
+                        <tr>
+                          <td
+                            colSpan={11}
+                            style={{
+                              padding: "12px 16px",
+                              background: "#eef2ff",
+                              borderBottom: "1px solid #c7d2fe",
+                              fontWeight: 700,
+                              fontSize: 12,
+                              color: "#3730a3",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            Ihr Superuser-Bereich — direkte & nicht zugeordnete Kunden ({ownCustomersList.length})
+                          </td>
+                        </tr>
+                        {ownCustomersList.length === 0 ? (
+                          <tr>
+                            <td colSpan={11} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
+                              Keine Kunden in diesem Bereich.
+                            </td>
+                          </tr>
+                        ) : (
+                          renderCustomerRows(ownCustomersList)
+                        )}
+                        <tr>
+                          <td
+                            colSpan={11}
+                            style={{
+                              padding: "12px 16px",
+                              background: "#f3f4f6",
+                              borderBottom: "1px solid #e5e7eb",
+                              fontWeight: 700,
+                              fontSize: 12,
+                              color: "#374151",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            Verkäufer-Kunden
+                          </td>
+                        </tr>
+                        {filteredSellerCustomerGroups.length === 0 ? (
+                          <tr>
+                            <td colSpan={11} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
+                              Keine weiteren Verkäufer-Kunden{sellerSearchFilter.trim() ? " (Filter)" : ""}.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredSellerCustomerGroups.flatMap(({ sellerId, items }) => {
+                            const label = sellerLabelById[sellerId] || sellerId;
+                            const open = sellerSectionOpen[sellerId] !== false;
+                            const headerRow = (
+                              <tr key={`h-${sellerId}`}>
+                                <td colSpan={11} style={{ padding: 0, background: "#fafafa", borderBottom: "1px solid #e5e7eb" }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSellerSectionOpen((prev) => ({ ...prev, [sellerId]: !open }))}
+                                    style={{
+                                      width: "100%",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      padding: "10px 16px",
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      font: "inherit",
+                                      textAlign: "left",
+                                    }}
+                                  >
+                                    <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{label}</span>
+                                    <span style={{ fontSize: 12, color: "#6b7280" }}>
+                                      {open ? "▾" : "▸"} {items.length} Kunde{items.length !== 1 ? "n" : ""}
+                                    </span>
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                            return open ? [headerRow, ...renderCustomerRows(items)] : [headerRow];
+                          })
+                        )}
+                      </>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </BlockStack>
           </Card>

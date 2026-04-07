@@ -25,6 +25,25 @@ function flattenCategoryTree(nodes, parentPath = "") {
   return out;
 }
 
+function buildCategoryTree(list) {
+  const byId = new Map();
+  (list || []).forEach((c) => {
+    if (!c?.id) return;
+    byId.set(c.id, { ...c, children: [] });
+  });
+  const roots = [];
+  byId.forEach((node) => {
+    if (node.parent_id && byId.has(node.parent_id)) byId.get(node.parent_id).children.push(node);
+    else roots.push(node);
+  });
+  const sortDeep = (nodes) => {
+    nodes.sort((a, b) => String(a.name || a.slug || "").localeCompare(String(b.name || b.slug || ""), undefined, { sensitivity: "base" }));
+    nodes.forEach((n) => n.children?.length && sortDeep(n.children));
+  };
+  sortDeep(roots);
+  return roots;
+}
+
 // ── Section wrapper ────────────────────────────────────────────────────────
 function SectionCard({ icon, title, subtitle, children }) {
   return (
@@ -124,6 +143,7 @@ export default function ImportExportPage() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesError, setCategoriesError] = useState(null);
   const [selectedSlugs, setSelectedSlugs] = useState(() => new Set());
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState(() => new Set());
   const [templateDownloading, setTemplateDownloading] = useState(false);
   const [templateError, setTemplateError] = useState(null);
 
@@ -132,6 +152,19 @@ export default function ImportExportPage() {
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState(null);
   const [progress, setProgress] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+  const [exportInfo, setExportInfo] = useState(null);
+  const [availableColumns, setAvailableColumns] = useState([]);
+  const [selectedColumns, setSelectedColumns] = useState(() => new Set());
+  const [exportDatasets, setExportDatasets] = useState(() => new Set(["products"]));
+  const [exportFormat, setExportFormat] = useState("xlsx");
+  const [includeAllSellers, setIncludeAllSellers] = useState(false);
+  const [groupBySeller, setGroupBySeller] = useState(true);
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -153,12 +186,23 @@ export default function ImportExportPage() {
     return () => { cancelled = true; };
   }, []);
 
+  const categoryTree = React.useMemo(() => buildCategoryTree(categories), [categories]);
+
   const toggleCategory = useCallback((slug) => {
     setSelectedSlugs((prev) => {
       const next = new Set(prev);
       const k = String(slug).trim();
       if (next.has(k)) next.delete(k);
       else next.add(k);
+      return next;
+    });
+  }, []);
+
+  const toggleExpand = useCallback((id) => {
+    setExpandedCategoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }, []);
@@ -233,6 +277,84 @@ export default function ImportExportPage() {
     }
   };
 
+  const loadExportColumns = async () => {
+    setExportError(null);
+    try {
+      const sellerToken = typeof window !== "undefined" ? (localStorage.getItem("sellerToken") || "") : "";
+      const res = await fetch("/api/import-export/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          preview: true,
+          sellerToken,
+          datasets: [...exportDatasets],
+          include_all_sellers: includeAllSellers,
+          filters: {
+            search: filterSearch,
+            status: filterStatus,
+            date_from: filterDateFrom,
+            date_to: filterDateTo,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setExportError(data.error || "Spalten konnten nicht geladen werden.");
+        return;
+      }
+      setExportInfo(data);
+      setAvailableColumns(data.columns || []);
+      setSelectedColumns(new Set(data.columns || []));
+    } catch (e) {
+      setExportError(e?.message || "Spalten konnten nicht geladen werden.");
+    }
+  };
+
+  const runExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const sellerToken = typeof window !== "undefined" ? (localStorage.getItem("sellerToken") || "") : "";
+      const cols = selectedColumns.size ? [...selectedColumns] : availableColumns;
+      const res = await fetch("/api/import-export/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sellerToken,
+          datasets: [...exportDatasets],
+          columns: cols,
+          format: exportFormat,
+          include_all_sellers: includeAllSellers,
+          group_by_seller: groupBySeller,
+          filters: {
+            search: filterSearch,
+            status: filterStatus,
+            date_from: filterDateFrom,
+            date_to: filterDateTo,
+          },
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setExportError(data.error || `Export fehlgeschlagen (${res.status})`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `belucha-export.${exportFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e?.message || "Export fehlgeschlagen.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <Page
@@ -264,25 +386,34 @@ export default function ImportExportPage() {
                   <Text as="p" variant="bodySm" tone="subdued">
                     Nur diese Slugs erscheinen als Dropdown im Excel; im zweiten Blatt sehen Sie die vollständige Liste mit Pfad.
                   </Text>
-                  <div
-                    style={{
-                      maxHeight: 260,
-                      overflowY: "auto",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      padding: 12,
-                      background: "#fafafa",
-                    }}
-                  >
-                    <BlockStack gap="150">
-                      {categories.map((c) => (
-                        <Checkbox
-                          key={c.slug}
-                          label={`${c.path} — ${c.slug}`}
-                          checked={selectedSlugs.has(c.slug)}
-                          onChange={() => toggleCategory(c.slug)}
-                        />
-                      ))}
+                  <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 8, background: "#fafafa" }}>
+                    <BlockStack gap="100">
+                      {categoryTree.map((node) => {
+                        const renderNode = (n, depth = 0) => {
+                          const hasChildren = Array.isArray(n.children) && n.children.length > 0;
+                          const isExpanded = expandedCategoryIds.has(n.id);
+                          return (
+                            <div key={n.id}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: depth * 18 }}>
+                                {hasChildren ? (
+                                  <button type="button" onClick={() => toggleExpand(n.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#6b7280", padding: "2px 4px" }}>
+                                    {isExpanded ? "▾" : "▸"}
+                                  </button>
+                                ) : (
+                                  <span style={{ width: 16, display: "inline-block" }} />
+                                )}
+                                <Checkbox
+                                  label={`${n.name || n.slug} — ${n.slug}`}
+                                  checked={selectedSlugs.has(n.slug)}
+                                  onChange={() => toggleCategory(n.slug)}
+                                />
+                              </div>
+                              {hasChildren && isExpanded ? n.children.map((c) => renderNode(c, depth + 1)) : null}
+                            </div>
+                          );
+                        };
+                        return renderNode(node, 0);
+                      })}
                     </BlockStack>
                   </div>
                 </BlockStack>
@@ -427,31 +558,99 @@ export default function ImportExportPage() {
             <SectionCard
               icon="📤"
               title="Daten exportieren"
-              subtitle="Exportiere deine Daten als Excel-Datei."
+              subtitle="Einfacher Export wie Billbee-Style: Datentyp wählen, Filter setzen, Spalten auswählen, Format downloaden."
             >
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
-                {[
-                  { label: "Alle Produkte", desc: "Vollständiger Export mit Varianten & Übersetzungen", icon: "📦", soon: false },
-                  { label: "Bestellungen", desc: "Bestellungen mit Positionen & Kundendaten", icon: "📋", soon: true },
-                  { label: "Kunden", desc: "Kundenprofile & Adressen", icon: "👥", soon: true },
-                  { label: "Lagerbestand", desc: "Aktueller Bestand je SKU", icon: "📊", soon: true },
-                ].map(({ label, desc, icon, soon }) => (
-                  <div key={label} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                    <div style={{ fontSize: 28 }}>{icon}</div>
-                    <div>
-                      <Text as="p" variant="bodyMd" fontWeight="semibold">{label}</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">{desc}</Text>
-                    </div>
-                    {soon ? (
-                      <Badge tone="attention">Demnächst</Badge>
-                    ) : (
-                      <Button variant="secondary" size="slim" icon={ExportIcon} disabled>
-                        Exportieren (demnächst)
-                      </Button>
-                    )}
+              <BlockStack gap="300">
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Seller hesapları yalnızca kendi verilerini export eder. Superuser, ister sadece platform verisini, ister tüm seller verisini export edebilir.
+                </Text>
+                <Divider />
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">1) Veri kapsamı</Text>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
+                    {[
+                      ["products", "Ürünler (fiyat, görsel, metadata)"],
+                      ["orders", "Siparişler / satışlar"],
+                      ["customers", "Müşteriler"],
+                      ["transactions", "Transactions / ödeme hareketleri"],
+                      ["ranking", "Görüntülenme / tıklama / performans (ranking)"],
+                    ].map(([k, label]) => (
+                      <Checkbox
+                        key={k}
+                        label={label}
+                        checked={exportDatasets.has(k)}
+                        onChange={() =>
+                          setExportDatasets((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(k)) next.delete(k); else next.add(k);
+                            return next;
+                          })
+                        }
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </BlockStack>
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">2) Filtreler</Text>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 10 }}>
+                    <input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder="Arama (SKU, ad, email...)" style={{ padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                    <input value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} placeholder="Status (optional)" style={{ padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                    <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} style={{ padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                    <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} style={{ padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                  </div>
+                  <InlineStack gap="300">
+                    <Checkbox label="Superuser: tüm seller verileri dahil" checked={includeAllSellers} onChange={setIncludeAllSellers} />
+                    <Checkbox label="XLSX exportta seller bazlı sheetlere ayır" checked={groupBySeller} onChange={setGroupBySeller} />
+                  </InlineStack>
+                </BlockStack>
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">3) Sütunlar</Text>
+                  <InlineStack gap="300">
+                    <Button variant="secondary" onClick={loadExportColumns}>Spalten laden</Button>
+                    {exportInfo?.total != null ? <Badge tone="info">{exportInfo.total} satır eşleşti</Badge> : null}
+                  </InlineStack>
+                  {availableColumns.length > 0 && (
+                    <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
+                        {availableColumns.map((c) => (
+                          <Checkbox
+                            key={c}
+                            label={c}
+                            checked={selectedColumns.has(c)}
+                            onChange={() =>
+                              setSelectedColumns((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(c)) next.delete(c); else next.add(c);
+                                return next;
+                              })
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </BlockStack>
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">4) Format ve indir</Text>
+                  <div style={{ maxWidth: 260 }}>
+                    <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }}>
+                      <option value="xlsx">XLSX</option>
+                      <option value="csv">CSV</option>
+                      <option value="txt">TXT</option>
+                    </select>
+                  </div>
+                  {exportError && <Banner tone="critical" onDismiss={() => setExportError(null)}>{exportError}</Banner>}
+                  <Button
+                    variant="primary"
+                    icon={ExportIcon}
+                    onClick={runExport}
+                    loading={exporting}
+                    disabled={exporting || exportDatasets.size === 0}
+                  >
+                    {exporting ? "Export läuft..." : "Export starten"}
+                  </Button>
+                </BlockStack>
+              </BlockStack>
             </SectionCard>
           </Layout.Section>
 

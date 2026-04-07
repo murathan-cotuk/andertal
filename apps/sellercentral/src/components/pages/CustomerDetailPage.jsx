@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { Modal, BlockStack, TextField, Text, Button, InlineStack } from "@shopify/polaris";
 import { EditIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
@@ -280,7 +281,6 @@ function BonusLedgerAddModal({ open, onClose, customerId, onAdded }) {
 export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const locale = params?.locale || "de";
   const id = params?.id;
 
   const [customer, setCustomer] = useState(null);
@@ -454,7 +454,7 @@ export default function CustomerDetailPage() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
         <div style={{ flexShrink: 0, marginTop: 4 }}>
-          <Button onClick={() => router.push(`/${locale}/customers`)}>← Zurück</Button>
+          <Button onClick={() => router.push("/customers")}>← Zurück</Button>
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -564,7 +564,7 @@ export default function CustomerDetailPage() {
                       <tr
                         key={i}
                         style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
-                        onClick={() => router.push(`/${locale}/orders/${o.id}`)}
+                        onClick={() => router.push(`/orders/${o.id}`)}
                         onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
                         onMouseLeave={e => e.currentTarget.style.background = ""}
                       >
@@ -617,92 +617,92 @@ export default function CustomerDetailPage() {
               )}
             </Card>
 
-            {/* Discounts */}
-            <Card
-              title="Rabatte & Gutscheine"
-              action={
-                <Button size="slim" variant="primary" onClick={() => setShowDiscountModal(true)}>
-                  Hinzufügen
-                </Button>
-              }
-            >
-              {discounts.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>Keine Rabattcodes</p>
-              ) : (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
-                  <thead>
-                    <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
-                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Code</th>
-                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Typ</th>
-                      <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Wert</th>
-                      <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Nutzungen</th>
-                      <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Gültig bis</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {discounts.map((d, i) => {
-                      const isExpired = d.expires_at && new Date(d.expires_at) < new Date();
-                      const isExhausted = d.used_count >= d.max_uses;
-                      return (
-                        <tr key={i} style={{ borderBottom: "1px solid #f3f4f6", opacity: (isExpired || isExhausted) ? 0.5 : 1 }}>
-                          <td style={{ padding: "8px 0", fontWeight: 700, fontFamily: "monospace", fontSize: 12 }}>{d.code}</td>
-                          <td style={{ padding: "8px 0", color: "#6b7280" }}>{d.type === "percentage" ? "%" : d.type === "fixed" ? "Fest" : "Versand"}</td>
-                          <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600 }}>
-                            {d.type === "percentage" ? `${d.value}%` : d.type === "fixed" ? `${Number(d.value).toFixed(2)} €` : "—"}
-                          </td>
-                          <td style={{ padding: "8px 0", textAlign: "right", color: "#6b7280" }}>{d.used_count}/{d.max_uses}</td>
-                          <td style={{ padding: "8px 0", textAlign: "right", fontSize: 12, color: isExpired ? "#ef4444" : "#6b7280" }}>
-                            {d.expires_at ? fmtDateShort(d.expires_at) : "—"}
-                          </td>
-                          <td style={{ padding: "8px 0", textAlign: "right" }}>
-                            {isSuperuser ? (
-                              <button type="button" onClick={() => handleDeleteDiscount(d.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 12 }}>Löschen</button>
-                            ) : (
-                              <span style={{ color: "#9ca3af", fontSize: 12 }}>—</span>
-                            )}
-                          </td>
+            {isSuperuser && (
+              <>
+                {/* Discounts */}
+                <Card
+                  title="Rabatte & Gutscheine"
+                  action={
+                    <Button size="slim" variant="primary" onClick={() => setShowDiscountModal(true)}>
+                      Hinzufügen
+                    </Button>
+                  }
+                >
+                  {discounts.length === 0 ? (
+                    <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>Keine Rabattcodes</p>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
+                      <thead>
+                        <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
+                          <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Code</th>
+                          <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Typ</th>
+                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Wert</th>
+                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Nutzungen</th>
+                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Gültig bis</th>
+                          <th></th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </Card>
+                      </thead>
+                      <tbody>
+                        {discounts.map((d, i) => {
+                          const isExpired = d.expires_at && new Date(d.expires_at) < new Date();
+                          const isExhausted = d.used_count >= d.max_uses;
+                          return (
+                            <tr key={i} style={{ borderBottom: "1px solid #f3f4f6", opacity: (isExpired || isExhausted) ? 0.5 : 1 }}>
+                              <td style={{ padding: "8px 0", fontWeight: 700, fontFamily: "monospace", fontSize: 12 }}>{d.code}</td>
+                              <td style={{ padding: "8px 0", color: "#6b7280" }}>{d.type === "percentage" ? "%" : d.type === "fixed" ? "Fest" : "Versand"}</td>
+                              <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600 }}>
+                                {d.type === "percentage" ? `${d.value}%` : d.type === "fixed" ? `${Number(d.value).toFixed(2)} €` : "—"}
+                              </td>
+                              <td style={{ padding: "8px 0", textAlign: "right", color: "#6b7280" }}>{d.used_count}/{d.max_uses}</td>
+                              <td style={{ padding: "8px 0", textAlign: "right", fontSize: 12, color: isExpired ? "#ef4444" : "#6b7280" }}>
+                                {d.expires_at ? fmtDateShort(d.expires_at) : "—"}
+                              </td>
+                              <td style={{ padding: "8px 0", textAlign: "right" }}>
+                                <button type="button" onClick={() => handleDeleteDiscount(d.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 12 }}>Löschen</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </Card>
 
-            {/* Notes */}
-            <Card
-              title="Notizen"
-              action={isSuperuser && !editNotes && (
-                <Button size="slim" onClick={() => setEditNotes(true)}>
-                  Bearbeiten
-                </Button>
-              )}
-            >
-              {isSuperuser && editNotes ? (
-                <div style={{ paddingTop: 8 }}>
-                  <textarea
-                    value={notesVal}
-                    onChange={e => setNotesVal(e.target.value)}
-                    style={{ width: "100%", height: 100, padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
-                    placeholder="Interne Notizen zum Kunden…"
-                    autoFocus
-                  />
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <Button variant="primary" onClick={handleSaveNotes} disabled={savingNotes} loading={savingNotes}>
-                      Speichern
+                {/* Notes */}
+                <Card
+                  title="Notizen"
+                  action={!editNotes && (
+                    <Button size="slim" onClick={() => setEditNotes(true)}>
+                      Bearbeiten
                     </Button>
-                    <Button onClick={() => { setEditNotes(false); setNotesVal(customer?.notes || ""); }}>
-                      Abbrechen
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <p style={{ fontSize: 13, color: notesVal ? "#111827" : "#9ca3af", margin: "10px 0 4px", whiteSpace: "pre-wrap" }}>
-                  {notesVal || "Keine Notizen"}
-                </p>
-              )}
-            </Card>
+                  )}
+                >
+                  {editNotes ? (
+                    <div style={{ paddingTop: 8 }}>
+                      <textarea
+                        value={notesVal}
+                        onChange={e => setNotesVal(e.target.value)}
+                        style={{ width: "100%", height: 100, padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
+                        placeholder="Interne Notizen zum Kunden…"
+                        autoFocus
+                      />
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <Button variant="primary" onClick={handleSaveNotes} disabled={savingNotes} loading={savingNotes}>
+                          Speichern
+                        </Button>
+                        <Button onClick={() => { setEditNotes(false); setNotesVal(customer?.notes || ""); }}>
+                          Abbrechen
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 13, color: notesVal ? "#111827" : "#9ca3af", margin: "10px 0 4px", whiteSpace: "pre-wrap" }}>
+                      {notesVal || "Keine Notizen"}
+                    </p>
+                  )}
+                </Card>
+              </>
+            )}
 
             {/* Bonus ledger (superuser only) */}
             {isSuperuser && (
