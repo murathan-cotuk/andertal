@@ -44,6 +44,14 @@ export function resolveShippingQuoteCents(prices, countryCode) {
   return getLowestShippingPriceCents(prices);
 }
 
+/**
+ * Strict lookup: only returns a price if the exact country has an entry.
+ * Returns null if the country is not covered — used to block purchase.
+ */
+export function resolveShippingQuoteStrict(prices, countryCode) {
+  return getShippingPriceCents(prices, countryCode, null);
+}
+
 const normShipGroupId = (x) => String(x ?? "").trim().toLowerCase();
 
 /** Match cart line `shipping_group_id` to `/store/shipping-groups` row (UUID string case/format safe). */

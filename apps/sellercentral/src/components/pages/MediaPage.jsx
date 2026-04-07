@@ -272,6 +272,8 @@ export default function MediaPage() {
   const fileInputRef = useRef(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [mySellerId, setMySellerId] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
   const [sellerLabelById, setSellerLabelById] = useState({});
   const [sellerSearchFilter, setSellerSearchFilter] = useState("");
   const [mediaSellerSectionsOpen, setMediaSellerSectionsOpen] = useState({});
@@ -384,8 +386,48 @@ export default function MediaPage() {
   const totalCount = media.length;
   const folderLabel = activeFolder === "all" ? "Alle Medien" : activeFolder === "none" ? "Ohne Ordner" : (folders.find(f => f.id === activeFolder)?.name || "Ordner");
 
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes("Files")) setIsDragging(true);
+  };
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) setIsDragging(false);
+  };
+  const handleDragOver = (e) => { e.preventDefault(); };
+  const handleDrop = (e) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    handleUpload(e.dataTransfer.files);
+  };
+
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 64px)", overflow: "hidden", background: "#f9fafb" }}>
+    <div
+      style={{ display: "flex", height: "calc(100vh - 64px)", overflow: "hidden", background: "#f9fafb", position: "relative" }}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 100,
+          background: "rgba(37,99,235,0.12)",
+          border: "3px dashed #2563eb",
+          borderRadius: 12,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          pointerEvents: "none",
+        }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 52, marginBottom: 12 }}>📂</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#2563eb" }}>Bilder hier ablegen</div>
+            <div style={{ fontSize: 13, color: "#3b82f6", marginTop: 4 }}>Loslassen um hochzuladen</div>
+          </div>
+        </div>
+      )}
       {/* Sidebar */}
       <div style={{ width: 220, background: "#fff", borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "16px 16px 8px", borderBottom: "1px solid #f3f4f6" }}>
@@ -514,10 +556,7 @@ export default function MediaPage() {
         </div>
 
         {/* Grid */}
-        <div style={{ flex: 1, overflowY: "auto", padding: 20 }}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); handleUpload(e.dataTransfer.files); }}
-        >
+        <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
           {loading && (
             <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>Laden…</div>
           )}

@@ -1,5 +1,9 @@
-06.04.
+07.04.
 
+-- sellerlar media menüsünde superuser tarafindan eklenmis klasörleri görememeli. ayrica sayfaya görsel sürüklendiginde hemen algilasin ve sürükleme ile görsel eklenebilsin.
+-- sellercentralde bir versandgruppe olusturdum ve icine yalnizca almanya icin fiyat girdim. bunu bir ürüne tanimladim. shopta bu ürüne gittigimde ve ülke olarak almanya disinda bir ülke (örnegin ispanya) sectigimde yine de ürünü sepete ekleyebiliyor ve siparis verebiliyorum. bu cok sacma. eger ürüne tanimlanmis olan versangruppede fiyat girilmemisse o ülkeye o ürünün satisinin olamamasi gerekiyor.
+-- sellercentralde ayarladigim shipping profili bir ürüne tanimladim. shopta o ürün sayfasina gittigimde versand ücreti yanlis gösteriliyor. almanya icin 5,99 ingiltere icin 13,9 belirledim. shopta almanyayi sectim. ancak shopta 13,9 gösteriyor. bu hatayi düzelt
+- ürünlerin icinde girdigimde breadcrumbs kisminda kategoriler gözüksün. kategorinin breadcrumbsu olsun ve kategorilere tiklanabilsin.
 - sellercentralde content/menus sayfasindaki Main menu (dropdown) menüsü shoptaku arama butonunun yanindaki dropdown ile bagliydi. burada secilen menü ne ise onun gözükmesi gerekiyordu shopta. ve öyleydi de. simdi Main menu (dropdown) a tanimladigim bir menü var. onun ile ilgili kararim shopta görünmüyor. ya altina menü item ekleyecegim ve o gözükecek, ya da more actions icinde categories with products secicem, menu items bos olacak ve shopta bu menüler gözükecek. ücüncüye söylüyorum bunu. bu sefer lütfen artik tamamen hallolmus olsun.
 - algoritma
 - ayni ean a sahip bir ürünü sinirsiz satici yükleyebilecek. buyboxu algoritmada en iyi puani olan satici alacak. diger saticilar buyboxun altinda "other sellers" olarak yaninda fiyatlar ve magaza puanlari seklinde gösterilecek. alinan yorumlar magazaya da isleyecek tabii ki. amazon mantigi yani.

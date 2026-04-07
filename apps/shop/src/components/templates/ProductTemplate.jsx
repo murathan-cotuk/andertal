@@ -16,7 +16,7 @@ import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } f
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
-import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
+import { findShippingGroup, resolveShippingQuoteCents, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import Carousel from "@/components/Carousel";
 import { StarRating } from "@/components/ProductCard";
 import { ProductCard } from "@/components/ProductCard";
@@ -883,11 +883,15 @@ export default function ProductTemplate() {
     shippingGroupIdRaw != null && String(shippingGroupIdRaw).trim() !== ""
       ? findShippingGroup(shippingGroups, shippingGroupIdRaw)
       : null;
-  const shippingPriceCents = resolveShippingQuoteCents(shippingGroup?.prices, countryCode);
-  const shippingDisplay =
-    shippingGroupIdRaw != null && String(shippingGroupIdRaw).trim() !== "" && shippingGroup
-      ? (shippingPriceCents != null ? `${formatPriceCents(shippingPriceCents)} €` : shippingGroup.name)
-      : (meta.shipping_info || meta.versand || "Standardversand");
+  const shippingPriceCents = shippingGroup ? resolveShippingQuoteStrict(shippingGroup.prices, marketCountry) : null;
+  const hasShippingGroup = shippingGroupIdRaw != null && String(shippingGroupIdRaw).trim() !== "" && shippingGroup != null;
+  // If a shipping group is assigned but no price exists for current market → product not shippable here
+  const shippingUnavailable = hasShippingGroup && shippingPriceCents === null;
+  const shippingDisplay = hasShippingGroup
+    ? (shippingPriceCents != null
+        ? `${formatPriceCents(shippingPriceCents)} €`
+        : { de: "Nicht verfügbar in dieser Region", tr: "Bu bölgede mevcut değil", fr: "Non disponible dans cette région", it: "Non disponibile in questa regione", es: "No disponible en esta región" }[locale] ?? "Not available in this region")
+    : (meta.shipping_info || meta.versand || "Standardversand");
   const rawVariants = product.variants || [];
   const variationGroups = product.variation_groups || null;
   const variants = normalizeVariants(rawVariants, variationGroups);
@@ -990,6 +994,7 @@ export default function ProductTemplate() {
   const handleAddToCart = async () => {
     const variantId = variant?.id;
     if (!variantId) return;
+    if (shippingUnavailable) return;
     // Avoid timer-race when user clicks quickly multiple times
     if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);
     if (cartNoticeTimersRef.current.clear) window.clearTimeout(cartNoticeTimersRef.current.clear);
@@ -1322,7 +1327,7 @@ export default function ProductTemplate() {
                       const v = Math.max(1, Math.floor(Number(e.target.value)) || 1);
                       setQuantity(v);
                     }}
-                    disabled={!inStock || isComingSoon}
+                    disabled={!inStock || isComingSoon || shippingUnavailable}
                   />
                 </QtyWrap>
               </StockRow>
@@ -1333,13 +1338,15 @@ export default function ProductTemplate() {
                 ) : null}
                 <ToCartButton
                   onClick={handleAddToCart}
-                  disabled={!inStock || isComingSoon}
+                  disabled={!inStock || isComingSoon || shippingUnavailable}
                 >
-                  {isComingSoon
-                    ? ({ de: "Bald verfügbar", tr: "Yakında", fr: "Bientôt disponible", it: "Disponibile presto", es: "Próximamente" }[locale] ?? "Coming Soon")
-                    : !inStock
-                      ? ({ de: "Ausverkauft", tr: "Stokta Yok", fr: "Épuisé", it: "Esaurito", es: "Agotado" }[locale] ?? "Out of Stock")
-                      : ({ de: "In den Einkaufswagen", tr: "Sepete Ekle", fr: "Ajouter au panier", it: "Aggiungi al carrello", es: "Añadir al carrito" }[locale] ?? "Add to Cart")
+                  {shippingUnavailable
+                    ? ({ de: "Nicht in diese Region lieferbar", tr: "Bu bölgeye teslimat yok", fr: "Pas de livraison dans cette région", it: "Nessuna consegna in questa regione", es: "Sin envío a esta región" }[locale] ?? "Not available in this region")
+                    : isComingSoon
+                      ? ({ de: "Bald verfügbar", tr: "Yakında", fr: "Bientôt disponible", it: "Disponibile presto", es: "Próximamente" }[locale] ?? "Coming Soon")
+                      : !inStock
+                        ? ({ de: "Ausverkauft", tr: "Stokta Yok", fr: "Épuisé", it: "Esaurito", es: "Agotado" }[locale] ?? "Out of Stock")
+                        : ({ de: "In den Einkaufswagen", tr: "Sepete Ekle", fr: "Ajouter au panier", it: "Aggiungi al carrello", es: "Añadir al carrito" }[locale] ?? "Add to Cart")
                   }
                 </ToCartButton>
                 {isComingSoon && publishDate && (

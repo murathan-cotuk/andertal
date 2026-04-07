@@ -6899,6 +6899,7 @@ async function start() {
           name varchar(255) NOT NULL,
           created_at timestamp DEFAULT now()
         )`).catch(() => {})
+        await mediaFolderMigrClient.query(`ALTER TABLE admin_hub_media_folders ADD COLUMN IF NOT EXISTS seller_id varchar(255) DEFAULT NULL`).catch(() => {})
         await mediaFolderMigrClient.query(`ALTER TABLE admin_hub_media ADD COLUMN IF NOT EXISTS folder_id uuid REFERENCES admin_hub_media_folders(id) ON DELETE SET NULL`).catch(() => {})
         await mediaFolderMigrClient.query(`ALTER TABLE admin_hub_media ADD COLUMN IF NOT EXISTS source_url text`).catch(() => {}) // for URL-added images
         await mediaFolderMigrClient.query(`ALTER TABLE admin_hub_media ADD COLUMN IF NOT EXISTS seller_id varchar(255)`).catch(() => {})
@@ -6912,18 +6913,26 @@ async function start() {
       if (!client) return res.json({ folders: [] })
       try {
         await client.connect()
-        const r = await client.query('SELECT f.*, COUNT(m.id)::int AS media_count FROM admin_hub_media_folders f LEFT JOIN admin_hub_media m ON m.folder_id = f.id GROUP BY f.id ORDER BY f.name ASC')
+        const isSuperuserReq = req.sellerUser?.is_superuser === true
+        const callerSellerId = req.sellerUser?.seller_id
+        let r
+        if (isSuperuserReq) {
+          r = await client.query('SELECT f.*, COUNT(m.id)::int AS media_count FROM admin_hub_media_folders f LEFT JOIN admin_hub_media m ON m.folder_id = f.id GROUP BY f.id ORDER BY f.name ASC')
+        } else {
+          r = await client.query('SELECT f.*, COUNT(m.id)::int AS media_count FROM admin_hub_media_folders f LEFT JOIN admin_hub_media m ON m.folder_id = f.id WHERE f.seller_id = $1 GROUP BY f.id ORDER BY f.name ASC', [callerSellerId])
+        }
         res.json({ folders: r.rows })
       } catch { res.json({ folders: [] }) } finally { await client.end().catch(() => {}) }
     }
     const mediaFoldersPOST = async (req, res) => {
       const { name } = req.body || {}
       if (!name) return res.status(400).json({ message: 'name required' })
+      const callerSellerId = req.sellerUser?.seller_id || null
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const r = await client.query('INSERT INTO admin_hub_media_folders (name) VALUES ($1) RETURNING *', [name.trim()])
+        const r = await client.query('INSERT INTO admin_hub_media_folders (name, seller_id) VALUES ($1, $2) RETURNING *', [name.trim(), callerSellerId])
         res.status(201).json({ folder: r.rows[0] })
       } catch (e) { res.status(500).json({ message: e?.message }) } finally { await client.end().catch(() => {}) }
     }
