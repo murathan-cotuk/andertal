@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { useCustomerAuth as useAuth } from "@belucha/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
 
 const Nav = styled.nav`
@@ -319,14 +320,16 @@ export default function Navbar() {
         const client = getMedusaClient();
         const menuData = await client.getMenus();
         const menus = menuData.menus || [];
-        // Prefer exact location="main", fallback to first menu — never treat "" as "main"
-        const mainMenu = menus.find((m) => m.location === "main") || menus.find((m) => !m.location) || menus[0];
+        // Only use a menu explicitly assigned to location "main"
+        const mainMenu = menus.find((m) => m.location === "main") || null;
         if (mainMenu && mainMenu.items && mainMenu.items.length > 0) {
+          // Menu has items → show them
           setMenuItems(mainMenu.items);
           setCategories([]);
           setLoading(false);
           return;
         }
+        // No main menu assigned, OR menu is empty (with/without categories_with_products) → show categories
         const data = await client.getCategories({ tree: true, is_visible: true });
         setCategories(data.tree || data.categories || []);
         setMenuItems([]);

@@ -2344,8 +2344,8 @@ async function start() {
         let n = 1
         if (body.name !== undefined) { updates.push(`name = $${n++}`); vals.push(body.name) }
         if (body.slug !== undefined) { updates.push(`slug = $${n++}`); vals.push(body.slug) }
-        // Store empty string or null as NULL so it's not misread as "main"
-        if (body.location !== undefined) { updates.push(`location = $${n++}`); vals.push(body.location === '' ? null : body.location) }
+        // Store null/empty as '' (empty string) so it's clearly "unassigned" and not misread as "main" (NULL maps to main in getStoreMenusFromDb)
+        if (body.location !== undefined) { updates.push(`location = $${n++}`); vals.push((body.location === null || body.location === '') ? '' : body.location) }
         if (body.categories_with_products !== undefined) { updates.push(`categories_with_products = $${n++}`); vals.push(Boolean(body.categories_with_products)) }
         const normalize = (loc) => (loc === null || loc === undefined) ? 'main' : String(loc).trim().toLowerCase()
         if (updates.length === 0) {
