@@ -185,10 +185,12 @@ const DescriptionPreview = styled.p`
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  min-height: calc(12.5px * 1.45 * 2);
 `;
 
 const ReviewRow = styled.div`
   margin-top: 8px;
+  min-height: 22px;
 `;
 
 /* Badges */
@@ -264,6 +266,7 @@ const VariantGroups = styled.div`
   display: flex;
   flex-direction: column;
   gap: 5px;
+  margin-top: 12px;
 `;
 
 const VGroupRow = styled.div``;
@@ -285,11 +288,11 @@ const Pills = styled.div`
 `;
 
 const Pill = styled.button`
-  padding: ${(p) => (p.$swatch ? "0" : "7px 12px")};
-  width: ${(p) => (p.$swatch ? "26px" : "auto")};
-  height: ${(p) => (p.$swatch ? "26px" : "auto")};
-  min-width: ${(p) => (p.$swatch ? "26px" : "34px")};
-  min-height: ${(p) => (p.$swatch ? "26px" : "28px")};
+  padding: ${(p) => (p.$swatch ? "0" : "7px 13px")};
+  width: ${(p) => (p.$swatch ? "32px" : "auto")};
+  height: ${(p) => (p.$swatch ? "32px" : "auto")};
+  min-width: ${(p) => (p.$swatch ? "32px" : "36px")};
+  min-height: ${(p) => (p.$swatch ? "32px" : "32px")};
   font-size: 11.5px;
   font-weight: 500;
   line-height: 1.1;
@@ -598,15 +601,15 @@ export function ProductCard({ product, activeFilters = {} }) {
           </CurrentPrice>
         </Prices>
 
-        {reviewCount > 0 || reviewAvg > 0 ? (
-          <ReviewRow>
+        <ReviewRow>
+          {(reviewCount > 0 || reviewAvg > 0) && (
             <StarRating average={reviewAvg} count={reviewCount} />
-          </ReviewRow>
-        ) : null}
+          )}
+        </ReviewRow>
 
-        {localizedDescription ? (
-          <DescriptionPreview>{htmlToText(localizedDescription).slice(0, 100)}{htmlToText(localizedDescription).length > 100 ? "…" : ""}</DescriptionPreview>
-        ) : null}
+        <DescriptionPreview>
+          {localizedDescription ? `${htmlToText(localizedDescription).slice(0, 100)}${htmlToText(localizedDescription).length > 100 ? "…" : ""}` : ""}
+        </DescriptionPreview>
 
         {showPills && (
           variationGroups ? (
@@ -660,7 +663,7 @@ export function ProductCard({ product, activeFilters = {} }) {
             </VariantGroups>
           ) : (
             /* Legacy: flat pill list */
-            <Pills>
+            <Pills style={{ marginTop: 12 }}>
               {normalizedVariants.slice(0, 5).map((v, i) => {
                 const qty = v.inventory_quantity ?? v.inventory ?? 0;
                 const outOfStock = Number(qty) <= 0;

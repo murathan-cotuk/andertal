@@ -354,6 +354,14 @@ class MedusaAdminClient {
   }
 
   /**
+   * Get single Admin Hub category by ID
+   */
+  async getAdminHubCategory(id) {
+    const data = await this.request(`/admin-hub/v1/categories/${id}`)
+    return data?.category || null
+  }
+
+  /**
    * Update Admin Hub category (PUT)
    */
   async updateAdminHubCategory(id, data) {

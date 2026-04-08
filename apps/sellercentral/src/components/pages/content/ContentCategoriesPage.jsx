@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Page,
   Layout,
@@ -89,6 +90,7 @@ function buildTree(flatList) {
 function TreeNode({ node, depth, onEdit, onDelete, categories }) {
   const [open, setOpen] = useState(false);
   const hasKids = node.children && node.children.length > 0;
+  const router = useRouter();
 
   return (
     <div>
@@ -118,9 +120,15 @@ function TreeNode({ node, depth, onEdit, onDelete, categories }) {
 
         {/* name */}
         <div style={{ flex: "0 0 240px", minWidth: 0 }}>
-          <Text as="span" variant="bodyMd" fontWeight={depth === 0 ? "semibold" : "regular"}>
-            {node.name}
-          </Text>
+          <button
+            type="button"
+            onClick={() => router.push(`/content/categories/${node.id}`)}
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+          >
+            <Text as="span" variant="bodyMd" fontWeight={depth === 0 ? "semibold" : "regular"} tone="magic">
+              {node.name}
+            </Text>
+          </button>
           {hasKids && (
             <Text as="span" variant="bodySm" tone="subdued"> ({node.children.length})</Text>
           )}
@@ -144,7 +152,7 @@ function TreeNode({ node, depth, onEdit, onDelete, categories }) {
 
         {/* actions */}
         <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-          <Button size="slim" variant="plain" tone="subdued" accessibilityLabel="Edit" icon={EditIcon} onClick={() => onEdit(node)} />
+          <Button size="slim" variant="plain" tone="subdued" accessibilityLabel="Edit" icon={EditIcon} onClick={() => router.push(`/content/categories/${node.id}`)} />
           <Button size="slim" variant="plain" tone="critical" accessibilityLabel="Delete" icon={DeleteIcon} onClick={() => onDelete(node.id)} />
         </div>
       </div>
