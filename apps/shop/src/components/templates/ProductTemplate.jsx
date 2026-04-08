@@ -744,6 +744,7 @@ export default function ProductTemplate() {
   const [productReviews, setProductReviews] = useState([]);
   const [multiOffer, setMultiOffer] = useState(null);
   const [selectedSellerId, setSelectedSellerId] = useState(null);
+  const [otherSellersOpen, setOtherSellersOpen] = useState(false);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
@@ -1040,6 +1041,12 @@ export default function ProductTemplate() {
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
+    ...(meta.category_slug
+      ? [{
+          label: (meta.category_name || String(meta.category_slug).replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase())),
+          href: `/category/${meta.category_slug}`,
+        }]
+      : []),
     ...(product.collection ? [{ label: product.collection.title, href: `/${product.collection.handle}` }] : []),
     { label: displayTitle, href: null },
   ];
@@ -1387,16 +1394,23 @@ export default function ProductTemplate() {
 
           {multiOffer?.other_sellers?.length > 0 ? (
             <OtherSellersCard>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, color: "#111827" }}>
-                {locale === "tr" ? `Diğer satıcılar (${multiOffer.other_sellers.length})` : locale === "de" ? `Weitere Angebote (${multiOffer.other_sellers.length})` : `Other sellers (${multiOffer.other_sellers.length})`}
-              </div>
-              <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 4px", lineHeight: 1.35 }}>
+              <button
+                type="button"
+                onClick={() => setOtherSellersOpen((v) => !v)}
+                style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, marginBottom: 6, cursor: "pointer", fontWeight: 700, fontSize: 14, color: "#111827" }}
+              >
+                {locale === "tr" ? `Diğer satıcılar (${multiOffer.other_sellers.length})` : locale === "de" ? `Other sellers (${multiOffer.other_sellers.length})` : `Other sellers (${multiOffer.other_sellers.length})`}
+                <span style={{ marginLeft: 8, fontSize: 12, color: "#6b7280" }}>{otherSellersOpen ? "▲" : "▼"}</span>
+              </button>
+              <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 8px", lineHeight: 1.35 }}>
                 {locale === "tr"
                   ? "Aynı EAN için diğer mağazalar. Mağaza puanları tüm ürün yorumlarından türetilir."
                   : locale === "de"
                     ? "Weitere Händler mit derselben EAN. Verkäufersterne aus allen Produktbewertungen."
                     : "More sellers for this EAN. Seller scores combine all their product reviews."}
               </p>
+              {otherSellersOpen && (
+                <>
               {selectedSellerId && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "6px 10px", marginBottom: 6, fontSize: 12 }}>
                   <span style={{ color: "#166534", fontWeight: 600 }}>
@@ -1463,6 +1477,8 @@ export default function ProductTemplate() {
                   </OtherSellerRow>
                 );
               })}
+                </>
+              )}
             </OtherSellersCard>
           ) : null}
         </RightCol>

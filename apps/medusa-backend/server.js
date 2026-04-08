@@ -408,6 +408,27 @@ async function start() {
         await client.query(`ALTER TABLE store_carts ADD COLUMN IF NOT EXISTS first_name text`).catch(() => {})
         await client.query(`ALTER TABLE store_carts ADD COLUMN IF NOT EXISTS last_name text`).catch(() => {})
         await client.query(`ALTER TABLE store_carts ADD COLUMN IF NOT EXISTS phone text`).catch(() => {})
+        await client.query(`ALTER TABLE store_carts ADD COLUMN IF NOT EXISTS coupon_code text`).catch(() => {})
+        await client.query(`ALTER TABLE store_carts ADD COLUMN IF NOT EXISTS coupon_discount_cents integer NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS coupon_code text`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS coupon_discount_cents integer NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_coupons (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            seller_id varchar(255) NOT NULL DEFAULT 'default',
+            code varchar(100) NOT NULL,
+            discount_type varchar(20) NOT NULL DEFAULT 'percent',
+            discount_value integer NOT NULL,
+            min_subtotal_cents integer NOT NULL DEFAULT 0,
+            usage_limit integer,
+            used_count integer NOT NULL DEFAULT 0,
+            active boolean NOT NULL DEFAULT true,
+            expires_at timestamp,
+            created_at timestamp DEFAULT now(),
+            updated_at timestamp DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_coupons_seller_code ON admin_hub_coupons(seller_id, lower(code));').catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_cart_items (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -495,6 +516,10 @@ async function start() {
         `).catch(() => {})
         await client.query(`INSERT INTO store_platform_checkout (id) VALUES (1) ON CONFLICT (id) DO NOTHING`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS free_shipping_thresholds jsonb`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS shop_logo_url text`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS shop_favicon_url text`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS sellercentral_logo_url text`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS sellercentral_favicon_url text`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS bonus_points_redeemed integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_shipping_carriers (
@@ -503,12 +528,14 @@ async function start() {
             tracking_url_template text,
             api_key text,
             api_secret text,
+            seller_id varchar(255),
             is_active boolean DEFAULT true,
             sort_order integer DEFAULT 0,
             created_at timestamp DEFAULT now(),
             updated_at timestamp DEFAULT now()
           );
         `).catch(() => {})
+        await client.query(`ALTER TABLE store_shipping_carriers ADD COLUMN IF NOT EXISTS seller_id varchar(255)`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_integrations (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2836,7 +2863,41 @@ async function start() {
             }
           }
           await lc.end()
-          return res.status(200).json({ product: masterProduct, listing, deduplicated: true, is_new_master: false })
+          // Seller onboarding copy: keep shared catalog data, but clear seller-owned fields.
+          const sellerViewProduct = {
+            ...masterProduct,
+            status: 'draft',
+            sku: null,
+            price: 0,
+            inventory: 0,
+            metadata: {
+              ...(masterProduct.metadata && typeof masterProduct.metadata === 'object' ? masterProduct.metadata : {}),
+              publish_date: null,
+              seller_name: null,
+              shop_name: null,
+              brand_id: null,
+              shipping_group_id: null,
+              related_product_ids: [],
+            },
+            variants: Array.isArray(masterProduct.variants)
+              ? masterProduct.variants.map((v) => ({
+                  ...(v || {}),
+                  sku: null,
+                  price: undefined,
+                  price_cents: 0,
+                  compare_at_price: undefined,
+                  compare_at_price_cents: undefined,
+                  inventory: 0,
+                  inventory_quantity: 0,
+                  metadata: {
+                    ...(v?.metadata && typeof v.metadata === 'object' ? v.metadata : {}),
+                    brand_id: null,
+                    shipping_group_id: null,
+                  },
+                }))
+              : [],
+          }
+          return res.status(200).json({ product: sellerViewProduct, listing, deduplicated: true, is_new_master: false })
         }
 
         // New product — create master (seller_id = null → superuser-owned)
@@ -2978,7 +3039,83 @@ async function start() {
     }
     const adminHubProductByIdPUT = async (req, res) => {
       try {
-        const product = await updateAdminHubProductDb(req.params.id, req.body || {})
+        const body = req.body || {}
+        const auth = req.headers['authorization'] || ''
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+        const sellerPayload = token ? verifySellerToken(token) : null
+        const isSuperuserCaller = sellerPayload?.is_superuser || false
+        const callerSellerId = (!isSuperuserCaller && sellerPayload?.seller_id) ? String(sellerPayload.seller_id).trim() : null
+        const existing = await getAdminHubProductByIdOrHandleDb(req.params.id)
+        if (callerSellerId && existing && !existing.seller_id) {
+          // Master product: non-superuser may only persist seller-owned listing fields.
+          const wantsSharedChange = Object.keys(body).some((k) => !['price', 'inventory', 'status'].includes(k))
+          if (wantsSharedChange) {
+            const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+            const { Client } = require('pg')
+            const qc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+            try {
+              await qc.connect()
+              const sharedKeys = Object.keys(body || {}).filter((k) => !['price', 'inventory', 'status'].includes(k))
+              for (const key of sharedKeys) {
+                const oldVal = existing && existing[key] !== undefined ? existing[key] : (existing?.metadata && existing.metadata[key] !== undefined ? existing.metadata[key] : null)
+                await qc.query(
+                  `INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value)
+                   VALUES ($1,$2,'pending',$3,$4,$5)`,
+                  [
+                    existing.id,
+                    callerSellerId,
+                    String(key),
+                    oldVal == null ? null : String(typeof oldVal === 'object' ? JSON.stringify(oldVal) : oldVal),
+                    body[key] == null ? '' : String(typeof body[key] === 'object' ? JSON.stringify(body[key]) : body[key]),
+                  ]
+                )
+              }
+              await qc.end()
+            } catch (_) {
+              try { await qc.end() } catch (__) {}
+            }
+            res.status(202).json({ message: 'Degisiklik oneriniz superuser onayina gonderildi.', suggestion_submitted: true })
+            return
+          }
+          const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+          const { Client } = require('pg')
+          const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await lc.connect()
+          const existingListing = await lc.query(
+            'SELECT id FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 LIMIT 1',
+            [existing.id, callerSellerId]
+          )
+          const priceCents = body.price !== undefined ? Math.max(0, Math.round(Number(body.price || 0) * 100)) : null
+          const inventory = body.inventory !== undefined ? Math.max(0, parseInt(body.inventory, 10) || 0) : null
+          const status = body.status !== undefined ? String(body.status || 'active') : null
+          let listing = null
+          if (existingListing.rows[0]) {
+            const lid = existingListing.rows[0].id
+            const ur = await lc.query(
+              `UPDATE admin_hub_seller_listings
+               SET price_cents = COALESCE($1, price_cents),
+                   inventory = COALESCE($2, inventory),
+                   status = COALESCE($3, status),
+                   updated_at = now()
+               WHERE id = $4
+               RETURNING *`,
+              [priceCents, inventory, status, lid]
+            )
+            listing = ur.rows[0] || null
+          } else {
+            const ir = await lc.query(
+              `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status)
+               VALUES ($1,$2,$3,$4,$5)
+               RETURNING *`,
+              [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'active']
+            )
+            listing = ir.rows[0] || null
+          }
+          await lc.end()
+          res.json({ product: existing, listing, listing_saved: true, shared_change_blocked: false })
+          return
+        }
+        const product = await updateAdminHubProductDb(req.params.id, body)
         if (product && product.__error) {
           res.status(400).json({ message: product.__error })
           return
@@ -3114,7 +3251,7 @@ async function start() {
         const client = getProductsDbClient()
         if (!client) return res.json({ store_name: '' })
         await client.connect()
-        const r = await client.query('SELECT store_name, free_shipping_thresholds FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
         await client.end()
         const row = r.rows && r.rows[0]
         const store_name = row && row.store_name != null ? String(row.store_name) : ''
@@ -3122,10 +3259,14 @@ async function start() {
         if (free_shipping_thresholds && typeof free_shipping_thresholds === 'object') {
           free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
         }
-        res.json({ store_name, free_shipping_thresholds })
+        const shop_logo_url = row && row.shop_logo_url ? String(row.shop_logo_url) : ''
+        const shop_favicon_url = row && row.shop_favicon_url ? String(row.shop_favicon_url) : ''
+        const sellercentral_logo_url = row && row.sellercentral_logo_url ? String(row.sellercentral_logo_url) : ''
+        const sellercentral_favicon_url = row && row.sellercentral_favicon_url ? String(row.sellercentral_favicon_url) : ''
+        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url })
       } catch (err) {
         console.error('sellerSettingsGET:', err)
-        res.json({ store_name: '' })
+        res.json({ store_name: '', shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '' })
       }
     }
     const sellerSettingsPATCH = async (req, res) => {
@@ -3135,6 +3276,10 @@ async function start() {
         const sellerId = (body.seller_id || req.query.seller_id || 'default').toString().trim() || 'default'
         let free_shipping_thresholds = (body.free_shipping_thresholds && typeof body.free_shipping_thresholds === 'object')
           ? body.free_shipping_thresholds : null
+        const shop_logo_url = body.shop_logo_url !== undefined ? (body.shop_logo_url ? String(body.shop_logo_url).trim() : null) : undefined
+        const shop_favicon_url = body.shop_favicon_url !== undefined ? (body.shop_favicon_url ? String(body.shop_favicon_url).trim() : null) : undefined
+        const sellercentral_logo_url = body.sellercentral_logo_url !== undefined ? (body.sellercentral_logo_url ? String(body.sellercentral_logo_url).trim() : null) : undefined
+        const sellercentral_favicon_url = body.sellercentral_favicon_url !== undefined ? (body.sellercentral_favicon_url ? String(body.sellercentral_favicon_url).trim() : null) : undefined
         if (free_shipping_thresholds) {
           free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
         }
@@ -3144,13 +3289,29 @@ async function start() {
         const thresholdsJson = free_shipping_thresholds ? JSON.stringify(free_shipping_thresholds) : null
         console.log('[sellerSettingsPATCH] saving free_shipping_thresholds:', thresholdsJson)
         await client.query(
-          `INSERT INTO admin_hub_seller_settings (seller_id, store_name, free_shipping_thresholds, updated_at) VALUES ($1, $2, $3::jsonb, now())
-           ON CONFLICT (seller_id) DO UPDATE SET store_name = $2, free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds), updated_at = now()`,
-          [sellerId, store_name || null, thresholdsJson]
+          `INSERT INTO admin_hub_seller_settings (
+             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, updated_at
+           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, now())
+           ON CONFLICT (seller_id) DO UPDATE SET
+             store_name = COALESCE($2, admin_hub_seller_settings.store_name),
+             free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds),
+             shop_logo_url = COALESCE($4, admin_hub_seller_settings.shop_logo_url),
+             shop_favicon_url = COALESCE($5, admin_hub_seller_settings.shop_favicon_url),
+             sellercentral_logo_url = COALESCE($6, admin_hub_seller_settings.sellercentral_logo_url),
+             sellercentral_favicon_url = COALESCE($7, admin_hub_seller_settings.sellercentral_favicon_url),
+             updated_at = now()`,
+          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url]
         )
         await client.end()
         console.log('[sellerSettingsPATCH] saved OK')
-        res.json({ store_name: store_name || '', free_shipping_thresholds })
+        res.json({
+          store_name: store_name || '',
+          free_shipping_thresholds,
+          shop_logo_url: shop_logo_url || '',
+          shop_favicon_url: shop_favicon_url || '',
+          sellercentral_logo_url: sellercentral_logo_url || '',
+          sellercentral_favicon_url: sellercentral_favicon_url || '',
+        })
       } catch (err) {
         console.error('sellerSettingsPATCH:', err)
         res.status(500).json({ message: err && err.message })
@@ -3651,11 +3812,11 @@ async function start() {
       try {
         const sellerId = (req.query.seller_id || 'default').toString().trim() || 'default'
         const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-        if (!dbUrl || !dbUrl.startsWith('postgres')) return res.json({ store_name: '', free_shipping_thresholds: null })
+        if (!dbUrl || !dbUrl.startsWith('postgres')) return res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '' })
         const { Client } = require('pg')
         const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const r = await client.query('SELECT store_name, free_shipping_thresholds FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
         await client.end()
         const row = r.rows && r.rows[0]
         const store_name = row && row.store_name != null ? String(row.store_name) : ''
@@ -3663,11 +3824,15 @@ async function start() {
         if (free_shipping_thresholds && typeof free_shipping_thresholds === 'object') {
           free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
         }
+        const shop_logo_url = row && row.shop_logo_url ? String(row.shop_logo_url) : ''
+        const shop_favicon_url = row && row.shop_favicon_url ? String(row.shop_favicon_url) : ''
+        const sellercentral_logo_url = row && row.sellercentral_logo_url ? String(row.sellercentral_logo_url) : ''
+        const sellercentral_favicon_url = row && row.sellercentral_favicon_url ? String(row.sellercentral_favicon_url) : ''
         console.log('[storeSellerSettingsGET] free_shipping_thresholds:', JSON.stringify(free_shipping_thresholds))
-        res.json({ store_name, free_shipping_thresholds })
+        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url })
       } catch (err) {
         console.error('[storeSellerSettingsGET] error:', err && err.message)
-        res.json({ store_name: '', free_shipping_thresholds: null })
+        res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '' })
       }
     }
     httpApp.get('/store/seller-settings', storeSellerSettingsGET)
@@ -3827,6 +3992,7 @@ async function start() {
       let all = await listAdminHubProductsDb({ limit: 5000 })
       all = all.filter((p) => (p.status || '').toLowerCase() === 'published' && isStoreVisibleSellerProduct(p, approvedSellerIds))
       const byCollection = new Map()
+      const byCategory = new Map()
       for (const p of all) {
         const score = salesScoreFromMetadata(p.metadata)
         if (!(score > 0)) continue
@@ -3836,8 +4002,16 @@ async function start() {
           const prev = byCollection.get(key)
           if (!prev || score > prev.score) byCollection.set(key, { id: String(p.id), score })
         }
+        const categoryKeys = storeProductCategoryIds(p)
+        for (const key of categoryKeys) {
+          const prev = byCategory.get(key)
+          if (!prev || score > prev.score) byCategory.set(key, { id: String(p.id), score })
+        }
       }
-      const ids = new Set(Array.from(byCollection.values()).map((x) => String(x.id)))
+      const ids = new Set([
+        ...Array.from(byCollection.values()).map((x) => String(x.id)),
+        ...Array.from(byCategory.values()).map((x) => String(x.id)),
+      ])
       bestsellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids }
       return ids
     }
@@ -4423,10 +4597,47 @@ async function start() {
     const BONUS_POINTS_PER_EURO_DISCOUNT = 25
     const BONUS_SIGNUP_POINTS = 100
     const STRIPE_MIN_CHARGE_CENTS_EUR = 50
+    const COUPON_CODE_MAX_LEN = 100
 
     const discountCentsFromBonusPoints = (points) => {
-      const blocks = Math.floor(Number(points || 0) / BONUS_POINTS_PER_EURO_DISCOUNT)
-      return blocks * 100
+      const p = Math.max(0, Number(points || 0))
+      return Math.floor((p / BONUS_POINTS_PER_EURO_DISCOUNT) * 100)
+    }
+
+    const normalizeCouponCode = (code) =>
+      String(code || '').trim().toUpperCase().slice(0, COUPON_CODE_MAX_LEN)
+
+    const resolveCouponDiscountCents = (couponRow, subtotalCents) => {
+      if (!couponRow) return 0
+      const sub = Math.max(0, Number(subtotalCents || 0))
+      const minSub = Math.max(0, Number(couponRow.min_subtotal_cents || 0))
+      if (sub < minSub) return 0
+      const type = String(couponRow.discount_type || 'percent').toLowerCase()
+      const val = Math.max(0, Number(couponRow.discount_value || 0))
+      if (type === 'fixed') return Math.min(sub, Math.floor(val))
+      const pct = Math.min(100, val)
+      return Math.min(sub, Math.floor((sub * pct) / 100))
+    }
+
+    const loadValidCouponForSeller = async (client, sellerId, code) => {
+      const normalizedCode = normalizeCouponCode(code)
+      if (!normalizedCode) return null
+      const r = await client.query(
+        `SELECT *
+         FROM admin_hub_coupons
+         WHERE seller_id = $1
+           AND lower(code) = lower($2)
+           AND active = true
+           AND (expires_at IS NULL OR expires_at > now())
+         LIMIT 1`,
+        [String(sellerId || 'default'), normalizedCode],
+      )
+      const row = r.rows?.[0]
+      if (!row) return null
+      const usageLimit = row.usage_limit == null ? null : Number(row.usage_limit)
+      const usedCount = Number(row.used_count || 0)
+      if (usageLimit != null && usedCount >= usageLimit) return null
+      return row
     }
 
     const bonusPointsEarnedFromOrderPaidCents = (paidCents) =>
@@ -4442,13 +4653,12 @@ async function start() {
 
     const clampCartBonusRedemption = (requestedPoints, balance, subtotalCents) => {
       let p = Math.max(0, Math.min(Number(requestedPoints) || 0, Number(balance) || 0))
-      p = Math.floor(p / BONUS_POINTS_PER_EURO_DISCOUNT) * BONUS_POINTS_PER_EURO_DISCOUNT
+      p = Math.floor(p)
       if (subtotalCents < STRIPE_MIN_CHARGE_CENTS_EUR) return 0
       let disc = discountCentsFromBonusPoints(p)
       const maxDiscount = subtotalCents - STRIPE_MIN_CHARGE_CENTS_EUR
       if (disc > maxDiscount) {
-        const maxBlocks = Math.floor(maxDiscount / 100)
-        p = maxBlocks * BONUS_POINTS_PER_EURO_DISCOUNT
+        p = Math.floor((maxDiscount * BONUS_POINTS_PER_EURO_DISCOUNT) / 100)
       }
       return p
     }
@@ -4488,7 +4698,7 @@ async function start() {
 
     const getCartWithItems = async (client, cartId) => {
       const cartRes = await client.query(
-        'SELECT id, created_at, updated_at, COALESCE(bonus_points_reserved, 0) AS bonus_points_reserved FROM store_carts WHERE id = $1',
+        'SELECT id, created_at, updated_at, COALESCE(bonus_points_reserved, 0) AS bonus_points_reserved, coupon_code, COALESCE(coupon_discount_cents, 0) AS coupon_discount_cents FROM store_carts WHERE id = $1',
         [cartId],
       )
       const cartRow = cartRes.rows && cartRes.rows[0]
@@ -4537,6 +4747,8 @@ async function start() {
         created_at: cartRow.created_at,
         updated_at: cartRow.updated_at,
         bonus_points_reserved: Number(cartRow.bonus_points_reserved || 0),
+        coupon_code: cartRow.coupon_code || null,
+        coupon_discount_cents: Number(cartRow.coupon_discount_cents || 0),
         items,
       }
     }
@@ -4588,6 +4800,7 @@ async function start() {
       const body = req.body || {}
       const rawReq = body.bonus_points_reserved ?? body.bonus_points_to_redeem
       const requested = Math.max(0, parseInt(rawReq, 10) || 0)
+      const couponCodeRaw = body.coupon_code
 
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       if (!dbUrl || !dbUrl.startsWith('postgres')) return res.status(503).json({ message: 'Database not configured' })
@@ -4604,6 +4817,17 @@ async function start() {
         }
         const items = Array.isArray(cart.items) ? cart.items : []
         const subtotalCents = items.reduce((sum, it) => sum + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0)
+
+        let sellerId = 'default'
+        try {
+          const firstItem = items[0]
+          if (firstItem && firstItem.product_id) {
+            const sellerRow = await client.query('SELECT seller_id FROM admin_hub_products WHERE id = $1', [firstItem.product_id])
+            if (sellerRow.rows && sellerRow.rows[0] && sellerRow.rows[0].seller_id) {
+              sellerId = sellerRow.rows[0].seller_id
+            }
+          }
+        } catch (_) {}
 
         let reserved = 0
         if (requested > 0) {
@@ -4622,6 +4846,22 @@ async function start() {
           reserved = clampCartBonusRedemption(requested, balance, subtotalCents)
         }
 
+        let nextCouponCode = cart.coupon_code || null
+        let couponDiscountCents = 0
+        if (couponCodeRaw !== undefined) {
+          const incoming = normalizeCouponCode(couponCodeRaw)
+          nextCouponCode = incoming || null
+        }
+        if (nextCouponCode) {
+          const couponRow = await loadValidCouponForSeller(client, sellerId, nextCouponCode)
+          if (!couponRow) {
+            await client.end()
+            return res.status(400).json({ message: 'Ungültiger oder abgelaufener Coupon-Code' })
+          }
+          nextCouponCode = normalizeCouponCode(couponRow.code)
+          couponDiscountCents = resolveCouponDiscountCents(couponRow, subtotalCents)
+        }
+
         // Save customer contact info if provided
         if (body.email !== undefined || body.first_name !== undefined || body.last_name !== undefined || body.phone !== undefined) {
           const fields = []; const vals = []
@@ -4632,16 +4872,18 @@ async function start() {
           vals.push(cartId)
           await client.query(`UPDATE store_carts SET ${fields.join(', ')}, updated_at = now() WHERE id = $${vals.length}`, vals)
         }
-        await client.query('UPDATE store_carts SET bonus_points_reserved = $1, updated_at = now() WHERE id = $2', [
-          reserved,
-          cartId,
-        ])
+        await client.query(
+          'UPDATE store_carts SET bonus_points_reserved = $1, coupon_code = $2, coupon_discount_cents = $3, updated_at = now() WHERE id = $4',
+          [reserved, nextCouponCode, couponDiscountCents, cartId],
+        )
         const updated = await getCartWithItems(client, cartId)
         await client.end()
         res.json({
           cart: updated,
           bonus_discount_cents: discountCentsFromBonusPoints(reserved),
+          coupon_discount_cents: couponDiscountCents,
           bonus_points_reserved: reserved,
+          coupon_code: nextCouponCode,
         })
       } catch (err) {
         if (client) try { await client.end() } catch (_) {}
@@ -4838,7 +5080,9 @@ async function start() {
         
         const subtotalCents = items.reduce((sum, it) => sum + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0)
         const reservedPts = Number(cart.bonus_points_reserved || 0)
-        const discountCents = discountCentsFromBonusPoints(reservedPts)
+        const bonusDiscountCents = discountCentsFromBonusPoints(reservedPts)
+        const couponDiscountCents = Math.max(0, Number(cart.coupon_discount_cents || 0))
+        const discountCents = Math.max(0, bonusDiscountCents + couponDiscountCents)
         const shippingCents = Math.max(0, Number(body.shipping_cents || 0))
         const payCents = Math.max(0, subtotalCents - discountCents + shippingCents)
         if (payCents <= 0) {
@@ -4866,6 +5110,8 @@ async function start() {
             cart_id: cartId,
             subtotal_cents: String(subtotalCents),
             discount_cents: String(discountCents),
+            coupon_discount_cents: String(couponDiscountCents),
+            coupon_code: String(cart.coupon_code || ''),
             bonus_points_redeemed: String(reservedPts),
           },
         }
@@ -4879,6 +5125,8 @@ async function start() {
           subtotal_cents: subtotalCents,
           shipping_cents: shippingCents,
           bonus_discount_cents: discountCents,
+          coupon_discount_cents: couponDiscountCents,
+          coupon_code: cart.coupon_code || null,
           bonus_points_reserved: reservedPts,
         })
       } catch (err) {
@@ -5294,7 +5542,7 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const orderCheck = await client.query(
-          `SELECT id FROM store_orders WHERE id = $1::uuid AND (customer_id = $2::uuid OR email = (SELECT email FROM store_customers WHERE id = $2::uuid))`,
+          `SELECT id, seller_id FROM store_orders WHERE id = $1::uuid AND (customer_id = $2::uuid OR email = (SELECT email FROM store_customers WHERE id = $2::uuid))`,
           [order_id, payload.id]
         )
         if (!orderCheck.rows[0]) {
@@ -5305,11 +5553,17 @@ async function start() {
         const cust = custR.rows[0]
         const customer_name = cust ? [cust.first_name, cust.last_name].filter(Boolean).join(' ') || null : null
         const pid = String(product_id || '').trim()
+        const orderSellerId =
+          orderCheck.rows && orderCheck.rows[0] && orderCheck.rows[0].seller_id != null && String(orderCheck.rows[0].seller_id).trim() !== ''
+            ? String(orderCheck.rows[0].seller_id).trim()
+            : null
         const pr = await client.query('SELECT seller_id FROM admin_hub_products WHERE id::text = $1 LIMIT 1', [pid])
-        const sellerIdForReview =
+        const productSellerId =
           pr.rows && pr.rows[0] && pr.rows[0].seller_id != null && String(pr.rows[0].seller_id).trim() !== ''
             ? String(pr.rows[0].seller_id).trim()
             : null
+        // Prefer seller from order (multi-offer / buybox flow); fallback to product row owner.
+        const sellerIdForReview = orderSellerId || productSellerId || null
         const r = await client.query(
           `INSERT INTO store_product_reviews (order_id, product_id, customer_id, rating, comment, customer_name, seller_id)
            VALUES ($1::uuid, $2, $3::uuid, $4, $5, $6, $7)
@@ -6288,7 +6542,9 @@ async function start() {
 
         const subtotalCents = items.reduce((sum, it) => sum + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0)
         const reservedPts = Number(cart.bonus_points_reserved || 0)
-        const discountCents = discountCentsFromBonusPoints(reservedPts)
+        const bonusDiscountCents = discountCentsFromBonusPoints(reservedPts)
+        const couponDiscountCents = Math.max(0, Number(cart.coupon_discount_cents || 0))
+        const discountCents = Math.max(0, bonusDiscountCents + couponDiscountCents)
         const shippingCentsOrder = Math.max(0, Number(body.shipping_cents || 0))
         const merchandiseAfterDiscount = Math.max(0, subtotalCents - discountCents)
         const orderPaidTotalCents = Math.max(0, merchandiseAfterDiscount + shippingCentsOrder)
@@ -6409,14 +6665,14 @@ async function start() {
              billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping,
              payment_method, customer_id, is_guest, newsletter_opted_in,
              order_status, payment_status,
-             subtotal_cents, discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency)
-           VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt',$23,$24,$25,$26,$27,'eur')
+             subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency)
+           VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt',$23,$24,$25,$26,$27,$28,$29,'eur')
            RETURNING id, order_number`,
           [cartId, paymentIntentId, sellerId, email, first_name, last_name, phone,
            address_line1, address_line2, city, postal_code, country,
            billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billingSame,
            paymentMethod, customerId, isGuest, newsletter_opted_in,
-           subtotalCents, discountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents]
+           subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents]
         )
 
         const orderId = ins.rows && ins.rows[0] ? ins.rows[0].id : null
@@ -6493,6 +6749,7 @@ async function start() {
         }
 
         await clearCartBonusReserve(client, cartId)
+        await client.query('UPDATE store_carts SET coupon_code = NULL, coupon_discount_cents = 0, updated_at = now() WHERE id = $1', [cartId]).catch(() => {})
 
         // Clear cart items so user can't reorder accidentally
         await client.query('DELETE FROM store_cart_items WHERE cart_id = $1', [cartId])
@@ -6675,8 +6932,8 @@ async function start() {
           id: r.id,
           name: r.name,
           slug: r.slug,
-          // null → 'main' (default for old records), '' → '' (explicitly unassigned — NOT treated as main)
-          location: (r.location === null || r.location === undefined) ? 'main' : String(r.location).trim().toLowerCase(),
+          // null/'' → '' (unassigned). Only explicitly set 'main' is treated as main.
+          location: (r.location === null || r.location === undefined || String(r.location).trim() === '') ? '' : String(r.location).trim().toLowerCase(),
           categories_with_products: Boolean(r.categories_with_products),
         }))
         const menusWithItems = []
@@ -8128,12 +8385,24 @@ async function start() {
 
     const adminHubCarriersGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = req.sellerUser?.seller_id || null
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const r = await client.query('SELECT * FROM store_shipping_carriers ORDER BY sort_order ASC, created_at ASC')
+        let r
+        if (isSuperuser) {
+          r = await client.query('SELECT * FROM store_shipping_carriers ORDER BY sort_order ASC, created_at ASC')
+        } else {
+          r = await client.query(
+            `SELECT * FROM store_shipping_carriers
+             WHERE seller_id = $1
+             ORDER BY sort_order ASC, created_at ASC`,
+            [callerSellerId]
+          )
+        }
         await client.end()
         res.json({ carriers: r.rows || [] })
       } catch (e) {
@@ -8144,6 +8413,8 @@ async function start() {
 
     const adminHubCarrierPOST = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = req.sellerUser?.seller_id || null
       let client
       try {
         const { Client } = require('pg')
@@ -8152,9 +8423,9 @@ async function start() {
         const { name, tracking_url_template, api_key, api_secret, is_active = true, sort_order = 0 } = req.body || {}
         if (!name) return res.status(400).json({ message: 'name required' })
         const r = await client.query(
-          `INSERT INTO store_shipping_carriers (name, tracking_url_template, api_key, api_secret, is_active, sort_order)
-           VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-          [name, tracking_url_template||null, api_key||null, api_secret||null, is_active, Number(sort_order||0)]
+          `INSERT INTO store_shipping_carriers (name, tracking_url_template, api_key, api_secret, seller_id, is_active, sort_order)
+           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+          [name, tracking_url_template||null, api_key||null, api_secret||null, isSuperuser ? null : callerSellerId, is_active, Number(sort_order||0)]
         )
         await client.end()
         res.json({ carrier: r.rows[0] })
@@ -8167,11 +8438,20 @@ async function start() {
     const adminHubCarrierPATCH = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const id = (req.params.id || '').trim()
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = req.sellerUser?.seller_id || null
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        if (!isSuperuser) {
+          const own = await client.query('SELECT id FROM store_shipping_carriers WHERE id = $1::uuid AND seller_id = $2', [id, callerSellerId])
+          if (!own.rows[0]) {
+            await client.end()
+            return res.status(403).json({ message: 'Forbidden' })
+          }
+        }
         const allowed = ['name','tracking_url_template','api_key','api_secret','is_active','sort_order']
         const body = req.body || {}
         const sets = []; const vals = []
@@ -8193,11 +8473,20 @@ async function start() {
     const adminHubCarrierDELETE = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const id = (req.params.id || '').trim()
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = req.sellerUser?.seller_id || null
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        if (!isSuperuser) {
+          const own = await client.query('SELECT id FROM store_shipping_carriers WHERE id = $1::uuid AND seller_id = $2', [id, callerSellerId])
+          if (!own.rows[0]) {
+            await client.end()
+            return res.status(403).json({ message: 'Forbidden' })
+          }
+        }
         await client.query('DELETE FROM store_shipping_carriers WHERE id = $1::uuid', [id])
         await client.end()
         res.json({ success: true })
@@ -8408,16 +8697,23 @@ async function start() {
           // Auto-reverse bonus points on refund
           try {
             const retRow = await client.query(
-              `SELECT r.order_id, o.customer_id, o.order_number FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.id = $1::uuid`,
+              `SELECT r.order_id, o.customer_id, o.order_number, COALESCE(o.bonus_points_redeemed, 0)::int AS bonus_points_redeemed
+               FROM store_returns r
+               LEFT JOIN store_orders o ON o.id = r.order_id
+               WHERE r.id = $1::uuid`,
               [id]
             )
             const rr = retRow.rows[0]
             if (rr?.customer_id && rr?.order_id) {
-              const alreadyDone = await client.query(
-                `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_return' LIMIT 1`,
+              const alreadyEarnedDone = await client.query(
+                `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_return_earn' LIMIT 1`,
                 [rr.order_id]
               )
-              if (!alreadyDone.rows.length) {
+              const alreadyRedeemDone = await client.query(
+                `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_return_redeem' LIMIT 1`,
+                [rr.order_id]
+              )
+              if (!alreadyEarnedDone.rows.length || !alreadyRedeemDone.rows.length) {
                 const earned = await client.query(
                   `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_earn'`,
                   [rr.order_id]
@@ -8428,18 +8724,20 @@ async function start() {
                   [rr.order_id]
                 )
                 const redeemedPts = Number(redeemed.rows[0]?.total || 0)
-                if (earnedPts > 0) {
+                if (earnedPts > 0 && !alreadyEarnedDone.rows.length) {
                   await appendBonusLedger(client, {
                     customerId: rr.customer_id, pointsDelta: -earnedPts,
                     description: `Retoure Bestellung #${rr.order_number} — Punkte zurückgebucht (−${earnedPts} Punkte)`,
-                    source: 'order_return', orderId: rr.order_id,
+                    source: 'order_return_earn', orderId: rr.order_id,
                   })
                 }
-                if (redeemedPts < 0) {
+                const redeemedFromOrder = Number(rr.bonus_points_redeemed || 0)
+                const pointsToGiveBack = redeemedPts < 0 ? -redeemedPts : redeemedFromOrder
+                if (pointsToGiveBack > 0 && !alreadyRedeemDone.rows.length) {
                   await appendBonusLedger(client, {
-                    customerId: rr.customer_id, pointsDelta: -redeemedPts,
-                    description: `Retoure Bestellung #${rr.order_number} — eingelöste Punkte zurückgegeben (+${-redeemedPts} Punkte)`,
-                    source: 'order_return', orderId: rr.order_id,
+                    customerId: rr.customer_id, pointsDelta: pointsToGiveBack,
+                    description: `Retoure Bestellung #${rr.order_number} — eingelöste Punkte zurückgegeben (+${pointsToGiveBack} Punkte)`,
+                    source: 'order_return_redeem', orderId: rr.order_id,
                   })
                 }
               }
@@ -8590,10 +8888,10 @@ async function start() {
     httpApp.post('/admin-hub/v1/customers/:id/bonus-ledger', requireSellerAuth, adminHubCustomerBonusLedgerPOST)
     httpApp.patch('/admin-hub/v1/customers/:customerId/bonus-ledger/:entryId', requireSellerAuth, adminHubCustomerBonusLedgerPATCH)
     httpApp.delete('/admin-hub/v1/customers/:customerId/bonus-ledger/:entryId', requireSellerAuth, adminHubCustomerBonusLedgerDELETE)
-    httpApp.get('/admin-hub/v1/shipping-carriers', adminHubCarriersGET)
-    httpApp.post('/admin-hub/v1/shipping-carriers', adminHubCarrierPOST)
-    httpApp.patch('/admin-hub/v1/shipping-carriers/:id', adminHubCarrierPATCH)
-    httpApp.delete('/admin-hub/v1/shipping-carriers/:id', adminHubCarrierDELETE)
+    httpApp.get('/admin-hub/v1/shipping-carriers', requireSellerAuth, adminHubCarriersGET)
+    httpApp.post('/admin-hub/v1/shipping-carriers', requireSellerAuth, adminHubCarrierPOST)
+    httpApp.patch('/admin-hub/v1/shipping-carriers/:id', requireSellerAuth, adminHubCarrierPATCH)
+    httpApp.delete('/admin-hub/v1/shipping-carriers/:id', requireSellerAuth, adminHubCarrierDELETE)
     httpApp.get('/admin-hub/v1/integrations', adminHubIntegrationsGET)
     httpApp.post('/admin-hub/v1/integrations', adminHubIntegrationPOST)
     httpApp.patch('/admin-hub/v1/integrations/:id', adminHubIntegrationPATCH)
@@ -9693,6 +9991,149 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.patch('/admin-hub/v1/smtp-settings', adminHubSmtpSettingsPATCH)
     httpApp.post('/admin-hub/v1/smtp-settings/test', adminHubSmtpSettingsTestPOST)
 
+    // ── Coupons ────────────────────────────────────────────────────────────────
+    const adminHubCouponsGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const isSuperuser = req.sellerUser?.is_superuser || false
+        const callerSellerId = req.sellerUser?.seller_id
+        const sellerId = req.query.seller_id || (!isSuperuser ? callerSellerId : null)
+        const params = []
+        let where = ''
+        if (sellerId) { params.push(sellerId); where = `WHERE seller_id = $1` }
+        const r = await client.query(
+          `SELECT id, seller_id, code, discount_type, discount_value, min_subtotal_cents, usage_limit, used_count, active, expires_at, created_at, updated_at
+           FROM admin_hub_coupons ${where}
+           ORDER BY created_at DESC
+           LIMIT 500`,
+          params,
+        )
+        await client.end()
+        res.json({ coupons: r.rows || [], count: r.rows?.length || 0 })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubCouponsPOST = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const isSuperuser = req.sellerUser?.is_superuser || false
+        const callerSellerId = req.sellerUser?.seller_id
+        const body = req.body || {}
+        const sellerId = String(body.seller_id || callerSellerId || 'default')
+        if (!isSuperuser && sellerId !== callerSellerId) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
+        const code = normalizeCouponCode(body.code)
+        if (!code) {
+          await client.end()
+          return res.status(400).json({ message: 'Coupon code required' })
+        }
+        const discountType = String(body.discount_type || 'percent').toLowerCase() === 'fixed' ? 'fixed' : 'percent'
+        const discountValue = Math.max(0, parseInt(body.discount_value, 10) || 0)
+        const minSubtotalCents = Math.max(0, parseInt(body.min_subtotal_cents, 10) || 0)
+        const usageLimitRaw = body.usage_limit == null || body.usage_limit === '' ? null : Math.max(0, parseInt(body.usage_limit, 10) || 0)
+        const active = body.active !== false
+        const expiresAt = body.expires_at ? new Date(body.expires_at) : null
+        if (discountValue <= 0) {
+          await client.end()
+          return res.status(400).json({ message: 'discount_value must be > 0' })
+        }
+        const r = await client.query(
+          `INSERT INTO admin_hub_coupons
+           (seller_id, code, discount_type, discount_value, min_subtotal_cents, usage_limit, active, expires_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+           RETURNING *`,
+          [sellerId, code, discountType, discountValue, minSubtotalCents, usageLimitRaw, active, expiresAt],
+        )
+        await client.end()
+        res.json({ coupon: r.rows?.[0] || null })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubCouponsPATCH = async (req, res) => {
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const isSuperuser = req.sellerUser?.is_superuser || false
+        const callerSellerId = req.sellerUser?.seller_id
+        const own = await client.query('SELECT seller_id FROM admin_hub_coupons WHERE id = $1', [id])
+        const ownerSellerId = own.rows?.[0]?.seller_id
+        if (!ownerSellerId) {
+          await client.end()
+          return res.status(404).json({ message: 'Coupon not found' })
+        }
+        if (!isSuperuser && ownerSellerId !== callerSellerId) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
+        const body = req.body || {}
+        const sets = []
+        const vals = []
+        const put = (k, v) => { vals.push(v); sets.push(`${k} = $${vals.length}`) }
+        if (body.code !== undefined) put('code', normalizeCouponCode(body.code))
+        if (body.discount_type !== undefined) put('discount_type', String(body.discount_type || 'percent').toLowerCase() === 'fixed' ? 'fixed' : 'percent')
+        if (body.discount_value !== undefined) put('discount_value', Math.max(0, parseInt(body.discount_value, 10) || 0))
+        if (body.min_subtotal_cents !== undefined) put('min_subtotal_cents', Math.max(0, parseInt(body.min_subtotal_cents, 10) || 0))
+        if (body.usage_limit !== undefined) put('usage_limit', body.usage_limit == null || body.usage_limit === '' ? null : Math.max(0, parseInt(body.usage_limit, 10) || 0))
+        if (body.active !== undefined) put('active', body.active !== false)
+        if (body.expires_at !== undefined) put('expires_at', body.expires_at ? new Date(body.expires_at) : null)
+        if (!sets.length) {
+          await client.end()
+          return res.status(400).json({ message: 'No fields to update' })
+        }
+        sets.push('updated_at = now()')
+        vals.push(id)
+        const r = await client.query(`UPDATE admin_hub_coupons SET ${sets.join(', ')} WHERE id = $${vals.length} RETURNING *`, vals)
+        await client.end()
+        res.json({ coupon: r.rows?.[0] || null })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubCouponsDELETE = async (req, res) => {
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const isSuperuser = req.sellerUser?.is_superuser || false
+        const callerSellerId = req.sellerUser?.seller_id
+        const own = await client.query('SELECT seller_id FROM admin_hub_coupons WHERE id = $1', [id])
+        const ownerSellerId = own.rows?.[0]?.seller_id
+        if (!ownerSellerId) {
+          await client.end()
+          return res.status(404).json({ message: 'Coupon not found' })
+        }
+        if (!isSuperuser && ownerSellerId !== callerSellerId) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
+        await client.query('DELETE FROM admin_hub_coupons WHERE id = $1', [id])
+        await client.end()
+        res.json({ ok: true })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     // ── Transactions ────────────────────────────────────────────────────────────
     // GET /admin-hub/v1/transactions — list eligible orders as transactions
     const adminHubTransactionsGET = async (req, res) => {
@@ -10423,6 +10864,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     }
 
     httpApp.get('/admin-hub/v1/transactions', requireSellerAuth, adminHubTransactionsGET)
+    httpApp.get('/admin-hub/v1/coupons', requireSellerAuth, adminHubCouponsGET)
+    httpApp.post('/admin-hub/v1/coupons', requireSellerAuth, adminHubCouponsPOST)
+    httpApp.patch('/admin-hub/v1/coupons/:id', requireSellerAuth, adminHubCouponsPATCH)
+    httpApp.delete('/admin-hub/v1/coupons/:id', requireSellerAuth, adminHubCouponsDELETE)
     httpApp.get('/admin-hub/v1/payouts', requireSellerAuth, adminHubPayoutsGET)
     httpApp.post('/admin-hub/v1/payouts', requireSellerAuth, adminHubPayoutsPOST)
     httpApp.patch('/admin-hub/v1/payouts/:id', requireSellerAuth, adminHubPayoutsPATCH)

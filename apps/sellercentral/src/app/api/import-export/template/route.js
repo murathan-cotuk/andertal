@@ -117,12 +117,6 @@ function buildColumns() {
     { key: "image_url_4", label: "image_url_4", note: "Bild-URL 4", width: 40, group: "core" },
     { key: "image_url_5", label: "image_url_5", note: "Bild-URL 5", width: 40, group: "core" },
     { key: "swatch_image_url", label: "swatch_image_url", note: "Farbmuster-URL (oft Variante 1)", width: 28, group: "core" },
-    { key: "variant_seo_title_de", label: "variant_seo_title_de", note: "Child: Variant SEO Titel (DE)", width: 30, group: "core" },
-    { key: "variant_seo_description_de", label: "variant_seo_description_de", note: "Child: Variant SEO Beschreibung (DE)", width: 40, group: "core" },
-    { key: "variant_seo_keywords_de", label: "variant_seo_keywords_de", note: "Child: Variant SEO Keywords (DE)", width: 30, group: "core" },
-    { key: "variant_seo_title_en", label: "variant_seo_title_en", note: "Child: Variant SEO title (EN)", width: 30, group: "core" },
-    { key: "variant_seo_description_en", label: "variant_seo_description_en", note: "Child: Variant SEO description (EN)", width: 40, group: "core" },
-    { key: "variant_seo_keywords_en", label: "variant_seo_keywords_en", note: "Child: Variant SEO keywords (EN)", width: 30, group: "core" },
     { key: "option1_name", label: "option1_name", note: "Parent: z.B. Farbe", width: 16, group: "core" },
     { key: "option1_value", label: "option1_value", note: "Child: z.B. Rot", width: 16, group: "core" },
     { key: "option2_name", label: "option2_name", note: "Parent: z.B. Größe", width: 16, group: "core" },
@@ -139,6 +133,21 @@ function buildColumns() {
     { key: "unit_value", label: "unit_value", note: "z.B. 200", width: 12, group: "core" },
   ];
   cols.push(...core);
+
+  for (const lang of LANGS) {
+    cols.push(
+      { key: `variant_title_${lang}`, label: `variant_title_${lang}`, note: `Child: Variant Titel (${LANG_LABELS[lang]})`, width: 30, group: "core" },
+      { key: `variant_description_${lang}`, label: `variant_description_${lang}`, note: `Child: Variant Beschreibung (${LANG_LABELS[lang]})`, width: 38, group: "core" },
+      { key: `variant_bullet1_${lang}`, label: `variant_bullet1_${lang}`, note: `Child: Variant Bullet 1 (${LANG_LABELS[lang]})`, width: 30, group: "core" },
+      { key: `variant_bullet2_${lang}`, label: `variant_bullet2_${lang}`, note: `Child: Variant Bullet 2 (${LANG_LABELS[lang]})`, width: 30, group: "core" },
+      { key: `variant_bullet3_${lang}`, label: `variant_bullet3_${lang}`, note: `Child: Variant Bullet 3 (${LANG_LABELS[lang]})`, width: 30, group: "core" },
+      { key: `variant_bullet4_${lang}`, label: `variant_bullet4_${lang}`, note: `Child: Variant Bullet 4 (${LANG_LABELS[lang]})`, width: 30, group: "core" },
+      { key: `variant_bullet5_${lang}`, label: `variant_bullet5_${lang}`, note: `Child: Variant Bullet 5 (${LANG_LABELS[lang]})`, width: 30, group: "core" },
+      { key: `variant_seo_title_${lang}`, label: `variant_seo_title_${lang}`, note: `Child: Variant SEO Titel (${LANG_LABELS[lang]})`, width: 30, group: "core" },
+      { key: `variant_seo_description_${lang}`, label: `variant_seo_description_${lang}`, note: `Child: Variant SEO Beschreibung (${LANG_LABELS[lang]})`, width: 40, group: "core" },
+      { key: `variant_seo_keywords_${lang}`, label: `variant_seo_keywords_${lang}`, note: `Child: Variant SEO Keywords (${LANG_LABELS[lang]})`, width: 30, group: "core" },
+    );
+  }
 
   for (let i = 1; i <= METAFIELD_PAIRS; i++) {
     cols.push(

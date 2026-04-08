@@ -8,6 +8,9 @@ export function toSalesScore(metadata) {
 
 export function isBestsellerMetadata(metadata) {
   if (!metadata || typeof metadata !== "object") return false;
-  if (metadata.is_bestseller === true || metadata.is_bestseller === "true") return true;
-  return toSalesScore(metadata) > 0;
+  return (
+    metadata.is_bestseller === true ||
+    metadata.is_bestseller === "true" ||
+    String(metadata.badge || "").toLowerCase().trim() === "bestseller"
+  );
 }

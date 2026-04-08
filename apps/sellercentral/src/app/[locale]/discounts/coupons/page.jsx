@@ -3,7 +3,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import CouponsPage from "@/components/pages/CouponsPage";
 
-export default function GiftCards() {
+export default function DiscountsCouponsRoute() {
   return (
     <DashboardLayout>
       <CouponsPage />

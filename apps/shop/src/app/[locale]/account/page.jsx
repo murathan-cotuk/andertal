@@ -252,8 +252,8 @@ export default function AccountPage() {
                   <span style={{ fontSize: 16, fontWeight: 600, color: DARK }}>Punkte</span>
                 </div>
                 <p style={{ fontSize: 13, color: GRAY, margin: "0 0 12px", lineHeight: 1.5 }}>
-                  25 Punkte = 1 € Rabatt an der Kasse. Pro bezahltem Euro (aufgerundet) sammeln Sie Punkte; bei Registrierung gibt es 100
-                  Willkommenspunkte.
+                  25 Punkte = 1 € Rabatt an der Kasse (frei einlösbar, z. B. 34 Punkte = 1,36 €). Pro bezahltem Euro (aufgerundet)
+                  sammeln Sie Punkte; bei Registrierung gibt es 100 Willkommenspunkte.
                 </p>
                 <Link href="/bonus" style={{ fontSize: 14, fontWeight: 600, color: ORANGE, textDecoration: "none" }}>
                   Details &amp; Regeln →

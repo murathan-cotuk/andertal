@@ -645,9 +645,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           }),
         }));
       }
-      // Keep variant EANs independent from parent EAN.
-      // Parent EAN lives in metadata.ean; each variant must keep its own unique ean.
       const variantsToSave = product.variants || [];
+      const missingVariantEan = variantsToSave.find((row) => String(row?.ean || "").trim() === "");
+      if (missingVariantEan) {
+        setMessage({ type: "error", text: "Variant EAN darf nicht leer sein. Boş varyant EAN ile kayıt yapılamaz." });
+        return;
+      }
       const collectionId = (metadata.collection_ids && metadata.collection_ids[0]) || product.collection_id || null;
       // Canonical title = DE locale (for backward compat with shop)
       const canonicalTitle = metadata.translations?.de?.title || product.title || "Untitled";
@@ -2089,7 +2092,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                   <div className="vm-sub-label">Inventory & Identifiers</div>
                                   <div className="vm-grid-3">
                                     <TextField label="SKU" value={v.sku ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "sku", val)} placeholder="SKU" autoComplete="off" />
-                                    <TextField label="EAN / GTIN" value={v.ean ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "ean", val)} placeholder="EAN" autoComplete="off" />
+                                    <TextField
+                                      label="EAN / GTIN"
+                                      value={v.ean ?? ""}
+                                      onChange={(val) => updateMatrixVariant(v.option_values, "ean", val)}
+                                      placeholder="EAN"
+                                      autoComplete="off"
+                                      error={String(v.ean || "").trim() === "" ? "EAN required" : undefined}
+                                    />
                                     <TextField label="Stock" type="number" min={0} value={v.inventory != null ? String(v.inventory) : "0"} onChange={(val) => updateMatrixVariant(v.option_values, "inventory", val)} placeholder="0" />
                                   </div>
                                 </div>
@@ -2323,66 +2333,68 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">SEO</Text>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: "var(--p-color-text-subdued)", marginBottom: 4 }}>
-                  URL-Handle (Shop){locale !== "de" ? " — this language" : " — canonical (German)"}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    value={
-                      locale === "de"
-                        ? ((product.handle || "").trim() || titleToHandle(editingTitle || product.title || ""))
-                        : ((editingTr.handle || "").trim())
-                    }
-                    onChange={(e) => {
-                      const v = sanitizeSeoHandleInput(e.target.value);
-                      if (locale === "de") {
-                        setProduct((prev) => {
-                          if (!prev) return prev;
-                          const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
-                          const tr = { ...(m.translations || {}) };
-                          tr.de = { ...(tr.de || {}), handle: v };
-                          return { ...prev, handle: v, metadata: { ...m, translations: tr } };
-                        });
-                      } else {
-                        updateLocaleField("handle", v);
+              {isSuperuser ? (
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--p-color-text-subdued)", marginBottom: 4 }}>
+                    URL-Handle (Shop){locale !== "de" ? " — this language" : " — canonical (German)"}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      value={
+                        locale === "de"
+                          ? ((product.handle || "").trim() || titleToHandle(editingTitle || product.title || ""))
+                          : ((editingTr.handle || "").trim())
                       }
-                    }}
-                    style={{ flex: 1, padding: "6px 10px", border: "1px solid var(--p-color-border)", borderRadius: 6, fontSize: 12, fontFamily: "monospace" }}
-                    placeholder="url-handle"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = titleToHandle(editingTitle || product.title || "");
-                      if (locale === "de") {
-                        setProduct((prev) => {
-                          if (!prev) return prev;
-                          const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
-                          const tr = { ...(m.translations || {}) };
-                          tr.de = { ...(tr.de || {}), handle: next };
-                          return { ...prev, handle: next, metadata: { ...m, translations: tr } };
-                        });
-                      } else {
-                        updateLocaleField("handle", next);
-                      }
-                    }}
-                    title="Titel → Handle synchronisieren"
-                    style={{ padding: "6px 10px", background: "var(--p-color-bg-surface-hover)", border: "1px solid var(--p-color-border)", borderRadius: 6, cursor: "pointer", fontSize: 11, whiteSpace: "nowrap" }}
-                  >
-                    ↻ Sync
-                  </button>
+                      onChange={(e) => {
+                        const v = sanitizeSeoHandleInput(e.target.value);
+                        if (locale === "de") {
+                          setProduct((prev) => {
+                            if (!prev) return prev;
+                            const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
+                            const tr = { ...(m.translations || {}) };
+                            tr.de = { ...(tr.de || {}), handle: v };
+                            return { ...prev, handle: v, metadata: { ...m, translations: tr } };
+                          });
+                        } else {
+                          updateLocaleField("handle", v);
+                        }
+                      }}
+                      style={{ flex: 1, padding: "6px 10px", border: "1px solid var(--p-color-border)", borderRadius: 6, fontSize: 12, fontFamily: "monospace" }}
+                      placeholder="url-handle"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = titleToHandle(editingTitle || product.title || "");
+                        if (locale === "de") {
+                          setProduct((prev) => {
+                            if (!prev) return prev;
+                            const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
+                            const tr = { ...(m.translations || {}) };
+                            tr.de = { ...(tr.de || {}), handle: next };
+                            return { ...prev, handle: next, metadata: { ...m, translations: tr } };
+                          });
+                        } else {
+                          updateLocaleField("handle", next);
+                        }
+                      }}
+                      title="Titel → Handle synchronisieren"
+                      style={{ padding: "6px 10px", background: "var(--p-color-bg-surface-hover)", border: "1px solid var(--p-color-border)", borderRadius: 6, cursor: "pointer", fontSize: 11, whiteSpace: "nowrap" }}
+                    >
+                      ↻ Sync
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 4 }}>
+                    Shop-URL: {shopPreviewPrefix(locale)}/produkt/
+                    <span style={{ fontFamily: "monospace" }}>
+                      {shopProductHandleForLocale(product, locale) || titleToHandle(editingTitle || product.title || "…")}
+                    </span>
+                    {locale !== "de" && !(editingTr.handle || "").trim() && (product.handle || "").trim() ? (
+                      <span> (empty uses DE handle)</span>
+                    ) : null}
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 4 }}>
-                  Shop-URL: {shopPreviewPrefix(locale)}/produkt/
-                  <span style={{ fontFamily: "monospace" }}>
-                    {shopProductHandleForLocale(product, locale) || titleToHandle(editingTitle || product.title || "…")}
-                  </span>
-                  {locale !== "de" && !(editingTr.handle || "").trim() && (product.handle || "").trim() ? (
-                    <span> (empty uses DE handle)</span>
-                  ) : null}
-                </div>
-              </div>
+              ) : null}
               <TextField label="Meta title" value={meta.seo_meta_title ?? ""} onChange={(v) => updateMeta("seo_meta_title", v)} placeholder="Meta title" autoComplete="off" />
               <TextField label="Meta description" value={meta.seo_meta_description ?? ""} onChange={(v) => updateMeta("seo_meta_description", v)} placeholder="Meta description" multiline={2} />
               <TextField label="Keywords" value={meta.seo_keywords ?? ""} onChange={(v) => updateMeta("seo_keywords", v)} placeholder="keyword1, keyword2" autoComplete="off" />

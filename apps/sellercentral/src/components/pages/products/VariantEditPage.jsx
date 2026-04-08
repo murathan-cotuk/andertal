@@ -256,10 +256,13 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
         }));
       }
 
-      const metaEan = metadata.ean != null ? String(metadata.ean).trim() : "";
-      const variantsToSave = metaEan
-        ? (product.variants || []).map((row) => ({ ...(row || {}), ean: metaEan }))
-        : product.variants || [];
+      const variantsToSave = product.variants || [];
+      const missingVariantEanIndex = variantsToSave.findIndex((row) => String(row?.ean || "").trim() === "");
+      if (missingVariantEanIndex >= 0) {
+        setMessage({ type: "error", text: "Variant EAN darf nicht leer sein. Bitte EAN eintragen." });
+        setSaving(false);
+        return;
+      }
       const collectionId = (metadata.collection_ids && metadata.collection_ids[0]) || product.collection_id || null;
       const canonicalTitle = metadata.translations?.de?.title || product.title || "Untitled";
       const dePriceCents =
@@ -476,6 +479,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     value={v.ean ?? ""}
                     onChange={(t) => patchVariant({ ean: t || undefined })}
                     autoComplete="off"
+                    error={String(v.ean || "").trim() === "" ? "EAN required" : undefined}
                   />
                 </Box>
               </InlineStack>

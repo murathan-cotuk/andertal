@@ -146,9 +146,9 @@ export default function BonusPage() {
                     <strong>78,29 €</strong> gezahlt → <strong>79 Punkte</strong>.
                   </li>
                   <li>
-                    <strong>Einlösen:</strong> An der Kasse: <strong>25 Punkte = 1 € Rabatt</strong> (nur in 25er-Schritten). Der
-                    Rabatt zählt als Plattform-Vorteil: <strong>Verkäufer werden weiterhin zum vollen Listenpreis der Ware</strong>{" "}
-                    abgerechnet.
+                    <strong>Einlösen:</strong> An der Kasse: <strong>25 Punkte = 1 € Rabatt</strong> und frei einlösbar
+                    (z. B. <strong>34 Punkte = 1,36 €</strong>). Der Rabatt zählt als Plattform-Vorteil:{" "}
+                    <strong>Verkäufer werden weiterhin zum vollen Listenpreis der Ware</strong> abgerechnet.
                   </li>
                   <li>Sie zahlen den reduzierten Betrag mit Ihrer Zahlungsart.</li>
                 </ul>

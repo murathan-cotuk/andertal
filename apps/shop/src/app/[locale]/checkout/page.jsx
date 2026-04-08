@@ -297,7 +297,7 @@ function applyToField(field, value) {
   field.onChange({ target: { value: value ?? "" } });
 }
 
-function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry, shippableCountries }) {
+function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry, shippableCountries, paymentIntentRefreshing = false }) {
   const shipList = useMemo(() => shippableCountries || [], [shippableCountries]);
   const pickShipCountry = (raw) => {
     const u = String(raw || "DE").toUpperCase();
@@ -941,10 +941,10 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
         {error && <ErrorBox>{error}</ErrorBox>}
         <PayNowButton
           type="submit"
-          disabled={!stripe || !elements || !paymentElementReady || processing}
+          disabled={!stripe || !elements || !paymentElementReady || processing || paymentIntentRefreshing}
           style={{ width: "100%", marginTop: 20 }}
         >
-          {processing ? t("processing") : `${t("placeOrder")} – ${formatPriceCents(payCentsDisplay)} €`}
+          {processing ? t("processing") : paymentIntentRefreshing ? t("processing") : `${t("placeOrder")} – ${formatPriceCents(payCentsDisplay)} €`}
         </PayNowButton>
       </FormCard>
     </form>
@@ -1028,6 +1028,9 @@ export default function CheckoutPage() {
   const [bonusErr, setBonusErr] = useState("");
   const [balancePoints, setBalancePoints] = useState(null);
   const [bonusApplying, setBonusApplying] = useState(false);
+  const [couponDraft, setCouponDraft] = useState("");
+  const [couponErr, setCouponErr] = useState("");
+  const [couponApplying, setCouponApplying] = useState(false);
   const [piRefreshKey, setPiRefreshKey] = useState(0);
   const [customerToken, setCustomerToken] = useState(null);
 
@@ -1066,6 +1069,9 @@ export default function CheckoutPage() {
     const pts = cart?.bonus_points_reserved ?? 0;
     setBonusDraft(String(pts || ""));
   }, [cart?.bonus_points_reserved]);
+  useEffect(() => {
+    setCouponDraft(String(cart?.coupon_code || ""));
+  }, [cart?.coupon_code]);
 
   useEffect(() => {
     if (!customerToken) {
@@ -1100,7 +1106,9 @@ export default function CheckoutPage() {
       const newPts = out.bonus_points_reserved ?? out.cart?.bonus_points_reserved ?? pts;
       setCart((prev) => (prev ? { ...prev, bonus_points_reserved: newPts } : prev));
       setBonusDraft(String(newPts));
-      // Trigger PI refetch with new discounted amount
+      // Force a fresh PaymentIntent whenever bonus changes.
+      setClientSecret(null);
+      setPayCents(null);
       setPiRefreshKey((k) => k + 1);
       // Fetch updated balance in background
       client.getCustomer(tok).then((r2) => {
@@ -1120,11 +1128,61 @@ export default function CheckoutPage() {
       const tok = getToken("customer");
       await clearBonusPoints(tok);
       setBonusDraft("");
+      setClientSecret(null);
       setPayCents(null);
       setPiRefreshKey((k) => k + 1);
     } catch (_) {}
     finally {
       setBonusApplying(false);
+    }
+  };
+
+  const applyCouponCode = async () => {
+    setCouponErr("");
+    if (!cart?.id) return;
+    setCouponApplying(true);
+    try {
+      const code = String(couponDraft || "").trim();
+      const client = getMedusaClient();
+      const out = await client.patchStoreCart(cart.id, { coupon_code: code });
+      if (out?.__error) {
+        setCouponErr(out.message || "Coupon konnte nicht angewendet werden.");
+        return;
+      }
+      const newCode = out?.coupon_code ?? out?.cart?.coupon_code ?? code;
+      const newDiscount = out?.coupon_discount_cents ?? out?.cart?.coupon_discount_cents ?? 0;
+      setCart((prev) => (prev ? { ...prev, coupon_code: newCode || null, coupon_discount_cents: Number(newDiscount || 0) } : prev));
+      setCouponDraft(String(newCode || ""));
+      setClientSecret(null);
+      setPayCents(null);
+      setPiRefreshKey((k) => k + 1);
+    } catch (e) {
+      setCouponErr(e?.message || "Coupon konnte nicht angewendet werden.");
+    } finally {
+      setCouponApplying(false);
+    }
+  };
+
+  const removeCouponCode = async () => {
+    setCouponErr("");
+    if (!cart?.id) return;
+    setCouponApplying(true);
+    try {
+      const client = getMedusaClient();
+      const out = await client.patchStoreCart(cart.id, { coupon_code: "" });
+      if (out?.__error) {
+        setCouponErr(out.message || "Coupon konnte nicht entfernt werden.");
+        return;
+      }
+      setCart((prev) => (prev ? { ...prev, coupon_code: null, coupon_discount_cents: 0 } : prev));
+      setCouponDraft("");
+      setClientSecret(null);
+      setPayCents(null);
+      setPiRefreshKey((k) => k + 1);
+    } catch (e) {
+      setCouponErr(e?.message || "Coupon konnte nicht entfernt werden.");
+    } finally {
+      setCouponApplying(false);
     }
   };
 
@@ -1146,6 +1204,8 @@ export default function CheckoutPage() {
 
     setLoadingPI(true);
     setPiError(null);
+    setClientSecret(null);
+    setPayCents(null);
     const effectiveShippingCents = isFreeShipping ? 0 : (shippingCents ?? 0);
     fetch("/api/store-payment-intent", {
       method: "POST",
@@ -1193,7 +1253,7 @@ export default function CheckoutPage() {
               {loadingPI && <p style={{ color: "#6b7280" }}>{t("processing")}</p>}
               {clientSecret && stripePromiseState && (
                 <Elements
-                  key={cart.id}
+                  key={`${cart.id}-${clientSecret}`}
                   stripe={stripePromiseState}
                   options={{
                     clientSecret,
@@ -1217,6 +1277,7 @@ export default function CheckoutPage() {
                     onCountryChange={setShippingCountry}
                     defaultCountry={shippingCountry}
                     shippableCountries={shippableCountries}
+                    paymentIntentRefreshing={loadingPI}
                   />
                 </Elements>
               )}
@@ -1313,6 +1374,64 @@ export default function CheckoutPage() {
                   <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: 0 }}>{t("bonusLogin")}</p>
                 )}
               </div>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#111827", marginBottom: 8 }}>Coupon code</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    type="text"
+                    value={couponDraft}
+                    onChange={(e) => setCouponDraft(e.target.value)}
+                    placeholder="z. B. SAVE10"
+                    style={{
+                      flex: "1 1 140px",
+                      minWidth: 120,
+                      padding: "8px 10px",
+                      border: "1px solid #d1d5db",
+                      borderRadius: 8,
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={applyCouponCode}
+                    disabled={couponApplying}
+                    style={{
+                      padding: "8px 14px",
+                      background: tokens.primary.DEFAULT,
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 8,
+                      fontSize: "0.8125rem",
+                      fontWeight: 600,
+                      cursor: couponApplying ? "wait" : "pointer",
+                      opacity: couponApplying ? 0.7 : 1,
+                    }}
+                  >
+                    Anwenden
+                  </button>
+                  {(cart?.coupon_code || "").trim() && (
+                    <button
+                      type="button"
+                      onClick={removeCouponCode}
+                      disabled={couponApplying}
+                      style={{
+                        padding: "8px 14px",
+                        background: "#fff",
+                        color: "#374151",
+                        border: "1px solid #d1d5db",
+                        borderRadius: 8,
+                        fontSize: "0.8125rem",
+                        fontWeight: 600,
+                        cursor: couponApplying ? "wait" : "pointer",
+                        opacity: couponApplying ? 0.7 : 1,
+                      }}
+                    >
+                      Entfernen
+                    </button>
+                  )}
+                </div>
+                {couponErr ? <p style={{ fontSize: "0.75rem", color: "#b91c1c", margin: "8px 0 0" }}>{couponErr}</p> : null}
+              </div>
               <Divider />
               <SummaryRow>
                 <span>{t("subtotal")}</span>
@@ -1345,6 +1464,12 @@ export default function CheckoutPage() {
                     </button>
                   </span>
                   <span>−{formatPriceCents(bonusDiscountCents)} €</span>
+                </SummaryRow>
+              )}
+              {Number(cart?.coupon_discount_cents || 0) > 0 && (
+                <SummaryRow style={{ color: "#16a34a" }}>
+                  <span>Coupon-Rabatt {(cart?.coupon_code || "").trim() ? `(${cart.coupon_code})` : ""}</span>
+                  <span>−{formatPriceCents(Number(cart?.coupon_discount_cents || 0))} €</span>
                 </SummaryRow>
               )}
               <SummaryRow>

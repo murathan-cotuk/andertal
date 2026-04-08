@@ -657,6 +657,7 @@ export default function ShopHeader() {
   const headerRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(116);
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
+  const [shopBranding, setShopBranding] = useState({ shop_logo_url: "", shop_favicon_url: "" });
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
   const [mainMenuAllItems, setMainMenuAllItems] = useState([]);
@@ -696,13 +697,46 @@ export default function ShopHeader() {
   const locale = useLocale();
 
   useEffect(() => {
+    let cancelled = false;
+    fetch("/api/store-seller-settings?seller_id=default", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        setShopBranding({
+          shop_logo_url: d?.shop_logo_url || "",
+          shop_favicon_url: d?.shop_favicon_url || "",
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const fav = (shopBranding.shop_favicon_url || "").trim();
+    if (!fav || typeof document === "undefined") return;
+    let link = document.querySelector("link[rel='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.setAttribute("rel", "icon");
+      document.head.appendChild(link);
+    }
+    link.setAttribute("href", fav);
+  }, [shopBranding.shop_favicon_url]);
+
+  useEffect(() => {
     const norm = (s) => String(s || "").toLowerCase().trim();
     const applyMenus = (locData, menuData) => {
       const locs = locData?.locations || [];
       const menus = Array.isArray(menuData?.menus) ? menuData.menus : [];
       const subnavLoc = locs.find((l) => norm(l?.html_id) === "subnav");
       const subnavSlug = norm(subnavLoc?.slug || "second");
-      const main = menus.find((m) => norm(m?.location) === "main") || menus[0];
+      // Prefer categories-with-products configured main menu for dropdown mode.
+      const mainCandidates = menus.filter((m) => norm(m?.location) === "main");
+      const main =
+        mainCandidates.find((m) => Boolean(m?.categories_with_products)) ||
+        mainCandidates.find((m) => (m.items || []).length > 0) ||
+        mainCandidates[0] ||
+        null;
       const second =
         menus.find((m) => norm(m?.location) === subnavSlug) ||
         menus.find((m) => norm(m?.slug) === "second-menu");
@@ -732,10 +766,11 @@ export default function ShopHeader() {
     let cancelled = false;
     const run = async () => {
       try {
-        const client = getMedusaClient();
         const [res, catRes] = await Promise.all([
           fetch("/api/store-products?limit=5000", { cache: "no-store" }),
-          client.getCategories({ tree: true, is_visible: true }).catch(() => ({ tree: [] })),
+          fetch("/api/store-categories?tree=true&is_visible=true", { cache: "no-store" })
+            .then((r) => r.json())
+            .catch(() => ({ tree: [] })),
         ]);
         if (cancelled) return;
         const tree = catRes.tree || [];
@@ -835,11 +870,12 @@ export default function ShopHeader() {
     url: "handle",
     image: "thumbnail",
   };
-  /** Fallback wenn das Menü keine Kategorie-Parents enthält: Wurzelkategorien aus der DB mit Produkten. */
+  /** Tüm root kategoriler (ürün koşulu olmadan). categories_with_products modunda sadece ürünlü olanlar. */
   const browseRootsFromTree = useMemo(() => {
-    if (!Array.isArray(categoryTree) || categoryTree.length === 0 || categoryIdsWithProducts.size === 0) return [];
+    if (!Array.isArray(categoryTree) || categoryTree.length === 0) return [];
+    const useProdFilter = mainMenuConfig?.categories_with_products && categoryIdsWithProducts.size > 0;
     return categoryTree
-      .filter((n) => n && categoryIdsWithProducts.has(normCatId(n.id)))
+      .filter((n) => n && (!useProdFilter || categoryIdsWithProducts.has(normCatId(n.id))))
       .map((n) => ({
         key: String(n.id),
         label: n.name || n.slug || "",
@@ -847,13 +883,20 @@ export default function ShopHeader() {
       }))
       .filter((r) => r.slug)
       .sort((a, b) => String(a.label).localeCompare(String(b.label), locale));
-  }, [categoryTree, categoryIdsWithProducts, locale]);
+  }, [categoryTree, categoryIdsWithProducts, mainMenuConfig, locale]);
 
   const categoryPanelRows = browseRootsFromTree.map((r) => ({
     key: r.key,
     label: r.label,
-    href: `/category/${r.slug}`,
+    href: `/kollektion/${r.slug}`,
   }));
+
+  // Root-level menu items (no parent) for direct link rendering
+  const menuPanelItems = useMemo(
+    () => (mainMenuAllItems || []).filter((i) => !i?.parent_id),
+    [mainMenuAllItems],
+  );
+  const showCategoriesMode = Boolean(mainMenuConfig?.categories_with_products);
 
   return (
     <>
@@ -864,7 +907,17 @@ export default function ShopHeader() {
         <MiddleBarWrap className="shop-header-main">
           <MiddleBarInner>
             <MiddleBarLeft>
-              <MiddleBarLogo href="/">Belucha</MiddleBarLogo>
+              <MiddleBarLogo href="/">
+                {shopBranding.shop_logo_url ? (
+                  <img
+                    src={shopBranding.shop_logo_url}
+                    alt="Shop logo"
+                    style={{ height: 34, width: "auto", maxWidth: 180, objectFit: "contain", display: "block" }}
+                  />
+                ) : (
+                  "Belucha"
+                )}
+              </MiddleBarLogo>
             </MiddleBarLeft>
 
             <MiddleBarCenter>
@@ -875,30 +928,48 @@ export default function ShopHeader() {
                   </svg>
                 </CategoriesButton>
                 <CategoriesPanel $open={mainMenuOpen}>
-                  {categoryPanelRows.length === 0 && (
+                  {!showCategoriesMode && menuPanelItems.length > 0 ? (
+                    // Main menu → direkt link olarak göster
+                    menuPanelItems.map((item) => {
+                      const href = menuItemHref(item);
+                      return (
+                        <CategoryRow
+                          as={Link}
+                          key={item.id}
+                          href={href === "#" ? "/" : href}
+                          onClick={() => setMainMenuOpen(false)}
+                        >
+                          {item.label}
+                        </CategoryRow>
+                      );
+                    })
+                  ) : categoryPanelRows.length === 0 ? (
                     <div style={{ padding: 12, color: tokens.dark[500], fontSize: 14 }}>
                       {tNav("categoryMenuEmpty")}
                     </div>
-                  )}
-                  {pendingBrowseTarget?.href ? (
-                    <div style={{ padding: "6px 14px 10px", fontSize: 12, color: tokens.dark[600], borderBottom: `1px solid ${tokens.border.light}` }}>
-                      {tNav("categoryPendingHint", { label: pendingBrowseTarget.label })}
-                    </div>
-                  ) : null}
-                  {categoryPanelRows.map((row) =>
-                    row.href && row.href !== "#" ? (
-                      <CategoryRow
-                        key={row.key}
-                        type="button"
-                        style={{ paddingLeft: 14 }}
-                        onClick={() => {
-                          setPendingBrowseTarget({ href: row.href, label: row.label });
-                          setMainMenuOpen(false);
-                        }}
-                      >
-                        {row.label}
-                      </CategoryRow>
-                    ) : null,
+                  ) : (
+                    <>
+                      {pendingBrowseTarget?.href ? (
+                        <div style={{ padding: "6px 14px 10px", fontSize: 12, color: tokens.dark[600], borderBottom: `1px solid ${tokens.border.light}` }}>
+                          {tNav("categoryPendingHint", { label: pendingBrowseTarget.label })}
+                        </div>
+                      ) : null}
+                      {categoryPanelRows.map((row) =>
+                        row.href && row.href !== "#" ? (
+                          <CategoryRow
+                            key={row.key}
+                            type="button"
+                            style={{ paddingLeft: 14 }}
+                            onClick={() => {
+                              setPendingBrowseTarget({ href: row.href, label: row.label });
+                              setMainMenuOpen(false);
+                            }}
+                          >
+                            {row.label}
+                          </CategoryRow>
+                        ) : null,
+                      )}
+                    </>
                   )}
                 </CategoriesPanel>
               </CategoriesDropdown>

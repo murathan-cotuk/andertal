@@ -303,6 +303,18 @@ function computeChildPresent(childRow, idx) {
   const kp = (k) => keyPresent(childRow, k, idx);
   const opts = {};
   for (let n = 1; n <= 40; n++) opts[n] = kp(`option${n}_value`);
+  const translations = {};
+  for (const lang of LANGS) {
+    translations[lang] = {
+      title: kp(`variant_title_${lang}`),
+      description: kp(`variant_description_${lang}`),
+      bullet1: kp(`variant_bullet1_${lang}`),
+      bullet2: kp(`variant_bullet2_${lang}`),
+      bullet3: kp(`variant_bullet3_${lang}`),
+      bullet4: kp(`variant_bullet4_${lang}`),
+      bullet5: kp(`variant_bullet5_${lang}`),
+    };
+  }
   const seo = {};
   for (const lang of LANGS) {
     seo[lang] = {
@@ -321,7 +333,8 @@ function computeChildPresent(childRow, idx) {
   return {
     ean: kp("ean"),
     inventory: kp("inventory"),
-    image1: kp("image_url_1"),
+    imageSlot: Object.fromEntries([1, 2, 3, 4, 5].map((n) => [n, kp(`image_url_${n}`)])),
+    translations,
     brand: kp("brand"),
     category_slug: kp("category_slug"),
     shipping_group: kp("shipping_group"),
@@ -362,6 +375,17 @@ function collectVariantMetafields(row, headers, idx) {
     if (k) out.push({ key: k, value: v });
   }
   return out.length ? out : undefined;
+}
+
+function collectImageSlotsFromRow(row, idx) {
+  const out = {};
+  for (let n = 1; n <= 5; n++) {
+    const col = idx[`image_url_${n}`];
+    if (col === undefined) continue;
+    const v = str(row[col]);
+    if (v) out[n] = v;
+  }
+  return out;
 }
 
 function normalizeVariants(v) {
@@ -409,7 +433,16 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
     const out = { ...cur };
     if (pres.ean) out.ean = inv.ean;
     if (pres.inventory) out.inventory = inv.inventory ?? 0;
-    if (pres.image1) out.image_urls = inv.image_urls ?? out.image_urls;
+    if (Object.values(pres.imageSlot || {}).some(Boolean)) {
+      if (inv.image_url) out.image_url = inv.image_url;
+      if (inv.image_urls) out.image_urls = inv.image_urls;
+      const invMedia = Array.isArray(inv.metadata?.media) ? inv.metadata.media : [];
+      if (invMedia.length) {
+        const md = out.metadata && typeof out.metadata === "object" ? { ...out.metadata } : {};
+        md.media = invMedia;
+        out.metadata = md;
+      }
+    }
     const commonTouched =
       pres.brand || pres.category_slug || pres.shipping_group || pres.type ||
       pres.weight_grams || pres.dim_length || pres.dim_width || pres.dim_height ||
@@ -455,6 +488,35 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
       md.translations = tr;
       out.metadata = md;
     }
+    const trTouched = LANGS.some((lang) => Object.values(pres.translations?.[lang] || {}).some(Boolean));
+    if (trTouched) {
+      const md = out.metadata && typeof out.metadata === "object" ? { ...out.metadata } : {};
+      const tr = md.translations && typeof md.translations === "object" ? { ...md.translations } : {};
+      const invTr = inv.metadata?.translations && typeof inv.metadata.translations === "object" ? inv.metadata.translations : {};
+      for (const lang of LANGS) {
+        const s = pres.translations?.[lang] || {};
+        if (!Object.values(s).some(Boolean)) continue;
+        const prev = { ...(tr[lang] || {}) };
+        const src = invTr[lang] || {};
+        if (s.title) prev.title = src.title;
+        if (s.description) prev.description = src.description;
+        if (s.bullet1 || s.bullet2 || s.bullet3 || s.bullet4 || s.bullet5) {
+          const next = Array.isArray(prev.bullet_points) ? [...prev.bullet_points] : [];
+          if (s.bullet1) next[0] = src.bullet_points?.[0] || "";
+          if (s.bullet2) next[1] = src.bullet_points?.[1] || "";
+          if (s.bullet3) next[2] = src.bullet_points?.[2] || "";
+          if (s.bullet4) next[3] = src.bullet_points?.[3] || "";
+          if (s.bullet5) next[4] = src.bullet_points?.[4] || "";
+          while (next.length && str(next[next.length - 1]) === "") next.pop();
+          if (next.length) prev.bullet_points = next;
+        }
+        tr[lang] = prev;
+      }
+      md.translations = tr;
+      out.metadata = md;
+      if (tr.de?.title) out.title = tr.de.title;
+      if (tr.de?.description) out.description = tr.de.description;
+    }
     if (pres.variantMetafieldTouched) {
       const md = out.metadata && typeof out.metadata === "object" ? { ...out.metadata } : {};
       const incomingMf = Array.isArray(inv.metadata?.metafields) ? inv.metadata.metafields : [];
@@ -482,6 +544,10 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
       }
       while (nextOv.length && nextOv[nextOv.length - 1] == null) nextOv.pop();
       out.option_values = nextOv.length ? nextOv : out.option_values;
+    }
+    if (inv.price_cents != null && Object.values(pres.prices || {}).some(Boolean)) {
+      out.price_cents = inv.price_cents;
+      if (inv.compare_at_price_cents != null) out.compare_at_price_cents = inv.compare_at_price_cents;
     }
     bySku.set(sk, out);
   }
@@ -683,11 +749,22 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     }
     const variantTranslations = {};
     for (const lang of LANGS) {
+      const vTitle = cGet(`variant_title_${lang}`);
+      const vDescription = cGet(`variant_description_${lang}`);
+      const vb1 = cGet(`variant_bullet1_${lang}`);
+      const vb2 = cGet(`variant_bullet2_${lang}`);
+      const vb3 = cGet(`variant_bullet3_${lang}`);
+      const vb4 = cGet(`variant_bullet4_${lang}`);
+      const vb5 = cGet(`variant_bullet5_${lang}`);
       const seoTitle = cGet(`variant_seo_title_${lang}`);
       const seoDescription = cGet(`variant_seo_description_${lang}`);
       const seoKeywords = cGet(`variant_seo_keywords_${lang}`);
-      if (!seoTitle && !seoDescription && !seoKeywords) continue;
+      if (!vTitle && !vDescription && !vb1 && !vb2 && !vb3 && !vb4 && !vb5 && !seoTitle && !seoDescription && !seoKeywords) continue;
       variantTranslations[lang] = {};
+      if (vTitle) variantTranslations[lang].title = vTitle;
+      if (vDescription) variantTranslations[lang].description = vDescription;
+      const vBullets = [vb1, vb2, vb3, vb4, vb5].filter(Boolean);
+      if (vBullets.length) variantTranslations[lang].bullet_points = vBullets;
       if (seoTitle) variantTranslations[lang].seo_title = seoTitle;
       if (seoDescription) variantTranslations[lang].seo_description = seoDescription;
       if (seoKeywords) variantTranslations[lang].seo_keywords = seoKeywords;
@@ -696,7 +773,8 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     const variantMeta = {};
     if (Object.keys(variantTranslations).length) variantMeta.translations = variantTranslations;
     if (variantMetafields?.length) variantMeta.metafields = variantMetafields;
-    const cImage = cGet("image_url_1");
+    const cImageSlots = collectImageSlotsFromRow(cRow, idx);
+    const cImage = cImageSlots[1] || "";
     const cBrand = str(cGet("brand"));
     const cBrandRef = cBrand ? brandByLowerName.get(cBrand.toLowerCase()) : null;
     if (cBrand && !cBrandRef) {
@@ -735,13 +813,21 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     if (str(cGet("unit_type"))) variantMeta.unit_type = str(cGet("unit_type"));
     if (parseNum(cGet("unit_value")) != null) variantMeta.unit_value = parseNum(cGet("unit_value"));
     if (Object.keys(cPrices).length) variantMeta.prices = cPrices;
+    const cGallery = Object.values(cImageSlots).filter(Boolean);
+    if (cGallery.length) variantMeta.media = cGallery;
+    const deBrutto = parseCents(cGet("price_brutto_DE"));
+    const deUvp = parseCents(cGet("price_uvp_DE"));
     variants.push({
       sku: cGet("sku") || undefined,
       ean: cGet("ean") || undefined,
       inventory: parseNum(cGet("inventory")) ?? 0,
+      title: cGet("variant_title_de") || (option_values.length ? option_values.join(" / ") : undefined),
+      description: cGet("variant_description_de") || undefined,
       option_values: option_values.length ? option_values : undefined,
       image_url: cImage || undefined,
       image_urls: cImage ? Object.fromEntries(LANGS.map((l) => [l, cImage])) : undefined,
+      ...(deBrutto != null ? { price_cents: deBrutto, price: Number((deBrutto / 100).toFixed(2)) } : {}),
+      ...(deUvp != null ? { compare_at_price_cents: deUvp } : {}),
       metadata: Object.keys(variantMeta).length ? variantMeta : undefined,
     });
   }

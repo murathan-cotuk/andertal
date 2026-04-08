@@ -305,6 +305,8 @@ export default function MediaPage() {
 
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
+  const dragCounterRef = useRef(0);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -689,8 +691,54 @@ export default function MediaPage() {
   /* ── Drag-and-drop ── */
   const handleDrop = (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingFiles(false);
     uploadFiles(e.dataTransfer.files);
   };
+
+  useEffect(() => {
+    const hasFiles = (dt) => {
+      if (!dt) return false;
+      const types = Array.from(dt.types || []);
+      return types.includes("Files");
+    };
+    const onDragEnter = (e) => {
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      dragCounterRef.current += 1;
+      setIsDraggingFiles(true);
+    };
+    const onDragOver = (e) => {
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      if (!isDraggingFiles) setIsDraggingFiles(true);
+    };
+    const onDragLeave = (e) => {
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+      if (dragCounterRef.current === 0) setIsDraggingFiles(false);
+    };
+    const onDropGlobal = (e) => {
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounterRef.current = 0;
+      setIsDraggingFiles(false);
+      uploadFiles(e.dataTransfer.files);
+    };
+    window.addEventListener("dragenter", onDragEnter);
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("drop", onDropGlobal);
+    return () => {
+      window.removeEventListener("dragenter", onDragEnter);
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("drop", onDropGlobal);
+    };
+  }, [uploadFiles, isDraggingFiles]);
 
   const folderSelectOptions = [
     { label: "— No folder (root) —", value: "" },
@@ -742,6 +790,40 @@ export default function MediaPage() {
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 9998, background: "#111", color: "#fff", padding: "10px 22px", borderRadius: 8, fontSize: 13, fontWeight: 600, pointerEvents: "none", boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
           {toast}
+        </div>
+      )}
+
+      {/* Global drag overlay */}
+      {isDraggingFiles && (
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9997,
+            background: "rgba(17, 24, 39, 0.18)",
+            border: "3px dashed #60a5fa",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "auto",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #dbeafe",
+              color: "#1e3a8a",
+              borderRadius: 12,
+              padding: "18px 26px",
+              fontSize: 16,
+              fontWeight: 700,
+              boxShadow: "0 10px 26px rgba(0,0,0,0.15)",
+            }}
+          >
+            Drop files to upload
+          </div>
         </div>
       )}
 

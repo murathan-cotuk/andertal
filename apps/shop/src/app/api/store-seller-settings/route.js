@@ -18,11 +18,15 @@ export async function GET(req) {
         store_name: data?.store_name || "",
         free_shipping_threshold_cents: data?.free_shipping_threshold_cents ?? null,
         free_shipping_thresholds: data?.free_shipping_thresholds ?? null,
+        shop_logo_url: data?.shop_logo_url || "",
+        shop_favicon_url: data?.shop_favicon_url || "",
+        sellercentral_logo_url: data?.sellercentral_logo_url || "",
+        sellercentral_favicon_url: data?.sellercentral_favicon_url || "",
       },
       { status: r.ok ? 200 : r.status }
     );
   } catch (e) {
-    return NextResponse.json({ store_name: "" }, { status: 200 });
+    return NextResponse.json({ store_name: "", shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "" }, { status: 200 });
   }
 }
 

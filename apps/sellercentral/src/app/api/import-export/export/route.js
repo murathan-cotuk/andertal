@@ -131,7 +131,7 @@ function toCsv(columns, rows) {
   };
   const lines = [columns.join(",")];
   for (const row of rows) lines.push(columns.map((c) => esc(row[c])).join(","));
-  return lines.join("\n");
+  return `\uFEFF${lines.join("\n")}`;
 }
 
 function toTxt(columns, rows) {
@@ -144,16 +144,57 @@ function toTxt(columns, rows) {
   return blocks.join("\n");
 }
 
-async function toXlsx(columns, rows, groupBySeller = false) {
+async function toXlsx(columns, rows, groupBySeller = false, meta = {}) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Belucha Sellercentral";
+  wb.created = new Date();
+  const addSummarySheet = () => {
+    const ws = wb.addWorksheet("summary");
+    ws.columns = [{ width: 26 }, { width: 80 }];
+    const lines = [
+      ["Generated at", new Date().toISOString()],
+      ["Datasets", Array.isArray(meta.datasets) ? meta.datasets.join(", ") : ""],
+      ["Rows", String(meta.totalRows ?? rows.length)],
+      ["Format", "xlsx"],
+      ["Grouped by seller", groupBySeller ? "yes" : "no"],
+      ["Filters.search", str(meta.filters?.search)],
+      ["Filters.status", str(meta.filters?.status)],
+      ["Filters.date_from", str(meta.filters?.date_from)],
+      ["Filters.date_to", str(meta.filters?.date_to)],
+      ["Columns", columns.join(", ")],
+    ];
+    lines.forEach((r) => ws.addRow(r));
+    ws.getRow(1).font = { bold: true };
+  };
+  addSummarySheet();
+
   const addSheet = (name, sheetRows) => {
     const ws = wb.addWorksheet(name.substring(0, 31));
     ws.addRow(columns);
-    ws.getRow(1).font = { bold: true };
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+    ws.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: Math.max(1, columns.length) },
+    };
+    const header = ws.getRow(1);
+    header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
     for (const row of sheetRows) ws.addRow(columns.map((c) => row[c] ?? ""));
+    for (let i = 2; i <= ws.rowCount; i++) {
+      if (i % 2 === 0) {
+        ws.getRow(i).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+      }
+    }
+    const sampleSize = Math.min(sheetRows.length, 200);
     ws.columns.forEach((col) => {
-      col.width = Math.min(45, Math.max(14, String(col.header || "").length + 2));
+      const key = String(col.header || "");
+      let maxLen = Math.max(12, key.length + 2);
+      for (let i = 0; i < sampleSize; i++) {
+        const v = sheetRows[i]?.[key];
+        const l = String(v ?? "").length;
+        if (l > maxLen) maxLen = l;
+      }
+      col.width = Math.min(60, Math.max(12, maxLen + 2));
     });
   };
   if (groupBySeller) {
@@ -232,7 +273,12 @@ export async function POST(request) {
         },
       });
     }
-    const buf = await toXlsx(picked.cols, picked.rows, isSuperuser && includeAllSellers && !!body.group_by_seller);
+    const buf = await toXlsx(
+      picked.cols,
+      picked.rows,
+      isSuperuser && includeAllSellers && !!body.group_by_seller,
+      { datasets, filters, totalRows: picked.rows.length }
+    );
     return new Response(buf, {
       status: 200,
       headers: {

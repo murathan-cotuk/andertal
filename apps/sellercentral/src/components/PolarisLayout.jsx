@@ -64,7 +64,6 @@ function getMenuItemsMain(t, isSuperuser = false) {
       subNavigationItems: [
         { url: "/products/inventory", label: t("inventory") },
         { url: "/products/collections", label: t("collections") },
-        { url: "/products/gift-cards", label: t("giftCards") },
       ],
     },
     {
@@ -100,7 +99,14 @@ function getMenuItemsMain(t, isSuperuser = false) {
         { url: "/marketing/automations", label: t("automations") },
       ],
     },
-    { url: "/discounts", label: t("discounts"), icon: DiscountIcon },
+    {
+      url: "/discounts",
+      label: t("discounts"),
+      icon: DiscountIcon,
+      subNavigationItems: [
+        { url: "/discounts/coupons", label: "Coupons" },
+      ],
+    },
     {
       url: "/content",
       label: t("content"),
@@ -143,7 +149,7 @@ function getMenuItemsSettings(t, isSuperuser = false) {
 
 // Parent nav URLs that should expand/collapse sub-menus on click (no page navigation)
 const PARENT_NAV_URLS = new Set([
-  "/products", "/marketing", "/content", "/analytics", "/customers-menu", "/sellers-menu",
+  "/products", "/marketing", "/content", "/analytics", "/customers-menu", "/sellers-menu", "/discounts",
 ]);
 
 const NextLink = forwardRef(function NextLink({ url, children, external, onClick, ...rest }, ref) {
@@ -219,9 +225,44 @@ export default function PolarisLayout({ children }) {
       ? localStorage.getItem("storeName") || "Seller Account"
       : "Seller Account"
   );
-  const [isSuspended, setIsSuspended] = useState(
-    typeof window !== "undefined" && localStorage.getItem("sellerApprovalStatus") === "suspended"
+  const [approvalStatus, setApprovalStatus] = useState(
+    typeof window !== "undefined" ? String(localStorage.getItem("sellerApprovalStatus") || "").toLowerCase() : ""
   );
+  const [platformBranding, setPlatformBranding] = useState({
+    sellercentral_logo_url: "",
+    sellercentral_favicon_url: "",
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token = localStorage.getItem("sellerToken");
+    const base = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "");
+    if (!base) return;
+    fetch(`${base}/admin-hub/seller-settings?seller_id=default`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: "no-store",
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        setPlatformBranding({
+          sellercentral_logo_url: d?.sellercentral_logo_url || "",
+          sellercentral_favicon_url: d?.sellercentral_favicon_url || "",
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const fav = (platformBranding.sellercentral_favicon_url || "").trim();
+    if (!fav || typeof document === "undefined") return;
+    let link = document.querySelector("link[rel='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.setAttribute("rel", "icon");
+      document.head.appendChild(link);
+    }
+    link.setAttribute("href", fav);
+  }, [platformBranding.sellercentral_favicon_url]);
 
   const refreshNotifications = useCallback(async () => {
     try {
@@ -307,7 +348,7 @@ export default function PolarisLayout({ children }) {
       getMedusaAdminClient().getSellerAccount().then((d) => {
         const status = String(d?.user?.approval_status || "").toLowerCase();
         if (status) localStorage.setItem("sellerApprovalStatus", status);
-        setIsSuspended(status === "suspended");
+        setApprovalStatus(status);
       }).catch(() => {});
       // Redirect non-superusers away from blocked routes
       if (!superuser && SELLER_BLOCKED_ROUTES.has(pathname)) {
@@ -435,6 +476,13 @@ export default function PolarisLayout({ children }) {
       onNavigationToggle={() => setShowMobileNav((v) => !v)}
       userMenu={
         <div style={{ display: "flex", alignItems: "center", gap: 4, height: 56 }}>
+          {platformBranding.sellercentral_logo_url ? (
+            <img
+              src={platformBranding.sellercentral_logo_url}
+              alt="Sellercentral logo"
+              style={{ height: 28, width: "auto", maxWidth: 140, objectFit: "contain", marginRight: 6, borderRadius: 4 }}
+            />
+          ) : null}
           {/* Language selector */}
           {langSelector}
 
@@ -649,6 +697,43 @@ export default function PolarisLayout({ children }) {
   );
 
   const linkComponent = unsaved ? UnsavedAwareLink : NextLink;
+  const approvalBanner = !isSuperuser ? (() => {
+    const status = String(approvalStatus || "").toLowerCase();
+    if (!status || status === "approved" || status === "active" || status === "registered") return null;
+    if (status === "suspended") {
+      return {
+        background: "#dc2626",
+        color: "#fff",
+        text: "your account is suspended. please contact with support",
+      };
+    }
+    if (status === "rejected") {
+      return {
+        background: "#ef4444",
+        color: "#fff",
+        text: "your account was rejected. please review your documents and contact support.",
+      };
+    }
+    if (status === "documents_submitted") {
+      return {
+        background: "#d97706",
+        color: "#fff",
+        text: "documents submitted. your account is under review.",
+      };
+    }
+    if (status === "pending_approval" || status === "pending") {
+      return {
+        background: "#2563eb",
+        color: "#fff",
+        text: "your account is pending approval. you will be notified after review.",
+      };
+    }
+    return {
+      background: "#4b5563",
+      color: "#fff",
+      text: `account status: ${status}`,
+    };
+  })() : null;
 
   return (
     <AppProvider i18n={en} linkComponent={linkComponent}>
@@ -658,18 +743,18 @@ export default function PolarisLayout({ children }) {
         showMobileNavigation={showMobileNav}
         onNavigationDismiss={() => setShowMobileNav(false)}
       >
-        {isSuspended && (
+        {approvalBanner && (
           <div
             style={{
-              background: "#dc2626",
-              color: "#fff",
+              background: approvalBanner.background,
+              color: approvalBanner.color,
               textAlign: "center",
               fontSize: 13,
               fontWeight: 600,
               padding: "10px 16px",
             }}
           >
-            your account is suspended. please contact with support
+            {approvalBanner.text}
           </div>
         )}
         {unsaved?.showNavigateConfirm && (

@@ -257,10 +257,13 @@ export default function SellerDetailPage({ sellerId }) {
   };
 
   const handleMarkPaid = async (payout) => {
-    if (!confirm(`Auszahlung ${fmtDate(payout.period_start)}–${fmtDate(payout.period_end)} als bezahlt markieren?`)) return;
+    if (!confirm(
+      `Auszahlung ${fmtDate(payout.period_start)}–${fmtDate(payout.period_end)} als extern überwiesen markieren?\n\n` +
+      `Hinweis: Bu işlem banka/Stripe transferi başlatmaz. Önce ödemeyi platform hesabından seller IBAN'ına gerçekten gönderin, sonra burada "bezahlt" işaretleyin.`
+    )) return;
     try {
       await client.updatePayout(payout.id, { status: "bezahlt" });
-      setMsg({ tone: "success", text: "Als bezahlt markiert." });
+      setMsg({ tone: "success", text: "Als extern überwiesen (bezahlt) markiert." });
       load();
     } catch (e) {
       setMsg({ tone: "critical", text: e?.message || "Fehler" });
@@ -416,7 +419,9 @@ ${"=".repeat(50)}
               {activeTab === 1 && (
                 <BlockStack gap="400">
                   <Banner tone="info">
-                    Automatische Auszahlungen werden am 01. und 15. eines Monats vorbereitet (Status: <strong>processing</strong>) und vom Superuser-Konto abgewickelt.
+                    Automatische Auszahlungen werden am 01. und 15. vorbereitet (Status: <strong>processing</strong>).
+                    <br />
+                    <strong>Wichtig:</strong> "Bezahlt/markieren" startet keine Zahlung. Erst echte Überweisung (z. B. Bank/Stripe) vom Plattformkonto zur Seller-IBAN durchführen, danach hier als bezahlt markieren.
                   </Banner>
                   <InlineStack gap="300" blockAlign="center" align="space-between">
                     <Text as="h3" variant="headingSm">Auszahlungshistorie & Abrechnungsdetails</Text>
@@ -529,7 +534,7 @@ ${"=".repeat(50)}
                               <td style={{ padding: "8px 12px" }}>
                                 <InlineStack gap="200">
                                   {p.status !== "bezahlt" && (
-                                    <Button size="slim" variant="primary" onClick={() => handleMarkPaid(p)}>Bezahlen</Button>
+                                    <Button size="slim" variant="primary" onClick={() => handleMarkPaid(p)}>Als überwiesen markieren</Button>
                                   )}
                                   <Button size="slim" onClick={() => generateInvoice(p)}>Rechnung</Button>
                                 </InlineStack>

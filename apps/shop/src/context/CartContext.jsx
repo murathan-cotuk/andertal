@@ -173,7 +173,7 @@ export function CartProvider({ children }) {
 
   const itemCount = (cart?.items || []).reduce((sum, i) => sum + (i.quantity || 0), 0);
   const subtotalCents = (cart?.items || []).reduce((sum, i) => sum + (i.quantity || 0) * (i.unit_price_cents || 0), 0);
-  const bonusDiscountCents = Math.floor((cart?.bonus_points_reserved || 0) / 25) * 100;
+  const bonusDiscountCents = Math.floor(((cart?.bonus_points_reserved || 0) / 25) * 100);
 
   const clearBonusPoints = useCallback(async (authToken) => {
     if (!cart?.id) return;

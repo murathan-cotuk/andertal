@@ -12,6 +12,13 @@ const fmt = (cents) =>
   (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+const fmtDateTime = (d) => d ? new Date(d).toLocaleString("de-DE") : "—";
+
+const csvEscape = (v) => {
+  const s = v == null ? "" : String(v);
+  if (/[",\n;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+};
 
 /** Generate the last N 15-day settlement periods, newest first */
 function generatePeriods(count = 12) {
@@ -80,6 +87,7 @@ function SellerPaymentsView() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [transactions, setTransactions] = useState([]);
 
   const selectedPeriod = PERIODS.find((p) => p.key === periodKey) || PERIODS[0];
 
@@ -87,12 +95,18 @@ function SellerPaymentsView() {
     setLoading(true); setErr("");
     try {
       const client = getMedusaAdminClient();
-      const [sumRes, histRes] = await Promise.allSettled([
+      const [sumRes, histRes, txRes] = await Promise.allSettled([
         client.getPayoutSummary({ period_start: selectedPeriod.start, period_end: selectedPeriod.end }),
         client.getPayouts(),
+        client.getTransactions({ include_pending: "true", payout_days: "14" }),
       ]);
       if (sumRes.status === "fulfilled") setSummary(sumRes.value?.summary || null);
       if (histRes.status === "fulfilled") setHistory(histRes.value?.payouts || []);
+      if (txRes && txRes.status === "fulfilled") {
+        setTransactions(Array.isArray(txRes.value?.transactions) ? txRes.value.transactions : []);
+      } else {
+        setTransactions([]);
+      }
     } catch (e) {
       setErr(e?.message || "Fehler beim Laden");
     } finally {
@@ -108,6 +122,57 @@ function SellerPaymentsView() {
   const refunds = summary?.refund_cents ?? 0;
   const net = revenue - commission - refunds + shipping;
   const payoutStatus = summary?.status || null;
+  const selectedStartTs = new Date(selectedPeriod.start).getTime();
+  const selectedEndTs = new Date(selectedPeriod.end).getTime();
+  const periodTransactions = transactions.filter((t) => {
+    const byDelivery = t?.delivery_date ? new Date(t.delivery_date).getTime() : NaN;
+    const byCreated = t?.created_at ? new Date(t.created_at).getTime() : NaN;
+    const ts = Number.isFinite(byDelivery) ? byDelivery : byCreated;
+    return Number.isFinite(ts) && ts >= selectedStartTs && ts <= selectedEndTs;
+  });
+
+  const exportTransactionsCsv = () => {
+    const rows = [
+      [
+        "order_number",
+        "created_at",
+        "delivery_date",
+        "customer",
+        "currency",
+        "gross_revenue_cents",
+        "commission_rate",
+        "commission_cents",
+        "payout_cents",
+        "shipping_cents",
+        "discount_cents",
+        "payout_eligible",
+      ],
+      ...periodTransactions.map((t) => [
+        t.order_number || "",
+        t.created_at || "",
+        t.delivery_date || "",
+        [t.first_name, t.last_name].filter(Boolean).join(" ").trim(),
+        t.currency || "EUR",
+        t.total_cents || 0,
+        t.commission_rate || 0,
+        t.commission_cents || 0,
+        t.payout_cents || 0,
+        t.shipping_cents || 0,
+        t.discount_cents || 0,
+        t.payout_eligible ? "yes" : "no",
+      ]),
+    ];
+    const csv = rows.map((r) => r.map(csvEscape).join(";")).join("\n");
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transactions-${selectedPeriod.key}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const periodOptions = PERIODS.map((p) => ({ label: p.label, value: p.key }));
 
@@ -221,6 +286,56 @@ function SellerPaymentsView() {
               )}
             </Card>
           </Box>
+
+          {/* Detailed transactions */}
+          <Box paddingBlockStart="400">
+            <Card padding="0">
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text variant="headingMd" as="h2">Transaktionen (Bestellungen / Rückgaben)</Text>
+                  <Button size="slim" onClick={exportTransactionsCsv} disabled={periodTransactions.length === 0}>
+                    CSV export
+                  </Button>
+                </InlineStack>
+              </div>
+              {periodTransactions.length === 0 ? (
+                <Box padding="500">
+                  <Text tone="subdued" alignment="center">Bu dönem için transaction girdisi yok.</Text>
+                </Box>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.4fr 120px 120px 120px 90px 90px", gap: 8, padding: "10px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
+                    <div>Bestellung</div>
+                    <div style={{ textAlign: "right" }}>Umsatz</div>
+                    <div style={{ textAlign: "right" }}>Provision</div>
+                    <div style={{ textAlign: "right" }}>Netto</div>
+                    <div style={{ textAlign: "right" }}>Rabatt</div>
+                    <div style={{ textAlign: "center" }}>Status</div>
+                  </div>
+                  {periodTransactions.map((t, i) => (
+                    <div key={`${t.id || ""}-${i}`} style={{ display: "grid", gridTemplateColumns: "1.4fr 120px 120px 120px 90px 90px", gap: 8, padding: "11px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{t.order_number || t.id}</div>
+                        <div style={{ color: "#6b7280", fontSize: 12 }}>{[t.first_name, t.last_name].filter(Boolean).join(" ") || "—"}</div>
+                        <div style={{ color: "#9ca3af", fontSize: 11 }}>
+                          Oluşturma: {fmtDateTime(t.created_at)} | Teslim: {fmtDate(t.delivery_date)}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>{fmt(t.total_cents || 0)}</div>
+                      <div style={{ textAlign: "right", color: "#dc2626" }}>- {fmt(t.commission_cents || 0)}</div>
+                      <div style={{ textAlign: "right", fontWeight: 700, color: "#059669" }}>{fmt(t.payout_cents || 0)}</div>
+                      <div style={{ textAlign: "right" }}>{fmt(t.discount_cents || 0)}</div>
+                      <div style={{ textAlign: "center" }}>
+                        <Badge tone={t.payout_eligible ? "success" : "warning"}>
+                          {t.payout_eligible ? "Eligible" : "Pending"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </Card>
+          </Box>
         </Layout.Section>
       </Layout>
     </Page>
@@ -255,7 +370,10 @@ function AdminPaymentsView() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleMarkPaid = async (seller) => {
-    if (!confirm(`Auszahlung für "${seller.store_name || seller.email}" als bezahlt markieren?`)) return;
+    if (!confirm(
+      `Auszahlung für "${seller.store_name || seller.email}" als extern überwiesen markieren?\n\n` +
+      `Hinweis: Bu adım ödeme göndermez. Önce gerçek transferi yapın, sonra status'u "bezahlt" yapın.`
+    )) return;
     setPaying(seller.seller_id);
     try {
       await getMedusaAdminClient().markPayoutPaid({
@@ -378,7 +496,7 @@ function AdminPaymentsView() {
                               onClick={() => handleMarkPaid(seller)}
                               loading={paying === seller.seller_id}
                             >
-                              Als bezahlt markieren
+                              Als überwiesen markieren
                             </Button>
                           ) : isPaid ? (
                             <Text variant="bodySm" tone="subdued">✓ Bezahlt{seller.paid_at ? ` ${fmtDate(seller.paid_at)}` : ""}</Text>

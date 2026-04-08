@@ -192,6 +192,30 @@ export default function OrderDetailPage() {
     ? `${order.customer_number} – ${[order?.first_name, order?.last_name].filter(Boolean).join(" ") || "—"}`
     : `Gast – ${[order?.first_name, order?.last_name].filter(Boolean).join(" ") || "—"}`;
 
+  const goToCustomerProfile = async (e) => {
+    e?.preventDefault?.();
+    if (!order) return;
+    if (order.customer_id) {
+      router.push(`/${locale}/customers/${order.customer_id}`);
+      return;
+    }
+    const email = String(order.email || "").trim();
+    if (!email) {
+      router.push(`/${locale}/customers`);
+      return;
+    }
+    try {
+      const client = getMedusaAdminClient();
+      const data = await client.getCustomers({ email, limit: 1 });
+      const found = data?.customers?.[0];
+      if (found?.id) {
+        router.push(`/${locale}/customers/${found.id}`);
+        return;
+      }
+    } catch (_) {}
+    router.push(`/${locale}/customers`);
+  };
+
   return (
     <div style={{ padding: 24, background: "#fff", minHeight: "100%" }}>
       {shipModalOpen && order && (
@@ -349,7 +373,8 @@ export default function OrderDetailPage() {
           <Section title="Kunde">
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
               <a
-                href={isSuperuser && order?.email ? `/${locale}/customers?email=${encodeURIComponent(order.email)}` : "#"}
+                href={order?.customer_id ? `/${locale}/customers/${order.customer_id}` : `/${locale}/customers`}
+                onClick={goToCustomerProfile}
                 style={{ color: "#202223", textDecoration: "underline" }}
               >
                 {customerLabel}

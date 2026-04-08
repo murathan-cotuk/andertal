@@ -388,6 +388,7 @@ export default function Navbar() {
               const hasChildren = category.children && category.children.length > 0;
               const hasCollection = category.has_collection;
 
+              const categoryHref = `/kollektion/${category.slug}`;
               if (hasChildren) {
                 return (
                   <CategoryDropdown
@@ -398,14 +399,14 @@ export default function Navbar() {
                     <CategoryButton>{category.name}</CategoryButton>
                     <SubcategoryMenu $isOpen={openCategoryId === category.id}>
                       {hasCollection && (
-                        <SubcategoryLink href={`/kollektion/${category.slug}`}>
+                        <SubcategoryLink href={categoryHref}>
                           {category.name} (All)
                         </SubcategoryLink>
                       )}
                       {category.children.map((child) => (
                         <SubcategoryLink
                           key={child.id}
-                          href={child.has_collection ? `/collections/${child.slug}` : "#"}
+                          href={`/kollektion/${child.slug}`}
                         >
                           {child.name}
                         </SubcategoryLink>
@@ -413,14 +414,12 @@ export default function Navbar() {
                     </SubcategoryMenu>
                   </CategoryDropdown>
                 );
-              } else if (hasCollection) {
-                return (
-                  <CategoryLink key={category.id} href={`/kollektion/${category.slug}`}>
-                    {category.name}
-                  </CategoryLink>
-                );
               }
-              return null;
+              return (
+                <CategoryLink key={category.id} href={categoryHref}>
+                  {category.name}
+                </CategoryLink>
+              );
             })
           ) : null}
         </CategoriesMenu>

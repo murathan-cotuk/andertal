@@ -528,7 +528,7 @@ function PayoutsTable({ payouts, loading, isSuperuser, onRefresh }) {
   const [markingPaid, setMarkingPaid] = useState(null);
 
   const doMarkPaid = async (p) => {
-    if (!confirm("Diesen Eintrag als bezahlt markieren?")) return;
+    if (!confirm("Diesen Eintrag als extern überwiesen markieren? (Bu işlem gerçek ödeme göndermez)")) return;
     setMarkingPaid(p.id);
     try {
       await getMedusaAdminClient().updatePayout(p.id, { status: "bezahlt" });
@@ -577,7 +577,7 @@ function PayoutsTable({ payouts, loading, isSuperuser, onRefresh }) {
             <div>
               {(p.status !== "bezahlt" && p.status !== "paid") && (
                 <Button size="slim" variant="primary" loading={markingPaid === p.id} onClick={() => doMarkPaid(p)}>
-                  Bezahlt
+                  Als überwiesen markieren
                 </Button>
               )}
             </div>

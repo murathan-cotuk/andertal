@@ -70,6 +70,7 @@ const BUTTON_COLOR_LABELS = {
   },
 };
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
+import MediaPickerModal from "@/components/MediaPickerModal";
 
 function normalizeHexForColorInput(val) {
   if (!val || typeof val !== "string") return "#ffffff";
@@ -642,6 +643,14 @@ export default function StylesPage() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [errMsg, setErrMsg] = useState("");
+  const [branding, setBranding] = useState({
+    shop_logo_url: "",
+    shop_favicon_url: "",
+    sellercentral_logo_url: "",
+    sellercentral_favicon_url: "",
+  });
+  const [brandingSnapshot, setBrandingSnapshot] = useState(null);
+  const [brandingPickerTarget, setBrandingPickerTarget] = useState(null);
 
   const loadStyles = useCallback(async () => {
     setLoading(true);
@@ -649,12 +658,24 @@ export default function StylesPage() {
       const data = await client.getStyles();
       const loaded = data?.styles || {};
       const merged = mergeLoadedShopStyles(loaded);
+      const settings = await client.getSellerSettings().catch(() => ({}));
       setStyles(merged);
       setSavedSnapshot(JSON.stringify(merged));
+      const loadedBranding = {
+        shop_logo_url: settings?.shop_logo_url || "",
+        shop_favicon_url: settings?.shop_favicon_url || "",
+        sellercentral_logo_url: settings?.sellercentral_logo_url || "",
+        sellercentral_favicon_url: settings?.sellercentral_favicon_url || "",
+      };
+      setBranding(loadedBranding);
+      setBrandingSnapshot(JSON.stringify(loadedBranding));
     } catch (_) {
       const merged = mergeLoadedShopStyles({});
       setStyles(merged);
       setSavedSnapshot(JSON.stringify(merged));
+      const emptyBranding = { shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "" };
+      setBranding(emptyBranding);
+      setBrandingSnapshot(JSON.stringify(emptyBranding));
     }
     setLoading(false);
   }, [client]);
@@ -662,13 +683,13 @@ export default function StylesPage() {
   useEffect(() => { loadStyles(); }, [loadStyles]);
 
   const isDirty = useMemo(() => {
-    if (loading || !styles || savedSnapshot === null) return false;
+    if (loading || !styles || savedSnapshot === null || brandingSnapshot === null) return false;
     try {
-      return JSON.stringify(styles) !== savedSnapshot;
+      return JSON.stringify(styles) !== savedSnapshot || JSON.stringify(branding) !== brandingSnapshot;
     } catch {
       return true;
     }
-  }, [loading, styles, savedSnapshot]);
+  }, [loading, styles, savedSnapshot, branding, brandingSnapshot]);
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -676,14 +697,16 @@ export default function StylesPage() {
     setSavedMsg("");
     try {
       await client.saveStyles(styles);
+      await client.updateSellerSettings({ seller_id: "default", ...branding });
       setSavedSnapshot(JSON.stringify(styles));
+      setBrandingSnapshot(JSON.stringify(branding));
       setSavedMsg("Stile gespeichert.");
       setTimeout(() => setSavedMsg(""), 4000);
     } catch (e) {
       setErrMsg(e?.message || "Fehler beim Speichern");
     }
     setSaving(false);
-  }, [styles, client]);
+  }, [styles, branding, client]);
 
   const handleDiscard = useCallback(async () => {
     await loadStyles();
@@ -779,6 +802,47 @@ export default function StylesPage() {
             <Banner tone="success" onDismiss={() => setSavedMsg("")}>{savedMsg}</Banner>
           </Layout.Section>
         )}
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Branding (Shop & Sellercentral)</Text>
+              <Text as="p" tone="subdued">
+                Hier kannst du unterschiedliche Logos und Favicons fuer Shop und Sellercentral setzen.
+              </Text>
+              {[
+                { key: "shop_logo_url", label: "Shop Logo" },
+                { key: "shop_favicon_url", label: "Shop Favicon" },
+                { key: "sellercentral_logo_url", label: "Sellercentral Logo" },
+                { key: "sellercentral_favicon_url", label: "Sellercentral Favicon" },
+              ].map((row) => (
+                <div key={row.key}>
+                  <InlineStack gap="200" blockAlign="end" wrap>
+                    <div style={{ flex: 1, minWidth: 280 }}>
+                      <TextField
+                        label={row.label}
+                        value={branding[row.key] || ""}
+                        onChange={(v) => setBranding((p) => ({ ...p, [row.key]: v }))}
+                        placeholder="https://... veya /uploads/..."
+                        autoComplete="off"
+                      />
+                    </div>
+                    <Button size="slim" onClick={() => setBrandingPickerTarget(row.key)}>Aus Medien waehlen</Button>
+                    {(branding[row.key] || "").trim() ? (
+                      <Button
+                        size="slim"
+                        tone="critical"
+                        variant="plain"
+                        onClick={() => setBranding((p) => ({ ...p, [row.key]: "" }))}
+                      >
+                        Entfernen
+                      </Button>
+                    ) : null}
+                  </InlineStack>
+                </div>
+              ))}
+            </BlockStack>
+          </Card>
+        </Layout.Section>
 
         {/* Colors */}
         <Layout.Section>
@@ -1184,6 +1248,18 @@ export default function StylesPage() {
           </BlockStack>
         </Layout.Section>
       </Layout>
+      <MediaPickerModal
+        open={Boolean(brandingPickerTarget)}
+        onClose={() => setBrandingPickerTarget(null)}
+        onSelect={(urls) => {
+          const first = Array.isArray(urls) ? urls[0] : null;
+          if (!first || !brandingPickerTarget) return;
+          setBranding((p) => ({ ...p, [brandingPickerTarget]: first }));
+          setBrandingPickerTarget(null);
+        }}
+        multiple={false}
+        title="Branding-Medien waehlen"
+      />
     </Page>
   );
 }

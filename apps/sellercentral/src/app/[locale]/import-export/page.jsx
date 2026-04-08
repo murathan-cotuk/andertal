@@ -143,7 +143,7 @@ export default function ImportExportPage() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesError, setCategoriesError] = useState(null);
   const [selectedSlugs, setSelectedSlugs] = useState(() => new Set());
-  const [expandedCategoryIds, setExpandedCategoryIds] = useState(() => new Set());
+  const [categoryPathIds, setCategoryPathIds] = useState([]);
   const [templateDownloading, setTemplateDownloading] = useState(false);
   const [templateError, setTemplateError] = useState(null);
 
@@ -165,6 +165,28 @@ export default function ImportExportPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [exportPreset, setExportPreset] = useState("custom");
+
+  const applyPreset = useCallback((preset) => {
+    if (preset === "basic_products") {
+      setExportDatasets(new Set(["products"]));
+      setFilterStatus("published");
+      setExportFormat("xlsx");
+      return;
+    }
+    if (preset === "sales_report") {
+      setExportDatasets(new Set(["orders", "transactions"]));
+      setFilterStatus("");
+      setExportFormat("xlsx");
+      return;
+    }
+    if (preset === "full_export") {
+      setExportDatasets(new Set(["products", "orders", "customers", "transactions", "ranking"]));
+      setFilterStatus("");
+      setExportFormat("xlsx");
+      return;
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -198,13 +220,34 @@ export default function ImportExportPage() {
     });
   }, []);
 
-  const toggleExpand = useCallback((id) => {
-    setExpandedCategoryIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const currentCategoryNodes = React.useMemo(() => {
+    let nodes = categoryTree;
+    for (const id of categoryPathIds) {
+      const found = (nodes || []).find((n) => n.id === id);
+      nodes = found?.children || [];
+    }
+    return nodes || [];
+  }, [categoryTree, categoryPathIds]);
+
+  const categoryPathNodes = React.useMemo(() => {
+    const out = [];
+    let nodes = categoryTree;
+    for (const id of categoryPathIds) {
+      const found = (nodes || []).find((n) => n.id === id);
+      if (!found) break;
+      out.push(found);
+      nodes = found.children || [];
+    }
+    return out;
+  }, [categoryTree, categoryPathIds]);
+
+  const enterCategory = useCallback((node) => {
+    if (!node || !Array.isArray(node.children) || node.children.length === 0) return;
+    setCategoryPathIds((prev) => [...prev, node.id]);
+  }, []);
+
+  const goToPathDepth = useCallback((depth) => {
+    setCategoryPathIds((prev) => prev.slice(0, depth));
   }, []);
 
   const handleProductImport = async () => {
@@ -384,37 +427,41 @@ export default function ImportExportPage() {
                     Kategorien für diesen Import (Pflicht für Download)
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Nur diese Slugs erscheinen als Dropdown im Excel; im zweiten Blatt sehen Sie die vollständige Liste mit Pfad.
+                    Drilldown wie ürün sayfası: önce parent, sonra onun sub kategorileri. İstediğin seviyede kategoriyi seçebilirsin.
                   </Text>
-                  <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 8, background: "#fafafa" }}>
-                    <BlockStack gap="100">
-                      {categoryTree.map((node) => {
-                        const renderNode = (n, depth = 0) => {
+                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fafafa" }}>
+                    <InlineStack gap="200" blockAlign="center" wrap>
+                      <Button size="slim" onClick={() => goToPathDepth(0)} disabled={categoryPathIds.length === 0}>Parent</Button>
+                      {categoryPathNodes.map((n, i) => (
+                        <Button key={n.id} size="slim" onClick={() => goToPathDepth(i + 1)}>{n.name || n.slug}</Button>
+                      ))}
+                    </InlineStack>
+                    <div style={{ marginTop: 10, maxHeight: 280, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", padding: 8 }}>
+                      <BlockStack gap="100">
+                        {currentCategoryNodes.length === 0 ? (
+                          <Text as="p" variant="bodySm" tone="subdued">Bu seviyede alt kategori yok.</Text>
+                        ) : currentCategoryNodes.map((n) => {
                           const hasChildren = Array.isArray(n.children) && n.children.length > 0;
-                          const isExpanded = expandedCategoryIds.has(n.id);
                           return (
-                            <div key={n.id}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: depth * 18 }}>
-                                {hasChildren ? (
-                                  <button type="button" onClick={() => toggleExpand(n.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#6b7280", padding: "2px 4px" }}>
-                                    {isExpanded ? "▾" : "▸"}
-                                  </button>
-                                ) : (
-                                  <span style={{ width: 16, display: "inline-block" }} />
-                                )}
-                                <Checkbox
-                                  label={`${n.name || n.slug} — ${n.slug}`}
-                                  checked={selectedSlugs.has(n.slug)}
-                                  onChange={() => toggleCategory(n.slug)}
-                                />
-                              </div>
-                              {hasChildren && isExpanded ? n.children.map((c) => renderNode(c, depth + 1)) : null}
+                            <div key={n.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "6px 4px", borderBottom: "1px solid #f3f4f6" }}>
+                              <Checkbox
+                                label={`${n.name || n.slug} — ${n.slug}`}
+                                checked={selectedSlugs.has(n.slug)}
+                                onChange={() => toggleCategory(n.slug)}
+                              />
+                              {hasChildren ? (
+                                <Button size="slim" onClick={() => enterCategory(n)}>Subcategories</Button>
+                              ) : null}
                             </div>
                           );
-                        };
-                        return renderNode(node, 0);
-                      })}
-                    </BlockStack>
+                        })}
+                      </BlockStack>
+                    </div>
+                    {selectedSlugs.size > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <Text as="p" variant="bodySm" tone="subdued">{selectedSlugs.size} Kategorie ausgewählt</Text>
+                      </div>
+                    )}
                   </div>
                 </BlockStack>
               )}
@@ -567,6 +614,22 @@ export default function ImportExportPage() {
                 <Divider />
                 <BlockStack gap="200">
                   <Text as="p" variant="bodyMd" fontWeight="semibold">1) Veri kapsamı</Text>
+                  <div style={{ maxWidth: 360 }}>
+                    <select
+                      value={exportPreset}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setExportPreset(v);
+                        if (v !== "custom") applyPreset(v);
+                      }}
+                      style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }}
+                    >
+                      <option value="custom">Custom</option>
+                      <option value="basic_products">Preset: Ürün temel</option>
+                      <option value="sales_report">Preset: Satış raporu</option>
+                      <option value="full_export">Preset: Tam export</option>
+                    </select>
+                  </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
                     {[
                       ["products", "Ürünler (fiyat, görsel, metadata)"],
@@ -607,7 +670,14 @@ export default function ImportExportPage() {
                   <Text as="p" variant="bodyMd" fontWeight="semibold">3) Sütunlar</Text>
                   <InlineStack gap="300">
                     <Button variant="secondary" onClick={loadExportColumns}>Spalten laden</Button>
+                    {availableColumns.length > 0 && (
+                      <>
+                        <Button size="slim" onClick={() => setSelectedColumns(new Set(availableColumns))}>Tümünü seç</Button>
+                        <Button size="slim" onClick={() => setSelectedColumns(new Set())}>Temizle</Button>
+                      </>
+                    )}
                     {exportInfo?.total != null ? <Badge tone="info">{exportInfo.total} satır eşleşti</Badge> : null}
+                    {availableColumns.length > 0 ? <Badge tone="success">{selectedColumns.size} sütun seçili</Badge> : null}
                   </InlineStack>
                   {availableColumns.length > 0 && (
                     <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>

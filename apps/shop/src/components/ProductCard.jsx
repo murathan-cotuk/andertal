@@ -9,6 +9,9 @@ import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
 import { localizedProductMediaList, variantImageUrlForLocale } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
+import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
+import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
@@ -35,13 +38,13 @@ const Card = styled.article`
   overflow: hidden;
 `;
 
-/* Image block: hover = second image if present + slight zoom. */
+/* Image block: keep full image visible (no crop). */
 const ImgBlock = styled.div`
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  background: #f4f4f2;
+  background: #fff;
   isolation: isolate;
 
   img {
@@ -49,7 +52,10 @@ const ImgBlock = styled.div`
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    background: #fff;
+    padding: 6px;
+    box-sizing: border-box;
     display: block;
     transition: transform 0.45s ease, opacity 0.35s ease;
   }
@@ -63,11 +69,11 @@ const ImgBlock = styled.div`
   }
   &:hover img.img-primary {
     opacity: 0;
-    transform: scale(1.04);
+    transform: scale(1.01);
   }
   &:hover img.img-secondary {
     opacity: 1;
-    transform: scale(1.04);
+    transform: scale(1.01);
   }
 `;
 
@@ -325,11 +331,15 @@ const MorePill = styled.span`
 
 export function ProductCard({ product, activeFilters = {} }) {
   const locale = useLocale();
+  const marketPrefixVal = useMarketPrefix();
+  const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
+  const countryCode = useShippingCountryForQuotes(marketCountry);
   const { title: displayTitle, description: localizedDescription } = getLocalizedProduct(product, locale);
   const cartCtx = useContext(CartContext);
   const addToCart = cartCtx?.addToCart ?? (async () => null);
   const openCartSidebar = cartCtx?.openCartSidebar ?? (() => {});
   const cartLoading = cartCtx?.loading ?? false;
+  const shippingGroups = cartCtx?.shippingGroups ?? [];
 
   const variants = product.variants || [];
   const variationGroups = Array.isArray(product.variation_groups) && product.variation_groups.length > 0
@@ -432,6 +442,14 @@ export function ProductCard({ product, activeFilters = {} }) {
   const maxQty = Number(inventoryQty) > 0 ? Number(inventoryQty) : 9999;
 
   const meta = product.metadata || {};
+  const shippingGroupIdRaw = meta.shipping_group_id;
+  const shippingGroup =
+    shippingGroupIdRaw != null && String(shippingGroupIdRaw).trim() !== ""
+      ? findShippingGroup(shippingGroups, shippingGroupIdRaw)
+      : null;
+  const shippingPriceCents = shippingGroup ? resolveShippingQuoteStrict(shippingGroup.prices, countryCode || marketCountry) : null;
+  const hasShippingGroup = shippingGroupIdRaw != null && String(shippingGroupIdRaw).trim() !== "" && shippingGroup != null;
+  const shippingUnavailable = hasShippingGroup && shippingPriceCents === null;
   const reviewAvg = meta.review_avg != null ? Number(meta.review_avg) : 0;
   const reviewCount = meta.review_count != null ? Number(meta.review_count) : 0;
 
@@ -441,7 +459,7 @@ export function ProductCard({ product, activeFilters = {} }) {
   const handleQuickAdd = async (e) => {
     e.preventDefault();
     const vid = variant?.id;
-    if (!vid || outOfStock) return;
+    if (!vid || outOfStock || shippingUnavailable) return;
     setAdding(true);
     // Avoid timer races
     if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);
@@ -512,6 +530,7 @@ export function ProductCard({ product, activeFilters = {} }) {
           {isComingSoon && <Badge $comingSoon>Pek yakında</Badge>}
           {hasSale && !isComingSoon && <Badge $sale>Sale</Badge>}
           {isNew && !hasSale && !isComingSoon && <Badge>New</Badge>}
+          {shippingUnavailable && !isComingSoon && <Badge $sold>Nicht lieferbar</Badge>}
           {outOfStock && !isComingSoon && <Badge $sold>Sold out</Badge>}
         </Badges>
         {product?.id && (
@@ -528,16 +547,16 @@ export function ProductCard({ product, activeFilters = {} }) {
       <AddToCartBtn
         type="button"
         onClick={handleQuickAdd}
-        disabled={cartLoading || adding || outOfStock || isComingSoon}
+        disabled={cartLoading || adding || outOfStock || isComingSoon || shippingUnavailable}
       >
-        {adding ? "…" : isComingSoon ? "Pek yakında" : outOfStock ? "Sold out" : "Add to cart"}
+        {adding ? "…" : isComingSoon ? "Pek yakında" : shippingUnavailable ? "Nicht lieferbar" : outOfStock ? "Sold out" : "Add to cart"}
       </AddToCartBtn>
 
       <QtyRow>
         <QtyBtn
           type="button"
           onClick={() => setQuantity((q) => clampQty(q - 1))}
-          disabled={quantity <= 1 || outOfStock || isComingSoon || adding || cartLoading}
+          disabled={quantity <= 1 || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
           aria-label="Menge verringern"
         >
           −
@@ -549,13 +568,13 @@ export function ProductCard({ product, activeFilters = {} }) {
           value={quantity}
           onChange={(e) => setQuantity(clampQty(e.target.value))}
           onBlur={(e) => setQuantity(clampQty(e.target.value))}
-          disabled={outOfStock || isComingSoon || adding || cartLoading}
+          disabled={outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
           aria-label="Menge"
         />
         <QtyBtn
           type="button"
           onClick={() => setQuantity((q) => clampQty(q + 1))}
-          disabled={quantity >= maxQty || outOfStock || isComingSoon || adding || cartLoading}
+          disabled={quantity >= maxQty || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
           aria-label="Menge erhöhen"
         >
           +

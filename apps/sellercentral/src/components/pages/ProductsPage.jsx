@@ -323,12 +323,102 @@ export default function ProductsPage() {
   const [message, setMessage] = useState({ type: "", text: "" });
 
   const [products, setProducts] = useState([]);
+  const [expandedProducts, setExpandedProducts] = useState(() => new Set());
+  const [variantDrafts, setVariantDrafts] = useState({});
+  const [savingVariantProductId, setSavingVariantProductId] = useState("");
   const [productsLoading, setProductsLoading] = useState(true);
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesError, setCategoriesError] = useState(null);
   const [creating, setCreating] = useState(false);
   const medusaClient = getMedusaAdminClient();
+
+  const normalizeVariantsForEdit = (variantsRaw) => {
+    const arr = Array.isArray(variantsRaw)
+      ? variantsRaw
+      : (typeof variantsRaw === "string" ? (() => {
+          try { return JSON.parse(variantsRaw); } catch { return []; }
+        })() : []);
+    return Array.isArray(arr) ? arr.map((v) => ({ ...(v || {}) })) : [];
+  };
+
+  const variantLabel = (v, idx) => {
+    const ov = Array.isArray(v?.option_values) ? v.option_values.filter(Boolean) : [];
+    if (ov.length) return ov.join(" / ");
+    if (v?.title) return String(v.title);
+    if (v?.value) return String(v.value);
+    return `Variant ${idx + 1}`;
+  };
+
+  const variantPriceInput = (v) => {
+    if (v?.price != null && v.price !== "") return String(v.price);
+    if (v?.price_cents != null && v.price_cents !== "") return (Number(v.price_cents) / 100).toFixed(2);
+    return "";
+  };
+
+  const variantInventoryInput = (v) => {
+    if (v?.inventory != null) return String(v.inventory);
+    if (v?.inventory_quantity != null) return String(v.inventory_quantity);
+    return "0";
+  };
+
+  const toggleProductVariants = (product) => {
+    const pid = String(product?.id || "");
+    if (!pid) return;
+    setExpandedProducts((prev) => {
+      const next = new Set(prev);
+      if (next.has(pid)) next.delete(pid);
+      else next.add(pid);
+      return next;
+    });
+    setVariantDrafts((prev) => {
+      if (prev[pid]) return prev;
+      return { ...prev, [pid]: normalizeVariantsForEdit(product?.variants) };
+    });
+  };
+
+  const updateVariantDraft = (productId, variantIndex, key, value) => {
+    const pid = String(productId || "");
+    if (!pid) return;
+    setVariantDrafts((prev) => {
+      const list = Array.isArray(prev[pid]) ? [...prev[pid]] : [];
+      const cur = { ...(list[variantIndex] || {}) };
+      cur[key] = value;
+      list[variantIndex] = cur;
+      return { ...prev, [pid]: list };
+    });
+  };
+
+  const saveVariantsForProduct = async (product) => {
+    const pid = String(product?.id || "");
+    if (!pid) return;
+    const draft = Array.isArray(variantDrafts[pid]) ? variantDrafts[pid] : [];
+    try {
+      setSavingVariantProductId(pid);
+      const payloadVariants = draft.map((v) => {
+        const row = { ...(v || {}) };
+        const nPrice = parseFloat(String(row.price ?? "").replace(",", "."));
+        if (!Number.isNaN(nPrice)) {
+          row.price = nPrice;
+          row.price_cents = Math.round(nPrice * 100);
+        } else if (row.price === "") {
+          delete row.price;
+        }
+        const nInv = parseInt(String(row.inventory ?? row.inventory_quantity ?? "0"), 10);
+        row.inventory = Number.isNaN(nInv) ? 0 : nInv;
+        row.inventory_quantity = row.inventory;
+        return row;
+      });
+      await medusaClient.updateAdminHubProduct(pid, { variants: payloadVariants });
+      const data = await medusaClient.getAdminHubProducts();
+      setProducts(data.products || []);
+      setMessage({ type: "success", text: "Varyasyonlar güncellendi." });
+    } catch (error) {
+      setMessage({ type: "error", text: error?.message || "Varyasyonlar güncellenemedi." });
+    } finally {
+      setSavingVariantProductId("");
+    }
+  };
 
   // Fetch products
   useEffect(() => {
@@ -879,6 +969,63 @@ export default function ProductsPage() {
                 <ProductInfo>
                   Status: <ProductStatus status={product.status}>{product.status}</ProductStatus>
                 </ProductInfo>
+                {normalizeVariantsForEdit(product.variants).length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <Button
+                      type="button"
+                      onClick={() => toggleProductVariants(product)}
+                      style={{ padding: "8px 12px", fontSize: 13 }}
+                    >
+                      {expandedProducts.has(String(product.id)) ? "Varyasyonları gizle" : "Varyasyonları göster"}
+                    </Button>
+                    {expandedProducts.has(String(product.id)) && (
+                      <div style={{ marginTop: 10, border: "1px solid #e5e7eb", borderRadius: 8, padding: 10, background: "#fafafa" }}>
+                        {(variantDrafts[String(product.id)] || []).map((v, idx) => (
+                          <div key={`${product.id}-${idx}`} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 0.8fr 0.8fr", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                            <Input
+                              label=""
+                              placeholder="Variant adı"
+                              value={variantLabel(v, idx)}
+                              disabled
+                            />
+                            <Input
+                              label=""
+                              placeholder="SKU"
+                              value={v?.sku || ""}
+                              onChange={(e) => updateVariantDraft(product.id, idx, "sku", e.target.value)}
+                            />
+                            <Input
+                              label=""
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="Fiyat"
+                              value={variantPriceInput(v)}
+                              onChange={(e) => updateVariantDraft(product.id, idx, "price", e.target.value)}
+                            />
+                            <Input
+                              label=""
+                              type="number"
+                              min="0"
+                              placeholder="Stok"
+                              value={variantInventoryInput(v)}
+                              onChange={(e) => updateVariantDraft(product.id, idx, "inventory", e.target.value)}
+                            />
+                          </div>
+                        ))}
+                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                          <Button
+                            type="button"
+                            onClick={() => saveVariantsForProduct(product)}
+                            disabled={savingVariantProductId === String(product.id)}
+                          >
+                            {savingVariantProductId === String(product.id) ? "Kaydediliyor..." : "Varyasyonları kaydet"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </ProductCard>
             ))}
           </ProductsList>

@@ -264,7 +264,6 @@ function MenuEditorPanel(props) {
   const [localMenuName, setLocalMenuName] = useState(panelMenu?.name ?? menuForm.name ?? "");
   const [localMenuSlug, setLocalMenuSlug] = useState(panelMenu?.slug ?? menuForm.slug ?? "");
   const [localMenuLocation, setLocalMenuLocation] = useState(panelMenu?.location ?? menuForm.location ?? "main");
-  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const isNew = panelMode === "new";
   const hasMenuId = !!effectiveMenuId && !isNew;
 
@@ -366,7 +365,6 @@ function MenuEditorPanel(props) {
       await client.updateMenu(menuId, payload);
       await fetchMenus();
       await fetchItems(menuId);
-      setMoreActionsOpen(false);
     } catch (err) {
       setError(err?.message || "Failed to update categories-with-products mode");
     } finally {
@@ -421,31 +419,16 @@ function MenuEditorPanel(props) {
                 {localMenuLocation === "second" ? "→ Shown in shop navbar (grey bar under main nav)" : localMenuLocation === "main" ? "→ Shown in shop as Kategorien dropdown" : "→ Other locations (e.g. footer)"}
               </span>
             </div>
-            <InlineStack gap="200">
+            <InlineStack gap="200" blockAlign="center">
               {hasMenuId && (
                 <Button size="slim" variant="secondary" onClick={() => handleDuplicateMenu(panelMenu)} disabled={saving}>
                   Duplicate
                 </Button>
               )}
               {hasMenuId && (
-                <Popover
-                  active={moreActionsOpen}
-                  activator={
-                    <Button size="slim" variant="secondary" onClick={() => setMoreActionsOpen(!moreActionsOpen)}>
-                      More actions
-                    </Button>
-                  }
-                  onClose={() => setMoreActionsOpen(false)}
-                  autofocusTarget="first-node"
-                >
-                  <ActionList
-                    actionRole="menuitem"
-                    items={[
-                      { content: panelMenu?.categories_with_products ? "Disable categories with products" : "Categories with products", onAction: () => { setMoreActionsOpen(false); handleCategoriesWithProducts(); } },
-                      { content: "Delete", destructive: true, onAction: () => { setMoreActionsOpen(false); handleDeleteMenu(null, panelMenu || { id: panelMenuId, name: localMenuName }); } },
-                    ]}
-                  />
-                </Popover>
+                <Button size="slim" variant="critical" onClick={() => handleDeleteMenu(null, panelMenu || { id: panelMenuId, name: localMenuName })} disabled={saving}>
+                  Delete
+                </Button>
               )}
             </InlineStack>
           </InlineStack>
@@ -453,13 +436,42 @@ function MenuEditorPanel(props) {
       </div>
       <div style={{ padding: "24px 32px" }}>
         <BlockStack gap="400">
-          <InlineStack gap="400" blockAlign="center" wrap>
+          <InlineStack align="space-between" blockAlign="center" wrap gap="300">
             <Text as="h3" variant="headingMd" fontWeight="semibold">Menu items</Text>
-            {typeof onOpenImportCsv === "function" && (
-              <Button variant="secondary" size="slim" onClick={onOpenImportCsv}>
-                Import from CSV
-              </Button>
-            )}
+            <InlineStack gap="300" blockAlign="center">
+              {hasMenuId && (
+                <button
+                  type="button"
+                  onClick={handleCategoriesWithProducts}
+                  disabled={saving}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 8, cursor: saving ? "not-allowed" : "pointer",
+                    padding: "5px 12px", borderRadius: 8, border: "1px solid",
+                    borderColor: panelMenu?.categories_with_products ? "#16a34a" : "var(--p-color-border-subdued)",
+                    background: panelMenu?.categories_with_products ? "#f0fdf4" : "var(--p-color-bg-surface)",
+                    color: panelMenu?.categories_with_products ? "#166534" : "var(--p-color-text-subdued)",
+                    fontSize: 13, fontWeight: 500, transition: "all 0.15s",
+                  }}
+                >
+                  <span style={{
+                    width: 32, height: 18, borderRadius: 9, display: "inline-block", flexShrink: 0, position: "relative",
+                    background: panelMenu?.categories_with_products ? "#16a34a" : "#d1d5db", transition: "background 0.15s",
+                  }}>
+                    <span style={{
+                      position: "absolute", top: 2, left: panelMenu?.categories_with_products ? 16 : 2,
+                      width: 14, height: 14, borderRadius: "50%", background: "#fff",
+                      transition: "left 0.15s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                    }} />
+                  </span>
+                  Auto-show categories
+                </button>
+              )}
+              {typeof onOpenImportCsv === "function" && (
+                <Button variant="secondary" size="slim" onClick={onOpenImportCsv}>
+                  Import from CSV
+                </Button>
+              )}
+            </InlineStack>
           </InlineStack>
           <div
             className="menu-items-card"
@@ -472,8 +484,9 @@ function MenuEditorPanel(props) {
             }}
           >
             {panelMenu?.categories_with_products ? (
-              <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--p-color-border-subdued)", background: "var(--p-color-bg-surface-secondary)" }}>
-                <Text as="p" tone="subdued">Icinde ürün olan kategoriler gösterilecek.</Text>
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border-subdued)", background: "#f0fdf4", display: "flex", alignItems: "center", gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="#16a34a"><path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm3.707-9.293a1 1 0 0 0-1.414-1.414L9 10.586 7.707 9.293a1 1 0 0 0-1.414 1.414l2 2a1 1 0 0 0 1.414 0l4-4z" clipRule="evenodd" /></svg>
+                <Text as="p" tone="success">Auto-show categories is ON — the shop will display all categories in the dropdown (menu items below are ignored).</Text>
               </div>
             ) : null}
             {hasMenuId && (

@@ -259,6 +259,10 @@ class MedusaAdminClient {
       store_name: res?.store_name ?? '',
       free_shipping_threshold_cents: res?.free_shipping_threshold_cents ?? null,
       free_shipping_thresholds: res?.free_shipping_thresholds ?? null,
+      shop_logo_url: res?.shop_logo_url ?? '',
+      shop_favicon_url: res?.shop_favicon_url ?? '',
+      sellercentral_logo_url: res?.sellercentral_logo_url ?? '',
+      sellercentral_favicon_url: res?.sellercentral_favicon_url ?? '',
     };
   }
 
@@ -906,6 +910,19 @@ class MedusaAdminClient {
   }
   async updatePayout(id, data) {
     return this.request(`/admin-hub/v1/payouts/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+  }
+  async getCoupons(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/coupons${qs}`)
+  }
+  async createCoupon(data) {
+    return this.request('/admin-hub/v1/coupons', { method: 'POST', body: JSON.stringify(data) })
+  }
+  async updateCoupon(id, data) {
+    return this.request(`/admin-hub/v1/coupons/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+  }
+  async deleteCoupon(id) {
+    return this.request(`/admin-hub/v1/coupons/${id}`, { method: 'DELETE' })
   }
   async getSellerProfile() {
     return this.request('/admin-hub/v1/seller/profile')
