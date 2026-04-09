@@ -476,13 +476,13 @@ export default function PolarisLayout({ children }) {
       onNavigationToggle={() => setShowMobileNav((v) => !v)}
       userMenu={
         <div style={{ display: "flex", alignItems: "center", gap: 4, height: 56 }}>
-          {platformBranding.sellercentral_logo_url ? (
+          {platformBranding.sellercentral_logo_url && (
             <img
               src={platformBranding.sellercentral_logo_url}
               alt="Sellercentral logo"
-              style={{ height: 28, width: "auto", maxWidth: 140, objectFit: "contain", marginRight: 6, borderRadius: 4 }}
+              style={{ height: 30, width: "auto", maxWidth: 140, objectFit: "contain", marginRight: 4, flexShrink: 0 }}
             />
-          ) : null}
+          )}
           {/* Language selector */}
           {langSelector}
 

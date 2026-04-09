@@ -12,16 +12,46 @@ import {
   Button,
   Banner,
   Badge,
+  Divider,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("de-DE") : "—");
+
+function CouponRow({ c, onToggle, onRemove }) {
+  return (
+    <div style={{ borderTop: "1px solid #f1f2f4", padding: "12px 0" }}>
+      <InlineStack align="space-between" blockAlign="center">
+        <BlockStack gap="100">
+          <InlineStack gap="200" blockAlign="center">
+            <Text as="span" fontWeight="semibold">{c.code}</Text>
+            <Badge tone={c.active ? "success" : "critical"}>{c.active ? "Aktiv" : "Inaktiv"}</Badge>
+          </InlineStack>
+          <Text tone="subdued" as="span">
+            {c.discount_type === "fixed" ? `${(Number(c.discount_value || 0) / 100).toFixed(2)} €` : `${c.discount_value}%`} |
+            Min: {(Number(c.min_subtotal_cents || 0) / 100).toFixed(2)} € |
+            Nutzung: {Number(c.used_count || 0)}{c.usage_limit != null ? ` / ${c.usage_limit}` : ""} |
+            Ablauf: {fmtDate(c.expires_at)}
+          </Text>
+          {c.seller_id && c.seller_id !== "default" && (
+            <Text tone="subdued" as="span" variant="bodySm">Verkäufer-ID: {c.seller_id}</Text>
+          )}
+        </BlockStack>
+        <InlineStack gap="200">
+          <Button size="slim" onClick={() => onToggle(c)}>{c.active ? "Deaktivieren" : "Aktivieren"}</Button>
+          <Button size="slim" tone="critical" variant="plain" onClick={() => onRemove(c.id)}>Löschen</Button>
+        </InlineStack>
+      </InlineStack>
+    </div>
+  );
+}
 
 export default function CouponsPage() {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [isSuperuser, setIsSuperuser] = useState(false);
   const [form, setForm] = useState({
     code: "",
     discount_type: "percent",
@@ -30,6 +60,10 @@ export default function CouponsPage() {
     usage_limit: "",
     expires_at: "",
   });
+
+  useEffect(() => {
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -59,14 +93,7 @@ export default function CouponsPage() {
         usage_limit: form.usage_limit === "" ? null : Number(form.usage_limit),
         expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
       });
-      setForm({
-        code: "",
-        discount_type: "percent",
-        discount_value: "",
-        min_subtotal_cents: "",
-        usage_limit: "",
-        expires_at: "",
-      });
+      setForm({ code: "", discount_type: "percent", discount_value: "", min_subtotal_cents: "", usage_limit: "", expires_at: "" });
       setMsg({ tone: "success", text: "Coupon erstellt." });
       await load();
     } catch (e) {
@@ -94,6 +121,10 @@ export default function CouponsPage() {
       setMsg({ tone: "critical", text: e?.message || "Coupon konnte nicht gelöscht werden." });
     }
   };
+
+  // Split coupons for superuser view
+  const ownCoupons = isSuperuser ? coupons.filter((c) => !c.seller_id || c.seller_id === "default") : coupons;
+  const sellerCoupons = isSuperuser ? coupons.filter((c) => c.seller_id && c.seller_id !== "default") : [];
 
   return (
     <Page title="Coupons">
@@ -161,39 +192,39 @@ export default function CouponsPage() {
         <Card>
           <BlockStack gap="200">
             <InlineStack align="space-between" blockAlign="center">
-              <Text as="h2" variant="headingMd">Coupons ({coupons.length})</Text>
+              <Text as="h2" variant="headingMd">
+                {isSuperuser ? `Eigene Coupons (${ownCoupons.length})` : `Coupons (${coupons.length})`}
+              </Text>
               <Button onClick={load} loading={loading} size="slim">Aktualisieren</Button>
             </InlineStack>
-            {coupons.length === 0 ? (
+            {ownCoupons.length === 0 ? (
               <Text tone="subdued">Noch keine Coupons vorhanden.</Text>
             ) : (
               <div>
-                {coupons.map((c) => (
-                  <div key={c.id} style={{ borderTop: "1px solid #f1f2f4", padding: "12px 0" }}>
-                    <InlineStack align="space-between" blockAlign="center">
-                      <BlockStack gap="100">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Text as="span" fontWeight="semibold">{c.code}</Text>
-                          <Badge tone={c.active ? "success" : "critical"}>{c.active ? "Aktiv" : "Inaktiv"}</Badge>
-                        </InlineStack>
-                        <Text tone="subdued" as="span">
-                          {c.discount_type === "fixed" ? `${(Number(c.discount_value || 0) / 100).toFixed(2)} €` : `${c.discount_value}%`} |
-                          Min: {(Number(c.min_subtotal_cents || 0) / 100).toFixed(2)} € |
-                          Nutzung: {Number(c.used_count || 0)}{c.usage_limit != null ? ` / ${c.usage_limit}` : ""} |
-                          Ablauf: {fmtDate(c.expires_at)}
-                        </Text>
-                      </BlockStack>
-                      <InlineStack gap="200">
-                        <Button size="slim" onClick={() => toggleActive(c)}>{c.active ? "Deaktivieren" : "Aktivieren"}</Button>
-                        <Button size="slim" tone="critical" variant="plain" onClick={() => remove(c.id)}>Löschen</Button>
-                      </InlineStack>
-                    </InlineStack>
-                  </div>
+                {ownCoupons.map((c) => (
+                  <CouponRow key={c.id} c={c} onToggle={toggleActive} onRemove={remove} />
                 ))}
               </div>
             )}
           </BlockStack>
         </Card>
+
+        {isSuperuser && (
+          <Card>
+            <BlockStack gap="200">
+              <Text as="h2" variant="headingMd">Verkäufer-Coupons ({sellerCoupons.length})</Text>
+              {sellerCoupons.length === 0 ? (
+                <Text tone="subdued">Keine Verkäufer-Coupons vorhanden.</Text>
+              ) : (
+                <div>
+                  {sellerCoupons.map((c) => (
+                    <CouponRow key={c.id} c={c} onToggle={toggleActive} onRemove={remove} />
+                  ))}
+                </div>
+              )}
+            </BlockStack>
+          </Card>
+        )}
       </BlockStack>
     </Page>
   );

@@ -94,7 +94,7 @@ const Thumb = styled.div`
   border-radius: 6px;
   overflow: hidden;
   background: #f3f4f6;
-  img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  img { width: 100%; height: 100%; object-fit: contain; background: #fff; display: block; }
 `;
 
 const ItemTitle = styled.div`

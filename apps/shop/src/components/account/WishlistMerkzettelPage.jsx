@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuthGuard, getToken } from "@belucha/lib";
+import NewtonsCradle from "@/components/NewtonsCradle";
 import { Link, useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -70,7 +71,7 @@ export default function WishlistMerkzettelPage() {
             <AccountSidebar onLogout={() => { logout(); router.push("/"); }} />
             <div>
               {loading ? (
-                <p style={{ color: GRAY }}>Laden…</p>
+                <NewtonsCradle />
               ) : products.length === 0 ? (
                 <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 40, textAlign: "center" }}>
                   <p style={{ color: GRAY, marginBottom: 20 }}>Ihr Merkzettel ist noch leer.</p>

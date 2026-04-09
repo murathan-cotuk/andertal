@@ -3046,9 +3046,17 @@ async function start() {
         const isSuperuserCaller = sellerPayload?.is_superuser || false
         const callerSellerId = (!isSuperuserCaller && sellerPayload?.seller_id) ? String(sellerPayload.seller_id).trim() : null
         const existing = await getAdminHubProductByIdOrHandleDb(req.params.id)
+        // Seller-specific fields that can be saved to the listing without superuser approval
+        const SELLER_LISTING_FIELDS = ['price', 'inventory', 'status', 'sku']
+        const SELLER_LISTING_META_FIELDS = ['shipping_group_id', 'brand_id', 'publish_date', 'seller_name', 'shop_name']
         if (callerSellerId && existing && !existing.seller_id) {
           // Master product: non-superuser may only persist seller-owned listing fields.
-          const wantsSharedChange = Object.keys(body).some((k) => !['price', 'inventory', 'status'].includes(k))
+          // Check if only seller-specific fields are being changed
+          const bodyKeys = Object.keys(body).filter((k) => k !== 'metadata')
+          const metaKeys = body.metadata && typeof body.metadata === 'object' ? Object.keys(body.metadata).filter((k) => k !== 'translations') : []
+          const hasSharedBodyChange = bodyKeys.some((k) => !SELLER_LISTING_FIELDS.includes(k))
+          const hasSharedMetaChange = metaKeys.some((k) => !SELLER_LISTING_META_FIELDS.includes(k))
+          const wantsSharedChange = hasSharedBodyChange || hasSharedMetaChange
           if (wantsSharedChange) {
             const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
             const { Client } = require('pg')
@@ -3088,6 +3096,11 @@ async function start() {
           const priceCents = body.price !== undefined ? Math.max(0, Math.round(Number(body.price || 0) * 100)) : null
           const inventory = body.inventory !== undefined ? Math.max(0, parseInt(body.inventory, 10) || 0) : null
           const status = body.status !== undefined ? String(body.status || 'active') : null
+          const skuVal = body.sku !== undefined ? (body.sku || null) : null
+          const meta = body.metadata && typeof body.metadata === 'object' ? body.metadata : {}
+          const shippingGroupId = meta.shipping_group_id !== undefined ? (meta.shipping_group_id || null) : null
+          const brandId = meta.brand_id !== undefined ? (meta.brand_id || null) : null
+          const publishDate = meta.publish_date !== undefined ? (meta.publish_date || null) : null
           let listing = null
           if (existingListing.rows[0]) {
             const lid = existingListing.rows[0].id
@@ -3096,23 +3109,42 @@ async function start() {
                SET price_cents = COALESCE($1, price_cents),
                    inventory = COALESCE($2, inventory),
                    status = COALESCE($3, status),
+                   sku = COALESCE($4, sku),
+                   shipping_group_id = COALESCE($5, shipping_group_id),
+                   brand_id = COALESCE($6, brand_id),
+                   publish_date = COALESCE($7, publish_date),
                    updated_at = now()
-               WHERE id = $4
+               WHERE id = $8
                RETURNING *`,
-              [priceCents, inventory, status, lid]
+              [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, lid]
             )
             listing = ur.rows[0] || null
           } else {
             const ir = await lc.query(
-              `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status)
-               VALUES ($1,$2,$3,$4,$5)
+              `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
                RETURNING *`,
-              [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'active']
+              [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate]
             )
             listing = ir.rows[0] || null
           }
           await lc.end()
-          res.json({ product: existing, listing, listing_saved: true, shared_change_blocked: false })
+          // Merge listing fields into the product response so frontend can show current seller values
+          const productWithListingData = {
+            ...existing,
+            price: (listing?.price_cents || 0) / 100,
+            price_cents: listing?.price_cents || 0,
+            inventory: listing?.inventory || 0,
+            status: listing?.status || existing.status,
+            sku: listing?.sku || null,
+            metadata: {
+              ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+              ...(listing?.shipping_group_id ? { shipping_group_id: listing.shipping_group_id } : {}),
+              ...(listing?.brand_id ? { brand_id: listing.brand_id } : {}),
+              ...(listing?.publish_date ? { publish_date: listing.publish_date } : {}),
+            },
+          }
+          res.json({ product: productWithListingData, listing, listing_saved: true, shared_change_blocked: false })
           return
         }
         const product = await updateAdminHubProductDb(req.params.id, body)
@@ -4622,15 +4654,21 @@ async function start() {
     const loadValidCouponForSeller = async (client, sellerId, code) => {
       const normalizedCode = normalizeCouponCode(code)
       if (!normalizedCode) return null
+      const effectiveSellerId = String(sellerId || 'default')
+      // Try seller-specific coupon first, then fall back to platform-wide ('default') coupons
+      const sellerIds = effectiveSellerId === 'default'
+        ? ['default']
+        : [effectiveSellerId, 'default']
       const r = await client.query(
         `SELECT *
          FROM admin_hub_coupons
-         WHERE seller_id = $1
+         WHERE seller_id = ANY($1)
            AND lower(code) = lower($2)
            AND active = true
            AND (expires_at IS NULL OR expires_at > now())
+         ORDER BY CASE WHEN seller_id = $3 THEN 0 ELSE 1 END
          LIMIT 1`,
-        [String(sellerId || 'default'), normalizedCode],
+        [sellerIds, normalizedCode, effectiveSellerId],
       )
       const row = r.rows?.[0]
       if (!row) return null
@@ -6737,7 +6775,7 @@ async function start() {
               await appendBonusLedger(client, {
                 customerId,
                 pointsDelta: earned,
-                description: `Bestellung #${orderNumber} — Punkte aus gezahltem Betrag inkl. Versand (+${earned} Punkte)`,
+                description: `Bestellung #${orderNumber} (+${earned} Punkte)`,
                 source: 'order_earn',
                 orderId,
                 skipBalanceUpdate: true,
@@ -10026,7 +10064,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const isSuperuser = req.sellerUser?.is_superuser || false
         const callerSellerId = req.sellerUser?.seller_id
         const body = req.body || {}
-        const sellerId = String(body.seller_id || callerSellerId || 'default')
+        // Superuser without explicit seller_id → 'default' (platform-wide coupon)
+        // Superuser with explicit seller_id → coupon for that specific seller
+        // Normal seller → always their own seller_id
+        const sellerId = isSuperuser
+          ? String(body.seller_id || 'default')
+          : String(callerSellerId || 'default')
         if (!isSuperuser && sellerId !== callerSellerId) {
           await client.end()
           return res.status(403).json({ message: 'Forbidden' })
@@ -11883,10 +11926,20 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       inventory   integer NOT NULL DEFAULT 0,
       status      varchar(50) NOT NULL DEFAULT 'active',
       orders_count integer NOT NULL DEFAULT 0,
+      sku         text,
+      shipping_group_id text,
+      brand_id    text,
+      publish_date text,
+      seller_metadata jsonb DEFAULT NULL,
       created_at  timestamptz DEFAULT now(),
       updated_at  timestamptz DEFAULT now(),
       UNIQUE(product_id, seller_id)
     )`).catch(() => {})
+    await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS sku text`).catch(() => {})
+    await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS shipping_group_id text`).catch(() => {})
+    await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS brand_id text`).catch(() => {})
+    await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS publish_date text`).catch(() => {})
+    await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS seller_metadata jsonb DEFAULT NULL`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_product ON admin_hub_seller_listings(product_id)`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_seller  ON admin_hub_seller_listings(seller_id)`).catch(() => {})
     await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_product_change_requests (

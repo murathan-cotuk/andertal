@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@belucha/lib";
+import NewtonsCradle from "@/components/NewtonsCradle";
 import { Link, useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -207,7 +208,7 @@ export default function AccountPage() {
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fff" }}>
         <ShopHeader />
         <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ color: GRAY, fontSize: 15 }}>Laden…</div>
+          <NewtonsCradle />
         </main>
         <Footer />
       </div>

@@ -6,6 +6,7 @@ import { useRouter } from "@/i18n/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import ShopHeader from "@/components/ShopHeader";
+import NewtonsCradle from "@/components/NewtonsCradle";
 import Footer from "@/components/Footer";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import { getMedusaClient } from "@/lib/medusa-client";
@@ -195,9 +196,7 @@ export default function PaymentMethodsPage() {
           <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 24, alignItems: "start" }}>
             <AccountSidebar onLogout={() => { logout(); router.push("/"); }} />
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {loading && (
-                <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af", fontSize: 14 }}>Laden…</div>
-              )}
+              {loading && <NewtonsCradle />}
               {err && (
                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: "10px 14px", borderRadius: 8, fontSize: 13 }}>
                   {err}

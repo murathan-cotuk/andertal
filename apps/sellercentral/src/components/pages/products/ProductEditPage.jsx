@@ -678,8 +678,18 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         router.push(`/products/${created?.id}`);
         return;
       }
-      const updated = await client.updateAdminHubProduct(idOrHandle, payload);
-      const savedProductRaw = updated || {
+      const updatedRaw = await client.updateAdminHubProduct(idOrHandle, payload);
+
+      // Handle suggestion_submitted (superuser review needed for shared catalog changes)
+      if (updatedRaw?.suggestion_submitted) {
+        setMessage({ type: "success", text: "Dein Änderungsvorschlag wurde eingereicht. Ein Superuser wird ihn prüfen." });
+        setSaving(false);
+        return;
+      }
+
+      // Handle listing_saved (seller-specific fields saved to listing, not master product)
+      const resolvedProduct = updatedRaw?.product ?? updatedRaw;
+      const savedProductRaw = (resolvedProduct && resolvedProduct.id) ? resolvedProduct : {
         ...product,
         ...payload,
         metadata: payload.metadata ?? product.metadata,
@@ -697,7 +707,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setProduct(savedProduct);
       initialSnapshotRef.current = JSON.stringify(normalizeForCompare(savedProduct));
       unsavedRef.current?.setDirty(false);
-      setMessage({ type: "success", text: "Saved" });
+      setMessage({ type: "success", text: updatedRaw?.listing_saved ? "Preis, Bestand und eigene Daten gespeichert." : "Saved" });
       onReload?.();
     } catch (err) {
       setMessage({ type: "error", text: err?.message || "Save failed" });

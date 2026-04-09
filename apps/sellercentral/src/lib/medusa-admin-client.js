@@ -157,7 +157,8 @@ class MedusaAdminClient {
       method: 'PUT',
       body: JSON.stringify(data),
     });
-    return res?.product ?? res;
+    // Return full response object so caller can inspect suggestion_submitted / listing_saved flags
+    return res;
   }
 
   /** DELETE /admin-hub/products/:id */

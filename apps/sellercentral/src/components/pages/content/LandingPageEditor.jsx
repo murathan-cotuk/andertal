@@ -143,7 +143,7 @@ function newContainer(type) {
   const base = { id, type, visible: true };
   switch (type) {
     case "hero_banner":
-      return { ...base, slides: [{ image: "", title: "", subtitle: "", btn_text: "", btn_url: "", overlay: 0, text_color: "#ffffff", text_position: "center", title_size: "clamp(24px,4vw,56px)", subtitle_size: "clamp(14px,2vw,22px)", content_padding: "32px 48px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8 }], height: "500px", autoplay: true, delay: 4000 };
+      return { ...base, slides: [{ image: "", title: "", subtitle: "", btn_text: "", btn_url: "", overlay: 0, text_color: "#ffffff", text_position: "center", title_size: "clamp(24px,4vw,56px)", subtitle_size: "clamp(14px,2vw,22px)", content_padding: "32px 48px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8 }], height: "500px", autoplay: true, delay: 4000, padding: "0px 0px 0px 0px", content_layout: "full" };
     case "text_block":
       return { ...base, title: "", body: "", btn_text: "", btn_url: "", align: "center", bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "image_text":
@@ -297,6 +297,8 @@ function HeroBannerEditor({ container, onChange }) {
               <TextField label="Verzögerung (ms)" type="number" value={String(container.delay || 4000)} onChange={(v) => onChange({ ...container, delay: Number(v) || 4000 })} autoComplete="off" />
             </div>
           </InlineStack>
+          <PaddingEditor label="Seitenabstand" value={container.padding || "0px 0px 0px 0px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="0px 0px 0px 0px" horizontalOnly />
+          <ContainerLayoutEditor container={container} onChange={onChange} />
         </BlockStack>
       </Card>
 

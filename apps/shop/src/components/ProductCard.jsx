@@ -602,9 +602,7 @@ export function ProductCard({ product, activeFilters = {} }) {
         </Prices>
 
         <ReviewRow>
-          {(reviewCount > 0 || reviewAvg > 0) && (
-            <StarRating average={reviewAvg} count={reviewCount} />
-          )}
+          <StarRating average={reviewAvg} count={reviewCount} />
         </ReviewRow>
 
         <DescriptionPreview>
@@ -704,7 +702,7 @@ export function StarRating({ average = 0, count = 0 }) {
         {half ? <span style={{ color: "#f59e0b" }}>★</span> : null}
         {[...Array(empty)].map((_, i) => <span key={`e${i}`} style={{ color: "#d1d5db" }}>★</span>)}
       </span>
-      {count > 0 && <span style={{ fontSize: 12, color: "#9ca3af" }}>({count})</span>}
+      <span style={{ fontSize: 12, color: "#9ca3af" }}>({count})</span>
     </div>
   );
 }

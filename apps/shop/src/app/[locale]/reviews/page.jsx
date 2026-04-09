@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuthGuard, getToken } from "@belucha/lib";
+import NewtonsCradle from "@/components/NewtonsCradle";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -156,7 +157,7 @@ export default function ReviewsPage() {
           <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 24, alignItems: "start" }}>
             <AccountSidebar onLogout={() => { logout(); router.push("/"); }} />
             <div>
-              {loading && <p style={{ color: GRAY }}>Laden…</p>}
+              {loading && <NewtonsCradle />}
               {!loading && ordersWithItems.length === 0 && (
                 <p style={{ color: GRAY }}>Noch keine Bestellungen vorhanden.</p>
               )}

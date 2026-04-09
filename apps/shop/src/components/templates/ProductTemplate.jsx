@@ -14,6 +14,7 @@ import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import NewtonsCradle from "@/components/NewtonsCradle";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { findShippingGroup, resolveShippingQuoteCents, resolveShippingQuoteStrict } from "@/lib/shipping-price";
@@ -78,7 +79,8 @@ const MainImageWrap = styled.div`
 const MainImage = styled.img`
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #fff;
   display: block;
 `;
 
@@ -92,7 +94,8 @@ const Thumbnails = styled.div`
 const Thumbnail = styled.img`
   width: 64px;
   height: 64px;
-  object-fit: cover;
+  object-fit: contain;
+  background: #fff;
   border-radius: 8px;
   cursor: pointer;
   border: 2px solid ${(p) => (p.$active ? "#0ea5e9" : "transparent")};
@@ -866,7 +869,7 @@ export default function ProductTemplate() {
       .catch(() => {});
   }, [product?.id, multiOffer?.review_product_ids]);
 
-  if (loading) return <Container>Laden…</Container>;
+  if (loading) return <Container><NewtonsCradle /></Container>;
   if (error) return <Container>Fehler: {error}</Container>;
   if (!product) return <Container>Produkt nicht gefunden.</Container>;
 

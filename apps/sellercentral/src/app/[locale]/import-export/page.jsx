@@ -1,47 +1,132 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/DashboardLayout";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import {
   Page, Layout, Card, Button, Text, BlockStack, InlineStack,
-  Box, Banner, Divider, Badge, ProgressBar, Checkbox, Spinner,
+  Box, Banner, Divider, Badge, ProgressBar, Checkbox, Spinner, Tabs,
 } from "@shopify/polaris";
 import { ImportIcon, ExportIcon, NoteIcon } from "@shopify/polaris-icons";
 
-function flattenCategoryTree(nodes, parentPath = "") {
-  const out = [];
-  for (const node of nodes || []) {
-    const slug = (node.slug || "").trim();
-    const name = (node.name || slug || "").trim();
-    const path = parentPath ? `${parentPath} › ${name}` : name;
-    if (slug) out.push({ id: node.id, slug, name, path });
-    const children = node.children || node.category_children;
-    if (Array.isArray(children) && children.length) {
-      out.push(...flattenCategoryTree(children, path));
-    }
+function sortDeep(nodes) {
+  nodes.sort((a, b) => String(a.name || a.slug || "").localeCompare(String(b.name || b.slug || ""), undefined, { sensitivity: "base" }));
+  nodes.forEach((n) => n.children?.length && sortDeep(n.children));
+  return nodes;
+}
+
+function buildTreeFromFlat(list) {
+  const byId = new Map();
+  (list || []).forEach((c) => { if (c?.id) byId.set(String(c.id), { ...c, children: [] }); });
+  const roots = [];
+  byId.forEach((node) => {
+    const pid = node.parent_id != null ? String(node.parent_id) : null;
+    if (pid && byId.has(pid)) byId.get(pid).children.push(node);
+    else roots.push(node);
+  });
+  return sortDeep(roots);
+}
+
+function collectAllSlugs(nodes, out = []) {
+  for (const n of nodes || []) {
+    if (n.slug) out.push(n.slug);
+    if (n.children?.length) collectAllSlugs(n.children, out);
   }
   return out;
 }
 
-function buildCategoryTree(list) {
-  const byId = new Map();
-  (list || []).forEach((c) => {
-    if (!c?.id) return;
-    byId.set(c.id, { ...c, children: [] });
-  });
-  const roots = [];
-  byId.forEach((node) => {
-    if (node.parent_id && byId.has(node.parent_id)) byId.get(node.parent_id).children.push(node);
-    else roots.push(node);
-  });
-  const sortDeep = (nodes) => {
-    nodes.sort((a, b) => String(a.name || a.slug || "").localeCompare(String(b.name || b.slug || ""), undefined, { sensitivity: "base" }));
-    nodes.forEach((n) => n.children?.length && sortDeep(n.children));
+/** Amazon-style multi-select drilldown for categories */
+function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree }) {
+  const [pathIds, setPathIds] = useState([]);
+
+  const byId = useMemo(() => {
+    const map = new Map();
+    const walk = (nodes) => { for (const n of nodes) { map.set(n.id, n); if (n.children?.length) walk(n.children); } };
+    walk(tree);
+    return map;
+  }, [tree]);
+
+  const currentNodes = useMemo(() => {
+    if (!pathIds.length) return tree;
+    const last = byId.get(pathIds[pathIds.length - 1]);
+    return last?.children || [];
+  }, [pathIds, byId, tree]);
+
+  const pathNodes = useMemo(() => pathIds.map((id) => byId.get(id)).filter(Boolean), [pathIds, byId]);
+
+  const getSubtreeSlugs = (node) => collectAllSlugs([node]);
+  const isSubtreeFullySelected = (node) => {
+    const slugs = getSubtreeSlugs(node);
+    return slugs.length > 0 && slugs.every((s) => selectedSlugs.has(s));
   };
-  sortDeep(roots);
-  return roots;
+  const isSubtreePartiallySelected = (node) => {
+    const slugs = getSubtreeSlugs(node);
+    return slugs.some((s) => selectedSlugs.has(s)) && !slugs.every((s) => selectedSlugs.has(s));
+  };
+
+  return (
+    <div>
+      {/* Breadcrumb */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 8, minHeight: 28 }}>
+        <button type="button" onClick={() => setPathIds([])}
+          style={{ fontSize: 12, color: pathIds.length === 0 ? "#111827" : "#2563eb", fontWeight: pathIds.length === 0 ? 700 : 400, background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}>
+          Alle Kategorien
+        </button>
+        {pathNodes.map((n, i) => (
+          <React.Fragment key={n.id}>
+            <span style={{ color: "#d1d5db", fontSize: 12 }}>›</span>
+            <button type="button" onClick={() => setPathIds((p) => p.slice(0, i + 1))}
+              style={{ fontSize: 12, color: i === pathNodes.length - 1 ? "#111827" : "#2563eb", fontWeight: i === pathNodes.length - 1 ? 700 : 400, background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}>
+              {n.name || n.slug}
+            </button>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Category list */}
+      <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", maxHeight: 320, overflowY: "auto" }}>
+        {currentNodes.length === 0 ? (
+          <div style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af" }}>Keine Unterkategorien.</div>
+        ) : currentNodes.map((node) => {
+          const hasKids = (node.children?.length || 0) > 0;
+          const allSelected = isSubtreeFullySelected(node);
+          const partial = !allSelected && isSubtreePartiallySelected(node);
+          const directSelected = selectedSlugs.has(node.slug);
+          return (
+            <div key={node.id} style={{ display: "flex", alignItems: "center", gap: 0, borderBottom: "1px solid #f3f4f6" }}>
+              {/* Checkbox */}
+              <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", flex: 1, cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={directSelected}
+                  ref={(el) => { if (el) el.indeterminate = partial && !directSelected; }}
+                  onChange={() => onToggle(node.slug)}
+                  style={{ width: 15, height: 15, accentColor: "#2563eb", flexShrink: 0 }}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{node.name || node.slug}</div>
+                  {node.slug && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 1 }}>{node.slug}</div>}
+                </div>
+                {hasKids && allSelected && <span style={{ marginLeft: "auto", fontSize: 11, color: "#16a34a", flexShrink: 0 }}>✓ alle</span>}
+                {hasKids && partial && <span style={{ marginLeft: "auto", fontSize: 11, color: "#f59e0b", flexShrink: 0 }}>teilweise</span>}
+              </label>
+
+              {/* Drill into children */}
+              {hasKids && (
+                <button type="button" onClick={() => setPathIds((p) => [...p, node.id])}
+                  style={{ flexShrink: 0, height: "100%", minHeight: 44, padding: "0 14px", background: "none", border: "none", borderLeft: "1px solid #f3f4f6", cursor: "pointer", color: "#6b7280", fontSize: 16 }}
+                  title="Unterkategorien anzeigen"
+                >
+                  ›
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────
@@ -139,11 +224,11 @@ export default function ImportExportPage() {
   const params = useParams();
   const locale = typeof params?.locale === "string" ? params.locale.split("-")[0].toLowerCase() : "de";
 
-  const [categories, setCategories] = useState([]);
+  const [activeTab, setActiveTab] = useState(0);
+  const [categoryTree, setCategoryTree] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesError, setCategoriesError] = useState(null);
   const [selectedSlugs, setSelectedSlugs] = useState(() => new Set());
-  const [categoryPathIds, setCategoryPathIds] = useState([]);
   const [templateDownloading, setTemplateDownloading] = useState(false);
   const [templateError, setTemplateError] = useState(null);
 
@@ -196,9 +281,11 @@ export default function ImportExportPage() {
       try {
         const client = getMedusaAdminClient();
         const data = await client.getAdminHubCategories({ all: true, tree: "true", active: "true" });
-        const tree = data.tree || data.categories || [];
-        const flat = flattenCategoryTree(Array.isArray(tree) ? tree : []);
-        if (!cancelled) setCategories(flat);
+        const rawTree = data.tree || data.categories || [];
+        // If API returns flat list, build tree; if already tree (has children), use directly
+        const hasFlatItems = Array.isArray(rawTree) && rawTree.length > 0 && !rawTree[0]?.children;
+        const built = hasFlatItems ? buildTreeFromFlat(rawTree) : sortDeep(rawTree.map((n) => ({ ...n, children: n.children || [] })));
+        if (!cancelled) setCategoryTree(built);
       } catch (e) {
         if (!cancelled) setCategoriesError(e?.message || "Kategorien konnten nicht geladen werden.");
       } finally {
@@ -208,8 +295,6 @@ export default function ImportExportPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const categoryTree = React.useMemo(() => buildCategoryTree(categories), [categories]);
-
   const toggleCategory = useCallback((slug) => {
     setSelectedSlugs((prev) => {
       const next = new Set(prev);
@@ -218,36 +303,6 @@ export default function ImportExportPage() {
       else next.add(k);
       return next;
     });
-  }, []);
-
-  const currentCategoryNodes = React.useMemo(() => {
-    let nodes = categoryTree;
-    for (const id of categoryPathIds) {
-      const found = (nodes || []).find((n) => n.id === id);
-      nodes = found?.children || [];
-    }
-    return nodes || [];
-  }, [categoryTree, categoryPathIds]);
-
-  const categoryPathNodes = React.useMemo(() => {
-    const out = [];
-    let nodes = categoryTree;
-    for (const id of categoryPathIds) {
-      const found = (nodes || []).find((n) => n.id === id);
-      if (!found) break;
-      out.push(found);
-      nodes = found.children || [];
-    }
-    return out;
-  }, [categoryTree, categoryPathIds]);
-
-  const enterCategory = useCallback((node) => {
-    if (!node || !Array.isArray(node.children) || node.children.length === 0) return;
-    setCategoryPathIds((prev) => [...prev, node.id]);
-  }, []);
-
-  const goToPathDepth = useCallback((depth) => {
-    setCategoryPathIds((prev) => prev.slice(0, depth));
   }, []);
 
   const handleProductImport = async () => {
@@ -398,12 +453,19 @@ export default function ImportExportPage() {
     }
   };
 
+  const tabs = [
+    { id: "import", content: "Import", panelID: "import-panel" },
+    { id: "export", content: "Export", panelID: "export-panel" },
+  ];
+
   return (
     <DashboardLayout>
       <Page
         title="Import / Export"
         subtitle="Produkte, Bestellungen und Kunden in großen Mengen importieren und exportieren"
       >
+        <Tabs tabs={tabs} selected={activeTab} onSelect={setActiveTab}>
+          {activeTab === 0 ? (
         <Layout>
 
           <Layout.Section>
@@ -421,48 +483,31 @@ export default function ImportExportPage() {
               {categoriesError && (
                 <Banner tone="critical">{categoriesError}</Banner>
               )}
-              {!categoriesLoading && !categoriesError && categories.length > 0 && (
+              {!categoriesLoading && !categoriesError && categoryTree.length > 0 && (
                 <BlockStack gap="300">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">
-                    Kategorien für diesen Import (Pflicht für Download)
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Drilldown wie ürün sayfası: önce parent, sonra onun sub kategorileri. İstediğin seviyede kategoriyi seçebilirsin.
-                  </Text>
-                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fafafa" }}>
-                    <InlineStack gap="200" blockAlign="center" wrap>
-                      <Button size="slim" onClick={() => goToPathDepth(0)} disabled={categoryPathIds.length === 0}>Parent</Button>
-                      {categoryPathNodes.map((n, i) => (
-                        <Button key={n.id} size="slim" onClick={() => goToPathDepth(i + 1)}>{n.name || n.slug}</Button>
-                      ))}
-                    </InlineStack>
-                    <div style={{ marginTop: 10, maxHeight: 280, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", padding: 8 }}>
-                      <BlockStack gap="100">
-                        {currentCategoryNodes.length === 0 ? (
-                          <Text as="p" variant="bodySm" tone="subdued">Bu seviyede alt kategori yok.</Text>
-                        ) : currentCategoryNodes.map((n) => {
-                          const hasChildren = Array.isArray(n.children) && n.children.length > 0;
-                          return (
-                            <div key={n.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "6px 4px", borderBottom: "1px solid #f3f4f6" }}>
-                              <Checkbox
-                                label={`${n.name || n.slug} — ${n.slug}`}
-                                checked={selectedSlugs.has(n.slug)}
-                                onChange={() => toggleCategory(n.slug)}
-                              />
-                              {hasChildren ? (
-                                <Button size="slim" onClick={() => enterCategory(n)}>Subcategories</Button>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </BlockStack>
-                    </div>
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="p" variant="bodySm" fontWeight="semibold">
+                      Kategorie auswählen (Pflicht für Download)
+                    </Text>
                     {selectedSlugs.size > 0 && (
-                      <div style={{ marginTop: 8 }}>
-                        <Text as="p" variant="bodySm" tone="subdued">{selectedSlugs.size} Kategorie ausgewählt</Text>
-                      </div>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text as="span" variant="bodySm" tone="subdued">{selectedSlugs.size} ausgewählt</Text>
+                        <Button size="slim" variant="plain" tone="critical" onClick={() => setSelectedSlugs(new Set())}>Zurücksetzen</Button>
+                      </InlineStack>
                     )}
-                  </div>
+                  </InlineStack>
+                  <CategoryMultiDrilldown
+                    tree={categoryTree}
+                    selectedSlugs={selectedSlugs}
+                    onToggle={toggleCategory}
+                  />
+                  {selectedSlugs.size > 0 && (
+                    <div style={{ padding: "8px 10px", background: "#eff6ff", borderRadius: 8, border: "1px solid #bfdbfe" }}>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {[...selectedSlugs].join(", ")}
+                      </Text>
+                    </div>
+                  )}
                 </BlockStack>
               )}
 
@@ -601,6 +646,9 @@ export default function ImportExportPage() {
             </SectionCard>
           </Layout.Section>
 
+        </Layout>
+          ) : (
+        <Layout>
           <Layout.Section>
             <SectionCard
               icon="📤"
@@ -725,6 +773,8 @@ export default function ImportExportPage() {
           </Layout.Section>
 
         </Layout>
+          )}
+        </Tabs>
       </Page>
     </DashboardLayout>
   );

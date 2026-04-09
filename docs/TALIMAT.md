@@ -1,18 +1,20 @@
-08.04.
+09.04.
 
--- shopta product cartlar farkli boytularda gözüküyorlar. review olan bir ürün var ise product cart uzuyor. beschreibungu daha uzun olann bir ürünün de product cardi uzuyor. productc cardlari beschreibung ya da review olmasa bile ayni boyutta gözüksün. sanki review ve beschreibung varmis gibi o bosluk görünsün olmayanlarda. cardda varyasyonlar ile acilama arasina biraz daha bosluk konsun. varyasyonlar hemen aciklamalarin dibinden basliyor. varyasyon yuvarlarklari biraz daha büyük gözükebilir bence. cok kücük duruyor
-
--- sellercentralde /content/categories sayfasi icerisindeki category lerin icine girebilelim. category ler, collectionlari actigimizda görünen sayfa gibi bir yapida olsun. asagida o categorylere eklenmis olan ürünleri de görelim ayni collections sayfasinda yaptigimiz gibi.
+- sellercentralde ürün sayfasinda yayin tarihi kismi var. orasi doldurulmaz ise otomatik olarak ürünün eklendigi tarih ve saat yazsin orada.
+- landing pageteki tekli ürün templateimiz hic güzel degil. solda görsel sagda icerikler, fiyat, sepet butonu falan olacak sekilde olmali.
+-- sellercentralde landing page menüsünde konteyner icin yaptigim degisikliklerin tamami yansimiyor sayfaya. mesela akoridoyn icin seitenabstand ve inhaltsbreite secenekleri mevcut ancak diger konteyner templateleri icin mevcut degil. örnegin Hero Banner / Slider icin asla genislik ve padding ayarlayamiyorum. bu ayarlarin tüm konteyner templatelerinde olmasini isterim.
+-- shopta product cartta yildiz olmayan ürünlerde bile o yildizlar gözüksün. bos dursun, yaninda 0 yazsin ama gözüksün. yoksa cok bos kaliyor. 
+- mesela bir ürüne ürün sayfasinda bir kategori bagladim. automotive-automotive-enthusiast-merchandise-automotive-enthusiast-apparel bu kategoriye bagladim. kategorinin icine girdigimde en alttaki products kisminda ekli olan ürünü ya da ürünleri göremiyorum. bu baglanti düzgün yapilmamis. görebilmek istiyorum.
 -- menüde Auto-show categories butonu secildiginde categorilerin iclerinde ürün olanlar listelensin dropdown menüde. önce sadece parentlar gözükecek, sonra childlari seklinde.
--- sellercentralde content/menus sayfasindaki Main menu (dropdown) menüsü shoptaki arama butonunun yanindaki dropdown ile bagliydi. burada secilen menü ne ise onun gözükmesi gerekiyordu shopta. ve öyleydi de. simdi Main menu (dropdown) a tanimladigim bir menü var. onun ile ilgili kararim shopta görünmüyor. ya altina menü item ekleyecegim ve o gözükecek, ya da more actions icinde categories with products secicem, menu items bos olacak ve shopta bu menüler gözükecek. ücüncüye söylüyorum bunu. bu sefer lütfen artik tamamen hallolmus olsun.
--- sisteme kare olarak eklenmemis görselleri kare haline getirirken biraz uzaklasitarark getir. mesela bi görsel product cardda üstü kesik duruyor cünkü direkt kesmissin. kesme görselleri. kisa olan kenarlarina beyaz renkte ekleme yap ki tam görsel gözükmeye devam etsin.
+- sellercentralde content/menus sayfasindaki Main menu (dropdown) menüsü shoptaki arama butonunun yanindaki dropdown ile bagliydi. burada secilen menü ne ise onun gözükmesi gerekiyordu shopta. ve öyleydi de. simdi Main menu (dropdown) a tanimladigim bir menü var. onun ile ilgili kararim shopta görünmüyor. ya altina menü item ekleyecegim ve o gözükecek, ya da more actions icinde categories with products secicem, menu items bos olacak ve shopta bu menüler gözükecek. ücüncüye söylüyorum bunu. bu sefer lütfen artik tamamen hallolmus olsun.
+-- sisteme kare olarak eklenmemis görseller cardda, categoryde, ürün sayfasinda falan kare seklinde gösteriliyor. bu dogru. ancak görseli kirpma. kare olmayan görsellerin uzun kenarlarlarini genislet ki görsel tamamen gözüksün. mesela 1600 x 2600 px bir görsel eklendi. 1600 olan uzunlugu 2600 yapacaksin ki büyük kare olarak gözükecek. iki kenardan esit uzat ki ürün ortada gözükmeye devam etsin
 -- sellercentralde ürünler sayfasinda ürünlerin varyasyonlarini görmek icin icine girmek zorunda kalmayalim. dropdown ile varyasyonlari acilabilsin. sku, isim falan gözüksün ayrica stok ve fiyat falan da degistirilebilsin.
--- sellercentralde siparis sayfasindayken sag üstteki müsteriye bastigimda direkt müsterinin profiline gitmek yerine genel /customer sayfasina yönlendiriyor. direkt ilgili customer in icine gitmeli.
+-- bonus puanlar icin beschreibung kisminda Bestellung #100009 — Punkte aus gezahltem Betrag inkl. Versand (+32 Punkte) yaziyor. "inkl. Versand (+32 Punkte)" kismi yazmasin!
 -- siparislerde elde edilen bonus puanlar ilgili siparis iade edildigi zaman müsteriden geri aliniyor cok güzel. eger bonus puan harcamis ise iade ettigi sipariste o bonus puanlar da hesabina geri tanimlanmali.
--- sellercentralde content/media sayfasina görseller sürüklendiginde hemen algilasin ve sürükleme ile görsel eklenebilsin. su anda upload files secip dosyayi bulmak gerekiyor. ancak görselleri sayfaya sürükledigimde direkt algilama fonksiyonu da olsa cok iyi olur.
--- "sellercentralde bir versandgruppe olusturdum ve icine yalnizca almanya icin fiyat girdim. bunu bir ürüne tanimladim. shopta bu ürüne gittigimde ve ülke olarak almanya disinda bir ülke (örnegin ispanya) sectigimde yine de ürünü sepete ekleyebiliyor ve siparis verebiliyorum. bu cok sacma. eger ürüne tanimlanmis olan versangruppede fiyat girilmemisse o ülkeye o ürünün satisinin olamamasi gerekiyor." demistim sana. ürün sayfasindayken eklenmiyor evet ancak product cardda gözüküyor ve orada add to cart dedigimde sepete ekleniyor. bir ürünün bir ülkeye teslimati yok ise o ülke secili iken hicbir sekilde sepete eklenememeli.
--- bir sellerin ya da superuser in ekledigi versandmethode baska seller tarafindan görünememeli. ben su anda baska sellerin ekledigi dhl hesabini görebiliyorum. her sellerin kendisine ait olmali.
--- ürünlerin icinde girdigimde breadcrumbs kisminda kategoriler gözüksün. kategorinin breadcrumbsu olsun ve kategorilere tiklanabilsin.
+- shopta bir arama yaptigimda solda tüm kategorilerin gözüktügü bir sidebar aciliyor. onu oradan kaldir bak cok kötü.
+
+- shopta ürünlerin icinde girdigimde breadcrumbs kisminda kategoriler gözüksün. kategorinin breadcrumbsu olsun ve kategorilere tiklanabilsin.
+-- sellercentralde baska bir satici tarafindan eklenmis bir ürünün eanini yazdim, bilgiler geldi, ancak kaydedemedim. save butonu calismiyor bu noktada. ayrica sisteme önceden eklenmis bir ürünün child artikelini yazdigimda da bu fonksiyonun ise yaramasini istiyorum. child eani yazildiginda direkt parent olarak hepsi gelecek.
 -- ayni ean a sahip bir ürünü sinirsiz satici yükleyebilecek. buyboxu algoritmada en iyi puani olan satici alacak. diger saticilar buyboxun altinda "other sellers" olarak yaninda fiyatlar ve magaza puanlari seklinde gösterilecek. alinan yorumlar magazaya da isleyecek tabii ki. amazon mantigi yani.
 -- import/export sayfasinda excel indirmek icin ilk önce kategori secilmesi gerekiyor. ancak kategorilerin gözüktügü kisim cok karisik. ürünler sayfasindaki kategori secici gibi ilerlemesini istiyorum. ilk önce parent kategori gözükecek. sonra secilen parentin subkategorisi. sonra onun subkategorisi, sonra digerininki diye devam edecek. bunu bu sekilde ayarla lütfen. bunun icin bir template olusturmustuk.
 -- sellerlara komisyon ödeme kismi cok anlasilir degil. manuel bir auszahlung olusturdum, bezahlten butonu cikiyor. bastigimda als bezahlt markieren? diye soruyor. sadece markieren olmamasi gerekir. ödemenin de yapilmasi gerekir. ödeme nereden yapiliyor, nereye yapiliyor?
@@ -20,23 +22,101 @@
 -- saticinin hesabinda siparisler, iadeler, vs. olmasina ragmen /settings/payments hicbir transaction girdisi yok. detayli girdiler olsun. ayrica bu transactionlar csv olarak export edilebilsin.
 -- shopta bonuspuan bozmak istedigimde yalnizca 25 ve katlarinda bozabiliyorum. 34 bozamiyorum mesela. istedigim kadar bozabilsin müsteriler. 25 bonuspuan 1 euroya tekabül ediyor ise bu matematikte 34 bonus puan 1,36 euroya tekabül eder ve müsteri bu indirimi alir mesela.
 -- önceden tikir tikir calisan bir sistemde sorun var. shopta /checkouta geliyorum. bonus puan pozdugumda bestellung aufgeben butonu basilamaz oluyor. neden? ayrica sepet tutari ile ödenecek tutar uyusmuyor falan da diyor. bonus puan hesaplamasi sisteme tam entegre sekilde ilerlesin bunun gibi hatalara asla gecit vermeyelim. indirim de düstükten sonraki gesamtsumme degeri icin ödeme alinacak her zaman. checkouta geldi diye checkouttaki degere kitlenmesin stripe. adam indirimini ekleyebilir, kaldirabilir.
--- checkoutta kupon kodu girme kismi ekleyelim. sellercentralde /gift-cards altindan kupon kodu ekleyip müsteriye verebilelim. ayrica /gift-cards menüsünün adini "Coupons" olarak degistirelim ve /products anamenüsünden silip /rabatte anamenüsünün altina alalim.
+-- checkoutta kupon kodu girme kismi var. sellercentralde /coupons sayfasindan bir kupon ekledim, shopta bu kupou girdim ancak Ungültiger oder abgelaufener Coupon-Code diyor. iyi ayarlamamis. ayrica superuser icin kategorizasyonu düzgün yap. üstte kendi kuponlarim, altta satici kuponlari. bir sey yaparken her zaman superuser icin bu formati dikkate al.
 -- excel ile product import yaptim. öncekinden daha iyiydi acak halen daha bir cok yer eksik. mesela varyasyon title, beschreibung, Media (variant gallery), fiyat, bullet pointler, metafieldler, seo metadatenler, parent sayfasinda varyasyonlarin solundaki cover imageler... ooh saydikca da bitmedi he. sunlara bi bakiver.
 -- import/export sayfasindaki export fonksiyonu fena degil. begendim biraz. ancak daha profesyonel yapabilirsin. export edilen excel de daha iyi olabilir.
--- variant eanlari otomatik olarak parentin eanini aliyor eger bos ise. varyant eani bos ise sayfada gösterilmeyecek ve yaninda hata verilecek sellercentralde. sakin otomatik parent ean ile doldurma bir daha.
--- sistemde mevcut olan bir eani baska bir satici ile ekledim. tüm bilgier otomatik geldi, sahane. ancak bu durumlarida status, draft olarak gelecek, yayin tarihi bos gelecek, sku bos gelecek, versandgruppe bos gelecek, related products bos gelecek (cünkü o ürün bizim seller accountumuzda degil), fiyat kismi bos gelecek, inventory kismi bos gelecek, hersteller kismi bos gelecek (buyboxu kim aldi ise shopta onun hersteller degeri gözükecek.), . Bu söylediklerim hem parent hem child artikeller icin gecerli olacak. ve save dedigimde kaydedilmiyor ürün. neden? ana ürün bilgilerinden yukarida saydiklarim haric hicbir sey degistirilmemis ise ürün 2. seller tarafindan kaydedilebilsin. cünkü o veriler sellerin kendine ait veriler, ürüne degil. seller yalnizca sisteme kayitli bir icerik degistirmek istediginde superusper a öneri olarak gelecek ve superuser bunu onayladikta sonra ancak live olacak. cünkü sisteme bir ürün eklendiginde artik sahibi superuser olacak. bir deger degistirmek isteyen baska saticilarin onay almasi gerekecek. ayrica shopta ilgili ürünün buybox u altinda "other sellers (3)" (ya da kac satici var ise) gösterilecek. tiklandiginda acilacak,  acildiginda yanlarinda fiyatlari ve aldigi yildizlar yazacak. ürüne yapilan yorumlar seller accounta da yasiyacak. buybox ise algoritma tarafindan en iyi saticiya verilecek. saticilarin fiyatlari, satis gecmisi, müsteri memnuniyeti gibi algoritmalar etkin olacak
--- SELLERLAR SELLERCENTRALDE ASLA AMA ASLA SEO URL KISIMLARINI GÖREMEMELILER.
--- superuser olarak bir seller i askiya alirsam, seller sayfasinda header da kirmizi bir top bar cikiyor ve "your account is suspended. please contact with support" yaziyor, süper. diger status degisikliklerinde de ilgili degisiklige göre bildirimler ciksin. 
--- kategori dropdownunda hala kategoriler gözükmüyor shopta!
--- sellercentralden logo ve faviconlari ekleyip düzenleyebilmek istiyorum. hem shop icin hem sellercentral icin farkli logolar ve faviconlar belirlenmeli. Bunu sellercentraldeki content/styles sayfasindan yapabilelim bence. bu sayfada en üstte bunlar ayarlanabilsin.
+-- sistemde mevcut olan bir eani baska bir satici ile ekledim. tüm bilgier otomatik geldi, sahane. ancak bu durumlarida status, draft olarak gelecek, yayin tarihi bos gelecek, sku bos gelecek, versandgruppe bos gelecek, related products bos gelecek (cünkü o ürün bizim seller accountumuzda degil), fiyat kismi bos gelecek, inventory kismi bos gelecek, hersteller kismi bos gelecek (buyboxu kim aldi ise shopta onun hersteller degeri gözükecek.), . Bu söylediklerim hem parent hem child artikeller icin gecerli olacak. ve save dedigimde kaydedilmiyor ürün. neden? ana ürün bilgilerinden yukarida saydiklarim haric hicbir sey degistirilmemis ise ürün 2. seller tarafindan kaydedilebilsin. cünkü o veriler sellerin kendine ait veriler, ürüne degil. seller yalnizca sisteme kayitli bir icerik degistirmek istediginde superusper a öneri olarak gelecek ve superuser bunu onayladikta sonra ancak live olacak. cünkü sisteme bir ürün eklendiginde artik sahibi superuser olacak. bir deger degistirmek isteyen baska saticilarin onay almasi gerekecek. ayrica shopta ilgili ürünün buybox u altinda "other sellers (3)" (ya da kac satici var ise) gösterilecek. tiklandiginda acilacak,  acildiginda yanlarinda fiyatlari ve aldigi yildizlar yazacak. ürüne yapilan yorumlar seller accounta da yasiyacak. buybox ise algoritma tarafindan en iyi saticiya verilecek. saticilarin fiyatlari, satis gecmisi, müsteri memnuniyeti gibi algoritmalar etkin olacak. 
+-- sellercentralden logo ve faviconlari ekleyip düzenleyebiliyorum artik, süper. loglarin header da görünme büyüklügünü de ayarlayabilmek isterim. ayrica sellercentral icin ekledigim logo sellercentralde sol üstte görünmüyor. görüsün.
 -- ilgili kategorideki en cok satan ürüne ihtisamli bir "Bestseller" etiketi ekleyelim. product cardda, kategori sayfalarinda, carousellerde, ürün sayfalarinda, sepette checkoutta her yerde gözükecek bu.
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 -- import/export sayfasindan excel yüklerken mevcut ürün skusu yazildiginda girilen bilgiler ile güncellensin sistemdeki ürün. ancak yalnizca SKU ayni olan ürünler güncellenecek. bos kalan kisimlar degismeyecek önceden nasil ise öyle kalacak. ancak doldurulan kisimlar degisecek. mesela A123 diye bir sku ekledim sisteme. excelde A123 yazarsam sku alanina ve acilama yazarsam sadece o ürünün aciklamasi degisecek. 
 -- müsterinin sipariste indirim olarak kullandigi bonuspuanlar saticinin fiyatindan düsmesin. mesela satici 10 euroya ürün listeledi, müsteri bonus puanlar ile 5 euro indirim kullandi. saticilar 10 euro üzerinden degerlendirilecek. yani bonusuan indirimleri saticinin cebinden degil, benim cebimden hesaplanacak. satici olumsuz etkilenmeyecek. ayrica müsteriler de ödedigi fiyattan bonus puan kazanacak. indirimsiz fiyat degil, indirim dahil edildikten sonraki ödedigi tutardan alacak bonus puani. shoptaki müsteri panelinde bonuspuan sayfasinda bonuspuan gecmisini görebilsin müsteriler
-
-
+-- sellercentralde import/export sayfasinda kategoriler alt alta karisik gözüküyorlar. lütfen ürün sayfasinda nasil gözüküyorsa o sekilde yap. bunun icin bir template olusturmustuk. ilk önce parent categoryler gözükecek. ona basinca alttan child i cikacak gibiyi. template i amazondan örnek alabilirsin.
+-- sepete ürün ekleyip sepete gittigimde kisa süreligine warenkorb leer diyor. sepetteki ürünler yüklenirken bu gözükmesin, loader gözüksün.
 -+ Sales fonksiyonunda sayfada ürün ekli olan tüm kategoriler icin mevcut carousel templatimiz gibi gözükecek seklinde carouseller olacak. alt alta, ürün ekli olan her bir kategori icin, en cok satilan, sitede görüntü alan, en iyi ürünler en basta görünecek sekilde, indirim olan ürünler burada carousel seklinde gösterilsin. see all tarzi bir buton olsun her bir carouselde. ona basildiginda o kategorideki tüm indirimi olan ürünlerin gösterildigi sayfaya gitsin. standart kategori sayfasi template i olarak gözükecek sekilde.
 -+ neuheiten fonksiyonu da ayni sekilde sales sayfasinin mantiginda olacak. yalnizca burada gözükecek olan ürünler siteye son 2 ayda eklenmis olan ürünlerden olusacak. kurali bu olacak yani.
 -+ bestsellers fonksiyonu da ayni sekilde sales sayfasinin mantiginda olacak. yalnizca burada gözükecek olan ürünler ilgili kategorilerde en cok satilan ürünlerden olusacak. kurali bu olacak yani.
+-- shopta sayfalar arasi gecislerde ekranda "Laden..." yaziyor. bu cok cirkin bir görüntü. sayfa yükleme esnasinda bir yükleme loader olmali. sunu kullanalim: 
+<div class="newtons-cradle">
+<div class="newtons-cradle__dot"></div>
+<div class="newtons-cradle__dot"></div>
+<div class="newtons-cradle__dot"></div>
+<div class="newtons-cradle__dot"></div>
+</div>
+<style>
+/* From Uiverse.io by dovatgabriel */ 
+.newtons-cradle {
+ --uib-size: 50px;
+ --uib-speed: 1.2s;
+ --uib-color: #474554;
+ position: relative;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ width: var(--uib-size);
+ height: var(--uib-size);
+}
+
+.newtons-cradle__dot {
+ position: relative;
+ display: flex;
+ align-items: center;
+ height: 100%;
+ width: 25%;
+ transform-origin: center top;
+}
+
+.newtons-cradle__dot::after {
+ content: '';
+ display: block;
+ width: 100%;
+ height: 25%;
+ border-radius: 50%;
+ background-color: var(--uib-color);
+}
+
+.newtons-cradle__dot:first-child {
+ animation: swing var(--uib-speed) linear infinite;
+}
+
+.newtons-cradle__dot:last-child {
+ animation: swing2 var(--uib-speed) linear infinite;
+}
+
+@keyframes swing {
+ 0% {
+  transform: rotate(0deg);
+  animation-timing-function: ease-out;
+ }
+
+ 25% {
+  transform: rotate(70deg);
+  animation-timing-function: ease-in;
+ }
+
+ 50% {
+  transform: rotate(0deg);
+  animation-timing-function: linear;
+ }
+}
+
+@keyframes swing2 {
+ 0% {
+  transform: rotate(0deg);
+  animation-timing-function: linear;
+ }
+
+ 50% {
+  transform: rotate(0deg);
+  animation-timing-function: ease-out;
+ }
+
+ 75% {
+  transform: rotate(-70deg);
+  animation-timing-function: ease-in;
+ }
+}
+</style>
+

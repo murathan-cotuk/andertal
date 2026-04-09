@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import Link from "next/link";
@@ -109,6 +109,118 @@ function EditPencilIcon() {
   );
 }
 
+function getVariantLabel(v, locale) {
+  if (!v) return "";
+  // option_values array: each is { value, labels, ... }
+  const opts = Array.isArray(v.option_values) ? v.option_values : [];
+  if (opts.length === 0) return v.title || v.name || "";
+  return opts.map((o) => {
+    const label = (o.labels && (o.labels[locale] || o.labels["de"] || o.labels["en"])) || o.value || "";
+    return label;
+  }).filter(Boolean).join(" / ");
+}
+
+function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
+  const matrixVariants = (product.variants || []).filter((v) => Array.isArray(v.option_values) && v.option_values.length > 0);
+  const [drafts, setDrafts] = useState(() =>
+    matrixVariants.map((v) => ({
+      option_values: v.option_values,
+      sku: v.sku || "",
+      inventory: v.inventory != null ? String(v.inventory) : "0",
+      price: v.price_cents != null ? String((v.price_cents / 100).toFixed(2)) : "",
+    }))
+  );
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+
+  const setField = (idx, field, val) => {
+    setDrafts((prev) => prev.map((d, i) => i === idx ? { ...d, [field]: val } : d));
+    setSavedMsg("");
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const updatedVariants = product.variants.map((v) => {
+        if (!Array.isArray(v.option_values) || v.option_values.length === 0) return v;
+        const draft = drafts.find((d) =>
+          JSON.stringify(d.option_values) === JSON.stringify(v.option_values)
+        );
+        if (!draft) return v;
+        return {
+          ...v,
+          sku: draft.sku,
+          inventory: parseInt(draft.inventory, 10) || 0,
+          price_cents: draft.price !== "" ? Math.round(parseFloat(draft.price) * 100) : v.price_cents,
+        };
+      });
+      const updated = await medusaClient.updateAdminHubProduct(product.id, { variants: updatedVariants });
+      if (updated) setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, variants: updatedVariants } : p));
+      setSavedMsg("Gespeichert ✓");
+    } catch (e) {
+      setSavedMsg("Fehler: " + (e?.message || ""));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (matrixVariants.length === 0) {
+    return <div style={{ padding: "8px 12px", fontSize: 13, color: "#6b7280" }}>Keine Variationen</div>;
+  }
+
+  return (
+    <div style={{ marginTop: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 80px 100px", gap: "6px 12px", padding: "0 4px", marginBottom: 4 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>Variante</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>SKU</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>Bestand</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>Preis (€)</div>
+      </div>
+      {drafts.map((d, idx) => (
+        <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 120px 80px 100px", gap: "6px 12px", alignItems: "center", padding: "4px 4px", borderRadius: 6, background: idx % 2 === 0 ? "#f9fafb" : "transparent" }}>
+          <div style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>
+            {getVariantLabel(matrixVariants[idx], locale) || `Variante ${idx + 1}`}
+          </div>
+          <input
+            type="text"
+            value={d.sku}
+            onChange={(e) => setField(idx, "sku", e.target.value)}
+            placeholder="SKU"
+            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none" }}
+          />
+          <input
+            type="number"
+            min="0"
+            value={d.inventory}
+            onChange={(e) => setField(idx, "inventory", e.target.value)}
+            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none" }}
+          />
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={d.price}
+            onChange={(e) => setField(idx, "price", e.target.value)}
+            placeholder="0.00"
+            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none" }}
+          />
+        </div>
+      ))}
+      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12 }}>
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          style={{ fontSize: 13, padding: "5px 14px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, cursor: saving ? "wait" : "pointer", opacity: saving ? 0.7 : 1 }}
+        >
+          {saving ? "Speichern…" : "Speichern"}
+        </button>
+        {savedMsg && <span style={{ fontSize: 12, color: savedMsg.startsWith("Fehler") ? "#dc2626" : "#16a34a" }}>{savedMsg}</span>}
+      </div>
+    </div>
+  );
+}
+
 function InventoryProductRow({
   product,
   locale,
@@ -121,6 +233,7 @@ function InventoryProductRow({
   openDuplicateModal,
   setProducts,
 }) {
+  const [variantsOpen, setVariantsOpen] = useState(false);
   const meta = product.metadata && typeof product.metadata === "object" ? product.metadata : {};
   const media = meta.media;
   const rawThumb =
@@ -140,6 +253,7 @@ function InventoryProductRow({
         : 0;
   const inv = product.inventory != null ? Number(product.inventory) : 0;
   const sku = product.sku || "—";
+  const hasVariants = Array.isArray(product.variants) && product.variants.filter((v) => Array.isArray(v.option_values) && v.option_values.length > 0).length > 0;
   return (
     <Box padding="300" background="bg-surface-secondary" borderRadius="200">
       <InlineStack align="space-between" blockAlign="center" gap="400">
@@ -177,6 +291,15 @@ function InventoryProductRow({
               <Text as="span" variant="bodySm" tone="subdued">
                 · {product.status || "draft"}
               </Text>
+              {hasVariants && (
+                <button
+                  type="button"
+                  onClick={() => setVariantsOpen((v) => !v)}
+                  style={{ fontSize: 12, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 3 }}
+                >
+                  {variantsOpen ? "▲ Variationen" : "▼ Variationen"}
+                </button>
+              )}
             </InlineStack>
           </BlockStack>
         </InlineStack>
@@ -241,6 +364,14 @@ function InventoryProductRow({
           </Box>
         </InlineStack>
       </InlineStack>
+      {variantsOpen && hasVariants && (
+        <InlineVariantEditor
+          product={product}
+          locale={locale}
+          medusaClient={medusaClient}
+          setProducts={setProducts}
+        />
+      )}
     </Box>
   );
 }

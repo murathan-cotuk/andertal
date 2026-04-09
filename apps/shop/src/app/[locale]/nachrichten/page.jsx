@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@belucha/lib";
+import NewtonsCradle from "@/components/NewtonsCradle";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -166,7 +167,7 @@ export default function NachrichtenPage() {
           <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", margin: "0 0 16px" }}>Nachrichten</h1>
 
           {loading ? (
-            <div style={{ background: "#fff", borderRadius: 12, padding: 48, textAlign: "center", color: "#9ca3af", fontSize: 14 }}>Laden…</div>
+            <NewtonsCradle />
           ) : threads.length === 0 ? (
             <div style={{ background: "#fff", borderRadius: 12, padding: 48, textAlign: "center", color: "#9ca3af", fontSize: 14 }}>Noch keine Nachrichten</div>
           ) : selected ? (

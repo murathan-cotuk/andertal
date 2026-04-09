@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuthGuard, getToken } from "@belucha/lib";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
+import NewtonsCradle from "@/components/NewtonsCradle";
 import Footer from "@/components/Footer";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import { getMedusaClient } from "@/lib/medusa-client";
@@ -148,7 +149,7 @@ export default function AddressesPage() {
             <AccountSidebar onLogout={() => { logout(); router.push("/"); }} />
             <div>
               {loading ? (
-                <p style={{ color: GRAY }}>Laden…</p>
+                <NewtonsCradle />
               ) : (
                 <div
                   style={{

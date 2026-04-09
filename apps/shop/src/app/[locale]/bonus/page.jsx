@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@belucha/lib";
+import NewtonsCradle from "@/components/NewtonsCradle";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -99,7 +100,7 @@ export default function BonusPage() {
               <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "24px 28px", marginBottom: 24 }}>
                 <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 16px" }}>Verlauf</h2>
                 {loading ? (
-                  <p style={{ color: GRAY, margin: 0 }}>Laden…</p>
+                  <NewtonsCradle />
                 ) : ledger.length === 0 ? (
                   <p style={{ color: GRAY, margin: 0 }}>Noch keine Einträge.</p>
                 ) : (

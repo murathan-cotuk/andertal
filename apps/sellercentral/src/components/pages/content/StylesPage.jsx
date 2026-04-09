@@ -648,6 +648,7 @@ export default function StylesPage() {
     shop_favicon_url: "",
     sellercentral_logo_url: "",
     sellercentral_favicon_url: "",
+    shop_logo_height: 34,
   });
   const [brandingSnapshot, setBrandingSnapshot] = useState(null);
   const [brandingPickerTarget, setBrandingPickerTarget] = useState(null);
@@ -666,6 +667,7 @@ export default function StylesPage() {
         shop_favicon_url: settings?.shop_favicon_url || "",
         sellercentral_logo_url: settings?.sellercentral_logo_url || "",
         sellercentral_favicon_url: settings?.sellercentral_favicon_url || "",
+        shop_logo_height: settings?.shop_logo_height != null ? Number(settings.shop_logo_height) : 34,
       };
       setBranding(loadedBranding);
       setBrandingSnapshot(JSON.stringify(loadedBranding));
@@ -673,7 +675,7 @@ export default function StylesPage() {
       const merged = mergeLoadedShopStyles({});
       setStyles(merged);
       setSavedSnapshot(JSON.stringify(merged));
-      const emptyBranding = { shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "" };
+      const emptyBranding = { shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "", shop_logo_height: 34 };
       setBranding(emptyBranding);
       setBrandingSnapshot(JSON.stringify(emptyBranding));
     }
@@ -838,6 +840,36 @@ export default function StylesPage() {
                       </Button>
                     ) : null}
                   </InlineStack>
+                  {row.key === "shop_logo_url" && (branding.shop_logo_url || "").trim() && (
+                    <div style={{ marginTop: 12 }}>
+                      <InlineStack gap="400" blockAlign="center" wrap={false}>
+                        <div style={{ flex: 1 }}>
+                          <Text as="span" variant="bodySm" fontWeight="medium">Logo-Höhe im Header</Text>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6 }}>
+                            <input
+                              type="range"
+                              min={20}
+                              max={120}
+                              step={1}
+                              value={branding.shop_logo_height || 34}
+                              onChange={(e) => setBranding((p) => ({ ...p, shop_logo_height: Number(e.target.value) }))}
+                              style={{ flex: 1, accentColor: "#008060" }}
+                            />
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", minWidth: 42, textAlign: "right" }}>
+                              {branding.shop_logo_height || 34}px
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ flexShrink: 0, padding: "8px 12px", background: "#f3f4f6", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                          <img
+                            src={branding.shop_logo_url}
+                            alt="Logo preview"
+                            style={{ height: branding.shop_logo_height || 34, width: "auto", maxWidth: 200, objectFit: "contain", display: "block" }}
+                          />
+                        </div>
+                      </InlineStack>
+                    </div>
+                  )}
                 </div>
               ))}
             </BlockStack>

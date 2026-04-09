@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import NewtonsCradle from "@/components/NewtonsCradle";
 import { useAuthGuard, getToken, useCustomerAuth as useAuth } from "@belucha/lib";
 import { Link, useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
@@ -423,9 +424,7 @@ export default function OrdersPage() {
                 </div>
               )}
 
-              {loading && (
-                <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af", fontSize: 14 }}>Laden…</div>
-              )}
+              {loading && <NewtonsCradle />}
 
               {error && (
                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: "10px 14px", borderRadius: 8, fontSize: 13 }}>

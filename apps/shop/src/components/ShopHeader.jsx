@@ -657,7 +657,7 @@ export default function ShopHeader() {
   const headerRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(116);
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
-  const [shopBranding, setShopBranding] = useState({ shop_logo_url: "", shop_favicon_url: "" });
+  const [shopBranding, setShopBranding] = useState({ shop_logo_url: "", shop_favicon_url: "", shop_logo_height: 34 });
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
   const [mainMenuAllItems, setMainMenuAllItems] = useState([]);
@@ -667,6 +667,7 @@ export default function ShopHeader() {
   const [categorySlugToId, setCategorySlugToId] = useState(() => new Map());
   const [categoryTree, setCategoryTree] = useState([]);
   const [pendingBrowseTarget, setPendingBrowseTarget] = useState(null);
+  const [drillCategoryId, setDrillCategoryId] = useState(null); // null = root level
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
 
@@ -705,6 +706,7 @@ export default function ShopHeader() {
         setShopBranding({
           shop_logo_url: d?.shop_logo_url || "",
           shop_favicon_url: d?.shop_favicon_url || "",
+          shop_logo_height: d?.shop_logo_height != null ? Number(d.shop_logo_height) : 34,
         });
       })
       .catch(() => {});
@@ -830,6 +832,7 @@ export default function ShopHeader() {
 
   useEffect(() => {
     setPendingBrowseTarget(null);
+    setDrillCategoryId(null);
   }, [pathname]);
 
   // Track actual header height so the spacer is always accurate
@@ -878,17 +881,49 @@ export default function ShopHeader() {
       .filter((n) => n && (!useProdFilter || categoryIdsWithProducts.has(normCatId(n.id))))
       .map((n) => ({
         key: String(n.id),
+        id: String(n.id),
         label: n.name || n.slug || "",
         slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
+        hasChildren: Array.isArray(n.children) && n.children.length > 0,
+        node: n,
       }))
       .filter((r) => r.slug)
       .sort((a, b) => String(a.label).localeCompare(String(b.label), locale));
   }, [categoryTree, categoryIdsWithProducts, mainMenuConfig, locale]);
 
+  // Children of the currently drilled category
+  const drillRows = useMemo(() => {
+    if (!drillCategoryId) return [];
+    const useProdFilter = mainMenuConfig?.categories_with_products && categoryIdsWithProducts.size > 0;
+    const findNode = (nodes, id) => {
+      for (const n of (nodes || [])) {
+        if (String(n.id) === String(id)) return n;
+        const found = findNode(n.children, id);
+        if (found) return found;
+      }
+      return null;
+    };
+    const parent = findNode(categoryTree, drillCategoryId);
+    if (!parent || !Array.isArray(parent.children)) return [];
+    return parent.children
+      .filter((n) => n && (!useProdFilter || categoryIdsWithProducts.has(normCatId(n.id))))
+      .map((n) => ({
+        key: String(n.id),
+        id: String(n.id),
+        label: n.name || n.slug || "",
+        slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
+        hasChildren: Array.isArray(n.children) && n.children.length > 0,
+      }))
+      .filter((r) => r.slug)
+      .sort((a, b) => String(a.label).localeCompare(String(b.label), locale));
+  }, [drillCategoryId, categoryTree, categoryIdsWithProducts, mainMenuConfig, locale]);
+
   const categoryPanelRows = browseRootsFromTree.map((r) => ({
     key: r.key,
+    id: r.id,
     label: r.label,
     href: `/kollektion/${r.slug}`,
+    hasChildren: r.hasChildren,
   }));
 
   // Root-level menu items (no parent) for direct link rendering
@@ -912,7 +947,7 @@ export default function ShopHeader() {
                   <img
                     src={shopBranding.shop_logo_url}
                     alt="Shop logo"
-                    style={{ height: 34, width: "auto", maxWidth: 180, objectFit: "contain", display: "block" }}
+                    style={{ height: shopBranding.shop_logo_height || 34, width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
                   />
                 ) : (
                   "Belucha"
@@ -922,7 +957,7 @@ export default function ShopHeader() {
 
             <MiddleBarCenter>
               <CategoriesDropdown data-categories-dropdown>
-                <CategoriesButton type="button" onClick={() => { setLocaleDropdownOpen(false); setUserMenuOpen(false); setMainMenuOpen((v) => !v); }} aria-expanded={mainMenuOpen} aria-label="Kategorien">
+                <CategoriesButton type="button" onClick={() => { setLocaleDropdownOpen(false); setUserMenuOpen(false); setDrillCategoryId(null); setMainMenuOpen((v) => !v); }} aria-expanded={mainMenuOpen} aria-label="Kategorien">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path fillRule="evenodd" clipRule="evenodd" d="M2 5.75C2 5.33579 2.33579 5 2.75 5H21.25C21.6642 5 22 5.33579 22 5.75C22 6.16421 21.6642 6.5 21.25 6.5H2.75C2.33579 6.5 2 6.16421 2 5.75ZM2 12C2 11.5858 2.33579 11.25 2.75 11.25H21.25C21.6642 11.25 22 11.5858 22 12C22 12.4142 21.6642 12.75 21.25 12.75H2.75C2.33579 12.75 2 12.4142 2 12ZM2 18.25C2 17.8358 2.33579 17.5 2.75 17.5H21.25C21.6642 17.5 22 17.8358 22 18.25C22 18.6642 21.6642 19 21.25 19H2.75C2.33579 19 2 18.6642 2 18.25Z" />
                   </svg>
@@ -947,7 +982,33 @@ export default function ShopHeader() {
                     <div style={{ padding: 12, color: tokens.dark[500], fontSize: 14 }}>
                       {tNav("categoryMenuEmpty")}
                     </div>
+                  ) : drillCategoryId ? (
+                    // Drilled into a parent category — show its children
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setDrillCategoryId(null)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "8px 14px", border: "none", background: "none", cursor: "pointer", fontSize: 13, color: tokens.dark[500], borderBottom: `1px solid ${tokens.border.light}`, fontFamily: "inherit" }}
+                      >
+                        <span style={{ fontSize: 16, lineHeight: 1 }}>‹</span> Zurück
+                      </button>
+                      {drillRows.length === 0 ? (
+                        <div style={{ padding: "8px 14px", fontSize: 13, color: tokens.dark[400] }}>Keine Unterkategorien</div>
+                      ) : drillRows.map((row) => (
+                        <CategoryRow
+                          key={row.key}
+                          as={Link}
+                          href={`/kollektion/${row.slug}`}
+                          style={{ paddingLeft: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                          onClick={() => { setMainMenuOpen(false); setDrillCategoryId(null); }}
+                        >
+                          <span>{row.label}</span>
+                          {row.hasChildren && <span style={{ fontSize: 16, color: tokens.dark[400] }}>›</span>}
+                        </CategoryRow>
+                      ))}
+                    </>
                   ) : (
+                    // Root level — show parent categories
                     <>
                       {pendingBrowseTarget?.href ? (
                         <div style={{ padding: "6px 14px 10px", fontSize: 12, color: tokens.dark[600], borderBottom: `1px solid ${tokens.border.light}` }}>
@@ -959,13 +1020,19 @@ export default function ShopHeader() {
                           <CategoryRow
                             key={row.key}
                             type="button"
-                            style={{ paddingLeft: 14 }}
+                            style={{ paddingLeft: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}
                             onClick={() => {
-                              setPendingBrowseTarget({ href: row.href, label: row.label });
-                              setMainMenuOpen(false);
+                              if (row.hasChildren) {
+                                // Drill into children
+                                setDrillCategoryId(row.id);
+                              } else {
+                                setPendingBrowseTarget({ href: row.href, label: row.label });
+                                setMainMenuOpen(false);
+                              }
                             }}
                           >
-                            {row.label}
+                            <span>{row.label}</span>
+                            {row.hasChildren && <span style={{ fontSize: 16, color: tokens.dark[400] }}>›</span>}
                           </CategoryRow>
                         ) : null,
                       )}

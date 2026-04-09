@@ -44,8 +44,12 @@ function isProductInCollection(product, collectionId) {
 
 function isProductInCategory(product, categoryId, linkedCollectionId) {
   if (!categoryId) return false;
-  // Direct category_id match
-  if (product?.category_id && String(product.category_id) === String(categoryId)) return true;
+  const catId = String(categoryId);
+  // Direct category_id match (root field)
+  if (product?.category_id && String(product.category_id) === catId) return true;
+  // category_id stored in metadata (product edit page saves it here)
+  const metaCatId = product?.metadata?.category_id;
+  if (metaCatId && String(metaCatId) === catId) return true;
   // Via linked collection
   if (linkedCollectionId && isProductInCollection(product, linkedCollectionId)) return true;
   return false;
@@ -175,9 +179,11 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
           collection_id: nextIds[0] || null,
         });
       } else {
-        // Direct category link
+        // Direct category link — write to both root field and metadata for consistency
+        const existing = await client.getAdminHubProduct(productId);
         await client.updateAdminHubProduct(productId, {
           category_id: String(initialCategory.id),
+          metadata: { ...(existing?.metadata || {}), category_id: String(initialCategory.id) },
         });
       }
       setAddProductSearch("");
@@ -202,7 +208,9 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
           collection_id: nextIds[0] || null,
         });
       } else {
-        await client.updateAdminHubProduct(productId, { category_id: null });
+        const meta = { ...(existing?.metadata || {}) };
+        delete meta.category_id;
+        await client.updateAdminHubProduct(productId, { category_id: null, metadata: meta });
       }
       await refreshProducts();
     } catch (e) {
