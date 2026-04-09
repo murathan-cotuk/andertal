@@ -9,7 +9,7 @@ import {
   buildGoogleFontsLinkHrefForFamilies,
 } from "@belucha/shop-theme";
 
-const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
+const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "https://belucha-medusa-backend.onrender.com").replace(/\/$/, "");
 
 const FONT_LINK_ID = "shop-google-font-link";
 

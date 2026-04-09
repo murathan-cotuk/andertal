@@ -6,7 +6,7 @@ export async function GET(req) {
   try {
     const url = new URL(req.url);
     const sellerId = url.searchParams.get("seller_id") || "default";
-    const base = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
+    const base = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "https://belucha-medusa-backend.onrender.com";
     const r = await fetch(
       `${base}/store/seller-settings?seller_id=${encodeURIComponent(sellerId)}`,
       { cache: "no-store" }

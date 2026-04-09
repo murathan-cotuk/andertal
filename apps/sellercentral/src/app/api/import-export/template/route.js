@@ -105,7 +105,7 @@ function buildColumns() {
     { key: "inventory", label: "inventory", note: "Lagerbestand (Zahl)", width: 12, group: "core" },
     { key: "brand", label: "brand", note: "Dropdown: Markenname wie in der Liste", width: 18, group: "core" },
     { key: "type", label: "type", note: "Produkttyp / Bezeichnung (frei)", width: 16, group: "core" },
-    { key: "category_slug", label: "category_slug", note: "Dropdown: exakter Slug aus Anleitung", width: 22, group: "core" },
+    { key: "category_slug", label: "category_slug", note: "Dropdown: exakter Slug aus der Kategorienliste", width: 22, group: "core" },
     { key: "shipping_group", label: "shipping_group", note: "Dropdown: Versandgruppe (Name)", width: 22, group: "core" },
     { key: "weight_grams", label: "weight_grams", note: "Gewicht in Gramm", width: 14, group: "core" },
     { key: "dim_length_cm", label: "dim_length_cm", note: "Länge cm", width: 14, group: "core" },
@@ -548,6 +548,7 @@ async function buildWorkbook({
   });
 
   const wsInfo = wb.addWorksheet(sheetTitle.substring(0, 31), { properties: { defaultColWidth: 88 } });
+  wsInfo.state = "veryHidden";
   wsInfo.getColumn(1).width = 4;
   wsInfo.getColumn(2).width = 92;
 

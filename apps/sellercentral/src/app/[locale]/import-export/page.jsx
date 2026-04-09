@@ -38,22 +38,8 @@ function collectAllSlugs(nodes, out = []) {
 
 /** Amazon-style multi-select drilldown for categories */
 function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree }) {
-  const [pathIds, setPathIds] = useState([]);
-
-  const byId = useMemo(() => {
-    const map = new Map();
-    const walk = (nodes) => { for (const n of nodes) { map.set(n.id, n); if (n.children?.length) walk(n.children); } };
-    walk(tree);
-    return map;
-  }, [tree]);
-
-  const currentNodes = useMemo(() => {
-    if (!pathIds.length) return tree;
-    const last = byId.get(pathIds[pathIds.length - 1]);
-    return last?.children || [];
-  }, [pathIds, byId, tree]);
-
-  const pathNodes = useMemo(() => pathIds.map((id) => byId.get(id)).filter(Boolean), [pathIds, byId]);
+  // Accordion path: only one open branch per depth.
+  const [openPath, setOpenPath] = useState([]);
 
   const getSubtreeSlugs = (node) => collectAllSlugs([node]);
   const isSubtreeFullySelected = (node) => {
@@ -65,65 +51,102 @@ function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree
     return slugs.some((s) => selectedSlugs.has(s)) && !slugs.every((s) => selectedSlugs.has(s));
   };
 
+  const toggleOpen = (depth, nodeId) => {
+    setOpenPath((prev) => {
+      if (prev[depth] === nodeId) return prev.slice(0, depth); // close current branch
+      const next = prev.slice(0, depth);
+      next[depth] = nodeId;
+      return next;
+    });
+  };
+
+  const renderNodes = (nodes, depth = 0) => (
+    (nodes || []).map((node) => {
+      const hasKids = (node.children?.length || 0) > 0;
+      const allSelected = isSubtreeFullySelected(node);
+      const partial = !allSelected && isSubtreePartiallySelected(node);
+      const directSelected = selectedSlugs.has(node.slug);
+      const isOpen = openPath[depth] === node.id;
+      return (
+        <React.Fragment key={`${depth}-${node.id}`}>
+          <div
+            onClick={() => hasKids && toggleOpen(depth, node.id)}
+            style={{
+              display: "flex",
+              alignItems: "stretch",
+              gap: 0,
+              borderBottom: "1px solid #f3f4f6",
+              minHeight: 44,
+              cursor: hasKids ? "pointer" : "default",
+              background: isOpen ? "#f8fafc" : "#fff",
+              marginLeft: depth * 18,
+            }}
+          >
+            <label
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", flex: 1, cursor: "pointer", userSelect: "none" }}
+            >
+              <input
+                type="checkbox"
+                checked={directSelected}
+                ref={(el) => { if (el) el.indeterminate = partial && !directSelected; }}
+                onChange={() => onToggle(node.slug)}
+                onClick={(e) => e.stopPropagation()}
+                style={{ width: 16, height: 16, accentColor: "#2563eb", flexShrink: 0 }}
+              />
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: depth > 0 ? 12 : 13,
+                    color: depth > 0 ? "#374151" : "#111827",
+                    fontWeight: depth > 0 ? 500 : 600,
+                    lineHeight: 1.3,
+                    paddingLeft: depth > 0 ? 4 : 0,
+                  }}
+                >
+                  {node.name || node.slug}
+                </div>
+              </div>
+              {hasKids && allSelected && <span style={{ marginLeft: "auto", fontSize: 11, color: "#16a34a", flexShrink: 0 }}>✓ alle</span>}
+              {hasKids && partial && <span style={{ marginLeft: "auto", fontSize: 11, color: "#f59e0b", flexShrink: 0 }}>teilweise</span>}
+            </label>
+            {hasKids ? (
+              <div
+                style={{
+                  flexShrink: 0,
+                  width: 58,
+                  minHeight: 44,
+                  padding: 0,
+                  background: "#f8fafc",
+                  borderLeft: "1px solid #e5e7eb",
+                  color: "#374151",
+                  fontSize: 22,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transform: isOpen ? "rotate(90deg)" : "none",
+                  transition: "transform .15s ease",
+                }}
+                aria-hidden
+              >
+                ›
+              </div>
+            ) : null}
+          </div>
+          {hasKids && isOpen ? renderNodes(node.children, depth + 1) : null}
+        </React.Fragment>
+      );
+    })
+  );
+
   return (
     <div>
-      {/* Breadcrumb */}
-      <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 8, minHeight: 28 }}>
-        <button type="button" onClick={() => setPathIds([])}
-          style={{ fontSize: 12, color: pathIds.length === 0 ? "#111827" : "#2563eb", fontWeight: pathIds.length === 0 ? 700 : 400, background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}>
-          Alle Kategorien
-        </button>
-        {pathNodes.map((n, i) => (
-          <React.Fragment key={n.id}>
-            <span style={{ color: "#d1d5db", fontSize: 12 }}>›</span>
-            <button type="button" onClick={() => setPathIds((p) => p.slice(0, i + 1))}
-              style={{ fontSize: 12, color: i === pathNodes.length - 1 ? "#111827" : "#2563eb", fontWeight: i === pathNodes.length - 1 ? 700 : 400, background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}>
-              {n.name || n.slug}
-            </button>
-          </React.Fragment>
-        ))}
-      </div>
-
-      {/* Category list */}
-      <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", maxHeight: 320, overflowY: "auto" }}>
-        {currentNodes.length === 0 ? (
+      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", maxHeight: 460, overflowY: "auto" }}>
+        {!Array.isArray(tree) || tree.length === 0 ? (
           <div style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af" }}>Keine Unterkategorien.</div>
-        ) : currentNodes.map((node) => {
-          const hasKids = (node.children?.length || 0) > 0;
-          const allSelected = isSubtreeFullySelected(node);
-          const partial = !allSelected && isSubtreePartiallySelected(node);
-          const directSelected = selectedSlugs.has(node.slug);
-          return (
-            <div key={node.id} style={{ display: "flex", alignItems: "center", gap: 0, borderBottom: "1px solid #f3f4f6" }}>
-              {/* Checkbox */}
-              <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", flex: 1, cursor: "pointer", userSelect: "none" }}>
-                <input
-                  type="checkbox"
-                  checked={directSelected}
-                  ref={(el) => { if (el) el.indeterminate = partial && !directSelected; }}
-                  onChange={() => onToggle(node.slug)}
-                  style={{ width: 15, height: 15, accentColor: "#2563eb", flexShrink: 0 }}
-                />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>{node.name || node.slug}</div>
-                  {node.slug && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 1 }}>{node.slug}</div>}
-                </div>
-                {hasKids && allSelected && <span style={{ marginLeft: "auto", fontSize: 11, color: "#16a34a", flexShrink: 0 }}>✓ alle</span>}
-                {hasKids && partial && <span style={{ marginLeft: "auto", fontSize: 11, color: "#f59e0b", flexShrink: 0 }}>teilweise</span>}
-              </label>
-
-              {/* Drill into children */}
-              {hasKids && (
-                <button type="button" onClick={() => setPathIds((p) => [...p, node.id])}
-                  style={{ flexShrink: 0, height: "100%", minHeight: 44, padding: "0 14px", background: "none", border: "none", borderLeft: "1px solid #f3f4f6", cursor: "pointer", color: "#6b7280", fontSize: 16 }}
-                  title="Unterkategorien anzeigen"
-                >
-                  ›
-                </button>
-              )}
-            </div>
-          );
-        })}
+        ) : (
+          renderNodes(tree, 0)
+        )}
       </div>
     </div>
   );
@@ -221,6 +244,7 @@ function ImportResult({ result }) {
 
 // ══════════════════════════════════════════════════════════════════════════
 export default function ImportExportPage() {
+  const [isSuperuser, setIsSuperuser] = useState(false);
   const params = useParams();
   const locale = typeof params?.locale === "string" ? params.locale.split("-")[0].toLowerCase() : "de";
 
@@ -251,6 +275,11 @@ export default function ImportExportPage() {
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [exportPreset, setExportPreset] = useState("custom");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
 
   const applyPreset = useCallback((preset) => {
     if (preset === "basic_products") {
@@ -295,15 +324,66 @@ export default function ImportExportPage() {
     return () => { cancelled = true; };
   }, []);
 
+  const categoryAncestorsBySlug = useMemo(() => {
+    const map = new Map();
+    const walk = (nodes, ancestors = []) => {
+      for (const n of nodes || []) {
+        if (!n) continue;
+        const slug = String(n.slug || "").trim();
+        const nextAncestors = slug ? [...ancestors, slug] : [...ancestors];
+        if (slug) map.set(slug, ancestors);
+        if (Array.isArray(n.children) && n.children.length) walk(n.children, nextAncestors);
+      }
+    };
+    walk(categoryTree, []);
+    return map;
+  }, [categoryTree]);
+
   const toggleCategory = useCallback((slug) => {
+    const k = String(slug || "").trim();
+    if (!k) return;
     setSelectedSlugs((prev) => {
       const next = new Set(prev);
-      const k = String(slug).trim();
       if (next.has(k)) next.delete(k);
-      else next.add(k);
+      else {
+        next.add(k);
+        const ancestors = categoryAncestorsBySlug.get(k) || [];
+        for (const a of ancestors) next.delete(a);
+      }
       return next;
     });
-  }, []);
+  }, [categoryAncestorsBySlug]);
+
+  const selectedCategoryDetails = useMemo(() => {
+    const out = [];
+    const selected = new Set([...selectedSlugs].map((s) => String(s).trim()).filter(Boolean));
+    const selectedEffective = new Set(selected);
+    for (const slug of selected) {
+      const ancestors = categoryAncestorsBySlug.get(slug) || [];
+      for (const a of ancestors) {
+        if (selected.has(a)) selectedEffective.delete(a);
+      }
+    }
+    const walk = (nodes, parents = []) => {
+      for (const n of nodes || []) {
+        if (!n) continue;
+        const slug = String(n.slug || "").trim();
+        const name = String(n.name || n.slug || "").trim();
+        const nextParents = [...parents, name];
+        if (slug && selectedEffective.has(slug)) {
+          out.push({
+            slug,
+            name,
+            breadcrumb: parents.join(" / "),
+          });
+        }
+        if (Array.isArray(n.children) && n.children.length) walk(n.children, nextParents);
+      }
+    };
+    walk(categoryTree, []);
+    out.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    return out;
+  }, [categoryTree, selectedSlugs, categoryAncestorsBySlug]);
 
   const handleProductImport = async () => {
     if (!productFile) return;
@@ -496,18 +576,36 @@ export default function ImportExportPage() {
                       </InlineStack>
                     )}
                   </InlineStack>
-                  <CategoryMultiDrilldown
-                    tree={categoryTree}
-                    selectedSlugs={selectedSlugs}
-                    onToggle={toggleCategory}
-                  />
-                  {selectedSlugs.size > 0 && (
-                    <div style={{ padding: "8px 10px", background: "#eff6ff", borderRadius: 8, border: "1px solid #bfdbfe" }}>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        {[...selectedSlugs].join(", ")}
-                      </Text>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                    <div style={{ width: "60%", minWidth: 320, maxWidth: 760 }}>
+                      <CategoryMultiDrilldown
+                        tree={categoryTree}
+                        selectedSlugs={selectedSlugs}
+                        onToggle={toggleCategory}
+                      />
                     </div>
-                  )}
+                    <div style={{ flex: 1, minWidth: 260, border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", maxHeight: 460, overflowY: "auto" }}>
+                      <div style={{ padding: "10px 12px", borderBottom: "1px solid #f1f2f4", background: "#fafafa" }}>
+                        <Text as="p" variant="bodySm" fontWeight="semibold">Seçilen kategoriler</Text>
+                      </div>
+                      {selectedCategoryDetails.length === 0 ? (
+                        <div style={{ padding: "10px 12px" }}>
+                          <Text as="p" variant="bodySm" tone="subdued">Henüz kategori seçilmedi.</Text>
+                        </div>
+                      ) : (
+                        selectedCategoryDetails.map((row) => (
+                          <div key={row.slug} style={{ padding: "8px 12px", borderBottom: "1px solid #f5f6f7" }}>
+                            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.2, marginBottom: 2 }}>
+                              {row.breadcrumb || "Parent"}
+                            </div>
+                            <div style={{ fontSize: 13, color: "#111827", fontWeight: 600, lineHeight: 1.25 }}>
+                              {row.name}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </BlockStack>
               )}
 
@@ -653,121 +751,138 @@ export default function ImportExportPage() {
             <SectionCard
               icon="📤"
               title="Daten exportieren"
-              subtitle="Einfacher Export wie Billbee-Style: Datentyp wählen, Filter setzen, Spalten auswählen, Format downloaden."
+              subtitle="Datentyp wählen, Filter setzen, Spalten prüfen und als Datei exportieren."
             >
-              <BlockStack gap="300">
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Seller hesapları yalnızca kendi verilerini export eder. Superuser, ister sadece platform verisini, ister tüm seller verisini export edebilir.
-                </Text>
-                <Divider />
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">1) Veri kapsamı</Text>
-                  <div style={{ maxWidth: 360 }}>
-                    <select
-                      value={exportPreset}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setExportPreset(v);
-                        if (v !== "custom") applyPreset(v);
-                      }}
-                      style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }}
-                    >
-                      <option value="custom">Custom</option>
-                      <option value="basic_products">Preset: Ürün temel</option>
-                      <option value="sales_report">Preset: Satış raporu</option>
-                      <option value="full_export">Preset: Tam export</option>
-                    </select>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
-                    {[
-                      ["products", "Ürünler (fiyat, görsel, metadata)"],
-                      ["orders", "Siparişler / satışlar"],
-                      ["customers", "Müşteriler"],
-                      ["transactions", "Transactions / ödeme hareketleri"],
-                      ["ranking", "Görüntülenme / tıklama / performans (ranking)"],
-                    ].map(([k, label]) => (
-                      <Checkbox
-                        key={k}
-                        label={label}
-                        checked={exportDatasets.has(k)}
-                        onChange={() =>
-                          setExportDatasets((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(k)) next.delete(k); else next.add(k);
-                            return next;
-                          })
-                        }
-                      />
-                    ))}
-                  </div>
-                </BlockStack>
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">2) Filtreler</Text>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 10 }}>
-                    <input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder="Arama (SKU, ad, email...)" style={{ padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
-                    <input value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} placeholder="Status (optional)" style={{ padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
-                    <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} style={{ padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
-                    <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} style={{ padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
-                  </div>
-                  <InlineStack gap="300">
-                    <Checkbox label="Superuser: tüm seller verileri dahil" checked={includeAllSellers} onChange={setIncludeAllSellers} />
-                    <Checkbox label="XLSX exportta seller bazlı sheetlere ayır" checked={groupBySeller} onChange={setGroupBySeller} />
-                  </InlineStack>
-                </BlockStack>
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">3) Sütunlar</Text>
-                  <InlineStack gap="300">
-                    <Button variant="secondary" onClick={loadExportColumns}>Spalten laden</Button>
-                    {availableColumns.length > 0 && (
-                      <>
-                        <Button size="slim" onClick={() => setSelectedColumns(new Set(availableColumns))}>Tümünü seç</Button>
-                        <Button size="slim" onClick={() => setSelectedColumns(new Set())}>Temizle</Button>
-                      </>
-                    )}
-                    {exportInfo?.total != null ? <Badge tone="info">{exportInfo.total} satır eşleşti</Badge> : null}
-                    {availableColumns.length > 0 ? <Badge tone="success">{selectedColumns.size} sütun seçili</Badge> : null}
-                  </InlineStack>
-                  {availableColumns.length > 0 && (
-                    <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
-                        {availableColumns.map((c) => (
+              <BlockStack gap="400">
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
+                  <BlockStack gap="250">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">1) Datenumfang</Text>
+                    <div style={{ maxWidth: 360 }}>
+                      <select
+                        value={exportPreset}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setExportPreset(v);
+                          if (v !== "custom") applyPreset(v);
+                        }}
+                        style={{ width: "100%", padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff" }}
+                      >
+                        <option value="custom">Custom</option>
+                        <option value="basic_products">Preset: Ürün temel</option>
+                        <option value="sales_report">Preset: Satış raporu</option>
+                        <option value="full_export">Preset: Tam export</option>
+                      </select>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
+                      {[
+                        ["products", "Ürünler (fiyat, görsel, metadata)"],
+                        ["orders", "Siparişler / satışlar"],
+                        ["customers", "Müşteriler"],
+                        ["transactions", "Transactions / ödeme hareketleri"],
+                        ["ranking", "Görüntülenme / tıklama / performans (ranking)"],
+                      ].map(([k, label]) => (
+                        <div key={k} style={{ border: "1px solid #eef0f3", borderRadius: 8, padding: "8px 10px", background: "#fafbfc" }}>
                           <Checkbox
-                            key={c}
-                            label={c}
-                            checked={selectedColumns.has(c)}
+                            label={label}
+                            checked={exportDatasets.has(k)}
                             onChange={() =>
-                              setSelectedColumns((prev) => {
+                              setExportDatasets((prev) => {
                                 const next = new Set(prev);
-                                if (next.has(c)) next.delete(c); else next.add(c);
+                                if (next.has(k)) next.delete(k); else next.add(k);
                                 return next;
                               })
                             }
                           />
-                        ))}
-                      </div>
+                        </div>
+                      ))}
                     </div>
-                  )}
-                </BlockStack>
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">4) Format ve indir</Text>
-                  <div style={{ maxWidth: 260 }}>
-                    <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }}>
-                      <option value="xlsx">XLSX</option>
-                      <option value="csv">CSV</option>
-                      <option value="txt">TXT</option>
-                    </select>
-                  </div>
-                  {exportError && <Banner tone="critical" onDismiss={() => setExportError(null)}>{exportError}</Banner>}
-                  <Button
-                    variant="primary"
-                    icon={ExportIcon}
-                    onClick={runExport}
-                    loading={exporting}
-                    disabled={exporting || exportDatasets.size === 0}
-                  >
-                    {exporting ? "Export läuft..." : "Export starten"}
-                  </Button>
-                </BlockStack>
+                  </BlockStack>
+                </div>
+
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
+                  <BlockStack gap="250">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">2) Filter</Text>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+                      <input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder="Arama (SKU, ad, email...)" style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                      <input value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} placeholder="Status (optional)" style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                      <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                      <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                    </div>
+                    <InlineStack gap="300">
+                      {isSuperuser ? (
+                        <Checkbox label="Superuser: tüm seller verileri dahil" checked={includeAllSellers} onChange={setIncludeAllSellers} />
+                      ) : null}
+                      <Checkbox label="XLSX exportta seller bazlı sheetlere ayır" checked={groupBySeller} onChange={setGroupBySeller} />
+                    </InlineStack>
+                  </BlockStack>
+                </div>
+
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
+                  <BlockStack gap="250">
+                    <InlineStack align="space-between" blockAlign="center">
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">3) Spalten</Text>
+                      <InlineStack gap="200">
+                        <Button variant="secondary" onClick={loadExportColumns}>Spalten laden</Button>
+                        {availableColumns.length > 0 && (
+                          <>
+                            <Button size="slim" onClick={() => setSelectedColumns(new Set(availableColumns))}>Tümünü seç</Button>
+                            <Button size="slim" onClick={() => setSelectedColumns(new Set())}>Temizle</Button>
+                          </>
+                        )}
+                      </InlineStack>
+                    </InlineStack>
+                    <InlineStack gap="200">
+                      {exportInfo?.total != null ? <Badge tone="info">{exportInfo.total} satır eşleşti</Badge> : null}
+                      {availableColumns.length > 0 ? <Badge tone="success">{selectedColumns.size} sütun seçili</Badge> : null}
+                    </InlineStack>
+                    {availableColumns.length > 0 && (
+                      <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
+                          {availableColumns.map((c) => (
+                            <div key={c} style={{ border: "1px solid #f1f2f4", borderRadius: 7, padding: "6px 8px" }}>
+                              <Checkbox
+                                label={c}
+                                checked={selectedColumns.has(c)}
+                                onChange={() =>
+                                  setSelectedColumns((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(c)) next.delete(c); else next.add(c);
+                                    return next;
+                                  })
+                                }
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </BlockStack>
+                </div>
+
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
+                  <BlockStack gap="250">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">4) Format & Download</Text>
+                    <div style={{ maxWidth: 260 }}>
+                      <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)} style={{ width: "100%", padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff" }}>
+                        <option value="xlsx">XLSX</option>
+                        <option value="csv">CSV</option>
+                        <option value="txt">TXT</option>
+                      </select>
+                    </div>
+                    {exportError && <Banner tone="critical" onDismiss={() => setExportError(null)}>{exportError}</Banner>}
+                    <InlineStack>
+                      <Button
+                        variant="primary"
+                        icon={ExportIcon}
+                        onClick={runExport}
+                        loading={exporting}
+                        disabled={exporting || exportDatasets.size === 0}
+                      >
+                        {exporting ? "Export läuft..." : "Export starten"}
+                      </Button>
+                    </InlineStack>
+                  </BlockStack>
+                </div>
               </BlockStack>
             </SectionCard>
           </Layout.Section>

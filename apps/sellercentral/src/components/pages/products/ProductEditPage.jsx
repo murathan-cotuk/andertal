@@ -611,6 +611,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         metadata.seller_name = storeName;
         metadata.shop_name = storeName;
       }
+      // Auto-fill publish_date when empty: prefer product created_at, else now.
+      if (!metadata.publish_date) {
+        const createdAt = product?.created_at ? new Date(product.created_at) : null;
+        metadata.publish_date =
+          createdAt && !isNaN(createdAt.getTime())
+            ? createdAt.toISOString()
+            : new Date().toISOString();
+      }
       // Commit the currently editing locale's content
       const allTranslations = { ...(metadata.translations || {}) };
       allTranslations[locale] = {
@@ -649,6 +657,17 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       const missingVariantEan = variantsToSave.find((row) => String(row?.ean || "").trim() === "");
       if (missingVariantEan) {
         setMessage({ type: "error", text: "Variant EAN darf nicht leer sein. Boş varyant EAN ile kayıt yapılamaz." });
+        return;
+      }
+      const gpsrMissing = [];
+      if (!String(metadata.hersteller || "").trim()) gpsrMissing.push("Hersteller");
+      if (!String(metadata.hersteller_information || "").trim()) gpsrMissing.push("Hersteller-Informationen");
+      if (!String(metadata.verantwortliche_person_information || "").trim()) gpsrMissing.push("Verantwortliche Person (EU)");
+      if (gpsrMissing.length > 0) {
+        setMessage({
+          type: "error",
+          text: `GPSR ist verpflichtend. Bitte folgende Felder ausfüllen: ${gpsrMissing.join(", ")}`,
+        });
         return;
       }
       const collectionId = (metadata.collection_ids && metadata.collection_ids[0]) || product.collection_id || null;
@@ -2336,10 +2355,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               </Modal>
 
               <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Produktsicherheitsinformationen (GPSR, optional)</Text>
-              <TextField label="Hersteller" value={meta.hersteller ?? ""} onChange={(v) => updateMeta("hersteller", v || undefined)} placeholder="Hersteller" autoComplete="off" />
-              <TextField label="Hersteller-Informationen" value={meta.hersteller_information ?? ""} onChange={(v) => updateMeta("hersteller_information", v || undefined)} placeholder="Hersteller-Informationen" multiline={2} />
-              <TextField label="Verantwortliche Person (EU)" value={meta.verantwortliche_person_information ?? ""} onChange={(v) => updateMeta("verantwortliche_person_information", v || undefined)} placeholder="Verantwortliche Person Information" multiline={2} />
+              <Text as="h2" variant="bodyMd" fontWeight="regular">Produktsicherheitsinformationen (GPSR)</Text>
+              <TextField label="Hersteller" requiredIndicator value={meta.hersteller ?? ""} onChange={(v) => updateMeta("hersteller", v || undefined)} placeholder="Hersteller" autoComplete="off" />
+              <TextField label="Hersteller-Informationen" requiredIndicator value={meta.hersteller_information ?? ""} onChange={(v) => updateMeta("hersteller_information", v || undefined)} placeholder="Hersteller-Informationen" multiline={2} />
+              <TextField label="Verantwortliche Person (EU)" requiredIndicator value={meta.verantwortliche_person_information ?? ""} onChange={(v) => updateMeta("verantwortliche_person_information", v || undefined)} placeholder="Verantwortliche Person Information" multiline={2} />
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">SEO</Text>

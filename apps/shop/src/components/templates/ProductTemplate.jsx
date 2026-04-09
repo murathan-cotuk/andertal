@@ -919,13 +919,34 @@ export default function ProductTemplate() {
   const effectiveTitle = variantContent.title || displayTitle;
   const effectiveDescription = variantContent.description || displayDescription;
   const mainImage = displayImages[selectedImage]?.url || variantImageUrl || (product.thumbnail ? resolveImageUrl(product.thumbnail) : null) || "https://via.placeholder.com/600";
+  const variantCountryPrice = (() => {
+    const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
+    const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
+    const direct = prices[countryCode] || prices[marketCountry];
+    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+  })();
+  const parentCountryPrice = (() => {
+    const prices = meta.prices && typeof meta.prices === "object" ? meta.prices : {};
+    const direct = prices[countryCode] || prices[marketCountry];
+    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+  })();
   const priceCents =
-    variant?.prices?.[0]?.amount != null
-      ? Number(variant.prices[0].amount)
-      : product.price != null
-        ? Math.round(Number(product.price) * 100)
-        : 0;
-  const uvpCents = variant?.compare_at_price_cents != null ? Number(variant.compare_at_price_cents) : (meta.uvp_cents != null ? Number(meta.uvp_cents) : null);
+    variantCountryPrice != null
+      ? variantCountryPrice
+      : (variant?.prices?.[0]?.amount != null
+          ? Number(variant.prices[0].amount)
+          : (parentCountryPrice != null
+              ? parentCountryPrice
+              : (product.price != null ? Math.round(Number(product.price) * 100) : 0)));
+  const uvpCountryCents = (() => {
+    const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
+    const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
+    const direct = prices[countryCode] || prices[marketCountry];
+    return direct && direct.uvp_cents != null ? Number(direct.uvp_cents) : null;
+  })();
+  const uvpCents = uvpCountryCents != null
+    ? uvpCountryCents
+    : (variant?.compare_at_price_cents != null ? Number(variant.compare_at_price_cents) : (meta.uvp_cents != null ? Number(meta.uvp_cents) : null));
   const saleCents = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null;
   const hasSale = saleCents != null && saleCents > 0 && priceCents > 0;
   const displayCents = hasSale ? saleCents : priceCents;
@@ -954,6 +975,7 @@ export default function ProductTemplate() {
   const maxQty = inventorySafeNum || 9999;
   const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
+  const variantMetafields = Array.isArray(variant?.metadata?.metafields) ? variant.metadata.metafields.filter((f) => f?.key && f?.value) : [];
   const metaRows = buildMetaRows(meta);
 
   // Grundpreis (unit price) — e.g. "1 kg = 50,00 €"
@@ -1255,7 +1277,7 @@ export default function ProductTemplate() {
               ))}
             </BulletList>
           )}
-          {(metaRows.length > 0 || dimensionsDisplay || (Array.isArray(meta.metafields) && meta.metafields.some((f) => f?.key && f?.value))) && (
+          {(metaRows.length > 0 || dimensionsDisplay || (Array.isArray(meta.metafields) && meta.metafields.some((f) => f?.key && f?.value)) || variantMetafields.length > 0) && (
             <MetaTable>
               <tbody>
                 {metaRows.map(({ key, value }) => (
@@ -1272,6 +1294,12 @@ export default function ProductTemplate() {
                 )}
                 {Array.isArray(meta.metafields) && meta.metafields.filter((f) => f?.key && f?.value).map((f, i) => (
                   <tr key={`mf-${i}`}>
+                    <th>{f.key}</th>
+                    <td>{f.value}</td>
+                  </tr>
+                ))}
+                {variantMetafields.map((f, i) => (
+                  <tr key={`vmf-${i}`}>
                     <th>{f.key}</th>
                     <td>{f.value}</td>
                   </tr>

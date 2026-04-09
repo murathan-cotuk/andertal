@@ -136,84 +136,88 @@ function HeroBanner({ container }) {
   const contentPad = slide.content_padding || "32px 48px";
 
   return (
-    <div style={{ position: "relative", width: "100%", height, overflow: "hidden" }}>
-      {/* Slides */}
-      {slides.map((s, i) => {
-        const imgEl = (
-          <>
-            <img src={resolveUrl(s.image)} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-          </>
-        );
-        const wrapStyle = { position: "absolute", inset: 0, opacity: i === current ? 1 : 0, transition: "opacity 0.7s ease" };
-        return s.btn_url ? (
-          <a key={i} href={s.btn_url} style={{ ...wrapStyle, display: "block" }}>{imgEl}</a>
-        ) : (
-          <div key={i} style={wrapStyle}>{imgEl}</div>
-        );
-      })}
+    <div style={getContainerPadding(container, "0px 0px 0px 0px")}>
+      <div style={getContentInnerStyle(container, 1600)}>
+        <div style={{ position: "relative", width: "100%", height, overflow: "hidden" }}>
+          {/* Slides */}
+          {slides.map((s, i) => {
+            const imgEl = (
+              <>
+                <img src={resolveUrl(s.image)} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              </>
+            );
+            const wrapStyle = { position: "absolute", inset: 0, opacity: i === current ? 1 : 0, transition: "opacity 0.7s ease" };
+            return s.btn_url ? (
+              <a key={i} href={s.btn_url} style={{ ...wrapStyle, display: "block" }}>{imgEl}</a>
+            ) : (
+              <div key={i} style={wrapStyle}>{imgEl}</div>
+            );
+          })}
 
-      {/* Text content */}
-      {(slide.title || slide.subtitle || slide.btn_text) && (
-        <div style={{
-          position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-          padding: contentPad, pointerEvents: "none",
-          ...posStyle,
-        }}>
-          {slide.title && (
-            <h2 style={{
-              fontSize: slide.title_size || "clamp(24px,4vw,56px)", fontWeight: 900,
-              color: slide.text_color || "#fff", margin: 0, lineHeight: 1.1,
-              marginBottom: slide.subtitle ? 12 : (slide.btn_text ? 20 : 0),
+          {/* Text content */}
+          {(slide.title || slide.subtitle || slide.btn_text) && (
+            <div style={{
+              position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+              padding: contentPad, pointerEvents: "none",
+              ...posStyle,
             }}>
-              {slide.title}
-            </h2>
+              {slide.title && (
+                <h2 style={{
+                  fontSize: slide.title_size || "clamp(24px,4vw,56px)", fontWeight: 900,
+                  color: slide.text_color || "#fff", margin: 0, lineHeight: 1.1,
+                  marginBottom: slide.subtitle ? 12 : (slide.btn_text ? 20 : 0),
+                }}>
+                  {slide.title}
+                </h2>
+              )}
+              {slide.subtitle && (
+                <p style={{
+                  fontSize: slide.subtitle_size || "clamp(14px,2vw,22px)",
+                  color: slide.subtitle_color || slide.text_color || "#fff",
+                  margin: slide.btn_text ? "0 0 20px" : 0, maxWidth: 600,
+                }}>
+                  {slide.subtitle}
+                </p>
+              )}
+              {slide.btn_text && (
+                <a
+                  href={slide.btn_url || "#"}
+                  style={{
+                    pointerEvents: "auto", display: "inline-block",
+                    padding: slide.btn_padding || "12px 28px",
+                    background: slide.btn_bg || "#ff971c",
+                    color: slide.btn_color || "#fff",
+                    border: slide.btn_border || "2px solid #000",
+                    borderRadius: slide.btn_radius || 8,
+                    fontWeight: 800, fontSize: 15, textDecoration: "none",
+                    boxShadow: "0 3px 0 2px #000",
+                    alignSelf: btnAlignSelf(posStyle.justifyContent),
+                  }}
+                >
+                  {slide.btn_text}
+                </a>
+              )}
+            </div>
           )}
-          {slide.subtitle && (
-            <p style={{
-              fontSize: slide.subtitle_size || "clamp(14px,2vw,22px)",
-              color: slide.subtitle_color || slide.text_color || "#fff",
-              margin: slide.btn_text ? "0 0 20px" : 0, maxWidth: 600,
-            }}>
-              {slide.subtitle}
-            </p>
+
+          {/* Dots */}
+          {slides.length > 1 && (
+            <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8, zIndex: 5 }}>
+              {slides.map((_, i) => (
+                <button key={i} onClick={() => goTo(i)} style={{ width: i === current ? 24 : 10, height: 10, borderRadius: 5, border: "none", cursor: "pointer", background: i === current ? "#ff971c" : "rgba(255,255,255,0.6)", transition: "all .3s", padding: 0 }} />
+              ))}
+            </div>
           )}
-          {slide.btn_text && (
-            <a
-              href={slide.btn_url || "#"}
-              style={{
-                pointerEvents: "auto", display: "inline-block",
-                padding: slide.btn_padding || "12px 28px",
-                background: slide.btn_bg || "#ff971c",
-                color: slide.btn_color || "#fff",
-                border: slide.btn_border || "2px solid #000",
-                borderRadius: slide.btn_radius || 8,
-                fontWeight: 800, fontSize: 15, textDecoration: "none",
-                boxShadow: "0 3px 0 2px #000",
-                alignSelf: btnAlignSelf(posStyle.justifyContent),
-              }}
-            >
-              {slide.btn_text}
-            </a>
+
+          {/* Arrows */}
+          {slides.length > 1 && (
+            <>
+              <button onClick={() => goTo((current - 1 + slides.length) % slides.length)} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>‹</button>
+              <button onClick={() => goTo((current + 1) % slides.length)} style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>›</button>
+            </>
           )}
         </div>
-      )}
-
-      {/* Dots */}
-      {slides.length > 1 && (
-        <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8, zIndex: 5 }}>
-          {slides.map((_, i) => (
-            <button key={i} onClick={() => goTo(i)} style={{ width: i === current ? 24 : 10, height: 10, borderRadius: 5, border: "none", cursor: "pointer", background: i === current ? "#ff971c" : "rgba(255,255,255,0.6)", transition: "all .3s", padding: 0 }} />
-          ))}
-        </div>
-      )}
-
-      {/* Arrows */}
-      {slides.length > 1 && (
-        <>
-          <button onClick={() => goTo((current - 1 + slides.length) % slides.length)} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>‹</button>
-          <button onClick={() => goTo((current + 1) % slides.length)} style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>›</button>
-        </>
-      )}
+      </div>
     </div>
   );
 }
@@ -391,11 +395,15 @@ function BannerCta({ container }) {
 }
 
 // ── Collection Carousel ───────────────────────────────────────────────────────
-function CollectionCarousel({ container }) {
-  const [products, setProducts] = useState([]);
+function CollectionCarousel({ container, preloadedProducts }) {
+  const [products, setProducts] = useState(Array.isArray(preloadedProducts) ? preloadedProducts : []);
   const itemsPerRow = container.items_per_row || 4;
 
   useEffect(() => {
+    if (Array.isArray(preloadedProducts)) {
+      setProducts(preloadedProducts);
+      return;
+    }
     if (!container.collection_id && !container.collection_handle) return;
     const param = container.collection_id
       ? `collection_id=${encodeURIComponent(container.collection_id)}`
@@ -404,7 +412,7 @@ function CollectionCarousel({ container }) {
       .then((r) => r.json())
       .then((d) => setProducts(Array.isArray(d?.products) ? d.products : []))
       .catch(() => {});
-  }, [container.collection_id, container.collection_handle]);
+  }, [container.collection_id, container.collection_handle, preloadedProducts]);
 
   if (!products.length) return null;
 
@@ -499,12 +507,16 @@ function CollectionsCarousel({ container }) {
 }
 
 // ── Single featured product ───────────────────────────────────────────────────
-function SingleProduct({ container }) {
-  const [product, setProduct] = useState(null);
+function SingleProduct({ container, preloadedProduct }) {
+  const [product, setProduct] = useState(preloadedProduct || null);
   // Prefer stable product_id (UUID); handle can change and break lookups.
   const idOrHandle = (container.product_id || container.product_handle || "").toString().trim();
 
   useEffect(() => {
+    if (preloadedProduct) {
+      setProduct(preloadedProduct);
+      return;
+    }
     if (!idOrHandle) {
       setProduct(null);
       return;
@@ -517,7 +529,7 @@ function SingleProduct({ container }) {
     return () => {
       cancelled = true;
     };
-  }, [idOrHandle]);
+  }, [idOrHandle, preloadedProduct]);
 
   if (!idOrHandle || !product) return null;
 
@@ -1059,20 +1071,22 @@ function Tabs({ container }) {
 }
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
-function renderContainer(c) {
+function renderContainer(c, preload = {}) {
   if (!c.visible) return null;
   let inner = null;
+  const collectionKey = `${String(c.collection_id || "").trim()}|${String(c.collection_handle || "").trim()}`;
+  const singleKey = String(c.product_id || c.product_handle || "").trim();
   switch (c.type) {
     case "hero_banner":          inner = <HeroBanner container={c} />; break;
     case "text_block":           inner = <TextBlock container={c} />; break;
     case "image_text":           inner = <ImageText container={c} />; break;
     case "image_grid":           inner = <ImageGrid container={c} />; break;
     case "banner_cta":           inner = <BannerCta container={c} />; break;
-    case "collection_carousel":  inner = <CollectionCarousel container={c} />; break;
+    case "collection_carousel":  inner = <CollectionCarousel container={c} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
     case "collections_carousel": inner = <CollectionsCarousel container={c} />; break;
     case "accordion":            inner = <Accordion container={c} />; break;
     case "tabs":                 inner = <Tabs container={c} />; break;
-    case "single_product":       inner = <SingleProduct container={c} />; break;
+    case "single_product":       inner = <SingleProduct container={c} preloadedProduct={preload.singleProducts?.[singleKey] || null} />; break;
     case "blog_carousel":        inner = <BlogCarousel container={c} />; break;
     case "newsletter":           inner = <NewsletterSignup container={c} />; break;
     default: return null;
@@ -1091,6 +1105,7 @@ function renderContainer(c) {
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function LandingContainers({ pageId, categoryId }) {
   const [containers, setContainers] = useState(null);
+  const [preload, setPreload] = useState({ ready: false, collectionProducts: {}, singleProducts: {} });
   const { setLandingHeaderFilterBar } = useLandingChrome();
 
   useEffect(() => {
@@ -1115,11 +1130,69 @@ export default function LandingContainers({ pageId, categoryId }) {
       });
   }, [pageId, categoryId, setLandingHeaderFilterBar]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!Array.isArray(containers) || containers.length === 0) {
+        if (!cancelled) setPreload({ ready: true, collectionProducts: {}, singleProducts: {} });
+        return;
+      }
+      setPreload((p) => ({ ...p, ready: false }));
+      const collectionTargets = new Map();
+      const singleTargets = new Set();
+      for (const c of containers) {
+        if (!c?.visible) continue;
+        if (c.type === "collection_carousel") {
+          const key = `${String(c.collection_id || "").trim()}|${String(c.collection_handle || "").trim()}`;
+          if (key !== "|") collectionTargets.set(key, c);
+        } else if (c.type === "single_product") {
+          const idOrHandle = String(c.product_id || c.product_handle || "").trim();
+          if (idOrHandle) singleTargets.add(idOrHandle);
+        }
+      }
+
+      const collectionEntries = await Promise.all(
+        [...collectionTargets.entries()].map(async ([key, c]) => {
+          try {
+            const param = c.collection_id
+              ? `collection_id=${encodeURIComponent(c.collection_id)}`
+              : `collection_handle=${encodeURIComponent(c.collection_handle)}`;
+            const d = await fetch(`/api/store-products?${param}&limit=20`, { cache: "no-store" }).then((r) => r.json());
+            return [key, Array.isArray(d?.products) ? d.products : []];
+          } catch {
+            return [key, []];
+          }
+        })
+      );
+
+      const singleEntries = await Promise.all(
+        [...singleTargets].map(async (idOrHandle) => {
+          try {
+            const { product } = await getMedusaClient().getProduct(idOrHandle);
+            return [idOrHandle, product || null];
+          } catch {
+            return [idOrHandle, null];
+          }
+        })
+      );
+
+      if (cancelled) return;
+      setPreload({
+        ready: true,
+        collectionProducts: Object.fromEntries(collectionEntries),
+        singleProducts: Object.fromEntries(singleEntries),
+      });
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [containers]);
+
   if (!containers || containers.length === 0) return null;
+  if (!preload.ready) return null;
 
   return (
     <div>
-      {containers.map((c) => renderContainer(c))}
+      {containers.map((c) => renderContainer(c, preload))}
     </div>
   );
 }

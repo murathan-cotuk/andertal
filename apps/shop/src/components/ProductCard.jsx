@@ -7,7 +7,7 @@ import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedProduct, htmlToText } from "@/lib/format";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
-import { localizedProductMediaList, variantImageUrlForLocale } from "@/lib/product-locale-media";
+import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
@@ -405,26 +405,43 @@ export function ProductCard({ product, activeFilters = {} }) {
   const variant = normalizedVariants[effectiveIdx] ?? normalizedVariants[0] ?? variants[0];
 
   const localeMedia = localizedProductMediaList(product, locale);
+  const variantMedia = variant ? variantMediaForLocale(variant, locale) : [];
   /* Resolve primary and second image (hover) */
   const rawImg =
     variantImageUrlForLocale(variant, locale) ||
+    variantMedia[0] ||
     product.images?.[0]?.url ||
     product.thumbnail ||
     localeMedia[0] ||
     null;
   const imgSrc = resolveImg(rawImg);
   const rawImg2 =
+    variantMedia[1] ||
     product.images?.[1]?.url ||
     (localeMedia[1] ? localeMedia[1] : null);
   const imgSrc2 = resolveImg(rawImg2);
 
   /* Price */
+  const variantCountryPrice = (() => {
+    const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
+    const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
+    const direct = prices[countryCode] || prices[marketCountry];
+    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+  })();
+  const parentCountryPrice = (() => {
+    const pm = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
+    const prices = pm.prices && typeof pm.prices === "object" ? pm.prices : {};
+    const direct = prices[countryCode] || prices[marketCountry];
+    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+  })();
   const priceCents =
-    variant?.prices?.[0]?.amount != null
-      ? Number(variant.prices[0].amount)
-      : product.price != null
-        ? Math.round(Number(product.price) * 100)
-        : 0;
+    variantCountryPrice != null
+      ? variantCountryPrice
+      : (variant?.prices?.[0]?.amount != null
+          ? Number(variant.prices[0].amount)
+          : (parentCountryPrice != null
+              ? parentCountryPrice
+              : (product.price != null ? Math.round(Number(product.price) * 100) : 0)));
   const saleCents =
     product.metadata?.rabattpreis_cents != null
       ? Number(product.metadata.rabattpreis_cents)

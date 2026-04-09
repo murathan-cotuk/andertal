@@ -2731,6 +2731,18 @@ async function start() {
       }
       return out
     }
+    const validateRequiredGpsrMetadata = (meta) => {
+      const m = meta && typeof meta === 'object' ? meta : {}
+      const hasManufacturer = String(m.hersteller || '').trim().length > 0
+      const hasManufacturerInfo = String(m.hersteller_information || '').trim().length > 0
+      const hasResponsiblePerson = String(m.verantwortliche_person_information || '').trim().length > 0
+      if (hasManufacturer && hasManufacturerInfo && hasResponsiblePerson) return { ok: true }
+      const missing = []
+      if (!hasManufacturer) missing.push('hersteller')
+      if (!hasManufacturerInfo) missing.push('hersteller_information')
+      if (!hasResponsiblePerson) missing.push('verantwortliche_person_information')
+      return { ok: false, message: `GPSR required fields missing: ${missing.join(', ')}` }
+    }
     const createAdminHubProductDb = async (body) => {
       const client = getProductsDbClient()
       if (!client) return null
@@ -2741,6 +2753,11 @@ async function start() {
         const price = typeof body.price === 'number' ? Math.round(body.price * 100) : parseInt(body.price, 10) || 0
         const inventory = parseInt(body.inventory, 10) || 0
         const metaObj = body.metadata && typeof body.metadata === 'object' ? normalizeProductMetadata(body.metadata) : null
+        const gpsrValidation = validateRequiredGpsrMetadata(metaObj || {})
+        if (!gpsrValidation.ok) {
+          await client.end()
+          return { __error: gpsrValidation.message || 'GPSR validation failed' }
+        }
         const metadata = metaObj ? JSON.stringify(metaObj) : null
         const variantsArr = body.variants && Array.isArray(body.variants) ? body.variants : null
         const variants = variantsArr ? JSON.stringify(variantsArr) : null
@@ -3012,6 +3029,11 @@ async function start() {
         let metadataObj = existing.metadata && typeof existing.metadata === 'object' ? { ...existing.metadata } : {}
         if (body.metadata !== undefined && body.metadata && typeof body.metadata === 'object') {
           metadataObj = normalizeProductMetadata({ ...metadataObj, ...body.metadata })
+        }
+        const gpsrValidation = validateRequiredGpsrMetadata(metadataObj || {})
+        if (!gpsrValidation.ok) {
+          await client.end()
+          return { __error: gpsrValidation.message || 'GPSR validation failed' }
         }
         const nextVariantsArr = body.variants !== undefined
           ? (Array.isArray(body.variants) ? body.variants : [])
@@ -3886,20 +3908,31 @@ async function start() {
     }
 
     // Store API: list/detail from Admin Hub so shop shows image, price, EAN, brand
-    const mapAdminHubToStoreProduct = (p) => {
+    const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
       const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
       const media = meta.media
       let rawMediaList = Array.isArray(media) ? media : (typeof media === 'string' && media ? [media] : [])
       if (rawMediaList.length === 0 && (meta.image_url || meta.image)) rawMediaList = [meta.image_url || meta.image]
       const thumb = resolveUploadUrl(rawMediaList[0] || null)
       const imagesResolved = rawMediaList.map((m) => resolveUploadUrl(typeof m === 'string' ? m : (m && m.url) || null)).filter(Boolean)
-      const priceCents = p.price != null ? Math.round(Number(p.price) * 100) : 0
+      const country = String(marketCountry || 'DE').toUpperCase()
+      const parentPriceByCountry = meta.prices && typeof meta.prices === 'object' ? meta.prices[country] : null
+      const priceCents =
+        parentPriceByCountry && parentPriceByCountry.brutto_cents != null
+          ? Number(parentPriceByCountry.brutto_cents)
+          : (p.price != null ? Math.round(Number(p.price) * 100) : 0)
       const rawVariants = Array.isArray(p.variants) && p.variants.length > 0 ? p.variants : []
       const variationGroups = Array.isArray(meta.variation_groups) ? meta.variation_groups : null
       const variants = rawVariants.length > 0
         ? rawVariants.map((v, i) => {
-            const vPriceCents = v.price_cents != null ? Number(v.price_cents) : (v.price != null ? Math.round(Number(v.price) * 100) : priceCents)
-            const vCompareCents = v.compare_at_price_cents != null ? Number(v.compare_at_price_cents) : null
+            const vMeta = v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
+            const vPriceByCountry = vMeta.prices && typeof vMeta.prices === 'object' ? vMeta.prices[country] : null
+            const vPriceCents = vPriceByCountry && vPriceByCountry.brutto_cents != null
+              ? Number(vPriceByCountry.brutto_cents)
+              : (v.price_cents != null ? Number(v.price_cents) : (v.price != null ? Math.round(Number(v.price) * 100) : priceCents))
+            const vCompareCents = vPriceByCountry && vPriceByCountry.uvp_cents != null
+              ? Number(vPriceByCountry.uvp_cents)
+              : (v.compare_at_price_cents != null ? Number(v.compare_at_price_cents) : null)
             const optionValues = Array.isArray(v.option_values) ? v.option_values : (v.value != null ? [v.value] : null)
             let image_urls = null
             if (v.image_urls && typeof v.image_urls === 'object' && !Array.isArray(v.image_urls)) {
@@ -3912,7 +3945,6 @@ async function start() {
               }
               if (Object.keys(m).length > 0) image_urls = m
             }
-            const vMeta = v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
             const vMediaResolved = Array.isArray(vMeta.media)
               ? vMeta.media.map((u) => resolveUploadUrl(u)).filter(Boolean)
               : []
@@ -3932,7 +3964,16 @@ async function start() {
             const row = {
               id: p.id + '-v-' + i,
               product_id: p.id,
-              title: v.title || (optionValues && optionValues.length > 0 ? optionValues.join(' / ') : v.value) || 'Option ' + (i + 1),
+              title:
+                v.title ||
+                (vMeta.translations && vMeta.translations.de && vMeta.translations.de.title) ||
+                (optionValues && optionValues.length > 0 ? optionValues.join(' / ') : v.value) ||
+                'Option ' + (i + 1),
+              description:
+                v.description ||
+                (vMeta.translations && vMeta.translations.de && vMeta.translations.de.description) ||
+                vMeta.description ||
+                null,
               value: v.value,
               option_values: optionValues,
               sku: v.sku || null,
@@ -4214,7 +4255,7 @@ async function start() {
         }
         const bestsellerIds = await getBestsellerProductIds()
         let products = list.map((p) => {
-          const mapped = mapAdminHubToStoreProduct(p)
+          const mapped = mapAdminHubToStoreProduct(p, query.country || 'DE')
           mergeCategoryIdsFromCollections(p, mapped)
           const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
           if (!existingSeller && p.seller_id && storeNamesBySeller[(p.seller_id || 'default').toString().trim()]) {
@@ -4524,7 +4565,7 @@ async function start() {
           const collection = await getAdminHubCollectionById(winnerRow.collection_id)
           if (collection) winnerRow.collection = collection
         }
-        const mapped = mapAdminHubToStoreProduct(winnerRow)
+        const mapped = mapAdminHubToStoreProduct(winnerRow, (req.query && req.query.country) || 'DE')
         await enrichMappedStoreProduct(winnerRow, mapped)
         res.json({ product: mapped, multi_offer: multiOffer })
       } catch (err) {
@@ -4598,7 +4639,7 @@ async function start() {
         await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))
         const bestsellerIds = await getBestsellerProductIds()
         const products = list.map((p) => {
-          const mapped = mapAdminHubToStoreProduct(p)
+          const mapped = mapAdminHubToStoreProduct(p, (req.query && req.query.country) || 'DE')
           const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
           if (!existingSeller && p.seller_id && storeNamesBySeller[(p.seller_id || 'default').toString().trim()]) {
             const storeName = storeNamesBySeller[(p.seller_id || 'default').toString().trim()]

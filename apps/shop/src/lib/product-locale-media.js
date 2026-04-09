@@ -54,12 +54,16 @@ export function variantLocaleContent(variant, locale) {
   if (!variant) return {};
   const loc = String(locale || "de").toLowerCase();
   const vMeta = variant.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
-  const tr = vMeta.translations?.[loc] || {};
+  const trMap = vMeta.translations && typeof vMeta.translations === "object" ? vMeta.translations : {};
+  const tr = trMap[loc] || {};
+  const trDe = trMap.de || {};
   return {
-    title: tr.title || (loc === "de" ? variant.title : null) || variant.title || null,
-    description: tr.description || (loc === "de" ? vMeta.description : null) || null,
+    title: tr.title || trDe.title || variant.title || null,
+    description: tr.description || trDe.description || vMeta.description || null,
     bullet_points: Array.isArray(tr.bullet_points) && tr.bullet_points.length > 0
       ? tr.bullet_points
-      : (loc === "de" && Array.isArray(vMeta.bullet_points) ? vMeta.bullet_points : null),
+      : (Array.isArray(trDe.bullet_points) && trDe.bullet_points.length > 0
+          ? trDe.bullet_points
+          : (Array.isArray(vMeta.bullet_points) ? vMeta.bullet_points : null)),
   };
 }

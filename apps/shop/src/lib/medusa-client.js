@@ -9,12 +9,23 @@
 // In production, this should be set to your deployed Medusa backend URL (e.g., Railway, Render)
 const MEDUSA_BACKEND_URL = 
   typeof window !== 'undefined' 
-    ? (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'http://localhost:9000')
-    : (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'http://localhost:9000')
+    ? (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'https://belucha-medusa-backend.onrender.com')
+    : (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'https://belucha-medusa-backend.onrender.com')
 
 class MedusaClient {
   constructor(baseURL = MEDUSA_BACKEND_URL) {
     this.baseURL = baseURL
+  }
+
+  inferMarketCountry() {
+    if (typeof window === 'undefined') return 'DE'
+    try {
+      const parts = String(window.location?.pathname || '').split('/').filter(Boolean)
+      const first = (parts[0] || '').toUpperCase()
+      return /^[A-Z]{2}$/.test(first) ? first : 'DE'
+    } catch (_) {
+      return 'DE'
+    }
   }
  
   /**
@@ -73,7 +84,9 @@ class MedusaClient {
    * Products
    */
   async getProducts(params = {}) {
-    const queryParams = new URLSearchParams(params).toString()
+    const withCountry = { ...params }
+    if (!withCountry.country) withCountry.country = this.inferMarketCountry()
+    const queryParams = new URLSearchParams(withCountry).toString()
     const res = await this.request(`/store/products${queryParams ? `?${queryParams}` : ''}`)
     if (res?.__error) return { products: [], count: 0 }
     return res
@@ -82,7 +95,8 @@ class MedusaClient {
   async getProduct(id) {
     const key = String(id ?? '').trim()
     if (!key) return { product: null }
-    const res = await this.request(`/store/products/${encodeURIComponent(key)}`)
+    const q = new URLSearchParams({ country: this.inferMarketCountry() }).toString()
+    const res = await this.request(`/store/products/${encodeURIComponent(key)}?${q}`)
     if (res?.__error) return { product: null }
     return res
   }
