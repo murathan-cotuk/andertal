@@ -3030,10 +3030,14 @@ async function start() {
         if (body.metadata !== undefined && body.metadata && typeof body.metadata === 'object') {
           metadataObj = normalizeProductMetadata({ ...metadataObj, ...body.metadata })
         }
-        const gpsrValidation = validateRequiredGpsrMetadata(metadataObj || {})
-        if (!gpsrValidation.ok) {
-          await client.end()
-          return { __error: gpsrValidation.message || 'GPSR validation failed' }
+        const bodyKeys = Object.keys(body || {})
+        const onlyVariantPatch = bodyKeys.length > 0 && bodyKeys.every((k) => k === 'variants')
+        if (!onlyVariantPatch) {
+          const gpsrValidation = validateRequiredGpsrMetadata(metadataObj || {})
+          if (!gpsrValidation.ok) {
+            await client.end()
+            return { __error: gpsrValidation.message || 'GPSR validation failed' }
+          }
         }
         const nextVariantsArr = body.variants !== undefined
           ? (Array.isArray(body.variants) ? body.variants : [])

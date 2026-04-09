@@ -152,8 +152,24 @@ const PARENT_NAV_URLS = new Set([
   "/products", "/marketing", "/content", "/analytics", "/customers-menu", "/sellers-menu", "/discounts",
 ]);
 
+const isModifiedOrNewTabClick = (e) => {
+  if (!e) return false;
+  return (
+    e.metaKey ||
+    e.ctrlKey ||
+    e.shiftKey ||
+    e.altKey ||
+    e.button === 1
+  );
+};
+
 const NextLink = forwardRef(function NextLink({ url, children, external, onClick, ...rest }, ref) {
   const handleClick = (e) => {
+    // Keep browser-native new-tab behavior (Ctrl/Cmd click, middle click, etc.)
+    if (isModifiedOrNewTabClick(e)) {
+      onClick?.(e);
+      return;
+    }
     if (PARENT_NAV_URLS.has(url || "") && typeof onClick === "function") {
       e.preventDefault();
     }
@@ -169,6 +185,11 @@ const NextLink = forwardRef(function NextLink({ url, children, external, onClick
 const UnsavedAwareLink = forwardRef(function UnsavedAwareLink({ url, children, external, onClick, ...rest }, ref) {
   const ctx = useUnsavedChanges();
   const handleClick = (e) => {
+    // Do not block browser-native new-tab actions.
+    if (isModifiedOrNewTabClick(e)) {
+      onClick?.(e);
+      return;
+    }
     if (PARENT_NAV_URLS.has(url || "") && typeof onClick === "function") {
       e.preventDefault();
       onClick?.(e);

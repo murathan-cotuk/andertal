@@ -26,6 +26,9 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { formatDecimal } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 
+const INVENTORY_ROW_GRID = "40px 56px 110px 72px minmax(320px, 2fr) minmax(140px, 0.9fr) minmax(150px, 1fr) minmax(200px, 1.2fr) 108px";
+const EXCEL_BORDER = "1px solid #e5e7eb";
+
 const DEFAULT_DUPLICATE_OPTIONS = {
   title: true,
   description: true,
@@ -71,6 +74,14 @@ function sortProductsList(list, locale, sortKey) {
   const arr = [...(list || [])];
   if (sortKey === "title_desc") {
     arr.sort((a, b) => getLocalizedTitle(b, locale).localeCompare(getLocalizedTitle(a, locale), undefined, { sensitivity: "base" }));
+  } else if (sortKey === "inventory_desc") {
+    arr.sort((a, b) => Number(b?.inventory ?? 0) - Number(a?.inventory ?? 0));
+  } else if (sortKey === "inventory_asc") {
+    arr.sort((a, b) => Number(a?.inventory ?? 0) - Number(b?.inventory ?? 0));
+  } else if (sortKey === "price_desc") {
+    arr.sort((a, b) => Number(b?.price ?? 0) - Number(a?.price ?? 0));
+  } else if (sortKey === "price_asc") {
+    arr.sort((a, b) => Number(a?.price ?? 0) - Number(b?.price ?? 0));
   } else if (sortKey === "created_desc") {
     arr.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   } else if (sortKey === "created_asc") {
@@ -113,11 +124,102 @@ function getVariantLabel(v, locale) {
   if (!v) return "";
   // option_values array: each is { value, labels, ... }
   const opts = Array.isArray(v.option_values) ? v.option_values : [];
-  if (opts.length === 0) return v.title || v.name || "";
-  return opts.map((o) => {
-    const label = (o.labels && (o.labels[locale] || o.labels["de"] || o.labels["en"])) || o.value || "";
-    return label;
-  }).filter(Boolean).join(" / ");
+  if (opts.length === 0) {
+    const raw = (v.value ?? v.option ?? "").toString().trim();
+    return raw;
+  }
+  return opts
+    .map((o) => {
+      if (o == null) return "";
+      if (typeof o === "string" || typeof o === "number") return String(o).trim();
+      const label =
+        (o.labels && (o.labels[locale] || o.labels["de"] || o.labels["en"])) ||
+        o.label ||
+        o.value ||
+        "";
+      return String(label).trim();
+    })
+    .filter(Boolean)
+    .join("/");
+}
+
+function getVariantName(v, locale, fallbackName = "—") {
+  if (!v) return "";
+  const l = String(locale || "de").toLowerCase();
+  const normalizeSig = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "")
+      .replace(/[_\-|]+/g, "/")
+      .replace(/\/+/g, "/")
+      .replace(/[^a-z0-9/]/g, "");
+  const optionSignature = normalizeSig(getVariantLabel(v, l));
+  const isOptionDerived = (text) => {
+    const t = normalizeSig(text);
+    if (!t) return false;
+    return optionSignature && t === optionSignature;
+  };
+  const tr = v.metadata && typeof v.metadata === "object" && v.metadata.translations && typeof v.metadata.translations === "object"
+    ? v.metadata.translations
+    : {};
+  const trTitle = String(tr[l]?.title || tr.de?.title || tr.en?.title || "").trim();
+  if (trTitle && !isOptionDerived(trTitle)) return trTitle;
+  const byName = String(v.name || "").trim();
+  if (byName && !isOptionDerived(byName)) return byName;
+  const byTitle = String(v.title || "").trim();
+  if (byTitle && !isOptionDerived(byTitle)) return byTitle;
+  const skuFallback = String(v?.sku || "").trim();
+  if (skuFallback) return skuFallback;
+  return String(fallbackName || "—");
+}
+
+function getDefaultShopUrl() {
+  const env = process.env.NEXT_PUBLIC_SHOP_URL || "";
+  const url = (typeof env === "string" ? env : "").trim();
+  if (url) return url.replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    if (window.location.hostname === "localhost") return "http://localhost:3000";
+    return window.location.origin;
+  }
+  return "";
+}
+
+function defaultShopMarketForLocale(loc) {
+  const l = String(loc || "de").toLowerCase();
+  if (l === "en") return "gb";
+  if (l === "tr") return "tr";
+  if (l === "fr") return "fr";
+  if (l === "it") return "it";
+  if (l === "es") return "es";
+  return "de";
+}
+
+function shopPreviewPrefix(loc) {
+  const l = String(loc || "de").toLowerCase();
+  return `/${defaultShopMarketForLocale(l)}/${l}/eur`;
+}
+
+function shopProductHandleForLocale(product, loc) {
+  const tr = product?.metadata?.translations?.[loc];
+  const h = (tr?.handle || "").trim();
+  if (h) return h;
+  return (product?.handle || "").trim();
+}
+
+function statusLabel(statusRaw) {
+  const s = String(statusRaw || "").toLowerCase();
+  if (s === "published" || s === "active") return "active";
+  if (s === "draft" || !s) return "draft";
+  if (s === "inactive" || s === "archived") return "inactive";
+  return s;
+}
+
+function statusColors(statusRaw) {
+  const s = String(statusRaw || "").toLowerCase();
+  if (s === "published" || s === "active") return { bg: "#dcfce7", fg: "#166534", br: "#86efac" };
+  if (s === "draft" || !s) return { bg: "#fef3c7", fg: "#92400e", br: "#fde68a" };
+  return { bg: "#fee2e2", fg: "#991b1b", br: "#fecaca" };
 }
 
 function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
@@ -164,37 +266,87 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
     }
   };
 
+  const shopBaseUrl = getDefaultShopUrl();
+  const l = String(locale || "en").toLowerCase();
+  const i18n = {
+    select: l === "tr" ? "Seç" : l === "de" ? "Ausw." : "Select",
+    status: l === "tr" ? "Durum" : l === "de" ? "Status" : "Status",
+    details: l === "tr" ? "Ürün detayları" : l === "de" ? "Produktdetails" : "Product details",
+    inventory: l === "tr" ? "Envanter" : l === "de" ? "Bestand" : "Inventory",
+    price: l === "tr" ? "Fiyat" : l === "de" ? "Preis" : "Price",
+    variations: l === "tr" ? "Varyasyonlar" : l === "de" ? "Variationen" : "Variations",
+    sku: "SKU",
+    ean: "EAN",
+    save: l === "tr" ? "Kaydet" : l === "de" ? "Speichern" : "Save",
+    saving: l === "tr" ? "Kaydediliyor…" : l === "de" ? "Speichern…" : "Saving…",
+    noVariations: l === "tr" ? "Varyasyon yok" : l === "de" ? "Keine Variationen" : "No variations",
+  };
+  const localizeStatus = (k) => {
+    if (k === "active") return l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : "Active";
+    if (k === "inactive") return l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : "Inactive";
+    return l === "tr" ? "Taslak" : l === "de" ? "Draft" : "Draft";
+  };
   if (matrixVariants.length === 0) {
-    return <div style={{ padding: "8px 12px", fontSize: 13, color: "#6b7280" }}>Keine Variationen</div>;
+    return <div style={{ padding: "8px 12px", fontSize: 13, color: "#6b7280" }}>{i18n.noVariations}</div>;
   }
 
   return (
-    <div style={{ marginTop: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 80px 100px", gap: "6px 12px", padding: "0 4px", marginBottom: 4 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>Variante</div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>SKU</div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>Bestand</div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase" }}>Preis (€)</div>
+    <div style={{ marginTop: 0, borderTop: EXCEL_BORDER, background: "#fff" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "40px 56px 110px 2fr 140px 150px 1.2fr", gap: 0, marginBottom: 0, background: "#f8fafc", borderBottom: EXCEL_BORDER, alignItems: "center" }}>
+        <div />
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 6px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.select}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 6px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.status}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 8px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.details}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{i18n.inventory}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{i18n.price}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 8px", textAlign: "center" }}>{i18n.variations}</div>
       </div>
       {drafts.map((d, idx) => (
-        <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 120px 80px 100px", gap: "6px 12px", alignItems: "center", padding: "4px 4px", borderRadius: 6, background: idx % 2 === 0 ? "#f9fafb" : "transparent" }}>
-          <div style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>
-            {getVariantLabel(matrixVariants[idx], locale) || `Variante ${idx + 1}`}
+        <div key={idx} style={{ display: "grid", gridTemplateColumns: "40px 56px 110px 2fr 140px 150px 1.2fr", gap: 0, alignItems: "center", borderBottom: idx === drafts.length - 1 ? "none" : EXCEL_BORDER, background: idx % 2 === 0 ? "#fff" : "#fcfdff" }}>
+          <div style={{ textAlign: "center", color: "#9ca3af", padding: "8px 4px", borderRight: EXCEL_BORDER }}>↳</div>
+          <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER }}><input type="checkbox" /></div>
+          <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER }}>
+            {(() => {
+              const c = statusColors(matrixVariants[idx]?.status || product.status);
+              return (
+                <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 7px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: c.bg, color: c.fg, border: `1px solid ${c.br}` }}>
+                  {localizeStatus(statusLabel(matrixVariants[idx]?.status || product.status))}
+                </span>
+              );
+            })()}
           </div>
-          <input
-            type="text"
-            value={d.sku}
-            onChange={(e) => setField(idx, "sku", e.target.value)}
-            placeholder="SKU"
-            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none" }}
-          />
+          <div style={{ minWidth: 0, padding: "8px 8px", borderRight: EXCEL_BORDER }}>
+            <a
+              href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/produkt/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ fontSize: 13, fontWeight: 600, color: "#111827", textDecoration: "none", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+              title={getVariantName(matrixVariants[idx], locale, `Variant ${idx + 1}`)}
+            >
+              {getVariantName(matrixVariants[idx], locale, `Variant ${idx + 1}`)}
+            </a>
+            <button
+              type="button"
+              onClick={() => window.location.assign(`/products/${product.id}`)}
+              style={{ marginTop: 1, padding: 0, background: "none", border: "none", cursor: "pointer", color: "#4b5563", fontSize: 12, textDecoration: "underline" }}
+              title="SKU üzerinden ürün düzenleme sayfasına git"
+            >
+              {i18n.sku}: {matrixVariants[idx]?.sku || "—"}
+            </button>
+            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.2 }}>
+              {i18n.ean}: {matrixVariants[idx]?.ean || "—"}
+            </div>
+          </div>
+          <div style={{ padding: "8px 8px", borderRight: EXCEL_BORDER }}>
           <input
             type="number"
             min="0"
             value={d.inventory}
             onChange={(e) => setField(idx, "inventory", e.target.value)}
-            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none" }}
+            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none", height: 30 }}
           />
+          </div>
+          <div style={{ padding: "8px 8px", borderRight: EXCEL_BORDER }}>
           <input
             type="number"
             min="0"
@@ -202,19 +354,18 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
             value={d.price}
             onChange={(e) => setField(idx, "price", e.target.value)}
             placeholder="0.00"
-            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none" }}
+            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none", height: 30 }}
           />
+          </div>
+          <div style={{ fontSize: 12, color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "8px 8px", textAlign: "center" }}>
+            {getVariantLabel(matrixVariants[idx], locale) || "—"}
+          </div>
         </div>
       ))}
-      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12 }}>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          style={{ fontSize: 13, padding: "5px 14px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, cursor: saving ? "wait" : "pointer", opacity: saving ? 0.7 : 1 }}
-        >
-          {saving ? "Speichern…" : "Speichern"}
-        </button>
+      <div style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 12, padding: "8px 6px", borderTop: "1px solid #e5e7eb", background: "#fff" }}>
+        <Button type="button" onClick={save} loading={saving} variant="primary">
+          {saving ? i18n.saving : i18n.save}
+        </Button>
         {savedMsg && <span style={{ fontSize: 12, color: savedMsg.startsWith("Fehler") ? "#dc2626" : "#16a34a" }}>{savedMsg}</span>}
       </div>
     </div>
@@ -234,6 +385,24 @@ function InventoryProductRow({
   setProducts,
 }) {
   const [variantsOpen, setVariantsOpen] = useState(false);
+  const shopBaseUrl = getDefaultShopUrl();
+  const l = String(locale || "en").toLowerCase();
+  const i18n = {
+    sku: "SKU",
+    ean: "EAN",
+    status: l === "tr" ? "Durum" : l === "de" ? "Status" : "Status",
+    active: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : "Active",
+    draft: l === "tr" ? "Taslak" : "Draft",
+    inactive: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : "Inactive",
+    openVariants: l === "tr" ? "Varyasyonları aç" : l === "de" ? "Variationen öffnen" : "Open variations",
+    closeVariants: l === "tr" ? "Varyasyonları kapat" : l === "de" ? "Variationen schließen" : "Close variations",
+    noVariants: l === "tr" ? "Varyasyon yok" : l === "de" ? "Keine Variationen" : "No variations",
+  };
+  const localizeStatus = (k) => {
+    if (k === "active") return i18n.active;
+    if (k === "inactive") return i18n.inactive;
+    return i18n.draft;
+  };
   const meta = product.metadata && typeof product.metadata === "object" ? product.metadata : {};
   const media = meta.media;
   const rawThumb =
@@ -253,11 +422,34 @@ function InventoryProductRow({
         : 0;
   const inv = product.inventory != null ? Number(product.inventory) : 0;
   const sku = product.sku || "—";
+  const ean = meta?.ean || "—";
+  const variationSummary = Array.isArray(meta?.variation_groups)
+    ? meta.variation_groups.map((g) => g?.name).filter(Boolean).join(" / ")
+    : "—";
   const hasVariants = Array.isArray(product.variants) && product.variants.filter((v) => Array.isArray(v.option_values) && v.option_values.length > 0).length > 0;
   return (
-    <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-      <InlineStack align="space-between" blockAlign="center" gap="400">
-        <InlineStack gap="300" blockAlign="center" wrap={false}>
+    <div style={{ background: "#fff", borderBottom: EXCEL_BORDER }}>
+      <div style={{ display: "grid", gridTemplateColumns: INVENTORY_ROW_GRID, gap: 0, alignItems: "center" }}>
+        <button
+          type="button"
+          onClick={() => hasVariants && setVariantsOpen((v) => !v)}
+          disabled={!hasVariants}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            border: "1px solid #d1d5db",
+            background: hasVariants ? "#fff" : "#f3f4f6",
+            color: hasVariants ? "#374151" : "#9ca3af",
+            cursor: hasVariants ? "pointer" : "not-allowed",
+            fontSize: 14,
+            lineHeight: 1,
+          }}
+          title={hasVariants ? (variantsOpen ? i18n.closeVariants : i18n.openVariants) : i18n.noVariants}
+        >
+          {hasVariants ? (variantsOpen ? "▾" : "▸") : "·"}
+        </button>
+          <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER, display: "flex", justifyContent: "center" }}>
           <input
             type="checkbox"
             checked={selectedIds.includes(product.id)}
@@ -267,43 +459,50 @@ function InventoryProductRow({
                 e.target.checked ? [...prev, product.id] : prev.filter((id) => id !== product.id)
               );
             }}
-            style={{ marginRight: "8px" }}
+            style={{ margin: 0 }}
           />
+          </div>
+          <div style={{ minWidth: 0, padding: "8px 6px", borderRight: EXCEL_BORDER, textAlign: "center" }}>
+            {(() => {
+              const c = statusColors(product.status);
+              return (
+                <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 7px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: c.bg, color: c.fg, border: `1px solid ${c.br}` }}>
+                  {localizeStatus(statusLabel(product.status))}
+                </span>
+              );
+            })()}
+          </div>
+          <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER, display: "flex", justifyContent: "center" }}>
           <Box minWidth="56px" width="56px" minHeight="56px" height="56px" background="bg-fill-secondary" borderRadius="200" overflow="hidden">
             {thumbUrl ? <img src={thumbUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
           </Box>
-          <BlockStack gap="100">
-            <Link href={`/products/${product.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-              <Text as="p" variant="bodyMd" fontWeight="medium">
-                {getLocalizedTitle(product, locale)}
-              </Text>
-            </Link>
-            <InlineStack gap="200" wrap>
-              <Text as="span" variant="bodySm" tone="subdued">
-                SKU: {sku}
-              </Text>
-              <Text as="span" variant="bodySm" tone="subdued">
-                · Qty: {inv}
-              </Text>
-              <Text as="span" variant="bodySm" tone="subdued">
-                · €{formatDecimal(price)}
-              </Text>
-              <Text as="span" variant="bodySm" tone="subdued">
-                · {product.status || "draft"}
-              </Text>
-              {hasVariants && (
-                <button
-                  type="button"
-                  onClick={() => setVariantsOpen((v) => !v)}
-                  style={{ fontSize: 12, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 3 }}
-                >
-                  {variantsOpen ? "▲ Variationen" : "▼ Variationen"}
-                </button>
-              )}
-            </InlineStack>
-          </BlockStack>
-        </InlineStack>
-        <InlineStack gap="200" blockAlign="center">
+          </div>
+          <div style={{ minWidth: 0, padding: "8px 8px", borderRight: EXCEL_BORDER }}>
+            <a
+              href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/produkt/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ fontSize: 14, fontWeight: 600, color: "#111827", textDecoration: "none", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+              title={getLocalizedTitle(product, locale)}
+            >
+              {getLocalizedTitle(product, locale)}
+            </a>
+            <button
+              type="button"
+              onClick={() => router.push(`/products/${product.id}`)}
+              style={{ marginTop: 2, padding: 0, background: "none", border: "none", cursor: "pointer", color: "#4b5563", fontSize: 12, textDecoration: "underline" }}
+              title="SKU üzerinden ürün düzenleme sayfasına git"
+            >
+              {i18n.sku}: {sku}
+            </button>
+            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.2 }}>{i18n.ean}: {ean}</div>
+          </div>
+          <div style={{ fontSize: 13, color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{inv}</div>
+          <div style={{ fontSize: 13, color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "8px 8px", borderRight: EXCEL_BORDER }}>€{formatDecimal(price)}</div>
+          <div style={{ fontSize: 12, color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "8px 8px", borderRight: EXCEL_BORDER, textAlign: "center" }}>
+            {variationSummary || "—"}
+          </div>
+          <InlineStack gap="100" blockAlign="center" style={{ padding: "8px 6px", justifyContent: "flex-end" }}>
           <Button
             variant="tertiary"
             onClick={() => router.push(`/products/${product.id}`)}
@@ -321,49 +520,75 @@ function InventoryProductRow({
               ⋯
             </Button>
             {menuOpenId === product.id && (
-              <Box
-                position="absolute"
-                right="0"
-                padding="200"
-                background="bg-surface"
-                borderRadius="200"
-                shadow="300"
-                style={{ zIndex: 10, minWidth: "140px" }}
+              <div
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  top: "calc(100% + 6px)",
+                  zIndex: 40,
+                  minWidth: 156,
+                  background: "#fff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
+                  overflow: "hidden",
+                }}
               >
-                <BlockStack gap="100">
-                  <Button
-                    fullWidth
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openDuplicateModal(product);
-                    }}
-                  >
-                    Duplicate
-                  </Button>
-                  <Button
-                    fullWidth
-                    tone="critical"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      try {
-                        await medusaClient.deleteAdminHubProduct(product.id);
-                        setProducts((prev) => prev.filter((p) => p.id !== product.id));
-                        setSelectedIds((prev) => prev.filter((id) => id !== product.id));
-                      } catch (err) {
-                        console.error("Failed to delete product", err);
-                      } finally {
-                        setMenuOpenId(null);
-                      }
-                    }}
-                  >
-                    Delete
-                  </Button>
-                </BlockStack>
-              </Box>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openDuplicateModal(product);
+                    setMenuOpenId(null);
+                  }}
+                  style={{
+                    width: "100%",
+                    height: 36,
+                    border: "none",
+                    background: "#fff",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    padding: "0 12px",
+                    fontSize: 13,
+                    color: "#111827",
+                  }}
+                >
+                  Duplicate
+                </button>
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      await medusaClient.deleteAdminHubProduct(product.id);
+                      setProducts((prev) => prev.filter((p) => p.id !== product.id));
+                      setSelectedIds((prev) => prev.filter((id) => id !== product.id));
+                    } catch (err) {
+                      console.error("Failed to delete product", err);
+                    } finally {
+                      setMenuOpenId(null);
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    height: 36,
+                    border: "none",
+                    borderTop: "1px solid #f1f5f9",
+                    background: "#fff",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    padding: "0 12px",
+                    fontSize: 13,
+                    color: "#b91c1c",
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
             )}
           </Box>
         </InlineStack>
-      </InlineStack>
+      </div>
       {variantsOpen && hasVariants && (
         <InlineVariantEditor
           product={product}
@@ -372,7 +597,7 @@ function InventoryProductRow({
           setProducts={setProducts}
         />
       )}
-    </Box>
+    </div>
   );
 }
 
@@ -393,9 +618,123 @@ export default function InventoryPage() {
   const [mySellerId, setMySellerId] = useState("");
   const [sellerLabelById, setSellerLabelById] = useState({});
   const [sellerSearchFilter, setSellerSearchFilter] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [detailsFilter, setDetailsFilter] = useState("");
+  const [variationFilter, setVariationFilter] = useState("");
+  const [inventoryMin, setInventoryMin] = useState("");
+  const [inventoryMax, setInventoryMax] = useState("");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
   const [inventorySort, setInventorySort] = useState("title_asc");
   const [sellerSectionsOpen, setSellerSectionsOpen] = useState({});
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState("xlsx");
+  const [exporting, setExporting] = useState(false);
   const medusaClient = getMedusaAdminClient();
+  const l = String(locale || "en").toLowerCase();
+  const rowHead = {
+    select: l === "tr" ? "Seç" : l === "de" ? "Ausw." : "Select",
+    status: l === "tr" ? "Durum" : l === "de" ? "Status" : "Status",
+    details: l === "tr" ? "Ürün detayları" : l === "de" ? "Produktdetails" : "Product details",
+    inventory: l === "tr" ? "Envanter" : l === "de" ? "Bestand" : "Inventory",
+    price: l === "tr" ? "Fiyat" : l === "de" ? "Preis" : "Price",
+    variations: l === "tr" ? "Varyasyonlar" : l === "de" ? "Variationen" : "Variations",
+  };
+  const renderInventoryHeader = () => (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: INVENTORY_ROW_GRID,
+        gap: 0,
+        borderBottom: EXCEL_BORDER,
+        alignItems: "center",
+        background: "#f8fafc",
+        position: "sticky",
+        top: 0,
+        zIndex: 2,
+      }}
+    >
+      <div style={{ borderRight: EXCEL_BORDER, padding: "8px 6px" }} />
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "8px 6px", textAlign: "center" }}>{rowHead.select}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "8px 6px", textAlign: "center" }}>{rowHead.status}</div>
+      <div style={{ borderRight: EXCEL_BORDER, padding: "8px 6px" }} />
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "8px 8px", textAlign: "center" }}>{rowHead.details}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "8px 8px", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "inventory_desc" ? "inventory_asc" : "inventory_desc"))}>{rowHead.inventory}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "8px 8px", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "price_desc" ? "price_asc" : "price_desc"))}>{rowHead.price}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "8px 8px", textAlign: "center" }}>{rowHead.variations}</div>
+      <div style={{ padding: "8px 6px" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "6px" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "6px" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "6px" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "6px" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px" }}>
+        <input value={detailsFilter} onChange={(e) => setDetailsFilter(e.target.value)} placeholder={l === "tr" ? "isim / sku / ean" : l === "de" ? "name / sku / ean" : "name / sku / ean"} style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 8px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+      </div>
+      <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+        <input value={inventoryMin} onChange={(e) => setInventoryMin(e.target.value)} placeholder="min" style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 6px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+        <input value={inventoryMax} onChange={(e) => setInventoryMax(e.target.value)} placeholder="max" style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 6px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+      </div>
+      <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+        <input value={priceMin} onChange={(e) => setPriceMin(e.target.value)} placeholder="min" style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 6px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+        <input value={priceMax} onChange={(e) => setPriceMax(e.target.value)} placeholder="max" style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 6px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+      </div>
+      <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px" }}>
+        <input value={variationFilter} onChange={(e) => setVariationFilter(e.target.value)} placeholder={l === "tr" ? "varyasyon" : l === "de" ? "variation" : "variation"} style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 8px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+      </div>
+      <div style={{ padding: "6px" }} />
+    </div>
+  );
+
+  const TableShell = ({ children }) => (
+    <div
+      style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: 8,
+        overflow: "hidden",
+        background: "#fff",
+        maxHeight: "68vh",
+        overflowY: "auto",
+      }}
+    >
+      {children}
+    </div>
+  );
+
+  const runQuickExport = async () => {
+    try {
+      setExporting(true);
+      const sellerToken = typeof window !== "undefined" ? (localStorage.getItem("sellerToken") || "") : "";
+      const response = await fetch("/api/import-export/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sellerToken,
+          datasets: ["products"],
+          format: exportFormat,
+          filters: {
+            search: productSearch || detailsFilter || variationFilter || "",
+            status: statusFilter === "all" ? "" : statusFilter,
+          },
+        }),
+      });
+      if (!response.ok) throw new Error(`Export failed (${response.status})`);
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `inventory-export.${exportFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+      setExportModalOpen(false);
+    } catch (e) {
+      setError(e?.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -449,10 +788,48 @@ export default function InventoryPage() {
     return () => { cancelled = true; };
   }, [duplicateModalOpen, duplicateSourceId]);
 
+  const productMatchesFilters = useCallback((product) => {
+    const statusOk = statusFilter === "all" ? true : String(product?.status || "draft").toLowerCase() === statusFilter;
+    if (!statusOk) return false;
+    const q = String(productSearch || "").trim().toLowerCase();
+    const meta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
+    const hay = [
+      getLocalizedTitle(product, locale),
+      product?.title || "",
+      product?.sku || "",
+      meta?.ean || "",
+      ...(Array.isArray(product?.variants)
+        ? product.variants.map((v) =>
+            [v?.sku || "", v?.ean || "", getVariantLabel(v, locale) || "", getVariantName(v, locale, "") || ""].join(" ")
+          )
+        : []),
+    ]
+      .join(" ")
+      .toLowerCase();
+    if (q && !hay.includes(q)) return false;
+    const detailsQ = String(detailsFilter || "").trim().toLowerCase();
+    if (detailsQ && !hay.includes(detailsQ)) return false;
+    const varQ = String(variationFilter || "").trim().toLowerCase();
+    if (varQ) {
+      const variationHay = (Array.isArray(product?.variants)
+        ? product.variants.map((v) => getVariantLabel(v, locale)).join(" ")
+        : "").toLowerCase();
+      if (!variationHay.includes(varQ)) return false;
+    }
+    const inv = Number(product?.inventory ?? 0);
+    if (inventoryMin !== "" && Number.isFinite(Number(inventoryMin)) && inv < Number(inventoryMin)) return false;
+    if (inventoryMax !== "" && Number.isFinite(Number(inventoryMax)) && inv > Number(inventoryMax)) return false;
+    const pr = Number(product?.price ?? 0);
+    if (priceMin !== "" && Number.isFinite(Number(priceMin)) && pr < Number(priceMin)) return false;
+    if (priceMax !== "" && Number.isFinite(Number(priceMax)) && pr > Number(priceMax)) return false;
+    return true;
+  }, [statusFilter, productSearch, detailsFilter, variationFilter, inventoryMin, inventoryMax, priceMin, priceMax, locale]);
+
   const { ownProducts, sellerGroups } = useMemo(() => {
     const own = [];
     const g = new Map();
     for (const p of products) {
+      if (!productMatchesFilters(p)) continue;
       if (isOwnInventoryProduct(p, mySellerId)) own.push(p);
       else {
         const sid = String(p.seller_id || "unknown");
@@ -464,7 +841,7 @@ export default function InventoryPage() {
       (sellerLabelById[a] || a).localeCompare(sellerLabelById[b] || b, undefined, { sensitivity: "base" })
     );
     return { ownProducts: own, sellerGroups: keys.map((k) => ({ sellerId: k, items: g.get(k) })) };
-  }, [products, mySellerId, sellerLabelById]);
+  }, [products, mySellerId, sellerLabelById, productMatchesFilters]);
 
   const filteredSellerGroups = useMemo(() => {
     const q = sellerSearchFilter.trim().toLowerCase();
@@ -570,6 +947,7 @@ export default function InventoryPage() {
       }}
       secondaryActions={[
         { content: "Bulk upload", url: "/products/bulk-upload" },
+        { content: "Export", onAction: () => setExportModalOpen(true) },
       ]}
     >
       <Layout>
@@ -585,6 +963,31 @@ export default function InventoryPage() {
           {isSuperuser && (
             <Box paddingBlockEnd="400">
               <InlineStack gap="400" blockAlign="center" wrap>
+                <Box minWidth="260px">
+                  <TextField
+                    label="Search products"
+                    labelHidden
+                    autoComplete="off"
+                    placeholder={l === "tr" ? "Ürün ara (isim, sku, ean, varyasyon)..." : l === "de" ? "Produkte suchen (Name, SKU, EAN, Variation)..." : "Search products (name, SKU, EAN, variation)..."}
+                    value={productSearch}
+                    onChange={setProductSearch}
+                  />
+                </Box>
+                <Box minWidth="180px">
+                  <Select
+                    label="Status filter"
+                    labelHidden
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={[
+                      { label: l === "tr" ? "Tüm statüler" : l === "de" ? "Alle Status" : "All statuses", value: "all" },
+                      { label: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : "Active", value: "published" },
+                      { label: l === "tr" ? "Taslak" : "Draft", value: "draft" },
+                      { label: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : "Inactive", value: "inactive" },
+                      { label: l === "tr" ? "Arşiv" : l === "de" ? "Archiviert" : "Archived", value: "archived" },
+                    ]}
+                  />
+                </Box>
                 <Box minWidth="200px">
                   <Select
                     label="Sortierung"
@@ -592,6 +995,10 @@ export default function InventoryPage() {
                     options={[
                       { label: "Name A–Z", value: "title_asc" },
                       { label: "Name Z–A", value: "title_desc" },
+                      { label: l === "tr" ? "Stok (yüksek→düşük)" : l === "de" ? "Bestand (hoch→niedrig)" : "Inventory (high→low)", value: "inventory_desc" },
+                      { label: l === "tr" ? "Stok (düşük→yüksek)" : l === "de" ? "Bestand (niedrig→hoch)" : "Inventory (low→high)", value: "inventory_asc" },
+                      { label: l === "tr" ? "Fiyat (yüksek→düşük)" : l === "de" ? "Preis (hoch→niedrig)" : "Price (high→low)", value: "price_desc" },
+                      { label: l === "tr" ? "Fiyat (düşük→yüksek)" : l === "de" ? "Preis (niedrig→hoch)" : "Price (low→high)", value: "price_asc" },
                       { label: "Neu zuerst", value: "created_desc" },
                       { label: "Älteste zuerst", value: "created_asc" },
                     ]}
@@ -609,6 +1016,31 @@ export default function InventoryPage() {
                 <InlineStack align="space-between" blockAlign="center" wrap>
                   <Text as="h2" variant="headingSm">All products</Text>
                   <InlineStack gap="300" blockAlign="center" wrap>
+                    <Box minWidth="260px">
+                      <TextField
+                        label="Search products"
+                        labelHidden
+                        autoComplete="off"
+                        placeholder={l === "tr" ? "Ürün ara (isim, sku, ean, varyasyon)..." : l === "de" ? "Produkte suchen (Name, SKU, EAN, Variation)..." : "Search products (name, SKU, EAN, variation)..."}
+                        value={productSearch}
+                        onChange={setProductSearch}
+                      />
+                    </Box>
+                    <Box minWidth="180px">
+                      <Select
+                        label="Status filter"
+                        labelHidden
+                        value={statusFilter}
+                        onChange={setStatusFilter}
+                        options={[
+                          { label: l === "tr" ? "Tüm statüler" : l === "de" ? "Alle Status" : "All statuses", value: "all" },
+                          { label: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : "Active", value: "published" },
+                          { label: l === "tr" ? "Taslak" : "Draft", value: "draft" },
+                          { label: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : "Inactive", value: "inactive" },
+                          { label: l === "tr" ? "Arşiv" : l === "de" ? "Archiviert" : "Archived", value: "archived" },
+                        ]}
+                      />
+                    </Box>
                     <Box minWidth="200px">
                       <Select
                         label="Sortierung"
@@ -616,6 +1048,10 @@ export default function InventoryPage() {
                         options={[
                           { label: "Name A–Z", value: "title_asc" },
                           { label: "Name Z–A", value: "title_desc" },
+                          { label: l === "tr" ? "Stok (yüksek→düşük)" : l === "de" ? "Bestand (hoch→niedrig)" : "Inventory (high→low)", value: "inventory_desc" },
+                          { label: l === "tr" ? "Stok (düşük→yüksek)" : l === "de" ? "Bestand (niedrig→hoch)" : "Inventory (low→high)", value: "inventory_asc" },
+                          { label: l === "tr" ? "Fiyat (yüksek→düşük)" : l === "de" ? "Preis (hoch→niedrig)" : "Price (high→low)", value: "price_desc" },
+                          { label: l === "tr" ? "Fiyat (düşük→yüksek)" : l === "de" ? "Preis (niedrig→hoch)" : "Price (low→high)", value: "price_asc" },
                           { label: "Neu zuerst", value: "created_desc" },
                           { label: "Älteste zuerst", value: "created_asc" },
                         ]}
@@ -624,7 +1060,7 @@ export default function InventoryPage() {
                       />
                     </Box>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      {products.length} {products.length === 1 ? "product" : "products"}
+                      {ownProducts.length} {ownProducts.length === 1 ? "product" : "products"}
                     </Text>
                     {selectedIds.length > 0 && (
                       <Button
@@ -643,7 +1079,7 @@ export default function InventoryPage() {
                   </InlineStack>
                 </InlineStack>
                 <Divider />
-                {products.length === 0 ? (
+                {ownProducts.length === 0 ? (
                   <Box paddingBlock="400">
                     <BlockStack gap="300">
                       <Text as="p" tone="subdued">No products yet. Add your first product to get started.</Text>
@@ -654,9 +1090,10 @@ export default function InventoryPage() {
                     </BlockStack>
                   </Box>
                 ) : (
-                  <BlockStack gap="200">
-                    {sortProductsList(products, locale, inventorySort).map((product) => renderRow(product))}
-                  </BlockStack>
+                  <TableShell>
+                    {renderInventoryHeader()}
+                    {sortProductsList(ownProducts, locale, inventorySort).map((product) => renderRow(product))}
+                  </TableShell>
                 )}
               </BlockStack>
             </Card>
@@ -689,9 +1126,10 @@ export default function InventoryPage() {
                   {ownProducts.length === 0 ? (
                     <Text as="p" tone="subdued">Keine Produkte in diesem Bereich.</Text>
                   ) : (
-                    <BlockStack gap="200">
+                    <TableShell>
+                      {renderInventoryHeader()}
                       {sortProductsList(ownProducts, locale, inventorySort).map((product) => renderRow(product))}
-                    </BlockStack>
+                    </TableShell>
                   )}
                 </BlockStack>
               </Card>
@@ -739,7 +1177,10 @@ export default function InventoryPage() {
                             </button>
                             {open && (
                               <Box paddingBlockStart="300">
-                                <BlockStack gap="200">{sortedItems.map((product) => renderRow(product))}</BlockStack>
+                                <TableShell>
+                                  {renderInventoryHeader()}
+                                  {sortedItems.map((product) => renderRow(product))}
+                                </TableShell>
                               </Box>
                             )}
                           </Box>
@@ -814,6 +1255,42 @@ export default function InventoryPage() {
                 />
               </BlockStack>
             )}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        title={l === "tr" ? "Envanteri dışa aktar" : l === "de" ? "Inventar exportieren" : "Export inventory"}
+        primaryAction={{
+          content: l === "tr" ? "Dışa aktar" : l === "de" ? "Exportieren" : "Export",
+          onAction: runQuickExport,
+          loading: exporting,
+        }}
+        secondaryActions={[
+          { content: l === "tr" ? "İptal" : l === "de" ? "Abbrechen" : "Cancel", onAction: () => setExportModalOpen(false) },
+        ]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text as="p" variant="bodySm" tone="subdued">
+              {l === "tr"
+                ? "Mevcut filtrelenmiş ürün görünümü dışa aktarılır."
+                : l === "de"
+                ? "Die aktuell gefilterte Produktansicht wird exportiert."
+                : "Current filtered product view will be exported."}
+            </Text>
+            <Select
+              label={l === "tr" ? "Format" : "Format"}
+              value={exportFormat}
+              onChange={setExportFormat}
+              options={[
+                { label: "XLSX", value: "xlsx" },
+                { label: "CSV", value: "csv" },
+                { label: "TXT", value: "txt" },
+              ]}
+            />
           </BlockStack>
         </Modal.Section>
       </Modal>

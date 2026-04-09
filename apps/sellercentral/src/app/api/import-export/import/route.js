@@ -283,6 +283,9 @@ function computeParentPresent(parentRow, idx) {
     brand: kp("brand"),
     category_slug: kp("category_slug"),
     shipping_group: kp("shipping_group"),
+    hersteller: kp("hersteller"),
+    hersteller_information: kp("hersteller_information"),
+    verantwortliche_person_information: kp("verantwortliche_person_information"),
     type: kp("type"),
     ean: kp("ean"),
     weight_grams: kp("weight_grams"),
@@ -669,6 +672,11 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
     if (pm.category_slug) m.category_slug = pm.category_slug;
   }
   if (parentPresent.shipping_group && pm.shipping_group_id) m.shipping_group_id = pm.shipping_group_id;
+  if (parentPresent.hersteller && pm.hersteller) m.hersteller = pm.hersteller;
+  if (parentPresent.hersteller_information && pm.hersteller_information) m.hersteller_information = pm.hersteller_information;
+  if (parentPresent.verantwortliche_person_information && pm.verantwortliche_person_information) {
+    m.verantwortliche_person_information = pm.verantwortliche_person_information;
+  }
   if (parentPresent.type && pm.type) m.type = pm.type;
 
   if (parentPresent.metafieldTouched && Array.isArray(pm.metafields)) {
@@ -849,6 +857,9 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     seo_meta_title: G("seo_title") || undefined,
     seo_meta_description: G("seo_description") || undefined,
     seo_keywords: G("seo_keywords") || undefined,
+    hersteller: G("hersteller") || undefined,
+    hersteller_information: G("hersteller_information") || undefined,
+    verantwortliche_person_information: G("verantwortliche_person_information") || undefined,
     ...(metafields ? { metafields } : {}),
   };
 
