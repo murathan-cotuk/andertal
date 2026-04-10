@@ -87,7 +87,7 @@ function buildTree(flatList) {
   return roots;
 }
 
-function TreeNode({ node, depth, onEdit, onDelete, categories }) {
+function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect }) {
   const [open, setOpen] = useState(false);
   const hasKids = node.children && node.children.length > 0;
   const router = useRouter();
@@ -117,6 +117,11 @@ function TreeNode({ node, depth, onEdit, onDelete, categories }) {
         >
           {hasKids ? (open ? <ChevronDownIcon /> : <ChevronRightIcon />) : <span style={{ width: 20 }} />}
         </button>
+        <Checkbox
+          checked={selectedIds.has(node.id)}
+          onChange={(checked) => onToggleSelect(node, checked)}
+          label=""
+        />
 
         {/* name */}
         <div style={{ flex: "0 0 240px", minWidth: 0 }}>
@@ -160,7 +165,7 @@ function TreeNode({ node, depth, onEdit, onDelete, categories }) {
       {hasKids && open && (
         <div style={{ borderLeft: "3px solid #e5e7eb", marginLeft: 16 + depth * 24 + 20 }}>
           {node.children.map(child => (
-            <TreeNode key={child.id} node={child} depth={depth + 1} onEdit={onEdit} onDelete={onDelete} categories={categories} />
+            <TreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} selectedIds={selectedIds} onToggleSelect={onToggleSelect} />
           ))}
         </div>
       )}
@@ -202,6 +207,8 @@ export default function ContentCategoriesPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [form, setForm] = useState(emptyForm);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(initialSlugTouched);
   const [medusaCollections, setMedusaCollections] = useState([]);
@@ -286,6 +293,45 @@ export default function ContentCategoriesPage() {
       setError(err?.message || "Failed to delete category. Delete or move child categories first.");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const collectDescendantIds = (categoryId) => {
+    const out = [];
+    const queue = [categoryId];
+    while (queue.length) {
+      const current = queue.shift();
+      out.push(current);
+      for (const c of categories) {
+        if (c.parent_id === current) queue.push(c.id);
+      }
+    }
+    return out;
+  };
+
+  const toggleNodeSelection = (node, checked) => {
+    const ids = collectDescendantIds(node.id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) ids.forEach((id) => next.add(id));
+      else ids.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+
+  const bulkSetActive = async (active) => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setBulkUpdating(true);
+    setError(null);
+    try {
+      await Promise.all(ids.map((id) => client.updateAdminHubCategory(id, { active })));
+      setSelectedIds(new Set());
+      await fetchCategories();
+    } catch (err) {
+      setError(err?.message || "Bulk update failed.");
+    } finally {
+      setBulkUpdating(false);
     }
   };
 
@@ -408,9 +454,21 @@ export default function ContentCategoriesPage() {
                 <Text as="h2" variant="headingSm">
                   All categories
                 </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  {categories.length} {categories.length === 1 ? "category" : "categories"}
-                </Text>
+                <InlineStack gap="200" blockAlign="center">
+                  {selectedIds.size > 0 && (
+                    <>
+                      <Button size="slim" onClick={() => bulkSetActive(true)} loading={bulkUpdating}>
+                        Activate selected
+                      </Button>
+                      <Button size="slim" tone="critical" onClick={() => bulkSetActive(false)} loading={bulkUpdating}>
+                        Deactivate selected
+                      </Button>
+                    </>
+                  )}
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {categories.length} {categories.length === 1 ? "category" : "categories"}
+                  </Text>
+                </InlineStack>
               </InlineStack>
               <Divider />
 
@@ -435,13 +493,14 @@ export default function ContentCategoriesPage() {
                 <div style={{ border: "1px solid #e1e3e5", borderRadius: 8, overflow: "hidden" }}>
                   {/* header */}
                   <div style={{ display: "flex", alignItems: "center", padding: "8px 16px 8px 60px", background: "#f6f6f7", borderBottom: "1px solid #e1e3e5", gap: 8 }}>
+                    <div style={{ width: 24 }} />
                     <div style={{ flex: "0 0 240px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Name</Text></div>
                     <div style={{ flex: "0 0 180px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Slug</Text></div>
                     <div style={{ flex: "0 0 100px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Collection</Text></div>
                     <div style={{ flex: "0 0 140px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Status</Text></div>
                   </div>
                   {tree.map(node => (
-                    <TreeNode key={node.id} node={node} depth={0} onEdit={openEdit} onDelete={setDeleteId} categories={categories} />
+                    <TreeNode key={node.id} node={node} depth={0} onDelete={setDeleteId} selectedIds={selectedIds} onToggleSelect={toggleNodeSelection} />
                   ))}
                 </div>
               )}

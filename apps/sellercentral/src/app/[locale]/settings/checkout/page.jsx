@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Page,
   Layout,
@@ -14,8 +14,10 @@ import {
   Box,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 
 export default function SettingsCheckoutPage() {
+  const unsaved = useUnsavedChanges();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -28,6 +30,7 @@ export default function SettingsCheckoutPage() {
   const [paypalClientId, setPaypalClientId] = useState("");
   const [paypalSecret, setPaypalSecret] = useState("");
   const [meta, setMeta] = useState(null);
+  const [initialSnapshot, setInitialSnapshot] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,6 +45,13 @@ export default function SettingsCheckoutPage() {
       setPaypalClientId(d.paypal_client_id || "");
       setPaypalSecret("");
       setMeta(d);
+      setInitialSnapshot(JSON.stringify({
+        stripePk: d.stripe_publishable_key || "",
+        payCard: d.pay_card !== false,
+        payPaypal: !!d.pay_paypal,
+        payKlarna: !!d.pay_klarna,
+        paypalClientId: d.paypal_client_id || "",
+      }));
     } catch (e) {
       setErr(e?.message || "Laden fehlgeschlagen");
     } finally {
@@ -78,6 +88,42 @@ export default function SettingsCheckoutPage() {
       setSaving(false);
     }
   };
+
+  const currentSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        stripePk: stripePk.trim(),
+        payCard: !!payCard,
+        payPaypal: !!payPaypal,
+        payKlarna: !!payKlarna,
+        paypalClientId: paypalClientId.trim(),
+      }),
+    [stripePk, payCard, payPaypal, payKlarna, paypalClientId]
+  );
+  const isDirty = !loading && initialSnapshot !== null && currentSnapshot !== initialSnapshot;
+
+  const discard = useCallback(() => {
+    if (!meta) return;
+    setStripePk(meta.stripe_publishable_key || "");
+    setStripeSk("");
+    setPayCard(meta.pay_card !== false);
+    setPayPaypal(!!meta.pay_paypal);
+    setPayKlarna(!!meta.pay_klarna);
+    setPaypalClientId(meta.paypal_client_id || "");
+    setPaypalSecret("");
+    setErr("");
+    setOk("");
+  }, [meta]);
+
+  useEffect(() => {
+    if (!unsaved) return;
+    unsaved.setDirty(isDirty);
+    unsaved.setHandlers({ onSave: save, onDiscard: discard });
+    return () => {
+      unsaved.clearHandlers();
+      unsaved.setDirty(false);
+    };
+  }, [unsaved, isDirty, save, discard]);
 
   if (loading) {
     return (

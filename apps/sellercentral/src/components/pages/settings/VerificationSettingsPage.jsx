@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Link, Text, TextField } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 
 const tByLocale = (l) => {
   if (l === "tr") {
@@ -202,6 +203,7 @@ function DocUploadRow({ label, docType, doc, onUpload, uploading, t }) {
 }
 
 export default function VerificationSettingsPage() {
+  const unsaved = useUnsavedChanges();
   const locale = useLocale();
   const t = useMemo(() => tByLocale(locale), [locale]);
   const client = getMedusaAdminClient();
@@ -213,6 +215,7 @@ export default function VerificationSettingsPage() {
   const [status, setStatus] = useState("registered");
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [uploadingDocType, setUploadingDocType] = useState(null);
+  const [initialSnapshot, setInitialSnapshot] = useState(null);
   const [form, setForm] = useState({
     companyName: "",
     authorizedPersonName: "",
@@ -226,6 +229,26 @@ export default function VerificationSettingsPage() {
     country: "",
     docs: { trade_register: null, id_passport: null, tax_document: null },
   });
+  const snapshotFrom = useCallback((nextForm, nextAgreement) => {
+    return JSON.stringify({
+      agreementAccepted: !!nextAgreement,
+      companyName: nextForm.companyName || "",
+      authorizedPersonName: nextForm.authorizedPersonName || "",
+      taxId: nextForm.taxId || "",
+      vatId: nextForm.vatId || "",
+      iban: nextForm.iban || "",
+      phone: nextForm.phone || "",
+      street: nextForm.street || "",
+      city: nextForm.city || "",
+      postalCode: nextForm.postalCode || "",
+      country: nextForm.country || "",
+      docs: DOC_TYPES.map((dt) => ({
+        doc_type: dt,
+        url: nextForm.docs?.[dt]?.url || null,
+        name: nextForm.docs?.[dt]?.name || null,
+      })),
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -247,8 +270,7 @@ export default function VerificationSettingsPage() {
         storedDocs.forEach((d) => {
           if (d?.doc_type && docs.hasOwnProperty(d.doc_type)) docs[d.doc_type] = d;
         });
-        setForm((p) => ({
-          ...p,
+        const nextForm = {
           companyName: seller?.company_name || "",
           authorizedPersonName: seller?.authorized_person_name || "",
           taxId: seller?.tax_id || "",
@@ -260,8 +282,14 @@ export default function VerificationSettingsPage() {
           postalCode: addr?.postal_code || "",
           country: addr?.country || "",
           docs,
+        };
+        setForm((p) => ({
+          ...p,
+          ...nextForm,
         }));
-        setAgreementAccepted(s !== "registered");
+        const nextAgreement = s !== "registered";
+        setAgreementAccepted(nextAgreement);
+        setInitialSnapshot(snapshotFrom(nextForm, nextAgreement));
       } catch (e) {
         if (!cancelled) setError(e?.message || "Failed to load verification data.");
       } finally {
@@ -269,7 +297,7 @@ export default function VerificationSettingsPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [client]);
+  }, [client, snapshotFrom]);
 
   const handleDocUpload = async (docType, file) => {
     setUploadingDocType(docType);
@@ -330,8 +358,18 @@ export default function VerificationSettingsPage() {
       setStatus(s);
       if (typeof window !== "undefined") localStorage.setItem("sellerApprovalStatus", s);
       setSuccess(t.saveOk);
+      setInitialSnapshot(snapshotFrom(form, agreementAccepted));
     } catch (e) {
-      setError(e?.message || "Save failed.");
+      const rawMsg = String(e?.message || "");
+      if (rawMsg.toLowerCase().includes("invalid input syntax for type json")) {
+        setError(locale === "tr"
+          ? "Doğrulama verileri hatalı formatta gönderildi. Lütfen adres ve belge alanlarını kontrol edip tekrar deneyin."
+          : locale === "de"
+            ? "Ungültiges Datenformat für die Verifizierung. Bitte Adress- und Dokumentfelder prüfen und erneut senden."
+            : "Invalid verification data format. Please review address and document fields and try again.");
+      } else {
+        setError(e?.message || "Save failed.");
+      }
     } finally {
       setSaving(false);
     }
@@ -347,6 +385,45 @@ export default function VerificationSettingsPage() {
 
   const normalizedStatus = String(status || "registered").toLowerCase();
   const isDocsSubmittedOrBeyond = ["documents_submitted", "pending_approval", "pending", "approved", "active", "rejected", "suspended"].includes(normalizedStatus);
+  const isDirty = !loading && initialSnapshot !== null && snapshotFrom(form, agreementAccepted) !== initialSnapshot;
+
+  const discardVerification = useCallback(() => {
+    if (!initialSnapshot) return;
+    try {
+      const snap = JSON.parse(initialSnapshot);
+      setAgreementAccepted(!!snap.agreementAccepted);
+      setForm((p) => ({
+        ...p,
+        companyName: snap.companyName || "",
+        authorizedPersonName: snap.authorizedPersonName || "",
+        taxId: snap.taxId || "",
+        vatId: snap.vatId || "",
+        iban: snap.iban || "",
+        phone: snap.phone || "",
+        street: snap.street || "",
+        city: snap.city || "",
+        postalCode: snap.postalCode || "",
+        country: snap.country || "",
+        docs: DOC_TYPES.reduce((acc, dt) => {
+          const hit = (snap.docs || []).find((d) => d?.doc_type === dt);
+          acc[dt] = hit?.url ? { doc_type: dt, name: hit?.name || "", url: hit.url } : null;
+          return acc;
+        }, {}),
+      }));
+      setError("");
+      setSuccess("");
+    } catch (_) {}
+  }, [initialSnapshot]);
+
+  useEffect(() => {
+    if (!unsaved) return;
+    unsaved.setDirty(isDirty);
+    unsaved.setHandlers({ onSave: saveVerification, onDiscard: discardVerification });
+    return () => {
+      unsaved.clearHandlers();
+      unsaved.setDirty(false);
+    };
+  }, [unsaved, isDirty, saveVerification, discardVerification]);
 
   return (
     <BlockStack gap="400">

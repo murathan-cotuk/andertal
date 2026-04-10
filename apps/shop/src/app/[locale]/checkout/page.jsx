@@ -1038,6 +1038,7 @@ export default function CheckoutPage() {
     STRIPE_PK_ENV ? loadStripe(STRIPE_PK_ENV) : null,
   );
   const [stripePkLoading, setStripePkLoading] = useState(!STRIPE_PK_ENV);
+  const [paymentMethodTypes, setPaymentMethodTypes] = useState(["card"]);
 
   useEffect(() => {
     if (STRIPE_PK_ENV) {
@@ -1050,11 +1051,18 @@ export default function CheckoutPage() {
       .then((d) => {
         if (cancelled) return;
         const pk = (d?.stripe_publishable_key || "").trim();
+        const pmTypes = Array.isArray(d?.payment_method_types) && d.payment_method_types.length
+          ? d.payment_method_types.map((x) => String(x || "").toLowerCase()).filter(Boolean)
+          : ["card"];
+        setPaymentMethodTypes(pmTypes);
         if (pk) setStripePromiseState(loadStripe(pk));
         setStripePkLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setStripePkLoading(false);
+        if (!cancelled) {
+          setPaymentMethodTypes(["card"]);
+          setStripePkLoading(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -1253,6 +1261,11 @@ export default function CheckoutPage() {
           <Layout>
             <div>
               {piError && <ErrorBox style={{ marginBottom: 24 }}>{piError}</ErrorBox>}
+              {!stripePkLoading && !paymentMethodTypes.includes("paypal") && (
+                <ErrorBox style={{ marginBottom: 24 }}>
+                  PayPal is currently disabled for this checkout. Enabled methods: {paymentMethodTypes.join(", ")}.
+                </ErrorBox>
+              )}
               {loadingPI && <p style={{ color: "#6b7280" }}>{t("processing")}</p>}
               {clientSecret && stripePromiseState && (
                 <Elements

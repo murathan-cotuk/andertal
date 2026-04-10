@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Page, Layout, Card, Text, BlockStack, InlineStack,
   Button, Banner, Badge, Box, Select,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (cents) =>
@@ -103,6 +104,7 @@ function formatIbanInput(raw) {
 // ── IBAN Management Card ───────────────────────────────────────────────────────
 function IbanSection({ commissionRate }) {
   const client = getMedusaAdminClient();
+  const unsaved = useUnsavedChanges();
   const sellerPct = Math.round((1 - (commissionRate ?? 0.12)) * 100);
   const platformPct = 100 - sellerPct;
 
@@ -118,6 +120,7 @@ function IbanSection({ commissionRate }) {
   const [savedHolder, setSavedHolder]       = useState("");
   const [savedBic, setSavedBic]             = useState("");
   const [savedBankName, setSavedBankName]   = useState("");
+  const [initialSnapshot, setInitialSnapshot] = useState(null);
 
   const [iban, setIban]             = useState("");
   const [holder, setHolder]         = useState("");
@@ -134,6 +137,12 @@ function IbanSection({ commissionRate }) {
         setSavedHolder(s.payment_account_holder || ""); setHolder(s.payment_account_holder || "");
         setSavedBic(s.payment_bic || ""); setBic(s.payment_bic || "");
         setSavedBankName(s.payment_bank_name || ""); setBankName(s.payment_bank_name || "");
+        setInitialSnapshot(JSON.stringify({
+          iban: iv || "",
+          holder: s.payment_account_holder || "",
+          bic: s.payment_bic || "",
+          bankName: s.payment_bank_name || "",
+        }));
       } catch (_) {}
       try {
         const sc = await client.stripeConnectStatus();
@@ -162,6 +171,12 @@ function IbanSection({ commissionRate }) {
       } catch (_) {}
       setSavedIban(trimmed); setSavedHolder(holder.trim());
       setSavedBic(bic.replace(/\s/g, "").toUpperCase()); setSavedBankName(bankName.trim());
+      setInitialSnapshot(JSON.stringify({
+        iban: trimmed || "",
+        holder: holder.trim() || "",
+        bic: bic.replace(/\s/g, "").toUpperCase() || "",
+        bankName: bankName.trim() || "",
+      }));
       setOk("Bankdaten gespeichert."); setEditing(false);
     } catch (e) { setErr(e?.message || "Fehler beim Speichern."); }
     finally { setSaving(false); }
@@ -171,6 +186,23 @@ function IbanSection({ commissionRate }) {
     setIban(savedIban); setHolder(savedHolder); setBic(savedBic); setBankName(savedBankName);
     setIbanError(""); setErr(""); setEditing(false);
   };
+  const currentSnapshot = useMemo(() => JSON.stringify({
+    iban: (iban || "").replace(/\s/g, "").toUpperCase(),
+    holder: holder || "",
+    bic: (bic || "").replace(/\s/g, "").toUpperCase(),
+    bankName: bankName || "",
+  }), [iban, holder, bic, bankName]);
+  const isDirty = !loading && initialSnapshot !== null && currentSnapshot !== initialSnapshot;
+
+  useEffect(() => {
+    if (!unsaved) return;
+    unsaved.setDirty(isDirty);
+    unsaved.setHandlers({ onSave: handleSave, onDiscard: handleCancel });
+    return () => {
+      unsaved.clearHandlers();
+      unsaved.setDirty(false);
+    };
+  }, [unsaved, isDirty, handleSave]);
 
   if (loading) return null;
 

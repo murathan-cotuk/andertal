@@ -11595,11 +11595,30 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const body = req.body || {}
       const allowed = ['company_name', 'authorized_person_name', 'tax_id', 'vat_id', 'business_address', 'warehouse_address', 'phone', 'website']
       const updates = []; const params = []; let n = 1
+      const toJsonOrNull = (val) => {
+        if (val === undefined) return undefined
+        if (val === null) return null
+        if (typeof val === 'string') return val
+        try { return JSON.stringify(val) } catch (_) { return null }
+      }
       for (const key of allowed) {
-        if (body[key] !== undefined) { updates.push(`${key} = $${n}`); params.push(body[key]); n++ }
+        if (body[key] !== undefined) {
+          const isJsonField = key === 'business_address' || key === 'warehouse_address'
+          const nextVal = isJsonField ? toJsonOrNull(body[key]) : body[key]
+          updates.push(`${key} = $${n}`)
+          params.push(nextVal)
+          n++
+        }
       }
       // Allow submitting documents
-      if (body.documents !== undefined) { updates.push(`documents = $${n}`); params.push(body.documents); n++ }
+      if (body.documents !== undefined) {
+        if (body.documents !== null && !Array.isArray(body.documents)) {
+          return res.status(400).json({ message: 'documents must be an array (or null).' })
+        }
+        updates.push(`documents = $${n}`)
+        params.push(toJsonOrNull(body.documents))
+        n++
+      }
       // Auto-advance status if submitting docs
       if (body.documents !== undefined) {
         updates.push(`approval_status = CASE WHEN approval_status = 'registered' THEN 'documents_submitted' ELSE approval_status END`)
@@ -11620,6 +11639,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.json({ seller: r.rows[0] })
       } catch (e) {
         try { await client.end() } catch (_) {}
+        if (String(e?.message || '').toLowerCase().includes('invalid input syntax for type json')) {
+          return res.status(400).json({ message: 'Invalid verification data format. Please check address/documents fields.' })
+        }
         res.status(500).json({ message: e?.message || 'Error' })
       }
     }
