@@ -140,7 +140,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
 
 
   useEffect(() => {
-    client.getAdminHubCategories({ all: true }).then((r) => setCategories(r.categories || [])).catch(() => setCategories([]));
+    client.getAdminHubCategories().then((r) => setCategories(r.categories || [])).catch(() => setCategories([]));
   }, []);
 
   useEffect(() => {

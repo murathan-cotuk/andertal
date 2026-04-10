@@ -649,6 +649,7 @@ export default function StylesPage() {
     sellercentral_logo_url: "",
     sellercentral_favicon_url: "",
     shop_logo_height: 34,
+    sellercentral_logo_height: 30,
   });
   const [brandingSnapshot, setBrandingSnapshot] = useState(null);
   const [brandingPickerTarget, setBrandingPickerTarget] = useState(null);
@@ -668,6 +669,7 @@ export default function StylesPage() {
         sellercentral_logo_url: settings?.sellercentral_logo_url || "",
         sellercentral_favicon_url: settings?.sellercentral_favicon_url || "",
         shop_logo_height: settings?.shop_logo_height != null ? Number(settings.shop_logo_height) : 34,
+        sellercentral_logo_height: settings?.sellercentral_logo_height != null ? Number(settings.sellercentral_logo_height) : 30,
       };
       setBranding(loadedBranding);
       setBrandingSnapshot(JSON.stringify(loadedBranding));
@@ -675,7 +677,7 @@ export default function StylesPage() {
       const merged = mergeLoadedShopStyles({});
       setStyles(merged);
       setSavedSnapshot(JSON.stringify(merged));
-      const emptyBranding = { shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "", shop_logo_height: 34 };
+      const emptyBranding = { shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "", shop_logo_height: 34, sellercentral_logo_height: 30 };
       setBranding(emptyBranding);
       setBrandingSnapshot(JSON.stringify(emptyBranding));
     }
@@ -840,7 +842,7 @@ export default function StylesPage() {
                       </Button>
                     ) : null}
                   </InlineStack>
-                  {row.key === "shop_logo_url" && (branding.shop_logo_url || "").trim() && (
+                  {(row.key === "shop_logo_url" || row.key === "sellercentral_logo_url") && (branding[row.key] || "").trim() && (
                     <div style={{ marginTop: 12 }}>
                       <InlineStack gap="400" blockAlign="center" wrap={false}>
                         <div style={{ flex: 1 }}>
@@ -851,20 +853,31 @@ export default function StylesPage() {
                               min={20}
                               max={120}
                               step={1}
-                              value={branding.shop_logo_height || 34}
-                              onChange={(e) => setBranding((p) => ({ ...p, shop_logo_height: Number(e.target.value) }))}
+                              value={row.key === "shop_logo_url" ? (branding.shop_logo_height || 34) : (branding.sellercentral_logo_height || 30)}
+                              onChange={(e) =>
+                                setBranding((p) => ({
+                                  ...p,
+                                  [row.key === "shop_logo_url" ? "shop_logo_height" : "sellercentral_logo_height"]: Number(e.target.value),
+                                }))
+                              }
                               style={{ flex: 1, accentColor: "#008060" }}
                             />
                             <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", minWidth: 42, textAlign: "right" }}>
-                              {branding.shop_logo_height || 34}px
+                              {row.key === "shop_logo_url" ? (branding.shop_logo_height || 34) : (branding.sellercentral_logo_height || 30)}px
                             </span>
                           </div>
                         </div>
                         <div style={{ flexShrink: 0, padding: "8px 12px", background: "#f3f4f6", borderRadius: 8, border: "1px solid #e5e7eb" }}>
                           <img
-                            src={branding.shop_logo_url}
+                            src={branding[row.key]}
                             alt="Logo preview"
-                            style={{ height: branding.shop_logo_height || 34, width: "auto", maxWidth: 200, objectFit: "contain", display: "block" }}
+                            style={{
+                              height: row.key === "shop_logo_url" ? (branding.shop_logo_height || 34) : (branding.sellercentral_logo_height || 30),
+                              width: "auto",
+                              maxWidth: 220,
+                              objectFit: "contain",
+                              display: "block",
+                            }}
                           />
                         </div>
                       </InlineStack>

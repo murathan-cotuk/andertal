@@ -133,6 +133,7 @@ export default class AdminHubService {
   async listCategories(filters?: {
     active?: boolean
     parent_id?: string | null
+    is_visible?: boolean
   }): Promise<AdminHubCategory[]> {
     const query = this.categoryRepository_.createQueryBuilder("category")
 
@@ -146,6 +147,9 @@ export default class AdminHubService {
       } else {
         query.andWhere("category.parent_id = :parent_id", { parent_id: filters.parent_id })
       }
+    }
+    if (filters?.is_visible !== undefined) {
+      query.andWhere("category.is_visible = :is_visible", { is_visible: filters.is_visible })
     }
 
     query.orderBy("category.sort_order", "ASC")
@@ -195,6 +199,12 @@ export default class AdminHubService {
     Object.assign(category, data)
     const savedCategory = await this.categoryRepository_.save(category)
 
+    // If a parent category is deactivated, cascade deactivate all descendants.
+    // Products remain linked, but deactivated categories must disappear from all selectors/menus.
+    if (data.active === false) {
+      await this.deactivateDescendants_(savedCategory.id)
+    }
+
     // Sync collection if has_collection changed or slug/name changed (best-effort; never fail the update)
     try {
       if (savedCategory.has_collection !== oldHasCollection) {
@@ -209,6 +219,25 @@ export default class AdminHubService {
     }
 
     return savedCategory
+  }
+
+  private async deactivateDescendants_(parentId: string): Promise<void> {
+    const queue = [parentId]
+    const visited = new Set<string>()
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      if (visited.has(current)) continue
+      visited.add(current)
+      const children = await this.categoryRepository_.find({ where: { parent_id: current } })
+      if (!children.length) continue
+      for (const child of children) {
+        if (child.active !== false) {
+          child.active = false
+          await this.categoryRepository_.save(child)
+        }
+        queue.push(child.id)
+      }
+    }
   }
 
   /**

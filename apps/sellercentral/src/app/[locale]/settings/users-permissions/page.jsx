@@ -7,6 +7,29 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
+const approvalStatusTone = (s) => {
+  const v = String(s || "registered").toLowerCase();
+  if (v === "approved" || v === "active") return "success";
+  if (v === "rejected" || v === "suspended") return "critical";
+  if (v === "documents_submitted" || v === "pending_approval" || v === "pending") return "warning";
+  return "info";
+};
+
+const approvalStatusLabel = (s) => {
+  const v = String(s || "registered").toLowerCase();
+  const map = {
+    registered: "Registriert",
+    documents_submitted: "Docs eingereicht",
+    pending_approval: "Wartet",
+    pending: "Wartet",
+    approved: "Genehmigt",
+    active: "Aktiv",
+    rejected: "Abgelehnt",
+    suspended: "Gesperrt",
+  };
+  return map[v] || v;
+};
+
 // All available menu routes with labels
 const ALL_PERMISSIONS = [
   { group: "Genel", items: [
@@ -386,6 +409,135 @@ function SuperUserModal({ user, onClose, onSaved }) {
   );
 }
 
+// ── KYB Review Modal ──────────────────────────────────────────────────────────
+function KybReviewModal({ user, onClose, onApproved }) {
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [showRejectInput, setShowRejectInput] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const handleAction = async (status) => {
+    if (status === "rejected" && !rejectionReason.trim()) {
+      setErr("Bitte geben Sie einen Ablehnungsgrund ein."); return;
+    }
+    setSaving(true); setErr("");
+    try {
+      await getMedusaAdminClient().approveSellerById(user.id, status, status === "rejected" ? rejectionReason.trim() : null);
+      onApproved(user.id, status);
+      onClose();
+    } catch (e) {
+      setErr(e?.message || "Fehler");
+      setSaving(false);
+    }
+  };
+
+  const addr = user.business_address || {};
+  const docs = Array.isArray(user.documents) ? user.documents : [];
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`KYB Review — ${user.store_name || user.email}`}
+      secondaryActions={[{ content: "Schließen", onAction: onClose }]}
+      large
+    >
+      <Modal.Section>
+        <BlockStack gap="400">
+          {err && <Banner tone="critical" onDismiss={() => setErr("")}><Text>{err}</Text></Banner>}
+
+          {/* Status */}
+          <InlineStack gap="200" blockAlign="center">
+            <Text variant="bodyMd" fontWeight="semibold">Status:</Text>
+            <Badge tone={approvalStatusTone(user.approval_status)}>{approvalStatusLabel(user.approval_status)}</Badge>
+          </InlineStack>
+
+          {/* Company info */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+            {[
+              ["Firmenname", user.company_name],
+              ["Bevollmächtigte Person", user.authorized_person_name],
+              ["E-Mail", user.email],
+              ["Telefon", user.phone],
+              ["Steuernummer", user.tax_id],
+              ["USt-IdNr.", user.vat_id],
+              ["IBAN", user.iban],
+              ["Straße", addr.street],
+              ["Stadt", addr.city],
+              ["PLZ", addr.postal_code],
+              ["Land", addr.country],
+            ].map(([label, val]) => val ? (
+              <div key={label}>
+                <Text variant="bodySm" tone="subdued">{label}</Text>
+                <Text variant="bodyMd">{val}</Text>
+              </div>
+            ) : null)}
+          </div>
+
+          {/* Documents */}
+          {docs.length > 0 && (
+            <div>
+              <Text variant="headingSm" as="h3">Dokumente ({docs.length})</Text>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                {docs.map((doc, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                    <div style={{ flex: 1 }}>
+                      <Text variant="bodySm" fontWeight="semibold">{doc.doc_type ? { trade_register: "Handelsregister", id_passport: "Ausweis/Reisepass", tax_document: "Steuerdokument" }[doc.doc_type] || doc.doc_type : doc.name}</Text>
+                      {doc.name && <Text variant="bodySm" tone="subdued">{doc.name}</Text>}
+                    </div>
+                    {doc.url && (
+                      <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ color: "#ff971c", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                        Öffnen ↗
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Rejection reason input */}
+          {showRejectInput && (
+            <TextField
+              label="Ablehnungsgrund"
+              value={rejectionReason}
+              onChange={setRejectionReason}
+              multiline={3}
+              autoComplete="off"
+            />
+          )}
+
+          {/* Action buttons */}
+          {(user.approval_status === "documents_submitted" || user.approval_status === "pending_approval" || user.approval_status === "pending") && (
+            <InlineStack gap="200">
+              <Button variant="primary" tone="success" onClick={() => handleAction("approved")} loading={saving && !showRejectInput}>
+                Genehmigen
+              </Button>
+              {!showRejectInput ? (
+                <Button tone="critical" onClick={() => setShowRejectInput(true)}>Ablehnen</Button>
+              ) : (
+                <Button tone="critical" onClick={() => handleAction("rejected")} loading={saving && showRejectInput}>
+                  Ablehnung bestätigen
+                </Button>
+              )}
+            </InlineStack>
+          )}
+          {user.approval_status === "approved" && (
+            <Button tone="critical" variant="secondary" onClick={() => handleAction("suspended")} loading={saving}>
+              Sperren
+            </Button>
+          )}
+          {(user.approval_status === "rejected" || user.approval_status === "suspended") && (
+            <Button variant="primary" onClick={() => handleAction("approved")} loading={saving}>
+              Wieder genehmigen
+            </Button>
+          )}
+        </BlockStack>
+      </Modal.Section>
+    </Modal>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function UsersPermissionsPage() {
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -407,8 +559,12 @@ export default function UsersPermissionsPage() {
 
   // Search / sort / filter state (superuser view)
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all"); // "all" | "seller" | "superuser"
+  const [roleFilter, setRoleFilter] = useState("all"); // "all" | "seller" | "superuser" | "kyb_pending"
   const [sortBy, setSortBy] = useState("date_desc"); // "date_desc" | "date_asc" | "name_asc" | "name_desc" | "role"
+
+  // KYB review
+  const [kybUser, setKybUser] = useState(null);
+  const [approvingId, setApprovingId] = useState(null);
 
   useEffect(() => {
     const su = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
@@ -426,6 +582,10 @@ export default function UsersPermissionsPage() {
     } catch (err) {
       setError(err?.message || "Failed to load users");
     } finally { setLoading(false); }
+  };
+
+  const handleApprovalUpdate = (userId, newStatus) => {
+    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, approval_status: newStatus } : u));
   };
 
   const handleDeleteUser = async (user) => {
@@ -480,6 +640,11 @@ export default function UsersPermissionsPage() {
       .filter((u) => {
         if (roleFilter === "seller" && u.is_superuser) return false;
         if (roleFilter === "superuser" && !u.is_superuser) return false;
+        if (roleFilter === "kyb_pending") {
+          if (u.is_superuser) return false;
+          const s = String(u.approval_status || "registered").toLowerCase();
+          if (!["documents_submitted", "pending_approval", "pending"].includes(s)) return false;
+        }
         if (q) {
           const haystack = [u.email, u.store_name, u.first_name, u.last_name].filter(Boolean).join(" ").toLowerCase();
           if (!haystack.includes(q)) return false;
@@ -530,10 +695,13 @@ export default function UsersPermissionsPage() {
                   />
                 </div>
                 {/* Role filter tabs */}
-                <div style={{ display: "flex", gap: 6 }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   <button style={filterTabStyle("all")} onClick={() => setRoleFilter("all")}>Alle</button>
                   <button style={filterTabStyle("seller")} onClick={() => setRoleFilter("seller")}>Seller</button>
                   <button style={filterTabStyle("superuser")} onClick={() => setRoleFilter("superuser")}>Superuser</button>
+                  <button style={filterTabStyle("kyb_pending")} onClick={() => setRoleFilter("kyb_pending")}>
+                    KYB Ausstehend {users.filter((u) => !u.is_superuser && ["documents_submitted","pending_approval","pending"].includes(String(u.approval_status||""))).length > 0 ? `(${users.filter((u) => !u.is_superuser && ["documents_submitted","pending_approval","pending"].includes(String(u.approval_status||""))).length})` : ""}
+                  </button>
                 </div>
                 {/* Sort */}
                 <select
@@ -584,6 +752,11 @@ export default function UsersPermissionsPage() {
                           ? <Badge tone="attention">Superuser</Badge>
                           : <Badge tone="info">Seller</Badge>
                         }
+                        {!user.is_superuser && (
+                          <Badge tone={approvalStatusTone(user.approval_status)}>
+                            {approvalStatusLabel(user.approval_status)}
+                          </Badge>
+                        )}
                       </InlineStack>
                       {!user.is_superuser && user.store_name && (
                         <Text variant="bodySm" tone="subdued">{user.email}</Text>
@@ -601,6 +774,9 @@ export default function UsersPermissionsPage() {
                       </Text>
                     </div>
                     <InlineStack gap="200">
+                      {!user.is_superuser && (
+                        <Button size="slim" variant="secondary" onClick={() => setKybUser(user)}>KYB</Button>
+                      )}
                       <Button size="slim" onClick={() => setEditUser(user)}>Bearbeiten</Button>
                       <Button size="slim" tone="critical" variant="secondary"
                         onClick={() => handleDeleteUser(user)} loading={deleting === user.id}>
@@ -619,6 +795,13 @@ export default function UsersPermissionsPage() {
             user={editUser?.id ? editUser : null}
             onClose={() => setEditUser(null)}
             onSaved={() => { setEditUser(null); fetchSuperuserData(); }}
+          />
+        )}
+        {kybUser && (
+          <KybReviewModal
+            user={kybUser}
+            onClose={() => setKybUser(null)}
+            onApproved={handleApprovalUpdate}
           />
         )}
       </Page>

@@ -80,6 +80,19 @@ function menuItemHref(item) {
   return value ? `/${String(value).replace(/^\//, "")}` : "#";
 }
 
+function categoryRefFromMenuItem(item) {
+  if (!item || String(item.link_type || "").toLowerCase() !== "category") return "";
+  const raw = item.link_value;
+  let value = String(raw || "").trim();
+  if (value.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(value);
+      value = String(parsed?.slug || parsed?.handle || parsed?.id || value).trim();
+    } catch (_) {}
+  }
+  return value.replace(/^\//, "").toLowerCase();
+}
+
 /** Map category slug → id from /store/categories tree (for menu items that only store slug). */
 function walkCategorySlugMap(nodes, outMap) {
   if (!Array.isArray(nodes)) return;
@@ -663,10 +676,8 @@ export default function ShopHeader() {
   const [mainMenuAllItems, setMainMenuAllItems] = useState([]);
   const [mainMenuConfig, setMainMenuConfig] = useState(null);
   const [secondMenuItems, setSecondMenuItems] = useState([]);
-  const [categoryIdsWithProducts, setCategoryIdsWithProducts] = useState(() => new Set());
   const [categorySlugToId, setCategorySlugToId] = useState(() => new Map());
   const [categoryTree, setCategoryTree] = useState([]);
-  const [pendingBrowseTarget, setPendingBrowseTarget] = useState(null);
   const [drillCategoryId, setDrillCategoryId] = useState(null); // null = root level
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
@@ -766,47 +777,24 @@ export default function ShopHeader() {
 
   useEffect(() => {
     let cancelled = false;
-    const run = async () => {
-      try {
-        const [res, catRes] = await Promise.all([
-          fetch("/api/store-products?limit=5000", { cache: "no-store" }),
-          fetch("/api/store-categories?tree=true&is_visible=true", { cache: "no-store" })
-            .then((r) => r.json())
-            .catch(() => ({ tree: [] })),
-        ]);
+    fetch("/api/store-categories?tree=true&is_visible=true", { cache: "no-store" })
+      .then((r) => r.json())
+      .catch(() => ({ tree: [] }))
+      .then((catRes) => {
         if (cancelled) return;
         const tree = catRes.tree || [];
         setCategoryTree(tree);
         const slugMap = new Map();
         walkCategorySlugMap(tree, slugMap);
         setCategorySlugToId(slugMap);
-        if (!res.ok) {
-          setCategoryIdsWithProducts(new Set());
-          return;
-        }
-        const data = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        const leafIds = new Set();
-        const products = Array.isArray(data?.products) ? data.products : [];
-        products.forEach((p) => {
-          productCategoryIds(p).forEach((id) => {
-            const k = normCatId(id);
-            if (k) leafIds.add(k);
-          });
-        });
-        setCategoryIdsWithProducts(expandCategoryIdsWithAncestors(tree, leafIds));
-      } catch {
+      })
+      .catch(() => {
         if (!cancelled) {
-          setCategoryIdsWithProducts(new Set());
           setCategorySlugToId(new Map());
           setCategoryTree([]);
         }
-      }
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
+      });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -831,7 +819,6 @@ export default function ShopHeader() {
   }, []);
 
   useEffect(() => {
-    setPendingBrowseTarget(null);
     setDrillCategoryId(null);
   }, [pathname]);
 
@@ -873,12 +860,11 @@ export default function ShopHeader() {
     url: "handle",
     image: "thumbnail",
   };
-  /** Tüm root kategoriler (ürün koşulu olmadan). categories_with_products modunda sadece ürünlü olanlar. */
+  /** Tüm root kategoriler — Auto-show categories modunda is_visible tree'den gelir, ürün filtresi yok. */
   const browseRootsFromTree = useMemo(() => {
     if (!Array.isArray(categoryTree) || categoryTree.length === 0) return [];
-    const useProdFilter = mainMenuConfig?.categories_with_products && categoryIdsWithProducts.size > 0;
     return categoryTree
-      .filter((n) => n && (!useProdFilter || categoryIdsWithProducts.has(normCatId(n.id))))
+      .filter((n) => n)
       .map((n) => ({
         key: String(n.id),
         id: String(n.id),
@@ -889,12 +875,11 @@ export default function ShopHeader() {
       }))
       .filter((r) => r.slug)
       .sort((a, b) => String(a.label).localeCompare(String(b.label), locale));
-  }, [categoryTree, categoryIdsWithProducts, mainMenuConfig, locale]);
+  }, [categoryTree, locale]);
 
   // Children of the currently drilled category
   const drillRows = useMemo(() => {
     if (!drillCategoryId) return [];
-    const useProdFilter = mainMenuConfig?.categories_with_products && categoryIdsWithProducts.size > 0;
     const findNode = (nodes, id) => {
       for (const n of (nodes || [])) {
         if (String(n.id) === String(id)) return n;
@@ -906,7 +891,7 @@ export default function ShopHeader() {
     const parent = findNode(categoryTree, drillCategoryId);
     if (!parent || !Array.isArray(parent.children)) return [];
     return parent.children
-      .filter((n) => n && (!useProdFilter || categoryIdsWithProducts.has(normCatId(n.id))))
+      .filter((n) => n)
       .map((n) => ({
         key: String(n.id),
         id: String(n.id),
@@ -916,7 +901,7 @@ export default function ShopHeader() {
       }))
       .filter((r) => r.slug)
       .sort((a, b) => String(a.label).localeCompare(String(b.label), locale));
-  }, [drillCategoryId, categoryTree, categoryIdsWithProducts, mainMenuConfig, locale]);
+  }, [drillCategoryId, categoryTree, locale]);
 
   const categoryPanelRows = browseRootsFromTree.map((r) => ({
     key: r.key,
@@ -928,8 +913,21 @@ export default function ShopHeader() {
 
   // Root-level menu items (no parent) for direct link rendering
   const menuPanelItems = useMemo(
-    () => (mainMenuAllItems || []).filter((i) => !i?.parent_id),
-    [mainMenuAllItems],
+    () =>
+      (mainMenuAllItems || [])
+        .filter((i) => !i?.parent_id)
+        .filter((i) => {
+          if (String(i?.link_type || "").toLowerCase() !== "category") return true;
+          const ref = categoryRefFromMenuItem(i);
+          if (!ref) return false;
+          // Only active/visible categories are present in categorySlugToId map.
+          if (categorySlugToId.has(ref)) return true;
+          for (const id of categorySlugToId.values()) {
+            if (String(id).toLowerCase() === ref) return true;
+          }
+          return false;
+        }),
+    [mainMenuAllItems, categorySlugToId],
   );
   const showCategoriesMode = Boolean(mainMenuConfig?.categories_with_products);
 
@@ -997,10 +995,17 @@ export default function ShopHeader() {
                       ) : drillRows.map((row) => (
                         <CategoryRow
                           key={row.key}
-                          as={Link}
-                          href={`/kollektion/${row.slug}`}
+                          type="button"
                           style={{ paddingLeft: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                          onClick={() => { setMainMenuOpen(false); setDrillCategoryId(null); }}
+                          onClick={() => {
+                            if (row.hasChildren) {
+                              setDrillCategoryId(row.id);
+                            } else {
+                              setMainMenuOpen(false);
+                              setDrillCategoryId(null);
+                              router.push(`/kollektion/${row.slug}`);
+                            }
+                          }}
                         >
                           <span>{row.label}</span>
                           {row.hasChildren && <span style={{ fontSize: 16, color: tokens.dark[400] }}>›</span>}
@@ -1010,11 +1015,6 @@ export default function ShopHeader() {
                   ) : (
                     // Root level — show parent categories
                     <>
-                      {pendingBrowseTarget?.href ? (
-                        <div style={{ padding: "6px 14px 10px", fontSize: 12, color: tokens.dark[600], borderBottom: `1px solid ${tokens.border.light}` }}>
-                          {tNav("categoryPendingHint", { label: pendingBrowseTarget.label })}
-                        </div>
-                      ) : null}
                       {categoryPanelRows.map((row) =>
                         row.href && row.href !== "#" ? (
                           <CategoryRow
@@ -1026,8 +1026,8 @@ export default function ShopHeader() {
                                 // Drill into children
                                 setDrillCategoryId(row.id);
                               } else {
-                                setPendingBrowseTarget({ href: row.href, label: row.label });
                                 setMainMenuOpen(false);
+                                router.push(row.href);
                               }
                             }}
                           >
@@ -1045,12 +1045,7 @@ export default function ShopHeader() {
                   <SearchBarButton
                     type="button"
                     aria-label="Suchen"
-                    onClick={() => {
-                      if (pendingBrowseTarget?.href) {
-                        router.push(pendingBrowseTarget.href);
-                        setPendingBrowseTarget(null);
-                      }
-                    }}
+                    onClick={() => {}}
                   >
                     <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" style={{ minWidth: 20, height: 20 }}>
                       <path d="M17.545 15.467l-3.779-3.779c0.57-0.935 0.898-2.035 0.898-3.21 0-3.417-2.961-6.377-6.378-6.377s-6.186 2.769-6.186 6.186c0 3.416 2.961 6.377 6.377 6.377 1.137 0 2.2-0.309 3.115-0.844l3.799 3.801c0.372 0.371 0.975 0.371 1.346 0l0.943-0.943c0.371-0.371 0.236-0.84-0.135-1.211zM4.004 8.287c0-2.366 1.917-4.283 4.282-4.283s4.474 2.107 4.474 4.474c0 2.365-1.918 4.283-4.283 4.283s-4.473-2.109-4.473-4.474z" />

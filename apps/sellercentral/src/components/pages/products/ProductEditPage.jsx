@@ -325,7 +325,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      client.getAdminHubCategories({ all: true }).then((r) => r.categories || []).catch(() => []),
+      client.getAdminHubCategories().then((r) => r.categories || []).catch(() => []),
       client.getMedusaCollections({ adminHub: true }).then((r) => r.collections || []).catch(() => []),
       client.getBrands().then((r) => r.brands || []).catch(() => []),
     ]).then(([categoriesList, collectionsList, brandsList]) => {

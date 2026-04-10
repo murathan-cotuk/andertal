@@ -39,6 +39,9 @@ function slugFromTitle(title) {
     .replace(/[^a-z0-9-]/g, "");
 }
 
+// Backward-compatible alias used in older handlers.
+const pageSlugFromTitle = slugFromTitle;
+
 /**
  * @param {{ blogOnly?: boolean }} props — blogOnly: nur Blog; sonst nur normale Seiten (gleiche Tabelle admin_hub_pages, getrennt über page_type)
  */

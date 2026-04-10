@@ -18,7 +18,7 @@ export async function GET(
 
     if (slug && typeof slug === "string") {
       const category = await adminHubService.getCategoryBySlug(slug)
-      if (!category) {
+      if (!category || category.active === false || category.is_visible === false) {
         res.status(404).json({ message: "Category not found" })
         return
       }
@@ -44,7 +44,7 @@ export async function GET(
       return
     }
 
-    const filters: any = {}
+    const filters: any = { active: true }
     if (is_visible !== undefined) {
       filters.is_visible = is_visible === "true"
     }

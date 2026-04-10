@@ -177,7 +177,7 @@ const CartNotice = styled.div`
 `;
 
 const DescriptionPreview = styled.p`
-  margin: 8px 0 0;
+  margin: 2px 0 0;
   font-size: 12.5px;
   color: #6b7280;
   line-height: 1.45;
@@ -189,7 +189,7 @@ const DescriptionPreview = styled.p`
 `;
 
 const ReviewRow = styled.div`
-  margin-top: 8px;
+  margin-top: 2px;
   min-height: 22px;
 `;
 
@@ -235,7 +235,7 @@ const Name = styled.h3`
   font-weight: 500;
   color: #111;
   line-height: 1.4;
-  margin: 0 0 5px;
+  margin: 0 0 3px;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -246,7 +246,7 @@ const Prices = styled.div`
   display: flex;
   align-items: baseline;
   gap: 7px;
-  margin-bottom: 7px;
+  margin-bottom: 2px;
 `;
 
 const CurrentPrice = styled.span`
@@ -265,19 +265,19 @@ const OriginalPrice = styled.span`
 const VariantGroups = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 5px;
 `;
 
 const VGroupRow = styled.div``;
 
 const VGroupLabel = styled.div`
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #999;
-  margin-bottom: 3px;
+  color: #00000;
+  margin-bottom: 5px;
 `;
 
 /* Variant pills */

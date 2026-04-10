@@ -151,6 +151,10 @@ function getMenuItemsSettings(t, isSuperuser = false) {
 const PARENT_NAV_URLS = new Set([
   "/products", "/marketing", "/content", "/analytics", "/customers-menu", "/sellers-menu", "/discounts",
 ]);
+const NAV_VIRTUAL_URL_FALLBACK = {
+  "/customers-menu": "/customers",
+  "/sellers-menu": "/sellers",
+};
 
 const isModifiedOrNewTabClick = (e) => {
   if (!e) return false;
@@ -164,6 +168,7 @@ const isModifiedOrNewTabClick = (e) => {
 };
 
 const NextLink = forwardRef(function NextLink({ url, children, external, onClick, ...rest }, ref) {
+  const href = NAV_VIRTUAL_URL_FALLBACK[url] || (url || "");
   const handleClick = (e) => {
     // Keep browser-native new-tab behavior (Ctrl/Cmd click, middle click, etc.)
     if (isModifiedOrNewTabClick(e)) {
@@ -176,7 +181,7 @@ const NextLink = forwardRef(function NextLink({ url, children, external, onClick
     onClick?.(e);
   };
   return (
-    <Link href={url || ""} ref={ref} onClick={handleClick} {...rest}>
+    <Link href={href} ref={ref} onClick={handleClick} {...rest}>
       {children}
     </Link>
   );
@@ -184,6 +189,7 @@ const NextLink = forwardRef(function NextLink({ url, children, external, onClick
 
 const UnsavedAwareLink = forwardRef(function UnsavedAwareLink({ url, children, external, onClick, ...rest }, ref) {
   const ctx = useUnsavedChanges();
+  const href = NAV_VIRTUAL_URL_FALLBACK[url] || (url || "#");
   const handleClick = (e) => {
     // Do not block browser-native new-tab actions.
     if (isModifiedOrNewTabClick(e)) {
@@ -203,7 +209,7 @@ const UnsavedAwareLink = forwardRef(function UnsavedAwareLink({ url, children, e
     onClick?.(e);
   };
   return (
-    <Link ref={ref} href={url || "#"} onClick={handleClick} {...rest}>
+    <Link ref={ref} href={href} onClick={handleClick} {...rest}>
       {children}
     </Link>
   );
@@ -252,6 +258,7 @@ export default function PolarisLayout({ children }) {
   const [platformBranding, setPlatformBranding] = useState({
     sellercentral_logo_url: "",
     sellercentral_favicon_url: "",
+    sellercentral_logo_height: 30,
   });
 
   useEffect(() => {
@@ -268,6 +275,7 @@ export default function PolarisLayout({ children }) {
         setPlatformBranding({
           sellercentral_logo_url: d?.sellercentral_logo_url || "",
           sellercentral_favicon_url: d?.sellercentral_favicon_url || "",
+          sellercentral_logo_height: d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 30,
         });
       })
       .catch(() => {});
@@ -497,13 +505,6 @@ export default function PolarisLayout({ children }) {
       onNavigationToggle={() => setShowMobileNav((v) => !v)}
       userMenu={
         <div style={{ display: "flex", alignItems: "center", gap: 4, height: 56 }}>
-          {platformBranding.sellercentral_logo_url && (
-            <img
-              src={platformBranding.sellercentral_logo_url}
-              alt="Sellercentral logo"
-              style={{ height: 30, width: "auto", maxWidth: 140, objectFit: "contain", marginRight: 4, flexShrink: 0 }}
-            />
-          )}
           {/* Language selector */}
           {langSelector}
 
@@ -594,7 +595,16 @@ export default function PolarisLayout({ children }) {
         </div>
       }
       searchField={
-        <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 520 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 680 }}>
+          {platformBranding.sellercentral_logo_url && (
+            <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
+              <img
+                src={platformBranding.sellercentral_logo_url}
+                alt="Sellercentral logo"
+                style={{ height: platformBranding.sellercentral_logo_height || 30, width: "auto", maxWidth: 220, objectFit: "contain" }}
+              />
+            </Link>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <GroupedDropdownSearch placeholder="Search products, orders, customers..." />
           </div>
@@ -718,35 +728,71 @@ export default function PolarisLayout({ children }) {
   );
 
   const linkComponent = unsaved ? UnsavedAwareLink : NextLink;
+  const bannerI18n = locale === "tr"
+    ? {
+        completeVerification: "Satışa başlayabilmek için doğrulama adımlarına geçin",
+        goVerification: "Doğrulamaya git",
+        suspended: "hesabınız askıya alındı. lütfen destek ile iletişime geçin",
+        rejected: "hesabınız reddedildi. lütfen evrakları kontrol edip destek ile iletişime geçin.",
+        docsSubmitted: "evraklar gönderildi. hesabınız inceleme altında.",
+        pending: "hesabınız onay bekliyor. inceleme sonrası bilgilendirileceksiniz.",
+      }
+    : locale === "de"
+      ? {
+          completeVerification: "Gehe zu den Verifizierungsschritten, um mit dem Verkauf zu starten",
+          goVerification: "Zur Verifizierung",
+          suspended: "your account is suspended. please contact with support",
+          rejected: "your account was rejected. please review your documents and contact support.",
+          docsSubmitted: "documents submitted. your account is under review.",
+          pending: "your account is pending approval. you will be notified after review.",
+        }
+      : {
+          completeVerification: "Go to verification steps to start selling",
+          goVerification: "Go to verification",
+          suspended: "your account is suspended. please contact with support",
+          rejected: "your account was rejected. please review your documents and contact support.",
+          docsSubmitted: "documents submitted. your account is under review.",
+          pending: "your account is pending approval. you will be notified after review.",
+        };
   const approvalBanner = !isSuperuser ? (() => {
     const status = String(approvalStatus || "").toLowerCase();
-    if (!status || status === "approved" || status === "active" || status === "registered") return null;
+    if (!status) return null;
+    if (status === "registered") {
+      return {
+        background: "#f59e0b",
+        color: "#111827",
+        text: bannerI18n.completeVerification,
+        actionLabel: bannerI18n.goVerification,
+        actionHref: "/settings/verification",
+      };
+    }
+    if (status === "approved" || status === "active") return null;
     if (status === "suspended") {
       return {
         background: "#dc2626",
         color: "#fff",
-        text: "your account is suspended. please contact with support",
+        text: bannerI18n.suspended,
       };
     }
     if (status === "rejected") {
       return {
         background: "#ef4444",
         color: "#fff",
-        text: "your account was rejected. please review your documents and contact support.",
+        text: bannerI18n.rejected,
       };
     }
     if (status === "documents_submitted") {
       return {
         background: "#d97706",
         color: "#fff",
-        text: "documents submitted. your account is under review.",
+        text: bannerI18n.docsSubmitted,
       };
     }
     if (status === "pending_approval" || status === "pending") {
       return {
         background: "#2563eb",
         color: "#fff",
-        text: "your account is pending approval. you will be notified after review.",
+        text: bannerI18n.pending,
       };
     }
     return {
@@ -775,7 +821,24 @@ export default function PolarisLayout({ children }) {
               padding: "10px 16px",
             }}
           >
-            {approvalBanner.text}
+            <span>{approvalBanner.text}</span>
+            {approvalBanner.actionHref && (
+              <button
+                type="button"
+                onClick={() => router.push(approvalBanner.actionHref)}
+                style={{
+                  marginLeft: 12,
+                  border: "none",
+                  background: "transparent",
+                  color: approvalBanner.color,
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  textDecoration: "underline",
+                }}
+              >
+                {approvalBanner.actionLabel} {"\u2192"}
+              </button>
+            )}
           </div>
         )}
         {unsaved?.showNavigateConfirm && (

@@ -30,6 +30,27 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function parseDocuments(raw) {
+  try {
+    if (!raw) return [];
+    const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Array.isArray(arr) ? arr : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function detectDocTypeLabel(doc) {
+  const hay = `${doc?.name || ""} ${doc?.type || ""} ${doc?.kind || ""}`.toLowerCase();
+  if (hay.includes("vertrag") || hay.includes("contract") || hay.includes("agreement")) return "Vertrag / Agreement";
+  if (hay.includes("sign") || hay.includes("imza") || hay.includes("signature")) return "Unterschrift / Signature";
+  if (hay.includes("pass") || hay.includes("passport")) return "Pass / Passport";
+  if (hay.includes("id") || hay.includes("ausweis") || hay.includes("kimlik")) return "ID / Ausweis";
+  if (hay.includes("handels") || hay.includes("register")) return "Handelsregister";
+  if (hay.includes("steuer") || hay.includes("tax") || hay.includes("vat")) return "Steuer / VAT";
+  return "Dokument";
+}
+
 function fmtMonth(d) {
   if (!d) return "";
   const dt = new Date(d);
@@ -333,6 +354,7 @@ ${"=".repeat(50)}
   const periodCommissionCents = periodTransactions.reduce((sum, t) => sum + (t.commission_cents || 0), 0);
   const periodPayoutCents = periodTransactions.reduce((sum, t) => sum + (t.payout_cents || 0), 0);
   const periodEligibleCount = periodTransactions.filter((t) => t.payout_eligible).length;
+  const sellerDocs = parseDocuments(seller.documents);
 
   return (
     <Page
@@ -584,14 +606,26 @@ ${"=".repeat(50)}
               {/* ── COMPANY TAB ──────────────────────────────────── */}
               {activeTab === 3 && (
                 <BlockStack gap="400">
+                  <Banner tone="info">
+                    Firmendaten-Review: Bitte Gesellschaftsdaten, rechtliche Zustimmung und hochgeladene Nachweise (Vertrag, Unterschrift, Pass/ID usw.) prüfen.
+                  </Banner>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
                     <BlockStack gap="100">
                       <Text as="h3" variant="headingSm">Firmendaten</Text>
                       <InfoRow label="Firmenname" value={seller.company_name} />
+                      <InfoRow label="Bevollmächtigte Person" value={seller.authorized_person_name} />
                       <InfoRow label="Steuer-Nr." value={seller.tax_id} />
                       <InfoRow label="USt-IdNr." value={seller.vat_id} />
                       <InfoRow label="Telefon" value={seller.phone} />
                       <InfoRow label="Website" value={seller.website} />
+                      <InfoRow label="IBAN" value={seller.iban ? seller.iban.replace(/(.{4})/g, "$1 ").trim() : null} />
+                    </BlockStack>
+                    <BlockStack gap="100">
+                      <Text as="h3" variant="headingSm">Rechtliche Zustimmung</Text>
+                      <InfoRow label="Agreement akzeptiert" value={seller.agreement_accepted ? "Ja" : "Nein"} />
+                      <InfoRow label="Akzeptiert am" value={fmtDate(seller.agreement_accepted_at)} />
+                      <InfoRow label="Version" value={seller.agreement_version} />
+                      <InfoRow label="IP" value={seller.agreement_ip} />
                     </BlockStack>
                     <BlockStack gap="100">
                       <Text as="h3" variant="headingSm">Geschäftsadresse</Text>
@@ -602,18 +636,40 @@ ${"=".repeat(50)}
                       <AddressBlock addr={seller.warehouse_address} />
                     </BlockStack>
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">Dokumente</Text>
-                      {seller.documents && seller.documents.length > 0 ? (
+                      <InlineStack align="space-between" blockAlign="center">
+                        <Text as="h3" variant="headingSm">Dokumente & Nachweise</Text>
+                        <Badge tone={sellerDocs.length > 0 ? "success" : "attention"}>{sellerDocs.length}</Badge>
+                      </InlineStack>
+                      {sellerDocs.length > 0 ? (
                         <BlockStack gap="100">
-                          {(typeof seller.documents === "string" ? JSON.parse(seller.documents) : seller.documents).map((doc, i) => (
-                            <a key={i} href={doc.url || doc} target="_blank" rel="noopener noreferrer"
-                              style={{ color: "#2563eb", fontSize: 13 }}>
-                              {doc.name || `Dokument ${i + 1}`}
-                            </a>
-                          ))}
+                          {sellerDocs.map((doc, i) => {
+                            const url = typeof doc === "string" ? doc : (doc?.url || "");
+                            const name = typeof doc === "string" ? `Dokument ${i + 1}` : (doc?.name || `Dokument ${i + 1}`);
+                            const typeLabel = detectDocTypeLabel(doc);
+                            return (
+                              <div key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px" }}>
+                                <InlineStack align="space-between" blockAlign="start">
+                                  <BlockStack gap="050">
+                                    <Text as="p" variant="bodyMd" fontWeight="semibold">{name}</Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">{typeLabel}</Text>
+                                    {doc?.uploaded_at && <Text as="p" variant="bodySm" tone="subdued">Upload: {fmtDate(doc.uploaded_at)}</Text>}
+                                  </BlockStack>
+                                  {url ? (
+                                    <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", fontSize: 13 }}>
+                                      Öffnen
+                                    </a>
+                                  ) : (
+                                    <Text as="span" tone="subdued">Kein Link</Text>
+                                  )}
+                                </InlineStack>
+                              </div>
+                            );
+                          })}
                         </BlockStack>
                       ) : (
-                        <Text as="p" tone="subdued">Keine Dokumente hochgeladen.</Text>
+                        <Banner tone="warning">
+                          Keine Dokumente hochgeladen. Für rechtssichere Freigabe bitte Vertrag, Unterschrift und Ausweis-/Pass-Nachweise anfordern.
+                        </Banner>
                       )}
                     </BlockStack>
                   </div>

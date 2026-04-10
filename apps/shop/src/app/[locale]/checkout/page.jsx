@@ -1207,9 +1207,12 @@ export default function CheckoutPage() {
     setClientSecret(null);
     setPayCents(null);
     const effectiveShippingCents = isFreeShipping ? 0 : (shippingCents ?? 0);
+    const customerToken = getToken("customer");
+    const paymentIntentHeaders = { "Content-Type": "application/json" };
+    if (customerToken) paymentIntentHeaders.Authorization = `Bearer ${customerToken}`;
     fetch("/api/store-payment-intent", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: paymentIntentHeaders,
       body: JSON.stringify({ cart_id: cart.id, shipping_cents: effectiveShippingCents }),
     })
       .then((r) => r.json())

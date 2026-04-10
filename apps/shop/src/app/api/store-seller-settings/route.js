@@ -22,11 +22,13 @@ export async function GET(req) {
         shop_favicon_url: data?.shop_favicon_url || "",
         sellercentral_logo_url: data?.sellercentral_logo_url || "",
         sellercentral_favicon_url: data?.sellercentral_favicon_url || "",
+        shop_logo_height: data?.shop_logo_height != null ? Number(data.shop_logo_height) : 34,
+        sellercentral_logo_height: data?.sellercentral_logo_height != null ? Number(data.sellercentral_logo_height) : 30,
       },
       { status: r.ok ? 200 : r.status }
     );
   } catch (e) {
-    return NextResponse.json({ store_name: "", shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "" }, { status: 200 });
+    return NextResponse.json({ store_name: "", shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "", shop_logo_height: 34, sellercentral_logo_height: 30 }, { status: 200 });
   }
 }
 

@@ -968,7 +968,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
 
   useEffect(() => {
     client.getMedusaCollections({ adminHub: true }).then((r) => setCollections(r.collections || [])).catch(() => setCollections([]));
-    client.getAdminHubCategories({ all: true }).then((r) => setCategories(r.categories || [])).catch(() => setCategories([]));
+    client.getAdminHubCategories().then((r) => setCategories(r.categories || [])).catch(() => setCategories([]));
     client.getAdminHubProducts().then((r) => {
       const list = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
       setProducts(list);

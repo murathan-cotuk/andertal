@@ -80,6 +80,275 @@ function StatBox({ label, value, sub, tone }) {
   );
 }
 
+// ── IBAN Helpers ──────────────────────────────────────────────────────────────
+function validateIban(raw) {
+  const v = raw.replace(/\s/g, "").toUpperCase();
+  if (!v) return { ok: false, error: "IBAN darf nicht leer sein." };
+  if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,}$/.test(v))
+    return { ok: false, error: "Ungültiges IBAN-Format (z.B. DE89 3704 0044 0532 0130 00)." };
+  if (v.length < 15 || v.length > 34)
+    return { ok: false, error: "IBAN-Länge ungültig." };
+  return { ok: true, error: null };
+}
+function maskIban(iban) {
+  const v = (iban || "").replace(/\s/g, "").toUpperCase();
+  if (v.length < 6) return v;
+  return `${v.slice(0, 4)} •••• •••• ${v.slice(-4)}`;
+}
+function formatIbanInput(raw) {
+  const v = raw.replace(/\s/g, "").toUpperCase();
+  return v.match(/.{1,4}/g)?.join(" ") || v;
+}
+
+// ── IBAN Management Card ───────────────────────────────────────────────────────
+function IbanSection({ commissionRate }) {
+  const client = getMedusaAdminClient();
+  const sellerPct = Math.round((1 - (commissionRate ?? 0.12)) * 100);
+  const platformPct = 100 - sellerPct;
+
+  const [loading, setLoading]       = useState(true);
+  const [saving, setSaving]         = useState(false);
+  const [editing, setEditing]       = useState(false);
+  const [err, setErr]               = useState("");
+  const [ok, setOk]                 = useState("");
+  const [ibanError, setIbanError]   = useState("");
+  const [stripeConnect, setStripeConnect] = useState(null);
+
+  const [savedIban, setSavedIban]           = useState("");
+  const [savedHolder, setSavedHolder]       = useState("");
+  const [savedBic, setSavedBic]             = useState("");
+  const [savedBankName, setSavedBankName]   = useState("");
+
+  const [iban, setIban]             = useState("");
+  const [holder, setHolder]         = useState("");
+  const [bic, setBic]               = useState("");
+  const [bankName, setBankName]     = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const account = await client.getSellerAccount();
+        const s = account?.sellerUser || account?.user || {};
+        const iv = s.iban || "";
+        setSavedIban(iv); setIban(iv);
+        setSavedHolder(s.payment_account_holder || ""); setHolder(s.payment_account_holder || "");
+        setSavedBic(s.payment_bic || ""); setBic(s.payment_bic || "");
+        setSavedBankName(s.payment_bank_name || ""); setBankName(s.payment_bank_name || "");
+      } catch (_) {}
+      try {
+        const sc = await client.stripeConnectStatus();
+        setStripeConnect(sc || null);
+      } catch (_) {}
+      finally { setLoading(false); }
+    })();
+  }, [client]);
+
+  const handleSave = async () => {
+    setErr(""); setOk(""); setIbanError("");
+    const trimmed = iban.replace(/\s/g, "").toUpperCase();
+    if (trimmed) {
+      const { ok: valid, error: ie } = validateIban(trimmed);
+      if (!valid) { setIbanError(ie); return; }
+    }
+    setSaving(true);
+    try {
+      await client.updateSellerIban(trimmed || null);
+      try {
+        await client.updateSellerCompanyInfo({
+          payment_account_holder: holder.trim() || null,
+          payment_bic: bic.replace(/\s/g, "").toUpperCase() || null,
+          payment_bank_name: bankName.trim() || null,
+        });
+      } catch (_) {}
+      setSavedIban(trimmed); setSavedHolder(holder.trim());
+      setSavedBic(bic.replace(/\s/g, "").toUpperCase()); setSavedBankName(bankName.trim());
+      setOk("Bankdaten gespeichert."); setEditing(false);
+    } catch (e) { setErr(e?.message || "Fehler beim Speichern."); }
+    finally { setSaving(false); }
+  };
+
+  const handleCancel = () => {
+    setIban(savedIban); setHolder(savedHolder); setBic(savedBic); setBankName(savedBankName);
+    setIbanError(""); setErr(""); setEditing(false);
+  };
+
+  if (loading) return null;
+
+  return (
+    <Box paddingBlockEnd="400">
+      {ok  && <Box paddingBlockEnd="300"><Banner tone="success" onDismiss={() => setOk("")}>{ok}</Banner></Box>}
+      {err && <Box paddingBlockEnd="300"><Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner></Box>}
+
+      {/* How payouts work */}
+      <Box paddingBlockEnd="400">
+        <div style={{ background: "#f9fafb", borderRadius: 12, border: "1px solid #f3f4f6", padding: "20px 24px" }}>
+          <BlockStack gap="300">
+            <Text as="p" variant="bodyMd" fontWeight="semibold">💳 So funktionieren Auszahlungen</Text>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              {[
+                { n: "1", label: "Kunde kauft", desc: "Zahlung geht über Stripe." },
+                { n: "2", label: "Sperrfrist", desc: "Auszahlung wird nach Lieferung +14 Tagen freigegeben." },
+                { n: "3", label: "Auszahlung", desc: stripeConnect?.onboarding_complete ? "Stripe Connect zahlt automatisch auf dein verbundenes Bankkonto aus." : "Bitte Stripe Connect Onboarding abschließen, damit Auszahlungen laufen." },
+              ].map(({ n, label, desc }) => (
+                <div key={n} style={{ background: "#fff", borderRadius: 8, padding: "12px 14px", border: "1px solid #e5e7eb" }}>
+                  <InlineStack gap="200" blockAlign="center">
+                    <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#111827", color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{n}</span>
+                    <Text as="span" variant="bodySm" fontWeight="semibold">{label}</Text>
+                  </InlineStack>
+                  <Box paddingBlockStart="100">
+                    <Text as="p" variant="bodySm" tone="subdued">{desc}</Text>
+                  </Box>
+                </div>
+              ))}
+            </div>
+          </BlockStack>
+        </div>
+      </Box>
+
+      {stripeConnect?.connected && (
+        <Box paddingBlockEnd="300">
+          <Banner tone={stripeConnect?.onboarding_complete ? "success" : "warning"}>
+            {stripeConnect?.onboarding_complete
+              ? "Stripe Connect ist aktiv. Auszahlungen laufen über das bei Stripe hinterlegte Bankkonto."
+              : "Stripe Connect verbunden, aber Onboarding noch unvollständig. Bitte unter Settings > Stripe Connect abschließen."}
+          </Banner>
+        </Box>
+      )}
+
+      {stripeConnect?.payout_bank?.last4 && (
+        <Box paddingBlockEnd="300">
+          <Card>
+            <BlockStack gap="100">
+              <Text as="h3" variant="headingSm">Stripe-Auszahlungskonto (synchronisiert)</Text>
+              <Text as="p" variant="bodySm">Bank: {stripeConnect.payout_bank.bank_name || "—"}</Text>
+              <Text as="p" variant="bodySm">Kontoinhaber: {stripeConnect.payout_bank.holder_name || "—"}</Text>
+              <Text as="p" variant="bodySm">Letzte 4: {`•••• ${stripeConnect.payout_bank.last4}`}</Text>
+              <Text as="p" variant="bodySm">Land / Währung: {`${(stripeConnect.payout_bank.country || "—").toUpperCase()} / ${(stripeConnect.payout_bank.currency || "—").toUpperCase()}`}</Text>
+            </BlockStack>
+          </Card>
+        </Box>
+      )}
+
+      {/* IBAN card */}
+      <Card>
+        <BlockStack gap="400">
+          <InlineStack align="space-between" blockAlign="center">
+            <BlockStack gap="050">
+              <Text as="h2" variant="headingMd">Bankkonto für Auszahlungen</Text>
+              <Text as="p" tone="subdued" variant="bodySm">An dieses Konto werden deine Verkaufserlöse überwiesen.</Text>
+            </BlockStack>
+            {!editing && (
+              <Button onClick={() => setEditing(true)} size="slim">
+                {savedIban ? "Bearbeiten" : "Hinzufügen"}
+              </Button>
+            )}
+          </InlineStack>
+
+          {/* Saved display */}
+          {!editing && (
+            savedIban ? (
+              <div style={{ background: "#f9fafb", borderRadius: 10, padding: "16px 20px", border: "1px solid #f3f4f6" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px" }}>
+                  <BlockStack gap="050">
+                    <Text as="p" variant="bodySm" tone="subdued">IBAN</Text>
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">{maskIban(savedIban)}</Text>
+                  </BlockStack>
+                  {savedHolder && (
+                    <BlockStack gap="050">
+                      <Text as="p" variant="bodySm" tone="subdued">Kontoinhaber</Text>
+                      <Text as="p" variant="bodyMd">{savedHolder}</Text>
+                    </BlockStack>
+                  )}
+                  {savedBic && (
+                    <BlockStack gap="050">
+                      <Text as="p" variant="bodySm" tone="subdued">BIC / SWIFT</Text>
+                      <Text as="p" variant="bodyMd">{savedBic}</Text>
+                    </BlockStack>
+                  )}
+                  {savedBankName && (
+                    <BlockStack gap="050">
+                      <Text as="p" variant="bodySm" tone="subdued">Bank</Text>
+                      <Text as="p" variant="bodyMd">{savedBankName}</Text>
+                    </BlockStack>
+                  )}
+                </div>
+                <Box paddingBlockStart="200">
+                  <InlineStack gap="150" blockAlign="center">
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", flexShrink: 0, display: "inline-block" }} />
+                    <Text as="p" variant="bodySm" tone="success">Bankkonto hinterlegt — bereit für Auszahlungen</Text>
+                  </InlineStack>
+                </Box>
+              </div>
+            ) : (
+              <div style={{ background: "#fffbeb", borderRadius: 10, padding: "16px 20px", border: "1px solid #fde68a" }}>
+                <InlineStack gap="300" blockAlign="center">
+                  <Text as="span" variant="headingLg">⚠️</Text>
+                  <BlockStack gap="050">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">Kein Bankkonto hinterlegt</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Ohne IBAN können keine Auszahlungen an dich verarbeitet werden.
+                    </Text>
+                  </BlockStack>
+                </InlineStack>
+              </div>
+            )
+          )}
+
+          {/* Edit form */}
+          {editing && (
+            <BlockStack gap="300">
+              <Box borderBlockStartWidth="025" borderColor="border-subdued" paddingBlockStart="300">
+                <BlockStack gap="300">
+                  <TextField
+                    label="IBAN *"
+                    value={formatIbanInput(iban)}
+                    onChange={(v) => { setIban(v.replace(/\s/g, "").toUpperCase()); setIbanError(""); }}
+                    error={ibanError}
+                    placeholder="DE89 3704 0044 0532 0130 00"
+                    helpText="Internationale Bankkontonummer — Leerzeichen werden automatisch formatiert"
+                    autoComplete="off"
+                  />
+                  <TextField
+                    label="Kontoinhaber"
+                    value={holder}
+                    onChange={setHolder}
+                    placeholder="Max Mustermann oder Musterfirma GmbH"
+                    autoComplete="off"
+                  />
+                  <InlineStack gap="300">
+                    <div style={{ flex: 1 }}>
+                      <TextField
+                        label="BIC / SWIFT (optional)"
+                        value={bic}
+                        onChange={(v) => setBic(v.toUpperCase())}
+                        placeholder="COBADEFFXXX"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <TextField
+                        label="Bankname (optional)"
+                        value={bankName}
+                        onChange={setBankName}
+                        placeholder="Commerzbank AG"
+                        autoComplete="off"
+                      />
+                    </div>
+                  </InlineStack>
+                </BlockStack>
+              </Box>
+              <InlineStack align="end" gap="200">
+                <Button onClick={handleCancel} disabled={saving}>Abbrechen</Button>
+                <Button variant="primary" onClick={handleSave} loading={saving}>Bankdaten speichern</Button>
+              </InlineStack>
+            </BlockStack>
+          )}
+        </BlockStack>
+      </Card>
+    </Box>
+  );
+}
+
 // ── SELLER VIEW ───────────────────────────────────────────────────────────────
 function SellerPaymentsView() {
   const [periodKey, setPeriodKey] = useState(PERIODS[0].key);
@@ -346,6 +615,7 @@ function SellerPaymentsView() {
 function AdminPaymentsView() {
   const [periodKey, setPeriodKey] = useState(PERIODS[0].key);
   const [sellers, setSellers] = useState([]);
+  const [txRows, setTxRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [paying, setPaying] = useState(null);
@@ -355,11 +625,19 @@ function AdminPaymentsView() {
   const loadData = useCallback(async () => {
     setLoading(true); setErr("");
     try {
-      const res = await getMedusaAdminClient().getAdminPayoutOverview({
-        period_start: selectedPeriod.start,
-        period_end: selectedPeriod.end,
-      });
-      setSellers(res?.sellers || []);
+      const [overview, tx] = await Promise.all([
+        getMedusaAdminClient().getAdminPayoutOverview({
+          period_start: selectedPeriod.start,
+          period_end: selectedPeriod.end,
+        }),
+        getMedusaAdminClient().getTransactions({
+          include_pending: "true",
+          period_start: selectedPeriod.start,
+          period_end: selectedPeriod.end,
+        }),
+      ]);
+      setSellers(overview?.sellers || []);
+      setTxRows(tx?.transactions || []);
     } catch (e) {
       setErr(e?.message || "Fehler beim Laden");
     } finally {
@@ -396,6 +674,11 @@ function AdminPaymentsView() {
   const totalPayout = sellers.reduce((s, x) => s + (x.payout_cents || 0), 0);
   const totalPaid = sellers.filter((s) => s.status === "bezahlt" || s.status === "paid").reduce((acc, x) => acc + (x.payout_cents || 0), 0);
   const totalPending = totalPayout - totalPaid;
+  const txByTransferStatus = txRows.reduce((acc, t) => {
+    const k = String(t?.stripe_transfer_status || "unknown");
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
 
   const periodOptions = PERIODS.map((p) => ({ label: p.label, value: p.key }));
 
@@ -507,6 +790,65 @@ function AdminPaymentsView() {
                       </div>
                     );
                   })}
+                </>
+              )}
+            </Card>
+          </Box>
+
+          <Box paddingBlockStart="400">
+            <Card padding="0">
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text variant="headingMd" as="h2">Stripe Transfer Monitor</Text>
+                  <InlineStack gap="200">
+                    <Badge tone="success">completed: {txByTransferStatus.completed || 0}</Badge>
+                    <Badge tone="warning">pending: {txByTransferStatus.pending || 0}</Badge>
+                    <Badge tone="attention">waiting_onboarding: {txByTransferStatus.waiting_onboarding || 0}</Badge>
+                    <Badge tone="critical">failed: {txByTransferStatus.failed || 0}</Badge>
+                  </InlineStack>
+                </InlineStack>
+              </div>
+              {txRows.length === 0 ? (
+                <Box padding="500">
+                  <Text tone="subdued" alignment="center">Keine Transferdaten im Zeitraum.</Text>
+                </Box>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.1fr 110px 130px 150px 1.4fr", gap: 8, padding: "10px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
+                    <div>Order</div>
+                    <div>Seller</div>
+                    <div style={{ textAlign: "right" }}>Payout</div>
+                    <div>Status</div>
+                    <div>Transfer ID</div>
+                    <div>Fehler</div>
+                  </div>
+                  {txRows.slice(0, 200).map((t, i) => (
+                    <div key={`${t.id || ""}-${i}`} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.1fr 110px 130px 150px 1.4fr", gap: 8, padding: "11px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>#{t.order_number || t.id}</div>
+                        <div style={{ color: "#6b7280", fontSize: 12 }}>Teslim: {fmtDate(t.delivery_date)}</div>
+                      </div>
+                      <div>{t.store_name || t.seller_id}</div>
+                      <div style={{ textAlign: "right" }}>{fmt(t.payout_cents || 0)}</div>
+                      <div>
+                        <Badge tone={
+                          t.stripe_transfer_status === "completed" ? "success" :
+                          t.stripe_transfer_status === "failed" ? "critical" :
+                          t.stripe_transfer_status === "waiting_onboarding" ? "attention" : "warning"
+                        }>
+                          {String(t.stripe_transfer_status || "pending")}
+                        </Badge>
+                      </div>
+                      <div>
+                        <code style={{ fontSize: 11, background: "#f3f4f6", padding: "2px 5px", borderRadius: 4, color: "#374151" }}>
+                          {t.stripe_transfer_id || "—"}
+                        </code>
+                      </div>
+                      <div style={{ color: "#b91c1c", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {t.stripe_transfer_error || "—"}
+                      </div>
+                    </div>
+                  ))}
                 </>
               )}
             </Card>

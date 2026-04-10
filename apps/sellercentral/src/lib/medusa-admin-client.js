@@ -264,6 +264,8 @@ class MedusaAdminClient {
       shop_favicon_url: res?.shop_favicon_url ?? '',
       sellercentral_logo_url: res?.sellercentral_logo_url ?? '',
       sellercentral_favicon_url: res?.sellercentral_favicon_url ?? '',
+      shop_logo_height: res?.shop_logo_height != null ? Number(res.shop_logo_height) : 34,
+      sellercentral_logo_height: res?.sellercentral_logo_height != null ? Number(res.sellercentral_logo_height) : 30,
     };
   }
 
@@ -1045,6 +1047,39 @@ class MedusaAdminClient {
 
   async updateSellerCompanyInfo(data) {
     return this.request('/admin-hub/v1/seller/company-info', { method: 'PATCH', body: JSON.stringify(data) })
+  }
+
+  // ── Stripe Connect ──────────────────────────────────────────────────────────
+  async stripeConnectOnboard() {
+    return this.request('/admin-hub/v1/stripe-connect/onboard', { method: 'POST', body: JSON.stringify({}) })
+  }
+  async stripeConnectStatus() {
+    return this.request('/admin-hub/v1/stripe-connect/status')
+  }
+  async stripeConnectDashboardLink() {
+    return this.request('/admin-hub/v1/stripe-connect/dashboard-link')
+  }
+  async stripeConnectDisconnect(seller_id) {
+    return this.request('/admin-hub/v1/stripe-connect/disconnect', { method: 'POST', body: JSON.stringify({ seller_id }) })
+  }
+
+  /** Run the verification pipeline for the logged-in seller */
+  async startVerification() {
+    return this.request('/admin-hub/v1/verification/start', { method: 'POST', body: JSON.stringify({}) })
+  }
+
+  /** Get verification status (seller: own, superuser: pass seller_id query param) */
+  async getVerificationStatus(sellerId) {
+    const qs = sellerId ? `?seller_id=${encodeURIComponent(sellerId)}` : ''
+    return this.request(`/admin-hub/v1/verification/status${qs}`)
+  }
+
+  /** Superuser manual review action */
+  async reviewVerification(seller_id, action, note) {
+    return this.request('/admin-hub/v1/verification/review', {
+      method: 'POST',
+      body: JSON.stringify({ seller_id, action, note }),
+    })
   }
 }
 

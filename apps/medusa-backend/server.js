@@ -499,6 +499,10 @@ async function start() {
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS shipped_at timestamp;`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS notes text;`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivery_date timestamp;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_transfer_status varchar(50) NOT NULL DEFAULT 'legacy_skipped';`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_transfer_id text;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_transfer_error text;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_transfer_at timestamp;`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS discount_cents integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS shipping_cents integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`
@@ -520,6 +524,8 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS shop_favicon_url text`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS sellercentral_logo_url text`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS sellercentral_favicon_url text`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS shop_logo_height integer DEFAULT 34`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS sellercentral_logo_height integer DEFAULT 30`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS bonus_points_redeemed integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_shipping_carriers (
@@ -689,6 +695,18 @@ async function start() {
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS rejection_reason text DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS approved_at timestamp DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS approved_by varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS agreement_accepted boolean NOT NULL DEFAULT false;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS agreement_accepted_at timestamp DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS agreement_version varchar(20) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS agreement_ip varchar(60) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS authorized_person_name varchar(255) DEFAULT NULL;`).catch(() => {})
+        // Verification pipeline columns
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS risk_score integer DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS verification_steps jsonb DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS verification_started_at timestamp DEFAULT NULL;`).catch(() => {})
+        // Stripe Connect columns
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_account_id varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_onboarding_complete boolean NOT NULL DEFAULT false;`).catch(() => {})
 
         // ── Ranking infrastructure ──────────────────────────────────────────────
         await client.query(`
@@ -3309,7 +3327,7 @@ async function start() {
         const client = getProductsDbClient()
         if (!client) return res.json({ store_name: '' })
         await client.connect()
-        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
         await client.end()
         const row = r.rows && r.rows[0]
         const store_name = row && row.store_name != null ? String(row.store_name) : ''
@@ -3321,10 +3339,12 @@ async function start() {
         const shop_favicon_url = row && row.shop_favicon_url ? String(row.shop_favicon_url) : ''
         const sellercentral_logo_url = row && row.sellercentral_logo_url ? String(row.sellercentral_logo_url) : ''
         const sellercentral_favicon_url = row && row.sellercentral_favicon_url ? String(row.sellercentral_favicon_url) : ''
-        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url })
+        const shop_logo_height = row && row.shop_logo_height != null ? Number(row.shop_logo_height) : 34
+        const sellercentral_logo_height = row && row.sellercentral_logo_height != null ? Number(row.sellercentral_logo_height) : 30
+        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height })
       } catch (err) {
         console.error('sellerSettingsGET:', err)
-        res.json({ store_name: '', shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '' })
+        res.json({ store_name: '', shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30 })
       }
     }
     const sellerSettingsPATCH = async (req, res) => {
@@ -3338,6 +3358,12 @@ async function start() {
         const shop_favicon_url = body.shop_favicon_url !== undefined ? (body.shop_favicon_url ? String(body.shop_favicon_url).trim() : null) : undefined
         const sellercentral_logo_url = body.sellercentral_logo_url !== undefined ? (body.sellercentral_logo_url ? String(body.sellercentral_logo_url).trim() : null) : undefined
         const sellercentral_favicon_url = body.sellercentral_favicon_url !== undefined ? (body.sellercentral_favicon_url ? String(body.sellercentral_favicon_url).trim() : null) : undefined
+        const shop_logo_height = body.shop_logo_height !== undefined && body.shop_logo_height !== null
+          ? Math.max(20, Math.min(120, Number(body.shop_logo_height) || 34))
+          : undefined
+        const sellercentral_logo_height = body.sellercentral_logo_height !== undefined && body.sellercentral_logo_height !== null
+          ? Math.max(20, Math.min(120, Number(body.sellercentral_logo_height) || 30))
+          : undefined
         if (free_shipping_thresholds) {
           free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
         }
@@ -3348,8 +3374,8 @@ async function start() {
         console.log('[sellerSettingsPATCH] saving free_shipping_thresholds:', thresholdsJson)
         await client.query(
           `INSERT INTO admin_hub_seller_settings (
-             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, updated_at
-           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, now())
+             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, updated_at
+           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, now())
            ON CONFLICT (seller_id) DO UPDATE SET
              store_name = COALESCE($2, admin_hub_seller_settings.store_name),
              free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds),
@@ -3357,8 +3383,10 @@ async function start() {
              shop_favicon_url = COALESCE($5, admin_hub_seller_settings.shop_favicon_url),
              sellercentral_logo_url = COALESCE($6, admin_hub_seller_settings.sellercentral_logo_url),
              sellercentral_favicon_url = COALESCE($7, admin_hub_seller_settings.sellercentral_favicon_url),
+             shop_logo_height = COALESCE($8, admin_hub_seller_settings.shop_logo_height),
+             sellercentral_logo_height = COALESCE($9, admin_hub_seller_settings.sellercentral_logo_height),
              updated_at = now()`,
-          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url]
+          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height]
         )
         await client.end()
         console.log('[sellerSettingsPATCH] saved OK')
@@ -3369,6 +3397,8 @@ async function start() {
           shop_favicon_url: shop_favicon_url || '',
           sellercentral_logo_url: sellercentral_logo_url || '',
           sellercentral_favicon_url: sellercentral_favicon_url || '',
+          shop_logo_height: shop_logo_height != null ? shop_logo_height : 34,
+          sellercentral_logo_height: sellercentral_logo_height != null ? sellercentral_logo_height : 30,
         })
       } catch (err) {
         console.error('sellerSettingsPATCH:', err)
@@ -3514,11 +3544,16 @@ async function start() {
         const display_last = last_name || invite?.last_name || null
         // Sub-users never get their own store_name — they operate under the parent seller's account
         const effective_store_name = sub_of_seller_id ? null : (store_name || null)
+        // Agreement tracking
+        const agreement_accepted = !!body.agreement_accepted
+        const agreement_accepted_at = agreement_accepted ? new Date().toISOString() : null
+        const agreement_version = body.agreement_version || '1.0'
+        const agreement_ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || null
         const r = await client.query(
-          `INSERT INTO seller_users (email, password_hash, store_name, seller_id, is_superuser, sub_of_seller_id, permissions, first_name, last_name)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `INSERT INTO seller_users (email, password_hash, store_name, seller_id, is_superuser, sub_of_seller_id, permissions, first_name, last_name, agreement_accepted, agreement_accepted_at, agreement_version, agreement_ip)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            RETURNING id, email, store_name, seller_id, is_superuser, sub_of_seller_id, permissions, first_name, last_name, created_at`,
-          [email, password_hash, effective_store_name, own_seller_id, is_superuser, sub_of_seller_id, effective_permissions ? JSON.stringify(effective_permissions) : null, display_first, display_last]
+          [email, password_hash, effective_store_name, own_seller_id, is_superuser, sub_of_seller_id, effective_permissions ? JSON.stringify(effective_permissions) : null, display_first, display_last, agreement_accepted, agreement_accepted_at, agreement_version, agreement_ip]
         )
         // Also upsert seller_settings so store name is available (only for main sellers, not sub-users)
         if (effective_store_name && !sub_of_seller_id) {
@@ -3618,7 +3653,10 @@ async function start() {
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
-        const r = await client.query('SELECT id, email, store_name, seller_id, is_superuser, created_at FROM seller_users ORDER BY created_at DESC')
+        const r = await client.query(`SELECT id, email, store_name, seller_id, is_superuser, created_at,
+          approval_status, company_name, authorized_person_name, tax_id, vat_id,
+          business_address, phone, iban, documents, rejection_reason, approved_at, permissions
+          FROM seller_users ORDER BY created_at DESC`)
         await client.end()
         res.json({ users: r.rows })
       } catch (err) {
@@ -3870,11 +3908,11 @@ async function start() {
       try {
         const sellerId = (req.query.seller_id || 'default').toString().trim() || 'default'
         const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-        if (!dbUrl || !dbUrl.startsWith('postgres')) return res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '' })
+        if (!dbUrl || !dbUrl.startsWith('postgres')) return res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30 })
         const { Client } = require('pg')
         const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
         await client.end()
         const row = r.rows && r.rows[0]
         const store_name = row && row.store_name != null ? String(row.store_name) : ''
@@ -3886,11 +3924,13 @@ async function start() {
         const shop_favicon_url = row && row.shop_favicon_url ? String(row.shop_favicon_url) : ''
         const sellercentral_logo_url = row && row.sellercentral_logo_url ? String(row.sellercentral_logo_url) : ''
         const sellercentral_favicon_url = row && row.sellercentral_favicon_url ? String(row.sellercentral_favicon_url) : ''
+        const shop_logo_height = row && row.shop_logo_height != null ? Number(row.shop_logo_height) : 34
+        const sellercentral_logo_height = row && row.sellercentral_logo_height != null ? Number(row.sellercentral_logo_height) : 30
         console.log('[storeSellerSettingsGET] free_shipping_thresholds:', JSON.stringify(free_shipping_thresholds))
-        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url })
+        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height })
       } catch (err) {
         console.error('[storeSellerSettingsGET] error:', err && err.message)
-        res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '' })
+        res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30 })
       }
     }
     httpApp.get('/store/seller-settings', storeSellerSettingsGET)
@@ -5185,10 +5225,37 @@ async function start() {
 
         const paymentMethodTypes = paymentMethodTypesFromPlatformRow(platformRow)
         const stripe = new (require('stripe'))(secretKeyResolved)
+        const authHdr = (req.headers.authorization || '').toString()
+        const bearerTok = authHdr.startsWith('Bearer ') ? authHdr.slice(7).trim() : ''
+        let stripeCustomerId = null
+        if (bearerTok) {
+          const payload = verifyCustomerToken(bearerTok)
+          if (payload?.id) {
+            const custR = await client.query(
+              'SELECT id, email, first_name, last_name, stripe_customer_id FROM store_customers WHERE id = $1::uuid',
+              [String(payload.id)],
+            )
+            const c = custR.rows?.[0]
+            if (c) {
+              stripeCustomerId = c.stripe_customer_id || null
+              if (!stripeCustomerId) {
+                const sc = await stripe.customers.create({
+                  email: c.email || payload.email || undefined,
+                  name: [c.first_name, c.last_name].filter(Boolean).join(' ').trim() || undefined,
+                  metadata: { belucha_customer_id: c.id },
+                })
+                stripeCustomerId = sc.id
+                await client.query('UPDATE store_customers SET stripe_customer_id = $1 WHERE id = $2::uuid', [stripeCustomerId, c.id])
+              }
+            }
+          }
+        }
         const piBody = {
           amount: payCents,
           currency: 'eur',
           payment_method_types: paymentMethodTypes,
+          // transfer_group links this charge to seller Transfers created at order completion
+          transfer_group: `cart_${cartId}`,
           metadata: {
             cart_id: cartId,
             subtotal_cents: String(subtotalCents),
@@ -5198,6 +5265,7 @@ async function start() {
             bonus_points_redeemed: String(reservedPts),
           },
         }
+        if (stripeCustomerId) piBody.customer = stripeCustomerId
         const paymentIntent = await stripe.paymentIntents.create(piBody)
 
         await client.end()
@@ -6747,9 +6815,9 @@ async function start() {
              address_line1, address_line2, city, postal_code, country,
              billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping,
              payment_method, customer_id, is_guest, newsletter_opted_in,
-             order_status, payment_status,
+             order_status, payment_status, stripe_transfer_status,
              subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency)
-           VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt',$23,$24,$25,$26,$27,$28,$29,'eur')
+           VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt','pending',$23,$24,$25,$26,$27,$28,$29,'eur')
            RETURNING id, order_number`,
           [cartId, paymentIntentId, sellerId, email, first_name, last_name, phone,
            address_line1, address_line2, city, postal_code, country,
@@ -6772,6 +6840,9 @@ async function start() {
             })
           } catch (_) {}
         }
+
+        // Stripe Connect transfer is intentionally NOT sent at order creation.
+        // It is dispatched by scheduled job after delivery + 14 days.
 
         for (const it of items) {
           await client.query(
@@ -6974,7 +7045,7 @@ async function start() {
         const slug = (req.query.slug || '').toString().trim()
         if (slug) {
           const category = await adminHubService.getCategoryBySlug(slug)
-          if (!category) return res.status(404).json({ message: 'Category not found' })
+          if (!category || category.active === false || category.is_visible === false) return res.status(404).json({ message: 'Category not found' })
           const meta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
           const collectionId = category.has_collection && meta.collection_id ? meta.collection_id : null
           const cat = {
@@ -10242,11 +10313,20 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (!includePending) {
           where.push(`o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days'`)
         }
+        if (req.query.period_start) {
+          params.push(req.query.period_start)
+          where.push(`o.created_at >= $${params.length}`)
+        }
+        if (req.query.period_end) {
+          params.push(req.query.period_end)
+          where.push(`o.created_at < ($${params.length}::date + interval '1 day')`)
+        }
         if (filterSellerId) { params.push(filterSellerId); where.push(`o.seller_id = $${params.length}`) }
         const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
         const r = await client.query(
           `SELECT o.id, o.order_number, o.seller_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents,
                   o.payment_status, o.delivery_status, o.delivery_date, o.created_at,
+                  o.stripe_transfer_status, o.stripe_transfer_id, o.stripe_transfer_error, o.stripe_transfer_at,
                   o.first_name, o.last_name, o.email, o.currency,
                   s.store_name, s.commission_rate, s.iban,
                   (o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days') AS payout_eligible
@@ -10277,6 +10357,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             payout_cents: payout,
             payout_eligible: row.payout_eligible === true || row.payout_eligible === 't',
             iban: isSuperuser ? row.iban : undefined,
+            stripe_transfer_status: row.stripe_transfer_status || null,
+            stripe_transfer_id: row.stripe_transfer_id || null,
+            stripe_transfer_error: row.stripe_transfer_error || null,
+            stripe_transfer_at: row.stripe_transfer_at || null,
             delivery_date: row.delivery_date,
             created_at: row.created_at,
             first_name: row.first_name,
@@ -10648,10 +10732,114 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    // Dispatch Stripe Connect transfers for delivered orders after 14 days.
+    // This keeps funds on platform first, then releases seller share on payout-eligible date.
+    const runStripeConnectTransfersIfDue = async () => {
+      const client = getDbClient()
+      if (!client) return
+      try {
+        await client.connect()
+        const platformRow = await loadPlatformCheckoutRow(client)
+        const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+        if (!secretKey) { await client.end(); return }
+        const stripe = new (require('stripe'))(secretKey)
+
+        const due = await client.query(
+          `SELECT id, order_number, seller_id, payment_intent_id, subtotal_cents, cart_id
+           FROM store_orders
+           WHERE payment_status = 'bezahlt'
+             AND delivery_date IS NOT NULL
+             AND delivery_date <= now() - interval '14 days'
+             AND payment_intent_id IS NOT NULL
+             AND COALESCE(stripe_transfer_status, 'legacy_skipped') IN ('pending', 'failed', 'waiting_onboarding')
+           ORDER BY delivery_date ASC
+           LIMIT 200`
+        )
+
+        for (const row of due.rows || []) {
+          const orderId = row.id
+          const sellerId = String(row.seller_id || '').trim()
+          if (!sellerId || sellerId === 'default') {
+            await client.query(
+              `UPDATE store_orders SET stripe_transfer_status = 'skipped', stripe_transfer_error = 'No eligible seller_id', stripe_transfer_at = now(), updated_at = now() WHERE id = $1::uuid`,
+              [orderId]
+            )
+            continue
+          }
+          try {
+            const sRes = await client.query(
+              `SELECT stripe_account_id, stripe_onboarding_complete, commission_rate
+               FROM seller_users WHERE seller_id = $1`,
+              [sellerId]
+            )
+            const s = sRes.rows?.[0]
+            if (!s?.stripe_account_id || !s?.stripe_onboarding_complete) {
+              await client.query(
+                `UPDATE store_orders SET stripe_transfer_status = 'waiting_onboarding', stripe_transfer_error = 'Seller Stripe onboarding incomplete', updated_at = now() WHERE id = $1::uuid`,
+                [orderId]
+              )
+              continue
+            }
+
+            const pi = await stripe.paymentIntents.retrieve(String(row.payment_intent_id), { expand: ['latest_charge'] })
+            const chargeId = typeof pi.latest_charge === 'object' ? pi.latest_charge?.id : pi.latest_charge
+            if (!chargeId) throw new Error('No latest_charge on payment intent')
+
+            const commissionRate = Number(s.commission_rate ?? 0.12)
+            const subtotalCents = Number(row.subtotal_cents || 0)
+            const transferAmount = Math.floor(subtotalCents * (1 - commissionRate))
+            if (transferAmount <= 0) {
+              await client.query(
+                `UPDATE store_orders SET stripe_transfer_status = 'skipped', stripe_transfer_error = 'Computed transfer amount <= 0', stripe_transfer_at = now(), updated_at = now() WHERE id = $1::uuid`,
+                [orderId]
+              )
+              continue
+            }
+
+            const tr = await stripe.transfers.create({
+              amount: transferAmount,
+              currency: 'eur',
+              destination: s.stripe_account_id,
+              source_transaction: chargeId,
+              transfer_group: `cart_${row.cart_id || ''}`,
+              description: `Order #${row.order_number || ''} seller ${sellerId}`,
+              metadata: { order_id: orderId, order_number: String(row.order_number || ''), seller_id: sellerId },
+            })
+
+            await client.query(
+              `UPDATE store_orders
+               SET stripe_transfer_status = 'completed',
+                   stripe_transfer_id = $2,
+                   stripe_transfer_error = NULL,
+                   stripe_transfer_at = now(),
+                   updated_at = now()
+               WHERE id = $1::uuid`,
+              [orderId, tr.id]
+            )
+          } catch (e) {
+            await client.query(
+              `UPDATE store_orders
+               SET stripe_transfer_status = 'failed',
+                   stripe_transfer_error = LEFT($2, 500),
+                   updated_at = now()
+               WHERE id = $1::uuid`,
+              [orderId, String(e?.message || 'Stripe transfer failed')]
+            )
+          }
+        }
+        await client.end()
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        console.error('runStripeConnectTransfersIfDue:', e?.message || e)
+      }
+    }
+
     // Fire once on boot and then hourly: creates payout records automatically on 1st and 15th.
     runAutomaticPayoutsIfDue().catch(() => {})
+    runStripeConnectTransfersIfDue().catch(() => {})
     setInterval(() => {
       runAutomaticPayoutsIfDue().catch(() => {})
+      runStripeConnectTransfersIfDue().catch(() => {})
     }, 60 * 60 * 1000)
 
     // PATCH /admin-hub/v1/seller/iban — set own IBAN
@@ -10700,7 +10888,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       try {
         await client.connect()
         const r = await client.query(
-          `SELECT id, email, store_name, seller_id, is_superuser, sub_of_seller_id, first_name, last_name, approval_status, created_at
+          `SELECT id, email, store_name, seller_id, is_superuser, sub_of_seller_id, first_name, last_name,
+                  approval_status, created_at, iban,
+                  company_name, authorized_person_name, tax_id, vat_id,
+                  business_address, phone, documents, rejection_reason, approved_at
            FROM seller_users WHERE id = $1`,
           [userId],
         )
@@ -10708,7 +10899,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const row = r.rows?.[0]
         if (!row) return res.status(404).json({ message: 'User not found' })
         res.json({
-          user: {
+          sellerUser: {
             id: row.id,
             email: row.email,
             store_name: row.store_name,
@@ -10719,6 +10910,25 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             first_name: row.first_name,
             last_name: row.last_name,
             created_at: row.created_at,
+            iban: row.iban,
+            company_name: row.company_name,
+            authorized_person_name: row.authorized_person_name,
+            tax_id: row.tax_id,
+            vat_id: row.vat_id,
+            business_address: row.business_address,
+            phone: row.phone,
+            documents: row.documents,
+            rejection_reason: row.rejection_reason,
+            approved_at: row.approved_at,
+          },
+          // legacy alias
+          user: {
+            id: row.id,
+            email: row.email,
+            store_name: row.store_name,
+            seller_id: row.seller_id,
+            is_superuser: row.is_superuser === true,
+            approval_status: row.approval_status || 'registered',
           },
         })
       } catch (e) {
@@ -11139,9 +11349,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     const SELLER_SELECT = `
       id, email, store_name, seller_id, is_superuser, created_at, updated_at,
       iban, commission_rate, first_name, last_name,
-      approval_status, company_name, tax_id, vat_id,
+      approval_status, company_name, authorized_person_name, tax_id, vat_id,
       business_address, warehouse_address, phone, website,
-      documents, rejection_reason, approved_at, approved_by
+      documents, rejection_reason, approved_at, approved_by,
+      agreement_accepted, agreement_accepted_at, agreement_version, agreement_ip
     `
 
     // GET /admin-hub/v1/sellers — list all sellers (superuser only)
@@ -11382,7 +11593,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const sellerId = req.sellerUser?.seller_id
       if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
       const body = req.body || {}
-      const allowed = ['company_name', 'tax_id', 'vat_id', 'business_address', 'warehouse_address', 'phone', 'website']
+      const allowed = ['company_name', 'authorized_person_name', 'tax_id', 'vat_id', 'business_address', 'warehouse_address', 'phone', 'website']
       const updates = []; const params = []; let n = 1
       for (const key of allowed) {
         if (body[key] !== undefined) { updates.push(`${key} = $${n}`); params.push(body[key]); n++ }
@@ -11419,6 +11630,426 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.patch('/admin-hub/v1/sellers/:id/approve', requireSellerAuth, adminHubSellerApprovePATCH)
     httpApp.patch('/admin-hub/v1/seller/company-info', requireSellerAuth, adminHubSellerCompanyInfoPATCH)
     console.log('Seller mgmt routes: GET/PATCH /admin-hub/v1/sellers, PATCH /admin-hub/v1/sellers/:id/approve')
+
+    // ── Verification Pipeline Routes ─────────────────────────────────────────
+    // Lazy-load so the pipeline module is not required until first use
+    const verificationPath = path.join(__dirname, 'verification', 'pipeline.js')
+    let _runPipeline = null
+    const getRunPipeline = () => {
+      if (!_runPipeline) {
+        try { _runPipeline = require(verificationPath).runPipeline } catch (e) {
+          console.error('[verification] pipeline.js not found:', e.message)
+        }
+      }
+      return _runPipeline
+    }
+
+    /**
+     * POST /admin-hub/v1/verification/start
+     * Seller triggers the verification pipeline against their own profile.
+     * Returns the pipeline result and saves risk_score + verification_steps to DB.
+     */
+    httpApp.post('/admin-hub/v1/verification/start', requireSellerAuth, async (req, res) => {
+      const userId = req.sellerUser?.id
+      const sellerId = req.sellerUser?.seller_id
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+
+      const runPipeline = getRunPipeline()
+      if (!runPipeline) return res.status(503).json({ message: 'Verification pipeline not available' })
+
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        // Fetch full seller profile to run the pipeline
+        const sellerRes = await client.query(
+          `SELECT * FROM seller_users WHERE id = $1`, [userId]
+        )
+        const seller = sellerRes.rows[0]
+        if (!seller) { await client.end(); return res.status(404).json({ message: 'Seller not found' }) }
+
+        // Extract client IP (respects proxy headers set by Render/Vercel)
+        const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+          || req.socket?.remoteAddress || null
+
+        const result = await runPipeline({ seller, ip })
+
+        // Map pipeline decision to existing approval_status values
+        const statusMap = { approved: 'approved', pending_review: 'pending_approval', rejected: 'rejected' }
+        const newStatus = statusMap[result.decision] || 'pending_approval'
+
+        // Only auto-advance status if currently in early stages (don't downgrade approved sellers)
+        const currentStatus = String(seller.approval_status || 'registered').toLowerCase()
+        const canAutoAdvance = ['registered', 'documents_submitted', 'pending_approval'].includes(currentStatus)
+
+        const updates = [
+          `risk_score = $1`,
+          `verification_steps = $2`,
+          `verification_started_at = COALESCE(verification_started_at, now())`,
+          `updated_at = now()`,
+        ]
+        const params = [result.score, JSON.stringify(result.steps)]
+
+        if (canAutoAdvance) {
+          updates.push(`approval_status = $3`)
+          params.push(newStatus)
+          params.push(userId)
+          updates.push(`updated_at = now()`)
+        } else {
+          params.push(userId)
+        }
+
+        await client.query(
+          `UPDATE seller_users SET ${updates.join(', ')} WHERE id = $${params.length}`,
+          params
+        )
+        await client.end()
+
+        if (typeof window === 'undefined' && result.decision !== 'approved') {
+          // Could trigger admin notification here (webhook, email, etc.)
+        }
+
+        res.json({
+          score: result.score,
+          decision: result.decision,
+          approval_status: canAutoAdvance ? newStatus : currentStatus,
+          steps: result.steps,
+          ran_at: result.ran_at,
+        })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        console.error('[verification/start]', e.message)
+        res.status(500).json({ message: e?.message || 'Verification failed' })
+      }
+    })
+
+    /**
+     * GET /admin-hub/v1/verification/status
+     * Returns current verification state for the logged-in seller.
+     * Accessible by the seller themselves OR superusers (with ?seller_id=).
+     */
+    httpApp.get('/admin-hub/v1/verification/status', requireSellerAuth, async (req, res) => {
+      const isSuperuser = req.sellerUser?.is_superuser
+      const targetSellerId = isSuperuser && req.query.seller_id
+        ? req.query.seller_id
+        : req.sellerUser?.id
+
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `SELECT id, email, store_name, seller_id, approval_status,
+                  risk_score, verification_steps, verification_started_at,
+                  company_name, authorized_person_name, tax_id, vat_id,
+                  phone, business_address, documents,
+                  agreement_accepted, agreement_accepted_at, agreement_version
+           FROM seller_users WHERE ${isSuperuser && req.query.seller_id ? 'seller_id' : 'id'} = $1`,
+          [targetSellerId]
+        )
+        await client.end()
+        const row = r.rows[0]
+        if (!row) return res.status(404).json({ message: 'Seller not found' })
+
+        res.json({
+          seller_id: row.seller_id,
+          approval_status: row.approval_status || 'registered',
+          risk_score: row.risk_score,
+          verification_steps: row.verification_steps || [],
+          verification_started_at: row.verification_started_at,
+          profile_completeness: {
+            company_name: !!row.company_name,
+            authorized_person: !!row.authorized_person_name,
+            tax_id: !!row.tax_id,
+            vat_id: !!row.vat_id,
+            phone: !!row.phone,
+            address: !!(row.business_address?.street || row.business_address?.city),
+            documents_count: Array.isArray(row.documents) ? row.documents.length : 0,
+            agreement_accepted: !!row.agreement_accepted,
+          },
+        })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+
+    /**
+     * POST /admin-hub/v1/verification/review
+     * Superuser manually overrides the pipeline decision.
+     * Body: { seller_id, action: 'approve'|'reject'|'flag', note? }
+     */
+    httpApp.post('/admin-hub/v1/verification/review', requireSellerAuth, async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const { seller_id, action, note } = req.body || {}
+      if (!seller_id || !action) return res.status(400).json({ message: 'seller_id and action are required' })
+
+      const actionStatusMap = { approve: 'approved', reject: 'rejected', flag: 'pending_approval', suspend: 'suspended' }
+      const newStatus = actionStatusMap[action]
+      if (!newStatus) return res.status(400).json({ message: `action must be one of: ${Object.keys(actionStatusMap).join(', ')}` })
+
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `UPDATE seller_users
+           SET approval_status = $1,
+               rejection_reason = CASE WHEN $1 = 'rejected' THEN $2 ELSE rejection_reason END,
+               approved_at = CASE WHEN $1 = 'approved' THEN now() ELSE approved_at END,
+               approved_by = CASE WHEN $1 = 'approved' THEN $3 ELSE approved_by END,
+               updated_at = now()
+           WHERE seller_id = $4
+           RETURNING id, seller_id, approval_status, rejection_reason, approved_at`,
+          [newStatus, note || null, req.sellerUser?.email || 'superuser', seller_id]
+        )
+        await client.end()
+        if (!r.rows[0]) return res.status(404).json({ message: 'Seller not found' })
+
+        // Sync product publish status (reuse existing logic pattern)
+        if (newStatus === 'approved') {
+          const prodClient = getSellerDbClient()
+          if (prodClient) {
+            prodClient.connect()
+              .then(() => prodClient.query(`UPDATE admin_hub_products SET status = 'published' WHERE seller_id = $1 AND status = 'draft'`, [seller_id]))
+              .then(() => prodClient.end())
+              .catch(() => {})
+          }
+        } else if (newStatus === 'rejected' || newStatus === 'suspended') {
+          const prodClient = getSellerDbClient()
+          if (prodClient) {
+            prodClient.connect()
+              .then(() => prodClient.query(`UPDATE admin_hub_products SET status = 'draft' WHERE seller_id = $1 AND status = 'published'`, [seller_id]))
+              .then(() => prodClient.end())
+              .catch(() => {})
+          }
+        }
+
+        res.json({ success: true, seller: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+    // ── End Verification Pipeline Routes ────────────────────────────────────
+
+    // ── Stripe Connect Routes ────────────────────────────────────────────────
+    const SELLERCENTRAL_URL = (process.env.SELLERCENTRAL_URL || 'http://localhost:3002').replace(/\/$/, '')
+
+    // Helper: load platform checkout row using a fresh DB connection
+    const loadPlatformCheckoutRowFresh = async () => {
+      const c = getSellerDbClient()
+      if (!c) return null
+      try {
+        await c.connect()
+        const row = await loadPlatformCheckoutRow(c)
+        await c.end()
+        return row
+      } catch (_) {
+        try { await c.end() } catch (_2) {}
+        return null
+      }
+    }
+
+    /**
+     * POST /admin-hub/v1/stripe-connect/onboard
+     * Creates (or reuses) a Stripe Express account for the seller and returns
+     * an Account Link URL they must visit to complete Stripe's own KYC.
+     */
+    httpApp.post('/admin-hub/v1/stripe-connect/onboard', requireSellerAuth, async (req, res) => {
+      const userId = req.sellerUser?.id
+      const sellerId = req.sellerUser?.seller_id
+      const email = req.sellerUser?.email
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+
+      const platformRow = await loadPlatformCheckoutRowFresh()
+      const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+      if (!secretKey) return res.status(503).json({ message: 'Stripe not configured. Set STRIPE_SECRET_KEY in Settings → Checkout.' })
+
+      const stripe = new (require('stripe'))(secretKey)
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const sellerRes = await client.query(
+          `SELECT stripe_account_id, stripe_onboarding_complete FROM seller_users WHERE id = $1`, [userId]
+        )
+        let stripeAccountId = sellerRes.rows?.[0]?.stripe_account_id || null
+
+        // Create Express account if not yet created
+        if (!stripeAccountId) {
+          const account = await stripe.accounts.create({
+            type: 'express',
+            email,
+            capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+            metadata: { seller_id: sellerId, seller_user_id: userId },
+          })
+          stripeAccountId = account.id
+          await client.query(
+            `UPDATE seller_users SET stripe_account_id = $1, updated_at = now() WHERE id = $2`,
+            [stripeAccountId, userId]
+          )
+        }
+
+        // Create (or refresh) an Account Link for onboarding
+        const accountLink = await stripe.accountLinks.create({
+          account: stripeAccountId,
+          refresh_url: `${SELLERCENTRAL_URL}/en/settings/stripe-connect?refresh=true`,
+          return_url: `${SELLERCENTRAL_URL}/en/settings/stripe-connect?connected=true`,
+          type: 'account_onboarding',
+        })
+
+        await client.end()
+        res.json({ url: accountLink.url, stripe_account_id: stripeAccountId })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        console.error('[stripe-connect/onboard]', e.message)
+        res.status(500).json({ message: e.message || 'Stripe Connect onboarding failed' })
+      }
+    })
+
+    /**
+     * GET /admin-hub/v1/stripe-connect/status
+     * Returns current Connect status for the logged-in seller.
+     * Also syncs onboarding_complete from Stripe if account exists.
+     */
+    httpApp.get('/admin-hub/v1/stripe-connect/status', requireSellerAuth, async (req, res) => {
+      const userId = req.sellerUser?.id
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const sellerRes = await client.query(
+          `SELECT stripe_account_id, stripe_onboarding_complete, commission_rate FROM seller_users WHERE id = $1`, [userId]
+        )
+        const row = sellerRes.rows?.[0] || {}
+        let onboardingComplete = row.stripe_onboarding_complete || false
+        const stripeAccountId = row.stripe_account_id || null
+
+        let payoutBank = null
+        // Sync from Stripe if account exists (and also expose payout destination summary)
+        if (stripeAccountId && !onboardingComplete) {
+          try {
+            const platformRow = await loadPlatformCheckoutRowFresh()
+            const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+            if (secretKey) {
+              const stripe = new (require('stripe'))(secretKey)
+              const account = await stripe.accounts.retrieve(stripeAccountId)
+              onboardingComplete = account.details_submitted && account.charges_enabled
+              try {
+                const ext = await stripe.accounts.listExternalAccounts(stripeAccountId, { object: 'bank_account', limit: 1 })
+                const bank = ext?.data?.[0]
+                if (bank) {
+                  payoutBank = {
+                    bank_name: bank.bank_name || null,
+                    country: bank.country || null,
+                    currency: bank.currency || null,
+                    last4: bank.last4 || null,
+                    holder_name: bank.account_holder_name || null,
+                    status: bank.status || null,
+                  }
+                }
+              } catch (_) {}
+              if (onboardingComplete) {
+                await client.query(
+                  `UPDATE seller_users SET stripe_onboarding_complete = true, updated_at = now() WHERE id = $1`, [userId]
+                )
+              }
+            }
+          } catch (_) {}
+        } else if (stripeAccountId) {
+          try {
+            const platformRow = await loadPlatformCheckoutRowFresh()
+            const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+            if (secretKey) {
+              const stripe = new (require('stripe'))(secretKey)
+              const ext = await stripe.accounts.listExternalAccounts(stripeAccountId, { object: 'bank_account', limit: 1 })
+              const bank = ext?.data?.[0]
+              if (bank) {
+                payoutBank = {
+                  bank_name: bank.bank_name || null,
+                  country: bank.country || null,
+                  currency: bank.currency || null,
+                  last4: bank.last4 || null,
+                  holder_name: bank.account_holder_name || null,
+                  status: bank.status || null,
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
+        await client.end()
+        res.json({
+          connected: !!stripeAccountId,
+          onboarding_complete: onboardingComplete,
+          stripe_account_id: stripeAccountId,
+          commission_rate: Number(row.commission_rate ?? 0.12),
+          payout_bank: payoutBank,
+        })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e.message || 'Error' })
+      }
+    })
+
+    /**
+     * GET /admin-hub/v1/stripe-connect/dashboard-link
+     * Returns a one-time Stripe Express dashboard URL so sellers can check their balance/payouts.
+     */
+    httpApp.get('/admin-hub/v1/stripe-connect/dashboard-link', requireSellerAuth, async (req, res) => {
+      const userId = req.sellerUser?.id
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const sellerRes = await client.query(`SELECT stripe_account_id FROM seller_users WHERE id = $1`, [userId])
+        const stripeAccountId = sellerRes.rows?.[0]?.stripe_account_id
+        await client.end()
+
+        if (!stripeAccountId) return res.status(404).json({ message: 'No Stripe account connected yet.' })
+
+        const platformRow = await loadPlatformCheckoutRowFresh()
+        const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+        if (!secretKey) return res.status(503).json({ message: 'Stripe not configured' })
+
+        const stripe = new (require('stripe'))(secretKey)
+        const loginLink = await stripe.accounts.createLoginLink(stripeAccountId)
+        res.json({ url: loginLink.url })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e.message || 'Error' })
+      }
+    })
+
+    /**
+     * POST /admin-hub/v1/stripe-connect/disconnect
+     * Superuser only — removes Connect linkage from a seller (does NOT delete Stripe account).
+     */
+    httpApp.post('/admin-hub/v1/stripe-connect/disconnect', requireSellerAuth, async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const { seller_id } = req.body || {}
+      if (!seller_id) return res.status(400).json({ message: 'seller_id required' })
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        await client.query(
+          `UPDATE seller_users SET stripe_account_id = NULL, stripe_onboarding_complete = false, updated_at = now() WHERE seller_id = $1`,
+          [seller_id]
+        )
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e.message || 'Error' })
+      }
+    })
+    // ── End Stripe Connect Routes ────────────────────────────────────────────
 
     // ── Ranking API ─────────────────────────────────────────────────────────
 

@@ -19,6 +19,7 @@ function RegisterForm() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
 
   useEffect(() => {
     const inviteEmail = searchParams?.get("email");
@@ -34,9 +35,14 @@ function RegisterForm() {
     if (!isInvited && !storeName) { setError("Store Name ist ein Pflichtfeld"); return; }
     if (isInvited && (!firstName || !lastName)) { setError("Vor- und Nachname sind Pflichtfelder"); return; }
     if (password.length < 6) { setError("Passwort muss mindestens 6 Zeichen haben"); return; }
+    if (!agreementAccepted) { setError("Bitte akzeptieren Sie die Nutzungsbedingungen und Datenschutzrichtlinie."); return; }
     setLoading(true);
     try {
-      const extra = inviteToken ? { invite_token: inviteToken, first_name: firstName, last_name: lastName } : {};
+      const extra = {
+        ...(inviteToken ? { invite_token: inviteToken, first_name: firstName, last_name: lastName } : {}),
+        agreement_accepted: true,
+        agreement_version: "1.0",
+      };
       const data = await getMedusaAdminClient().registerSeller(
         email.trim().toLowerCase(), password, isInvited ? null : storeName.trim(), extra
       );
@@ -117,6 +123,21 @@ function RegisterForm() {
                 </button>
               </div>
             </div>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 14, color: "#374151" }}>
+              <input
+                type="checkbox"
+                checked={agreementAccepted}
+                onChange={(e) => setAgreementAccepted(e.target.checked)}
+                style={{ marginTop: 2, width: 16, height: 16, cursor: "pointer", accentColor: "#ff971c", flexShrink: 0 }}
+              />
+              <span>
+                Ich habe die{" "}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#ff971c", textDecoration: "underline" }}>Nutzungsbedingungen</a>
+                {" "}und die{" "}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "#ff971c", textDecoration: "underline" }}>Datenschutzrichtlinie</a>
+                {" "}gelesen und akzeptiere sie. *
+              </span>
+            </label>
             {error && (
               <div style={{ background: "#fee2e2", border: "1px solid #ef4444", borderRadius: 8, padding: "12px 14px", color: "#991b1b", fontSize: 14 }}>{error}</div>
             )}
