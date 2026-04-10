@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Link, Text, TextField } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
@@ -415,15 +415,22 @@ export default function VerificationSettingsPage() {
     } catch (_) {}
   }, [initialSnapshot]);
 
+  const saveRef = useRef(saveVerification);
+  const discardRef = useRef(discardVerification);
+  saveRef.current = saveVerification;
+  discardRef.current = discardVerification;
+
   useEffect(() => {
     if (!unsaved) return;
     unsaved.setDirty(isDirty);
-    unsaved.setHandlers({ onSave: saveVerification, onDiscard: discardVerification });
+    unsaved.setHandlers({
+      onSave: () => saveRef.current?.(),
+      onDiscard: () => discardRef.current?.(),
+    });
     return () => {
       unsaved.clearHandlers();
-      unsaved.setDirty(false);
     };
-  }, [unsaved, isDirty, saveVerification, discardVerification]);
+  }, [unsaved, isDirty]);
 
   return (
     <BlockStack gap="400">

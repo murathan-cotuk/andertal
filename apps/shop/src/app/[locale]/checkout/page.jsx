@@ -30,6 +30,7 @@ import { normalizeIsoCountryCode } from "@/lib/iso-country";
 import { CHECKOUT_SHIPPING_COUNTRY_LS, CHECKOUT_SHIPPING_MARKET_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 
 const STRIPE_PK_ENV = (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim();
 
@@ -1250,7 +1251,7 @@ export default function CheckoutPage() {
         <Title>{t("title")}</Title>
 
         {stripePkLoading && items.length > 0 ? (
-          <p style={{ color: "#6b7280" }}>{t("processing")}</p>
+          <GlobalPageLoader label={t("processing")} />
         ) : !stripePromiseState ? (
           <ErrorBox style={{ maxWidth: 540 }}>{t("configError")}</ErrorBox>
         ) : items.length === 0 ? (
@@ -1261,12 +1262,7 @@ export default function CheckoutPage() {
           <Layout>
             <div>
               {piError && <ErrorBox style={{ marginBottom: 24 }}>{piError}</ErrorBox>}
-              {!stripePkLoading && !paymentMethodTypes.includes("paypal") && (
-                <ErrorBox style={{ marginBottom: 24 }}>
-                  PayPal is currently disabled for this checkout. Enabled methods: {paymentMethodTypes.join(", ")}.
-                </ErrorBox>
-              )}
-              {loadingPI && <p style={{ color: "#6b7280" }}>{t("processing")}</p>}
+              {loadingPI && <GlobalPageLoader label={t("processing")} />}
               {clientSecret && stripePromiseState && (
                 <Elements
                   key={`${cart.id}-${clientSecret}`}

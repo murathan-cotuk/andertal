@@ -45,34 +45,42 @@ const GroupedDropdownSearch = dynamic(
 );
 
 function getMenuItemsMain(t, isSuperuser = false) {
+  const tx = (key, fallback) => {
+    try {
+      if (typeof t.has === "function" && !t.has(key)) return fallback;
+      return t(key);
+    } catch {
+      return fallback;
+    }
+  };
   const items = [
-    { url: "/dashboard", label: t("home"), icon: HomeIcon },
+    { url: "/dashboard", label: tx("home", "Home"), icon: HomeIcon },
     {
       url: "/orders",
-      label: t("orders"),
+      label: tx("orders", "Orders"),
       icon: OrderIcon,
       subNavigationItems: [
-        { url: "/orders", label: "Ansicht" },
-        { url: "/orders/returns", label: t("returns") },
-        { url: "/orders/abandoned-checkouts", label: t("abandonedCheckouts") },
+        { url: "/orders", label: tx("view", "View") },
+        { url: "/orders/returns", label: tx("returns", "Returns") },
+        { url: "/orders/abandoned-checkouts", label: tx("abandonedCheckouts", "Abandoned checkouts") },
       ],
     },
     {
       url: "/products",
-      label: t("products"),
+      label: tx("products", "Products"),
       icon: ProductIcon,
       subNavigationItems: [
-        { url: "/products/inventory", label: t("inventory") },
-        { url: "/products/collections", label: t("collections") },
+        { url: "/products/inventory", label: tx("inventory", "Inventory") },
+        { url: "/products/collections", label: tx("collections", "Collections") },
       ],
     },
     {
       url: "/customers-menu",
-      label: t("customers"),
+      label: tx("customers", "Customers"),
       icon: ProfileIcon,
       subNavigationItems: [
-        { url: "/customers", label: "Liste" },
-        { url: "/customers/reviews", label: "Bewertungen" },
+        { url: "/customers", label: tx("list", "List") },
+        { url: "/customers/reviews", label: tx("reviews", "Reviews") },
       ],
     },
   ];
@@ -80,10 +88,10 @@ function getMenuItemsMain(t, isSuperuser = false) {
   if (isSuperuser) {
     items.push({
       url: "/sellers-menu",
-      label: "Verkäufer",
+      label: tx("sellers", "Sellers"),
       icon: StoreIcon,
       subNavigationItems: [
-        { url: "/sellers", label: "Ansicht" },
+        { url: "/sellers", label: tx("view", "View") },
       ],
     });
   }
@@ -91,50 +99,50 @@ function getMenuItemsMain(t, isSuperuser = false) {
   items.push(
     {
       url: "/marketing",
-      label: t("marketing"),
+      label: tx("marketing", "Marketing"),
       icon: MegaphoneIcon,
       subNavigationItems: [
-        { url: "/marketing/campaigns", label: t("campaigns") },
-        { url: "/marketing/attribution", label: t("attribution") },
-        { url: "/marketing/automations", label: t("automations") },
+        { url: "/marketing/campaigns", label: tx("campaigns", "Campaigns") },
+        { url: "/marketing/attribution", label: tx("attribution", "Attribution") },
+        { url: "/marketing/automations", label: tx("automations", "Automations") },
       ],
     },
     {
       url: "/discounts",
-      label: t("discounts"),
+      label: tx("discounts", "Discounts"),
       icon: DiscountIcon,
       subNavigationItems: [
-        { url: "/discounts/coupons", label: "Coupons" },
+        { url: "/discounts/coupons", label: tx("coupons", "Coupons") },
       ],
     },
     {
       url: "/content",
-      label: t("content"),
+      label: tx("content", "Content"),
       icon: ListBulletedIcon,
       subNavigationItems: [
-        { url: "/content/media", label: t("media") },
-        { url: "/content/menus", label: t("menus") },
-        { url: "/content/categories", label: t("categories") },
-        { url: "/content/brands", label: t("brands") },
-        { url: "/content/metaobjects", label: t("metaobjects") },
-        { url: "/content/landing-page", label: "Landing Page" },
-        { url: "/content/styles", label: "Styles" },
-        { url: "/content/pages", label: t("pages") },
-        { url: "/content/blog-posts", label: t("blogPosts") },
+        { url: "/content/media", label: tx("media", "Media") },
+        { url: "/content/menus", label: tx("menus", "Menus") },
+        { url: "/content/categories", label: tx("categories", "Categories") },
+        { url: "/content/brands", label: tx("brands", "Brands") },
+        { url: "/content/metaobjects", label: tx("metaobjects", "Metaobjects") },
+        { url: "/content/landing-page", label: tx("landingPage", "Landing Page") },
+        { url: "/content/styles", label: tx("styles", "Styles") },
+        { url: "/content/pages", label: tx("pages", "Pages") },
+        { url: "/content/blog-posts", label: tx("blogPosts", "Blog Posts") },
       ],
     },
     {
       url: "/analytics",
-      label: t("analytics"),
+      label: tx("analytics", "Analytics"),
       icon: ChartVerticalIcon,
       subNavigationItems: [
-        { url: "/analytics/reports", label: t("reports") },
+        { url: "/analytics/reports", label: tx("reports", "Reports") },
         { url: "/analytics/transactions", label: "Transactions" },
-        { url: "/analytics/live-view", label: t("liveView") },
-        { url: "/analytics/ranking", label: "Sıralama Algoritması" },
+        { url: "/analytics/live-view", label: tx("liveView", "Live View") },
+        { url: "/analytics/ranking", label: tx("reports", "Reports") },
       ],
     },
-    { url: "/import-export", label: t("importExport"), icon: ImportIcon },
+    { url: "/import-export", label: tx("importExport", "Import/Export"), icon: ImportIcon },
   );
   return items;
 }
@@ -227,7 +235,21 @@ const LOCALES = [
 export default function PolarisLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const t = useTranslations("nav");
+  const tRaw = useTranslations("nav");
+  const t = useCallback((key) => {
+    try {
+      return tRaw(key);
+    } catch {
+      return String(key);
+    }
+  }, [tRaw]);
+  t.has = (key) => {
+    try {
+      return typeof tRaw.has === "function" ? tRaw.has(key) : true;
+    } catch {
+      return false;
+    }
+  };
   const locale = useLocale();
   const unsaved = useUnsavedChanges();
   const [showMobileNav, setShowMobileNav] = useState(false);
@@ -595,7 +617,7 @@ export default function PolarisLayout({ children }) {
         </div>
       }
       searchField={
-        <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 680 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: "100%", marginLeft: -12 }}>
           {platformBranding.sellercentral_logo_url && (
             <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
               <img

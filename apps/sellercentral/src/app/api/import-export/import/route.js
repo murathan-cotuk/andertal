@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 
 const LANGS = ["de", "en", "tr", "fr", "it", "es"];
-const COUNTRIES = ["DE", "AT", "CH", "FR", "IT", "ES", "TR", "US"];
+const COUNTRIES = ["DE", "FR", "IT", "ES", "TR"];
 const DEFAULT_BACKEND = "https://belucha-medusa-backend.onrender.com";
 
 function getBackendBase() {
@@ -17,7 +17,7 @@ function parseCents(val) {
 
 function parseNum(val) {
   if (val == null || val === "") return undefined;
-  const n = Number(val);
+  const n = Number(String(val).replace(",", "."));
   return isNaN(n) ? undefined : n;
 }
 
@@ -131,7 +131,17 @@ function groupRows(rows, headers) {
   const idx = {};
   headers.forEach((h, i) => {
     const key = str(h);
-    if (key) idx[key] = i;
+    if (!key) return;
+    idx[key] = i;
+    if (key === "manufacturer") idx.hersteller = i;
+    if (key === "manufacturer_information") idx.hersteller_information = i;
+    if (key === "responsible_person_information") idx.verantwortliche_person_information = i;
+    const m = key.match(/^variation(\d+)_(name|value)$/i);
+    if (m) {
+      // Backward/forward compatibility: template may expose variationN_* labels,
+      // importer internally uses optionN_* keys.
+      idx[`option${m[1]}_${m[2]}`] = i;
+    }
   });
   const get = (row, key) => str(row[idx[key]] ?? "");
 
@@ -238,16 +248,19 @@ function collectMetafields(parentRow, headers, idx) {
 
 function computeParentPresent(parentRow, idx) {
   const kp = (k) => keyPresent(parentRow, k, idx);
+  const sharedTitle = kp("title");
+  const sharedDescription = kp("description");
+  const sharedBullets = [kp("bullet1"), kp("bullet2"), kp("bullet3"), kp("bullet4"), kp("bullet5")];
   const translations = {};
   for (const lang of LANGS) {
     translations[lang] = {
-      title: kp(`title_${lang}`),
-      description: kp(`description_${lang}`),
-      bullet1: kp(`bullet1_${lang}`),
-      bullet2: kp(`bullet2_${lang}`),
-      bullet3: kp(`bullet3_${lang}`),
-      bullet4: kp(`bullet4_${lang}`),
-      bullet5: kp(`bullet5_${lang}`),
+      title: kp(`title_${lang}`) || sharedTitle,
+      description: kp(`description_${lang}`) || sharedDescription,
+      bullet1: kp(`bullet1_${lang}`) || sharedBullets[0],
+      bullet2: kp(`bullet2_${lang}`) || sharedBullets[1],
+      bullet3: kp(`bullet3_${lang}`) || sharedBullets[2],
+      bullet4: kp(`bullet4_${lang}`) || sharedBullets[3],
+      bullet5: kp(`bullet5_${lang}`) || sharedBullets[4],
       seo_title: kp(`seo_title_${lang}`),
       seo_description: kp(`seo_description_${lang}`),
       seo_keywords: kp(`seo_keywords_${lang}`),
@@ -304,26 +317,29 @@ function computeParentPresent(parentRow, idx) {
 
 function computeChildPresent(childRow, idx) {
   const kp = (k) => keyPresent(childRow, k, idx);
+  const sharedTitle = kp("title");
+  const sharedDescription = kp("description");
+  const sharedBullets = [kp("bullet1"), kp("bullet2"), kp("bullet3"), kp("bullet4"), kp("bullet5")];
   const opts = {};
   for (let n = 1; n <= 40; n++) opts[n] = kp(`option${n}_value`);
   const translations = {};
   for (const lang of LANGS) {
     translations[lang] = {
-      title: kp(`variant_title_${lang}`),
-      description: kp(`variant_description_${lang}`),
-      bullet1: kp(`variant_bullet1_${lang}`),
-      bullet2: kp(`variant_bullet2_${lang}`),
-      bullet3: kp(`variant_bullet3_${lang}`),
-      bullet4: kp(`variant_bullet4_${lang}`),
-      bullet5: kp(`variant_bullet5_${lang}`),
+      title: kp(`title_${lang}`) || sharedTitle,
+      description: kp(`description_${lang}`) || sharedDescription,
+      bullet1: kp(`bullet1_${lang}`) || sharedBullets[0],
+      bullet2: kp(`bullet2_${lang}`) || sharedBullets[1],
+      bullet3: kp(`bullet3_${lang}`) || sharedBullets[2],
+      bullet4: kp(`bullet4_${lang}`) || sharedBullets[3],
+      bullet5: kp(`bullet5_${lang}`) || sharedBullets[4],
     };
   }
   const seo = {};
   for (const lang of LANGS) {
     seo[lang] = {
-      title: kp(`variant_seo_title_${lang}`),
-      description: kp(`variant_seo_description_${lang}`),
-      keywords: kp(`variant_seo_keywords_${lang}`),
+      title: kp(`seo_title_${lang}`),
+      description: kp(`seo_description_${lang}`),
+      keywords: kp(`seo_keywords_${lang}`),
     };
   }
   let variantMetafieldTouched = false;
@@ -591,20 +607,20 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
     if (!tp || !Object.values(tp).some(Boolean)) continue;
     const prev = { ...(m.translations[lang] || {}) };
     if (tp.title) {
-      const t = G(`title_${lang}`);
+      const t = G(`title_${lang}`) || G("title");
       if (t) prev.title = t;
     }
     if (tp.description) {
-      const d = G(`description_${lang}`);
+      const d = G(`description_${lang}`) || G("description");
       if (d) prev.description = d;
     }
     if (tp.bullet1 || tp.bullet2 || tp.bullet3 || tp.bullet4 || tp.bullet5) {
       const next = Array.isArray(prev.bullet_points) ? [...prev.bullet_points] : [];
-      if (tp.bullet1) next[0] = G(`bullet1_${lang}`);
-      if (tp.bullet2) next[1] = G(`bullet2_${lang}`);
-      if (tp.bullet3) next[2] = G(`bullet3_${lang}`);
-      if (tp.bullet4) next[3] = G(`bullet4_${lang}`);
-      if (tp.bullet5) next[4] = G(`bullet5_${lang}`);
+      if (tp.bullet1) next[0] = G(`bullet1_${lang}`) || G("bullet1");
+      if (tp.bullet2) next[1] = G(`bullet2_${lang}`) || G("bullet2");
+      if (tp.bullet3) next[2] = G(`bullet3_${lang}`) || G("bullet3");
+      if (tp.bullet4) next[3] = G(`bullet4_${lang}`) || G("bullet4");
+      if (tp.bullet5) next[4] = G(`bullet5_${lang}`) || G("bullet5");
       while (next.length && str(next[next.length - 1]) === "") next.pop();
       prev.bullet_points = next.length ? next : undefined;
     }
@@ -703,14 +719,17 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
   const { slugToId, brandByLowerName, shipByLowerName } = lookups;
 
   const translations = {};
+  const sharedTitle = G("title");
+  const sharedDesc = G("description");
+  const sharedBullets = [G("bullet1"), G("bullet2"), G("bullet3"), G("bullet4"), G("bullet5")];
   for (const lang of LANGS) {
-    const title = G(`title_${lang}`);
-    const desc = G(`description_${lang}`);
-    const b1 = G(`bullet1_${lang}`);
-    const b2 = G(`bullet2_${lang}`);
-    const b3 = G(`bullet3_${lang}`);
-    const b4 = G(`bullet4_${lang}`);
-    const b5 = G(`bullet5_${lang}`);
+    const title = G(`title_${lang}`) || sharedTitle;
+    const desc = G(`description_${lang}`) || sharedDesc;
+    const b1 = G(`bullet1_${lang}`) || sharedBullets[0];
+    const b2 = G(`bullet2_${lang}`) || sharedBullets[1];
+    const b3 = G(`bullet3_${lang}`) || sharedBullets[2];
+    const b4 = G(`bullet4_${lang}`) || sharedBullets[3];
+    const b5 = G(`bullet5_${lang}`) || sharedBullets[4];
     const seoTitleLang = G(`seo_title_${lang}`);
     const seoDescLang = G(`seo_description_${lang}`);
     const seoKeywordsLang = G(`seo_keywords_${lang}`);
@@ -757,16 +776,16 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     }
     const variantTranslations = {};
     for (const lang of LANGS) {
-      const vTitle = cGet(`variant_title_${lang}`);
-      const vDescription = cGet(`variant_description_${lang}`);
-      const vb1 = cGet(`variant_bullet1_${lang}`);
-      const vb2 = cGet(`variant_bullet2_${lang}`);
-      const vb3 = cGet(`variant_bullet3_${lang}`);
-      const vb4 = cGet(`variant_bullet4_${lang}`);
-      const vb5 = cGet(`variant_bullet5_${lang}`);
-      const seoTitle = cGet(`variant_seo_title_${lang}`);
-      const seoDescription = cGet(`variant_seo_description_${lang}`);
-      const seoKeywords = cGet(`variant_seo_keywords_${lang}`);
+      const vTitle = cGet(`title_${lang}`) || cGet("title");
+      const vDescription = cGet(`description_${lang}`) || cGet("description");
+      const vb1 = cGet(`bullet1_${lang}`) || cGet("bullet1");
+      const vb2 = cGet(`bullet2_${lang}`) || cGet("bullet2");
+      const vb3 = cGet(`bullet3_${lang}`) || cGet("bullet3");
+      const vb4 = cGet(`bullet4_${lang}`) || cGet("bullet4");
+      const vb5 = cGet(`bullet5_${lang}`) || cGet("bullet5");
+      const seoTitle = cGet(`seo_title_${lang}`);
+      const seoDescription = cGet(`seo_description_${lang}`);
+      const seoKeywords = cGet(`seo_keywords_${lang}`);
       if (!vTitle && !vDescription && !vb1 && !vb2 && !vb3 && !vb4 && !vb5 && !seoTitle && !seoDescription && !seoKeywords) continue;
       variantTranslations[lang] = {};
       if (vTitle) variantTranslations[lang].title = vTitle;
@@ -829,8 +848,8 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
       sku: cGet("sku") || undefined,
       ean: cGet("ean") || undefined,
       inventory: parseNum(cGet("inventory")) ?? 0,
-      title: cGet("variant_title_de") || (option_values.length ? option_values.join(" / ") : undefined),
-      description: cGet("variant_description_de") || undefined,
+      title: cGet("title_de") || cGet("title") || (option_values.length ? option_values.join(" / ") : undefined),
+      description: cGet("description_de") || cGet("description") || undefined,
       option_values: option_values.length ? option_values : undefined,
       image_url: cImage || undefined,
       image_urls: cImage ? Object.fromEntries(LANGS.map((l) => [l, cImage])) : undefined,
@@ -863,8 +882,8 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     ...(metafields ? { metafields } : {}),
   };
 
-  const firstTitle = LANGS.map((lang) => G(`title_${lang}`)).find(Boolean);
-  const firstDesc = LANGS.map((lang) => G(`description_${lang}`)).find(Boolean);
+  const firstTitle = G("title") || LANGS.map((lang) => G(`title_${lang}`)).find(Boolean);
+  const firstDesc = G("description") || LANGS.map((lang) => G(`description_${lang}`)).find(Boolean);
   const payload = {
     title: firstTitle || undefined,
     description: firstDesc || undefined,
@@ -1006,7 +1025,7 @@ export async function POST(request) {
 
       if (!payload.title) {
         results.failed++;
-        results.errors.push({ sku, error: "Missing title_de (or title_en)" });
+        results.errors.push({ sku, error: "Missing title (or title_de/title_en)" });
         continue;
       }
 

@@ -3,10 +3,12 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 export default function Login() {
   const router = useRouter();
+  const t = useTranslations("auth.login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -16,7 +18,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!email || !password) { setError("Email and password are required"); return; }
+    if (!email || !password) { setError(t("errorRequired")); return; }
     setLoading(true);
     try {
       const data = await getMedusaAdminClient().loginSeller(email.trim().toLowerCase(), password);
@@ -30,7 +32,7 @@ export default function Login() {
       localStorage.setItem("sellerLoggedIn", "true");
       router.push("/dashboard");
     } catch (err) {
-      setError(err?.message || "Login failed. Check your email and password.");
+      setError(err?.message || t("errorFailed"));
     } finally {
       setLoading(false);
     }
@@ -44,23 +46,23 @@ export default function Login() {
         </div>
       <div style={{ background: "#fff", borderRadius: 12, padding: "40px 36px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111827", margin: "0 0 6px" }}>Seller Login</h1>
-          <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>Sign in to your seller account</p>
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111827", margin: "0 0 6px" }}>{t("title")}</h1>
+          <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>{t("subtitle")}</p>
         </div>
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div>
-            <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>Email</label>
+            <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("email")}</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" }}
-              placeholder="you@example.com"
+              placeholder={t("emailPlaceholder")}
             />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>Password</label>
+            <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("password")}</label>
             <div style={{ position: "relative" }}>
               <input
                 type={showPassword ? "text" : "password"}
@@ -68,7 +70,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 style={{ width: "100%", padding: "10px 44px 10px 14px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" }}
-                placeholder="••••••••"
+                placeholder={t("passwordPlaceholder")}
               />
               <button
                 type="button"
@@ -94,12 +96,11 @@ export default function Login() {
             disabled={loading}
             style={{ padding: "12px", background: loading ? "#9ca3af" : "#ff971c", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}
           >
-            {loading ? "Signing in…" : "Sign In"}
+            {loading ? t("submitting") : t("submit")}
           </button>
         </form>
         <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "#6b7280" }}>
-          Don&apos;t have an account?{" "}
-          <Link href="/register" style={{ color: "#ff971c", fontWeight: 600, textDecoration: "none" }}>Register here</Link>
+          <Link href="/register" style={{ color: "#ff971c", fontWeight: 600, textDecoration: "none" }}>{t("noAccount")}</Link>
         </p>
       </div>
       </div>

@@ -1,13 +1,11 @@
 import ExcelJS from "exceljs";
 
 const LANGS = ["de", "en", "tr", "fr", "it", "es"];
-const COUNTRIES = ["DE", "AT", "CH", "FR", "IT", "ES", "TR", "US"];
+const COUNTRIES = ["DE", "FR", "IT", "ES", "TR"];
 
-const LANG_LABELS = { de: "Deutsch", en: "English", tr: "Türkçe", fr: "Français", it: "Italiano", es: "Español" };
+const LANG_LABELS = { de: "German", en: "English", tr: "Turkish", fr: "French", it: "Italian", es: "Spanish" };
 const COUNTRY_LABELS = {
-  DE: "Deutschland (EUR)", AT: "Österreich (EUR)", CH: "Schweiz (CHF)",
-  FR: "Frankreich (EUR)", IT: "Italien (EUR)", ES: "Spanien (EUR)",
-  TR: "Türkei (TRY)", US: "USA (USD)",
+  DE: "Germany (EUR)", FR: "France (EUR)", IT: "Italy (EUR)", ES: "Spain (EUR)", TR: "Turkey (TRY)",
 };
 
 const DEFAULT_BACKEND = "https://belucha-medusa-backend.onrender.com";
@@ -98,77 +96,62 @@ function buildColumns() {
 
   const core = [
     { key: "product_type", label: "product_type", note: "Dropdown: parent | child", width: 14, group: "core" },
-    { key: "sku", label: "sku", note: "Eindeutige Artikel-Nr. (Pflicht)", width: 20, group: "core" },
-    { key: "parent_sku", label: "parent_sku", note: "Nur child: SKU der Parent-Zeile", width: 20, group: "core" },
+    { key: "sku", label: "sku", note: "Unique product SKU (required)", width: 20, group: "core" },
+    { key: "parent_sku", label: "parent_sku", note: "Child only: parent row SKU", width: 20, group: "core" },
     { key: "status", label: "status", note: "Dropdown: draft | published", width: 13, group: "core" },
     { key: "ean", label: "ean", note: "EAN / GTIN", width: 18, group: "core" },
-    { key: "inventory", label: "inventory", note: "Lagerbestand (Zahl)", width: 12, group: "core" },
-    { key: "brand", label: "brand", note: "Dropdown: Markenname wie in der Liste", width: 18, group: "core" },
-    { key: "type", label: "type", note: "Produkttyp / Bezeichnung (frei)", width: 16, group: "core" },
-    { key: "category_slug", label: "category_slug", note: "Dropdown: exakter Slug aus der Kategorienliste", width: 22, group: "core" },
-    { key: "shipping_group", label: "shipping_group", note: "Dropdown: Versandgruppe (Name)", width: 22, group: "core" },
-    { key: "hersteller", label: "hersteller", note: "GPSR: Hersteller (Pflicht)", width: 26, group: "core" },
-    { key: "hersteller_information", label: "hersteller_information", note: "GPSR: Hersteller-Informationen (Pflicht)", width: 42, group: "core" },
-    { key: "verantwortliche_person_information", label: "verantwortliche_person_information", note: "GPSR: Verantwortliche Person EU (Pflicht)", width: 42, group: "core" },
-    { key: "weight_grams", label: "weight_grams", note: "Gewicht in Gramm", width: 14, group: "core" },
-    { key: "dim_length_cm", label: "dim_length_cm", note: "Länge cm", width: 14, group: "core" },
-    { key: "dim_width_cm", label: "dim_width_cm", note: "Breite cm", width: 13, group: "core" },
-    { key: "dim_height_cm", label: "dim_height_cm", note: "Höhe cm", width: 13, group: "core" },
-    { key: "image_url_1", label: "image_url_1", note: "Bild-URL 1 (Parent/Hauptbild)", width: 40, group: "core" },
-    { key: "image_url_2", label: "image_url_2", note: "Bild-URL 2", width: 40, group: "core" },
-    { key: "image_url_3", label: "image_url_3", note: "Bild-URL 3", width: 40, group: "core" },
-    { key: "image_url_4", label: "image_url_4", note: "Bild-URL 4", width: 40, group: "core" },
-    { key: "image_url_5", label: "image_url_5", note: "Bild-URL 5", width: 40, group: "core" },
-    { key: "swatch_image_url", label: "swatch_image_url", note: "Farbmuster-URL (oft Variante 1)", width: 28, group: "core" },
-    { key: "option1_name", label: "option1_name", note: "Parent: z.B. Farbe", width: 16, group: "core" },
-    { key: "option1_value", label: "option1_value", note: "Child: z.B. Rot", width: 16, group: "core" },
-    { key: "option2_name", label: "option2_name", note: "Parent: z.B. Größe", width: 16, group: "core" },
-    { key: "option2_value", label: "option2_value", note: "Child: z.B. M", width: 14, group: "core" },
-    { key: "option3_name", label: "option3_name", note: "Parent: weitere Option (optional)", width: 16, group: "core" },
-    { key: "option3_value", label: "option3_value", note: "Child: Wert für Option 3", width: 16, group: "core" },
-    { key: "option4_name", label: "option4_name", note: "Parent: weitere Option (optional)", width: 16, group: "core" },
-    { key: "option4_value", label: "option4_value", note: "Child: Wert für Option 4", width: 16, group: "core" },
-    { key: "option5_name", label: "option5_name", note: "Parent: weitere Option (optional)", width: 16, group: "core" },
-    { key: "option5_value", label: "option5_value", note: "Child: Wert für Option 5", width: 16, group: "core" },
-    { key: "option6_name", label: "option6_name", note: "Parent: weitere Option (optional)", width: 16, group: "core" },
-    { key: "option6_value", label: "option6_value", note: "Child: Wert für Option 6", width: 16, group: "core" },
-    { key: "unit_type", label: "unit_type", note: "Dropdown: kg | g | L | ml | stück", width: 12, group: "core" },
-    { key: "unit_value", label: "unit_value", note: "z.B. 200", width: 12, group: "core" },
+    { key: "inventory", label: "inventory", note: "Inventory quantity", width: 12, group: "core" },
+    { key: "brand", label: "brand", note: "Dropdown: brand name from list", width: 18, group: "core" },
+    { key: "type", label: "type", note: "Product type", width: 16, group: "core" },
+    { key: "category_slug", label: "category_slug", note: "Dropdown: exact category slug from list", width: 22, group: "core" },
+    { key: "shipping_group", label: "shipping_group", note: "Dropdown: shipping group name", width: 22, group: "core" },
+    { key: "manufacturer", label: "manufacturer", note: "GPSR: manufacturer (required)", width: 26, group: "core" },
+    { key: "manufacturer_information", label: "manufacturer_information", note: "GPSR: manufacturer information (required)", width: 42, group: "core" },
+    { key: "responsible_person_information", label: "responsible_person_information", note: "GPSR: responsible person in EU (required)", width: 42, group: "core" },
+    { key: "weight_grams", label: "weight_grams", note: "Weight in grams", width: 14, group: "core" },
+    { key: "dim_length_cm", label: "dim_length_cm", note: "Length in cm", width: 14, group: "core" },
+    { key: "dim_width_cm", label: "dim_width_cm", note: "Width in cm", width: 13, group: "core" },
+    { key: "dim_height_cm", label: "dim_height_cm", note: "Height in cm", width: 13, group: "core" },
+    { key: "image_url_1", label: "image_url_1", note: "Image URL 1 (main image)", width: 40, group: "core" },
+    { key: "image_url_2", label: "image_url_2", note: "Image URL 2", width: 40, group: "core" },
+    { key: "image_url_3", label: "image_url_3", note: "Image URL 3", width: 40, group: "core" },
+    { key: "image_url_4", label: "image_url_4", note: "Image URL 4", width: 40, group: "core" },
+    { key: "image_url_5", label: "image_url_5", note: "Image URL 5", width: 40, group: "core" },
+    { key: "swatch_image_url", label: "swatch_image_url", note: "Swatch image URL", width: 28, group: "core" },
+    { key: "option1_name", label: "variation1_name", note: "Parent: variation 1 name (e.g. color)", width: 18, group: "variations" },
+    { key: "option1_value", label: "variation1_value", note: "Child: variation 1 value (e.g. red)", width: 18, group: "variations" },
+    { key: "option2_name", label: "variation2_name", note: "Parent: variation 2 name (e.g. size)", width: 18, group: "variations" },
+    { key: "option2_value", label: "variation2_value", note: "Child: variation 2 value (e.g. M)", width: 18, group: "variations" },
+    { key: "option3_name", label: "variation3_name", note: "Parent: Variation 3 Name (optional)", width: 18, group: "variations" },
+    { key: "option3_value", label: "variation3_value", note: "Child: variation 3 value", width: 18, group: "variations" },
+    { key: "option4_name", label: "variation4_name", note: "Parent: Variation 4 Name (optional)", width: 18, group: "variations" },
+    { key: "option4_value", label: "variation4_value", note: "Child: variation 4 value", width: 18, group: "variations" },
+    { key: "option5_name", label: "variation5_name", note: "Parent: Variation 5 Name (optional)", width: 18, group: "variations" },
+    { key: "option5_value", label: "variation5_value", note: "Child: variation 5 value", width: 18, group: "variations" },
+    { key: "option6_name", label: "variation6_name", note: "Parent: Variation 6 Name (optional)", width: 18, group: "variations" },
+    { key: "option6_value", label: "variation6_value", note: "Child: variation 6 value", width: 18, group: "variations" },
+    { key: "unit_type", label: "unit_type", note: "Dropdown: kg | g | L | ml | piece", width: 12, group: "core" },
+    { key: "unit_value", label: "unit_value", note: "e.g. 200", width: 12, group: "core" },
   ];
   cols.push(...core);
 
-  for (const lang of LANGS) {
-    cols.push(
-      { key: `variant_title_${lang}`, label: `variant_title_${lang}`, note: `Child: Variant Titel (${LANG_LABELS[lang]})`, width: 30, group: "core" },
-      { key: `variant_description_${lang}`, label: `variant_description_${lang}`, note: `Child: Variant Beschreibung (${LANG_LABELS[lang]})`, width: 38, group: "core" },
-      { key: `variant_bullet1_${lang}`, label: `variant_bullet1_${lang}`, note: `Child: Variant Bullet 1 (${LANG_LABELS[lang]})`, width: 30, group: "core" },
-      { key: `variant_bullet2_${lang}`, label: `variant_bullet2_${lang}`, note: `Child: Variant Bullet 2 (${LANG_LABELS[lang]})`, width: 30, group: "core" },
-      { key: `variant_bullet3_${lang}`, label: `variant_bullet3_${lang}`, note: `Child: Variant Bullet 3 (${LANG_LABELS[lang]})`, width: 30, group: "core" },
-      { key: `variant_bullet4_${lang}`, label: `variant_bullet4_${lang}`, note: `Child: Variant Bullet 4 (${LANG_LABELS[lang]})`, width: 30, group: "core" },
-      { key: `variant_bullet5_${lang}`, label: `variant_bullet5_${lang}`, note: `Child: Variant Bullet 5 (${LANG_LABELS[lang]})`, width: 30, group: "core" },
-      { key: `variant_seo_title_${lang}`, label: `variant_seo_title_${lang}`, note: `Child: Variant SEO Titel (${LANG_LABELS[lang]})`, width: 30, group: "core" },
-      { key: `variant_seo_description_${lang}`, label: `variant_seo_description_${lang}`, note: `Child: Variant SEO Beschreibung (${LANG_LABELS[lang]})`, width: 40, group: "core" },
-      { key: `variant_seo_keywords_${lang}`, label: `variant_seo_keywords_${lang}`, note: `Child: Variant SEO Keywords (${LANG_LABELS[lang]})`, width: 30, group: "core" },
-    );
-  }
-
   for (let i = 1; i <= METAFIELD_PAIRS; i++) {
     cols.push(
-      { key: `metafield_${i}_key`, label: `metafield_${i}_key`, note: `Metafeld ${i} — technischer Schlüssel`, width: 22, group: "metafields", outline: 1 },
-      { key: `metafield_${i}_value`, label: `metafield_${i}_value`, note: `Metafield ${i} — Wert (Text)`, width: 34, group: "metafields", outline: 1 }
+      { key: `metafield_${i}_key`, label: `metafield_${i}_key`, note: `Metafield ${i} - key`, width: 22, group: "metafields", outline: 1 },
+      { key: `metafield_${i}_value`, label: `metafield_${i}_value`, note: `Metafield ${i} - value (text)`, width: 34, group: "metafields", outline: 1 }
     );
   }
   for (let i = 1; i <= METAFIELD_PAIRS; i++) {
     cols.push(
-      { key: `variant_metafield_${i}_key`, label: `variant_metafield_${i}_key`, note: `Child Variant-Metafeld ${i} — key`, width: 24, group: "metafields", outline: 1 },
-      { key: `variant_metafield_${i}_value`, label: `variant_metafield_${i}_value`, note: `Child Variant-Metafeld ${i} — value`, width: 34, group: "metafields", outline: 1 }
+      { key: `variant_metafield_${i}_key`, label: `variant_metafield_${i}_key`, note: `Child variant metafield ${i} - key`, width: 24, group: "metafields", outline: 1 },
+      { key: `variant_metafield_${i}_value`, label: `variant_metafield_${i}_value`, note: `Child variant metafield ${i} - value`, width: 34, group: "metafields", outline: 1 }
     );
   }
 
   for (const lang of LANGS) {
     cols.push(
       { key: `title_${lang}`, label: `title_${lang}`, note: `Titel (${LANG_LABELS[lang]})`, width: 36, group: `lang_${lang}`, outline: 1 },
-      { key: `description_${lang}`, label: `description_${lang}`, note: `Beschreibung HTML (${LANG_LABELS[lang]})`, width: 50, group: `lang_${lang}`, outline: 1 },
+      { key: `description_${lang}`, label: `description_${lang}`, note: `Beschreibung HTML (${LANG_LABELS[lang]}) — Parent/Child`, width: 50, group: `lang_${lang}`, outline: 1 },
       { key: `bullet1_${lang}`, label: `bullet1_${lang}`, note: `Stichpunkt 1`, width: 36, group: `lang_${lang}`, outline: 1 },
       { key: `bullet2_${lang}`, label: `bullet2_${lang}`, note: `Stichpunkt 2`, width: 36, group: `lang_${lang}`, outline: 1 },
       { key: `bullet3_${lang}`, label: `bullet3_${lang}`, note: `Stichpunkt 3`, width: 36, group: `lang_${lang}`, outline: 1 },
@@ -187,12 +170,6 @@ function buildColumns() {
       { key: `price_sale_${country}`, label: `price_sale_${country}`, note: `Aktionspreis`, width: 18, group: `price_${country}`, outline: 1 },
     );
   }
-
-  cols.push(
-    { key: "seo_title", label: "seo_title", note: "SEO-Titel", width: 36, group: "seo", outline: 1 },
-    { key: "seo_description", label: "seo_description", note: "SEO-Beschreibung", width: 60, group: "seo", outline: 1 },
-    { key: "seo_keywords", label: "seo_keywords", note: "Stichwörter (Komma)", width: 36, group: "seo", outline: 1 },
-  );
 
   return cols;
 }
@@ -219,18 +196,10 @@ function border() {
   return { top: thin, left: thin, bottom: thin, right: thin };
 }
 
-const INFO_SHEET_TITLES = {
-  de: "Anleitung",
-  en: "Guide",
-  tr: "Kılavuz",
-  fr: "Guide",
-  it: "Guida",
-  es: "Guía",
-};
+const INFO_SHEET_TITLES = { de: "Guide", en: "Guide", tr: "Guide", fr: "Guide", it: "Guide", es: "Guide" };
 
 function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipNames }) {
-  const allowed = ["de", "en", "tr", "fr", "it", "es"];
-  const loc = allowed.includes(locale) ? locale : "de";
+  const loc = "en";
   const L = {
     de: {
       title: "BELUCHA — Produkte per Excel importieren",
@@ -242,11 +211,11 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       shipTitle: "Versandgruppen (Dropdown „shipping_group“) — Namen wie unter Einstellungen > Versand:",
       colsTitle: "Wichtige Spalten (Blatt „Products“, ab Zeile 4)",
       rowStructure: "Zeilen 1–3: Gruppenkopf, Spaltenname, Kurzhinweis — nicht löschen.",
-      parentChild: "Parent-Zeilen: gemeinsame Texte, Bilder, Preise, Kategorie, Marke, Versandgruppe, optionN_name (Optionstitel). Child-Zeilen: gleiche product_type-Spalte „child“, parent_sku, varianten-spezifisch optionN_value, SKU, EAN, Lager, optionale Bilder/Swatch.",
+      parentChild: "Parent-Zeilen: gemeinsame Texte, Bilder, Preise, Kategorie, Marke, Versandgruppe, optionN_name (Optionstitel). Child-Zeilen: gleiche product_type-Spalte „child“, parent_sku, varianten-spezifisch optionN_value, SKU, EAN, Lager, optionale Bilder/Swatch. Titel/Beschreibung/Bullets werden zentral über title, description, bullet1..bullet5 gepflegt.",
       options: "Varianten: Mindestens zwei Optionen (option1/option2) sind im Beispiel; Sie können option3_name … option6_name (und passende *_value in Child-Zeilen) nutzen. Weitere Optionen können Sie analog ergänzen (option7_name …), sofern Sie die Spalten in Excel hinzufügen — der Import liest alle fortlaufenden optionN_*-Spalten.",
       metafields: `Metafelder: Paare metafield_N_key / metafield_N_value (hier N=1…${METAFIELD_PAIRS}). Sie können weitere Paare mit N=16,17,… als neue Spalten anfügen — der Import übernimmt alle solchen Spalten.`,
       noCollection: "Kollektionen werden bei diesem Import nicht per Excel gesetzt — bitte im Anschluss in der Oberfläche zuordnen, falls nötig.",
-      prices: "Preise mit Punkt als Dezimaltrenner (z.B. 29.99). HTML in description_* ist erlaubt.",
+      prices: "Preise mit Komma als Dezimaltrenner (z.B. 29,99). HTML in description_* ist erlaubt.",
       comments: "Leere Datenzeilen werden übersprungen. Zeilen mit SKU beginnend mit # sind Kommentare.",
       skuUpdate:
         "Bestehende Produkte: Stimmt die Parent-SKU mit einer SKU im System überein, wird das Produkt aktualisiert — es wird nur überschrieben, was in der Excel-Zelle gefüllt ist; leere Zellen lassen die bisherigen Werte unverändert.",
@@ -261,11 +230,11 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       shipTitle: 'Shipping groups ("shipping_group" dropdown) — names as in Settings > Shipping:',
       colsTitle: 'Key columns (sheet "Products", from row 4)',
       rowStructure: "Rows 1–3: group header, column key, short hint — do not delete.",
-      parentChild: 'Parent rows: shared copy, images, prices, category, brand, shipping group, optionN_names. Child rows: product_type = child, parent_sku, per-variant optionN_value, SKU, EAN, stock, optional images/swatch.',
+      parentChild: 'Parent rows: shared copy, images, prices, category, brand, shipping group, optionN_names. Child rows: product_type = child, parent_sku, per-variant optionN_value, SKU, EAN, stock, optional images/swatch. Use title, description and bullet1..bullet5 as single shared content fields.',
       options: "Variants: the sample uses two options; you may use option3…option6 (add option7_name / option7_value columns in Excel if needed — import reads consecutive optionN_* columns).",
       metafields: `Metafields: pairs metafield_N_key / metafield_N_value (here N=1…${METAFIELD_PAIRS}). Add columns for N=16,17,… as needed — all pairs are imported.`,
       noCollection: "Collections are not set via this Excel import — assign in the UI afterward if needed.",
-      prices: "Use a dot for decimals (e.g. 29.99). HTML is allowed in description_*.",
+      prices: "Use a comma for decimals (e.g. 29,99). HTML is allowed in description_*.",
       comments: "Empty rows are skipped. Rows with SKU starting with # are comments.",
       skuUpdate:
         "Existing products: If the parent row SKU matches a product SKU in the system, that product is updated — only cells you fill in Excel overwrite data; empty cells keep the previous values.",
@@ -284,7 +253,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       options: "Örnekte iki seçenek vardır; option3…option6 kullanılabilir; daha fazlası için Excel’de option7_name / option7_value sütunları eklenebilir.",
       metafields: `Metafield çiftleri: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). N=16 ve sonrası sütun eklenebilir — içe aktarma hepsini okur.`,
       noCollection: "Koleksiyonlar bu Excel ile atanmaz — gerekirse arayüzden ekleyin.",
-      prices: "Ondalık ayırıcı nokta (örn. 29.99). description_* alanında HTML kullanılabilir.",
+      prices: "Ondalık ayırıcı virgül (örn. 29,99). description_* alanında HTML kullanılabilir.",
       comments: "Boş satırlar atlanır. SKU # ile başlayan satırlar yorum sayılır.",
     },
   };
@@ -324,7 +293,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
   lines.push(["", pack.prices]);
   lines.push(["", pack.comments]);
   if (pack.skuUpdate) lines.push(["", pack.skuUpdate]);
-  return { lines, sheetTitle: `📋 ${INFO_SHEET_TITLES[loc] || "Anleitung"}` };
+  return { lines, sheetTitle: `📋 ${INFO_SHEET_TITLES[loc] || "Guide"}` };
 }
 
 function fillListsSheet(ws, lists) {
@@ -380,7 +349,7 @@ async function buildWorkbook({
   const shipNames = [...new Set(shippingGroups.map((g) => String(g.name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
   const ws = wb.addWorksheet("Products", {
-    properties: { outlineLevelCol: 1, defaultColWidth: 16 },
+    properties: { defaultColWidth: 16 },
     views: [{ state: "frozen", ySplit: 3, xSplit: 0 }],
   });
 
@@ -388,21 +357,25 @@ async function buildWorkbook({
   cols.forEach((col, i) => {
     const exCol = ws.getColumn(i + 1);
     exCol.width = col.width;
-    if (col.outline) {
-      exCol.outlineLevel = col.outline;
-      exCol.hidden = true;
+  });
+
+  const groupSegments = [];
+  cols.forEach((col, i) => {
+    const g = col.group;
+    const colNo = i + 1;
+    const last = groupSegments[groupSegments.length - 1];
+    if (last && last.group === g && last.end === colNo - 1) {
+      last.end = colNo;
+    } else {
+      groupSegments.push({ group: g, start: colNo, end: colNo });
     }
   });
 
-  const groups = {};
-  cols.forEach((col, i) => {
-    const g = col.group;
-    if (!groups[g]) groups[g] = { start: i + 1, end: i + 1 };
-    else groups[g].end = i + 1;
-  });
+  // Column grouping/outline intentionally disabled.
 
   const groupMeta = {
     core: { label: "Core", bg: COLORS.coreBg, fg: COLORS.core },
+    variations: { label: "Variations", bg: COLORS.coreBg, fg: COLORS.core },
     seo: { label: "SEO", bg: COLORS.seoBg, fg: COLORS.seo },
     metafields: { label: "Metafields (optional +)", bg: COLORS.metaBg, fg: COLORS.meta },
   };
@@ -415,16 +388,16 @@ async function buildWorkbook({
 
   const row1 = ws.getRow(1);
   row1.height = 20;
-  for (const [g, span] of Object.entries(groups)) {
-    const meta = groupMeta[g];
+  for (const seg of groupSegments) {
+    const meta = groupMeta[seg.group];
     if (!meta) continue;
-    const cell = ws.getCell(1, span.start);
+    const cell = ws.getCell(1, seg.start);
     cell.value = meta.label;
     cell.fill = headerFill(meta.bg);
     cell.font = { bold: true, color: meta.fg, size: 10 };
     cell.alignment = { horizontal: "center", vertical: "middle" };
     cell.border = border();
-    if (span.end > span.start) ws.mergeCells(1, span.start, 1, span.end);
+    if (seg.end > seg.start) ws.mergeCells(1, seg.start, 1, seg.end);
   }
 
   const row2 = ws.getRow(2);
@@ -486,8 +459,8 @@ async function buildWorkbook({
     }
   }
 
-  const exBrand = brandNames[0] || "Markenname";
-  const exCat = categorySlugs[0] || "kategorie-slug";
+  const exBrand = brandNames[0] || "brand-name";
+  const exCat = categorySlugs[0] || "category-slug";
   const exShip = shipNames[0] || "";
 
   setRow(4, {
@@ -509,14 +482,8 @@ async function buildWorkbook({
     bullet1_de: "100% Baumwolle",
     bullet2_de: "Maschinenwaschbar",
     bullet3_de: "Regular Fit",
-    title_en: "Basic T-Shirt",
-    description_en: "<p>High-quality basic T-shirt.</p>",
-    price_brutto_DE: "29.99",
-    price_uvp_DE: "39.99",
-    price_brutto_AT: "29.99",
-    price_brutto_CH: "32.00",
-    seo_title: "Basic T-Shirt kaufen",
-    seo_description: "Jetzt Basic T-Shirt online bestellen.",
+    price_brutto_DE: "29,99",
+    price_uvp_DE: "39,99",
   }, "FFFAFAFA");
 
   setRow(5, {
@@ -587,7 +554,7 @@ async function buildWorkbook({
   const listRefs = fillListsSheet(listsWs, {
     productTypes: ["parent", "child"],
     statuses: ["draft", "published"],
-    unitTypes: ["kg", "g", "L", "ml", "stück"],
+    unitTypes: ["kg", "g", "L", "ml", "piece"],
     categorySlugs: categorySlugs.length ? categorySlugs : ["—"],
     brandNames: brandNames.length ? brandNames : ["—"],
     shipNames: shipNames.length ? shipNames : ["—"],

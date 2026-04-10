@@ -1,10 +1,66 @@
 {
   "common": {
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "add": "Agregar",
+    "remove": "Quitar",
+    "upload": "Subir",
+    "duplicate": "Duplicar",
+    "loading": "Cargando…",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "export": "Exportar",
+    "import": "Importar",
+    "back": "Volver",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "required": "Obligatorio",
+    "optional": "Opcional",
+    "yes": "Sí",
+    "no": "No",
+    "error": "Error",
+    "success": "Éxito",
+    "actions": "Acciones",
+    "view": "Vista",
+    "list": "Lista",
+    "free": "Gratis",
+    "noItems": "Sin artículos",
+    "all": "Todos",
+    "new": "Nuevo",
     "dashboard": "Panel",
     "products": "Productos",
     "orders": "Pedidos",
-    "settings": "Ajustes",
-    "logout": "Cerrar sesión"
+    "settings": "Configuración",
+    "logout": "Cerrar sesión",
+    "productStatus": {
+      "published": "Activo",
+      "draft": "Borrador",
+      "archived": "Archivado"
+    },
+    "orderStatus": {
+      "pending": "Abierto",
+      "processing": "En proceso",
+      "shipped": "Enviado",
+      "delivered": "Entregado",
+      "completed": "Completado",
+      "cancelled": "Cancelado",
+      "paid": "Pagado",
+      "refunded": "Reembolsado",
+      "teil_erstattet": "Parcialmente reembolsado",
+      "retoure": "Devolución",
+      "retoure_anfrage": "Devolución pendiente"
+    },
+    "approvalStatus": {
+      "pending": "Pendiente",
+      "pending_review": "En revisión",
+      "approved": "Aprobado",
+      "rejected": "Rechazado",
+      "suspended": "Suspendido",
+      "documents_submitted": "Documentos enviados"
+    }
   },
   "nav": {
     "home": "Inicio",
@@ -13,32 +69,39 @@
     "orders": "Pedidos",
     "content": "Contenido",
     "marketing": "Marketing",
-    "settings": "Ajustes",
+    "settings": "Configuración",
     "language": "Idioma",
     "drafts": "Borradores",
     "abandonedCheckouts": "Carritos abandonados",
     "returns": "Devoluciones",
     "inventory": "Inventario",
     "collections": "Colecciones",
-    "giftCards": "Tarjetas regalo",
+    "giftCards": "Tarjetas de regalo",
     "customers": "Clientes",
     "customersList": "Lista",
     "campaigns": "Campañas",
     "attribution": "Atribución",
     "automations": "Automatizaciones",
     "discounts": "Descuentos",
-    "metaobjects": "Metaobjetos",
+    "metaobjects": "Meta objetos",
     "categories": "Categorías",
     "media": "Medios",
     "pages": "Páginas",
     "files": "Archivos",
     "menus": "Menús",
-    "blogPosts": "Entradas del blog",
+    "blogPosts": "Publicaciones de blog",
     "brands": "Marcas",
-    "analytics": "Analíticas",
+    "analytics": "Análisis",
     "reports": "Informes",
     "liveView": "Vista en vivo",
-    "importExport": "Importar/Exportar"
+    "importExport": "Importar/Exportar",
+    "view": "Vista",
+    "list": "Lista",
+    "reviews": "Reseñas",
+    "sellers": "Vendedores",
+    "coupons": "Cupones",
+    "landingPage": "Página de destino",
+    "styles": "Estilos"
   },
   "locale": {
     "en": "English",
@@ -47,5 +110,617 @@
     "fr": "Français",
     "it": "Italiano",
     "es": "Español"
+  },
+  "auth": {
+    "login": {
+      "title": "Inicio de sesión del vendedor",
+      "subtitle": "Inicia sesión en tu cuenta de vendedor",
+      "email": "Correo electrónico",
+      "emailPlaceholder": "tu@ejemplo.es",
+      "password": "Contraseña",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Iniciar sesión",
+      "submitting": "Iniciando sesión…",
+      "noAccount": "¿No tienes cuenta? Regístrate aquí",
+      "errorRequired": "El correo y la contraseña son obligatorios",
+      "errorFailed": "Inicio de sesión fallido. Verifica tu correo y contraseña."
+    },
+    "register": {
+      "title": "Conviértete en vendedor",
+      "titleInvited": "Aceptar invitación",
+      "subtitle": "Regístrate ahora y empieza a vender",
+      "subtitleInvited": "Crea tu cuenta",
+      "firstName": "Nombre",
+      "firstNamePlaceholder": "Carlos",
+      "lastName": "Apellido",
+      "lastNamePlaceholder": "García",
+      "storeName": "Nombre de la tienda",
+      "storeNamePlaceholder": "Mi Tienda",
+      "email": "Correo electrónico",
+      "emailPlaceholder": "tu@ejemplo.es",
+      "password": "Contraseña",
+      "passwordPlaceholder": "Mín. 6 caracteres",
+      "agreeText": "He leído y acepto los {terms} y la {privacy}.",
+      "terms": "Términos de servicio",
+      "privacy": "Política de privacidad",
+      "submit": "Crear cuenta de vendedor",
+      "submitInvited": "Crear cuenta",
+      "submitting": "Creando cuenta…",
+      "alreadyHaveAccount": "¿Ya estás registrado? Inicia sesión",
+      "success": "¡Cuenta creada! Redirigiendo…",
+      "errorRequired": "El correo y la contraseña son obligatorios",
+      "errorStoreName": "El nombre de la tienda es obligatorio",
+      "errorName": "El nombre y apellido son obligatorios",
+      "errorPasswordLength": "La contraseña debe tener al menos 6 caracteres",
+      "errorTerms": "Acepta los términos de servicio y la política de privacidad.",
+      "errorFailed": "Registro fallido. Inténtalo de nuevo."
+    }
+  },
+  "orders": {
+    "title": "Pedidos",
+    "newOrder": "Nuevo pedido",
+    "searchPlaceholder": "Buscar por nombre, correo, #…",
+    "sellerSearchPlaceholder": "Buscar vendedor (nombre)…",
+    "return": "Devolución (activa)",
+    "loading": "Cargando…",
+    "empty": "No se encontraron pedidos",
+    "sort": {
+      "label": "Ordenar",
+      "newest": "Más reciente primero",
+      "oldest": "Más antiguo primero",
+      "amountDesc": "Importe ↓",
+      "amountAsc": "Importe ↑"
+    },
+    "table": {
+      "order": "Pedido",
+      "customer": "Cliente",
+      "date": "Fecha",
+      "items": "Artículos",
+      "total": "Total",
+      "status": "Estado",
+      "payment": "Pago",
+      "delivery": "Entrega"
+    },
+    "actions": {
+      "viewDetails": "Ver detalles",
+      "ship": "Enviar",
+      "cancel": "Cancelar",
+      "delete": "Eliminar"
+    },
+    "new": {
+      "title": "Nuevo pedido",
+      "customerData": "Datos del cliente",
+      "email": "Correo *",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "phone": "Teléfono",
+      "country": "País",
+      "street": "Calle",
+      "postalCode": "Código postal",
+      "city": "Ciudad",
+      "items": "Artículos",
+      "itemDescription": "Descripción",
+      "itemQty": "Cant.",
+      "itemPrice": "Precio (céntimos)",
+      "addItem": "Agregar artículo",
+      "shipping": "Envío (céntimos)",
+      "discount": "Descuento (céntimos)",
+      "paymentMethod": "Método de pago",
+      "paymentMethodPlaceholder": "Transferencia, PayPal…",
+      "notes": "Notas",
+      "create": "Crear pedido"
+    },
+    "detail": {
+      "back": "← Pedidos",
+      "orderPrefix": "Pedido #",
+      "sections": {
+        "items": "Artículos",
+        "statusManagement": "Gestión de estado",
+        "shipping": "Envío",
+        "paymentInfo": "Info de pago",
+        "customerInfo": "Info del cliente",
+        "shippingAddress": "Dirección de envío",
+        "billingAddress": "Dirección de facturación",
+        "summary": "Resumen",
+        "deleteOrder": "Eliminar pedido"
+      },
+      "table": {
+        "product": "Producto",
+        "qty": "Cant.",
+        "unitPrice": "Precio unitario",
+        "total": "Total"
+      },
+      "fields": {
+        "orderStatus": "Estado del pedido",
+        "paymentStatus": "Estado del pago",
+        "deliveryStatus": "Estado de entrega",
+        "carrier": "Transportista",
+        "trackingNumber": "Número de seguimiento",
+        "shippedDate": "Fecha de envío",
+        "paymentMethod": "Método de pago",
+        "customerType": "Tipo de cliente",
+        "firstOrder": "Primer pedido",
+        "newsletter": "Newsletter",
+        "orderNumber": "Número de pedido",
+        "date": "Fecha"
+      },
+      "customerTypes": {
+        "guest": "Cliente invitado",
+        "registered": "Cliente registrado"
+      },
+      "sameAsShipping": "igual que la dirección de envío",
+      "buttons": {
+        "saveStatus": "Guardar estado",
+        "editShipping": "Editar envío / marcar como enviado",
+        "invoice": "Factura (PDF)",
+        "packingSlip": "Albarán (PDF)",
+        "deleteOrder": "Eliminar pedido",
+        "saved": "✓ Guardado"
+      },
+      "costBreakdown": {
+        "shippingCosts": "Costos de envío",
+        "discount": "Descuento",
+        "subtotal": "Subtotal (IVA incluido)",
+        "total": "Total"
+      },
+      "messages": {
+        "loadError": "No se pudo cargar el pedido",
+        "saveFailed": "Error al guardar",
+        "deleteConfirm": "¿Eliminar este pedido?",
+        "deleteFailed": "Error al eliminar",
+        "undoWarning": "Esta acción es irreversible.",
+        "loading": "Cargando…",
+        "noItems": "Sin artículos"
+      }
+    }
+  },
+  "products": {
+    "title": "Productos",
+    "newProduct": "Nuevo producto",
+    "searchPlaceholder": "Buscar productos…",
+    "loading": "Cargando…",
+    "empty": "No se encontraron productos",
+    "sort": {
+      "nameAsc": "Nombre A–Z",
+      "nameDesc": "Nombre Z–A",
+      "newest": "Más reciente primero",
+      "oldest": "Más antiguo primero"
+    },
+    "table": {
+      "product": "Producto",
+      "sku": "SKU",
+      "category": "Categoría",
+      "price": "Precio",
+      "inventory": "Inventario",
+      "status": "Estado",
+      "seller": "Vendedor"
+    },
+    "actions": {
+      "edit": "Editar",
+      "duplicate": "Duplicar",
+      "delete": "Eliminar"
+    },
+    "edit": {
+      "back": "← Productos",
+      "newTitle": "Nuevo producto",
+      "editTitle": "Editar producto",
+      "sections": {
+        "basicInfo": "Información básica",
+        "description": "Descripción",
+        "media": "Medios",
+        "pricing": "Precios",
+        "inventory": "Inventario",
+        "variants": "Variantes",
+        "metadata": "Metadatos",
+        "seo": "SEO",
+        "shipping": "Envío y dimensiones",
+        "productType": "Tipo de producto",
+        "relatedProducts": "Productos relacionados"
+      },
+      "fields": {
+        "title": "Título",
+        "titlePlaceholder": "ej. Camiseta de algodón",
+        "sku": "SKU",
+        "ean": "EAN / Código de barras",
+        "category": "Categoría",
+        "categoryPlaceholder": "Seleccionar categoría",
+        "brand": "Marca",
+        "noBrand": "— Ninguna —",
+        "shippingGroup": "Grupo de envío",
+        "collections": "Colecciones",
+        "collectionsPlaceholder": "Buscar colección…",
+        "status": "Estado",
+        "metaTitle": "Meta título",
+        "metaDescription": "Meta descripción",
+        "keywords": "Palabras clave",
+        "keywordsPlaceholder": "palabra1, palabra2",
+        "urlHandle": "URL handle",
+        "syncHandle": "Sincronizar título → handle",
+        "weight": "Peso (g)",
+        "length": "L (cm)",
+        "width": "An (cm)",
+        "height": "Al (cm)",
+        "productType": "Tipo de producto",
+        "productTypePlaceholder": "ej. Camiseta",
+        "manufacturer": "Fabricante",
+        "manufacturerInfo": "Información del fabricante",
+        "responsiblePerson": "Persona responsable (UE)",
+        "searchOrEnter": "Buscar o ingresar…",
+        "relatedSearch": "Buscar producto…",
+        "quantity": "Cantidad"
+      },
+      "pricing": {
+        "net": "Neto",
+        "gross": "Bruto (IVA {taxLabel} {vatRate}% incluido)",
+        "rrp": "Precio recomendado",
+        "sale": "Oferta",
+        "linkNetGross": "Vincular neto y bruto",
+        "unlinkNetGross": "Desvincular neto y bruto"
+      },
+      "variants": {
+        "groupName": "Nombre del grupo",
+        "groupNamePlaceholder": "ej. Color, Talla, Material",
+        "value": "Valor",
+        "swatch": "Muestra",
+        "addSwatchImage": "Agregar imagen de muestra",
+        "changeSwatchImage": "Cambiar imagen de muestra",
+        "removeOption": "Quitar opción",
+        "removeSwatch": "Quitar muestra",
+        "price": "Precio (€)",
+        "rrp": "Precio rec. (€)",
+        "sale": "Oferta (€)"
+      },
+      "description": {
+        "visualToggle": "Mostrar visual",
+        "htmlToggle": "Mostrar HTML"
+      },
+      "media": {
+        "addImage": "Agregar imagen",
+        "selectImage": "Seleccionar imagen"
+      },
+      "units": {
+        "none": "— Ninguna —",
+        "piece": "Pieza"
+      },
+      "duplicate": {
+        "title": "Duplicar producto",
+        "create": "Crear duplicado",
+        "cancel": "Cancelar",
+        "fields": {
+          "title": "Título (con sufijo \"(Copia)\")",
+          "description": "Descripción",
+          "price": "Precio",
+          "inventory": "Cantidad en stock",
+          "categories": "Categorías / colección",
+          "images": "Imágenes / medios",
+          "variants": "Variantes (nombres y valores de opciones; SKU/EAN nunca copiados)"
+        }
+      },
+      "messages": {
+        "created": "Producto creado",
+        "saved": "Guardado",
+        "proposalSubmitted": "Tu propuesta de cambio ha sido enviada. Un superusuario la revisará.",
+        "priceStockSaved": "Precio, stock y datos personalizados guardados.",
+        "saveFailed": "Error al guardar",
+        "duplicateFailed": "Error al duplicar",
+        "deleteFailed": "Error al eliminar",
+        "variantEanRequired": "El EAN de la variante no puede estar vacío.",
+        "gpsr": "El GPSR es obligatorio. Completa los siguientes campos: {fields}"
+      }
+    }
+  },
+  "inventory": {
+    "title": "Inventario",
+    "searchPlaceholder": "Buscar productos…",
+    "loading": "Cargando…",
+    "empty": "No se encontraron productos",
+    "sort": {
+      "nameAsc": "Nombre A–Z",
+      "nameDesc": "Nombre Z–A",
+      "newest": "Más reciente primero",
+      "oldest": "Más antiguo primero"
+    },
+    "table": {
+      "product": "Producto",
+      "sku": "SKU",
+      "available": "Disponible",
+      "reserved": "Reservado",
+      "total": "Total"
+    }
+  },
+  "customers": {
+    "title": "Clientes",
+    "newCustomer": "Nuevo cliente",
+    "searchPlaceholder": "Buscar por nombre, correo o #…",
+    "sellerSearchPlaceholder": "Buscar vendedor (nombre)…",
+    "loading": "Cargando…",
+    "empty": "No se encontraron clientes",
+    "emptyArea": "No hay clientes en esta área.",
+    "emptySellerCustomers": "Sin clientes de vendedor",
+    "superuserArea": "Tu área de superusuario — clientes directos y no asignados",
+    "sellerCustomers": "Clientes de vendedores",
+    "allCustomers": "Todos los clientes",
+    "count": "{count} cliente",
+    "countPlural": "{count} clientes",
+    "table": {
+      "number": "Cliente #",
+      "name": "Nombre",
+      "email": "Correo",
+      "type": "Tipo",
+      "registered": "Registrado",
+      "newsletter": "Newsletter",
+      "country": "País",
+      "orders": "Pedidos",
+      "totalSpent": "Total gastado",
+      "lastPurchase": "Última compra"
+    },
+    "accountTypes": {
+      "guest": "Invitado",
+      "business": "Empresa",
+      "private": "Particular"
+    },
+    "subscribed": "✓ Suscrito",
+    "registered": "Registrado",
+    "actions": {
+      "edit": "Editar",
+      "delete": "Eliminar"
+    },
+    "deleteConfirm": {
+      "title": "¿Eliminar cliente?",
+      "body": "será eliminado permanentemente.",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar"
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "general": {
+      "title": "Configuración general",
+      "subtitle": "Nombre de la tienda y contacto. El nombre de la tienda aparece como Vendedor en las páginas de producto.",
+      "sections": {
+        "language": "Idioma",
+        "languageHint": "Idioma de la interfaz para Sellercentral. Los datos del producto pueden ingresarse en cualquier idioma.",
+        "storeInfo": "Información de la tienda",
+        "address": "Dirección",
+        "companyDetails": "Detalles de la empresa y documentos",
+        "registeredAddress": "Dirección comercial registrada",
+        "warehouseAddress": "Dirección del almacén / devoluciones",
+        "documents": "Documentos de la empresa",
+        "documentsHint": "Sube licencia comercial, certificado fiscal, documentos de registro, etc."
+      },
+      "fields": {
+        "storeName": "Nombre de la tienda",
+        "storeNamePlaceholder": "ej. Mi Tienda",
+        "email": "Correo electrónico",
+        "emailPlaceholder": "tu@ejemplo.es",
+        "phone": "Teléfono",
+        "phonePlaceholder": "+34 …",
+        "city": "Ciudad",
+        "postalCode": "Código postal",
+        "country": "País",
+        "description": "Descripción de la tienda",
+        "descriptionPlaceholder": "Cuéntanos sobre tu tienda…",
+        "companyName": "Razón social",
+        "taxId": "NIF / CIF",
+        "vatId": "Número de IVA",
+        "iban": "IBAN (opcional)",
+        "website": "Sitio web",
+        "websitePlaceholder": "https://...",
+        "street": "Calle",
+        "streetPlaceholder": "Calle y número"
+      },
+      "buttons": {
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "remove": "Quitar",
+        "uploading": "Subiendo documentos…"
+      },
+      "messages": {
+        "saved": "Configuración guardada con éxito.",
+        "loading": "Cargando…"
+      }
+    },
+    "payments": {
+      "title": "Pagos y transferencias",
+      "subtitle": "Agrega tu cuenta bancaria para recibir los ingresos de ventas.",
+      "howItWorks": {
+        "title": "Cómo funcionan las transferencias",
+        "step1Label": "El cliente compra",
+        "step1Desc": "El pago va directamente a la plataforma (Stripe)",
+        "step2Label": "Liquidación",
+        "step2Desc": "Se calcula el {sellerPct}% de tus ingresos — {platformPct}% comisión de plataforma",
+        "step3Label": "Transferencia bancaria",
+        "step3Desc": "El importe se transfiere a tu IBAN",
+        "note": "Las transferencias las procesa manualmente la plataforma. Se te notificará por correo cuando se inicie una transferencia."
+      },
+      "bankAccount": {
+        "title": "Cuenta bancaria para transferencias",
+        "subtitle": "Tus ingresos de ventas se transferirán a esta cuenta.",
+        "addButton": "Agregar",
+        "editButton": "Editar",
+        "ibanLabel": "IBAN",
+        "holderLabel": "Titular de la cuenta",
+        "bicLabel": "BIC / SWIFT",
+        "bankNameLabel": "Banco",
+        "ibanPlaceholder": "ES91 2100 0418 4502 0005 1332",
+        "holderPlaceholder": "Carlos García o García SL",
+        "bicPlaceholder": "CAIXESBBXXX",
+        "bankNamePlaceholder": "CaixaBank",
+        "ibanHelp": "Número de cuenta bancaria internacional (con o sin espacios — ambos son aceptados)",
+        "saveButton": "Guardar datos bancarios",
+        "cancelButton": "Cancelar",
+        "accountReady": "Cuenta bancaria agregada — lista para transferencias",
+        "noAccount": "Sin cuenta bancaria agregada",
+        "noAccountDesc": "Sin IBAN no se pueden procesar transferencias. Agrega tu cuenta bancaria."
+      },
+      "history": {
+        "title": "Historial de transferencias",
+        "empty": "Sin transferencias todavía.",
+        "emptyHint": "Cuando se realice una transferencia, aparecerá aquí con fecha, importe y referencia."
+      },
+      "validation": {
+        "ibanEmpty": "El IBAN no puede estar vacío.",
+        "ibanFormat": "Formato de IBAN no válido (ej. ES91 2100 0418 4502 0005 1332).",
+        "ibanLength": "Longitud de IBAN no válida."
+      },
+      "messages": {
+        "saved": "Datos bancarios guardados con éxito.",
+        "loadError": "Error al cargar los datos de pago.",
+        "saveError": "Error al guardar.",
+        "loading": "Cargando…"
+      }
+    },
+    "verification": {
+      "title": "Verificación del vendedor",
+      "subtitle": "Completa la confirmación legal y los documentos de la empresa antes de empezar a vender.",
+      "statusLabel": "Estado de verificación",
+      "statuses": {
+        "pending": "Registrado — verificación requerida antes de vender",
+        "documents_submitted": "Documentos enviados — revisión en curso",
+        "pending_review": "Pendiente de aprobación",
+        "approved": "Cuenta verificada — venta habilitada",
+        "rejected": "Rechazado — contacta con soporte",
+        "suspended": "Suspendido — contacta con soporte"
+      },
+      "sections": {
+        "agreement": "Confirmación legal",
+        "company": "Detalles de la empresa",
+        "contact": "Contacto y dirección",
+        "documents": "Documentos"
+      },
+      "agreement": {
+        "label": "Confirmo que estoy autorizado a representar esta empresa y que toda la información proporcionada es precisa y completa.",
+        "terms": "Términos de servicio",
+        "privacy": "Política de privacidad",
+        "alreadyAccepted": "Acuerdo legal aceptado el {date}."
+      },
+      "fields": {
+        "companyName": "Nombre de la empresa",
+        "authorizedPerson": "Persona autorizada (nombre completo)",
+        "taxId": "NIF / CIF",
+        "vatId": "Número de IVA",
+        "iban": "IBAN",
+        "phone": "Número de teléfono",
+        "street": "Calle y número",
+        "city": "Ciudad",
+        "postalCode": "Código postal",
+        "country": "País"
+      },
+      "documents": {
+        "tradeRegister": "Extracto del registro mercantil",
+        "idPassport": "DNI / Pasaporte",
+        "taxDocument": "Documento fiscal (opcional)",
+        "uploaded": "Subido",
+        "notUploaded": "Aún no subido",
+        "required": "Obligatorio",
+        "optional": "Opcional",
+        "chooseFile": "Elegir archivo"
+      },
+      "buttons": {
+        "submit": "Enviar para verificación",
+        "saving": "Guardando…"
+      },
+      "validation": {
+        "agreement": "Acepta primero el acuerdo legal.",
+        "documents": "Sube el extracto del registro mercantil y el DNI/pasaporte."
+      },
+      "messages": {
+        "saved": "Datos guardados y enviados para verificación.",
+        "saveError": "Error al guardar."
+      }
+    },
+    "users": {
+      "title": "Usuarios y permisos",
+      "tabs": {
+        "all": "Todos",
+        "kybPending": "KYB pendiente ({count})"
+      },
+      "table": {
+        "name": "Nombre",
+        "email": "Correo",
+        "store": "Tienda",
+        "role": "Rol",
+        "status": "Estado",
+        "joined": "Registrado",
+        "actions": "Acciones"
+      },
+      "roles": {
+        "superuser": "Superusuario",
+        "seller": "Vendedor"
+      },
+      "actions": {
+        "kyb": "KYB",
+        "edit": "Editar",
+        "makeAdmin": "Hacer administrador",
+        "removeSuperuser": "Quitar superusuario",
+        "delete": "Eliminar"
+      },
+      "kyb": {
+        "title": "Revisión KYB",
+        "approve": "Aprobar",
+        "reject": "Rechazar",
+        "suspend": "Suspender",
+        "rejectionReason": "Motivo de rechazo",
+        "rejectionReasonPlaceholder": "Motivo…",
+        "close": "Cerrar",
+        "fields": {
+          "companyName": "Empresa",
+          "authorizedPerson": "Persona autorizada",
+          "taxId": "NIF / CIF",
+          "vatId": "IVA",
+          "iban": "IBAN",
+          "phone": "Teléfono",
+          "country": "País",
+          "agreementAccepted": "Acuerdo aceptado",
+          "agreementDate": "Fecha del acuerdo",
+          "riskScore": "Puntuación de riesgo",
+          "documents": "Documentos"
+        }
+      },
+      "deleteConfirm": {
+        "title": "¿Eliminar usuario?",
+        "body": "será eliminado permanentemente.",
+        "cancel": "Cancelar",
+        "confirm": "Eliminar"
+      },
+      "messages": {
+        "loading": "Cargando…",
+        "empty": "No se encontraron usuarios.",
+        "superuserGranted": "Acceso de superusuario concedido.",
+        "superuserRevoked": "Acceso de superusuario revocado.",
+        "updateFailed": "Error al actualizar.",
+        "deleteFailed": "Error al eliminar.",
+        "approvalUpdated": "Estado de aprobación actualizado."
+      }
+    }
+  },
+  "marketing": {
+    "discounts": {
+      "title": "Descuentos",
+      "newDiscount": "Nuevo descuento",
+      "loading": "Cargando…",
+      "empty": "No se encontraron descuentos.",
+      "table": {
+        "code": "Código",
+        "type": "Tipo",
+        "value": "Valor",
+        "usage": "Uso",
+        "expires": "Vence",
+        "status": "Estado"
+      },
+      "actions": {
+        "edit": "Editar",
+        "delete": "Eliminar"
+      }
+    }
+  },
+  "content": {
+    "media": {
+      "title": "Biblioteca de medios",
+      "upload": "Subir",
+      "loading": "Cargando…",
+      "empty": "No se encontraron archivos de medios.",
+      "searchPlaceholder": "Buscar medios…"
+    }
   }
 }

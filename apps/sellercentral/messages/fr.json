@@ -1,10 +1,66 @@
 {
   "common": {
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "cancel": "Annuler",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "add": "Ajouter",
+    "remove": "Retirer",
+    "upload": "Télécharger",
+    "duplicate": "Dupliquer",
+    "loading": "Chargement…",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "export": "Exporter",
+    "import": "Importer",
+    "back": "Retour",
+    "close": "Fermer",
+    "confirm": "Confirmer",
+    "required": "Requis",
+    "optional": "Facultatif",
+    "yes": "Oui",
+    "no": "Non",
+    "error": "Erreur",
+    "success": "Succès",
+    "actions": "Actions",
+    "view": "Vue",
+    "list": "Liste",
+    "free": "Gratuit",
+    "noItems": "Aucun article",
+    "all": "Tous",
+    "new": "Nouveau",
     "dashboard": "Tableau de bord",
     "products": "Produits",
     "orders": "Commandes",
     "settings": "Paramètres",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "productStatus": {
+      "published": "Actif",
+      "draft": "Brouillon",
+      "archived": "Archivé"
+    },
+    "orderStatus": {
+      "pending": "Ouvert",
+      "processing": "En traitement",
+      "shipped": "Expédié",
+      "delivered": "Livré",
+      "completed": "Terminé",
+      "cancelled": "Annulé",
+      "paid": "Payé",
+      "refunded": "Remboursé",
+      "teil_erstattet": "Partiellement remboursé",
+      "retoure": "Retour",
+      "retoure_anfrage": "Retour en attente"
+    },
+    "approvalStatus": {
+      "pending": "En attente",
+      "pending_review": "En révision",
+      "approved": "Approuvé",
+      "rejected": "Rejeté",
+      "suspended": "Suspendu",
+      "documents_submitted": "Documents soumis"
+    }
   },
   "nav": {
     "home": "Accueil",
@@ -18,7 +74,7 @@
     "drafts": "Brouillons",
     "abandonedCheckouts": "Paniers abandonnés",
     "returns": "Retours",
-    "inventory": "Stock",
+    "inventory": "Inventaire",
     "collections": "Collections",
     "giftCards": "Cartes cadeaux",
     "customers": "Clients",
@@ -35,10 +91,17 @@
     "menus": "Menus",
     "blogPosts": "Articles de blog",
     "brands": "Marques",
-    "analytics": "Analytiques",
+    "analytics": "Analyses",
     "reports": "Rapports",
     "liveView": "Vue en direct",
-    "importExport": "Import/Export"
+    "importExport": "Import/Export",
+    "view": "Vue",
+    "list": "Liste",
+    "reviews": "Avis",
+    "sellers": "Vendeurs",
+    "coupons": "Coupons",
+    "landingPage": "Page d'atterrissage",
+    "styles": "Styles"
   },
   "locale": {
     "en": "English",
@@ -47,5 +110,617 @@
     "fr": "Français",
     "it": "Italiano",
     "es": "Español"
+  },
+  "auth": {
+    "login": {
+      "title": "Connexion Vendeur",
+      "subtitle": "Connectez-vous à votre compte vendeur",
+      "email": "E-mail",
+      "emailPlaceholder": "vous@exemple.fr",
+      "password": "Mot de passe",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Se connecter",
+      "submitting": "Connexion…",
+      "noAccount": "Pas de compte ? Inscrivez-vous ici",
+      "errorRequired": "L'e-mail et le mot de passe sont requis",
+      "errorFailed": "Connexion échouée. Vérifiez votre e-mail et mot de passe."
+    },
+    "register": {
+      "title": "Devenir Vendeur",
+      "titleInvited": "Accepter l'invitation",
+      "subtitle": "Inscrivez-vous maintenant et commencez à vendre",
+      "subtitleInvited": "Créez votre compte",
+      "firstName": "Prénom",
+      "firstNamePlaceholder": "Jean",
+      "lastName": "Nom",
+      "lastNamePlaceholder": "Dupont",
+      "storeName": "Nom de la boutique",
+      "storeNamePlaceholder": "Ma Super Boutique",
+      "email": "E-mail",
+      "emailPlaceholder": "vous@exemple.fr",
+      "password": "Mot de passe",
+      "passwordPlaceholder": "Min. 6 caractères",
+      "agreeText": "J'ai lu et j'accepte les {terms} et la {privacy}.",
+      "terms": "Conditions d'utilisation",
+      "privacy": "Politique de confidentialité",
+      "submit": "Créer un compte vendeur",
+      "submitInvited": "Créer un compte",
+      "submitting": "Création du compte…",
+      "alreadyHaveAccount": "Déjà inscrit ? Connectez-vous",
+      "success": "Compte créé ! Redirection…",
+      "errorRequired": "L'e-mail et le mot de passe sont requis",
+      "errorStoreName": "Le nom de la boutique est requis",
+      "errorName": "Le prénom et le nom sont requis",
+      "errorPasswordLength": "Le mot de passe doit comporter au moins 6 caractères",
+      "errorTerms": "Veuillez accepter les conditions d'utilisation et la politique de confidentialité.",
+      "errorFailed": "Inscription échouée. Veuillez réessayer."
+    }
+  },
+  "orders": {
+    "title": "Commandes",
+    "newOrder": "Nouvelle commande",
+    "searchPlaceholder": "Rechercher par nom, e-mail, #…",
+    "sellerSearchPlaceholder": "Rechercher un vendeur (nom)…",
+    "return": "Retour (actif)",
+    "loading": "Chargement…",
+    "empty": "Aucune commande trouvée",
+    "sort": {
+      "label": "Tri",
+      "newest": "Plus récent d'abord",
+      "oldest": "Plus ancien d'abord",
+      "amountDesc": "Montant ↓",
+      "amountAsc": "Montant ↑"
+    },
+    "table": {
+      "order": "Commande",
+      "customer": "Client",
+      "date": "Date",
+      "items": "Articles",
+      "total": "Total",
+      "status": "Statut",
+      "payment": "Paiement",
+      "delivery": "Livraison"
+    },
+    "actions": {
+      "viewDetails": "Voir les détails",
+      "ship": "Expédier",
+      "cancel": "Annuler",
+      "delete": "Supprimer"
+    },
+    "new": {
+      "title": "Nouvelle commande",
+      "customerData": "Données client",
+      "email": "E-mail *",
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "phone": "Téléphone",
+      "country": "Pays",
+      "street": "Rue",
+      "postalCode": "Code postal",
+      "city": "Ville",
+      "items": "Articles",
+      "itemDescription": "Description",
+      "itemQty": "Qté",
+      "itemPrice": "Prix (centimes)",
+      "addItem": "Ajouter un article",
+      "shipping": "Livraison (centimes)",
+      "discount": "Remise (centimes)",
+      "paymentMethod": "Mode de paiement",
+      "paymentMethodPlaceholder": "Virement, PayPal…",
+      "notes": "Notes",
+      "create": "Créer la commande"
+    },
+    "detail": {
+      "back": "← Commandes",
+      "orderPrefix": "Commande #",
+      "sections": {
+        "items": "Articles",
+        "statusManagement": "Gestion du statut",
+        "shipping": "Livraison",
+        "paymentInfo": "Info paiement",
+        "customerInfo": "Info client",
+        "shippingAddress": "Adresse de livraison",
+        "billingAddress": "Adresse de facturation",
+        "summary": "Récapitulatif",
+        "deleteOrder": "Supprimer la commande"
+      },
+      "table": {
+        "product": "Produit",
+        "qty": "Qté",
+        "unitPrice": "Prix unitaire",
+        "total": "Total"
+      },
+      "fields": {
+        "orderStatus": "Statut commande",
+        "paymentStatus": "Statut paiement",
+        "deliveryStatus": "Statut livraison",
+        "carrier": "Transporteur",
+        "trackingNumber": "Numéro de suivi",
+        "shippedDate": "Date d'expédition",
+        "paymentMethod": "Mode de paiement",
+        "customerType": "Type de client",
+        "firstOrder": "Première commande",
+        "newsletter": "Newsletter",
+        "orderNumber": "Numéro de commande",
+        "date": "Date"
+      },
+      "customerTypes": {
+        "guest": "Client invité",
+        "registered": "Client enregistré"
+      },
+      "sameAsShipping": "identique à l'adresse de livraison",
+      "buttons": {
+        "saveStatus": "Enregistrer le statut",
+        "editShipping": "Modifier l'expédition / marquer comme expédié",
+        "invoice": "Facture (PDF)",
+        "packingSlip": "Bon de livraison (PDF)",
+        "deleteOrder": "Supprimer la commande",
+        "saved": "✓ Enregistré"
+      },
+      "costBreakdown": {
+        "shippingCosts": "Frais de livraison",
+        "discount": "Remise",
+        "subtotal": "Sous-total (TTC)",
+        "total": "Total"
+      },
+      "messages": {
+        "loadError": "Impossible de charger la commande",
+        "saveFailed": "Échec de l'enregistrement",
+        "deleteConfirm": "Supprimer cette commande ?",
+        "deleteFailed": "Échec de la suppression",
+        "undoWarning": "Cette action est irréversible.",
+        "loading": "Chargement…",
+        "noItems": "Aucun article"
+      }
+    }
+  },
+  "products": {
+    "title": "Produits",
+    "newProduct": "Nouveau produit",
+    "searchPlaceholder": "Rechercher des produits…",
+    "loading": "Chargement…",
+    "empty": "Aucun produit trouvé",
+    "sort": {
+      "nameAsc": "Nom A–Z",
+      "nameDesc": "Nom Z–A",
+      "newest": "Plus récent d'abord",
+      "oldest": "Plus ancien d'abord"
+    },
+    "table": {
+      "product": "Produit",
+      "sku": "SKU",
+      "category": "Catégorie",
+      "price": "Prix",
+      "inventory": "Stock",
+      "status": "Statut",
+      "seller": "Vendeur"
+    },
+    "actions": {
+      "edit": "Modifier",
+      "duplicate": "Dupliquer",
+      "delete": "Supprimer"
+    },
+    "edit": {
+      "back": "← Produits",
+      "newTitle": "Nouveau produit",
+      "editTitle": "Modifier le produit",
+      "sections": {
+        "basicInfo": "Informations de base",
+        "description": "Description",
+        "media": "Médias",
+        "pricing": "Tarification",
+        "inventory": "Inventaire",
+        "variants": "Variantes",
+        "metadata": "Métadonnées",
+        "seo": "SEO",
+        "shipping": "Livraison & Dimensions",
+        "productType": "Type de produit",
+        "relatedProducts": "Produits associés"
+      },
+      "fields": {
+        "title": "Titre",
+        "titlePlaceholder": "ex. T-shirt en coton",
+        "sku": "SKU",
+        "ean": "EAN / Code-barres",
+        "category": "Catégorie",
+        "categoryPlaceholder": "Sélectionner une catégorie",
+        "brand": "Marque",
+        "noBrand": "— Aucune —",
+        "shippingGroup": "Groupe de livraison",
+        "collections": "Collections",
+        "collectionsPlaceholder": "Rechercher une collection…",
+        "status": "Statut",
+        "metaTitle": "Titre meta",
+        "metaDescription": "Description meta",
+        "keywords": "Mots-clés",
+        "keywordsPlaceholder": "motclé1, motclé2",
+        "urlHandle": "URL handle",
+        "syncHandle": "Synchroniser titre → handle",
+        "weight": "Poids (g)",
+        "length": "L (cm)",
+        "width": "l (cm)",
+        "height": "H (cm)",
+        "productType": "Type de produit",
+        "productTypePlaceholder": "ex. T-shirt",
+        "manufacturer": "Fabricant",
+        "manufacturerInfo": "Informations fabricant",
+        "responsiblePerson": "Personne responsable (UE)",
+        "searchOrEnter": "Rechercher ou saisir…",
+        "relatedSearch": "Rechercher un produit…",
+        "quantity": "Quantité"
+      },
+      "pricing": {
+        "net": "HT",
+        "gross": "TTC ({taxLabel} {vatRate}% inclus)",
+        "rrp": "Prix conseillé",
+        "sale": "Promotion",
+        "linkNetGross": "Lier HT et TTC",
+        "unlinkNetGross": "Délier HT et TTC"
+      },
+      "variants": {
+        "groupName": "Nom du groupe",
+        "groupNamePlaceholder": "ex. Couleur, Taille, Matière",
+        "value": "Valeur",
+        "swatch": "Nuancier",
+        "addSwatchImage": "Ajouter une image de nuancier",
+        "changeSwatchImage": "Changer l'image de nuancier",
+        "removeOption": "Supprimer l'option",
+        "removeSwatch": "Supprimer le nuancier",
+        "price": "Prix (€)",
+        "rrp": "Prix conseillé (€)",
+        "sale": "Promo (€)"
+      },
+      "description": {
+        "visualToggle": "Affichage visuel",
+        "htmlToggle": "Affichage HTML"
+      },
+      "media": {
+        "addImage": "Ajouter une image",
+        "selectImage": "Sélectionner une image"
+      },
+      "units": {
+        "none": "— Aucune —",
+        "piece": "Pièce"
+      },
+      "duplicate": {
+        "title": "Dupliquer le produit",
+        "create": "Créer un doublon",
+        "cancel": "Annuler",
+        "fields": {
+          "title": "Titre (avec le suffixe \"(Copie)\")",
+          "description": "Description",
+          "price": "Prix",
+          "inventory": "Quantité en stock",
+          "categories": "Catégories / collection",
+          "images": "Images / médias",
+          "variants": "Variantes (noms et valeurs ; SKU/EAN jamais copiés)"
+        }
+      },
+      "messages": {
+        "created": "Produit créé",
+        "saved": "Enregistré",
+        "proposalSubmitted": "Votre proposition de modification a été soumise. Un superutilisateur va la réviser.",
+        "priceStockSaved": "Prix, stock et données personnalisées enregistrés.",
+        "saveFailed": "Échec de l'enregistrement",
+        "duplicateFailed": "Échec de la duplication",
+        "deleteFailed": "Échec de la suppression",
+        "variantEanRequired": "L'EAN de la variante ne peut pas être vide.",
+        "gpsr": "Le GPSR est obligatoire. Veuillez remplir les champs suivants : {fields}"
+      }
+    }
+  },
+  "inventory": {
+    "title": "Inventaire",
+    "searchPlaceholder": "Rechercher des produits…",
+    "loading": "Chargement…",
+    "empty": "Aucun produit trouvé",
+    "sort": {
+      "nameAsc": "Nom A–Z",
+      "nameDesc": "Nom Z–A",
+      "newest": "Plus récent d'abord",
+      "oldest": "Plus ancien d'abord"
+    },
+    "table": {
+      "product": "Produit",
+      "sku": "SKU",
+      "available": "Disponible",
+      "reserved": "Réservé",
+      "total": "Total"
+    }
+  },
+  "customers": {
+    "title": "Clients",
+    "newCustomer": "Nouveau client",
+    "searchPlaceholder": "Rechercher par nom, e-mail ou #…",
+    "sellerSearchPlaceholder": "Rechercher un vendeur (nom)…",
+    "loading": "Chargement…",
+    "empty": "Aucun client trouvé",
+    "emptyArea": "Aucun client dans cette zone.",
+    "emptySellerCustomers": "Aucun client vendeur",
+    "superuserArea": "Votre zone superutilisateur — clients directs et non assignés",
+    "sellerCustomers": "Clients vendeurs",
+    "allCustomers": "Tous les clients",
+    "count": "{count} client",
+    "countPlural": "{count} clients",
+    "table": {
+      "number": "Client #",
+      "name": "Nom",
+      "email": "E-mail",
+      "type": "Type",
+      "registered": "Inscrit",
+      "newsletter": "Newsletter",
+      "country": "Pays",
+      "orders": "Commandes",
+      "totalSpent": "Total dépensé",
+      "lastPurchase": "Dernier achat"
+    },
+    "accountTypes": {
+      "guest": "Invité",
+      "business": "Professionnel",
+      "private": "Particulier"
+    },
+    "subscribed": "✓ Abonné",
+    "registered": "Inscrit",
+    "actions": {
+      "edit": "Modifier",
+      "delete": "Supprimer"
+    },
+    "deleteConfirm": {
+      "title": "Supprimer le client ?",
+      "body": "sera supprimé définitivement.",
+      "cancel": "Annuler",
+      "confirm": "Supprimer"
+    }
+  },
+  "settings": {
+    "title": "Paramètres",
+    "general": {
+      "title": "Paramètres généraux",
+      "subtitle": "Nom de la boutique et contact. Le nom de la boutique apparaît comme Vendeur sur les pages produit.",
+      "sections": {
+        "language": "Langue",
+        "languageHint": "Langue de l'interface pour Sellercentral. Les données produit peuvent être saisies dans n'importe quelle langue.",
+        "storeInfo": "Informations de la boutique",
+        "address": "Adresse",
+        "companyDetails": "Détails de l'entreprise et documents",
+        "registeredAddress": "Adresse commerciale enregistrée",
+        "warehouseAddress": "Adresse entrepôt / retours",
+        "documents": "Documents d'entreprise",
+        "documentsHint": "Téléchargez licence commerciale, certificat fiscal, documents d'enregistrement, etc."
+      },
+      "fields": {
+        "storeName": "Nom de la boutique",
+        "storeNamePlaceholder": "ex. Ma Boutique",
+        "email": "E-mail",
+        "emailPlaceholder": "vous@exemple.fr",
+        "phone": "Téléphone",
+        "phonePlaceholder": "+33 …",
+        "city": "Ville",
+        "postalCode": "Code postal",
+        "country": "Pays",
+        "description": "Description de la boutique",
+        "descriptionPlaceholder": "Parlez-nous de votre boutique…",
+        "companyName": "Raison sociale",
+        "taxId": "Numéro fiscal",
+        "vatId": "Numéro TVA",
+        "iban": "IBAN (facultatif)",
+        "website": "Site web",
+        "websitePlaceholder": "https://...",
+        "street": "Rue",
+        "streetPlaceholder": "Rue et numéro"
+      },
+      "buttons": {
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "remove": "Retirer",
+        "uploading": "Téléchargement des documents…"
+      },
+      "messages": {
+        "saved": "Paramètres enregistrés avec succès.",
+        "loading": "Chargement…"
+      }
+    },
+    "payments": {
+      "title": "Paiements et virements",
+      "subtitle": "Ajoutez votre compte bancaire pour recevoir vos revenus de vente.",
+      "howItWorks": {
+        "title": "Comment fonctionnent les virements",
+        "step1Label": "Le client achète",
+        "step1Desc": "Le paiement va directement sur la plateforme (Stripe)",
+        "step2Label": "Règlement",
+        "step2Desc": "{sellerPct}% de votre chiffre d'affaires est calculé — {platformPct}% de frais de plateforme",
+        "step3Label": "Virement bancaire",
+        "step3Desc": "Le montant est transféré sur votre IBAN",
+        "note": "Les virements sont effectués manuellement par la plateforme. Vous serez notifié par e-mail lors du déclenchement d'un virement."
+      },
+      "bankAccount": {
+        "title": "Compte bancaire pour les virements",
+        "subtitle": "Vos revenus de vente seront virés sur ce compte.",
+        "addButton": "Ajouter",
+        "editButton": "Modifier",
+        "ibanLabel": "IBAN",
+        "holderLabel": "Titulaire du compte",
+        "bicLabel": "BIC / SWIFT",
+        "bankNameLabel": "Banque",
+        "ibanPlaceholder": "FR76 3000 6000 0112 3456 7890 189",
+        "holderPlaceholder": "Jean Dupont ou Dupont SAS",
+        "bicPlaceholder": "BNPAFRPPXXX",
+        "bankNamePlaceholder": "BNP Paribas",
+        "ibanHelp": "Numéro de compte bancaire international (avec ou sans espaces — les deux sont acceptés)",
+        "saveButton": "Enregistrer les coordonnées bancaires",
+        "cancelButton": "Annuler",
+        "accountReady": "Compte bancaire ajouté — prêt pour les virements",
+        "noAccount": "Aucun compte bancaire ajouté",
+        "noAccountDesc": "Sans IBAN, aucun virement ne peut être traité. Veuillez ajouter votre compte bancaire."
+      },
+      "history": {
+        "title": "Historique des virements",
+        "empty": "Aucun virement pour l'instant.",
+        "emptyHint": "Dès qu'un virement est effectué, il apparaît ici avec date, montant et référence."
+      },
+      "validation": {
+        "ibanEmpty": "L'IBAN ne peut pas être vide.",
+        "ibanFormat": "Format IBAN invalide (ex. FR76 3000 6000 0112 3456 7890 189).",
+        "ibanLength": "Longueur IBAN invalide."
+      },
+      "messages": {
+        "saved": "Coordonnées bancaires enregistrées avec succès.",
+        "loadError": "Erreur lors du chargement des données de paiement.",
+        "saveError": "Erreur lors de l'enregistrement.",
+        "loading": "Chargement…"
+      }
+    },
+    "verification": {
+      "title": "Vérification du vendeur",
+      "subtitle": "Complétez la confirmation légale et les documents d'entreprise avant de commencer à vendre.",
+      "statusLabel": "Statut de vérification",
+      "statuses": {
+        "pending": "Inscrit — vérification requise avant de vendre",
+        "documents_submitted": "Documents soumis — révision en cours",
+        "pending_review": "En attente d'approbation",
+        "approved": "Compte vérifié — vente activée",
+        "rejected": "Rejeté — veuillez contacter le support",
+        "suspended": "Suspendu — veuillez contacter le support"
+      },
+      "sections": {
+        "agreement": "Confirmation légale",
+        "company": "Détails de l'entreprise",
+        "contact": "Contact et adresse",
+        "documents": "Documents"
+      },
+      "agreement": {
+        "label": "Je confirme que je suis autorisé à représenter cette entreprise et que toutes les informations fournies sont exactes et complètes.",
+        "terms": "Conditions d'utilisation",
+        "privacy": "Politique de confidentialité",
+        "alreadyAccepted": "Accord légal accepté le {date}."
+      },
+      "fields": {
+        "companyName": "Nom de l'entreprise",
+        "authorizedPerson": "Personne autorisée (nom complet)",
+        "taxId": "Numéro fiscal",
+        "vatId": "Numéro TVA",
+        "iban": "IBAN",
+        "phone": "Numéro de téléphone",
+        "street": "Rue et numéro",
+        "city": "Ville",
+        "postalCode": "Code postal",
+        "country": "Pays"
+      },
+      "documents": {
+        "tradeRegister": "Extrait du registre du commerce",
+        "idPassport": "Carte d'identité / Passeport",
+        "taxDocument": "Document fiscal (facultatif)",
+        "uploaded": "Téléchargé",
+        "notUploaded": "Pas encore téléchargé",
+        "required": "Requis",
+        "optional": "Facultatif",
+        "chooseFile": "Choisir un fichier"
+      },
+      "buttons": {
+        "submit": "Soumettre pour vérification",
+        "saving": "Enregistrement…"
+      },
+      "validation": {
+        "agreement": "Veuillez d'abord accepter l'accord légal.",
+        "documents": "Veuillez télécharger l'extrait du registre du commerce et la pièce d'identité/passeport."
+      },
+      "messages": {
+        "saved": "Données enregistrées et soumises pour vérification.",
+        "saveError": "Erreur lors de l'enregistrement."
+      }
+    },
+    "users": {
+      "title": "Utilisateurs et permissions",
+      "tabs": {
+        "all": "Tous",
+        "kybPending": "KYB en attente ({count})"
+      },
+      "table": {
+        "name": "Nom",
+        "email": "E-mail",
+        "store": "Boutique",
+        "role": "Rôle",
+        "status": "Statut",
+        "joined": "Inscrit",
+        "actions": "Actions"
+      },
+      "roles": {
+        "superuser": "Superutilisateur",
+        "seller": "Vendeur"
+      },
+      "actions": {
+        "kyb": "KYB",
+        "edit": "Modifier",
+        "makeAdmin": "Rendre admin",
+        "removeSuperuser": "Retirer superutilisateur",
+        "delete": "Supprimer"
+      },
+      "kyb": {
+        "title": "Révision KYB",
+        "approve": "Approuver",
+        "reject": "Rejeter",
+        "suspend": "Suspendre",
+        "rejectionReason": "Motif de rejet",
+        "rejectionReasonPlaceholder": "Motif…",
+        "close": "Fermer",
+        "fields": {
+          "companyName": "Entreprise",
+          "authorizedPerson": "Personne autorisée",
+          "taxId": "N° fiscal",
+          "vatId": "N° TVA",
+          "iban": "IBAN",
+          "phone": "Téléphone",
+          "country": "Pays",
+          "agreementAccepted": "Accord accepté",
+          "agreementDate": "Date d'accord",
+          "riskScore": "Score de risque",
+          "documents": "Documents"
+        }
+      },
+      "deleteConfirm": {
+        "title": "Supprimer l'utilisateur ?",
+        "body": "sera supprimé définitivement.",
+        "cancel": "Annuler",
+        "confirm": "Supprimer"
+      },
+      "messages": {
+        "loading": "Chargement…",
+        "empty": "Aucun utilisateur trouvé.",
+        "superuserGranted": "Accès superutilisateur accordé.",
+        "superuserRevoked": "Accès superutilisateur révoqué.",
+        "updateFailed": "Échec de la mise à jour.",
+        "deleteFailed": "Échec de la suppression.",
+        "approvalUpdated": "Statut d'approbation mis à jour."
+      }
+    }
+  },
+  "marketing": {
+    "discounts": {
+      "title": "Remises",
+      "newDiscount": "Nouvelle remise",
+      "loading": "Chargement…",
+      "empty": "Aucune remise trouvée.",
+      "table": {
+        "code": "Code",
+        "type": "Type",
+        "value": "Valeur",
+        "usage": "Utilisation",
+        "expires": "Expire",
+        "status": "Statut"
+      },
+      "actions": {
+        "edit": "Modifier",
+        "delete": "Supprimer"
+      }
+    }
+  },
+  "content": {
+    "media": {
+      "title": "Médiathèque",
+      "upload": "Télécharger",
+      "loading": "Chargement…",
+      "empty": "Aucun fichier média trouvé.",
+      "searchPlaceholder": "Rechercher des médias…"
+    }
   }
 }

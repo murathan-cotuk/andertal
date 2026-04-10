@@ -1,13 +1,69 @@
 {
   "common": {
+    "save": "Speichern",
+    "saving": "Wird gespeichert…",
+    "cancel": "Abbrechen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "add": "Hinzufügen",
+    "remove": "Entfernen",
+    "upload": "Hochladen",
+    "duplicate": "Duplizieren",
+    "loading": "Laden…",
+    "search": "Suchen",
+    "filter": "Filtern",
+    "export": "Exportieren",
+    "import": "Importieren",
+    "back": "Zurück",
+    "close": "Schließen",
+    "confirm": "Bestätigen",
+    "required": "Pflichtfeld",
+    "optional": "Optional",
+    "yes": "Ja",
+    "no": "Nein",
+    "error": "Fehler",
+    "success": "Erfolg",
+    "actions": "Aktionen",
+    "view": "Ansicht",
+    "list": "Liste",
+    "free": "Kostenlos",
+    "noItems": "Keine Artikel",
+    "all": "Alle",
+    "new": "Neu",
     "dashboard": "Dashboard",
     "products": "Produkte",
     "orders": "Bestellungen",
     "settings": "Einstellungen",
-    "logout": "Abmelden"
+    "logout": "Abmelden",
+    "productStatus": {
+      "published": "Aktiv",
+      "draft": "Entwurf",
+      "archived": "Archiviert"
+    },
+    "orderStatus": {
+      "pending": "Offen",
+      "processing": "In Bearbeitung",
+      "shipped": "Versendet",
+      "delivered": "Zugestellt",
+      "completed": "Abgeschlossen",
+      "cancelled": "Storniert",
+      "paid": "Bezahlt",
+      "refunded": "Erstattet",
+      "teil_erstattet": "Teilweise erstattet",
+      "retoure": "Retoure",
+      "retoure_anfrage": "Retoure ausstehend"
+    },
+    "approvalStatus": {
+      "pending": "Ausstehend",
+      "pending_review": "In Prüfung",
+      "approved": "Genehmigt",
+      "rejected": "Abgelehnt",
+      "suspended": "Gesperrt",
+      "documents_submitted": "Dokumente eingereicht"
+    }
   },
   "nav": {
-    "home": "Start",
+    "home": "Startseite",
     "dashboard": "Dashboard",
     "products": "Produkte",
     "orders": "Bestellungen",
@@ -16,16 +72,16 @@
     "settings": "Einstellungen",
     "language": "Sprache",
     "drafts": "Entwürfe",
-    "abandonedCheckouts": "Verlassene Warenkörbe",
+    "abandonedCheckouts": "Abgebrochene Checkouts",
     "returns": "Retouren",
-    "inventory": "Bestand",
+    "inventory": "Inventar",
     "collections": "Kollektionen",
     "giftCards": "Geschenkgutscheine",
     "customers": "Kunden",
     "customersList": "Liste",
     "campaigns": "Kampagnen",
     "attribution": "Attribution",
-    "automations": "Automationen",
+    "automations": "Automatisierungen",
     "discounts": "Rabatte",
     "metaobjects": "Metaobjekte",
     "categories": "Kategorien",
@@ -38,7 +94,14 @@
     "analytics": "Analysen",
     "reports": "Berichte",
     "liveView": "Live-Ansicht",
-    "importExport": "Import/Export"
+    "importExport": "Import/Export",
+    "view": "Ansicht",
+    "list": "Liste",
+    "reviews": "Bewertungen",
+    "sellers": "Verkäufer",
+    "coupons": "Coupons",
+    "landingPage": "Landing Page",
+    "styles": "Stile"
   },
   "locale": {
     "en": "English",
@@ -47,5 +110,617 @@
     "fr": "Français",
     "it": "Italiano",
     "es": "Español"
+  },
+  "auth": {
+    "login": {
+      "title": "Verkäufer-Login",
+      "subtitle": "Melden Sie sich bei Ihrem Verkäuferkonto an",
+      "email": "E-Mail",
+      "emailPlaceholder": "sie@beispiel.de",
+      "password": "Passwort",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Anmelden",
+      "submitting": "Wird angemeldet…",
+      "noAccount": "Noch kein Konto? Hier registrieren",
+      "errorRequired": "E-Mail und Passwort sind Pflichtfelder",
+      "errorFailed": "Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen."
+    },
+    "register": {
+      "title": "Verkäufer werden",
+      "titleInvited": "Einladung annehmen",
+      "subtitle": "Jetzt registrieren und verkaufen",
+      "subtitleInvited": "Erstellen Sie Ihr Konto",
+      "firstName": "Vorname",
+      "firstNamePlaceholder": "Max",
+      "lastName": "Nachname",
+      "lastNamePlaceholder": "Mustermann",
+      "storeName": "Shop-Name",
+      "storeNamePlaceholder": "Mein toller Shop",
+      "email": "E-Mail",
+      "emailPlaceholder": "sie@beispiel.de",
+      "password": "Passwort",
+      "passwordPlaceholder": "Min. 6 Zeichen",
+      "agreeText": "Ich habe die {terms} und die {privacy} gelesen und akzeptiere sie.",
+      "terms": "Nutzungsbedingungen",
+      "privacy": "Datenschutzrichtlinie",
+      "submit": "Verkäufer-Konto erstellen",
+      "submitInvited": "Konto erstellen",
+      "submitting": "Konto wird erstellt…",
+      "alreadyHaveAccount": "Bereits registriert? Anmelden",
+      "success": "Konto erstellt! Weiterleitung…",
+      "errorRequired": "E-Mail und Passwort sind Pflichtfelder",
+      "errorStoreName": "Shop-Name ist ein Pflichtfeld",
+      "errorName": "Vor- und Nachname sind Pflichtfelder",
+      "errorPasswordLength": "Passwort muss mindestens 6 Zeichen haben",
+      "errorTerms": "Bitte akzeptieren Sie die Nutzungsbedingungen und Datenschutzrichtlinie.",
+      "errorFailed": "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut."
+    }
+  },
+  "orders": {
+    "title": "Bestellungen",
+    "newOrder": "Neue Bestellung",
+    "searchPlaceholder": "Suche nach Name, E-Mail, #…",
+    "sellerSearchPlaceholder": "Verkäufer suchen (Name)…",
+    "return": "Retoure (aktiv)",
+    "loading": "Laden…",
+    "empty": "Keine Bestellungen gefunden",
+    "sort": {
+      "label": "Sortierung",
+      "newest": "Neu zuerst",
+      "oldest": "Älteste zuerst",
+      "amountDesc": "Betrag ↓",
+      "amountAsc": "Betrag ↑"
+    },
+    "table": {
+      "order": "Bestellung",
+      "customer": "Kunde",
+      "date": "Datum",
+      "items": "Artikel",
+      "total": "Gesamt",
+      "status": "Status",
+      "payment": "Zahlung",
+      "delivery": "Lieferung"
+    },
+    "actions": {
+      "viewDetails": "Details anzeigen",
+      "ship": "Versenden",
+      "cancel": "Stornieren",
+      "delete": "Löschen"
+    },
+    "new": {
+      "title": "Neue Bestellung",
+      "customerData": "Kundendaten",
+      "email": "E-Mail *",
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "phone": "Telefon",
+      "country": "Land",
+      "street": "Straße",
+      "postalCode": "PLZ",
+      "city": "Stadt",
+      "items": "Artikel",
+      "itemDescription": "Bezeichnung",
+      "itemQty": "Menge",
+      "itemPrice": "Preis (Cent)",
+      "addItem": "Artikel hinzufügen",
+      "shipping": "Versand (Cent)",
+      "discount": "Rabatt (Cent)",
+      "paymentMethod": "Zahlungsmethode",
+      "paymentMethodPlaceholder": "Überweisung, PayPal…",
+      "notes": "Notizen",
+      "create": "Bestellung erstellen"
+    },
+    "detail": {
+      "back": "← Bestellungen",
+      "orderPrefix": "Bestellung #",
+      "sections": {
+        "items": "Artikel",
+        "statusManagement": "Status verwalten",
+        "shipping": "Versand",
+        "paymentInfo": "Zahlungsinfo",
+        "customerInfo": "Kundeninfo",
+        "shippingAddress": "Lieferadresse",
+        "billingAddress": "Rechnungsadresse",
+        "summary": "Zusammenfassung",
+        "deleteOrder": "Bestellung löschen"
+      },
+      "table": {
+        "product": "Produkt",
+        "qty": "Menge",
+        "unitPrice": "Einzelpreis",
+        "total": "Gesamt"
+      },
+      "fields": {
+        "orderStatus": "Bestellstatus",
+        "paymentStatus": "Zahlungsstatus",
+        "deliveryStatus": "Lieferstatus",
+        "carrier": "Versanddienst",
+        "trackingNumber": "Trackingnummer",
+        "shippedDate": "Versanddatum",
+        "paymentMethod": "Zahlungsmethode",
+        "customerType": "Kundentyp",
+        "firstOrder": "Erste Bestellung",
+        "newsletter": "Newsletter",
+        "orderNumber": "Bestellnummer",
+        "date": "Datum"
+      },
+      "customerTypes": {
+        "guest": "Gastkunde",
+        "registered": "Registrierter Kunde"
+      },
+      "sameAsShipping": "gleich wie Lieferadresse",
+      "buttons": {
+        "saveStatus": "Status speichern",
+        "editShipping": "Versand bearbeiten / als versendet markieren",
+        "invoice": "Rechnung (PDF)",
+        "packingSlip": "Lieferschein (PDF)",
+        "deleteOrder": "Bestellung löschen",
+        "saved": "✓ Gespeichert"
+      },
+      "costBreakdown": {
+        "shippingCosts": "Versandkosten",
+        "discount": "Rabatt",
+        "subtotal": "Zwischensumme (brutto)",
+        "total": "Gesamtkosten"
+      },
+      "messages": {
+        "loadError": "Bestellung konnte nicht geladen werden",
+        "saveFailed": "Speichern fehlgeschlagen",
+        "deleteConfirm": "Bestellung wirklich löschen?",
+        "deleteFailed": "Löschen fehlgeschlagen",
+        "undoWarning": "Diese Aktion kann nicht rückgängig gemacht werden.",
+        "loading": "Laden…",
+        "noItems": "Keine Artikel"
+      }
+    }
+  },
+  "products": {
+    "title": "Produkte",
+    "newProduct": "Neues Produkt",
+    "searchPlaceholder": "Produkte suchen…",
+    "loading": "Laden…",
+    "empty": "Keine Produkte gefunden",
+    "sort": {
+      "nameAsc": "Name A–Z",
+      "nameDesc": "Name Z–A",
+      "newest": "Neu zuerst",
+      "oldest": "Älteste zuerst"
+    },
+    "table": {
+      "product": "Produkt",
+      "sku": "SKU",
+      "category": "Kategorie",
+      "price": "Preis",
+      "inventory": "Bestand",
+      "status": "Status",
+      "seller": "Verkäufer"
+    },
+    "actions": {
+      "edit": "Bearbeiten",
+      "duplicate": "Duplizieren",
+      "delete": "Löschen"
+    },
+    "edit": {
+      "back": "← Produkte",
+      "newTitle": "Neues Produkt",
+      "editTitle": "Produkt bearbeiten",
+      "sections": {
+        "basicInfo": "Grundinformationen",
+        "description": "Beschreibung",
+        "media": "Medien",
+        "pricing": "Preise",
+        "inventory": "Inventar",
+        "variants": "Varianten",
+        "metadata": "Metadaten",
+        "seo": "SEO",
+        "shipping": "Versand & Maße",
+        "productType": "Produkttyp",
+        "relatedProducts": "Ähnliche Produkte"
+      },
+      "fields": {
+        "title": "Titel",
+        "titlePlaceholder": "z.B. Baumwoll-T-Shirt",
+        "sku": "SKU",
+        "ean": "EAN / Barcode",
+        "category": "Kategorie",
+        "categoryPlaceholder": "Kategorie wählen",
+        "brand": "Marke",
+        "noBrand": "— Keine —",
+        "shippingGroup": "Versandgruppe",
+        "collections": "Kollektionen",
+        "collectionsPlaceholder": "Kollektion suchen…",
+        "status": "Status",
+        "metaTitle": "Meta-Titel",
+        "metaDescription": "Meta-Beschreibung",
+        "keywords": "Schlüsselwörter",
+        "keywordsPlaceholder": "stichwort1, stichwort2",
+        "urlHandle": "URL-Handle",
+        "syncHandle": "Titel → Handle synchronisieren",
+        "weight": "Gewicht (g)",
+        "length": "L (cm)",
+        "width": "B (cm)",
+        "height": "H (cm)",
+        "productType": "Produkttyp",
+        "productTypePlaceholder": "z.B. T-Shirt",
+        "manufacturer": "Hersteller",
+        "manufacturerInfo": "Hersteller-Informationen",
+        "responsiblePerson": "Verantwortliche Person (EU)",
+        "searchOrEnter": "Suchen oder eingeben…",
+        "relatedSearch": "Produkt suchen…",
+        "quantity": "Menge"
+      },
+      "pricing": {
+        "net": "Netto",
+        "gross": "Brutto (inkl. {taxLabel} {vatRate}%)",
+        "rrp": "UVP",
+        "sale": "Sale",
+        "linkNetGross": "Netto und Brutto koppeln",
+        "unlinkNetGross": "Netto und Brutto entkoppeln"
+      },
+      "variants": {
+        "groupName": "Gruppenname",
+        "groupNamePlaceholder": "z.B. Farbe, Größe, Material",
+        "value": "Wert",
+        "swatch": "Swatch",
+        "addSwatchImage": "Swatch-Bild hinzufügen",
+        "changeSwatchImage": "Swatch-Bild ändern",
+        "removeOption": "Option entfernen",
+        "removeSwatch": "Swatch entfernen",
+        "price": "Preis (€)",
+        "rrp": "UVP (€)",
+        "sale": "Sale (€)"
+      },
+      "description": {
+        "visualToggle": "Visuell anzeigen",
+        "htmlToggle": "HTML anzeigen"
+      },
+      "media": {
+        "addImage": "Bild hinzufügen",
+        "selectImage": "Bild auswählen"
+      },
+      "units": {
+        "none": "— Keine —",
+        "piece": "Stück"
+      },
+      "duplicate": {
+        "title": "Produkt duplizieren",
+        "create": "Duplikat erstellen",
+        "cancel": "Abbrechen",
+        "fields": {
+          "title": "Titel (mit \"(Kopie)\"-Suffix)",
+          "description": "Beschreibung",
+          "price": "Preis",
+          "inventory": "Lagerbestand",
+          "categories": "Kategorien / Kollektion",
+          "images": "Bilder / Medien",
+          "variants": "Varianten (Option-Namen und -Werte; SKU/EAN werden nie kopiert)"
+        }
+      },
+      "messages": {
+        "created": "Produkt erstellt",
+        "saved": "Gespeichert",
+        "proposalSubmitted": "Dein Änderungsvorschlag wurde eingereicht. Ein Superuser wird ihn prüfen.",
+        "priceStockSaved": "Preis, Bestand und eigene Daten gespeichert.",
+        "saveFailed": "Speichern fehlgeschlagen",
+        "duplicateFailed": "Duplizieren fehlgeschlagen",
+        "deleteFailed": "Löschen fehlgeschlagen",
+        "variantEanRequired": "Varianten-EAN darf nicht leer sein.",
+        "gpsr": "GPSR ist verpflichtend. Bitte folgende Felder ausfüllen: {fields}"
+      }
+    }
+  },
+  "inventory": {
+    "title": "Inventar",
+    "searchPlaceholder": "Produkte suchen…",
+    "loading": "Laden…",
+    "empty": "Keine Produkte gefunden",
+    "sort": {
+      "nameAsc": "Name A–Z",
+      "nameDesc": "Name Z–A",
+      "newest": "Neu zuerst",
+      "oldest": "Älteste zuerst"
+    },
+    "table": {
+      "product": "Produkt",
+      "sku": "SKU",
+      "available": "Verfügbar",
+      "reserved": "Reserviert",
+      "total": "Gesamt"
+    }
+  },
+  "customers": {
+    "title": "Kunden",
+    "newCustomer": "Neuer Kunde",
+    "searchPlaceholder": "Suche nach Name, E-Mail oder #…",
+    "sellerSearchPlaceholder": "Verkäufer suchen (Name)…",
+    "loading": "Laden…",
+    "empty": "Keine Kunden gefunden",
+    "emptyArea": "Keine Kunden in diesem Bereich.",
+    "emptySellerCustomers": "Keine Verkäufer-Kunden",
+    "superuserArea": "Ihr Superuser-Bereich — direkte & nicht zugeordnete Kunden",
+    "sellerCustomers": "Verkäufer-Kunden",
+    "allCustomers": "Alle Kunden",
+    "count": "{count} Kunde",
+    "countPlural": "{count} Kunden",
+    "table": {
+      "number": "Kundennr.",
+      "name": "Name",
+      "email": "E-Mail",
+      "type": "Typ",
+      "registered": "Registriert",
+      "newsletter": "Newsletter",
+      "country": "Land",
+      "orders": "Bestellungen",
+      "totalSpent": "Gesamtumsatz",
+      "lastPurchase": "Letzter Kauf"
+    },
+    "accountTypes": {
+      "guest": "Gast",
+      "business": "Gewerbe",
+      "private": "Privat"
+    },
+    "subscribed": "✓ Abonniert",
+    "registered": "Registriert",
+    "actions": {
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
+    },
+    "deleteConfirm": {
+      "title": "Kunde löschen?",
+      "body": "wird dauerhaft gelöscht.",
+      "cancel": "Abbrechen",
+      "confirm": "Löschen"
+    }
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "general": {
+      "title": "Allgemeine Einstellungen",
+      "subtitle": "Shop-Name und Kontaktdaten. Der Shop-Name wird als Verkäufer auf Produktseiten angezeigt.",
+      "sections": {
+        "language": "Sprache",
+        "languageHint": "Oberflächensprache für Sellercentral. Produktdaten können in jeder Sprache eingegeben werden.",
+        "storeInfo": "Shop-Informationen",
+        "address": "Adresse",
+        "companyDetails": "Firmendaten & Dokumente",
+        "registeredAddress": "Eingetragene Geschäftsadresse",
+        "warehouseAddress": "Lager- / Retourennadresse",
+        "documents": "Firmendokumente",
+        "documentsHint": "Gewerbeschein, Steuerbescheinigung, Registrierungsunterlagen usw. hochladen."
+      },
+      "fields": {
+        "storeName": "Shop-Name",
+        "storeNamePlaceholder": "z.B. Mein Shop",
+        "email": "E-Mail",
+        "emailPlaceholder": "sie@beispiel.de",
+        "phone": "Telefon",
+        "phonePlaceholder": "+49 …",
+        "city": "Stadt",
+        "postalCode": "Postleitzahl",
+        "country": "Land",
+        "description": "Shop-Beschreibung",
+        "descriptionPlaceholder": "Erzählen Sie uns von Ihrem Shop…",
+        "companyName": "Rechtlicher Firmenname",
+        "taxId": "Steuernummer",
+        "vatId": "USt-IdNr.",
+        "iban": "IBAN (optional)",
+        "website": "Webseite",
+        "websitePlaceholder": "https://...",
+        "street": "Straße",
+        "streetPlaceholder": "Straße und Hausnummer"
+      },
+      "buttons": {
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "remove": "Entfernen",
+        "uploading": "Dokumente werden hochgeladen…"
+      },
+      "messages": {
+        "saved": "Einstellungen erfolgreich gespeichert.",
+        "loading": "Laden…"
+      }
+    },
+    "payments": {
+      "title": "Zahlungen & Auszahlungen",
+      "subtitle": "Hinterlege dein Bankkonto, um Verkaufserlöse zu empfangen.",
+      "howItWorks": {
+        "title": "Wie Auszahlungen funktionieren",
+        "step1Label": "Kunde kauft",
+        "step1Desc": "Zahlung geht direkt an die Plattform (Stripe)",
+        "step2Label": "Abrechnung",
+        "step2Desc": "{sellerPct}% deines Umsatzes wird berechnet — {platformPct}% Plattformgebühr",
+        "step3Label": "Banküberweisung",
+        "step3Desc": "Betrag wird an deine IBAN überwiesen",
+        "note": "Auszahlungen erfolgen manuell durch die Plattform. Du wirst per E-Mail benachrichtigt, wenn eine Überweisung eingeleitet wird."
+      },
+      "bankAccount": {
+        "title": "Bankkonto für Auszahlungen",
+        "subtitle": "An dieses Konto werden deine Verkaufserlöse überwiesen.",
+        "addButton": "Hinzufügen",
+        "editButton": "Bearbeiten",
+        "ibanLabel": "IBAN",
+        "holderLabel": "Kontoinhaber",
+        "bicLabel": "BIC / SWIFT",
+        "bankNameLabel": "Bank",
+        "ibanPlaceholder": "DE89 3704 0044 0532 0130 00",
+        "holderPlaceholder": "Max Mustermann oder Musterfirma GmbH",
+        "bicPlaceholder": "COBADEFFXXX",
+        "bankNamePlaceholder": "Commerzbank AG",
+        "ibanHelp": "Internationale Bankkontonummer (ohne Leerzeichen eingeben oder mit Leerzeichen — beides wird akzeptiert)",
+        "saveButton": "Bankdaten speichern",
+        "cancelButton": "Abbrechen",
+        "accountReady": "Bankkonto hinterlegt — bereit für Auszahlungen",
+        "noAccount": "Kein Bankkonto hinterlegt",
+        "noAccountDesc": "Ohne IBAN können keine Auszahlungen verarbeitet werden. Bitte füge dein Bankkonto hinzu."
+      },
+      "history": {
+        "title": "Auszahlungshistorie",
+        "empty": "Noch keine Auszahlungen.",
+        "emptyHint": "Sobald eine Überweisung durchgeführt wird, erscheint sie hier mit Datum, Betrag und Referenz."
+      },
+      "validation": {
+        "ibanEmpty": "IBAN darf nicht leer sein.",
+        "ibanFormat": "Ungültiges IBAN-Format (z.B. DE89 3704 0044 0532 0130 00).",
+        "ibanLength": "IBAN-Länge ungültig."
+      },
+      "messages": {
+        "saved": "Bankdaten erfolgreich gespeichert.",
+        "loadError": "Fehler beim Laden der Zahlungsdaten.",
+        "saveError": "Fehler beim Speichern.",
+        "loading": "Laden…"
+      }
+    },
+    "verification": {
+      "title": "Verkäufer-Verifizierung",
+      "subtitle": "Schließe rechtliche Bestätigung und Unternehmensdokumente ab, um mit dem Verkauf zu starten.",
+      "statusLabel": "Verifizierungsstatus",
+      "statuses": {
+        "pending": "Registriert — Verifizierung vor dem Verkauf erforderlich",
+        "documents_submitted": "Dokumente eingereicht — Prüfung läuft",
+        "pending_review": "Wartet auf Freigabe",
+        "approved": "Konto bestätigt — Verkauf ist möglich",
+        "rejected": "Abgelehnt — bitte Support kontaktieren",
+        "suspended": "Gesperrt — bitte Support kontaktieren"
+      },
+      "sections": {
+        "agreement": "Rechtliche Bestätigung",
+        "company": "Firmendaten",
+        "contact": "Kontakt & Adresse",
+        "documents": "Dokumente"
+      },
+      "agreement": {
+        "label": "Ich bestätige, dass ich berechtigt bin, dieses Unternehmen zu vertreten, und dass alle angegebenen Informationen korrekt und vollständig sind.",
+        "terms": "Nutzungsbedingungen",
+        "privacy": "Datenschutzrichtlinie",
+        "alreadyAccepted": "Rechtliche Vereinbarung akzeptiert am {date}."
+      },
+      "fields": {
+        "companyName": "Firmenname",
+        "authorizedPerson": "Bevollmächtigte Person (Vor- und Nachname)",
+        "taxId": "Steuernummer",
+        "vatId": "USt-IdNr.",
+        "iban": "IBAN",
+        "phone": "Telefonnummer",
+        "street": "Straße und Hausnummer",
+        "city": "Stadt",
+        "postalCode": "Postleitzahl",
+        "country": "Land"
+      },
+      "documents": {
+        "tradeRegister": "Handelsregisterauszug",
+        "idPassport": "Ausweis / Reisepass",
+        "taxDocument": "Steuerdokument (optional)",
+        "uploaded": "Hochgeladen",
+        "notUploaded": "Noch nicht hochgeladen",
+        "required": "Pflichtfeld",
+        "optional": "Optional",
+        "chooseFile": "Datei auswählen"
+      },
+      "buttons": {
+        "submit": "Zur Verifizierung senden",
+        "saving": "Wird gespeichert…"
+      },
+      "validation": {
+        "agreement": "Bitte bestätige zuerst die rechtliche Vereinbarung.",
+        "documents": "Bitte lade Handelsregisterauszug und Ausweis/Reisepass hoch."
+      },
+      "messages": {
+        "saved": "Daten gespeichert und zur Verifizierung eingereicht.",
+        "saveError": "Fehler beim Speichern."
+      }
+    },
+    "users": {
+      "title": "Benutzer und Berechtigungen",
+      "tabs": {
+        "all": "Alle",
+        "kybPending": "KYB ausstehend ({count})"
+      },
+      "table": {
+        "name": "Name",
+        "email": "E-Mail",
+        "store": "Shop",
+        "role": "Rolle",
+        "status": "Status",
+        "joined": "Beigetreten",
+        "actions": "Aktionen"
+      },
+      "roles": {
+        "superuser": "Superuser",
+        "seller": "Verkäufer"
+      },
+      "actions": {
+        "kyb": "KYB",
+        "edit": "Bearbeiten",
+        "makeAdmin": "Zum Admin machen",
+        "removeSuperuser": "Superuser entfernen",
+        "delete": "Löschen"
+      },
+      "kyb": {
+        "title": "KYB-Prüfung",
+        "approve": "Genehmigen",
+        "reject": "Ablehnen",
+        "suspend": "Sperren",
+        "rejectionReason": "Ablehnungsgrund",
+        "rejectionReasonPlaceholder": "Grund…",
+        "close": "Schließen",
+        "fields": {
+          "companyName": "Firma",
+          "authorizedPerson": "Bevollmächtigte Person",
+          "taxId": "Steuernummer",
+          "vatId": "USt-IdNr.",
+          "iban": "IBAN",
+          "phone": "Telefon",
+          "country": "Land",
+          "agreementAccepted": "Vereinbarung akzeptiert",
+          "agreementDate": "Vereinbarungsdatum",
+          "riskScore": "Risikoscore",
+          "documents": "Dokumente"
+        }
+      },
+      "deleteConfirm": {
+        "title": "Benutzer löschen?",
+        "body": "wird dauerhaft gelöscht.",
+        "cancel": "Abbrechen",
+        "confirm": "Löschen"
+      },
+      "messages": {
+        "loading": "Laden…",
+        "empty": "Keine Benutzer gefunden.",
+        "superuserGranted": "Superuser-Zugriff gewährt.",
+        "superuserRevoked": "Superuser-Zugriff entzogen.",
+        "updateFailed": "Aktualisierung fehlgeschlagen.",
+        "deleteFailed": "Löschen fehlgeschlagen.",
+        "approvalUpdated": "Genehmigungsstatus aktualisiert."
+      }
+    }
+  },
+  "marketing": {
+    "discounts": {
+      "title": "Rabatte",
+      "newDiscount": "Neuer Rabatt",
+      "loading": "Laden…",
+      "empty": "Keine Rabatte gefunden.",
+      "table": {
+        "code": "Code",
+        "type": "Typ",
+        "value": "Wert",
+        "usage": "Nutzung",
+        "expires": "Läuft ab",
+        "status": "Status"
+      },
+      "actions": {
+        "edit": "Bearbeiten",
+        "delete": "Löschen"
+      }
+    }
+  },
+  "content": {
+    "media": {
+      "title": "Medienbibliothek",
+      "upload": "Hochladen",
+      "loading": "Laden…",
+      "empty": "Keine Mediendateien gefunden.",
+      "searchPlaceholder": "Medien suchen…"
+    }
   }
 }

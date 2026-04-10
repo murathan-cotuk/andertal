@@ -281,6 +281,10 @@ export default function ImportExportPage() {
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
   }, []);
 
+  useEffect(() => {
+    if (!isSuperuser) setGroupBySeller(false);
+  }, [isSuperuser]);
+
   const applyPreset = useCallback((preset) => {
     if (preset === "basic_products") {
       setExportDatasets(new Set(["products"]));
@@ -503,7 +507,7 @@ export default function ImportExportPage() {
           columns: cols,
           format: exportFormat,
           include_all_sellers: includeAllSellers,
-          group_by_seller: groupBySeller,
+          group_by_seller: isSuperuser ? groupBySeller : false,
           filters: {
             search: filterSearch,
             status: filterStatus,
@@ -620,7 +624,12 @@ export default function ImportExportPage() {
                     { type: "collections", label: "Kollektionen", desc: "Kollektion-Titel und Beschreibungen", icon: "🗂" },
                     { type: "customers", label: "Kunden", desc: "Kundendaten & Adressen", icon: "👥" },
                     { type: "inventory", label: "Lagerbestand", desc: "Schnell-Update: SKU + Menge", icon: "📊" },
-                  ].map(({ type, label, desc, icon, primary }) => (
+                  ]
+                    .filter((item) => {
+                      if (isSuperuser) return true;
+                      return !["collections", "customers", "inventory"].includes(item.type);
+                    })
+                    .map(({ type, label, desc, icon, primary }) => (
                     <div
                       key={type}
                       style={{
@@ -731,7 +740,7 @@ export default function ImportExportPage() {
                     "Handles (URL) werden automatisch vergeben — keine handle_*-Spalten nötig.",
                     "Metafelder: Paare metafield_N_key / metafield_N_value; weitere Nummern als Spalten ergänzbar.",
                     "Varianten: mindestens option1/2; option3… in der Vorlage — weitere optionN-Spalten in Excel möglich.",
-                    "Preise als Dezimalzahl: z.B. 29.99 (Punkt als Trennzeichen).",
+                    "Preise als Dezimalzahl: z.B. 29,99 (Komma als Trennzeichen).",
                     "HTML in description_*: <p>, <b>, <ul>, <li> usw. werden übernommen.",
                   ].map((rule, i) => (
                     <InlineStack key={i} gap="200" blockAlign="start">
@@ -812,7 +821,9 @@ export default function ImportExportPage() {
                       {isSuperuser ? (
                         <Checkbox label="Superuser: tüm seller verileri dahil" checked={includeAllSellers} onChange={setIncludeAllSellers} />
                       ) : null}
-                      <Checkbox label="XLSX exportta seller bazlı sheetlere ayır" checked={groupBySeller} onChange={setGroupBySeller} />
+                      {isSuperuser ? (
+                        <Checkbox label="XLSX exportta seller bazlı sheetlere ayır" checked={groupBySeller} onChange={setGroupBySeller} />
+                      ) : null}
                     </InlineStack>
                   </BlockStack>
                 </div>

@@ -3,10 +3,12 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 function RegisterForm() {
   const router = useRouter();
+  const t = useTranslations("auth.register");
   const searchParams = useSearchParams();
   const [storeName, setStoreName] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -31,11 +33,11 @@ function RegisterForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(""); setSuccess("");
-    if (!email || !password) { setError("E-Mail und Passwort sind Pflichtfelder"); return; }
-    if (!isInvited && !storeName) { setError("Store Name ist ein Pflichtfeld"); return; }
-    if (isInvited && (!firstName || !lastName)) { setError("Vor- und Nachname sind Pflichtfelder"); return; }
-    if (password.length < 6) { setError("Passwort muss mindestens 6 Zeichen haben"); return; }
-    if (!agreementAccepted) { setError("Bitte akzeptieren Sie die Nutzungsbedingungen und Datenschutzrichtlinie."); return; }
+    if (!email || !password) { setError(t("errorRequired")); return; }
+    if (!isInvited && !storeName) { setError(t("errorStoreName")); return; }
+    if (isInvited && (!firstName || !lastName)) { setError(t("errorName")); return; }
+    if (password.length < 6) { setError(t("errorPasswordLength")); return; }
+    if (!agreementAccepted) { setError(t("errorTerms")); return; }
     setLoading(true);
     try {
       const extra = {
@@ -53,10 +55,10 @@ function RegisterForm() {
       localStorage.setItem("storeName", data.user.store_name || storeName || `${firstName} ${lastName}`);
       localStorage.setItem("sellerIsSuperuser", data.user.is_superuser ? "true" : "false");
       localStorage.setItem("sellerLoggedIn", "true");
-      setSuccess("Konto erstellt! Weiterleitung…");
+      setSuccess(t("success"));
       setTimeout(() => router.push("/dashboard"), 1200);
     } catch (err) {
-      setError(err?.message || "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.");
+      setError(err?.message || t("errorFailed"));
     } finally {
       setLoading(false);
     }
@@ -72,45 +74,45 @@ function RegisterForm() {
         </div>
         <div style={{ background: "#fff", borderRadius: 12, padding: "40px 36px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111827", margin: "0 0 6px" }}>{isInvited ? "Einladung annehmen" : "Seller werden"}</h1>
-            <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>{isInvited ? "Erstellen Sie Ihr Konto" : "Jetzt registrieren und verkaufen"}</p>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111827", margin: "0 0 6px" }}>{isInvited ? t("titleInvited") : t("title")}</h1>
+            <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>{isInvited ? t("subtitleInvited") : t("subtitle")}</p>
           </div>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {isInvited ? (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>Vorname *</label>
-                  <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required style={inputStyle} placeholder="Max" />
+                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("firstName")} *</label>
+                  <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required style={inputStyle} placeholder={t("firstNamePlaceholder")} />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>Nachname *</label>
-                  <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} required style={inputStyle} placeholder="Mustermann" />
+                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("lastName")} *</label>
+                  <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} required style={inputStyle} placeholder={t("lastNamePlaceholder")} />
                 </div>
               </div>
             ) : (
               <div>
-                <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>Store Name *</label>
-                <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} required style={inputStyle} placeholder="My Awesome Store" />
+                <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("storeName")} *</label>
+                <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} required style={inputStyle} placeholder={t("storeNamePlaceholder")} />
               </div>
             )}
             <div>
-              <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>E-Mail *</label>
+              <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("email")} *</label>
               <input
                 type="email" value={email}
                 onChange={(e) => !isInvited && setEmail(e.target.value)}
                 required readOnly={isInvited}
                 style={{ ...inputStyle, background: isInvited ? "#f9fafb" : "#fff" }}
-                placeholder="you@example.com"
+                placeholder={t("emailPlaceholder")}
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>Passwort *</label>
+              <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("password")} *</label>
               <div style={{ position: "relative" }}>
                 <input
                   type={showPassword ? "text" : "password"} value={password}
                   onChange={(e) => setPassword(e.target.value)} required
                   style={{ ...inputStyle, padding: "10px 44px 10px 14px" }}
-                  placeholder="Min. 6 Zeichen"
+                  placeholder={t("passwordPlaceholder")}
                 />
                 <button type="button" onClick={() => setShowPassword((v) => !v)}
                   style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 0, display: "flex", alignItems: "center" }}
@@ -131,11 +133,14 @@ function RegisterForm() {
                 style={{ marginTop: 2, width: 16, height: 16, cursor: "pointer", accentColor: "#ff971c", flexShrink: 0 }}
               />
               <span>
-                Ich habe die{" "}
-                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#ff971c", textDecoration: "underline" }}>Nutzungsbedingungen</a>
-                {" "}und die{" "}
-                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "#ff971c", textDecoration: "underline" }}>Datenschutzrichtlinie</a>
-                {" "}gelesen und akzeptiere sie. *
+                {t.rich("agreeText", {
+                  terms: (chunks) => (
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#ff971c", textDecoration: "underline" }}>{chunks}</a>
+                  ),
+                  privacy: (chunks) => (
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "#ff971c", textDecoration: "underline" }}>{chunks}</a>
+                  ),
+                })} *
               </span>
             </label>
             {error && (
@@ -146,12 +151,11 @@ function RegisterForm() {
             )}
             <button type="submit" disabled={loading}
               style={{ padding: "12px", background: loading ? "#9ca3af" : "#ff971c", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
-              {loading ? "Konto wird erstellt…" : (isInvited ? "Konto erstellen" : "Seller-Konto erstellen")}
+              {loading ? t("submitting") : (isInvited ? t("submitInvited") : t("submit"))}
             </button>
           </form>
           <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "#6b7280" }}>
-            Bereits registriert?{" "}
-            <Link href="/login" style={{ color: "#ff971c", fontWeight: 600, textDecoration: "none" }}>Anmelden</Link>
+            <Link href="/login" style={{ color: "#ff971c", fontWeight: 600, textDecoration: "none" }}>{t("alreadyHaveAccount")}</Link>
           </p>
         </div>
       </div>
@@ -161,7 +165,7 @@ function RegisterForm() {
 
 export default function Register() {
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Laden…</div>}>
+    <Suspense fallback={<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading…</div>}>
       <RegisterForm />
     </Suspense>
   );

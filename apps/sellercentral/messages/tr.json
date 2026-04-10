@@ -1,13 +1,69 @@
 {
   "common": {
+    "save": "Kaydet",
+    "saving": "Kaydediliyor…",
+    "cancel": "İptal",
+    "edit": "Düzenle",
+    "delete": "Sil",
+    "add": "Ekle",
+    "remove": "Kaldır",
+    "upload": "Yükle",
+    "duplicate": "Çoğalt",
+    "loading": "Yükleniyor…",
+    "search": "Ara",
+    "filter": "Filtrele",
+    "export": "Dışa aktar",
+    "import": "İçe aktar",
+    "back": "Geri",
+    "close": "Kapat",
+    "confirm": "Onayla",
+    "required": "Zorunlu",
+    "optional": "İsteğe bağlı",
+    "yes": "Evet",
+    "no": "Hayır",
+    "error": "Hata",
+    "success": "Başarılı",
+    "actions": "İşlemler",
+    "view": "Görünüm",
+    "list": "Liste",
+    "free": "Ücretsiz",
+    "noItems": "Ürün yok",
+    "all": "Tümü",
+    "new": "Yeni",
     "dashboard": "Panel",
     "products": "Ürünler",
     "orders": "Siparişler",
     "settings": "Ayarlar",
-    "logout": "Çıkış"
+    "logout": "Çıkış yap",
+    "productStatus": {
+      "published": "Aktif",
+      "draft": "Taslak",
+      "archived": "Arşivlendi"
+    },
+    "orderStatus": {
+      "pending": "Açık",
+      "processing": "İşleniyor",
+      "shipped": "Kargoya verildi",
+      "delivered": "Teslim edildi",
+      "completed": "Tamamlandı",
+      "cancelled": "İptal edildi",
+      "paid": "Ödendi",
+      "refunded": "İade edildi",
+      "teil_erstattet": "Kısmi iade",
+      "retoure": "İade",
+      "retoure_anfrage": "İade beklemede"
+    },
+    "approvalStatus": {
+      "pending": "Beklemede",
+      "pending_review": "İncelemede",
+      "approved": "Onaylandı",
+      "rejected": "Reddedildi",
+      "suspended": "Askıya alındı",
+      "documents_submitted": "Belgeler yüklendi"
+    }
   },
   "nav": {
-    "home": "Ana Sayfa",
+    "home": "Ana sayfa",
     "dashboard": "Panel",
     "products": "Ürünler",
     "orders": "Siparişler",
@@ -18,9 +74,9 @@
     "drafts": "Taslaklar",
     "abandonedCheckouts": "Terk edilen sepetler",
     "returns": "İadeler",
-    "inventory": "Envanter",
+    "inventory": "Stok",
     "collections": "Koleksiyonlar",
-    "giftCards": "Hediye Kartları",
+    "giftCards": "Hediye kartları",
     "customers": "Müşteriler",
     "customersList": "Liste",
     "campaigns": "Kampanyalar",
@@ -33,12 +89,19 @@
     "pages": "Sayfalar",
     "files": "Dosyalar",
     "menus": "Menüler",
-    "blogPosts": "Blog Yazıları",
+    "blogPosts": "Blog yazıları",
     "brands": "Markalar",
     "analytics": "Analitik",
     "reports": "Raporlar",
-    "liveView": "Canlı Görünüm",
-    "importExport": "İçe/Dışa Aktar"
+    "liveView": "Canlı görünüm",
+    "importExport": "İçe/Dışa aktar",
+    "view": "Görünüm",
+    "list": "Liste",
+    "reviews": "Değerlendirmeler",
+    "sellers": "Satıcılar",
+    "coupons": "Kuponlar",
+    "landingPage": "Açılış sayfası",
+    "styles": "Stiller"
   },
   "locale": {
     "en": "English",
@@ -47,5 +110,617 @@
     "fr": "Français",
     "it": "Italiano",
     "es": "Español"
+  },
+  "auth": {
+    "login": {
+      "title": "Satıcı Girişi",
+      "subtitle": "Satıcı hesabınıza giriş yapın",
+      "email": "E-posta",
+      "emailPlaceholder": "siz@ornek.com",
+      "password": "Şifre",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Giriş yap",
+      "submitting": "Giriş yapılıyor…",
+      "noAccount": "Hesabınız yok mu? Buradan kayıt olun",
+      "errorRequired": "E-posta ve şifre zorunludur",
+      "errorFailed": "Giriş başarısız. E-posta ve şifrenizi kontrol edin."
+    },
+    "register": {
+      "title": "Satıcı Ol",
+      "titleInvited": "Daveti Kabul Et",
+      "subtitle": "Hemen kayıt ol ve satmaya başla",
+      "subtitleInvited": "Hesabınızı oluşturun",
+      "firstName": "Ad",
+      "firstNamePlaceholder": "Ahmet",
+      "lastName": "Soyad",
+      "lastNamePlaceholder": "Yılmaz",
+      "storeName": "Mağaza adı",
+      "storeNamePlaceholder": "Harika Mağazam",
+      "email": "E-posta",
+      "emailPlaceholder": "siz@ornek.com",
+      "password": "Şifre",
+      "passwordPlaceholder": "En az 6 karakter",
+      "agreeText": "{terms} ve {privacy} okudum ve kabul ediyorum.",
+      "terms": "Kullanım Koşulları",
+      "privacy": "Gizlilik Politikası",
+      "submit": "Satıcı Hesabı Oluştur",
+      "submitInvited": "Hesap Oluştur",
+      "submitting": "Hesap oluşturuluyor…",
+      "alreadyHaveAccount": "Zaten kayıtlı mısınız? Giriş yapın",
+      "success": "Hesap oluşturuldu! Yönlendiriliyor…",
+      "errorRequired": "E-posta ve şifre zorunludur",
+      "errorStoreName": "Mağaza adı zorunludur",
+      "errorName": "Ad ve soyad zorunludur",
+      "errorPasswordLength": "Şifre en az 6 karakter olmalıdır",
+      "errorTerms": "Lütfen Kullanım Koşulları ve Gizlilik Politikasını kabul edin.",
+      "errorFailed": "Kayıt başarısız. Lütfen tekrar deneyin."
+    }
+  },
+  "orders": {
+    "title": "Siparişler",
+    "newOrder": "Yeni Sipariş",
+    "searchPlaceholder": "Ad, e-posta veya # ile ara…",
+    "sellerSearchPlaceholder": "Satıcı ara (isim)…",
+    "return": "İade (aktif)",
+    "loading": "Yükleniyor…",
+    "empty": "Sipariş bulunamadı",
+    "sort": {
+      "label": "Sıralama",
+      "newest": "En yeni önce",
+      "oldest": "En eski önce",
+      "amountDesc": "Tutar ↓",
+      "amountAsc": "Tutar ↑"
+    },
+    "table": {
+      "order": "Sipariş",
+      "customer": "Müşteri",
+      "date": "Tarih",
+      "items": "Ürünler",
+      "total": "Toplam",
+      "status": "Durum",
+      "payment": "Ödeme",
+      "delivery": "Teslimat"
+    },
+    "actions": {
+      "viewDetails": "Detayları görüntüle",
+      "ship": "Kargoyla",
+      "cancel": "İptal et",
+      "delete": "Sil"
+    },
+    "new": {
+      "title": "Yeni Sipariş",
+      "customerData": "Müşteri bilgileri",
+      "email": "E-posta *",
+      "firstName": "Ad",
+      "lastName": "Soyad",
+      "phone": "Telefon",
+      "country": "Ülke",
+      "street": "Sokak",
+      "postalCode": "Posta kodu",
+      "city": "Şehir",
+      "items": "Ürünler",
+      "itemDescription": "Açıklama",
+      "itemQty": "Adet",
+      "itemPrice": "Fiyat (kuruş)",
+      "addItem": "Ürün ekle",
+      "shipping": "Kargo (kuruş)",
+      "discount": "İndirim (kuruş)",
+      "paymentMethod": "Ödeme yöntemi",
+      "paymentMethodPlaceholder": "Havale, PayPal…",
+      "notes": "Notlar",
+      "create": "Sipariş oluştur"
+    },
+    "detail": {
+      "back": "← Siparişler",
+      "orderPrefix": "Sipariş #",
+      "sections": {
+        "items": "Ürünler",
+        "statusManagement": "Durum yönetimi",
+        "shipping": "Kargo",
+        "paymentInfo": "Ödeme bilgisi",
+        "customerInfo": "Müşteri bilgisi",
+        "shippingAddress": "Teslimat adresi",
+        "billingAddress": "Fatura adresi",
+        "summary": "Özet",
+        "deleteOrder": "Siparişi sil"
+      },
+      "table": {
+        "product": "Ürün",
+        "qty": "Adet",
+        "unitPrice": "Birim fiyat",
+        "total": "Toplam"
+      },
+      "fields": {
+        "orderStatus": "Sipariş durumu",
+        "paymentStatus": "Ödeme durumu",
+        "deliveryStatus": "Teslimat durumu",
+        "carrier": "Kargo şirketi",
+        "trackingNumber": "Takip numarası",
+        "shippedDate": "Kargo tarihi",
+        "paymentMethod": "Ödeme yöntemi",
+        "customerType": "Müşteri tipi",
+        "firstOrder": "İlk sipariş",
+        "newsletter": "Bülten",
+        "orderNumber": "Sipariş numarası",
+        "date": "Tarih"
+      },
+      "customerTypes": {
+        "guest": "Misafir müşteri",
+        "registered": "Kayıtlı müşteri"
+      },
+      "sameAsShipping": "teslimat adresiyle aynı",
+      "buttons": {
+        "saveStatus": "Durumu kaydet",
+        "editShipping": "Kargo düzenle / kargoya verildi işaretle",
+        "invoice": "Fatura (PDF)",
+        "packingSlip": "İrsaliye (PDF)",
+        "deleteOrder": "Siparişi sil",
+        "saved": "✓ Kaydedildi"
+      },
+      "costBreakdown": {
+        "shippingCosts": "Kargo maliyeti",
+        "discount": "İndirim",
+        "subtotal": "Ara toplam (KDV dahil)",
+        "total": "Toplam"
+      },
+      "messages": {
+        "loadError": "Sipariş yüklenemedi",
+        "saveFailed": "Kaydetme başarısız",
+        "deleteConfirm": "Sipariş gerçekten silinsin mi?",
+        "deleteFailed": "Silme başarısız",
+        "undoWarning": "Bu işlem geri alınamaz.",
+        "loading": "Yükleniyor…",
+        "noItems": "Ürün yok"
+      }
+    }
+  },
+  "products": {
+    "title": "Ürünler",
+    "newProduct": "Yeni Ürün",
+    "searchPlaceholder": "Ürün ara…",
+    "loading": "Yükleniyor…",
+    "empty": "Ürün bulunamadı",
+    "sort": {
+      "nameAsc": "Ad A–Z",
+      "nameDesc": "Ad Z–A",
+      "newest": "En yeni önce",
+      "oldest": "En eski önce"
+    },
+    "table": {
+      "product": "Ürün",
+      "sku": "SKU",
+      "category": "Kategori",
+      "price": "Fiyat",
+      "inventory": "Stok",
+      "status": "Durum",
+      "seller": "Satıcı"
+    },
+    "actions": {
+      "edit": "Düzenle",
+      "duplicate": "Çoğalt",
+      "delete": "Sil"
+    },
+    "edit": {
+      "back": "← Ürünler",
+      "newTitle": "Yeni Ürün",
+      "editTitle": "Ürünü Düzenle",
+      "sections": {
+        "basicInfo": "Temel bilgiler",
+        "description": "Açıklama",
+        "media": "Medya",
+        "pricing": "Fiyatlandırma",
+        "inventory": "Stok",
+        "variants": "Varyantlar",
+        "metadata": "Meta veriler",
+        "seo": "SEO",
+        "shipping": "Kargo ve Boyutlar",
+        "productType": "Ürün tipi",
+        "relatedProducts": "İlgili ürünler"
+      },
+      "fields": {
+        "title": "Başlık",
+        "titlePlaceholder": "ör. Pamuklu T-Shirt",
+        "sku": "SKU",
+        "ean": "EAN / Barkod",
+        "category": "Kategori",
+        "categoryPlaceholder": "Kategori seç",
+        "brand": "Marka",
+        "noBrand": "— Yok —",
+        "shippingGroup": "Kargo grubu",
+        "collections": "Koleksiyonlar",
+        "collectionsPlaceholder": "Koleksiyon ara…",
+        "status": "Durum",
+        "metaTitle": "Meta başlık",
+        "metaDescription": "Meta açıklama",
+        "keywords": "Anahtar kelimeler",
+        "keywordsPlaceholder": "kelime1, kelime2",
+        "urlHandle": "URL tanıtıcısı",
+        "syncHandle": "Başlığı → tanıtıcıya senkronize et",
+        "weight": "Ağırlık (g)",
+        "length": "U (cm)",
+        "width": "G (cm)",
+        "height": "Y (cm)",
+        "productType": "Ürün tipi",
+        "productTypePlaceholder": "ör. T-Shirt",
+        "manufacturer": "Üretici",
+        "manufacturerInfo": "Üretici bilgileri",
+        "responsiblePerson": "Sorumlu kişi (AB)",
+        "searchOrEnter": "Ara veya gir…",
+        "relatedSearch": "Ürün ara…",
+        "quantity": "Miktar"
+      },
+      "pricing": {
+        "net": "Net",
+        "gross": "Brüt ({taxLabel} {vatRate}% dahil)",
+        "rrp": "Tavsiye fiyat",
+        "sale": "İndirimli",
+        "linkNetGross": "Net ve brütü bağla",
+        "unlinkNetGross": "Net ve brütü ayır"
+      },
+      "variants": {
+        "groupName": "Grup adı",
+        "groupNamePlaceholder": "ör. Renk, Beden, Malzeme",
+        "value": "Değer",
+        "swatch": "Renk örneği",
+        "addSwatchImage": "Renk örneği resmi ekle",
+        "changeSwatchImage": "Renk örneği resmini değiştir",
+        "removeOption": "Seçeneği kaldır",
+        "removeSwatch": "Renk örneğini kaldır",
+        "price": "Fiyat (€)",
+        "rrp": "TSF (€)",
+        "sale": "İndirimli (€)"
+      },
+      "description": {
+        "visualToggle": "Görsel göster",
+        "htmlToggle": "HTML göster"
+      },
+      "media": {
+        "addImage": "Görsel ekle",
+        "selectImage": "Görsel seç"
+      },
+      "units": {
+        "none": "— Yok —",
+        "piece": "Adet"
+      },
+      "duplicate": {
+        "title": "Ürünü çoğalt",
+        "create": "Kopya oluştur",
+        "cancel": "İptal",
+        "fields": {
+          "title": "Başlık (\"(Kopya)\" ekiyle)",
+          "description": "Açıklama",
+          "price": "Fiyat",
+          "inventory": "Stok miktarı",
+          "categories": "Kategoriler / koleksiyon",
+          "images": "Görseller / medya",
+          "variants": "Varyantlar (seçenek adları ve değerleri; SKU/EAN kopyalanmaz)"
+        }
+      },
+      "messages": {
+        "created": "Ürün oluşturuldu",
+        "saved": "Kaydedildi",
+        "proposalSubmitted": "Değişiklik teklifiniz gönderildi. Bir süper kullanıcı inceleyecek.",
+        "priceStockSaved": "Fiyat, stok ve özel veriler kaydedildi.",
+        "saveFailed": "Kaydetme başarısız",
+        "duplicateFailed": "Çoğaltma başarısız",
+        "deleteFailed": "Silme başarısız",
+        "variantEanRequired": "Varyant EAN boş olamaz.",
+        "gpsr": "GPSR zorunludur. Lütfen şu alanları doldurun: {fields}"
+      }
+    }
+  },
+  "inventory": {
+    "title": "Stok",
+    "searchPlaceholder": "Ürün ara…",
+    "loading": "Yükleniyor…",
+    "empty": "Ürün bulunamadı",
+    "sort": {
+      "nameAsc": "Ad A–Z",
+      "nameDesc": "Ad Z–A",
+      "newest": "En yeni önce",
+      "oldest": "En eski önce"
+    },
+    "table": {
+      "product": "Ürün",
+      "sku": "SKU",
+      "available": "Mevcut",
+      "reserved": "Rezerve",
+      "total": "Toplam"
+    }
+  },
+  "customers": {
+    "title": "Müşteriler",
+    "newCustomer": "Yeni Müşteri",
+    "searchPlaceholder": "Ad, e-posta veya # ile ara…",
+    "sellerSearchPlaceholder": "Satıcı ara (isim)…",
+    "loading": "Yükleniyor…",
+    "empty": "Müşteri bulunamadı",
+    "emptyArea": "Bu alanda müşteri yok.",
+    "emptySellerCustomers": "Satıcı müşterisi yok",
+    "superuserArea": "Süper kullanıcı alanınız — doğrudan ve atanmamış müşteriler",
+    "sellerCustomers": "Satıcı Müşterileri",
+    "allCustomers": "Tüm Müşteriler",
+    "count": "{count} müşteri",
+    "countPlural": "{count} müşteri",
+    "table": {
+      "number": "Müşteri #",
+      "name": "Ad",
+      "email": "E-posta",
+      "type": "Tip",
+      "registered": "Kayıt tarihi",
+      "newsletter": "Bülten",
+      "country": "Ülke",
+      "orders": "Siparişler",
+      "totalSpent": "Toplam harcama",
+      "lastPurchase": "Son satın alma"
+    },
+    "accountTypes": {
+      "guest": "Misafir",
+      "business": "Kurumsal",
+      "private": "Bireysel"
+    },
+    "subscribed": "✓ Abone",
+    "registered": "Kayıtlı",
+    "actions": {
+      "edit": "Düzenle",
+      "delete": "Sil"
+    },
+    "deleteConfirm": {
+      "title": "Müşteri silinsin mi?",
+      "body": "kalıcı olarak silinecek.",
+      "cancel": "İptal",
+      "confirm": "Sil"
+    }
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "general": {
+      "title": "Genel Ayarlar",
+      "subtitle": "Mağaza adı ve iletişim bilgileri. Mağaza adı mağazadaki ürün sayfalarında Satıcı olarak görünür.",
+      "sections": {
+        "language": "Dil",
+        "languageHint": "Satıcı merkezi arayüz dili. Ürün verileri herhangi bir dilde girilebilir.",
+        "storeInfo": "Mağaza Bilgileri",
+        "address": "Adres",
+        "companyDetails": "Şirket bilgileri ve belgeler",
+        "registeredAddress": "Tescilli iş adresi",
+        "warehouseAddress": "Depo / iade adresi",
+        "documents": "Şirket belgeleri",
+        "documentsHint": "Ticaret lisansı, vergi sertifikası, kayıt belgeleri vb. yükleyin."
+      },
+      "fields": {
+        "storeName": "Mağaza adı",
+        "storeNamePlaceholder": "ör. Mağazam",
+        "email": "E-posta",
+        "emailPlaceholder": "siz@ornek.com",
+        "phone": "Telefon",
+        "phonePlaceholder": "+90 …",
+        "city": "Şehir",
+        "postalCode": "Posta kodu",
+        "country": "Ülke",
+        "description": "Mağaza açıklaması",
+        "descriptionPlaceholder": "Mağazanızı anlatın…",
+        "companyName": "Yasal şirket adı",
+        "taxId": "Vergi numarası",
+        "vatId": "KDV numarası",
+        "iban": "IBAN (isteğe bağlı)",
+        "website": "Web sitesi",
+        "websitePlaceholder": "https://...",
+        "street": "Sokak",
+        "streetPlaceholder": "Sokak ve numara"
+      },
+      "buttons": {
+        "save": "Kaydet",
+        "cancel": "İptal",
+        "remove": "Kaldır",
+        "uploading": "Belgeler yükleniyor…"
+      },
+      "messages": {
+        "saved": "Ayarlar başarıyla kaydedildi.",
+        "loading": "Yükleniyor…"
+      }
+    },
+    "payments": {
+      "title": "Ödemeler ve Transferler",
+      "subtitle": "Satış gelirlerini almak için banka hesabınızı ekleyin.",
+      "howItWorks": {
+        "title": "Ödemeler nasıl çalışır",
+        "step1Label": "Müşteri satın alır",
+        "step1Desc": "Ödeme doğrudan platforma gider (Stripe)",
+        "step2Label": "Hesaplama",
+        "step2Desc": "Gelirinizin {sellerPct}%'i hesaplanır — {platformPct}% platform ücreti",
+        "step3Label": "Banka transferi",
+        "step3Desc": "Tutar IBAN'ınıza transfer edilir",
+        "note": "Ödemeler platform tarafından manuel olarak işlenir. Transfer başlatıldığında e-posta ile bilgilendirileceksiniz."
+      },
+      "bankAccount": {
+        "title": "Ödeme banka hesabı",
+        "subtitle": "Satış gelirleriniz bu hesaba transfer edilecektir.",
+        "addButton": "Ekle",
+        "editButton": "Düzenle",
+        "ibanLabel": "IBAN",
+        "holderLabel": "Hesap sahibi",
+        "bicLabel": "BIC / SWIFT",
+        "bankNameLabel": "Banka",
+        "ibanPlaceholder": "TR33 0006 1005 1978 6457 8413 26",
+        "holderPlaceholder": "Ahmet Yılmaz veya Yılmaz Ltd. Şti.",
+        "bicPlaceholder": "COBADEFFXXX",
+        "bankNamePlaceholder": "Ziraat Bankası",
+        "ibanHelp": "Uluslararası banka hesap numarası (boşluklu veya boşluksuz — ikisi de kabul edilir)",
+        "saveButton": "Banka bilgilerini kaydet",
+        "cancelButton": "İptal",
+        "accountReady": "Banka hesabı eklendi — ödemeler için hazır",
+        "noAccount": "Banka hesabı eklenmedi",
+        "noAccountDesc": "IBAN olmadan ödeme yapılamaz. Lütfen banka hesabınızı ekleyin."
+      },
+      "history": {
+        "title": "Ödeme geçmişi",
+        "empty": "Henüz ödeme yok.",
+        "emptyHint": "Transfer yapıldığında tarih, tutar ve referansıyla burada görünecektir."
+      },
+      "validation": {
+        "ibanEmpty": "IBAN boş olamaz.",
+        "ibanFormat": "Geçersiz IBAN formatı.",
+        "ibanLength": "IBAN uzunluğu geçersiz."
+      },
+      "messages": {
+        "saved": "Banka bilgileri başarıyla kaydedildi.",
+        "loadError": "Ödeme verileri yüklenirken hata oluştu.",
+        "saveError": "Kaydetme hatası.",
+        "loading": "Yükleniyor…"
+      }
+    },
+    "verification": {
+      "title": "Satıcı Doğrulama",
+      "subtitle": "Satışa başlamadan önce yasal onayı ve şirket belgelerini tamamlayın.",
+      "statusLabel": "Doğrulama Durumu",
+      "statuses": {
+        "pending": "Kayıtlı — satış öncesi doğrulama gerekli",
+        "documents_submitted": "Belgeler yüklendi — inceleme devam ediyor",
+        "pending_review": "Onay bekliyor",
+        "approved": "Hesap doğrulandı — satış etkin",
+        "rejected": "Reddedildi — lütfen destek ile iletişime geçin",
+        "suspended": "Askıya alındı — lütfen destek ile iletişime geçin"
+      },
+      "sections": {
+        "agreement": "Yasal Onay",
+        "company": "Şirket Bilgileri",
+        "contact": "İletişim ve Adres",
+        "documents": "Belgeler"
+      },
+      "agreement": {
+        "label": "Bu şirketi temsil etmeye yetkili olduğumu ve sağlanan tüm bilgilerin doğru ve eksiksiz olduğunu onaylıyorum.",
+        "terms": "Kullanım Koşulları",
+        "privacy": "Gizlilik Politikası",
+        "alreadyAccepted": "Yasal sözleşme {date} tarihinde kabul edildi."
+      },
+      "fields": {
+        "companyName": "Şirket adı",
+        "authorizedPerson": "Yetkili kişi (ad soyad)",
+        "taxId": "Vergi numarası",
+        "vatId": "KDV numarası",
+        "iban": "IBAN",
+        "phone": "Telefon numarası",
+        "street": "Sokak ve bina numarası",
+        "city": "Şehir",
+        "postalCode": "Posta kodu",
+        "country": "Ülke"
+      },
+      "documents": {
+        "tradeRegister": "Ticaret sicil belgesi",
+        "idPassport": "Kimlik / Pasaport",
+        "taxDocument": "Vergi belgesi (isteğe bağlı)",
+        "uploaded": "Yüklendi",
+        "notUploaded": "Henüz yüklenmedi",
+        "required": "Zorunlu",
+        "optional": "İsteğe bağlı",
+        "chooseFile": "Dosya seç"
+      },
+      "buttons": {
+        "submit": "Doğrulama için gönder",
+        "saving": "Kaydediliyor…"
+      },
+      "validation": {
+        "agreement": "Lütfen önce yasal sözleşmeyi kabul edin.",
+        "documents": "Lütfen ticaret sicil belgesi ve kimlik/pasaport yükleyin."
+      },
+      "messages": {
+        "saved": "Veriler kaydedildi ve doğrulama için gönderildi.",
+        "saveError": "Kaydetme hatası."
+      }
+    },
+    "users": {
+      "title": "Kullanıcılar ve İzinler",
+      "tabs": {
+        "all": "Tümü",
+        "kybPending": "KYB Beklemede ({count})"
+      },
+      "table": {
+        "name": "Ad",
+        "email": "E-posta",
+        "store": "Mağaza",
+        "role": "Rol",
+        "status": "Durum",
+        "joined": "Katılım",
+        "actions": "İşlemler"
+      },
+      "roles": {
+        "superuser": "Süper kullanıcı",
+        "seller": "Satıcı"
+      },
+      "actions": {
+        "kyb": "KYB",
+        "edit": "Düzenle",
+        "makeAdmin": "Yönetici yap",
+        "removeSuperuser": "Süper kullanıcıyı kaldır",
+        "delete": "Sil"
+      },
+      "kyb": {
+        "title": "KYB İncelemesi",
+        "approve": "Onayla",
+        "reject": "Reddet",
+        "suspend": "Askıya al",
+        "rejectionReason": "Red nedeni",
+        "rejectionReasonPlaceholder": "Neden…",
+        "close": "Kapat",
+        "fields": {
+          "companyName": "Şirket",
+          "authorizedPerson": "Yetkili kişi",
+          "taxId": "Vergi no",
+          "vatId": "KDV no",
+          "iban": "IBAN",
+          "phone": "Telefon",
+          "country": "Ülke",
+          "agreementAccepted": "Sözleşme kabul edildi",
+          "agreementDate": "Sözleşme tarihi",
+          "riskScore": "Risk puanı",
+          "documents": "Belgeler"
+        }
+      },
+      "deleteConfirm": {
+        "title": "Kullanıcı silinsin mi?",
+        "body": "kalıcı olarak silinecek.",
+        "cancel": "İptal",
+        "confirm": "Sil"
+      },
+      "messages": {
+        "loading": "Yükleniyor…",
+        "empty": "Kullanıcı bulunamadı.",
+        "superuserGranted": "Süper kullanıcı erişimi verildi.",
+        "superuserRevoked": "Süper kullanıcı erişimi iptal edildi.",
+        "updateFailed": "Güncelleme başarısız.",
+        "deleteFailed": "Silme başarısız.",
+        "approvalUpdated": "Onay durumu güncellendi."
+      }
+    }
+  },
+  "marketing": {
+    "discounts": {
+      "title": "İndirimler",
+      "newDiscount": "Yeni İndirim",
+      "loading": "Yükleniyor…",
+      "empty": "İndirim bulunamadı.",
+      "table": {
+        "code": "Kod",
+        "type": "Tip",
+        "value": "Değer",
+        "usage": "Kullanım",
+        "expires": "Bitiş tarihi",
+        "status": "Durum"
+      },
+      "actions": {
+        "edit": "Düzenle",
+        "delete": "Sil"
+      }
+    }
+  },
+  "content": {
+    "media": {
+      "title": "Medya Kütüphanesi",
+      "upload": "Yükle",
+      "loading": "Yükleniyor…",
+      "empty": "Medya dosyası bulunamadı.",
+      "searchPlaceholder": "Medya ara…"
+    }
   }
 }

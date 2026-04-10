@@ -37,7 +37,14 @@
     "analytics": "Analíticas",
     "reports": "Informes",
     "liveView": "Vista en vivo",
-    "importExport": "Importar/Exportar"
+    "importExport": "Importar/Exportar",
+    "view": "Vista",
+    "list": "Lista",
+    "reviews": "Resenas",
+    "sellers": "Vendedores",
+    "coupons": "Cupones",
+    "landingPage": "Pagina de inicio",
+    "styles": "Estilos"
   },
   "locale": {
     "en": "English",

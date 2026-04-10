@@ -2,10 +2,11 @@
 
 import React, { Suspense } from "react";
 import SearchTemplate from "@/components/templates/SearchTemplate";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 48, color: "#6b7280", textAlign: "center" }}>Loading...</div>}>
+    <Suspense fallback={<GlobalPageLoader label="Suche wird geladen..." />}>
       <SearchTemplate />
     </Suspense>
   );

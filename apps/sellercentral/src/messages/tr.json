@@ -37,7 +37,14 @@
     "analytics": "Analitik",
     "reports": "Raporlar",
     "liveView": "Canlı Görünüm",
-    "importExport": "İçe/Dışa Aktar"
+    "importExport": "İçe/Dışa Aktar",
+    "view": "Görünüm",
+    "list": "Liste",
+    "reviews": "Yorumlar",
+    "sellers": "Satıcılar",
+    "coupons": "Kuponlar",
+    "landingPage": "Landing Page",
+    "styles": "Stiller"
   },
   "locale": {
     "en": "English",
