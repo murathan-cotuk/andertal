@@ -20,9 +20,9 @@ export default async function LocaleLayout({ children, params }) {
 
   let messages;
   try {
-    messages = (await import(`../../messages/${locale}.json`)).default;
+    messages = (await import(`../../../messages/${locale}.json`)).default;
   } catch {
-    messages = (await import(`../../messages/${routing.defaultLocale}.json`)).default;
+    messages = (await import(`../../../messages/${routing.defaultLocale}.json`)).default;
   }
   if (!messages || typeof messages !== "object") messages = {};
 
