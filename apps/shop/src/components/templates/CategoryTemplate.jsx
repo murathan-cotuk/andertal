@@ -518,18 +518,21 @@ function findCategoryNodeById(nodes, id) {
   return null;
 }
 
-function visibleSubcats(children) {
-  return (children || []).filter((c) => c && c.active !== false && c.is_visible !== false);
+/** Returns ancestor nodes (root → direct parent) for a given slug, or null if not found. */
+function findAncestors(nodes, slug, path = []) {
+  const norm = String(slug || "").replace(/^\//, "");
+  for (const n of nodes || []) {
+    if (!n) continue;
+    const s = String(n.slug || n.handle || "").replace(/^\//, "");
+    if (s === norm) return path;
+    const found = findAncestors(n.children || [], slug, [...path, n]);
+    if (found !== null) return found;
+  }
+  return null;
 }
 
-function collectCategorySlugsDeep(node, out = []) {
-  if (!node) return out;
-  const slug = String(node.slug || node.handle || "").replace(/^\//, "").trim();
-  if (slug) out.push(slug);
-  for (const child of node.children || []) {
-    collectCategorySlugsDeep(child, out);
-  }
-  return out;
+function visibleSubcats(children) {
+  return (children || []).filter((c) => c && c.active !== false && c.is_visible !== false);
 }
 
 export default function CategoryTemplate() {
@@ -540,6 +543,8 @@ export default function CategoryTemplate() {
   const [category, setCategory] = useState(null);
   const [products, setProducts] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
+  const [parentCategory, setParentCategory] = useState(null);
+  const [ancestors, setAncestors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState("default");
@@ -576,40 +581,30 @@ export default function CategoryTemplate() {
         if (!resolvedCategory) {
           setProducts([]);
           setSubcategories([]);
+          setParentCategory(null);
+          setAncestors([]);
           setLoading(false);
           return;
         }
         const current = currentFromTree || findCategoryNodeById(roots, resolvedCategory.id);
-        // Always show current category's own children
-        let subs = visibleSubcats(current?.children);
-        const categorySlugs = Array.from(
-          new Set(
-            collectCategorySlugsDeep(current || resolvedCategory, []).filter(Boolean),
-          ),
-        );
-        const productResponses = await Promise.all(
-          (categorySlugs.length ? categorySlugs : [slug]).map((catSlug) =>
-            fetch(`/api/store-products?category=${encodeURIComponent(catSlug)}&limit=5000`)
-              .then((r) => r.json())
-              .catch(() => ({ products: [] })),
-          ),
-        );
-        if (cancelled) return;
-        const mergedProducts = [];
-        const seenProductIds = new Set();
-        for (const res of productResponses) {
-          for (const p of res?.products || []) {
-            const pid = String(p?.id || "").trim();
-            if (!pid || seenProductIds.has(pid)) continue;
-            seenProductIds.add(pid);
-            mergedProducts.push(p);
-          }
-        }
-        setProducts(mergedProducts);
-        // Keep all visible direct children in sidebar navigation, even if
-        // current listing payload does not contain products for each child yet.
-        subs = subs.filter((s) => s && normCatId(s.id));
+
+        // Ancestor chain (root → direct parent)
+        const ancestorChain = findAncestors(roots, slug) || [];
+        setAncestors(ancestorChain);
+        // Direct parent (last ancestor)
+        const directParent = ancestorChain.length > 0 ? ancestorChain[ancestorChain.length - 1] : null;
+        setParentCategory(directParent);
+
+        // Direct children of current category for sidebar navigation
+        const subs = visibleSubcats(current?.children).filter((s) => s && normCatId(s.id));
         setSubcategories(subs);
+
+        // Single API call — backend's collectCategorySubtreeIdsBySlug handles all descendants
+        const productRes = await fetch(
+          `/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`
+        ).then((r) => r.json()).catch(() => ({ products: [] }));
+        if (cancelled) return;
+        setProducts(productRes?.products ?? []);
 
       } catch (err) {
         if (!cancelled) {
@@ -695,7 +690,7 @@ export default function CategoryTemplate() {
   const facets = buildFacetsFromProducts(products);
   const hasFacets = Object.keys(facets).length > 0;
   const hasSubcategories = subcategories.length > 0;
-  const showCatalogSidebar = hasFacets || hasSubcategories;
+  const showCatalogSidebar = hasFacets || hasSubcategories || !!parentCategory;
 
   useEffect(() => {
     const facetKeys = Object.keys(facets);
@@ -814,6 +809,15 @@ export default function CategoryTemplate() {
             )}
             <Breadcrumb aria-label="Breadcrumb">
               <Link href={`/${locale}`}>Home</Link>
+              {ancestors.map((anc) => {
+                const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
+                return (
+                  <React.Fragment key={anc.id || ancSlug}>
+                    <span style={{ color: "#ccc" }}>/</span>
+                    <Link href={`/${ancSlug}`}>{anc.name || ancSlug}</Link>
+                  </React.Fragment>
+                );
+              })}
               <span style={{ color: "#ccc" }}>/</span>
               <b>{displayTitle}</b>
             </Breadcrumb>
@@ -840,32 +844,81 @@ export default function CategoryTemplate() {
               <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555", lineHeight: 1 }}>×</button>
             </SidebarHead>
             <SidebarSplit>
-              {hasSubcategories && (
+              {(hasSubcategories || parentCategory) && (
                 <SidebarPane $half={true}>
                   <SubcategoryGroup style={{ marginTop: 0 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4 }}>
-                      Kategorien
-                    </div>
-                    <SubcategoryLink
-                      href={slug ? `/${slug}` : "#"}
-                      $active={true}
-                      onClick={() => { setFilters({}); setPage(1); }}
-                    >
-                      Alle
-                    </SubcategoryLink>
-                    {subcategories.map((sub) => {
-                      const isActive = String(sub.slug || "").replace(/^\//, "") === slug;
-                      return (
+                    {/* If current category has children → show current as "Alle" + children */}
+                    {hasSubcategories ? (
+                      <>
+                        {parentCategory && (
+                          <SubcategoryLink
+                            href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                            $active={false}
+                            style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+                          >
+                            ← {parentCategory.name || parentCategory.slug}
+                          </SubcategoryLink>
+                        )}
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
+                          {displayTitle}
+                        </div>
                         <SubcategoryLink
-                          key={sub.id}
-                          href={sub?.slug ? `/${String(sub.slug).replace(/^\//, "")}` : "#"}
-                          $active={isActive}
+                          href={slug ? `/${slug}` : "#"}
+                          $active={true}
                           onClick={() => { setFilters({}); setPage(1); }}
                         >
-                          {sub.name || sub.slug}
+                          Alle
                         </SubcategoryLink>
-                      );
-                    })}
+                        {subcategories.map((sub) => {
+                          const subSlug = String(sub.slug || "").replace(/^\//, "");
+                          return (
+                            <SubcategoryLink
+                              key={sub.id}
+                              href={subSlug ? `/${subSlug}` : "#"}
+                              $active={false}
+                              onClick={() => { setFilters({}); setPage(1); }}
+                            >
+                              {sub.name || sub.slug}
+                            </SubcategoryLink>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      /* Leaf category: show siblings (parent's children) with current highlighted */
+                      <>
+                        <SubcategoryLink
+                          href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                          $active={false}
+                          style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+                        >
+                          ← {parentCategory.name || parentCategory.slug}
+                        </SubcategoryLink>
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: 4 }}>
+                          {parentCategory.name || parentCategory.slug}
+                        </div>
+                        <SubcategoryLink
+                          href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                          $active={false}
+                          onClick={() => { setFilters({}); setPage(1); }}
+                        >
+                          Alle
+                        </SubcategoryLink>
+                        {visibleSubcats(parentCategory.children || []).map((sibling) => {
+                          const sibSlug = String(sibling.slug || "").replace(/^\//, "");
+                          const isCurrent = sibSlug === slug;
+                          return (
+                            <SubcategoryLink
+                              key={sibling.id}
+                              href={sibSlug ? `/${sibSlug}` : "#"}
+                              $active={isCurrent}
+                              onClick={() => { setFilters({}); setPage(1); }}
+                            >
+                              {sibling.name || sibling.slug}
+                            </SubcategoryLink>
+                          );
+                        })}
+                      </>
+                    )}
                   </SubcategoryGroup>
                 </SidebarPane>
               )}

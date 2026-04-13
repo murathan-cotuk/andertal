@@ -231,10 +231,19 @@ async function start() {
     // Old uploads stored as absolute localhost URLs are returned as-is; new uploads
     // stored as relative paths (/uploads/...) get the current SERVER_URL prepended.
     const CURRENT_SERVER_URL = (process.env.SERVER_URL || `http://localhost:${PORT}`).replace(/\/$/, '')
+    /** Accepts string, { url }, { src }, { path }, or other primitives; avoids url.startsType errors. */
     const resolveUploadUrl = (url) => {
-      if (!url) return null
-      if (url.startsWith('http') || url.startsWith('//')) return url
-      return `${CURRENT_SERVER_URL}${url.startsWith('/') ? '' : '/'}${url}`
+      if (url == null || url === '') return null
+      if (typeof url === 'object' && url !== null) {
+        const nested = url.url != null ? url.url : url.src != null ? url.src : url.path != null ? url.path : null
+        if (nested != null && nested !== url) return resolveUploadUrl(nested)
+        return null
+      }
+      const s = typeof url === 'string' ? url : String(url)
+      const t = s.trim()
+      if (!t) return null
+      if (t.startsWith('http') || t.startsWith('//')) return t
+      return `${CURRENT_SERVER_URL}${t.startsWith('/') ? '' : '/'}${t}`
     }
 
     // Explicit OPTIONS preflight handler on httpApp so Medusa's own CORS does not
@@ -2669,6 +2678,27 @@ async function start() {
           where.push('LOWER(TRIM(sku)) = LOWER($' + (params.length + 1) + ')')
           params.push(skuFilter)
         }
+        const catAllow = query.category_id_allowlist
+        if (Array.isArray(catAllow) && catAllow.length > 0) {
+          const arr = catAllow.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean)
+          if (arr.length > 0) {
+            const p = params.length + 1
+            where.push(
+              '(' +
+                'LOWER(TRIM(COALESCE(metadata->>\'admin_category_id\', \'\'))) = ANY($' + p + '::text[])' +
+                ' OR LOWER(TRIM(COALESCE(metadata->>\'category_id\', \'\'))) = ANY($' + p + '::text[])' +
+                ' OR EXISTS (' +
+                  'SELECT 1 FROM jsonb_array_elements_text(' +
+                    'CASE WHEN jsonb_typeof(COALESCE(metadata->\'category_ids\', \'[]\'::jsonb)) = \'array\'' +
+                    ' THEN COALESCE(metadata->\'category_ids\', \'[]\'::jsonb) ELSE \'[]\'::jsonb END' +
+                  ') AS _cat_el(value)' +
+                  ' WHERE LOWER(TRIM(_cat_el.value)) = ANY($' + p + '::text[])' +
+                ')' +
+              ')'
+            )
+            params.push(arr)
+          }
+        }
         if (where.length) sql += ' WHERE ' + where.join(' AND ')
         sql += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2)
         params.push(limit, offset)
@@ -4176,7 +4206,14 @@ async function start() {
       }
       push(meta.admin_category_id)
       push(meta.category_id)
-      if (Array.isArray(meta.category_ids)) meta.category_ids.forEach(push)
+      if (Array.isArray(meta.category_ids)) {
+        meta.category_ids.forEach(push)
+      } else if (typeof meta.category_ids === 'string' && meta.category_ids.trim().startsWith('[')) {
+        try {
+          const parsed = JSON.parse(meta.category_ids)
+          if (Array.isArray(parsed)) parsed.forEach(push)
+        } catch (_) {}
+      }
       if (Array.isArray(p?.categories)) p.categories.forEach((c) => push(c?.id))
       return out
     }
@@ -4209,10 +4246,13 @@ async function start() {
           if (resolvedId) collectionId = resolvedId
         }
         const queryWithId = collectionId ? { ...query, collection_id: collectionId } : query
+        const categoryIdAllowlist =
+          allowedCategoryIds && allowedCategoryIds.size > 0 ? [...allowedCategoryIds] : undefined
         let list = await listAdminHubProductsDb({
           ...queryWithId,
           limit: searchQ ? 200 : (categorySlugFilter ? Math.max(parseInt(query.limit, 10) || 3000, 500) : (query.limit || 100)),
           category: categorySlugFilter || undefined,
+          category_id_allowlist: categoryIdAllowlist,
         })
         if (collectionId) {
           const norm = (s) => (s || '').toString().trim().toLowerCase()
@@ -7048,6 +7088,8 @@ async function start() {
     console.log('Store route: GET /store/collections')
 
     // GET /store/menus – Public menüler (Shop). Her menü SADECE kendi menu_id’sine ait item’ları alır (raw DB).
+    let storeCategoriesTreeCache = { at: 0, payload: null }
+    const STORE_CATEGORIES_TREE_TTL_MS = 45_000
     const storeCategoriesGET = async (req, res) => {
       const adminHubService = resolveAdminHub()
       if (!adminHubService) return res.status(200).json({ categories: [], tree: [], count: 0 })
@@ -7058,6 +7100,7 @@ async function start() {
           if (!category || category.active === false || category.is_visible === false) return res.status(404).json({ message: 'Category not found' })
           const meta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
           const collectionId = category.has_collection && meta.collection_id ? meta.collection_id : null
+          const rawBanner = category.banner_image_url != null ? category.banner_image_url : meta.banner_image_url
           const cat = {
             id: category.id,
             name: category.name,
@@ -7066,15 +7109,24 @@ async function start() {
             handle: category.slug,
             description: category.description || null,
             long_content: category.long_content || null,
-            banner_image_url: resolveUploadUrl(category.banner_image_url || meta.banner_image_url || null) || null,
+            banner_image_url: resolveUploadUrl(rawBanner) || null,
             has_collection: category.has_collection,
             collection_id: collectionId || null,
           }
           return res.json({ category: cat, categories: [cat], count: 1 })
         }
+        const now = Date.now()
+        if (
+          storeCategoriesTreeCache.payload &&
+          now - storeCategoriesTreeCache.at < STORE_CATEGORIES_TREE_TTL_MS
+        ) {
+          return res.json(storeCategoriesTreeCache.payload)
+        }
         const tree = await adminHubService.getCategoryTree({ is_visible: true })
         const categories = (tree || []).map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
-        res.json({ categories, tree, count: categories.length })
+        const payload = { categories, tree, count: categories.length }
+        storeCategoriesTreeCache = { at: now, payload }
+        res.json(payload)
       } catch (err) {
         console.error('Store categories GET error:', err)
         res.status(200).json({ categories: [], tree: [], count: 0 })

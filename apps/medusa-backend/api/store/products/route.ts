@@ -109,9 +109,27 @@ export async function GET(
         const adminHubService: AdminHubService = req.scope.resolve("adminHubService")
         const categoryEntity = await adminHubService.getCategoryBySlug(category)
         if (categoryEntity) {
+          const want = String(categoryEntity.id || "").trim().toLowerCase()
           filteredProducts = filteredProducts.filter((product: any) => {
             const productMetadata = product.metadata || {}
-            return productMetadata.admin_category_id === categoryEntity.id
+            const primary = String(productMetadata.admin_category_id || productMetadata.category_id || "")
+              .trim()
+              .toLowerCase()
+            if (primary && primary === want) return true
+            const raw = productMetadata.category_ids
+            const arr = Array.isArray(raw)
+              ? raw
+              : typeof raw === "string" && raw.trim().startsWith("[")
+                ? (() => {
+                    try {
+                      const p = JSON.parse(raw)
+                      return Array.isArray(p) ? p : []
+                    } catch {
+                      return []
+                    }
+                  })()
+                : []
+            return arr.some((id: unknown) => String(id || "").trim().toLowerCase() === want)
           })
         } else {
           filteredProducts = []
