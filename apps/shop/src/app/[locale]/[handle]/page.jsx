@@ -587,13 +587,11 @@ export default function CollectionPage() {
         setLoading(true);
         setError(null);
 
-        // Category-first resolution: if slug exists in category tree, always
-        // render category template regardless of similarly named collections.
-        const categoryTreeRes = await fetch(`/api/store-categories?tree=true&is_visible=true`).catch(() => null);
-        if (categoryTreeRes?.ok) {
-          const categoryTreeData = await categoryTreeRes.json().catch(() => null);
-          const categoryTree = categoryTreeData?.tree || categoryTreeData?.categories || [];
-          if (findCategoryBySlug(categoryTree, handle)) {
+        // Lightweight category resolution first (cheap query by slug).
+        const categoryBySlugRes = await fetch(`/api/store-categories?slug=${encodeURIComponent(handle)}`).catch(() => null);
+        if (categoryBySlugRes?.ok) {
+          const categoryBySlugData = await categoryBySlugRes.json().catch(() => null);
+          if (categoryBySlugData?.category?.id || (categoryBySlugData?.categories?.length)) {
             setIsCategorySlug(true);
             setLoading(false);
             return;
@@ -620,13 +618,7 @@ export default function CollectionPage() {
             if (pageData2?.id) { setCmsPage(pageData2); setLoading(false); return; }
           }
           // Fallback 3: try as category slug
-          const catBySlugRes = await fetch(`/api/store-categories?slug=${encodeURIComponent(handle)}`).catch(() => null);
-          if (catBySlugRes?.ok) {
-            const catBySlugData = await catBySlugRes.json().catch(() => null);
-            if (catBySlugData?.category?.id || (catBySlugData?.categories?.length)) {
-              setIsCategorySlug(true); setLoading(false); return;
-            }
-          }
+          // Final fallback (heavier): full tree lookup only if slug lookup failed.
           const catTreeRes = await fetch(`/api/store-categories?tree=true&is_visible=true`).catch(() => null);
           if (catTreeRes?.ok) {
             const catTreeData = await catTreeRes.json().catch(() => null);

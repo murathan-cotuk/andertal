@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import styled, { keyframes } from "styled-components";
-import { getMedusaClient } from "@/lib/medusa-client";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Link } from "@/i18n/navigation";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
@@ -563,13 +562,13 @@ export default function CategoryTemplate() {
       try {
         setLoading(true);
         setError(null);
-        const client = getMedusaClient();
-        const [cat, catRes] = await Promise.all([
-          client.getCategoryBySlug(slug).catch(() => null),
-          client.getCategories({ tree: true, is_visible: true }).catch(() => ({ tree: [] })),
+        const [catResBySlug, catResTree] = await Promise.all([
+          fetch(`/api/store-categories?slug=${encodeURIComponent(slug)}`).then((r) => r.json()).catch(() => ({ categories: [] })),
+          fetch(`/api/store-categories?tree=true&is_visible=true`).then((r) => r.json()).catch(() => ({ tree: [] })),
         ]);
         if (cancelled) return;
-        const tree = catRes.tree || catRes.categories || [];
+        const cat = catResBySlug?.category || (Array.isArray(catResBySlug?.categories) ? catResBySlug.categories[0] : null);
+        const tree = catResTree.tree || catResTree.categories || [];
         const roots = Array.isArray(tree) ? tree : [tree];
         const currentFromTree = findCategoryNodeBySlug(roots, slug);
         const resolvedCategory = cat || currentFromTree || null;
