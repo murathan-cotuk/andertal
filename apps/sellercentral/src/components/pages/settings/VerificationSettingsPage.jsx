@@ -1,10 +1,25 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Link, Spinner, Text, TextField } from "@shopify/polaris";
+import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Spinner, Text, TextField } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
+
+const PHONE_CODES = [
+  { code: "DE", dial: "+49" },
+  { code: "AT", dial: "+43" },
+  { code: "CH", dial: "+41" },
+  { code: "TR", dial: "+90" },
+  { code: "FR", dial: "+33" },
+  { code: "NL", dial: "+31" },
+  { code: "BE", dial: "+32" },
+  { code: "PL", dial: "+48" },
+  { code: "IT", dial: "+39" },
+  { code: "ES", dial: "+34" },
+  { code: "GB", dial: "+44" },
+  { code: "US", dial: "+1" },
+];
 
 const tByLocale = (l) => {
   if (l === "tr") {
@@ -20,9 +35,12 @@ const tByLocale = (l) => {
       companyName: "Şirket adı",
       authorizedPerson: "Yetkili kişi adı soyadı",
       taxId: "Vergi numarası",
+      taxIdHelp: "Örn. 1234567890 — Vergi dairesinden alınan 10 haneli vergi numarası (KDV numarasından farklıdır).",
       vatId: "KDV numarası",
+      vatIdHelp: "Örn. DE123456789 — KDV mükellefleri için. Uluslararası satış yapıyorsanız zorunludur.",
       iban: "IBAN",
       phone: "Telefon numarası",
+      phoneCountry: "Ülke kodu",
       street: "Adres (sokak, bina no)",
       city: "Şehir",
       postalCode: "Posta kodu",
@@ -31,6 +49,11 @@ const tByLocale = (l) => {
         trade_register: "Ticaret sicil belgesi",
         id_passport: "Kimlik / Pasaport",
         tax_document: "Vergi levhası (opsiyonel)",
+      },
+      docHints: {
+        trade_register: "Ticaret sicil gazetesi veya ticaret odası faaliyet belgesi. Son 3 ay içinde alınmış olmalı. PDF tercih edilir.",
+        id_passport: "Kimlik kartı veya pasaport ön yüz (kimlik için arka yüz de eklenebilir). PDF veya JPG formatında yükleyin.",
+        tax_document: "Vergi levhası veya vergi beyan belgesi. PDF olarak yükleyin. Opsiyonel ama önerilir.",
       },
       uploadBtn: "Dosya seç",
       uploaded: "Yüklendi",
@@ -70,9 +93,12 @@ const tByLocale = (l) => {
       companyName: "Firmenname",
       authorizedPerson: "Bevollmächtigte Person (Vor- und Nachname)",
       taxId: "Steuernummer",
+      taxIdHelp: "Z.B. 12/345/67890 — die vom Finanzamt zugeteilte Steuernummer (nicht die USt-IdNr.). Format je nach Bundesland unterschiedlich.",
       vatId: "USt-IdNr.",
+      vatIdHelp: "Z.B. DE123456789 — Umsatzsteuer-Identifikationsnummer, beginnt mit Ländercode + 9 Ziffern. Nur für USt-pflichtige Unternehmen.",
       iban: "IBAN",
       phone: "Telefonnummer",
+      phoneCountry: "Vorwahl",
       street: "Straße und Hausnummer",
       city: "Stadt",
       postalCode: "Postleitzahl",
@@ -81,6 +107,11 @@ const tByLocale = (l) => {
         trade_register: "Handelsregisterauszug",
         id_passport: "Ausweis / Reisepass",
         tax_document: "Steuerdokument (optional)",
+      },
+      docHints: {
+        trade_register: "Offizieller Handelsregisterauszug (HRB/HRA), nicht älter als 3 Monate. PDF bevorzugt.",
+        id_passport: "Vorder- und Rückseite des Personalausweises oder Reisepasses als PDF oder JPG.",
+        tax_document: "Steuerbescheid oder Umsatzsteuervoranmeldung als PDF. Optional, aber empfohlen.",
       },
       uploadBtn: "Datei auswählen",
       uploaded: "Hochgeladen",
@@ -119,9 +150,12 @@ const tByLocale = (l) => {
     companyName: "Company name",
     authorizedPerson: "Authorized person (full name)",
     taxId: "Tax ID",
+    taxIdHelp: "e.g. 12/345/67890 — Tax number issued by your local tax office (not the VAT ID).",
     vatId: "VAT ID",
+    vatIdHelp: "e.g. DE123456789 — Required for VAT-registered businesses. Starts with country code + digits.",
     iban: "IBAN",
     phone: "Phone number",
+    phoneCountry: "Country code",
     street: "Street address",
     city: "City",
     postalCode: "Postal code",
@@ -130,6 +164,11 @@ const tByLocale = (l) => {
       trade_register: "Trade register extract",
       id_passport: "ID / Passport",
       tax_document: "Tax document (optional)",
+    },
+    docHints: {
+      trade_register: "Official trade register extract, not older than 3 months. PDF preferred.",
+      id_passport: "Front and back of your ID card or passport as PDF or JPG.",
+      tax_document: "Tax assessment or VAT return document as PDF. Optional but recommended.",
     },
     uploadBtn: "Choose file",
     uploaded: "Uploaded",
@@ -168,42 +207,60 @@ const statusTone = (status) => {
 const DOC_TYPES = ["trade_register", "id_passport", "tax_document"];
 const DOC_REQUIRED = { trade_register: true, id_passport: true, tax_document: false };
 
-function DocUploadRow({ label, docType, doc, onUpload, uploading, t }) {
+/** Extracts dial code from a stored phone string. Returns { dialCode, number }. */
+function parseStoredPhone(phone) {
+  if (!phone) return { dialCode: "+49", number: "" };
+  const str = String(phone).trim();
+  for (const entry of PHONE_CODES) {
+    if (str.startsWith(entry.dial)) {
+      return { dialCode: entry.dial, number: str.slice(entry.dial.length).trim() };
+    }
+  }
+  // If starts with + but unknown, keep as-is in number field
+  return { dialCode: "+49", number: str };
+}
+
+function DocUploadRow({ label, hint, docType, doc, onUpload, uploading, t }) {
   const inputId = `doc-upload-${docType}`;
   const isRequired = DOC_REQUIRED[docType];
   return (
     <Box borderWidth="025" borderColor="border" borderRadius="200" padding="300">
-      <InlineStack align="space-between" blockAlign="center" wrap gap="200">
-        <BlockStack gap="100">
-          <InlineStack gap="150" blockAlign="center">
-            <Text as="span" variant="bodyMd" fontWeight="semibold">{label}</Text>
-            <Text as="span" variant="bodySm" tone="subdued">({isRequired ? t.required : t.optional})</Text>
-          </InlineStack>
-          {doc ? (
+      <BlockStack gap="200">
+        <InlineStack align="space-between" blockAlign="center" wrap gap="200">
+          <BlockStack gap="100">
             <InlineStack gap="150" blockAlign="center">
-              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#10b981", flexShrink: 0 }} />
-              <Text as="span" variant="bodySm" tone="success">{t.uploaded}: {doc.name || doc.url?.split("/").pop() || "file"}</Text>
+              <Text as="span" variant="bodyMd" fontWeight="semibold">{label}</Text>
+              <Text as="span" variant="bodySm" tone="subdued">({isRequired ? t.required : t.optional})</Text>
             </InlineStack>
-          ) : (
-            <InlineStack gap="150" blockAlign="center">
-              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#9ca3af", flexShrink: 0 }} />
-              <Text as="span" variant="bodySm" tone="subdued">{t.notUploaded}</Text>
-            </InlineStack>
-          )}
-        </BlockStack>
-        <div>
-          <input
-            id={inputId}
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
-            style={{ display: "none" }}
-            onChange={(e) => e.target.files?.[0] && onUpload(docType, e.target.files[0])}
-          />
-          <Button size="slim" onClick={() => document.getElementById(inputId)?.click()} loading={uploading}>
-            {t.uploadBtn}
-          </Button>
-        </div>
-      </InlineStack>
+            {doc ? (
+              <InlineStack gap="150" blockAlign="center">
+                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#10b981", flexShrink: 0 }} />
+                <Text as="span" variant="bodySm" tone="success">{t.uploaded}: {doc.name || doc.url?.split("/").pop() || "file"}</Text>
+              </InlineStack>
+            ) : (
+              <InlineStack gap="150" blockAlign="center">
+                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#9ca3af", flexShrink: 0 }} />
+                <Text as="span" variant="bodySm" tone="subdued">{t.notUploaded}</Text>
+              </InlineStack>
+            )}
+          </BlockStack>
+          <div>
+            <input
+              id={inputId}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              style={{ display: "none" }}
+              onChange={(e) => e.target.files?.[0] && onUpload(docType, e.target.files[0])}
+            />
+            <Button size="slim" onClick={() => document.getElementById(inputId)?.click()} loading={uploading}>
+              {t.uploadBtn}
+            </Button>
+          </div>
+        </InlineStack>
+        {hint && (
+          <Text as="p" variant="bodySm" tone="subdued">{hint}</Text>
+        )}
+      </BlockStack>
     </Box>
   );
 }
@@ -222,6 +279,7 @@ export default function VerificationSettingsPage() {
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [uploadingDocType, setUploadingDocType] = useState(null);
   const [initialSnapshot, setInitialSnapshot] = useState(null);
+  const [phoneDialCode, setPhoneDialCode] = useState("+49");
   const [form, setForm] = useState({
     companyName: "",
     authorizedPersonName: "",
@@ -235,9 +293,11 @@ export default function VerificationSettingsPage() {
     country: "",
     docs: { trade_register: null, id_passport: null, tax_document: null },
   });
-  const snapshotFrom = useCallback((nextForm, nextAgreement) => {
+
+  const snapshotFrom = useCallback((nextForm, nextAgreement, nextDialCode) => {
     return JSON.stringify({
       agreementAccepted: !!nextAgreement,
+      phoneDialCode: nextDialCode || "+49",
       companyName: nextForm.companyName || "",
       authorizedPersonName: nextForm.authorizedPersonName || "",
       taxId: nextForm.taxId || "",
@@ -270,32 +330,30 @@ export default function VerificationSettingsPage() {
         setStatus(s);
         if (typeof window !== "undefined") localStorage.setItem("sellerApprovalStatus", s);
         const addr = seller?.business_address || {};
-        // Map stored documents array to typed slots
         const storedDocs = Array.isArray(seller?.documents) ? seller.documents : [];
         const docs = { trade_register: null, id_passport: null, tax_document: null };
         storedDocs.forEach((d) => {
           if (d?.doc_type && docs.hasOwnProperty(d.doc_type)) docs[d.doc_type] = d;
         });
+        const { dialCode, number } = parseStoredPhone(seller?.phone);
+        setPhoneDialCode(dialCode);
         const nextForm = {
           companyName: seller?.company_name || "",
           authorizedPersonName: seller?.authorized_person_name || "",
           taxId: seller?.tax_id || "",
           vatId: seller?.vat_id || "",
           iban: seller?.iban || "",
-          phone: seller?.phone || "",
+          phone: number,
           street: addr?.street || "",
           city: addr?.city || "",
           postalCode: addr?.postal_code || "",
           country: addr?.country || "",
           docs,
         };
-        setForm((p) => ({
-          ...p,
-          ...nextForm,
-        }));
+        setForm((p) => ({ ...p, ...nextForm }));
         const nextAgreement = s !== "registered";
         setAgreementAccepted(nextAgreement);
-        setInitialSnapshot(snapshotFrom(nextForm, nextAgreement));
+        setInitialSnapshot(snapshotFrom(nextForm, nextAgreement, dialCode));
       } catch (e) {
         if (!cancelled) setError(e?.message || "Failed to load verification data.");
       } finally {
@@ -336,12 +394,13 @@ export default function VerificationSettingsPage() {
     setSaving(true);
     try {
       const documents = DOC_TYPES.map((dt) => form.docs[dt]).filter(Boolean);
+      const fullPhone = form.phone.trim() ? `${phoneDialCode}${form.phone.trim()}` : "";
       await client.updateSellerCompanyInfo({
         company_name: form.companyName.trim() || null,
         authorized_person_name: form.authorizedPersonName.trim() || null,
         tax_id: form.taxId.trim() || null,
         vat_id: form.vatId.trim() || null,
-        phone: form.phone.trim() || null,
+        phone: fullPhone || null,
         business_address: {
           street: form.street.trim() || null,
           city: form.city.trim() || null,
@@ -351,7 +410,6 @@ export default function VerificationSettingsPage() {
         documents,
       });
       await client.updateSellerIban(form.iban.trim() || null);
-      // Run the verification pipeline — auto-scores and advances status
       let pipelineResult = null;
       try { pipelineResult = await client.startVerification(); } catch (_) {}
       const account = await client.getSellerAccount();
@@ -364,7 +422,7 @@ export default function VerificationSettingsPage() {
       setStatus(s);
       if (typeof window !== "undefined") localStorage.setItem("sellerApprovalStatus", s);
       setSuccess(t.saveOk);
-      setInitialSnapshot(snapshotFrom(form, agreementAccepted));
+      setInitialSnapshot(snapshotFrom(form, agreementAccepted, phoneDialCode));
     } catch (e) {
       const rawMsg = String(e?.message || "");
       if (rawMsg.toLowerCase().includes("invalid input syntax for type json")) {
@@ -383,13 +441,14 @@ export default function VerificationSettingsPage() {
 
   const normalizedStatus = String(status || "registered").toLowerCase();
   const isDocsSubmittedOrBeyond = ["documents_submitted", "pending_approval", "pending", "approved", "active", "rejected", "suspended"].includes(normalizedStatus);
-  const isDirty = !loading && initialSnapshot !== null && snapshotFrom(form, agreementAccepted) !== initialSnapshot;
+  const isDirty = !loading && initialSnapshot !== null && snapshotFrom(form, agreementAccepted, phoneDialCode) !== initialSnapshot;
 
   const discardVerification = useCallback(() => {
     if (!initialSnapshot) return;
     try {
       const snap = JSON.parse(initialSnapshot);
       setAgreementAccepted(!!snap.agreementAccepted);
+      setPhoneDialCode(snap.phoneDialCode || "+49");
       setForm((p) => ({
         ...p,
         companyName: snap.companyName || "",
@@ -466,12 +525,7 @@ export default function VerificationSettingsPage() {
         </div>
       ) : (
         <Banner tone={statusTone(normalizedStatus)}>
-          <InlineStack align="space-between" blockAlign="center" wrap>
-            <Text as="p"><strong>{t.statusLabel}:</strong> {t.status[normalizedStatus] || normalizedStatus}</Text>
-            {normalizedStatus === "registered" && (
-              <Link url="/settings/verification">{locale === "tr" ? "Doğrulamaya git" : locale === "de" ? "Zur Verifizierung" : "Go to verification"} →</Link>
-            )}
-          </InlineStack>
+          <Text as="p"><strong>{t.statusLabel}:</strong> {t.status[normalizedStatus] || normalizedStatus}</Text>
         </Banner>
       )}
 
@@ -508,10 +562,22 @@ export default function VerificationSettingsPage() {
               <TextField label={t.authorizedPerson} value={form.authorizedPersonName} onChange={(v) => setForm((p) => ({ ...p, authorizedPersonName: v }))} autoComplete="off" />
               <InlineStack gap="300">
                 <div style={{ flex: 1 }}>
-                  <TextField label={t.taxId} value={form.taxId} onChange={(v) => setForm((p) => ({ ...p, taxId: v }))} autoComplete="off" />
+                  <TextField
+                    label={t.taxId}
+                    value={form.taxId}
+                    onChange={(v) => setForm((p) => ({ ...p, taxId: v }))}
+                    autoComplete="off"
+                    helpText={t.taxIdHelp}
+                  />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <TextField label={t.vatId} value={form.vatId} onChange={(v) => setForm((p) => ({ ...p, vatId: v }))} autoComplete="off" />
+                  <TextField
+                    label={t.vatId}
+                    value={form.vatId}
+                    onChange={(v) => setForm((p) => ({ ...p, vatId: v }))}
+                    autoComplete="off"
+                    helpText={t.vatIdHelp}
+                  />
                 </div>
               </InlineStack>
               <TextField label={t.iban} value={form.iban} onChange={(v) => setForm((p) => ({ ...p, iban: v }))} autoComplete="off" />
@@ -522,7 +588,43 @@ export default function VerificationSettingsPage() {
           <Card>
             <BlockStack gap="300">
               <Text as="h3" variant="headingSm">{t.contactTitle}</Text>
-              <TextField label={t.phone} value={form.phone} onChange={(v) => setForm((p) => ({ ...p, phone: v }))} autoComplete="off" type="tel" />
+              {/* Phone with country code selector */}
+              <BlockStack gap="100">
+                <Text as="span" variant="bodyMd">{t.phone}</Text>
+                <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                  <select
+                    value={phoneDialCode}
+                    onChange={(e) => setPhoneDialCode(e.target.value)}
+                    style={{
+                      height: 36,
+                      border: "1px solid #8c9196",
+                      borderRadius: 6,
+                      padding: "0 8px",
+                      fontSize: 14,
+                      background: "#fff",
+                      color: "#202223",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      minWidth: 88,
+                    }}
+                  >
+                    {PHONE_CODES.map((c) => (
+                      <option key={c.code} value={c.dial}>{c.code} {c.dial}</option>
+                    ))}
+                  </select>
+                  <div style={{ flex: 1 }}>
+                    <TextField
+                      label=""
+                      labelHidden
+                      value={form.phone}
+                      onChange={(v) => setForm((p) => ({ ...p, phone: v }))}
+                      autoComplete="off"
+                      type="tel"
+                      placeholder="123 456 7890"
+                    />
+                  </div>
+                </div>
+              </BlockStack>
               <TextField label={t.street} value={form.street} onChange={(v) => setForm((p) => ({ ...p, street: v }))} autoComplete="off" />
               <InlineStack gap="300">
                 <div style={{ flex: 1 }}>
@@ -544,6 +646,7 @@ export default function VerificationSettingsPage() {
                 <DocUploadRow
                   key={dt}
                   label={t.docTypes[dt]}
+                  hint={t.docHints[dt]}
                   docType={dt}
                   doc={form.docs[dt]}
                   onUpload={handleDocUpload}

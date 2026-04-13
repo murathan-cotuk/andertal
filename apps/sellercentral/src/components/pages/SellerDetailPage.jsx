@@ -655,8 +655,30 @@ ${"=".repeat(50)}
                                     {doc?.uploaded_at && <Text as="p" variant="bodySm" tone="subdued">Upload: {fmtDate(doc.uploaded_at)}</Text>}
                                   </BlockStack>
                                   {url ? (
-                                    <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", fontSize: 13 }}>
-                                      Öffnen
+                                    <a
+                                      href={url}
+                                      download={name}
+                                      onClick={(e) => {
+                                        // Force download for cross-origin URLs via fetch+blob
+                                        e.preventDefault();
+                                        fetch(url)
+                                          .then((r) => r.blob())
+                                          .then((blob) => {
+                                            const blobUrl = URL.createObjectURL(blob);
+                                            const a = document.createElement("a");
+                                            a.href = blobUrl;
+                                            a.download = name;
+                                            a.click();
+                                            URL.revokeObjectURL(blobUrl);
+                                          })
+                                          .catch(() => {
+                                            // Fallback: open in new tab
+                                            window.open(url, "_blank", "noopener,noreferrer");
+                                          });
+                                      }}
+                                      style={{ color: "#2563eb", fontSize: 13, textDecoration: "underline", cursor: "pointer" }}
+                                    >
+                                      Herunterladen
                                     </a>
                                   ) : (
                                     <Text as="span" tone="subdued">Kein Link</Text>

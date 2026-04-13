@@ -315,6 +315,19 @@ export default function PolarisLayout({ children }) {
     link.setAttribute("href", fav);
   }, [platformBranding.sellercentral_favicon_url]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const h = Math.min(Math.max(platformBranding.sellercentral_logo_height || 30, 16), 44);
+    const id = "belucha-sc-logo-height";
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement("style");
+      el.id = id;
+      document.head.appendChild(el);
+    }
+    el.textContent = `[class*="LogoContainer"] img,[class*="LogoLink"] img,.Polaris-TopBar__LogoContainer img{height:${h}px!important;width:auto!important;max-height:${h}px!important;}`;
+  }, [platformBranding.sellercentral_logo_height]);
+
   const refreshNotifications = useCallback(async () => {
     try {
       const d = await getMedusaAdminClient().getNotificationsUnread();
@@ -573,10 +586,19 @@ export default function PolarisLayout({ children }) {
               <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, background: "#fff", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", border: "1px solid #e5e7eb", zIndex: 9999 }}>
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 13, fontWeight: 700, color: "#111827" }}>Benachrichtigungen</div>
                 <div style={{ maxHeight: 340, overflowY: "auto" }}>
-                  {(!notifData?.recent_orders?.length && !notifData?.recent_returns?.length) ? (
+                  {(!notifData?.recent_orders?.length && !notifData?.recent_returns?.length && !notifData?.recent_verifications?.length) ? (
                     <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Keine neuen Benachrichtigungen</div>
                   ) : (
                     <>
+                      {(notifData?.recent_verifications || []).map((v) => (
+                        <Link key={v.id} href={v.seller_id ? `/sellers/${v.seller_id}` : "/sellers"} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
+                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📋</span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{v.title || "Evrak Gönderildi"}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>{v.body || "Satıcı doğrulama evraklarını gönderdi."}</div>
+                          </div>
+                        </Link>
+                      ))}
                       {(notifData?.recent_orders || []).map((o) => (
                         <Link key={o.id} href={`/orders/${o.id}`} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📦</span>

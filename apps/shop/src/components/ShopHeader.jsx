@@ -911,7 +911,7 @@ export default function ShopHeader() {
     key: r.key,
     id: r.id,
     label: r.label,
-    href: `/kollektion/${r.slug}`,
+    href: `/${r.slug}`,
     hasChildren: r.hasChildren,
   }));
 

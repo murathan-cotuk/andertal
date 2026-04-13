@@ -3,6 +3,7 @@
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import LandingContainers from "@/components/landing/LandingContainers";
+import CategoryTemplate from "@/components/templates/CategoryTemplate";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
@@ -515,6 +516,7 @@ export default function CollectionPage() {
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
   const [notFoundSt,  setNotFoundSt]  = useState(false);
+  const [isCategorySlug, setIsCategorySlug] = useState(false);
   const [sort,        setSort]        = useState("default");
   const [page,        setPage]        = useState(1);
   const [filters,     setFilters]     = useState({});
@@ -591,6 +593,14 @@ export default function CollectionPage() {
           if (pageRes2?.ok) {
             const pageData2 = await pageRes2.json().catch(() => null);
             if (pageData2?.id) { setCmsPage(pageData2); setLoading(false); return; }
+          }
+          // Fallback 3: try as category slug
+          const catRes = await fetch(`/api/store-categories?slug=${encodeURIComponent(handle)}`).catch(() => null);
+          if (catRes?.ok) {
+            const catData = await catRes.json().catch(() => null);
+            if (catData?.category?.id || (catData?.categories?.length)) {
+              setIsCategorySlug(true); setLoading(false); return;
+            }
           }
           setNotFoundSt(true); setLoading(false); return;
         }
@@ -723,6 +733,16 @@ export default function CollectionPage() {
           <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px" }}
             dangerouslySetInnerHTML={{ __html: sanitize(cmsPage.body) }} />
         ) : null}
+      </Main>
+      <Footer />
+    </PageWrap>
+  );
+
+  if (isCategorySlug) return (
+    <PageWrap>
+      <ShopHeader />
+      <Main>
+        <CategoryTemplate />
       </Main>
       <Footer />
     </PageWrap>

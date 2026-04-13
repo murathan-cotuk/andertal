@@ -385,7 +385,7 @@ export default function Navbar() {
             ))
           ) : categories.length > 0 ? (
             categories.map((category) => (
-              <CategoryLink key={category.id} href={`/kollektion/${category.slug}`}>
+              <CategoryLink key={category.id} href={`/${category.slug}`}>
                 {category.name}
               </CategoryLink>
             ))

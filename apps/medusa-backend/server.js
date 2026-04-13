@@ -670,6 +670,16 @@ async function start() {
           );
         `).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS notifications_seen_at timestamp;`).catch(() => {})
+        await client.query(`CREATE TABLE IF NOT EXISTS admin_hub_notifications (
+          id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+          type varchar(50) NOT NULL,
+          title text,
+          body text,
+          seller_id varchar(255),
+          reference_id text,
+          seen_at timestamp,
+          created_at timestamp NOT NULL DEFAULT now()
+        )`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS iban text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS commission_rate numeric(5,4) NOT NULL DEFAULT 0.12;`).catch(() => {})
@@ -9677,20 +9687,25 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                )`,
           )
         }
-        const [ordersR, returnsR] = await Promise.all([
+        const [ordersR, returnsR, verificationsR] = await Promise.all([
           client.query(`SELECT COUNT(*)::int AS c FROM store_orders WHERE created_at > $1`, [seenAt]),
           client.query(`SELECT COUNT(*)::int AS c FROM store_returns WHERE created_at > $1`, [seenAt]),
+          client.query(`SELECT COUNT(*)::int AS c FROM admin_hub_notifications WHERE type = 'verification_submitted' AND seen_at IS NULL`).catch(() => ({ rows: [{ c: 0 }] })),
         ])
         const recentOrders = await client.query(`SELECT id, order_number, first_name, last_name, total_cents, created_at FROM store_orders WHERE created_at > $1 ORDER BY created_at DESC LIMIT 5`, [seenAt])
         const recentReturns = await client.query(`SELECT r.id, r.return_number, r.status, r.created_at, o.order_number FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.created_at > $1 ORDER BY r.created_at DESC LIMIT 5`, [seenAt])
+        const recentVerifications = await client.query(`SELECT id, title, body, seller_id, created_at FROM admin_hub_notifications WHERE type = 'verification_submitted' AND seen_at IS NULL ORDER BY created_at DESC LIMIT 5`).catch(() => ({ rows: [] }))
         await client.end()
+        const verCount = verificationsR.rows[0]?.c || 0
         res.json({
-          unread: (ordersR.rows[0]?.c || 0) + (returnsR.rows[0]?.c || 0) + (messagesR.rows[0]?.c || 0),
+          unread: (ordersR.rows[0]?.c || 0) + (returnsR.rows[0]?.c || 0) + (messagesR.rows[0]?.c || 0) + verCount,
           orders: ordersR.rows[0]?.c || 0,
           returns: returnsR.rows[0]?.c || 0,
           messages: messagesR.rows[0]?.c || 0,
+          verifications: verCount,
           recent_orders: recentOrders.rows.map(r => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_returns: recentReturns.rows.map(r => ({ ...r, return_number: r.return_number ? Number(r.return_number) : null, order_number: r.order_number ? Number(r.order_number) : null })),
+          recent_verifications: recentVerifications.rows,
           seen_at: seenAt,
         })
       } catch (e) {
@@ -9707,6 +9722,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         await client.query(`INSERT INTO admin_hub_seller_settings (seller_id, notifications_seen_at) VALUES ('default', now()) ON CONFLICT (seller_id) DO UPDATE SET notifications_seen_at = now()`)
+        await client.query(`UPDATE admin_hub_notifications SET seen_at = now() WHERE seen_at IS NULL`).catch(() => {})
         await client.end()
         res.json({ success: true })
       } catch (e) {
@@ -11727,9 +11743,25 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         )
         await client.end()
 
-        if (typeof window === 'undefined' && result.decision !== 'approved') {
-          // Could trigger admin notification here (webhook, email, etc.)
-        }
+        // Insert notification for superusers
+        try {
+          const notifClient = getProductsDbClient()
+          if (notifClient) {
+            await notifClient.connect()
+            const storeName = seller.store_name || seller.email || sellerId || 'Bir satıcı'
+            await notifClient.query(
+              `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+               VALUES ('verification_submitted', $1, $2, $3, $4)`,
+              [
+                `${storeName} — Evrak Gönderildi`,
+                `${storeName} doğrulama evraklarını gönderdi. Lütfen inceleyiniz.`,
+                sellerId || null,
+                userId,
+              ]
+            )
+            await notifClient.end()
+          }
+        } catch (_) {}
 
         res.json({
           score: result.score,
