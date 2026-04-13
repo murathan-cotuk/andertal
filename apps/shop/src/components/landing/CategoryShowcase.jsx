@@ -80,7 +80,7 @@ export default function CategoryShowcase({
         {categories.slice(0, 6).map((cat, i) => (
           <Card
             key={cat.id || cat.slug || i}
-            href={cat.slug ? `/kollektion/${cat.slug}` : cat.handle ? `/kollektion/${cat.handle}` : "#"}
+            href={cat.slug ? `/${cat.slug}` : cat.handle ? `/${cat.handle}` : "#"}
             whileHover={{ scale: 1.03 }}
             transition={{ duration: 0.2 }}
           >

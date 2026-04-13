@@ -72,7 +72,7 @@ function menuItemHref(item) {
   if (item.link_type === "product" && value) return `/produkt/${value}`;
   if (item.link_type === "category") {
     const slug = value ? String(value).replace(/^\//, "").trim() : "";
-    return slug ? `/category/${slug}` : "#";
+    return slug ? `/${slug}` : "#";
   }
   if (item.link_type === "collection") {
     return value ? `/${String(value).replace(/^\//, "")}` : "#";

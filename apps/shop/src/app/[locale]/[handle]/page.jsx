@@ -559,6 +559,18 @@ export default function CollectionPage() {
     return null;
   };
 
+  const findCategoryBySlug = (nodes, slug) => {
+    const wanted = String(slug || "").replace(/^\//, "").toLowerCase();
+    if (!wanted) return null;
+    for (const node of nodes || []) {
+      const nodeSlug = String(node?.slug || node?.handle || "").replace(/^\//, "").toLowerCase();
+      if (nodeSlug === wanted) return node;
+      const nested = findCategoryBySlug(node?.children || [], wanted);
+      if (nested) return nested;
+    }
+    return null;
+  };
+
   /* ── Fetch ── */
   useEffect(() => {
     if (!handle) return;
@@ -595,10 +607,18 @@ export default function CollectionPage() {
             if (pageData2?.id) { setCmsPage(pageData2); setLoading(false); return; }
           }
           // Fallback 3: try as category slug
-          const catRes = await fetch(`/api/store-categories?slug=${encodeURIComponent(handle)}`).catch(() => null);
-          if (catRes?.ok) {
-            const catData = await catRes.json().catch(() => null);
-            if (catData?.category?.id || (catData?.categories?.length)) {
+          const catBySlugRes = await fetch(`/api/store-categories?slug=${encodeURIComponent(handle)}`).catch(() => null);
+          if (catBySlugRes?.ok) {
+            const catBySlugData = await catBySlugRes.json().catch(() => null);
+            if (catBySlugData?.category?.id || (catBySlugData?.categories?.length)) {
+              setIsCategorySlug(true); setLoading(false); return;
+            }
+          }
+          const catTreeRes = await fetch(`/api/store-categories?tree=true&is_visible=true`).catch(() => null);
+          if (catTreeRes?.ok) {
+            const catTreeData = await catTreeRes.json().catch(() => null);
+            const catTree = catTreeData?.tree || catTreeData?.categories || [];
+            if (findCategoryBySlug(catTree, handle)) {
               setIsCategorySlug(true); setLoading(false); return;
             }
           }

@@ -1069,7 +1069,7 @@ export default function ProductTemplate() {
     ...(meta.category_slug
       ? [{
           label: (meta.category_name || String(meta.category_slug).replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase())),
-          href: `/category/${meta.category_slug}`,
+          href: `/${meta.category_slug}`,
         }]
       : []),
     ...(product.collection ? [{ label: product.collection.title, href: `/${product.collection.handle}` }] : []),

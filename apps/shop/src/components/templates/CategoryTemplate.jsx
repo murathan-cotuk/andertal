@@ -532,16 +532,18 @@ export default function CategoryTemplate() {
           client.getCategories({ tree: true, is_visible: true }).catch(() => ({ tree: [] })),
         ]);
         if (cancelled) return;
-        setCategory(cat || null);
-        if (!cat) {
+        const tree = catRes.tree || catRes.categories || [];
+        const roots = Array.isArray(tree) ? tree : [tree];
+        const currentFromTree = findCategoryNodeBySlug(roots, slug);
+        const resolvedCategory = cat || currentFromTree || null;
+        setCategory(resolvedCategory);
+        if (!resolvedCategory) {
           setProducts([]);
           setSubcategories([]);
           setLoading(false);
           return;
         }
-        const tree = catRes.tree || catRes.categories || [];
-        const roots = Array.isArray(tree) ? tree : [tree];
-        const current = findCategoryNodeBySlug(roots, slug);
+        const current = currentFromTree || findCategoryNodeById(roots, resolvedCategory.id);
         // Always show current category's own children
         let subs = visibleSubcats(current?.children);
         const pr = await fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`)

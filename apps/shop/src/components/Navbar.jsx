@@ -298,7 +298,9 @@ function menuItemHref(item) {
     value = itemSlug;
   }
   if (item.link_type === "url" && value) return String(value).startsWith("http") ? value : `/${String(value).replace(/^\//, "")}`;
-  if ((item.link_type === "category" || item.link_type === "collection") && value) return `/kollektion/${value}`;
+  if ((item.link_type === "category" || item.link_type === "collection") && value) {
+    return `/${String(value).replace(/^\//, "")}`;
+  }
   if (item.link_type === "product" && value) return `/produkt/${value}`;
   return value ? `/${String(value).replace(/^\//, "")}` : "#";
 }

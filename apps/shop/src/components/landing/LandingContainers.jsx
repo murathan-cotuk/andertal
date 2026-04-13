@@ -64,7 +64,7 @@ function getContentInnerStyle(container, fallbackMaxPx) {
 
 function collectionHref(handle) {
   const value = String(handle || "").trim();
-  return value ? `/kollektion/${value}` : "#";
+  return value ? `/${value}` : "#";
 }
 
 function blogBodyToPlainSnippet(html, maxLen = 400) {
