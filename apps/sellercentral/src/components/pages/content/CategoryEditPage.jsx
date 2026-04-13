@@ -42,17 +42,56 @@ function isProductInCollection(product, collectionId) {
   return getProductCollectionIds(product).includes(String(collectionId));
 }
 
-function isProductInCategory(product, categoryId, linkedCollectionId) {
-  if (!categoryId) return false;
-  const catId = String(categoryId);
+function isProductInCategory(product, categoryIds, linkedCollectionId) {
+  const ids = Array.isArray(categoryIds) ? categoryIds.map(String) : [];
+  if (ids.length === 0) return false;
+  const wanted = new Set(ids);
   // Direct category_id match (root field)
-  if (product?.category_id && String(product.category_id) === catId) return true;
+  if (product?.category_id && wanted.has(String(product.category_id))) return true;
   // category_id stored in metadata (product edit page saves it here)
   const metaCatId = product?.metadata?.category_id;
-  if (metaCatId && String(metaCatId) === catId) return true;
+  if (metaCatId && wanted.has(String(metaCatId))) return true;
+  const metaCatIds = Array.isArray(product?.metadata?.category_ids) ? product.metadata.category_ids.map(String) : [];
+  if (metaCatIds.some((id) => wanted.has(String(id)))) return true;
   // Via linked collection
   if (linkedCollectionId && isProductInCollection(product, linkedCollectionId)) return true;
   return false;
+}
+
+function categoryLineageIdsFromFlatList(flatCategories, categoryId) {
+  if (!categoryId || !Array.isArray(flatCategories) || flatCategories.length === 0) return [];
+  const byId = new Map(flatCategories.map((c) => [String(c.id), c]));
+  const out = [];
+  let cur = byId.get(String(categoryId));
+  const seen = new Set();
+  while (cur && !seen.has(String(cur.id))) {
+    seen.add(String(cur.id));
+    out.push(String(cur.id));
+    const pid = cur.parent_id != null ? String(cur.parent_id) : "";
+    cur = pid && byId.has(pid) ? byId.get(pid) : null;
+  }
+  return out;
+}
+
+function collectDescendantIdsFromFlatList(flatCategories, rootId) {
+  if (!rootId || !Array.isArray(flatCategories) || flatCategories.length === 0) return [];
+  const childrenByParent = new Map();
+  for (const c of flatCategories) {
+    const pid = c?.parent_id != null ? String(c.parent_id) : "";
+    if (!pid) continue;
+    if (!childrenByParent.has(pid)) childrenByParent.set(pid, []);
+    childrenByParent.get(pid).push(c);
+  }
+  const out = [];
+  const walk = (id) => {
+    const kids = childrenByParent.get(String(id)) || [];
+    for (const k of kids) {
+      out.push(String(k.id));
+      walk(String(k.id));
+    }
+  };
+  walk(String(rootId));
+  return out;
 }
 
 export default function CategoryEditPage({ category: initialCategory, onReload }) {
@@ -104,6 +143,14 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
   const [addProductSearch, setAddProductSearch] = useState("");
   const unsaved = useUnsavedChanges();
 
+  const categoryScopeIds = React.useMemo(() => {
+    const rootId = String(initialCategory?.id || "");
+    if (!rootId) return [];
+    const all = [initialCategory, ...(allCategories || [])].filter(Boolean);
+    const descendants = collectDescendantIdsFromFlatList(all, rootId);
+    return Array.from(new Set([rootId, ...descendants.map(String)]));
+  }, [initialCategory, allCategories]);
+
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialFormRef.current);
 
   useEffect(() => {
@@ -124,16 +171,16 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     client.getAdminHubProducts({ limit: 500 }).then((r) => {
       const list = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
       setAllProducts(list);
-      setCategoryProducts(list.filter((p) => isProductInCategory(p, initialCategory.id, linkedCollectionId)));
+      setCategoryProducts(list.filter((p) => isProductInCategory(p, categoryScopeIds, linkedCollectionId)));
     }).catch(() => { setAllProducts([]); setCategoryProducts([]); });
-  }, [initialCategory?.id, linkedCollectionId]);
+  }, [initialCategory?.id, linkedCollectionId, categoryScopeIds]);
 
   const refreshProducts = useCallback(async () => {
     const r = await client.getAdminHubProducts({ limit: 500 });
     const list = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
     setAllProducts(list);
-    setCategoryProducts(list.filter((p) => isProductInCategory(p, initialCategory.id, linkedCollectionId)));
-  }, [initialCategory?.id, linkedCollectionId]);
+    setCategoryProducts(list.filter((p) => isProductInCategory(p, categoryScopeIds, linkedCollectionId)));
+  }, [initialCategory?.id, linkedCollectionId, categoryScopeIds]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -170,20 +217,27 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     setAddingProductId(productId);
     try {
       const existing = await client.getAdminHubProduct(productId);
+      const allCats = [initialCategory, ...(allCategories || [])].filter(Boolean);
+      const lineage = categoryLineageIdsFromFlatList(allCats, String(initialCategory.id));
+      const enrichedMeta = {
+        ...(existing?.metadata || {}),
+        category_id: String(initialCategory.id),
+        admin_category_id: String(initialCategory.id),
+        category_ids: lineage.length > 0 ? lineage : [String(initialCategory.id)],
+      };
       if (linkedCollectionId) {
         // Add to linked collection
         const existingIds = getProductCollectionIds(existing);
         const nextIds = Array.from(new Set([...existingIds, String(linkedCollectionId)]));
         await client.updateAdminHubProduct(productId, {
-          metadata: { ...(existing?.metadata || {}), collection_ids: nextIds },
+          metadata: { ...enrichedMeta, collection_ids: nextIds },
           collection_id: nextIds[0] || null,
         });
       } else {
         // Direct category link — write to both root field and metadata for consistency
-        const existing = await client.getAdminHubProduct(productId);
         await client.updateAdminHubProduct(productId, {
           category_id: String(initialCategory.id),
-          metadata: { ...(existing?.metadata || {}), category_id: String(initialCategory.id) },
+          metadata: enrichedMeta,
         });
       }
       setAddProductSearch("");
@@ -210,6 +264,8 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
       } else {
         const meta = { ...(existing?.metadata || {}) };
         delete meta.category_id;
+        delete meta.admin_category_id;
+        delete meta.category_ids;
         await client.updateAdminHubProduct(productId, { category_id: null, metadata: meta });
       }
       await refreshProducts();
@@ -229,6 +285,31 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     { label: "— No parent (root) —", value: "" },
     ...allCategories.map((c) => ({ label: c.name, value: String(c.id) })),
   ];
+
+  const categoryTreeRows = (() => {
+    const rootId = String(initialCategory?.id || "");
+    const all = [initialCategory, ...(allCategories || [])].filter(Boolean);
+    const byId = new Map(all.map((c) => [String(c.id), c]));
+    const descendants = collectDescendantIdsFromFlatList(all, rootId);
+    const depthOf = (id) => {
+      let d = 0;
+      let cur = byId.get(String(id));
+      const seen = new Set();
+      while (cur && String(cur.id) !== rootId && !seen.has(String(cur.id))) {
+        seen.add(String(cur.id));
+        const pid = cur.parent_id != null ? String(cur.parent_id) : "";
+        if (!pid) break;
+        cur = byId.get(pid);
+        d += 1;
+      }
+      return d;
+    };
+    return descendants
+      .map((id) => byId.get(String(id)))
+      .filter(Boolean)
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" }))
+      .map((c) => ({ id: String(c.id), name: c.name || c.slug || c.id, slug: c.slug || "", depth: depthOf(c.id) }));
+  })();
 
   return (
     <Page
@@ -372,6 +453,34 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                           >
                             Remove
                           </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </BlockStack>
+                )}
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h2" variant="headingMd">
+                    Category tree <Text as="span" tone="subdued" variant="bodySm">({categoryTreeRows.length} child)</Text>
+                  </Text>
+                </InlineStack>
+                {categoryTreeRows.length === 0 ? (
+                  <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                    <Text as="p" tone="subdued">No child category under this category.</Text>
+                  </Box>
+                ) : (
+                  <BlockStack gap="100">
+                    {categoryTreeRows.map((row) => (
+                      <div key={row.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #f1f1f1" }}>
+                        <span style={{ display: "inline-block", width: `${Math.min(20, row.depth * 12)}px` }} />
+                        <Text as="span" variant="bodySm">{row.name}</Text>
+                        <Text as="span" tone="subdued" variant="bodySm">/{row.slug}</Text>
+                        <div style={{ marginLeft: "auto" }}>
+                          <Button size="micro" url={`/content/categories/${row.id}`}>Open</Button>
                         </div>
                       </div>
                     ))}

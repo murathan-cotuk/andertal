@@ -587,6 +587,19 @@ export default function CollectionPage() {
         setLoading(true);
         setError(null);
 
+        // Category-first resolution: if slug exists in category tree, always
+        // render category template regardless of similarly named collections.
+        const categoryTreeRes = await fetch(`/api/store-categories?tree=true&is_visible=true`).catch(() => null);
+        if (categoryTreeRes?.ok) {
+          const categoryTreeData = await categoryTreeRes.json().catch(() => null);
+          const categoryTree = categoryTreeData?.tree || categoryTreeData?.categories || [];
+          if (findCategoryBySlug(categoryTree, handle)) {
+            setIsCategorySlug(true);
+            setLoading(false);
+            return;
+          }
+        }
+
         const colRes = await fetch(`/api/store-collections?handle=${encodeURIComponent(handle)}`);
         if (!colRes.ok) throw new Error(`HTTP ${colRes.status}`);
 

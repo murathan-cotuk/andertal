@@ -14,7 +14,7 @@ import {
   filterProductsByFacets,
   applyCatalogSort,
 } from "@/lib/catalog-listing";
-import { productCategoryIds, normCatId } from "@/lib/category-product-ids";
+import { normCatId } from "@/lib/category-product-ids";
 import LandingContainers from "@/components/landing/LandingContainers";
 
 const HEADER_H = 112;
@@ -186,12 +186,13 @@ const ContentWrap = styled.div`
 `;
 
 const Sidebar = styled.aside`
-  width: 220px;
+  width: 280px;
   flex-shrink: 0;
   position: sticky;
   top: ${HEADER_H + 68}px;
+  height: calc(100vh - ${HEADER_H + 68}px);
   max-height: calc(100vh - ${HEADER_H + 68}px);
-  overflow-y: auto;
+  overflow: hidden;
 
   @media (max-width: 767px) {
     position: fixed;
@@ -206,6 +207,34 @@ const Sidebar = styled.aside`
     transition: left 0.3s ease;
     padding: 16px;
     box-sizing: border-box;
+  }
+`;
+
+const SidebarSplit = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 12px;
+
+  @media (max-width: 767px) {
+    height: auto;
+    min-height: auto;
+  }
+`;
+
+const SidebarPane = styled.section`
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid #eceae7;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+  flex: ${(p) => (p.$half ? "1 1 50%" : "0 0 auto")};
+
+  @media (max-width: 767px) {
+    overflow-y: visible;
+    flex: 0 0 auto;
   }
 `;
 
@@ -298,19 +327,19 @@ const CheckRow = styled.label`
 `;
 
 const SubcategoryGroup = styled.div`
-  border-bottom: 1px solid #eceae7;
-  padding-bottom: 10px;
-  margin-bottom: 6px;
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
 `;
 
 const SubcategoryLink = styled(Link)`
   display: block;
-  padding: 10px 12px;
-  font-size: 14px;
+  padding: 8px 10px;
+  font-size: 13px;
   color: ${(p) => (p.$active ? "#111827" : "#4b5563")};
   font-weight: ${(p) => (p.$active ? 600 : 400)};
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
   margin-bottom: 2px;
   transition: background 0.12s, color 0.12s;
@@ -494,6 +523,16 @@ function visibleSubcats(children) {
   return (children || []).filter((c) => c && c.active !== false && c.is_visible !== false);
 }
 
+function collectCategorySlugsDeep(node, out = []) {
+  if (!node) return out;
+  const slug = String(node.slug || node.handle || "").replace(/^\//, "").trim();
+  if (slug) out.push(slug);
+  for (const child of node.children || []) {
+    collectCategorySlugsDeep(child, out);
+  }
+  return out;
+}
+
 export default function CategoryTemplate() {
   const params = useParams();
   const slug = params?.slug ? String(params.slug) : params?.handle ? String(params.handle) : "";
@@ -507,14 +546,12 @@ export default function CategoryTemplate() {
   const [sort, setSort] = useState("default");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({});
-  const [selectedChildId, setSelectedChildId] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
 
   const bodyRef = useRef(null);
 
   useEffect(() => {
-    setSelectedChildId(null);
     setFilters({});
     setPage(1);
   }, [slug]);
@@ -546,19 +583,33 @@ export default function CategoryTemplate() {
         const current = currentFromTree || findCategoryNodeById(roots, resolvedCategory.id);
         // Always show current category's own children
         let subs = visibleSubcats(current?.children);
-        const pr = await fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`)
-          .then((r) => r.json())
-          .catch(() => ({ products: [] }));
+        const categorySlugs = Array.from(
+          new Set(
+            collectCategorySlugsDeep(current || resolvedCategory, []).filter(Boolean),
+          ),
+        );
+        const productResponses = await Promise.all(
+          (categorySlugs.length ? categorySlugs : [slug]).map((catSlug) =>
+            fetch(`/api/store-products?category=${encodeURIComponent(catSlug)}&limit=5000`)
+              .then((r) => r.json())
+              .catch(() => ({ products: [] })),
+          ),
+        );
         if (cancelled) return;
-        setProducts(pr?.products ?? []);
-        const prodCatIds = new Set();
-        (pr?.products || []).forEach((p) => {
-          productCategoryIds(p).forEach((id) => {
-            const k = normCatId(id);
-            if (k) prodCatIds.add(k);
-          });
-        });
-        subs = subs.filter((s) => s && prodCatIds.has(normCatId(s.id)));
+        const mergedProducts = [];
+        const seenProductIds = new Set();
+        for (const res of productResponses) {
+          for (const p of res?.products || []) {
+            const pid = String(p?.id || "").trim();
+            if (!pid || seenProductIds.has(pid)) continue;
+            seenProductIds.add(pid);
+            mergedProducts.push(p);
+          }
+        }
+        setProducts(mergedProducts);
+        // Keep all visible direct children in sidebar navigation, even if
+        // current listing payload does not contain products for each child yet.
+        subs = subs.filter((s) => s && normCatId(s.id));
         setSubcategories(subs);
 
       } catch (err) {
@@ -677,12 +728,6 @@ export default function CategoryTemplate() {
   };
 
   let filtered = [...products];
-  if (selectedChildId) {
-    const childNorm = normCatId(selectedChildId);
-    filtered = filtered.filter((p) =>
-      productCategoryIds(p).some((id) => normCatId(id) === childNorm)
-    );
-  }
   filtered = filterProductsByFacets(filtered, filters);
   const sorted = applyCatalogSort(filtered, sort, { bestsellerOnly: false });
   const total = sorted.length;
@@ -795,90 +840,85 @@ export default function CategoryTemplate() {
               </span>
               <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555", lineHeight: 1 }}>×</button>
             </SidebarHead>
-
-            {hasSubcategories && (
-              <SubcategoryGroup style={{ marginTop: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 6 }}>
-                  Kategorien
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setSelectedChildId(null); setFilters({}); setPage(1); }}
-                  style={{
-                    display: "block", width: "100%", textAlign: "left",
-                    padding: "10px 12px", fontSize: 14, border: "none", cursor: "pointer",
-                    borderRadius: 8, marginBottom: 2, transition: "background 0.12s, color 0.12s",
-                    background: selectedChildId === null ? "#e5e7eb" : "transparent",
-                    color: selectedChildId === null ? "#111827" : "#4b5563",
-                    fontWeight: selectedChildId === null ? 600 : 400,
-                  }}
-                >
-                  Alle
-                </button>
-                {subcategories.map((sub) => {
-                  const isActive = selectedChildId === String(sub.id);
-                  return (
-                    <button
-                      key={sub.id}
-                      type="button"
-                      onClick={() => { setSelectedChildId(isActive ? null : String(sub.id)); setFilters({}); setPage(1); }}
-                      style={{
-                        display: "block", width: "100%", textAlign: "left",
-                        padding: "10px 12px", fontSize: 14, border: "none", cursor: "pointer",
-                        borderRadius: 8, marginBottom: 2, transition: "background 0.12s, color 0.12s",
-                        background: isActive ? "#e5e7eb" : "transparent",
-                        color: isActive ? "#111827" : "#4b5563",
-                        fontWeight: isActive ? 600 : 400,
-                      }}
+            <SidebarSplit>
+              {hasSubcategories && (
+                <SidebarPane $half={true}>
+                  <SubcategoryGroup style={{ marginTop: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4 }}>
+                      Kategorien
+                    </div>
+                    <SubcategoryLink
+                      href={slug ? `/${slug}` : "#"}
+                      $active={true}
+                      onClick={() => { setFilters({}); setPage(1); }}
                     >
-                      {sub.name || sub.slug}
-                    </button>
-                  );
-                })}
-              </SubcategoryGroup>
-            )}
+                      Alle
+                    </SubcategoryLink>
+                    {subcategories.map((sub) => {
+                      const isActive = String(sub.slug || "").replace(/^\//, "") === slug;
+                      return (
+                        <SubcategoryLink
+                          key={sub.id}
+                          href={sub?.slug ? `/${String(sub.slug).replace(/^\//, "")}` : "#"}
+                          $active={isActive}
+                          onClick={() => { setFilters({}); setPage(1); }}
+                        >
+                          {sub.name || sub.slug}
+                        </SubcategoryLink>
+                      );
+                    })}
+                  </SubcategoryGroup>
+                </SidebarPane>
+              )}
 
-            {hasFacets && (
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 20, paddingBottom: 12, borderBottom: "1px solid #e8e8e6" }}>
-                Filter
-                {activeCount > 0 && (
-                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
-                    Clear
-                  </ClearAllBtn>
-                )}
-              </div>
-            )}
+              <SidebarPane $half={true}>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
+                    Filter
+                    {activeCount > 0 && (
+                      <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
+                        Clear
+                      </ClearAllBtn>
+                    )}
+                  </div>
 
-            {Object.entries(facets).map(([key, vals]) => (
-              <FilterGroup key={key}>
-                <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                  <FilterGroupHeading>{({
-                    brand_name: "Marke", farbe: "Farbe", colour: "Colour", color: "Color",
-                    material: "Material", size: "Größe", groesse: "Größe",
-                    typ: "Typ", style: "Style", gender: "Gender",
-                    age_group: "Altersgruppe", season: "Saison",
-                  })[key] ?? key.replace(/_/g, " ")}</FilterGroupHeading>
-                  <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
-                </FilterGroupTitle>
-                <FilterGroupBody $open={!!openFilterGroups[key]}>
-                  {vals.map((val) => {
-                    const on = (filters[key] || []).includes(val);
-                    return (
-                      <CheckRow key={val} $on={on}>
-                        <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
-                        {val}
-                      </CheckRow>
-                    );
-                  })}
-                </FilterGroupBody>
-              </FilterGroup>
-            ))}
+                  {hasFacets ? (
+                    Object.entries(facets).map(([key, vals]) => (
+                      <FilterGroup key={key}>
+                        <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
+                          <FilterGroupHeading>{({
+                            brand_name: "Marke", farbe: "Farbe", colour: "Colour", color: "Color",
+                            material: "Material", size: "Größe", groesse: "Größe",
+                            typ: "Typ", style: "Style", gender: "Gender",
+                            age_group: "Altersgruppe", season: "Saison",
+                          })[key] ?? key.replace(/_/g, " ")}</FilterGroupHeading>
+                          <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
+                        </FilterGroupTitle>
+                        <FilterGroupBody $open={!!openFilterGroups[key]}>
+                          {vals.map((val) => {
+                            const on = (filters[key] || []).includes(val);
+                            return (
+                              <CheckRow key={val} $on={on}>
+                                <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
+                                {val}
+                              </CheckRow>
+                            );
+                          })}
+                        </FilterGroupBody>
+                      </FilterGroup>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#8b8b8b", padding: "6px 2px" }}>
+                      Bu kategoride filtre bulunmuyor.
+                    </div>
+                  )}
 
-            {activeCount > 0 && (
-              <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
-                Clear all filters
-              </ClearAllBtn>
-            )}
+                  {activeCount > 0 && (
+                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
+                      Clear all filters
+                    </ClearAllBtn>
+                  )}
+              </SidebarPane>
+            </SidebarSplit>
           </Sidebar>
         )}
 

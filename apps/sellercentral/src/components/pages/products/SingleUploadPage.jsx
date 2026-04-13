@@ -41,6 +41,21 @@ const VARIANT_TYPES = [
   { name: "Leg Style", commonOptions: ["Straight", "Slim", "Wide", "Skinny", "Bootcut", "Flared"] },
 ];
 
+function categoryLineageIdsFromFlatList(flatCategories, categoryId) {
+  if (!categoryId || !Array.isArray(flatCategories) || flatCategories.length === 0) return [];
+  const byId = new Map(flatCategories.map((c) => [String(c.id), c]));
+  const out = [];
+  let cur = byId.get(String(categoryId));
+  const seen = new Set();
+  while (cur && !seen.has(String(cur.id))) {
+    seen.add(String(cur.id));
+    out.push(String(cur.id));
+    const pid = cur.parent_id != null ? String(cur.parent_id) : "";
+    cur = pid && byId.has(pid) ? byId.get(pid) : null;
+  }
+  return out;
+}
+
 export default function SingleUploadPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -163,7 +178,12 @@ export default function SingleUploadPage() {
       const selected = categories.find(
         (c) => formData.categories.includes(c.id) || formData.categories.includes(c.slug)
       );
-      if (selected && selected.id !== "uncategorized") metadata.admin_category_id = selected.id;
+      if (selected && selected.id !== "uncategorized") {
+        const lineage = categoryLineageIdsFromFlatList(categories, selected.id);
+        metadata.admin_category_id = String(selected.id);
+        metadata.category_id = String(selected.id);
+        metadata.category_ids = lineage.length > 0 ? lineage : [String(selected.id)];
+      }
     }
 
     const productData = {

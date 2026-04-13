@@ -83,6 +83,21 @@ function categoryBreadcrumbFromFlatList(flatCategories, categoryId) {
   return parts.filter(Boolean).join(" › ");
 }
 
+function categoryLineageIdsFromFlatList(flatCategories, categoryId) {
+  if (!categoryId || !Array.isArray(flatCategories) || flatCategories.length === 0) return [];
+  const byId = new Map(flatCategories.map((c) => [String(c.id), c]));
+  const out = [];
+  let cur = byId.get(String(categoryId));
+  const seen = new Set();
+  while (cur && !seen.has(String(cur.id))) {
+    seen.add(String(cur.id));
+    out.push(String(cur.id));
+    const pid = cur.parent_id != null ? String(cur.parent_id) : "";
+    cur = pid && byId.has(pid) ? byId.get(pid) : null;
+  }
+  return out;
+}
+
 /** Per-locale variant image; no leaking another locale’s image into DE when `image_urls` is set. */
 function variantImageUrlForLocale(row, loc) {
   const l = String(loc || "de").toLowerCase();
@@ -592,6 +607,25 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     });
   }, []);
 
+  const updateCategoryWithParents = useCallback((categoryId) => {
+    const selected = String(categoryId || "").trim();
+    setProduct((prev) => {
+      if (!prev) return prev;
+      const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
+      if (!selected) {
+        delete m.category_id;
+        delete m.admin_category_id;
+        delete m.category_ids;
+        return { ...prev, metadata: m };
+      }
+      const lineage = categoryLineageIdsFromFlatList(categories, selected);
+      m.category_id = selected;
+      m.admin_category_id = selected;
+      m.category_ids = lineage.length > 0 ? lineage : [selected];
+      return { ...prev, metadata: m };
+    });
+  }, [categories]);
+
   const save = async () => {
     if (!product) return;
     // Flush visual editor content for the current editing locale
@@ -606,6 +640,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setSaving(true);
       setMessage({ type: "", text: "" });
       const metadata = { ...(product.metadata || {}) };
+      const selectedCategoryId = String(metadata.category_id || "").trim();
+      if (selectedCategoryId) {
+        const lineage = categoryLineageIdsFromFlatList(categories, selectedCategoryId);
+        metadata.category_id = selectedCategoryId;
+        metadata.admin_category_id = selectedCategoryId;
+        metadata.category_ids = lineage.length > 0 ? lineage : [selectedCategoryId];
+      }
       const storeName = (typeof window !== "undefined" ? (localStorage.getItem("storeName") || "").trim() : "") || "";
       if (storeName) {
         metadata.seller_name = storeName;
@@ -1428,7 +1469,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                               labelHidden
                               categories={categories || []}
                               value={getMeta(product, "category_id")}
-                              onChange={(v) => updateMeta("category_id", v)}
+                              onChange={updateCategoryWithParents}
                               placeholder="Kategorie wählen"
                             />
                           </Box>
