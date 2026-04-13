@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import ShopHeader from "@/components/ShopHeader";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import Footer from "@/components/Footer";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
@@ -163,7 +164,7 @@ export default function BestsellersPage() {
           <IntroText>{copy.text}</IntroText>
         </Intro>
 
-        {loading ? <p style={{ color: "#6b7280", padding: "0 24px" }}>Loading…</p> : null}
+        {loading ? <GlobalPageLoader /> : null}
         {error ? <p style={{ color: "#b91c1c", padding: "0 24px" }}>{error}</p> : null}
         {!loading && !error && rows.length === 0 ? (
           <p style={{ color: "#6b7280", padding: "0 24px" }}>{copy.empty}</p>

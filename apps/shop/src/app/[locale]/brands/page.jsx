@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import ShopHeader from "@/components/ShopHeader";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import Footer from "@/components/Footer";
 import { BrandCard } from "@/components/BrandCard";
 import { useLocale } from "next-intl";
@@ -101,7 +102,7 @@ export default function BrandsPage() {
         <Container>
           <Title className="shop-typo-catalog-title">{copy.title}</Title>
           <Subtitle>{copy.subtitle}</Subtitle>
-          {loading ? <p style={{ color: "#6b7280" }}>Loading…</p> : null}
+          {loading ? <GlobalPageLoader /> : null}
           {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
           {!loading && !error ? (
             brands.length ? (

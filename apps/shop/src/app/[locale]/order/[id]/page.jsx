@@ -6,6 +6,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { useParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import Footer from "@/components/Footer";
 import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
@@ -175,7 +176,7 @@ export default function OrderConfirmationPage() {
       <ShopHeader />
       <Main>
         {loading ? (
-          <p style={{ color: "#6b7280" }}>{t("loading")}</p>
+          <GlobalPageLoader />
         ) : error ? (
           <p style={{ color: "#ef4444" }}>{error}</p>
         ) : (

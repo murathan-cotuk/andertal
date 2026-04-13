@@ -7123,6 +7123,30 @@ async function start() {
           return res.json(storeCategoriesTreeCache.payload)
         }
         const tree = await adminHubService.getCategoryTree({ is_visible: true })
+        // Build set of category IDs that have at least one published product
+        let categoryIdsWithProducts = new Set()
+        try {
+          const allProducts = await listAdminHubProductsDb({ limit: 10000 })
+          const approvedIds = await getApprovedSellerIdsSet()
+          for (const p of allProducts) {
+            if ((p.status || '').toLowerCase() !== 'published') continue
+            if (!isStoreVisibleSellerProduct(p, approvedIds)) continue
+            for (const cid of storeProductCategoryIds(p)) {
+              categoryIdsWithProducts.add(cid)
+            }
+          }
+        } catch (_) {}
+        // Annotate tree nodes recursively: has_products = true if this node or any descendant has products
+        const annotateTree = (nodes) => {
+          for (const n of nodes || []) {
+            if (!n) continue
+            annotateTree(n.children)
+            const directHit = categoryIdsWithProducts.has(String(n.id).trim().toLowerCase())
+            const childHit = (n.children || []).some((c) => c && c.has_products)
+            n.has_products = directHit || childHit
+          }
+        }
+        annotateTree(tree)
         const categories = (tree || []).map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
         const payload = { categories, tree, count: categories.length }
         storeCategoriesTreeCache = { at: now, payload }

@@ -94,6 +94,13 @@ function collectDescendantIdsFromFlatList(flatCategories, rootId) {
   return out;
 }
 
+function descriptionVisualToHtml(html) {
+  const s = (html || "").trim();
+  if (!s) return "";
+  if (/<(p|div|h[1-6]|ul|ol|li)\b/i.test(s)) return s;
+  return "<p>" + s + "</p>";
+}
+
 export default function CategoryEditPage({ category: initialCategory, onReload }) {
   const router = useRouter();
   const client = getMedusaAdminClient();
@@ -104,6 +111,8 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [mainImgPickerOpen, setMainImgPickerOpen] = useState(false);
   const [bannerImgPickerOpen, setBannerImgPickerOpen] = useState(false);
+  const [richtextMode, setRichtextMode] = useState("visual");
+  const richtextEditorRef = useRef(null);
 
   const meta = (initialCategory?.metadata && typeof initialCategory.metadata === "object") ? initialCategory.metadata : {};
   const linkedCollectionId = meta.collection_id || null;
@@ -111,7 +120,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
   const [form, setForm] = useState({
     name: initialCategory?.name ?? "",
     slug: initialCategory?.slug ?? "",
-    description: initialCategory?.description ?? "",
+    long_content: initialCategory?.long_content ?? "",
     parent_id: initialCategory?.parent_id ?? "",
     active: initialCategory?.active !== false,
     is_visible: initialCategory?.is_visible !== false,
@@ -125,7 +134,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
   const initialFormRef = useRef(JSON.parse(JSON.stringify({
     name: initialCategory?.name ?? "",
     slug: initialCategory?.slug ?? "",
-    description: initialCategory?.description ?? "",
+    long_content: initialCategory?.long_content ?? "",
     parent_id: initialCategory?.parent_id ?? "",
     active: initialCategory?.active !== false,
     is_visible: initialCategory?.is_visible !== false,
@@ -153,10 +162,24 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
 
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialFormRef.current);
 
+  const saveRef = useRef(null);
+  const discardRef = useRef(null);
+
   useEffect(() => {
     if (!unsaved) return;
     unsaved.setDirty(isDirty);
+    unsaved.setHandlers({
+      onSave: () => saveRef.current?.(),
+      onDiscard: () => discardRef.current?.(),
+    });
+    return () => { unsaved.clearHandlers?.(); };
   }, [isDirty, unsaved]);
+
+  useEffect(() => {
+    if (richtextMode === "visual" && richtextEditorRef.current) {
+      richtextEditorRef.current.innerHTML = form.long_content || "";
+    }
+  }, [richtextMode]);
 
   // Load categories for parent selector
   useEffect(() => {
@@ -189,10 +212,11 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
       await client.updateAdminHubCategory(initialCategory.id, {
         name: form.name,
         slug: form.slug,
-        description: form.description,
+        long_content: form.long_content || null,
         parent_id: form.parent_id || null,
         active: form.active,
         is_visible: form.is_visible,
+        banner_image_url: form.banner_image_url || null,
         metadata: {
           ...(initialCategory.metadata || {}),
           meta_title: form.meta_title || null,
@@ -211,6 +235,15 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
       setSaving(false);
     }
   };
+
+  const handleDiscard = () => {
+    setForm({ ...initialFormRef.current });
+    unsaved?.setDirty(false);
+  };
+
+  // Keep refs current on every render so topbar save/discard buttons always call latest version
+  saveRef.current = handleSave;
+  discardRef.current = handleDiscard;
 
   const addProductToCategory = async (productId) => {
     if (!productId) return;
@@ -317,8 +350,23 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
       title={form.name || initialCategory?.name || "Category"}
       subtitle={`/${form.slug || initialCategory?.slug || ""}`}
       primaryAction={{ content: "Save", onAction: handleSave, loading: saving, disabled: saving || !isDirty }}
-      secondaryActions={[{ content: "Discard", onAction: () => { setForm({ ...initialFormRef.current }); unsaved?.setDirty(false); }, disabled: !isDirty }]}
+      secondaryActions={[{ content: "Discard", onAction: handleDiscard, disabled: !isDirty }]}
     >
+      <style>{`
+        .category-richtext-editor { color: var(--p-color-text); }
+        .category-richtext-editor h1 { font-size: 1.75rem; font-weight: 700; margin: 0.75em 0 0.35em; line-height: 1.3; }
+        .category-richtext-editor h2 { font-size: 1.5rem; font-weight: 700; margin: 0.75em 0 0.35em; line-height: 1.3; }
+        .category-richtext-editor h3 { font-size: 1.25rem; font-weight: 600; margin: 0.6em 0 0.3em; line-height: 1.35; }
+        .category-richtext-editor h1:first-child, .category-richtext-editor h2:first-child, .category-richtext-editor h3:first-child { margin-top: 0; }
+        .category-richtext-editor p { margin: 0 0 0.6em; }
+        .category-richtext-editor p:last-child { margin-bottom: 0; }
+        .category-richtext-editor ul, .category-richtext-editor ol { margin: 0.4em 0 0.8em 1.5em; padding-left: 1.5em; }
+        .category-richtext-editor ul { list-style-type: disc; }
+        .category-richtext-editor ol { list-style-type: decimal; }
+        .category-richtext-editor li { margin-bottom: 0.25em; }
+        .category-richtext-editor strong { font-weight: 600; }
+        .category-richtext-editor blockquote { margin: 0.75em 0; padding-left: 1em; border-left: 4px solid var(--p-color-border); color: var(--p-color-text-subdued); }
+      `}</style>
       {error && (
         <Box paddingBlockEnd="400">
           <Banner tone="critical" onDismiss={() => setError(null)}>{error}</Banner>
@@ -346,13 +394,26 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                   prefix="/"
                   helpText="Used in the shop URL"
                 />
-                <TextField
-                  label="Description"
-                  value={form.description}
-                  onChange={(v) => setForm((p) => ({ ...p, description: v }))}
-                  multiline={3}
-                  autoComplete="off"
-                />
+                <BlockStack gap="100">
+                  <Text as="p" variant="bodySm" fontWeight="medium">Description</Text>
+                  <div style={{ border: "1px solid var(--p-color-border)", borderRadius: 12, overflow: "hidden", background: "var(--p-color-bg-surface)" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--p-color-bg-surface-secondary)", borderBottom: "1px solid var(--p-color-border)" }}>
+                      {richtextMode === "visual" && (
+                        <>
+                          <button type="button" style={{ width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent", color: "var(--p-color-text-subdued)", fontWeight: 700, fontSize: 14 }} onMouseDown={(e) => { e.preventDefault(); document.execCommand("bold"); }} title="Bold">B</button>
+                          <button type="button" style={{ width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent", color: "var(--p-color-text-subdued)", fontStyle: "italic", fontSize: 14 }} onMouseDown={(e) => { e.preventDefault(); document.execCommand("italic"); }} title="Italic">I</button>
+                          <button type="button" style={{ width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent", color: "var(--p-color-text-subdued)", fontSize: 16 }} onMouseDown={(e) => { e.preventDefault(); document.execCommand("insertUnorderedList"); }} title="List">•</button>
+                        </>
+                      )}
+                      <button type="button" style={{ marginLeft: 8, width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: richtextMode === "html" ? "var(--p-color-bg-surface-selected)" : "transparent", color: "var(--p-color-text-subdued)", fontSize: 11 }} onClick={() => { if (richtextMode === "visual" && richtextEditorRef.current) setForm((prev) => ({ ...prev, long_content: descriptionVisualToHtml(richtextEditorRef.current.innerHTML || "") })); else if (richtextMode !== "visual" && richtextEditorRef.current) richtextEditorRef.current.innerHTML = form.long_content || ""; setRichtextMode(richtextMode === "html" ? "visual" : "html"); }} title="HTML">{"</>"}</button>
+                    </div>
+                    {richtextMode === "html" ? (
+                      <textarea style={{ minHeight: 160, width: "100%", padding: 16, fontFamily: "ui-monospace, monospace", fontSize: 13, border: "none", resize: "vertical", boxSizing: "border-box" }} value={form.long_content || ""} onChange={(e) => setForm((prev) => ({ ...prev, long_content: e.target.value }))} placeholder="<h2>Heading</h2><p>…</p>" />
+                    ) : (
+                      <div ref={richtextEditorRef} className="category-richtext-editor" contentEditable suppressContentEditableWarning style={{ minHeight: 160, padding: 16, outline: "none", fontSize: 14, lineHeight: 1.6 }} onBlur={() => { if (richtextEditorRef.current) setForm((prev) => ({ ...prev, long_content: descriptionVisualToHtml(richtextEditorRef.current.innerHTML || "") })); }} />
+                    )}
+                  </div>
+                </BlockStack>
                 <Select
                   label="Parent category"
                   options={parentOptions}
@@ -573,12 +634,22 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
       <MediaPickerModal
         open={mainImgPickerOpen}
         onClose={() => setMainImgPickerOpen(false)}
-        onSelect={(url) => { setForm((p) => ({ ...p, image_url: url })); setMainImgPickerOpen(false); }}
+        multiple={false}
+        onSelect={(urls) => {
+          const url = Array.isArray(urls) ? urls[0] : urls;
+          if (url) setForm((p) => ({ ...p, image_url: url }));
+          setMainImgPickerOpen(false);
+        }}
       />
       <MediaPickerModal
         open={bannerImgPickerOpen}
         onClose={() => setBannerImgPickerOpen(false)}
-        onSelect={(url) => { setForm((p) => ({ ...p, banner_image_url: url })); setBannerImgPickerOpen(false); }}
+        multiple={false}
+        onSelect={(urls) => {
+          const url = Array.isArray(urls) ? urls[0] : urls;
+          if (url) setForm((p) => ({ ...p, banner_image_url: url }));
+          setBannerImgPickerOpen(false);
+        }}
       />
     </Page>
   );

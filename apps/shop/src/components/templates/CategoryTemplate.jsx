@@ -476,6 +476,22 @@ const Desc = styled.div`
   a { color: var(--shop-primary, #111); text-decoration: underline; }
 `;
 
+function safeUrl(val) {
+  if (!val) return null;
+  if (typeof val === "string") {
+    const s = val.trim();
+    if (s.startsWith("[")) {
+      try {
+        const arr = JSON.parse(s);
+        return Array.isArray(arr) && arr[0] ? String(arr[0]) : null;
+      } catch { return null; }
+    }
+    return s || null;
+  }
+  if (Array.isArray(val)) return val[0] ? String(val[0]) : null;
+  return null;
+}
+
 function sanitizeHtml(html) {
   if (!html || typeof html !== "string") return "";
   return html
@@ -627,7 +643,7 @@ export default function CategoryTemplate() {
     category?.name ||
     slug ||
     "Category";
-  const rawBanner = category?.banner_image_url || null;
+  const rawBanner = safeUrl(category?.banner_image_url);
   const bannerUrl = rawBanner ? resolveImageUrl(rawBanner) : "";
   const richtextHtml = category?.long_content
     ? sanitizeHtml(rewriteImageUrlsInHtml(category.long_content))

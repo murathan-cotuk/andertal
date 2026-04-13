@@ -864,11 +864,11 @@ export default function ShopHeader() {
     url: "handle",
     image: "thumbnail",
   };
-  /** Tüm root kategoriler — Auto-show categories modunda is_visible tree'den gelir, ürün filtresi yok. */
+  /** Tüm root kategoriler — ürünü olan (has_products=true) kategoriler gösterilir. */
   const browseRootsFromTree = useMemo(() => {
     if (!Array.isArray(categoryTree) || categoryTree.length === 0) return [];
     return categoryTree
-      .filter((n) => n && !n.parent_id)
+      .filter((n) => n && !n.parent_id && n.has_products !== false)
       .map((n) => ({
         key: String(n.id),
         id: String(n.id),
@@ -895,13 +895,13 @@ export default function ShopHeader() {
     const parent = findNode(categoryTree, drillCategoryId);
     if (!parent || !Array.isArray(parent.children)) return [];
     return parent.children
-      .filter((n) => n)
+      .filter((n) => n && n.has_products !== false)
       .map((n) => ({
         key: String(n.id),
         id: String(n.id),
         label: n.name || n.slug || "",
         slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
-        hasChildren: Array.isArray(n.children) && n.children.length > 0,
+        hasChildren: Array.isArray(n.children) && n.children.some((c) => c && c.has_products !== false),
       }))
       .filter((r) => r.slug)
       .sort((a, b) => String(a.label).localeCompare(String(b.label), locale));
