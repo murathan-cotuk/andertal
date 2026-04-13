@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Link, Text, TextField } from "@shopify/polaris";
+import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Link, Spinner, Text, TextField } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
@@ -42,6 +42,8 @@ const tByLocale = (l) => {
       needAgreement: "Devam etmek için sözleşme onayı gerekli.",
       needDocs: "Ticaret sicil belgesi ve kimlik/pasaport yüklemelisiniz.",
       saveOk: "Bilgiler kaydedildi ve doğrulama süreci başlatıldı.",
+      reviewingTitle: "Doğrulama inceleniyor",
+      reviewingDetail: "Evraklarınız ve bilgileriniz ekibimiz tarafından inceleniyor. Bu süreç genellikle 1-3 iş günü sürer. Sonuç e-posta ile bildirilecektir.",
       statusLabel: "Hesap durumu",
       status: {
         registered: "Kayıt oldu - satış öncesi doğrulama gerekli",
@@ -90,6 +92,8 @@ const tByLocale = (l) => {
       needAgreement: "Bitte bestätige zuerst die rechtliche Vereinbarung.",
       needDocs: "Bitte lade Handelsregisterauszug und Ausweis/Reisepass hoch.",
       saveOk: "Daten gespeichert und zur Verifizierung eingereicht.",
+      reviewingTitle: "Verifizierung wird geprüft",
+      reviewingDetail: "Deine Dokumente und Angaben werden von unserem Team geprüft. Dies dauert in der Regel 1–3 Werktage. Das Ergebnis wird per E-Mail mitgeteilt.",
       statusLabel: "Kontostatus",
       status: {
         registered: "Registriert - Verifizierung vor dem Verkauf erforderlich",
@@ -137,6 +141,8 @@ const tByLocale = (l) => {
     needAgreement: "Please accept the legal agreement to continue.",
     needDocs: "Please upload trade register extract and ID/Passport.",
     saveOk: "Saved successfully and submitted for verification.",
+    reviewingTitle: "Verification under review",
+    reviewingDetail: "Your documents and details are being reviewed by our team. This typically takes 1–3 business days. You will be notified by email once complete.",
     statusLabel: "Account status",
     status: {
       registered: "Registered - verification required before selling",
@@ -375,14 +381,6 @@ export default function VerificationSettingsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <Text as="p" tone="subdued">Loading...</Text>
-      </Card>
-    );
-  }
-
   const normalizedStatus = String(status || "registered").toLowerCase();
   const isDocsSubmittedOrBeyond = ["documents_submitted", "pending_approval", "pending", "approved", "active", "rejected", "suspended"].includes(normalizedStatus);
   const isDirty = !loading && initialSnapshot !== null && snapshotFrom(form, agreementAccepted) !== initialSnapshot;
@@ -432,6 +430,14 @@ export default function VerificationSettingsPage() {
     };
   }, [unsaved, isDirty]);
 
+  if (loading) {
+    return (
+      <Card>
+        <Text as="p" tone="subdued">Loading...</Text>
+      </Card>
+    );
+  }
+
   return (
     <BlockStack gap="400">
       <Card>
@@ -441,14 +447,33 @@ export default function VerificationSettingsPage() {
         </BlockStack>
       </Card>
 
-      <Banner tone={statusTone(normalizedStatus)}>
-        <InlineStack align="space-between" blockAlign="center" wrap>
-          <Text as="p"><strong>{t.statusLabel}:</strong> {t.status[normalizedStatus] || normalizedStatus}</Text>
-          {normalizedStatus === "registered" && (
-            <Link url="/settings/verification">{locale === "tr" ? "Doğrulamaya git" : locale === "de" ? "Zur Verifizierung" : "Go to verification"} →</Link>
-          )}
-        </InlineStack>
-      </Banner>
+      {(normalizedStatus === "documents_submitted" || normalizedStatus === "pending_approval" || normalizedStatus === "pending") ? (
+        <div style={{
+          background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+          border: "1.5px solid #f59e0b",
+          borderRadius: 10,
+          padding: "16px 20px",
+        }}>
+          <InlineStack gap="300" blockAlign="start" wrap={false}>
+            <div style={{ paddingTop: 2, flexShrink: 0 }}>
+              <Spinner size="small" />
+            </div>
+            <BlockStack gap="100">
+              <Text as="p" variant="bodyMd" fontWeight="bold" tone="caution">{t.reviewingTitle}</Text>
+              <Text as="p" variant="bodySm" tone="subdued">{t.reviewingDetail}</Text>
+            </BlockStack>
+          </InlineStack>
+        </div>
+      ) : (
+        <Banner tone={statusTone(normalizedStatus)}>
+          <InlineStack align="space-between" blockAlign="center" wrap>
+            <Text as="p"><strong>{t.statusLabel}:</strong> {t.status[normalizedStatus] || normalizedStatus}</Text>
+            {normalizedStatus === "registered" && (
+              <Link url="/settings/verification">{locale === "tr" ? "Doğrulamaya git" : locale === "de" ? "Zur Verifizierung" : "Go to verification"} →</Link>
+            )}
+          </InlineStack>
+        </Banner>
+      )}
 
       {success && (
         <Banner tone="success" onDismiss={() => setSuccess("")}>{success}</Banner>

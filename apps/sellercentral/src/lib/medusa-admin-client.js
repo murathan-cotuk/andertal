@@ -251,9 +251,9 @@ class MedusaAdminClient {
     });
   }
 
-  /** GET /admin-hub/seller-settings */
-  async getSellerSettings() {
-    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+  /** GET /admin-hub/seller-settings – pass sellerIdOverride='default' for platform-wide settings */
+  async getSellerSettings(sellerIdOverride = null) {
+    const sellerId = sellerIdOverride || (typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null);
     const params = sellerId ? `?seller_id=${encodeURIComponent(sellerId)}` : '';
     const res = await this.request(`/admin-hub/seller-settings${params}`).catch(() => ({ store_name: '' }));
     return {

@@ -1,17 +1,7 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useRouter } from "@/i18n/navigation";
-import { useEffect } from "react";
+import CategoryTemplate from "@/components/templates/CategoryTemplate";
 
-export default function KollektionRedirectPage() {
-  const params = useParams();
-  const router = useRouter();
-  const handle = params?.handle != null ? String(params.handle) : "";
-
-  useEffect(() => {
-    if (handle) router.replace(`/${handle}`);
-  }, [handle, router]);
-
-  return null;
+export default function KollektionPage() {
+  return <CategoryTemplate />;
 }

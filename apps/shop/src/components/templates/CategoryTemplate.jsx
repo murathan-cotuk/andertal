@@ -496,7 +496,7 @@ function visibleSubcats(children) {
 
 export default function CategoryTemplate() {
   const params = useParams();
-  const slug = params?.slug ? String(params.slug) : "";
+  const slug = params?.slug ? String(params.slug) : params?.handle ? String(params.handle) : "";
   const locale = params?.locale ? String(params.locale) : "de";
 
   const [category, setCategory] = useState(null);
@@ -507,10 +507,17 @@ export default function CategoryTemplate() {
   const [sort, setSort] = useState("default");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({});
+  const [selectedChildId, setSelectedChildId] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
 
   const bodyRef = useRef(null);
+
+  useEffect(() => {
+    setSelectedChildId(null);
+    setFilters({});
+    setPage(1);
+  }, [slug]);
 
   useEffect(() => {
     if (!slug) return;
@@ -535,13 +542,8 @@ export default function CategoryTemplate() {
         const tree = catRes.tree || catRes.categories || [];
         const roots = Array.isArray(tree) ? tree : [tree];
         const current = findCategoryNodeBySlug(roots, slug);
-        let subs = [];
-        if (current?.parent_id) {
-          const parent = findCategoryNodeById(roots, current.parent_id);
-          subs = visibleSubcats(parent?.children);
-        } else {
-          subs = visibleSubcats(current?.children);
-        }
+        // Always show current category's own children
+        let subs = visibleSubcats(current?.children);
         const pr = await fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`)
           .then((r) => r.json())
           .catch(() => ({ products: [] }));
@@ -672,7 +674,14 @@ export default function CategoryTemplate() {
     setPage(1);
   };
 
-  let filtered = filterProductsByFacets([...products], filters);
+  let filtered = [...products];
+  if (selectedChildId) {
+    const childNorm = normCatId(selectedChildId);
+    filtered = filtered.filter((p) =>
+      productCategoryIds(p).some((id) => normCatId(id) === childNorm)
+    );
+  }
+  filtered = filterProductsByFacets(filtered, filters);
   const sorted = applyCatalogSort(filtered, sort, { bestsellerOnly: false });
   const total = sorted.length;
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
@@ -788,19 +797,40 @@ export default function CategoryTemplate() {
             {hasSubcategories && (
               <SubcategoryGroup style={{ marginTop: 0 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 6 }}>
-                  Subkategorien
+                  Kategorien
                 </div>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedChildId(null); setFilters({}); setPage(1); }}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left",
+                    padding: "10px 12px", fontSize: 14, border: "none", cursor: "pointer",
+                    borderRadius: 8, marginBottom: 2, transition: "background 0.12s, color 0.12s",
+                    background: selectedChildId === null ? "#e5e7eb" : "transparent",
+                    color: selectedChildId === null ? "#111827" : "#4b5563",
+                    fontWeight: selectedChildId === null ? 600 : 400,
+                  }}
+                >
+                  Alle
+                </button>
                 {subcategories.map((sub) => {
-                  const subSlug = String(sub?.slug || sub?.handle || "").replace(/^\//, "");
-                  if (!subSlug) return null;
+                  const isActive = selectedChildId === String(sub.id);
                   return (
-                    <SubcategoryLink
-                      key={sub.id || subSlug}
-                      href={`/category/${subSlug}`}
-                      $active={subSlug === slug}
+                    <button
+                      key={sub.id}
+                      type="button"
+                      onClick={() => { setSelectedChildId(isActive ? null : String(sub.id)); setFilters({}); setPage(1); }}
+                      style={{
+                        display: "block", width: "100%", textAlign: "left",
+                        padding: "10px 12px", fontSize: 14, border: "none", cursor: "pointer",
+                        borderRadius: 8, marginBottom: 2, transition: "background 0.12s, color 0.12s",
+                        background: isActive ? "#e5e7eb" : "transparent",
+                        color: isActive ? "#111827" : "#4b5563",
+                        fontWeight: isActive ? 600 : 400,
+                      }}
                     >
-                      {sub.name || subSlug}
-                    </SubcategoryLink>
+                      {sub.name || sub.slug}
+                    </button>
                   );
                 })}
               </SubcategoryGroup>

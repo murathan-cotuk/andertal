@@ -18,7 +18,7 @@ const getDefaultBaseUrl = () => {
 };
 
 function resolveImageUrl(url) {
-  if (!url) return null;
+  if (!url || typeof url !== "string") return null;
   if (url.startsWith("http")) return url;
   const base = getDefaultBaseUrl().replace(/\/$/, "");
   return `${base}${url.startsWith("/") ? "" : "/"}${url}`;

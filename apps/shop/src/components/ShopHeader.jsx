@@ -173,6 +173,10 @@ const MiddleBarLogo = styled(Link)`
   padding: 0 4px 0 0;
   letter-spacing: -0.02em;
   transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  max-height: 56px;
+  overflow: hidden;
 
   &:hover {
     opacity: 0.92;
@@ -864,13 +868,13 @@ export default function ShopHeader() {
   const browseRootsFromTree = useMemo(() => {
     if (!Array.isArray(categoryTree) || categoryTree.length === 0) return [];
     return categoryTree
-      .filter((n) => n)
+      .filter((n) => n && !n.parent_id)
       .map((n) => ({
         key: String(n.id),
         id: String(n.id),
         label: n.name || n.slug || "",
         slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
-        hasChildren: Array.isArray(n.children) && n.children.length > 0,
+        hasChildren: false,
         node: n,
       }))
       .filter((r) => r.slug)
@@ -945,7 +949,7 @@ export default function ShopHeader() {
                   <img
                     src={shopBranding.shop_logo_url}
                     alt="Shop logo"
-                    style={{ height: shopBranding.shop_logo_height || 34, width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
+                    style={{ height: Math.min(shopBranding.shop_logo_height || 34, 56), maxHeight: 56, width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
                   />
                 ) : (
                   "Belucha"
@@ -980,59 +984,22 @@ export default function ShopHeader() {
                     <div style={{ padding: 12, color: tokens.dark[500], fontSize: 14 }}>
                       {tNav("categoryMenuEmpty")}
                     </div>
-                  ) : drillCategoryId ? (
-                    // Drilled into a parent category — show its children
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setDrillCategoryId(null)}
-                        style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "8px 14px", border: "none", background: "none", cursor: "pointer", fontSize: 13, color: tokens.dark[500], borderBottom: `1px solid ${tokens.border.light}`, fontFamily: "inherit" }}
-                      >
-                        <span style={{ fontSize: 16, lineHeight: 1 }}>‹</span> Zurück
-                      </button>
-                      {drillRows.length === 0 ? (
-                        <div style={{ padding: "8px 14px", fontSize: 13, color: tokens.dark[400] }}>Keine Unterkategorien</div>
-                      ) : drillRows.map((row) => (
-                        <CategoryRow
-                          key={row.key}
-                          type="button"
-                          style={{ paddingLeft: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                          onClick={() => {
-                            if (row.hasChildren) {
-                              setDrillCategoryId(row.id);
-                            } else {
-                              setMainMenuOpen(false);
-                              setDrillCategoryId(null);
-                              router.push(`/kollektion/${row.slug}`);
-                            }
-                          }}
-                        >
-                          <span>{row.label}</span>
-                          {row.hasChildren && <span style={{ fontSize: 16, color: tokens.dark[400] }}>›</span>}
-                        </CategoryRow>
-                      ))}
-                    </>
                   ) : (
-                    // Root level — show parent categories
+                    // Root level — show parent categories only
                     <>
                       {categoryPanelRows.map((row) =>
                         row.href && row.href !== "#" ? (
                           <CategoryRow
                             key={row.key}
                             type="button"
-                            style={{ paddingLeft: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                            style={{ paddingLeft: 14 }}
                             onClick={() => {
-                              if (row.hasChildren) {
-                                // Drill into children
-                                setDrillCategoryId(row.id);
-                              } else {
-                                setMainMenuOpen(false);
-                                router.push(row.href);
-                              }
+                              setMainMenuOpen(false);
+                              setDrillCategoryId(null);
+                              router.push(row.href);
                             }}
                           >
                             <span>{row.label}</span>
-                            {row.hasChildren && <span style={{ fontSize: 16, color: tokens.dark[400] }}>›</span>}
                           </CategoryRow>
                         ) : null,
                       )}

@@ -660,7 +660,7 @@ export default function StylesPage() {
       const data = await client.getStyles();
       const loaded = data?.styles || {};
       const merged = mergeLoadedShopStyles(loaded);
-      const settings = await client.getSellerSettings().catch(() => ({}));
+      const settings = await client.getSellerSettings('default').catch(() => ({}));
       setStyles(merged);
       setSavedSnapshot(JSON.stringify(merged));
       const loadedBranding = {
@@ -867,14 +867,14 @@ export default function StylesPage() {
                             </span>
                           </div>
                         </div>
-                        <div style={{ flexShrink: 0, padding: "8px 12px", background: "#f3f4f6", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                        <div style={{ flexShrink: 0, padding: "8px 12px", background: "#f3f4f6", borderRadius: 8, border: "1px solid #e5e7eb", height: 56, display: "flex", alignItems: "center" }}>
                           <img
                             src={branding[row.key]}
                             alt="Logo preview"
                             style={{
-                              height: row.key === "shop_logo_url" ? (branding.shop_logo_height || 34) : (branding.sellercentral_logo_height || 30),
+                              height: 36,
                               width: "auto",
-                              maxWidth: 220,
+                              maxWidth: 180,
                               objectFit: "contain",
                               display: "block",
                             }}

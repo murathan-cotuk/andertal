@@ -1,4 +1,4 @@
-10.04.
+13.04.
 
 - mesela bir ürüne ürün sayfasinda bir kategori bagladim. automotive-automotive-enthusiast-merchandise-automotive-enthusiast-apparel bu kategoriye bagladim. kategorinin icine girdigimde en alttaki products kisminda ekli olan ürünü ya da ürünleri göremiyorum. bu baglanti düzgün yapilmamis. görebilmek istiyorum.
 -- menüde Auto-show categories butonu secildiginde categorilerin iclerinde ürün olanlar listelensin dropdown menüde. önce sadece parentlar gözükecek, sonra childlari seklinde.
@@ -40,8 +40,7 @@
 
 -- sellercentralde sellerlar verification sayfasinda bu islemi tamamlamak icin basladiginda söyle bir secici var: "Ich habe die rechtlichen Vereinbarungen zwischen Verkäufer und Plattform gelesen und akzeptiere sie." ancak okunabilecek bir metin, bir belge yok. bunu nasil ayarlamak gerekiyor?
 -- zur verifizierung senden butonuna basinca "invalid input syntax for type json" diye bir uyari cikiyor. hem bu uyari cikmasin, hem de uyari cikiyorsa daha aciklayici olsun.
-- verification gönderildikten sonra yukaridaki status barinda verification inceleniyor gibi bir uyari olmali.
--- shopta checkouta gittim ancak paypal falan göremiyorum. ne bicim ayarladin sen bunu?
+-- verification gönderildikten sonra yukaridaki status barinda verification inceleniyor gibi bir uyari olmali.
 -- seller olarak kayit oldugumda settings/verification sayfasinda su uyariyi aliyorum: Application error: a client-side exception has occurred while loading belucha-sellercentral.vercel.app (see the browser console for more information). yani bu sayfaya bir sey eklemeni istemistim anasini sikmeni degil
 
 -- import excel formatinda variant title, variant beschreibung gidiyor her dilde. ancak variant_title degil de düz title olsun. ayrica dilleri saklanabilir yapalim. her dil + ile acilabilsin ya da kapanabilsin.

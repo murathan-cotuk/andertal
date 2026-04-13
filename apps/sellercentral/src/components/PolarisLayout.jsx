@@ -617,16 +617,7 @@ export default function PolarisLayout({ children }) {
         </div>
       }
       searchField={
-        <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: "100%", marginLeft: -12 }}>
-          {platformBranding.sellercentral_logo_url && (
-            <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
-              <img
-                src={platformBranding.sellercentral_logo_url}
-                alt="Sellercentral logo"
-                style={{ height: platformBranding.sellercentral_logo_height || 30, width: "auto", maxWidth: 220, objectFit: "contain" }}
-              />
-            </Link>
-          )}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: "100%" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <GroupedDropdownSearch placeholder="Search products, orders, customers..." />
           </div>
@@ -831,6 +822,12 @@ export default function PolarisLayout({ children }) {
         topBar={topBarMarkup}
         showMobileNavigation={showMobileNav}
         onNavigationDismiss={() => setShowMobileNav(false)}
+        logo={platformBranding.sellercentral_logo_url ? {
+          topBarSource: platformBranding.sellercentral_logo_url,
+          url: "/dashboard",
+          width: 140,
+          accessibilityLabel: "Sellercentral",
+        } : undefined}
       >
         {approvalBanner && (
           <div

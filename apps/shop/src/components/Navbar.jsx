@@ -384,43 +384,11 @@ export default function Navbar() {
               </CategoryLink>
             ))
           ) : categories.length > 0 ? (
-            categories.map((category) => {
-              const hasChildren = category.children && category.children.length > 0;
-              const hasCollection = category.has_collection;
-
-              const categoryHref = `/kollektion/${category.slug}`;
-              if (hasChildren) {
-                return (
-                  <CategoryDropdown
-                    key={category.id}
-                    onMouseEnter={() => setOpenCategoryId(category.id)}
-                    onMouseLeave={() => setOpenCategoryId(null)}
-                  >
-                    <CategoryButton>{category.name}</CategoryButton>
-                    <SubcategoryMenu $isOpen={openCategoryId === category.id}>
-                      {hasCollection && (
-                        <SubcategoryLink href={categoryHref}>
-                          {category.name} (All)
-                        </SubcategoryLink>
-                      )}
-                      {category.children.map((child) => (
-                        <SubcategoryLink
-                          key={child.id}
-                          href={`/kollektion/${child.slug}`}
-                        >
-                          {child.name}
-                        </SubcategoryLink>
-                      ))}
-                    </SubcategoryMenu>
-                  </CategoryDropdown>
-                );
-              }
-              return (
-                <CategoryLink key={category.id} href={categoryHref}>
-                  {category.name}
-                </CategoryLink>
-              );
-            })
+            categories.map((category) => (
+              <CategoryLink key={category.id} href={`/kollektion/${category.slug}`}>
+                {category.name}
+              </CategoryLink>
+            ))
           ) : null}
         </CategoriesMenu>
         <RightMenu>
