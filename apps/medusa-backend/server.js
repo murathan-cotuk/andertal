@@ -242,6 +242,14 @@ async function start() {
       const s = typeof url === 'string' ? url : String(url)
       const t = s.trim()
       if (!t) return null
+      // Handle JSON-array-encoded URLs: '["https://..."]' stored by old media picker bug
+      if (t.startsWith('[')) {
+        try {
+          const arr = JSON.parse(t)
+          if (Array.isArray(arr) && arr[0]) return resolveUploadUrl(arr[0])
+        } catch (_) {}
+        return null
+      }
       if (t.startsWith('http') || t.startsWith('//')) return t
       return `${CURRENT_SERVER_URL}${t.startsWith('/') ? '' : '/'}${t}`
     }

@@ -94,6 +94,19 @@ function collectDescendantIdsFromFlatList(flatCategories, rootId) {
   return out;
 }
 
+/** Unwrap JSON-array-encoded URL strings: '["https://..."]' → "https://..." */
+function safeStoredUrl(val) {
+  if (!val || typeof val !== "string") return "";
+  const s = val.trim();
+  if (s.startsWith("[")) {
+    try {
+      const arr = JSON.parse(s);
+      return Array.isArray(arr) && arr[0] ? String(arr[0]) : "";
+    } catch (_) { return ""; }
+  }
+  return s;
+}
+
 function descriptionVisualToHtml(html) {
   const s = (html || "").trim();
   if (!s) return "";
@@ -127,8 +140,8 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     meta_title: meta.meta_title ?? "",
     meta_description: meta.meta_description ?? "",
     keywords: meta.keywords ?? "",
-    image_url: meta.image_url ?? initialCategory?.image_url ?? "",
-    banner_image_url: meta.banner_image_url ?? initialCategory?.banner_image_url ?? "",
+    image_url: safeStoredUrl(meta.image_url ?? initialCategory?.image_url ?? ""),
+    banner_image_url: safeStoredUrl(meta.banner_image_url ?? initialCategory?.banner_image_url ?? ""),
   });
 
   const initialFormRef = useRef(JSON.parse(JSON.stringify({
@@ -141,8 +154,8 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     meta_title: meta.meta_title ?? "",
     meta_description: meta.meta_description ?? "",
     keywords: meta.keywords ?? "",
-    image_url: meta.image_url ?? initialCategory?.image_url ?? "",
-    banner_image_url: meta.banner_image_url ?? initialCategory?.banner_image_url ?? "",
+    image_url: safeStoredUrl(meta.image_url ?? initialCategory?.image_url ?? ""),
+    banner_image_url: safeStoredUrl(meta.banner_image_url ?? initialCategory?.banner_image_url ?? ""),
   })));
 
   const [categoryProducts, setCategoryProducts] = useState([]);

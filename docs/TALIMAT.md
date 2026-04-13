@@ -1,4 +1,4 @@
-13.04.
+14.04.
 
 - mesela bir ürüne ürün sayfasinda bir kategori bagladim. automotive-automotive-enthusiast-merchandise-automotive-enthusiast-apparel bu kategoriye bagladim. kategorinin icine girdigimde en alttaki products kisminda ekli olan ürünü ya da ürünleri göremiyorum. bu baglanti düzgün yapilmamis. görebilmek istiyorum.
 -- menüde Auto-show categories butonu secildiginde categorilerin iclerinde ürün olanlar listelensin dropdown menüde. önce sadece parentlar gözükecek, sonra childlari seklinde.

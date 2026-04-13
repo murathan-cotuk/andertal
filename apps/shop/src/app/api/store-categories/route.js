@@ -10,7 +10,7 @@ const getBackendUrl = () => {
 };
 
 const categoriesCache = new Map();
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 45 * 1000; // 45 seconds — matches backend TTL so edits appear quickly
 
 export async function GET(request) {
   try {

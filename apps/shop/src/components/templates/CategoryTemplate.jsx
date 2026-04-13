@@ -548,7 +548,7 @@ function findAncestors(nodes, slug, path = []) {
 }
 
 function visibleSubcats(children) {
-  return (children || []).filter((c) => c && c.active !== false && c.is_visible !== false);
+  return (children || []).filter((c) => c && c.active !== false && c.is_visible !== false && c.has_products !== false);
 }
 
 export default function CategoryTemplate() {

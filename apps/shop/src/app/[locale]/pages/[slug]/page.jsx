@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 
 function sanitizeHtml(html) {
   if (!html || typeof html !== "string") return "";
@@ -49,8 +50,8 @@ export default function CmsPageBySlug() {
     return (
       <div className="min-h-screen flex flex-col">
         <ShopHeader />
-        <main className="flex-1 container mx-auto px-4 py-12">
-          <p className="text-gray-500">Loading…</p>
+        <main className="flex-1">
+          <GlobalPageLoader />
         </main>
         <Footer />
       </div>
