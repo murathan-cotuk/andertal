@@ -1077,8 +1077,45 @@ export default function ProductTemplate() {
   ];
 
 
+  // JSON-LD structured data for SEO (Product schema)
+  const jsonLd = product ? {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: effectiveTitle || displayTitle,
+    description: displayDescription || "",
+    image: displayImages.length > 0 ? displayImages.map((i) => i.url || i) : undefined,
+    sku: variant?.sku || product.id,
+    brand: meta.brand_name ? { "@type": "Brand", name: meta.brand_name } : undefined,
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "EUR",
+      price: displayCents > 0 ? (displayCents / 100).toFixed(2) : "0.00",
+      availability: inStock
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
+      url: typeof window !== "undefined" ? window.location.href : undefined,
+    },
+    ...(reviewCount > 0 && reviewAvg > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: reviewAvg.toFixed(1),
+            reviewCount: reviewCount,
+            bestRating: "5",
+            worstRating: "1",
+          },
+        }
+      : {}),
+  } : null;
+
   return (
     <Container>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
       <Breadcrumbs items={breadcrumbItems} />
 
       <ThreeCol>

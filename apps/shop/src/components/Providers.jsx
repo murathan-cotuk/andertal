@@ -8,23 +8,26 @@ import { ShopStylesProvider } from "@/context/ShopStylesContext";
 import CartSidebar from "@/components/CartSidebar";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 import CookieBanner from "@/components/CookieBanner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function Providers({ children }) {
   return (
-    <CustomerAuthProvider>
-      <WishlistProvider>
-        <CartProvider>
-          <ShopStylesProvider>
-          <LandingChromeProvider>
-            {children}
-          </LandingChromeProvider>
-          </ShopStylesProvider>
-          <CartSidebar />
-          <ScrollToTopButton />
-          <CookieBanner />
-        </CartProvider>
-      </WishlistProvider>
-    </CustomerAuthProvider>
+    <ErrorBoundary>
+      <CustomerAuthProvider>
+        <WishlistProvider>
+          <CartProvider>
+            <ShopStylesProvider>
+              <LandingChromeProvider>
+                {children}
+              </LandingChromeProvider>
+            </ShopStylesProvider>
+            <CartSidebar />
+            <ScrollToTopButton />
+            <CookieBanner />
+          </CartProvider>
+        </WishlistProvider>
+      </CustomerAuthProvider>
+    </ErrorBoundary>
   );
 }
 

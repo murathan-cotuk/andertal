@@ -143,6 +143,7 @@ const { asValue } = require('@medusajs/framework/awilix')
 const { ContainerRegistrationKeys } = require('@medusajs/utils')
 const express = require('express')
 const cors = require('cors')
+const rateLimit = require('express-rate-limit')
 
 const PORT = process.env.PORT || 9000
 const HOST = process.env.HOST || '0.0.0.0'
@@ -194,6 +195,32 @@ async function start() {
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'sentry-trace', 'sentry-baggage'],
     }))
+    // Rate limiting — prevent brute-force and abuse
+    const generalLimiter = rateLimit({
+      windowMs: 60 * 1000,       // 1 minute
+      max: 300,                  // 300 requests per minute per IP (storefront + admin)
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      skip: (req) => req.path === '/health', // don't limit health checks
+    })
+    const authLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000,  // 15 minutes
+      max: 20,                   // 20 login attempts per 15 min per IP
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      message: { error: 'Too many login attempts. Please try again later.' },
+    })
+    const paymentLimiter = rateLimit({
+      windowMs: 60 * 1000,       // 1 minute
+      max: 10,                   // 10 payment intents per minute per IP
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      message: { error: 'Too many payment requests. Please slow down.' },
+    })
+    app.use(generalLimiter)
+    app.use('/admin-hub/auth/login', authLimiter)
+    app.use('/store/payment-intent', paymentLimiter)
+
     // Root ve health: "Cannot GET /" yerine JSON döner
     app.get('/', (req, res) => {
       res.json({ ok: true, service: 'medusa-backend', timestamp: new Date().toISOString() })

@@ -1,5 +1,6 @@
 14.04.
 
+- render redis almistik o kurulu mu kontrol et. ayrica posthog, unkey, resend, Pino + Better Stack/Datadog logs, playwright, zod, storybook,    CSS variables + theme tokens (sizde var, ama daha disiplinli hale getir), lenis smooth scroll, micro-ui accents, figma design system kit     kurulumlarini yap. ayrica sellercentral /content/landing-page sayfasinda sayfalara ekledigimiz konteynerlarin yönetimi ve tasarimlari ile    alakali stroybook ve framer dan ilham alarak 2 yeni konteyner template i ekle. sellercentral üzerinden yönetebilecegim ve görüntüleyebilecegim bir seyler olursa bunlari da sellercentral superuser icin ilgili yerlere ekle
 -- dropdown menüyü megamenü seklinde yapalim
 -- ürün görselleri kare format sarti sun ve 1000x1000px ten kücük olmamasini sagla. saticilar png olarak, jpg olarak gönderebilir ürünleri ancak biz backendde .webp formatinda tutup shopa da bu formatta yansitalim bence daha az yer kaplamasi acisindan.     
 -- sellercentral superuser kisminda /content/landing-page sayfasindan landing page e "Kollektionen-Karussell" ekledim. buraya 3 tane koleksiyon ekledim, landing page de görünüyor. ancak oraya eklenmis olan bir koleksiyonun ismini ya da görselini degistirdigimde bu degisiklik shopta carousele yansimiyor. düzelt

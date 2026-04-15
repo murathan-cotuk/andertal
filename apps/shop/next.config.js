@@ -38,6 +38,34 @@ const nextConfig = {
       'next-intl/config': './src/i18n/request.js',
     },
   },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          // Prevent clickjacking
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          // Prevent MIME-type sniffing
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          // Referrer policy — don't leak full URL to third parties
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // HSTS — force HTTPS for 1 year (production only; harmless in dev)
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          // Permissions — disable unused browser APIs
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          // Basic XSS protection for older browsers
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+        ],
+      },
+      // API routes — no caching by default
+      {
+        source: "/api/(.*)",
+        headers: [
+          { key: "Cache-Control", value: "no-store, max-age=0" },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = withSentryConfig(withNextIntl(nextConfig), {
