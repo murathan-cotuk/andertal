@@ -17,7 +17,7 @@
     "autoprefixer": "^10.4.16",
     "exceljs": "^4.4.0",
     "zod": "^3.25.3",
-    "@unkey/api": "^0.37.7",
+    "@unkey/api": "^2.3.3",
     "next": "16.0.10",
     "next-intl": "^3.25.0",
     "postcss": "^8.4.32",
