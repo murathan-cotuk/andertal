@@ -35,6 +35,7 @@
     "@belucha/config": "*",
     "@types/react": "19.2.9",
     "eslint": "^9.0.0",
-    "eslint-config-next": "16.0.10"
+    "eslint-config-next": "16.0.10",
+    "eslint-plugin-react-hooks": "^7.0.1"
   }
 }
