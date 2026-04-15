@@ -479,7 +479,6 @@ function CollectionsCarousel({ container }) {
         setLiveCollections(merged);
       })
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [container.id]);
 
   const collections = liveCollections ?? snapshots;

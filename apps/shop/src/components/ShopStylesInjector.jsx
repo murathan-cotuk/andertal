@@ -60,7 +60,7 @@ export default function ShopStylesInjector() {
         if (ctx?.setStyles) ctx.setStyles(merged);
       })
       .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return null;
 }
