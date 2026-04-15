@@ -101,3 +101,8 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+@keyframes shimmer {
+  0%   { background-position: -800px 0; }
+  100% { background-position:  800px 0; }
+}

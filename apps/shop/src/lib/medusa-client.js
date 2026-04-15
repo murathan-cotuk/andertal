@@ -7,10 +7,8 @@
 
 // Get Medusa backend URL from environment variable
 // In production, this should be set to your deployed Medusa backend URL (e.g., Railway, Render)
-const MEDUSA_BACKEND_URL = 
-  typeof window !== 'undefined' 
-    ? (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'https://belucha-medusa-backend.onrender.com')
-    : (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'https://belucha-medusa-backend.onrender.com')
+const MEDUSA_BACKEND_URL =
+  (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'http://localhost:9000').replace(/\/$/, '')
 
 class MedusaClient {
   constructor(baseURL = MEDUSA_BACKEND_URL) {

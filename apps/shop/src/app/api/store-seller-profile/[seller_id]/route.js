@@ -2,13 +2,8 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const getBackendUrl = () => {
-  const raw = String(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").trim();
-  if (!raw || /localhost|127\.0\.0\.1/i.test(raw)) {
-    return "https://belucha-medusa-backend.onrender.com";
-  }
-  return raw.replace(/\/$/, "");
-};
+const getBackendUrl = () =>
+  (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
 export async function GET(req, { params }) {
   try {

@@ -396,7 +396,8 @@ function BannerCta({ container }) {
 
 // ── Collection Carousel ───────────────────────────────────────────────────────
 function CollectionCarousel({ container, preloadedProducts }) {
-  const [products, setProducts] = useState(Array.isArray(preloadedProducts) ? preloadedProducts : []);
+  // undefined = still loading, [] = loaded but empty, [...] = has products
+  const [products, setProducts] = useState(preloadedProducts);
   const itemsPerRow = container.items_per_row || 4;
 
   useEffect(() => {
@@ -404,15 +405,28 @@ function CollectionCarousel({ container, preloadedProducts }) {
       setProducts(preloadedProducts);
       return;
     }
-    if (!container.collection_id && !container.collection_handle) return;
+    if (!container.collection_id && !container.collection_handle) { setProducts([]); return; }
     const param = container.collection_id
       ? `collection_id=${encodeURIComponent(container.collection_id)}`
       : `collection_handle=${encodeURIComponent(container.collection_handle)}`;
     fetch(`/api/store-products?${param}&limit=20`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setProducts(Array.isArray(d?.products) ? d.products : []))
-      .catch(() => {});
+      .catch(() => setProducts([]));
   }, [container.collection_id, container.collection_handle, preloadedProducts]);
+
+  // Still loading → show skeleton placeholder row
+  if (products === undefined) {
+    return (
+      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+        <div style={{ display: "flex", gap: 16, overflow: "hidden" }}>
+          {Array.from({ length: itemsPerRow }).map((_, i) => (
+            <div key={i} style={{ flex: `0 0 calc(${100 / itemsPerRow}% - 12px)`, height: 280, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!products.length) return null;
 
@@ -537,30 +551,36 @@ function CollectionsCarousel({ container }) {
 
 // ── Single featured product ───────────────────────────────────────────────────
 function SingleProduct({ container, preloadedProduct }) {
-  const [product, setProduct] = useState(preloadedProduct || null);
-  // Prefer stable product_id (UUID); handle can change and break lookups.
+  // undefined = loading, null = not found/no id, object = loaded
+  const [product, setProduct] = useState(preloadedProduct !== undefined ? (preloadedProduct || null) : undefined);
   const idOrHandle = (container.product_id || container.product_handle || "").toString().trim();
 
   useEffect(() => {
-    if (preloadedProduct) {
-      setProduct(preloadedProduct);
+    if (preloadedProduct !== undefined) {
+      setProduct(preloadedProduct || null);
       return;
     }
-    if (!idOrHandle) {
-      setProduct(null);
-      return;
-    }
+    if (!idOrHandle) { setProduct(null); return; }
     let cancelled = false;
     (async () => {
-      const { product: p } = await getMedusaClient().getProduct(idOrHandle);
-      if (!cancelled) setProduct(p || null);
+      try {
+        const { product: p } = await getMedusaClient().getProduct(idOrHandle);
+        if (!cancelled) setProduct(p || null);
+      } catch { if (!cancelled) setProduct(null); }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [idOrHandle, preloadedProduct]);
 
-  if (!idOrHandle || !product) return null;
+  if (!idOrHandle) return null;
+  // Still loading → small skeleton
+  if (product === undefined) {
+    return (
+      <div style={{ ...getContainerPadding(container, "48px 24px"), background: container.bg_color || "#fff" }}>
+        <div style={{ maxWidth: 420, margin: "0 auto", height: 360, borderRadius: 12, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
+      </div>
+    );
+  }
+  if (!product) return null;
 
   const wrapBg = container.bg_color || "#fff";
   const title = container.title;
@@ -1115,7 +1135,7 @@ function renderContainer(c, preload = {}) {
     case "collections_carousel": inner = <CollectionsCarousel container={c} />; break;
     case "accordion":            inner = <Accordion container={c} />; break;
     case "tabs":                 inner = <Tabs container={c} />; break;
-    case "single_product":       inner = <SingleProduct container={c} preloadedProduct={preload.singleProducts?.[singleKey] || null} />; break;
+    case "single_product":       inner = <SingleProduct container={c} preloadedProduct={preload.singleProducts?.[singleKey]} />; break;
     case "blog_carousel":        inner = <BlogCarousel container={c} />; break;
     case "newsletter":           inner = <NewsletterSignup container={c} />; break;
     default: return null;
@@ -1134,7 +1154,7 @@ function renderContainer(c, preload = {}) {
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function LandingContainers({ pageId, categoryId }) {
   const [containers, setContainers] = useState(null);
-  const [preload, setPreload] = useState({ ready: false, collectionProducts: {}, singleProducts: {} });
+  const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
   const { setLandingHeaderFilterBar } = useLandingChrome();
 
   useEffect(() => {
@@ -1162,11 +1182,8 @@ export default function LandingContainers({ pageId, categoryId }) {
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      if (!Array.isArray(containers) || containers.length === 0) {
-        if (!cancelled) setPreload({ ready: true, collectionProducts: {}, singleProducts: {} });
-        return;
-      }
-      setPreload((p) => ({ ...p, ready: false }));
+      if (!Array.isArray(containers) || containers.length === 0) return;
+
       const collectionTargets = new Map();
       const singleTargets = new Set();
       for (const c of containers) {
@@ -1180,34 +1197,35 @@ export default function LandingContainers({ pageId, categoryId }) {
         }
       }
 
-      const collectionEntries = await Promise.all(
-        [...collectionTargets.entries()].map(async ([key, c]) => {
-          try {
-            const param = c.collection_id
-              ? `collection_id=${encodeURIComponent(c.collection_id)}`
-              : `collection_handle=${encodeURIComponent(c.collection_handle)}`;
-            const d = await fetch(`/api/store-products?${param}&limit=20`, { cache: "no-store" }).then((r) => r.json());
-            return [key, Array.isArray(d?.products) ? d.products : []];
-          } catch {
-            return [key, []];
-          }
-        })
-      );
-
-      const singleEntries = await Promise.all(
-        [...singleTargets].map(async (idOrHandle) => {
-          try {
-            const { product } = await getMedusaClient().getProduct(idOrHandle);
-            return [idOrHandle, product || null];
-          } catch {
-            return [idOrHandle, null];
-          }
-        })
-      );
+      // Fetch collections AND single products in parallel
+      const [collectionEntries, singleEntries] = await Promise.all([
+        Promise.all(
+          [...collectionTargets.entries()].map(async ([key, c]) => {
+            try {
+              const param = c.collection_id
+                ? `collection_id=${encodeURIComponent(c.collection_id)}`
+                : `collection_handle=${encodeURIComponent(c.collection_handle)}`;
+              const d = await fetch(`/api/store-products?${param}&limit=20`, { cache: "no-store" }).then((r) => r.json());
+              return [key, Array.isArray(d?.products) ? d.products : []];
+            } catch {
+              return [key, []];
+            }
+          })
+        ),
+        Promise.all(
+          [...singleTargets].map(async (idOrHandle) => {
+            try {
+              const { product } = await getMedusaClient().getProduct(idOrHandle);
+              return [idOrHandle, product || null];
+            } catch {
+              return [idOrHandle, null];
+            }
+          })
+        ),
+      ]);
 
       if (cancelled) return;
       setPreload({
-        ready: true,
         collectionProducts: Object.fromEntries(collectionEntries),
         singleProducts: Object.fromEntries(singleEntries),
       });
@@ -1216,8 +1234,9 @@ export default function LandingContainers({ pageId, categoryId }) {
     return () => { cancelled = true; };
   }, [containers]);
 
-  if (!containers || containers.length === 0) return null;
-  if (!preload.ready) return null;
+  // Don't block render — show layout immediately, data-dependent components show skeleton
+  if (!containers) return null;
+  if (containers.length === 0) return null;
 
   return (
     <div>

@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 
-const FALLBACK_BACKEND_URL = "https://belucha-medusa-backend.onrender.com";
-const getBackendUrl = () => {
-  const raw = String(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").trim();
-  if (!raw || /localhost:9000/i.test(raw)) return FALLBACK_BACKEND_URL;
-  return raw.replace(/\/$/, "");
-};
+const getBackendUrl = () =>
+  (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
 export async function POST(request) {
   try {

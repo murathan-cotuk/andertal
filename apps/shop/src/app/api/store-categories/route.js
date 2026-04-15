@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
 
-const FALLBACK_BACKEND = "https://belucha-medusa-backend.onrender.com";
-const getBackendUrl = () => {
-  const raw = String(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").trim();
-  if (!raw) return FALLBACK_BACKEND;
-  const normalized = raw.replace(/\/$/, "");
-  if (/localhost|127\.0\.0\.1/i.test(normalized)) return FALLBACK_BACKEND;
-  return normalized;
-};
+const getBackendUrl = () =>
+  (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
 const categoriesCache = new Map();
-const CACHE_TTL_MS = 45 * 1000; // 45 seconds — matches backend TTL so edits appear quickly
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
 
 export async function GET(request) {
   try {

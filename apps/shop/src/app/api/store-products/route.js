@@ -1,13 +1,27 @@
 import { NextResponse } from "next/server";
 
-const FALLBACK_BACKEND = "https://belucha-medusa-backend.onrender.com";
-const getBackendUrl = () => {
-  const raw = String(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").trim();
-  if (!raw) return FALLBACK_BACKEND;
-  const normalized = raw.replace(/\/$/, "");
-  if (/localhost|127\.0\.0\.1/i.test(normalized)) return FALLBACK_BACKEND;
-  return normalized;
-};
+const getBackendUrl = () =>
+  (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
+
+// Cache approved seller IDs — changes rarely, no need to re-fetch every product request
+const approvedCache = { ids: null, expiresAt: 0 };
+const APPROVED_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getApprovedSellerIds(base) {
+  const now = Date.now();
+  if (approvedCache.ids && approvedCache.expiresAt > now) return approvedCache.ids;
+  try {
+    const res = await fetch(`${base}/store/approved-seller-ids`, { next: { revalidate: 300 } });
+    if (!res.ok) throw new Error("not ok");
+    const data = await res.json();
+    const ids = new Set((data?.seller_ids || []).map((s) => String(s || "").trim()).filter(Boolean));
+    approvedCache.ids = ids;
+    approvedCache.expiresAt = now + APPROVED_TTL;
+    return ids;
+  } catch {
+    return approvedCache.ids || new Set();
+  }
+}
 
 export async function GET(request) {
   try {
@@ -15,19 +29,15 @@ export async function GET(request) {
     const qs = searchParams.toString();
     const base = getBackendUrl();
     const url = qs ? `${base}/store/products?${qs}` : `${base}/store/products`;
-    const res = await fetch(url, {
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      return NextResponse.json({ products: [], count: 0 }, { status: 200 });
-    }
+    // Fetch products and approved seller IDs in parallel
+    const [res, approved] = await Promise.all([
+      fetch(url, { headers: { "Content-Type": "application/json" }, cache: "no-store" }),
+      getApprovedSellerIds(base),
+    ]);
+    if (!res.ok) return NextResponse.json({ products: [], count: 0 }, { status: 200 });
     const data = await res.json();
     const list = Array.isArray(data?.products) ? data.products : [];
-    const approvedRes = await fetch(`${base}/store/approved-seller-ids`, { cache: "no-store" }).catch(() => null);
-    const approvedData = approvedRes && approvedRes.ok ? await approvedRes.json().catch(() => ({ seller_ids: [] })) : { seller_ids: [] };
-    const approved = new Set((approvedData?.seller_ids || []).map((s) => String(s || "").trim()).filter(Boolean));
-    const filtered = list.filter((p) => {
+    const filtered = approved.size === 0 ? list : list.filter((p) => {
       const sid = String(p?.seller_id || "").trim();
       if (!sid || sid === "default") return true;
       return approved.has(sid);

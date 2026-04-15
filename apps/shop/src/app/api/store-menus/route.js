@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server";
 
-const FALLBACK_BACKEND = "https://belucha-medusa-backend.onrender.com";
-const getBackendUrl = () => {
-  const raw = String(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").trim();
-  if (!raw) return FALLBACK_BACKEND;
-  const normalized = raw.replace(/\/$/, "");
-  if (/localhost|127\.0\.0\.1/i.test(normalized)) return FALLBACK_BACKEND;
-  return normalized;
-};
+const getBackendUrl = () =>
+  (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
+
+const menusCache = { data: null, expiresAt: 0 };
+const MENUS_TTL = 60 * 1000; // 60 seconds
 
 export async function GET() {
   try {
+    const now = Date.now();
+    if (menusCache.data && menusCache.expiresAt > now) {
+      return NextResponse.json(menusCache.data);
+    }
     const base = getBackendUrl();
     const res = await fetch(`${base}/store/menus`, {
       headers: { "Content-Type": "application/json" },
-      cache: "no-store",
+      next: { revalidate: 60 },
     });
     if (!res.ok) return NextResponse.json({ menus: [], count: 0 }, { status: 200 });
     const data = await res.json();
+    menusCache.data = data;
+    menusCache.expiresAt = now + MENUS_TTL;
     return NextResponse.json(data);
   } catch (e) {
     return NextResponse.json({ menus: [], count: 0 }, { status: 200 });

@@ -10,7 +10,8 @@ import {
 } from "@belucha/shop-theme";
 import { ShopStylesContext } from "@/context/ShopStylesContext";
 
-const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "https://belucha-medusa-backend.onrender.com").replace(/\/$/, "");
+// Fetch styles through the internal API route (handles backend URL + caching)
+const STYLES_URL = "/api/store-styles";
 
 const FONT_LINK_ID = "shop-google-font-link";
 
@@ -47,7 +48,7 @@ export default function ShopStylesInjector() {
   }, []);
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/store/styles`)
+    fetch(STYLES_URL)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         const raw = data?.styles || {};
