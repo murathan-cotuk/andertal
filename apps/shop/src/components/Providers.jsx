@@ -9,15 +9,24 @@ import CartSidebar from "@/components/CartSidebar";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 import CookieBanner from "@/components/CookieBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useLenis } from "@/hooks/useLenis";
+import PostHogProvider from "@/components/PostHogProvider";
+
+function LenisInit() {
+  useLenis();
+  return null;
+}
 
 export default function Providers({ children }) {
   return (
+    <PostHogProvider>
     <ErrorBoundary>
       <CustomerAuthProvider>
         <WishlistProvider>
           <CartProvider>
             <ShopStylesProvider>
               <LandingChromeProvider>
+                <LenisInit />
                 {children}
               </LandingChromeProvider>
             </ShopStylesProvider>
@@ -28,6 +37,7 @@ export default function Providers({ children }) {
         </WishlistProvider>
       </CustomerAuthProvider>
     </ErrorBoundary>
+    </PostHogProvider>
   );
 }
 

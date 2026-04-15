@@ -11,7 +11,9 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "postinstall": "patch-package || true",
     "patch:backend": "node apps/medusa-backend/scripts/patch-link-modules.js",
-    "start": "node apps/medusa-backend/server.js"
+    "start": "node apps/medusa-backend/server.js",
+    "storybook": "npm run storybook --workspace=packages/ui",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@opentelemetry/sdk-trace-base": "^1.28.0",
@@ -26,6 +28,7 @@
     "scheduler": "^0.27.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@turbo/gen": "^2.6.1",
     "prettier": "^3.0.0",
     "turbo": "^2.9.4",

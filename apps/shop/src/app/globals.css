@@ -75,6 +75,25 @@
   /* Layout */
   --navbar-height: 72px;
   --topbar-height: 40px;
+
+  /* ── Micro-UI accents ── */
+  --focus-ring: 0 0 0 3px rgba(255, 106, 0, 0.28);
+  --focus-ring-offset: 2px;
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 350ms ease;
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --skeleton-bg: #efefed;
+  --skeleton-shine: #e5e5e3;
+  --overlay-sm: rgba(0, 0, 0, 0.18);
+  --overlay-md: rgba(0, 0, 0, 0.35);
+  --overlay-dark: rgba(0, 0, 0, 0.64);
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
 }
 
 * {

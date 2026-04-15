@@ -16,6 +16,39 @@ const CATALOG = [
   { name: "Mailchimp", slug: "mailchimp", logo: "🐒", category: "marketing", description: "E-Mail-Marketing" },
   { name: "Klaviyo", slug: "klaviyo", logo: "📧", category: "marketing", description: "E-Commerce E-Mail & SMS" },
   { name: "Google Analytics", slug: "google-analytics", logo: "📊", category: "analytics", description: "Web-Analyse" },
+  {
+    name: "PostHog", slug: "posthog", logo: "🦔", category: "analytics",
+    description: "Product analytics, session replays & feature flags (GDPR-konform, EU-Cloud)",
+    fieldLabels: {
+      api_key: "Project API Key",
+      api_key_placeholder: "phc_xxxxxxxxxxxxxxxxxxxx",
+      api_secret: "Host (optional)",
+      api_secret_placeholder: "https://eu.i.posthog.com",
+    },
+    helpText: "Project API Key aus PostHog → Project Settings → Project API Key. EU-Host: https://eu.i.posthog.com (Standard). Wird im Shop als NEXT_PUBLIC_POSTHOG_KEY gesetzt.",
+  },
+  {
+    name: "Resend", slug: "resend", logo: "✉️", category: "marketing",
+    description: "Transaktions-E-Mails per API (Bestellbestätigungen, Passwort-Reset u. a.)",
+    fieldLabels: {
+      api_key: "API Key",
+      api_key_placeholder: "re_xxxxxxxxxxxxxxxxxxxx",
+      api_secret: "Standard-Absender",
+      api_secret_placeholder: "noreply@belucha.de",
+    },
+    helpText: "API Key aus Resend Dashboard → API Keys. Standard-Absender muss in Resend verifiziert sein.",
+  },
+  {
+    name: "Unkey", slug: "unkey", logo: "🔑", category: "automation",
+    description: "API Key Management — sichere externe Schnittstellen mit kurzlebigen API-Schlüsseln",
+    fieldLabels: {
+      api_key: "Root Key",
+      api_key_placeholder: "unkey_xxxxxxxxxxxxxxxxxxxx",
+      api_secret: "API ID",
+      api_secret_placeholder: "api_xxxxxxxxxxxxxxxxxxxx",
+    },
+    helpText: "Root Key + API ID aus Unkey Dashboard. Wird für programmatische API-Schlüssel-Ausstellung verwendet.",
+  },
   { name: "Slack", slug: "slack", logo: "💬", category: "communication", description: "Team-Kommunikation" },
   { name: "Zapier", slug: "zapier", logo: "⚡", category: "automation", description: "Workflow-Automatisierung" },
   {

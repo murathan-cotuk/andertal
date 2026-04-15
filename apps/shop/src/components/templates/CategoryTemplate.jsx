@@ -196,9 +196,8 @@ const Sidebar = styled.aside`
   flex-shrink: 0;
   position: sticky;
   top: ${HEADER_H + 68}px;
-  height: calc(100vh - ${HEADER_H + 68}px);
   max-height: calc(100vh - ${HEADER_H + 68}px);
-  overflow: hidden;
+  overflow-y: auto;
 
   @media (max-width: 767px) {
     position: fixed;
@@ -219,28 +218,15 @@ const Sidebar = styled.aside`
 const SidebarSplit = styled.div`
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  gap: 12px;
-
-  @media (max-width: 767px) {
-    height: auto;
-    min-height: auto;
-  }
+  gap: 0;
 `;
 
 const SidebarPane = styled.section`
-  min-height: 0;
-  overflow-y: auto;
-  border: 1px solid #eceae7;
-  border-radius: 8px;
-  padding: 10px;
-  background: #fff;
-  flex: ${(p) => (p.$half ? "1 1 50%" : "0 0 auto")};
+  padding: 0 0 16px;
 
-  @media (max-width: 767px) {
-    overflow-y: visible;
-    flex: 0 0 auto;
+  & + & {
+    padding-top: 16px;
+    border-top: 1px solid #eceae7;
   }
 `;
 
@@ -884,7 +870,7 @@ export default function CategoryTemplate() {
             </SidebarHead>
             <SidebarSplit>
               {(hasSubcategories || parentCategory) && (
-                <SidebarPane $half={true}>
+                <SidebarPane>
                   <SubcategoryGroup style={{ marginTop: 0 }}>
                     {/* If current category has children → show current as "Alle" + children */}
                     {hasSubcategories ? (
@@ -962,7 +948,7 @@ export default function CategoryTemplate() {
                 </SidebarPane>
               )}
 
-              <SidebarPane $half={true}>
+              <SidebarPane>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
                     Filter
                     {activeCount > 0 && (

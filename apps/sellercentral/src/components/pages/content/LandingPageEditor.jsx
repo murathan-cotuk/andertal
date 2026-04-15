@@ -108,6 +108,8 @@ const CONTAINER_TYPES = [
   { type: "single_product",     label: "Einzelnes Produkt",     description: "Ein hervorgehobenes Produkt (Karte mit Warenkorb)" },
   { type: "blog_carousel",      label: "Blog-Beiträge (Karussell)", description: "Veröffentlichte Blog-Seiten aus „Content → Blog-Beiträge“ auswählen (Bild, Teaser, Text & SEO kommen aus dem Beitrag)" },
   { type: "newsletter",         label: "Newsletter-Anmeldung",  description: "Formular (Mailchimp, Brevo, Klaviyo u. a.) per action-URL" },
+  { type: "feature_grid",       label: "Feature-Raster",         description: "Raster mit Icon/Emoji, Titel und Beschreibungstext — ideal für USPs und Produktmerkmale" },
+  { type: "testimonials",       label: "Kundenstimmen",          description: "Kundenzitate als Karten mit optionalem Avatar, Name, Rolle und Sternebewertung" },
 ];
 
 const CAT_HEADING = "__heading_categories__";
@@ -204,6 +206,49 @@ function newContainer(type) {
         btn_color: "#ffffff",
         padding: "48px 24px",
         content_layout: "full",
+      };
+    case "feature_grid":
+      return {
+        ...base,
+        title: "Unsere Vorteile",
+        subtitle: "",
+        title_align: "center",
+        cols: 3,
+        card_style: "bordered",
+        icon_size: "40px",
+        bg_color: "#ffffff",
+        card_bg: "#f9fafb",
+        card_border_color: "#e5e7eb",
+        text_color: "#111827",
+        icon_color: "#ff971c",
+        padding: "64px 24px",
+        content_layout: "full",
+        items: [
+          { icon: "⚡", title: "Schnelle Lieferung", body: "Versand innerhalb von 1–2 Werktagen direkt zu dir nach Hause." },
+          { icon: "🔒", title: "Sicher einkaufen", body: "SSL-verschlüsselte Zahlung und Datenschutz nach DSGVO." },
+          { icon: "↩️", title: "Kostenlose Rücksendung", body: "30 Tage Rückgaberecht — kein Aufwand, keine Fragen." },
+        ],
+      };
+    case "testimonials":
+      return {
+        ...base,
+        title: "Das sagen unsere Kunden",
+        subtitle: "",
+        title_align: "center",
+        cols: 3,
+        show_stars: true,
+        card_bg: "#ffffff",
+        card_border_color: "#e5e7eb",
+        bg_color: "#f9fafb",
+        text_color: "#111827",
+        accent_color: "#ff971c",
+        padding: "64px 24px",
+        content_layout: "full",
+        items: [
+          { quote: "Absolut begeistert von der Qualität! Schnelle Lieferung und toller Kundenservice.", author: "Maria S.", role: "Stammkundin", avatar: "", rating: 5 },
+          { quote: "Super einfache Bestellung, alles hat perfekt gepasst. Sehr empfehlenswert!", author: "Thomas K.", role: "Verifizierter Käufer", avatar: "", rating: 5 },
+          { quote: "Endlich ein Online-Shop, dem man vertrauen kann. Tolle Auswahl und faire Preise.", author: "Julia M.", role: "Neukunde", avatar: "", rating: 4 },
+        ],
       };
     default:
       return base;
@@ -1168,6 +1213,218 @@ function NewsletterEditor({ container, onChange }) {
   );
 }
 
+// ── Feature Grid editor ───────────────────────────────────────────────────────
+function FeatureGridEditor({ container, onChange }) {
+  const items = container.items || [];
+
+  const updateItem = (idx, key, val) => {
+    const next = items.map((item, i) => i === idx ? { ...item, [key]: val } : item);
+    onChange({ ...container, items: next });
+  };
+  const addItem = () => onChange({ ...container, items: [...items, { icon: "✨", title: `Merkmal ${items.length + 1}`, body: "" }] });
+  const removeItem = (idx) => onChange({ ...container, items: items.filter((_, i) => i !== idx) });
+  const moveItem = (idx, dir) => {
+    const next = [...items];
+    const target = idx + dir;
+    if (target < 0 || target >= next.length) return;
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange({ ...container, items: next });
+  };
+
+  return (
+    <BlockStack gap="400">
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">Feature-Raster Einstellungen</Text>
+          <TextField label="Überschrift" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
+          <TextField label="Untertitel (optional)" value={container.subtitle || ""} onChange={(v) => onChange({ ...container, subtitle: v })} multiline={2} autoComplete="off" />
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}>
+              <Select
+                label="Ausrichtung Titel"
+                options={[{ label: "Zentriert", value: "center" }, { label: "Links", value: "left" }]}
+                value={container.title_align || "center"}
+                onChange={(v) => onChange({ ...container, title_align: v })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Select
+                label="Spalten (Desktop)"
+                options={[2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+                value={String(container.cols || 3)}
+                onChange={(v) => onChange({ ...container, cols: Number(v) })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Select
+                label="Karten-Stil"
+                options={[
+                  { label: "Mit Rahmen", value: "bordered" },
+                  { label: "Mit Schatten", value: "shadow" },
+                  { label: "Flach (kein Rahmen)", value: "flat" },
+                ]}
+                value={container.card_style || "bordered"}
+                onChange={(v) => onChange({ ...container, card_style: v })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <TextField label="Icon-Größe" value={container.icon_size || "40px"} onChange={(v) => onChange({ ...container, icon_size: v })} autoComplete="off" helpText="z. B. 40px, 2rem" />
+            </div>
+          </InlineStack>
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}><ColorField label="Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Karten-Hintergrund" value={container.card_bg || "#f9fafb"} onChange={(v) => onChange({ ...container, card_bg: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Kartenrahmen" value={container.card_border_color || "#e5e7eb"} onChange={(v) => onChange({ ...container, card_border_color: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
+          </InlineStack>
+          <PaddingEditor label="Seitenabstand" value={container.padding || "64px 24px 64px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="64px 24px 64px 24px" horizontalOnly />
+          <ContainerLayoutEditor container={container} onChange={onChange} />
+        </BlockStack>
+      </Card>
+
+      {items.map((item, idx) => (
+        <Card key={idx}>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingSm">Merkmal {idx + 1}</Text>
+              <InlineStack gap="200">
+                <Button size="slim" disabled={idx === 0} onClick={() => moveItem(idx, -1)}>↑</Button>
+                <Button size="slim" disabled={idx === items.length - 1} onClick={() => moveItem(idx, 1)}>↓</Button>
+                {items.length > 1 && <Button size="slim" tone="critical" onClick={() => removeItem(idx)}>Entfernen</Button>}
+              </InlineStack>
+            </InlineStack>
+            <InlineStack gap="400" wrap={false}>
+              <div style={{ flex: "0 0 120px" }}>
+                <TextField label="Icon / Emoji" value={item.icon || ""} onChange={(v) => updateItem(idx, "icon", v)} autoComplete="off" helpText="z. B. ⚡ 🔒 ↩️" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <TextField label="Titel" value={item.title || ""} onChange={(v) => updateItem(idx, "title", v)} autoComplete="off" />
+              </div>
+            </InlineStack>
+            <TextField label="Beschreibung" value={item.body || ""} onChange={(v) => updateItem(idx, "body", v)} multiline={3} autoComplete="off" />
+          </BlockStack>
+        </Card>
+      ))}
+
+      <InlineStack>
+        <Button onClick={addItem}>+ Merkmal hinzufügen</Button>
+      </InlineStack>
+    </BlockStack>
+  );
+}
+
+// ── Testimonials editor ───────────────────────────────────────────────────────
+function TestimonialsEditor({ container, onChange }) {
+  const items = container.items || [];
+  const [pickerIdx, setPickerIdx] = useState(null);
+
+  const updateItem = (idx, key, val) => {
+    const next = items.map((item, i) => i === idx ? { ...item, [key]: val } : item);
+    onChange({ ...container, items: next });
+  };
+  const addItem = () => onChange({ ...container, items: [...items, { quote: "", author: `Kunde ${items.length + 1}`, role: "", avatar: "", rating: 5 }] });
+  const removeItem = (idx) => onChange({ ...container, items: items.filter((_, i) => i !== idx) });
+  const moveItem = (idx, dir) => {
+    const next = [...items];
+    const target = idx + dir;
+    if (target < 0 || target >= next.length) return;
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange({ ...container, items: next });
+  };
+
+  return (
+    <BlockStack gap="400">
+      {pickerIdx !== null && (
+        <MediaPickerModal open multiple={false} onClose={() => setPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateItem(pickerIdx, "avatar", urls[0]); setPickerIdx(null); }} />
+      )}
+
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">Kundenstimmen Einstellungen</Text>
+          <TextField label="Überschrift" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
+          <TextField label="Untertitel (optional)" value={container.subtitle || ""} onChange={(v) => onChange({ ...container, subtitle: v })} multiline={2} autoComplete="off" />
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}>
+              <Select
+                label="Ausrichtung Titel"
+                options={[{ label: "Zentriert", value: "center" }, { label: "Links", value: "left" }]}
+                value={container.title_align || "center"}
+                onChange={(v) => onChange({ ...container, title_align: v })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Select
+                label="Spalten (Desktop)"
+                options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+                value={String(container.cols || 3)}
+                onChange={(v) => onChange({ ...container, cols: Number(v) })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Select
+                label="Sternebewertung anzeigen"
+                options={[{ label: "Ja", value: "true" }, { label: "Nein", value: "false" }]}
+                value={container.show_stars !== false ? "true" : "false"}
+                onChange={(v) => onChange({ ...container, show_stars: v === "true" })}
+              />
+            </div>
+          </InlineStack>
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}><ColorField label="Hintergrund" value={container.bg_color || "#f9fafb"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Karten-Hintergrund" value={container.card_bg || "#ffffff"} onChange={(v) => onChange({ ...container, card_bg: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Kartenrahmen" value={container.card_border_color || "#e5e7eb"} onChange={(v) => onChange({ ...container, card_border_color: v })} /></div>
+            <div style={{ flex: 1 }}><ColorField label="Akzentfarbe (Sterne)" value={container.accent_color || "#ff971c"} onChange={(v) => onChange({ ...container, accent_color: v })} /></div>
+          </InlineStack>
+          <PaddingEditor label="Seitenabstand" value={container.padding || "64px 24px 64px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="64px 24px 64px 24px" horizontalOnly />
+          <ContainerLayoutEditor container={container} onChange={onChange} />
+        </BlockStack>
+      </Card>
+
+      {items.map((item, idx) => (
+        <Card key={idx}>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingSm">Stimme {idx + 1}</Text>
+              <InlineStack gap="200">
+                <Button size="slim" disabled={idx === 0} onClick={() => moveItem(idx, -1)}>↑</Button>
+                <Button size="slim" disabled={idx === items.length - 1} onClick={() => moveItem(idx, 1)}>↓</Button>
+                {items.length > 1 && <Button size="slim" tone="critical" onClick={() => removeItem(idx)}>Entfernen</Button>}
+              </InlineStack>
+            </InlineStack>
+            <TextField label="Zitat" value={item.quote || ""} onChange={(v) => updateItem(idx, "quote", v)} multiline={3} autoComplete="off" />
+            <InlineStack gap="400" wrap={false}>
+              <div style={{ flex: 1 }}>
+                <TextField label="Name" value={item.author || ""} onChange={(v) => updateItem(idx, "author", v)} autoComplete="off" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <TextField label="Rolle / Titel (optional)" value={item.role || ""} onChange={(v) => updateItem(idx, "role", v)} autoComplete="off" />
+              </div>
+              <div style={{ flex: "0 0 80px" }}>
+                <Select
+                  label="Sterne"
+                  options={[5, 4, 3, 2, 1].map((n) => ({ label: `${n} ★`, value: String(n) }))}
+                  value={String(item.rating || 5)}
+                  onChange={(v) => updateItem(idx, "rating", Number(v))}
+                />
+              </div>
+            </InlineStack>
+            <ImageField
+              label="Avatar (optional)"
+              value={item.avatar || ""}
+              onPick={() => setPickerIdx(idx)}
+              onClear={() => updateItem(idx, "avatar", "")}
+            />
+          </BlockStack>
+        </Card>
+      ))}
+
+      <InlineStack>
+        <Button onClick={addItem}>+ Stimme hinzufügen</Button>
+      </InlineStack>
+    </BlockStack>
+  );
+}
+
 function ContainerLayoutEditor({ container, onChange }) {
   const layout = container.content_layout === "full" ? "full" : "contained";
   const maxW =
@@ -1273,6 +1530,8 @@ function ContainerEditor({ container, onChange }) {
     case "single_product":       editor = <SingleProductEditor container={container} onChange={onChange} />; break;
     case "blog_carousel":        editor = <BlogCarouselEditor container={container} onChange={onChange} />; break;
     case "newsletter":           editor = <NewsletterEditor container={container} onChange={onChange} />; break;
+    case "feature_grid":         editor = <FeatureGridEditor container={container} onChange={onChange} />; break;
+    case "testimonials":         editor = <TestimonialsEditor container={container} onChange={onChange} />; break;
     default: return null;
   }
   return (

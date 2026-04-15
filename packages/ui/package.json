@@ -5,7 +5,9 @@
   "main": "./index.jsx",
   "scripts": {
     "lint": "eslint . --max-warnings 0",
-    "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist"
+    "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist",
+    "storybook": "storybook dev -p 6006",
+    "storybook:build": "storybook build -o storybook-static"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -13,7 +15,14 @@
     "styled-components": "^6.1.6"
   },
   "devDependencies": {
-    "@belucha/config": "*"
+    "@belucha/config": "*",
+    "@storybook/react": "^8.6.12",
+    "@storybook/react-vite": "^8.6.12",
+    "@storybook/addon-essentials": "^8.6.12",
+    "@storybook/addon-interactions": "^8.6.12",
+    "storybook": "^8.6.12",
+    "vite": "^6.3.5",
+    "@vitejs/plugin-react": "^4.5.0"
   },
   "peerDependencies": {
     "react": "^18.2.0",

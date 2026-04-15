@@ -1119,6 +1119,161 @@ function Tabs({ container }) {
   );
 }
 
+// ── Feature Grid ──────────────────────────────────────────────────────────────
+function FeatureGrid({ container }) {
+  const {
+    title, subtitle, title_align = "center",
+    cols = 3, card_style = "bordered",
+    icon_size = "40px",
+    bg_color = "#ffffff", card_bg = "#f9fafb",
+    card_border_color = "#e5e7eb", text_color = "#111827",
+    items = [],
+  } = container;
+
+  const cardStyle = (() => {
+    const base = {
+      background: card_bg,
+      color: text_color,
+      padding: "28px 24px",
+      borderRadius: 16,
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+    };
+    if (card_style === "bordered") return { ...base, border: `1px solid ${card_border_color}` };
+    if (card_style === "shadow") return { ...base, boxShadow: "0 4px 24px -6px rgba(15,23,42,0.10), 0 1px 3px rgba(15,23,42,0.06)" };
+    return base; // flat
+  })();
+
+  return (
+    <div style={{ background: bg_color, ...getContainerPadding(container, "64px 24px") }}>
+      <div style={getContentInnerStyle(container, 1200)}>
+        {(title || subtitle) && (
+          <div style={{ textAlign: title_align, marginBottom: 40 }}>
+            {title && (
+              <h2 style={{ margin: "0 0 12px", fontSize: "clamp(1.5rem,3.5vw,2.25rem)", fontWeight: 700, color: text_color, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                {title}
+              </h2>
+            )}
+            {subtitle && (
+              <p style={{ margin: 0, fontSize: "1.0625rem", color: text_color, opacity: 0.7, maxWidth: 560, ...(title_align === "center" ? { marginLeft: "auto", marginRight: "auto" } : {}) }}>
+                {subtitle}
+              </p>
+            )}
+          </div>
+        )}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${Math.max(1, cols)}, 1fr)`,
+          gap: 20,
+        }}
+          className="landing-feature-grid"
+        >
+          {items.map((item, i) => (
+            <div key={i} style={cardStyle}>
+              {item.icon && (
+                <div style={{ fontSize: icon_size, lineHeight: 1 }}>{item.icon}</div>
+              )}
+              {item.title && (
+                <div style={{ fontSize: "1.0625rem", fontWeight: 700, color: text_color, margin: 0 }}>{item.title}</div>
+              )}
+              {item.body && (
+                <div style={{ fontSize: "0.9375rem", color: text_color, opacity: 0.72, lineHeight: 1.6, margin: 0 }}>{item.body}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      <style>{`@media(max-width:767px){.landing-feature-grid{grid-template-columns:1fr!important;}}@media(min-width:768px) and (max-width:1023px){.landing-feature-grid{grid-template-columns:repeat(2,1fr)!important;}}`}</style>
+    </div>
+  );
+}
+
+// ── Testimonials ──────────────────────────────────────────────────────────────
+function Testimonials({ container }) {
+  const {
+    title, subtitle, title_align = "center",
+    cols = 3, show_stars = true,
+    bg_color = "#f9fafb", card_bg = "#ffffff",
+    card_border_color = "#e5e7eb", text_color = "#111827",
+    accent_color = "#ff971c",
+    items = [],
+  } = container;
+
+  const stars = (n) => Array.from({ length: 5 }, (_, i) => (
+    <span key={i} style={{ color: i < n ? accent_color : "#d1d5db", fontSize: "0.875rem" }}>★</span>
+  ));
+
+  return (
+    <div style={{ background: bg_color, ...getContainerPadding(container, "64px 24px") }}>
+      <div style={getContentInnerStyle(container, 1200)}>
+        {(title || subtitle) && (
+          <div style={{ textAlign: title_align, marginBottom: 40 }}>
+            {title && (
+              <h2 style={{ margin: "0 0 12px", fontSize: "clamp(1.5rem,3.5vw,2.25rem)", fontWeight: 700, color: text_color, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                {title}
+              </h2>
+            )}
+            {subtitle && (
+              <p style={{ margin: 0, fontSize: "1.0625rem", color: text_color, opacity: 0.7, maxWidth: 560, ...(title_align === "center" ? { marginLeft: "auto", marginRight: "auto" } : {}) }}>
+                {subtitle}
+              </p>
+            )}
+          </div>
+        )}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${Math.max(1, cols)}, 1fr)`,
+          gap: 20,
+        }}
+          className="landing-testimonials-grid"
+        >
+          {items.map((item, i) => (
+            <div key={i} style={{
+              background: card_bg,
+              border: `1px solid ${card_border_color}`,
+              borderRadius: 16,
+              padding: "28px 24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              color: text_color,
+            }}>
+              {show_stars && item.rating > 0 && (
+                <div style={{ display: "flex", gap: 2 }}>{stars(Number(item.rating) || 5)}</div>
+              )}
+              {item.quote && (
+                <p style={{ margin: 0, fontSize: "0.9688rem", lineHeight: 1.7, color: text_color, flex: 1 }}>
+                  "{item.quote}"
+                </p>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: "auto" }}>
+                {item.avatar && (
+                  <img
+                    src={resolveUrl(item.avatar)}
+                    alt={item.author || ""}
+                    style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `2px solid ${card_border_color}` }}
+                  />
+                )}
+                {!item.avatar && (
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: accent_color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "1rem", fontWeight: 700, color: "#fff" }}>
+                    {(item.author || "?")[0].toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  {item.author && <div style={{ fontWeight: 700, fontSize: "0.9375rem", color: text_color }}>{item.author}</div>}
+                  {item.role && <div style={{ fontSize: "0.8125rem", color: text_color, opacity: 0.6 }}>{item.role}</div>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <style>{`@media(max-width:767px){.landing-testimonials-grid{grid-template-columns:1fr!important;}}@media(min-width:768px) and (max-width:1023px){.landing-testimonials-grid{grid-template-columns:repeat(2,1fr)!important;}}`}</style>
+    </div>
+  );
+}
+
 // ── Renderer ──────────────────────────────────────────────────────────────────
 function renderContainer(c, preload = {}) {
   if (!c.visible) return null;
@@ -1138,6 +1293,8 @@ function renderContainer(c, preload = {}) {
     case "single_product":       inner = <SingleProduct container={c} preloadedProduct={preload.singleProducts?.[singleKey]} />; break;
     case "blog_carousel":        inner = <BlogCarousel container={c} />; break;
     case "newsletter":           inner = <NewsletterSignup container={c} />; break;
+    case "feature_grid":         inner = <FeatureGrid container={c} />; break;
+    case "testimonials":         inner = <Testimonials container={c} />; break;
     default: return null;
   }
   const m = c.margin || {};
