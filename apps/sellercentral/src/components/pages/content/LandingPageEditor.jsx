@@ -23,6 +23,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
+import { mergeLoadedShopStyles } from "@belucha/shop-theme";
 
 const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
@@ -111,6 +112,7 @@ const CONTAINER_TYPES = [
 
 const CAT_HEADING = "__heading_categories__";
 const PAGE_HEADING = "__heading_cms_pages__";
+const BLOG_HEADING = "__heading_blog_posts__";
 
 function flattenCategoriesForSelect(nodes, depth = 0, acc = []) {
   if (!Array.isArray(nodes)) return acc;
@@ -1284,9 +1286,63 @@ function ContainerEditor({ container, onChange }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 const DEFAULT_PAGE_ID = "__default__"; // shop homepage (legacy single-row table)
 
+const TEMPLATE_DEFAULTS = {
+  collection_template: { banner_style: "strip", show_sidebar: true, sidebar_width: "220px", products_per_row: 4, richtext_align: "left", richtext_max_width: "700px", content_padding_x: "32px" },
+  category_template:   { banner_style: "strip", show_sidebar: true, sidebar_width: "280px", products_per_row: 3, richtext_align: "left", richtext_max_width: "700px", content_padding_x: "32px" },
+};
+
 export default function LandingPageEditor() {
   const client = getMedusaAdminClient();
   const unsaved = useUnsavedChanges();
+
+  // ── Top-level tab: 0 = Seiten, 1 = Templates
+  const [mainTab, setMainTab] = useState(0);
+
+  // ── Template settings (collection + category)
+  const [tmpl, setTmpl] = useState(TEMPLATE_DEFAULTS);
+  const [tmplSaving, setTmplSaving] = useState(false);
+  const [tmplSaved, setTmplSaved] = useState(false);
+  const [tmplErr, setTmplErr] = useState("");
+  const [tmplSnapshot, setTmplSnapshot] = useState(JSON.stringify(TEMPLATE_DEFAULTS));
+
+  const loadTemplates = useCallback(async () => {
+    try {
+      const data = await client.getStyles();
+      const merged = mergeLoadedShopStyles(data?.styles || {});
+      const loaded = {
+        collection_template: { ...TEMPLATE_DEFAULTS.collection_template, ...(merged.collection_template || {}) },
+        category_template:   { ...TEMPLATE_DEFAULTS.category_template,   ...(merged.category_template   || {}) },
+      };
+      setTmpl(loaded);
+      setTmplSnapshot(JSON.stringify(loaded));
+    } catch (_) {}
+  }, [client]);
+
+  useEffect(() => { loadTemplates(); }, [loadTemplates]);
+
+  const saveTemplates = useCallback(async () => {
+    setTmplSaving(true);
+    setTmplErr("");
+    setTmplSaved(false);
+    try {
+      // Mevcut styles'ı al, sadece template alanlarını güncelle
+      const data = await client.getStyles();
+      const current = data?.styles || {};
+      await client.saveStyles({ ...current, collection_template: tmpl.collection_template, category_template: tmpl.category_template });
+      setTmplSnapshot(JSON.stringify(tmpl));
+      setTmplSaved(true);
+      setTimeout(() => setTmplSaved(false), 3500);
+    } catch (e) {
+      setTmplErr(e?.message || "Fehler beim Speichern");
+    }
+    setTmplSaving(false);
+  }, [client, tmpl]);
+
+  const updateTmpl = (section, key, val) =>
+    setTmpl((prev) => ({ ...prev, [section]: { ...prev[section], [key]: val } }));
+
+  const tmplDirty = JSON.stringify(tmpl) !== tmplSnapshot;
+
   const [pages, setPages] = useState([]);
   const [selectedPageId, setSelectedPageId] = useState(DEFAULT_PAGE_ID);
   const [containers, setContainers] = useState([]);
@@ -1418,15 +1474,19 @@ export default function LandingPageEditor() {
   };
 
   const typeInfo = (type) => CONTAINER_TYPES.find((t) => t.type === type) || { label: type };
+  const cmsPages  = pages.filter((p) => p.page_type !== "blog");
+  const blogPosts = pages.filter((p) => p.page_type === "blog");
   const pageOptions = [
     { label: "— Auswählen —", value: "" },
     { label: "Startseite (Shop)", value: "__default__" },
-    { label: "—— Kategorien ——", value: CAT_HEADING, disabled: true },
-    ...(categoryRows.length
-      ? categoryRows
-      : [{ label: "(Keine Kategorien)", value: "__no_cat__", disabled: true }]),
     { label: "—— CMS-Seiten ——", value: PAGE_HEADING, disabled: true },
-    ...pages.map((p) => ({ label: `${p.title || "Seite"} (/${p.slug || p.id})`, value: String(p.id) })),
+    ...(cmsPages.length
+      ? cmsPages.map((p) => ({ label: `${p.title || "Seite"} (/${p.slug || p.id})`, value: String(p.id) }))
+      : [{ label: "(Keine CMS-Seiten)", value: "__no_page__", disabled: true }]),
+    { label: "—— Blog-Beiträge ——", value: BLOG_HEADING, disabled: true },
+    ...(blogPosts.length
+      ? blogPosts.map((p) => ({ label: `${p.title || "Beitrag"} (/${p.slug || p.id})`, value: String(p.id) }))
+      : [{ label: "(Keine Blog-Beiträge)", value: "__no_blog__", disabled: true }]),
   ];
   const isCategorySelection = String(selectedPageId).startsWith("cat:");
   const editorTabs = [
@@ -1434,16 +1494,37 @@ export default function LandingPageEditor() {
     { id: "category", content: "Kategorie" },
   ];
 
+  const mainTabs = [
+    { id: "seiten", content: "Seiten" },
+    { id: "templates", content: "Templates" },
+  ];
+
   return (
     <Page
       title="Landing Page"
       subtitle="Gestalte Seiten deines Shops mit Containern"
+      primaryAction={mainTab === 1 ? {
+        content: tmplSaving ? "Speichern…" : "Speichern",
+        onAction: saveTemplates,
+        loading: tmplSaving,
+        disabled: !tmplDirty,
+      } : undefined}
     >
       <Layout>
         {err && <Layout.Section><Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner></Layout.Section>}
         {saved && <Layout.Section><Banner tone="success" onDismiss={() => setSaved(false)}>Änderungen gespeichert.</Banner></Layout.Section>}
+        {tmplErr && <Layout.Section><Banner tone="critical" onDismiss={() => setTmplErr("")}>{tmplErr}</Banner></Layout.Section>}
+        {tmplSaved && <Layout.Section><Banner tone="success" onDismiss={() => setTmplSaved(false)}>Template-Einstellungen gespeichert.</Banner></Layout.Section>}
 
+        {/* ── Hauptnavigation: Seiten / Templates ── */}
         <Layout.Section>
+          <Card>
+            <PolarisTabs tabs={mainTabs} selected={mainTab} onSelect={setMainTab} />
+          </Card>
+        </Layout.Section>
+
+        {/* ── TAB 0: Seiten ── */}
+        {mainTab === 0 && <Layout.Section>
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingSm">Seite auswählen</Text>
@@ -1457,7 +1538,7 @@ export default function LandingPageEditor() {
                 options={pageOptions}
                 value={selectedPageId}
                 onChange={(v) => {
-                  if (!v || v === CAT_HEADING || v === PAGE_HEADING || v === "__no_cat__") return;
+                  if (!v || v === CAT_HEADING || v === PAGE_HEADING || v === BLOG_HEADING || v === "__no_cat__" || v === "__no_page__" || v === "__no_blog__") return;
                   setSelectedPageId(v);
                   setExpandedId(null);
                   setActiveTab(0);
@@ -1465,9 +1546,9 @@ export default function LandingPageEditor() {
               />
             </BlockStack>
           </Card>
-        </Layout.Section>
+        </Layout.Section>}
 
-        {selectedPageId && (
+        {mainTab === 0 && selectedPageId && (
           <Layout.Section>
             <Card>
               <PolarisTabs tabs={editorTabs} selected={activeTab} onSelect={setActiveTab}>
@@ -1572,6 +1653,165 @@ export default function LandingPageEditor() {
               </PolarisTabs>
             </Card>
           </Layout.Section>
+        )}
+
+        {/* ── TAB 1: Templates ── */}
+        {mainTab === 1 && (
+          <>
+            {/* Kollektion-Template */}
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="400">
+                  <BlockStack gap="100">
+                    <Text as="h2" variant="headingMd">Kollektion-Template</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Gilt für alle Kollektionsseiten (z. B. /stiefel, /taschen).
+                    </Text>
+                  </BlockStack>
+                  <Divider />
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                    <Select
+                      label="Banner-Stil"
+                      options={[
+                        { label: "Schmaler Streifen (Standard)", value: "strip" },
+                        { label: "Mittelgroß", value: "medium" },
+                        { label: "Groß / Hoch", value: "tall" },
+                        { label: "Kein Banner", value: "none" },
+                      ]}
+                      value={tmpl.collection_template.banner_style}
+                      onChange={(v) => updateTmpl("collection_template", "banner_style", v)}
+                    />
+                    <Select
+                      label="Produkte pro Zeile (Desktop)"
+                      options={[2,3,4,5,6].map((n) => ({ label: String(n), value: String(n) }))}
+                      value={String(tmpl.collection_template.products_per_row)}
+                      onChange={(v) => updateTmpl("collection_template", "products_per_row", Number(v))}
+                    />
+                    <Select
+                      label="Filter-Sidebar"
+                      options={[
+                        { label: "Anzeigen", value: "true" },
+                        { label: "Verstecken", value: "false" },
+                      ]}
+                      value={tmpl.collection_template.show_sidebar === false ? "false" : "true"}
+                      onChange={(v) => updateTmpl("collection_template", "show_sidebar", v === "true")}
+                    />
+                    <TextField
+                      label="Sidebar-Breite"
+                      value={tmpl.collection_template.sidebar_width}
+                      onChange={(v) => updateTmpl("collection_template", "sidebar_width", v)}
+                      autoComplete="off"
+                      helpText="z. B. 200px, 260px"
+                    />
+                    <Select
+                      label="Beschreibung: Ausrichtung"
+                      options={[
+                        { label: "Linksbündig", value: "left" },
+                        { label: "Zentriert", value: "center" },
+                      ]}
+                      value={tmpl.collection_template.richtext_align}
+                      onChange={(v) => updateTmpl("collection_template", "richtext_align", v)}
+                    />
+                    <Select
+                      label="Beschreibung: Breite"
+                      options={[
+                        { label: "Schmal (520 px)", value: "520px" },
+                        { label: "Begrenzt (700 px)", value: "700px" },
+                        { label: "Mittel (900 px)", value: "900px" },
+                        { label: "Volle Breite", value: "full" },
+                      ]}
+                      value={tmpl.collection_template.richtext_max_width}
+                      onChange={(v) => updateTmpl("collection_template", "richtext_max_width", v)}
+                    />
+                    <TextField
+                      label="Seitenabstand links / rechts"
+                      value={tmpl.collection_template.content_padding_x}
+                      onChange={(v) => updateTmpl("collection_template", "content_padding_x", v)}
+                      autoComplete="off"
+                      helpText="z. B. 32px, 24px, 0px"
+                    />
+                  </div>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+
+            {/* Kategorie-Template */}
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="400">
+                  <BlockStack gap="100">
+                    <Text as="h2" variant="headingMd">Kategorie-Template</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Gilt für alle Kategorieseiten (z. B. /schuhe, /damen).
+                    </Text>
+                  </BlockStack>
+                  <Divider />
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                    <Select
+                      label="Banner-Stil"
+                      options={[
+                        { label: "Schmaler Streifen (Standard)", value: "strip" },
+                        { label: "Mittelgroß", value: "medium" },
+                        { label: "Groß / Hoch", value: "tall" },
+                        { label: "Kein Banner", value: "none" },
+                      ]}
+                      value={tmpl.category_template.banner_style}
+                      onChange={(v) => updateTmpl("category_template", "banner_style", v)}
+                    />
+                    <Select
+                      label="Produkte pro Zeile (Desktop)"
+                      options={[2,3,4,5,6].map((n) => ({ label: String(n), value: String(n) }))}
+                      value={String(tmpl.category_template.products_per_row)}
+                      onChange={(v) => updateTmpl("category_template", "products_per_row", Number(v))}
+                    />
+                    <Select
+                      label="Navigations-Sidebar"
+                      options={[
+                        { label: "Anzeigen", value: "true" },
+                        { label: "Verstecken", value: "false" },
+                      ]}
+                      value={tmpl.category_template.show_sidebar === false ? "false" : "true"}
+                      onChange={(v) => updateTmpl("category_template", "show_sidebar", v === "true")}
+                    />
+                    <TextField
+                      label="Sidebar-Breite"
+                      value={tmpl.category_template.sidebar_width}
+                      onChange={(v) => updateTmpl("category_template", "sidebar_width", v)}
+                      autoComplete="off"
+                      helpText="z. B. 240px, 300px"
+                    />
+                    <Select
+                      label="Beschreibung: Ausrichtung"
+                      options={[
+                        { label: "Linksbündig", value: "left" },
+                        { label: "Zentriert", value: "center" },
+                      ]}
+                      value={tmpl.category_template.richtext_align}
+                      onChange={(v) => updateTmpl("category_template", "richtext_align", v)}
+                    />
+                    <Select
+                      label="Beschreibung: Breite"
+                      options={[
+                        { label: "Schmal (520 px)", value: "520px" },
+                        { label: "Begrenzt (700 px)", value: "700px" },
+                        { label: "Mittel (900 px)", value: "900px" },
+                        { label: "Volle Breite", value: "full" },
+                      ]}
+                      value={tmpl.category_template.richtext_max_width}
+                      onChange={(v) => updateTmpl("category_template", "richtext_max_width", v)}
+                    />
+                    <TextField
+                      label="Seitenabstand links / rechts"
+                      value={tmpl.category_template.content_padding_x}
+                      onChange={(v) => updateTmpl("category_template", "content_padding_x", v)}
+                      autoComplete="off"
+                      helpText="z. B. 32px, 24px, 0px"
+                    />
+                  </div>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          </>
         )}
 
         <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title="Container auswählen">

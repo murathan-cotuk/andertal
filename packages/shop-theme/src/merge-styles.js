@@ -90,6 +90,8 @@ export function mergeLoadedShopStyles(loaded = {}) {
     footer: { ...DEFAULT_SHOP_STYLES.footer, ...(loaded.footer || {}) },
     typography,
     scrollUpButton: { ...DEFAULT_SHOP_STYLES.scrollUpButton, ...(loaded.scrollUpButton || {}) },
+    collection_template: { ...DEFAULT_SHOP_STYLES.collection_template, ...(loaded.collection_template || {}) },
+    category_template: { ...DEFAULT_SHOP_STYLES.category_template, ...(loaded.category_template || {}) },
     buttons: mergeButtonCatalog(DEFAULT_SHOP_STYLES.buttons, loaded.buttons || {}),
   };
 }

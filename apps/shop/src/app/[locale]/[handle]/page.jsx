@@ -8,6 +8,7 @@ import { ProductGrid } from "@/components/ProductGrid";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useParams, useSearchParams, notFound } from "next/navigation";
+import { useShopStyles } from "@/context/ShopStylesContext";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
 import { getMedusaClient } from "@/lib/medusa-client";
 import {
@@ -64,12 +65,18 @@ const Main = styled.main`
   flex: 1;
 `;
 
-/* ─── Hero banner (no overlay/shadow) ───────────────────── */
+/* ─── Hero banner (height controlled via props) ──────────── */
+const BANNER_PRESETS = {
+  strip:  { aspectRatio: "21 / 6", minHeight: "120px", maxHeight: "320px" },
+  medium: { aspectRatio: "4 / 1",  minHeight: "200px", maxHeight: "480px" },
+  tall:   { aspectRatio: "16 / 7", minHeight: "320px", maxHeight: "640px" },
+};
+
 const HeroBanner = styled.div`
   width: 100%;
-  aspect-ratio: 21 / 6;
-  min-height: 160px;
-  max-height: 320px;
+  aspect-ratio: ${(p) => p.$aspect || "21 / 6"};
+  min-height: ${(p) => p.$minH || "120px"};
+  max-height: ${(p) => p.$maxH || "320px"};
   overflow: hidden;
   position: relative;
   background: #f4f4f2;
@@ -228,7 +235,7 @@ const ContentWrap = styled.div`
 
 /* Left filter sidebar */
 const Sidebar = styled.aside`
-  width: 220px;
+  width: ${(p) => p.$width || "220px"};
   flex-shrink: 0;
   position: sticky;
   top: ${HEADER_H + 68}px;
@@ -436,7 +443,10 @@ const Desc = styled.div`
   line-height: var(--body-lh);
   color: var(--body-color);
   font-family: var(--body-font);
-  max-width: 700px;
+  max-width: ${(p) => (p.$maxWidth === "full" ? "none" : (p.$maxWidth || "700px"))};
+  margin-left: ${(p) => (p.$align === "center" ? "auto" : "0")};
+  margin-right: ${(p) => (p.$align === "center" ? "auto" : "0")};
+  text-align: ${(p) => (p.$align === "center" ? "center" : "left")};
 
   & h1 {
     font-family: var(--h1-ff);
@@ -506,6 +516,8 @@ export default function CollectionPage() {
   const router = useRouter();
   const locale = params?.locale ?? "en";
   const handle = params?.handle ? String(params.handle) : undefined;
+  const shopStyles = useShopStyles();
+  const tmpl = shopStyles?.collection_template || {};
   const saleOnly = (searchParams?.get("sale") || "").trim() === "1";
   const neuOnly = (searchParams?.get("neu") || "").trim() === "1";
   const bestsellerOnly = (searchParams?.get("bestseller") || "").trim() === "1";
@@ -749,6 +761,17 @@ export default function CollectionPage() {
   const rawBanner = collection?.banner || collection?.banner_image_url || collection?.image_url || "";
   const bannerUrl = rawBanner ? resolveImageUrl(rawBanner) : "";
 
+  /* ── Template settings (from StylesPage) ── */
+  const bannerStyle   = tmpl.banner_style || "strip";
+  const bannerPreset  = BANNER_PRESETS[bannerStyle] || BANNER_PRESETS.strip;
+  const showBanner    = bannerStyle !== "none" && !!bannerUrl;
+  const showSidebar   = tmpl.show_sidebar !== false;
+  const sidebarWidth  = tmpl.sidebar_width || "220px";
+  const colsPerRow    = Number(tmpl.products_per_row) || 4;
+  const richtextAlign = tmpl.richtext_align || "left";
+  const richtextMaxW  = tmpl.richtext_max_width || "700px";
+  const contentPadX   = tmpl.content_padding_x || "32px";
+
   if (cmsPage) return (
     <PageWrap>
       <ShopHeader />
@@ -824,15 +847,17 @@ export default function CollectionPage() {
       <Main>
 
         {/* ── Banner / header ── */}
-        {bannerUrl ? (
-          <HeroBanner>
+        {showBanner ? (
+          <HeroBanner $aspect={bannerPreset.aspectRatio} $minH={bannerPreset.minHeight} $maxH={bannerPreset.maxHeight}>
             <img src={bannerUrl} alt={title} />
             <HeroText>
               <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">{title}</h1>
             </HeroText>
           </HeroBanner>
         ) : (
-          <ColHeader><h1 className="shop-typo-catalog-title">{title}</h1></ColHeader>
+          <ColHeader style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
+            <h1 className="shop-typo-catalog-title">{title}</h1>
+          </ColHeader>
         )}
 
         {linkedCategoryId ? <LandingContainers categoryId={linkedCategoryId} /> : null}
@@ -884,12 +909,12 @@ export default function CollectionPage() {
         </SortBar>
 
         {/* ── Sidebar + content ── */}
-        {showCatalogSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
-        <ContentWrap ref={bodyRef}>
+        {showCatalogSidebar && showSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
+        <ContentWrap ref={bodyRef} style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
 
           {/* Left filter sidebar */}
-          {showCatalogSidebar && (
-            <Sidebar $open={panelOpen}>
+          {showCatalogSidebar && showSidebar && (
+            <Sidebar $open={panelOpen} $width={sidebarWidth}>
               {/* Mobile header */}
               <SidebarHead>
                 <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
@@ -966,7 +991,7 @@ export default function CollectionPage() {
                 No products match your filters.
               </div>
             ) : (
-              <ProductGrid products={paginated} maxColumns={4} activeFilters={filters} />
+              <ProductGrid products={paginated} maxColumns={colsPerRow} activeFilters={filters} />
             )}
 
             {/* Önerilen ürünler */}
@@ -1012,7 +1037,8 @@ export default function CollectionPage() {
 
             {/* Description */}
             {collection.description && (
-              <Desc dangerouslySetInnerHTML={{ __html: sanitize(rewriteImageUrlsInHtml(collection.description)) }} />
+              <Desc $align={richtextAlign} $maxWidth={richtextMaxW}
+                dangerouslySetInnerHTML={{ __html: sanitize(rewriteImageUrlsInHtml(collection.description)) }} />
             )}
           </Body>
         </ContentWrap>

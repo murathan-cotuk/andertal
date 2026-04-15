@@ -199,6 +199,112 @@ const CategoriesDropdown = styled.div`
   position: relative;
   flex-shrink: 0;
   margin-right: 4px;
+
+  /* Hide hamburger on desktop when mega nav is shown */
+  ${(p) =>
+    p.$megaActive
+      ? `@media (min-width: 1024px) { display: none; }`
+      : ""}
+`;
+
+/* ── Mega menu nav (desktop only) ─────────────────────────── */
+const MegaNav = styled.nav`
+  display: none;
+  @media (min-width: 1024px) {
+    display: flex;
+    align-items: stretch;
+    flex-shrink: 0;
+    margin-right: 12px;
+    height: 72px;
+  }
+`;
+
+const MegaNavItem = styled.div`
+  position: relative;
+  display: flex;
+  align-items: stretch;
+`;
+
+/* Shared visual style for both link and button variants */
+const megaNavItemCss = `
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--header-text, #fff);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover,
+  &[data-active="true"] {
+    background: rgba(255, 255, 255, 0.12);
+    border-bottom-color: rgba(255, 255, 255, 0.8);
+    color: var(--header-text, #fff);
+  }
+`;
+
+const MegaNavLink = styled(Link)`
+  ${megaNavItemCss}
+`;
+
+const MegaNavBtn = styled.button`
+  ${megaNavItemCss}
+`;
+
+/* Full-width mega panel — absolutely positioned below the header */
+const MegaPanel = styled.div`
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 3px solid var(--shop-primary, #1b8880);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.13);
+  z-index: 2147483646;
+  overflow: hidden;
+  max-height: ${(p) => (p.$open ? "480px" : "0")};
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: ${(p) => (p.$open ? "auto" : "none")};
+
+  @media (max-width: 1023px) {
+    display: none;
+  }
+`;
+
+const MegaPanelInner = styled.div`
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 32px 32px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 36px;
+`;
+
+const MegaChildLink = styled(Link)`
+  display: block;
+  padding: 6px 10px;
+  font-size: 13.5px;
+  font-family: ${tokens.fontFamily.sans};
+  color: ${tokens.dark[700]};
+  text-decoration: none;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: background 0.13s ease, color 0.13s ease;
+
+  &:hover {
+    background: ${tokens.background.soft};
+    color: var(--shop-primary, ${tokens.primary.DEFAULT});
+    text-decoration: none;
+  }
 `;
 
 const CategoriesButton = styled.button`
@@ -355,45 +461,77 @@ const AccountSignedInBadge = styled.span`
 /* Locale dropdown trigger – sadece ikon */
 const MiddleBarLocaleBtn = styled(MiddleBarIconBtn)``;
 
-const CategoriesPanel = styled(motion.div)`
+/* Full-width category mega panel — positioned absolute on HeaderWrap */
+const CategoryMegaPanel = styled.div`
   position: absolute;
-  top: calc(100% + 8px);
+  top: 100%;
   left: 0;
-  min-width: 240px;
-  max-height: 80vh;
-  overflow-y: auto;
-  background: ${tokens.background.card};
-  border: 1px solid ${tokens.border.light};
-  border-radius: 8px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-  padding: 4px 0;
+  right: 0;
+  background: #fff;
+  border-top: 3px solid var(--shop-primary, #1b8880);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.13);
   z-index: 2147483647;
-  display: ${(p) => (p.$open ? "block" : "none")};
+  overflow: hidden;
+  max-height: ${(p) => (p.$open ? "600px" : "0")};
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: ${(p) => (p.$open ? "auto" : "none")};
 `;
 
-const CategoryRow = styled.button`
+const CategoryMegaInner = styled.div`
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 32px 28px;
+  display: flex;
+  gap: 0 8px;
+  overflow-x: auto;
+`;
+
+const CategoryMegaCol = styled.div`
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-width: 160px;
+`;
+
+const CategoryMegaLink = styled(Link)`
   display: block;
-  width: 100%;
-  text-align: left;
-  padding: 8px 14px;
-  border: none;
-  background: none;
-  cursor: pointer;
+  padding: 7px 12px;
+  font-size: 13.5px;
+  font-family: ${tokens.fontFamily.sans};
+  color: ${tokens.dark[700]};
   text-decoration: none;
-  transition: background ${tokens.transition.base}, color ${tokens.transition.base};
-  font-family: var(--menu-catalog-ff);
-  font-size: var(--menu-catalog-fs);
-  font-weight: var(--menu-catalog-fw);
-  font-style: var(--menu-catalog-style);
-  color: var(--menu-catalog-color);
-  letter-spacing: var(--menu-catalog-ls);
-  line-height: var(--menu-catalog-lh);
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: background 0.13s ease, color 0.13s ease;
 
   &:hover {
     background: ${tokens.background.soft};
     color: var(--shop-primary, ${tokens.primary.DEFAULT});
   }
 `;
+
+const CategoryMegaBtnLink = styled.button`
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 12px;
+  font-size: 13.5px;
+  font-family: ${tokens.fontFamily.sans};
+  color: ${tokens.dark[700]};
+  text-decoration: none;
+  border-radius: 6px;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+
+  &:hover {
+    background: ${tokens.background.soft};
+    color: var(--shop-primary, ${tokens.primary.DEFAULT});
+  }
+`;
+
 
 /* Keep for minimal bar & dropdowns */
 const Right = styled.div`
@@ -672,8 +810,10 @@ export default function ShopHeader() {
   const [scrollingDown, setScrollingDown] = useState(false);
   const lastScrollYRef = useRef(0);
   const headerRef = useRef(null);
+  const megaMenuTimerRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(116);
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
+  const [hoveredMenuItemId, setHoveredMenuItemId] = useState(null);
   const [shopBranding, setShopBranding] = useState({ shop_logo_url: "", shop_favicon_url: "", shop_logo_height: 34 });
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
@@ -844,9 +984,10 @@ export default function ShopHeader() {
       setMainMenuOpen(false);
       setUserMenuOpen(false);
       setLocaleDropdownOpen(false);
+      setHoveredMenuItemId(null);
     };
     document.addEventListener("mousedown", (e) => {
-      if (!e.target.closest("[data-categories-dropdown]") && !e.target.closest("[data-user-menu]") && !e.target.closest("[data-locale-dropdown]")) close();
+      if (!e.target.closest("[data-categories-dropdown]") && !e.target.closest("[data-user-menu]") && !e.target.closest("[data-locale-dropdown]") && !e.target.closest("[data-mega-nav]")) close();
     });
     return () => document.removeEventListener("mousedown", close);
   }, []);
@@ -935,6 +1076,36 @@ export default function ShopHeader() {
   );
   const showCategoriesMode = Boolean(mainMenuConfig?.categories_with_products);
 
+  /* Mega menu — children grouped by parent id */
+  const menuChildrenByParent = useMemo(() => {
+    const map = new Map();
+    for (const item of mainMenuAllItems) {
+      if (item.parent_id) {
+        const pid = String(item.parent_id);
+        if (!map.has(pid)) map.set(pid, []);
+        map.get(pid).push(item);
+      }
+    }
+    return map;
+  }, [mainMenuAllItems]);
+
+  const hoveredChildren = useMemo(
+    () => (hoveredMenuItemId ? menuChildrenByParent.get(hoveredMenuItemId) || [] : []),
+    [hoveredMenuItemId, menuChildrenByParent],
+  );
+
+  const hasMegaNav = !showCategoriesMode && menuPanelItems.length > 0;
+
+  const openMegaMenu = (id) => {
+    clearTimeout(megaMenuTimerRef.current);
+    setMainMenuOpen(false); // close hamburger panel when nav item is hovered
+    setHoveredMenuItemId(id);
+  };
+  const closeMegaMenu = () => {
+    megaMenuTimerRef.current = setTimeout(() => setHoveredMenuItemId(null), 140);
+  };
+  const keepMegaMenuOpen = () => clearTimeout(megaMenuTimerRef.current);
+
   return (
     <>
       <HeaderWrap ref={headerRef} style={{ transform: showHeader ? "translateY(0)" : "translateY(-100%)" }}>
@@ -958,55 +1129,61 @@ export default function ShopHeader() {
             </MiddleBarLeft>
 
             <MiddleBarCenter>
-              <CategoriesDropdown data-categories-dropdown>
-                <CategoriesButton type="button" onClick={() => { setLocaleDropdownOpen(false); setUserMenuOpen(false); setDrillCategoryId(null); setMainMenuOpen((v) => !v); }} aria-expanded={mainMenuOpen} aria-label="Kategorien">
+              <CategoriesDropdown data-categories-dropdown $megaActive={hasMegaNav}>
+                <CategoriesButton
+                  type="button"
+                  onClick={() => {
+                    setLocaleDropdownOpen(false);
+                    setUserMenuOpen(false);
+                    setHoveredMenuItemId(null);
+                    setDrillCategoryId(null);
+                    setMainMenuOpen((v) => !v);
+                  }}
+                  aria-expanded={mainMenuOpen}
+                  aria-label="Kategorien"
+                >
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path fillRule="evenodd" clipRule="evenodd" d="M2 5.75C2 5.33579 2.33579 5 2.75 5H21.25C21.6642 5 22 5.33579 22 5.75C22 6.16421 21.6642 6.5 21.25 6.5H2.75C2.33579 6.5 2 6.16421 2 5.75ZM2 12C2 11.5858 2.33579 11.25 2.75 11.25H21.25C21.6642 11.25 22 11.5858 22 12C22 12.4142 21.6642 12.75 21.25 12.75H2.75C2.33579 12.75 2 12.4142 2 12ZM2 18.25C2 17.8358 2.33579 17.5 2.75 17.5H21.25C21.6642 17.5 22 17.8358 22 18.25C22 18.6642 21.6642 19 21.25 19H2.75C2.33579 19 2 18.6642 2 18.25Z" />
                   </svg>
                 </CategoriesButton>
-                <CategoriesPanel $open={mainMenuOpen}>
-                  {!showCategoriesMode && menuPanelItems.length > 0 ? (
-                    // Main menu → direkt link olarak göster
-                    menuPanelItems.map((item) => {
-                      const href = menuItemHref(item);
-                      return (
-                        <CategoryRow
-                          as={Link}
-                          key={item.id}
-                          href={href === "#" ? "/" : href}
-                          onClick={() => setMainMenuOpen(false)}
-                        >
-                          {item.label}
-                        </CategoryRow>
-                      );
-                    })
-                  ) : categoryPanelRows.length === 0 ? (
-                    <div style={{ padding: 12, color: tokens.dark[500], fontSize: 14 }}>
-                      {tNav("categoryMenuEmpty")}
-                    </div>
-                  ) : (
-                    // Root level — show parent categories only
-                    <>
-                      {categoryPanelRows.map((row) =>
-                        row.href && row.href !== "#" ? (
-                          <CategoryRow
-                            key={row.key}
-                            type="button"
-                            style={{ paddingLeft: 14 }}
-                            onClick={() => {
-                              setMainMenuOpen(false);
-                              setDrillCategoryId(null);
-                              router.push(row.href);
-                            }}
-                          >
-                            <span>{row.label}</span>
-                          </CategoryRow>
-                        ) : null,
-                      )}
-                    </>
-                  )}
-                </CategoriesPanel>
               </CategoriesDropdown>
+
+              {/* Desktop mega nav */}
+              {hasMegaNav && (
+                <MegaNav data-mega-nav>
+                  {menuPanelItems.map((item) => {
+                    const children = menuChildrenByParent.get(String(item.id)) || [];
+                    const hasChildren = children.length > 0;
+                    const href = menuItemHref(item);
+                    const isActive = hoveredMenuItemId === String(item.id);
+                    return (
+                      <MegaNavItem
+                        key={item.id}
+                        onMouseEnter={() => openMegaMenu(String(item.id))}
+                        onMouseLeave={closeMegaMenu}
+                      >
+                        {hasChildren ? (
+                          <MegaNavBtn type="button" data-active={isActive ? "true" : "false"}>
+                            {item.label}
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true" style={{ opacity: 0.7, marginTop: 1 }}>
+                              <path d="M1 3l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            </svg>
+                          </MegaNavBtn>
+                        ) : (
+                          <MegaNavLink
+                            href={href === "#" ? "/" : href}
+                            data-active={isActive ? "true" : "false"}
+                            onClick={() => setHoveredMenuItemId(null)}
+                          >
+                            {item.label}
+                          </MegaNavLink>
+                        )}
+                      </MegaNavItem>
+                    );
+                  })}
+                </MegaNav>
+              )}
+
               <MiddleBarSearch>
                 <SearchBarForm role="search">
                   <SearchBarButton
@@ -1161,6 +1338,82 @@ export default function ShopHeader() {
             </MiddleBarRight>
           </MiddleBarInner>
         </MiddleBarWrap>
+
+        {/* Mega menu panel — floats below the header bar */}
+        {hasMegaNav && (
+          <MegaPanel
+            $open={hoveredMenuItemId !== null && hoveredChildren.length > 0}
+            data-mega-nav
+            onMouseEnter={keepMegaMenuOpen}
+            onMouseLeave={closeMegaMenu}
+          >
+            <MegaPanelInner>
+              {hoveredChildren.map((child) => (
+                <MegaChildLink
+                  key={child.id}
+                  href={menuItemHref(child) === "#" ? "/" : menuItemHref(child)}
+                  onClick={() => setHoveredMenuItemId(null)}
+                >
+                  {child.label}
+                </MegaChildLink>
+              ))}
+            </MegaPanelInner>
+          </MegaPanel>
+        )}
+
+        {/* Category mega panel — opens when hamburger is clicked */}
+        <CategoryMegaPanel
+          $open={mainMenuOpen}
+          data-categories-dropdown
+          onClick={(e) => {
+            // close only on direct backdrop click, not on child clicks
+            if (e.target === e.currentTarget) setMainMenuOpen(false);
+          }}
+        >
+          <CategoryMegaInner>
+            {(() => {
+              const rows =
+                !showCategoriesMode && menuPanelItems.length > 0
+                  ? menuPanelItems.map((item) => ({
+                      key: item.id,
+                      href: menuItemHref(item),
+                      label: item.label,
+                      onClick: () => { setMainMenuOpen(false); },
+                    }))
+                  : categoryPanelRows.map((row) => ({
+                      key: row.key,
+                      href: row.href || "#",
+                      label: row.label,
+                      onClick: () => { setMainMenuOpen(false); setDrillCategoryId(null); },
+                    })).filter((r) => r.href && r.href !== "#");
+
+              if (rows.length === 0) {
+                return (
+                  <div style={{ padding: "8px 0", color: tokens.dark[500], fontSize: 14 }}>
+                    {tNav("categoryMenuEmpty")}
+                  </div>
+                );
+              }
+
+              const COLS_MAX = 8;
+              const cols = [];
+              for (let i = 0; i < rows.length; i += COLS_MAX) {
+                cols.push(rows.slice(i, i + COLS_MAX));
+              }
+
+              return cols.map((col, ci) => (
+                <CategoryMegaCol key={ci}>
+                  {col.map((row) => (
+                    <CategoryMegaLink key={row.key} href={row.href} onClick={row.onClick}>
+                      {row.label}
+                    </CategoryMegaLink>
+                  ))}
+                </CategoryMegaCol>
+              ));
+            })()}
+          </CategoryMegaInner>
+        </CategoryMegaPanel>
+
         <SubNavWrap id="subnav" className="second-nav" $hide={!showSubNav || !showHeaderFilterBar}>
           <SecondMenuRowInner>
             {secondMenuItems.map((item) => (

@@ -130,6 +130,26 @@ export const DEFAULT_SHOP_STYLES = {
     shadow: "0 4px 12px rgba(0,0,0,0.2)",
     border: "none",
   },
+  /** Kollektion-Template (shop/[handle]) görünüm ayarları */
+  collection_template: {
+    banner_style: "strip",    // "strip" | "medium" | "tall" | "none"
+    show_sidebar: true,
+    sidebar_width: "220px",
+    products_per_row: 4,
+    richtext_align: "left",   // "left" | "center"
+    richtext_max_width: "700px",
+    content_padding_x: "32px",
+  },
+  /** Kategorie-Template (shop/category/[slug]) görünüm ayarları */
+  category_template: {
+    banner_style: "strip",
+    show_sidebar: true,
+    sidebar_width: "280px",
+    products_per_row: 3,
+    richtext_align: "left",
+    richtext_max_width: "700px",
+    content_padding_x: "32px",
+  },
   buttons: {
     add_to_cart: {
       label: "Add to Cart Button",

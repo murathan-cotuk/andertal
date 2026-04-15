@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useContext } from "react";
 import {
   DEFAULT_SHOP_STYLES,
   buildShopThemeCSS,
@@ -8,6 +8,7 @@ import {
   collectTypographyGoogleFamilies,
   buildGoogleFontsLinkHrefForFamilies,
 } from "@belucha/shop-theme";
+import { ShopStylesContext } from "@/context/ShopStylesContext";
 
 const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "https://belucha-medusa-backend.onrender.com").replace(/\/$/, "");
 
@@ -36,6 +37,8 @@ function ensureGoogleFontLink(href) {
 }
 
 export default function ShopStylesInjector() {
+  const ctx = useContext(ShopStylesContext);
+
   // İlk boyamadan önce :root değişkenleri (H1–H5, body) hazır olsun; yoksa rich text h1 body fontuna düşer
   useLayoutEffect(() => {
     injectCss(buildShopThemeCSS(DEFAULT_SHOP_STYLES));
@@ -52,9 +55,11 @@ export default function ShopStylesInjector() {
         injectCss(buildShopThemeCSS(merged, { merge: false }));
         const href = buildGoogleFontsLinkHrefForFamilies(collectTypographyGoogleFamilies(merged.typography));
         ensureGoogleFontLink(href);
+        // Template ayarlarını context'e yaz (sidebar, banner, columns, vb.)
+        if (ctx?.setStyles) ctx.setStyles(merged);
       })
       .catch(() => {});
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
 }

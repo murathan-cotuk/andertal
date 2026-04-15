@@ -3984,6 +3984,80 @@ async function start() {
     httpApp.get('/store/seller-settings', storeSellerSettingsGET)
     console.log('Store routes: GET /store/seller-settings')
 
+    // GET /store/seller-profile/:seller_id — public seller profile (info + reviews + products)
+    const storeSellerProfileGET = async (req, res) => {
+      const seller_id = (req.params.seller_id || 'default').toString().trim() || 'default'
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl || !dbUrl.startsWith('postgres')) return res.json({ seller: null, reviews: [], products: [] })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+
+        // 1. Seller info + review aggregate
+        const sellerR = await client.query(
+          `SELECT store_name, shop_logo_url, shop_logo_height, review_avg, review_count
+           FROM admin_hub_seller_settings WHERE seller_id = $1`,
+          [seller_id]
+        )
+        const sellerRow = sellerR.rows[0] || null
+
+        // 2. Rating distribution (count per star 1-5)
+        const distR = await client.query(
+          `SELECT rating, COUNT(*)::int as cnt FROM store_product_reviews WHERE seller_id = $1 GROUP BY rating ORDER BY rating DESC`,
+          [seller_id]
+        )
+        const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+        for (const row of distR.rows) dist[row.rating] = row.cnt
+
+        // 3. Recent reviews (public — no email, just name + rating + comment)
+        const revR = await client.query(
+          `SELECT r.id, r.rating, r.comment, r.customer_name, r.created_at,
+                  p.title as product_title, p.handle as product_handle
+           FROM store_product_reviews r
+           LEFT JOIN admin_hub_products p ON p.id::text = r.product_id
+           WHERE r.seller_id = $1
+           ORDER BY r.created_at DESC LIMIT 30`,
+          [seller_id]
+        )
+
+        // 4. Published products by seller (limit 16 for profile page)
+        const prodR = await client.query(
+          `SELECT id, title, handle, price_cents, metadata FROM admin_hub_products
+           WHERE seller_id = $1 AND status = 'published'
+           ORDER BY created_at DESC LIMIT 16`,
+          [seller_id]
+        )
+
+        await client.end()
+        res.json({
+          seller: sellerRow ? {
+            seller_id,
+            store_name: sellerRow.store_name || '',
+            shop_logo_url: sellerRow.shop_logo_url || '',
+            shop_logo_height: sellerRow.shop_logo_height || 34,
+            review_avg: sellerRow.review_avg != null ? parseFloat(sellerRow.review_avg) : null,
+            review_count: sellerRow.review_count != null ? Number(sellerRow.review_count) : 0,
+            rating_distribution: dist,
+          } : { seller_id, store_name: '', shop_logo_url: '', shop_logo_height: 34, review_avg: null, review_count: 0, rating_distribution: dist },
+          reviews: revR.rows || [],
+          products: (prodR.rows || []).map(p => ({
+            id: p.id,
+            title: p.title,
+            handle: p.handle,
+            price_cents: p.price_cents,
+            metadata: p.metadata || {},
+          })),
+        })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+    httpApp.get('/store/seller-profile/:seller_id', storeSellerProfileGET)
+    console.log('Store routes: GET /store/seller-profile/:seller_id')
+
     const getBrandById = async (brandId) => {
       if (!brandId) return null
       const client = getBrandsDbClient()
@@ -6262,18 +6336,27 @@ async function start() {
         }
         const r = await client.query(
           `SELECT r.id, r.order_id, r.product_id, r.rating, r.comment, r.customer_name, r.created_at,
+                  r.seller_id,
                   o.order_number,
-                  p.title as product_title, p.handle as product_handle
+                  p.title as product_title, p.handle as product_handle, p.metadata->>'sku' as product_sku,
+                  s.store_name as seller_store_name
            FROM store_product_reviews r
            LEFT JOIN store_orders o ON o.id = r.order_id
            LEFT JOIN admin_hub_products p ON p.id::text = r.product_id
+           LEFT JOIN admin_hub_seller_settings s ON s.seller_id = r.seller_id
            ${sellerFilter}
            ORDER BY r.created_at DESC
            LIMIT 1000`,
           params
         )
         await client.end()
-        res.json({ reviews: r.rows || [] })
+        // Aggregate stats
+        const rows = r.rows || []
+        const totalCount = rows.length
+        const avgRating = totalCount > 0 ? rows.reduce((s, x) => s + (x.rating || 0), 0) / totalCount : null
+        const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+        for (const row of rows) dist[row.rating] = (dist[row.rating] || 0) + 1
+        res.json({ reviews: rows, stats: { total: totalCount, avg: avgRating ? Math.round(avgRating * 10) / 10 : null, distribution: dist } })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })

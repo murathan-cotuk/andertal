@@ -1,12 +1,14 @@
 14.04.
 
--  category ve collection template indeki icerikleri sellercentraldeki styles menüsünden     
+-- dropdown menüyü megamenü seklinde yapalim
+-- ürün görselleri kare format sarti sun ve 1000x1000px ten kücük olmamasini sagla. saticilar png olarak, jpg olarak gönderebilir ürünleri ancak biz backendde .webp formatinda tutup shopa da bu formatta yansitalim bence daha az yer kaplamasi acisindan.     
+-- sellercentral superuser kisminda /content/landing-page sayfasindan landing page e "Kollektionen-Karussell" ekledim. buraya 3 tane koleksiyon ekledim, landing page de görünüyor. ancak oraya eklenmis olan bir koleksiyonun ismini ya da görselini degistirdigimde bu degisiklik shopta carousele yansimiyor. düzelt
+--  category ve collection template indeki icerikleri sellercentraldeki landing-page menüsünden     
   güncelleyebilmek istiyorum. atiyorum banner uzunlugu, tam ekran mi yarim mi, ne kadar      
   padding kalmali, richtext ortali mi yoksa ekran genisligi mi, filtre ve kategori           
   sidebarlari görünümü, 1 satirda kac ürün olacagi gibi degiskenleri bu templateler icin de  
-  yapabilelim detaylica. styles sayfasinda normal conteyner eklendiginde yapabiliyoruz. bu   
+  yapabilelim detaylica. landing-page sayfasinda normal conteyner eklendiginde yapabiliyoruz. bu   
   iki template icin de ayrica iki secenek olustur ve bu dediklerimi güncelleyebilelim.
-- mesela bir ürüne ürün sayfasinda bir kategori bagladim. automotive-automotive-enthusiast-merchandise-automotive-enthusiast-apparel bu kategoriye bagladim. kategorinin icine girdigimde en alttaki products kisminda ekli olan ürünü ya da ürünleri göremiyorum. bu baglanti düzgün yapilmamis. görebilmek istiyorum.
 -- menüde Auto-show categories butonu secildiginde categorilerin iclerinde ürün olanlar listelensin dropdown menüde. önce sadece parentlar gözükecek, sonra childlari seklinde.
 - sellercentralde content/menus sayfasindaki Main menu (dropdown) menüsü shoptaki arama butonunun yanindaki dropdown ile bagliydi. burada secilen menü ne ise onun gözükmesi gerekiyordu shopta. ve öyleydi de. simdi Main menu (dropdown) a tanimladigim bir menü var. onun ile ilgili kararim shopta görünmüyor. ya altina menü item ekleyecegim ve o gözükecek, ya da more actions icinde categories with products secicem, menu items bos olacak ve shopta bu menüler gözükecek. ücüncüye söylüyorum bunu. bu sefer lütfen artik tamamen hallolmus olsun.
 -- sisteme kare olarak eklenmemis görseller cardda, categoryde, ürün sayfasinda falan kare seklinde gösteriliyor. bu dogru. ancak görseli kirpma. kare olmayan görsellerin uzun kenarlarlarini genislet ki görsel tamamen gözüksün. mesela 1600 x 2600 px bir görsel eklendi. 1600 olan uzunlugu 2600 yapacaksin ki büyük kare olarak gözükecek. iki kenardan esit uzat ki ürün ortada gözükmeye devam etsin

@@ -38,6 +38,7 @@ function CustomerReviewsPage() {
   const locale = params?.locale || "de";
 
   const [reviews, setReviews] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterRating, setFilterRating] = useState("");
@@ -48,7 +49,7 @@ function CustomerReviewsPage() {
   useEffect(() => {
     getMedusaAdminClient()
       .request("/admin-hub/reviews")
-      .then((d) => setReviews(d?.reviews || []))
+      .then((d) => { setReviews(d?.reviews || []); setStats(d?.stats || null); })
       .catch(() => setReviews([]))
       .finally(() => setLoading(false));
   }, []);
@@ -89,9 +90,13 @@ function CustomerReviewsPage() {
     return list;
   }, [reviews, search, filterRating, sort]);
 
-  const avgRating = reviews.length
-    ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1)
-    : "—";
+  const avgRating = stats?.avg != null ? Number(stats.avg).toFixed(1) : (reviews.length ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1) : "—");
+
+  const ratingDist = [5, 4, 3, 2, 1].map((n) => {
+    const cnt = stats?.distribution?.[n] ?? reviews.filter((r) => r.rating === n).length;
+    const total = stats?.total ?? reviews.length;
+    return { n, cnt, pct: total ? Math.round((cnt / total) * 100) : 0 };
+  });
 
   return (
     <div style={{ padding: 24, background: "#fff", minHeight: "100%" }}>
@@ -111,6 +116,46 @@ function CustomerReviewsPage() {
           )}
         </div>
       </div>
+
+      {/* Rating summary cards */}
+      {!loading && reviews.length > 0 && (
+        <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+          {/* Score card */}
+          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "20px 28px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 120 }}>
+            <div style={{ fontSize: 36, fontWeight: 800, color: "#92400e", lineHeight: 1 }}>{avgRating}</div>
+            <div style={{ fontSize: 20, color: "#f59e0b", letterSpacing: 2, margin: "4px 0" }}>
+              {[1,2,3,4,5].map(n => <span key={n} style={{ color: Number(avgRating) >= n ? "#f59e0b" : "#d1d5db" }}>★</span>)}
+            </div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{reviews.length} Bewertungen</div>
+          </div>
+          {/* Distribution bars */}
+          <div style={{ flex: 1, minWidth: 200, background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "14px 20px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 5 }}>
+            {ratingDist.map(({ n, cnt, pct }) => (
+              <div key={n} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                <span style={{ minWidth: 10, color: "#374151", fontWeight: 600 }}>{n}</span>
+                <span style={{ color: "#f59e0b", fontSize: 11 }}>★</span>
+                <div style={{ flex: 1, height: 6, background: "#e5e7eb", borderRadius: 99, overflow: "hidden" }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: "#f59e0b", borderRadius: 99, transition: "width 0.4s" }} />
+                </div>
+                <span style={{ minWidth: 28, color: "#6b7280", textAlign: "right" }}>{cnt}</span>
+              </div>
+            ))}
+          </div>
+          {/* Quick stats */}
+          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "14px 20px", display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
+            {[
+              { label: "Positiv (4-5★)", val: reviews.filter(r => r.rating >= 4).length, color: "#059669" },
+              { label: "Neutral (3★)", val: reviews.filter(r => r.rating === 3).length, color: "#d97706" },
+              { label: "Negativ (1-2★)", val: reviews.filter(r => r.rating <= 2).length, color: "#dc2626" },
+            ].map(({ label, val, color }) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, fontSize: 13 }}>
+                <span style={{ color: "#6b7280" }}>{label}</span>
+                <span style={{ fontWeight: 700, color }}>{val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
@@ -138,6 +183,7 @@ function CustomerReviewsPage() {
               {[
                 { label: "Kunde", col: "customer_name" },
                 { label: "SKU / Produkt", col: "product_sku" },
+                ...(isSuperuser ? [{ label: "Seller", col: "seller_store_name" }] : []),
                 { label: "Bewertung", col: "rating" },
                 { label: "Kommentar", col: "comment" },
                 { label: "Datum", col: "created_at" },
@@ -166,12 +212,12 @@ function CustomerReviewsPage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={5} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Laden…</td>
+                <td colSpan={isSuperuser ? 6 : 5} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Laden…</td>
               </tr>
             )}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Keine Bewertungen gefunden</td>
+                <td colSpan={isSuperuser ? 6 : 5} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Keine Bewertungen gefunden</td>
               </tr>
             )}
             {filtered.map((r, i) => (
@@ -209,6 +255,13 @@ function CustomerReviewsPage() {
                   )}
                   <div style={{ color: "#374151" }}>{r.product_title || r.product_id || "—"}</div>
                 </td>
+
+                {/* Seller (superuser only) */}
+                {isSuperuser && (
+                  <td style={{ padding: "10px 12px", minWidth: 120 }}>
+                    <span style={{ fontSize: 12, color: "#6b7280" }}>{r.seller_store_name || r.seller_id || "—"}</span>
+                  </td>
+                )}
 
                 {/* Bewertung */}
                 <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>

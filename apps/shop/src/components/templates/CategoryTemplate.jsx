@@ -15,6 +15,7 @@ import {
 } from "@/lib/catalog-listing";
 import { normCatId } from "@/lib/category-product-ids";
 import LandingContainers from "@/components/landing/LandingContainers";
+import { useShopStyles } from "@/context/ShopStylesContext";
 
 const HEADER_H = 112;
 
@@ -28,11 +29,17 @@ const Bone = styled.div`
   animation: ${shimmer} 1.5s infinite linear;
 `;
 
+const CAT_BANNER_PRESETS = {
+  strip:  { aspectRatio: "21 / 6", minHeight: "120px", maxHeight: "320px" },
+  medium: { aspectRatio: "4 / 1",  minHeight: "200px", maxHeight: "480px" },
+  tall:   { aspectRatio: "16 / 7", minHeight: "320px", maxHeight: "640px" },
+};
+
 const HeroBanner = styled.div`
   width: 100%;
-  aspect-ratio: 21 / 6;
-  min-height: 160px;
-  max-height: 320px;
+  aspect-ratio: ${(p) => p.$aspect || "21 / 6"};
+  min-height: ${(p) => p.$minH || "120px"};
+  max-height: ${(p) => p.$maxH || "320px"};
   overflow: hidden;
   position: relative;
   background: #f4f4f2;
@@ -185,7 +192,7 @@ const ContentWrap = styled.div`
 `;
 
 const Sidebar = styled.aside`
-  width: 280px;
+  width: ${(p) => p.$width || "280px"};
   flex-shrink: 0;
   position: sticky;
   top: ${HEADER_H + 68}px;
@@ -440,7 +447,10 @@ const Desc = styled.div`
   line-height: var(--body-lh);
   color: var(--body-color);
   font-family: var(--body-font);
-  max-width: 700px;
+  max-width: ${(p) => (p.$maxWidth === "full" ? "none" : (p.$maxWidth || "700px"))};
+  margin-left: ${(p) => (p.$align === "center" ? "auto" : "0")};
+  margin-right: ${(p) => (p.$align === "center" ? "auto" : "0")};
+  text-align: ${(p) => (p.$align === "center" ? "center" : "left")};
 
   & h1 {
     font-family: var(--h1-ff);
@@ -555,6 +565,8 @@ export default function CategoryTemplate() {
   const params = useParams();
   const slug = params?.slug ? String(params.slug) : params?.handle ? String(params.handle) : "";
   const locale = params?.locale ? String(params.locale) : "de";
+  const shopStyles = useShopStyles();
+  const tmpl = shopStyles?.category_template || {};
 
   const [category, setCategory] = useState(null);
   const [products, setProducts] = useState([]);
@@ -648,6 +660,17 @@ export default function CategoryTemplate() {
   const richtextHtml = category?.long_content
     ? sanitizeHtml(rewriteImageUrlsInHtml(category.long_content))
     : "";
+
+  /* ── Category template settings ── */
+  const catBannerStyle  = tmpl.banner_style || "strip";
+  const catBannerPreset = CAT_BANNER_PRESETS[catBannerStyle] || CAT_BANNER_PRESETS.strip;
+  const showCatBanner   = catBannerStyle !== "none" && !!bannerUrl;
+  const showSidebar     = tmpl.show_sidebar !== false;
+  const sidebarWidth    = tmpl.sidebar_width || "280px";
+  const colsPerRow      = Number(tmpl.products_per_row) || 3;
+  const richtextAlign   = tmpl.richtext_align || "left";
+  const richtextMaxW    = tmpl.richtext_max_width || "700px";
+  const contentPadX     = tmpl.content_padding_x || "32px";
 
   useEffect(() => {
     if (!category || typeof document === "undefined") return;
@@ -787,15 +810,15 @@ export default function CategoryTemplate() {
 
   return (
     <>
-      {bannerUrl ? (
-        <HeroBanner>
+      {showCatBanner ? (
+        <HeroBanner $aspect={catBannerPreset.aspectRatio} $minH={catBannerPreset.minHeight} $maxH={catBannerPreset.maxHeight}>
           <img src={bannerUrl} alt={displayTitle} />
           <HeroText>
             <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">{displayTitle}</h1>
           </HeroText>
         </HeroBanner>
       ) : (
-        <ColHeader>
+        <ColHeader style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
           <h1 className="shop-typo-catalog-title">{displayTitle}</h1>
         </ColHeader>
       )}
@@ -805,7 +828,7 @@ export default function CategoryTemplate() {
       <SortBar>
         <SortBarInner>
           <SortBarLeft>
-            {showCatalogSidebar && (
+            {showCatalogSidebar && showSidebar && (
               <FilterBtn
                 type="button"
                 $active={panelOpen || activeCount > 0}
@@ -849,10 +872,10 @@ export default function CategoryTemplate() {
         </SortBarInner>
       </SortBar>
 
-      {showCatalogSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
-      <ContentWrap ref={bodyRef}>
-        {showCatalogSidebar && (
-          <Sidebar $open={panelOpen}>
+      {showCatalogSidebar && showSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
+      <ContentWrap ref={bodyRef} style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
+        {showCatalogSidebar && showSidebar && (
+          <Sidebar $open={panelOpen} $width={sidebarWidth}>
             <SidebarHead>
               <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
                 Navigation
@@ -1012,7 +1035,7 @@ export default function CategoryTemplate() {
               No products match your filters.
             </div>
           ) : (
-            <ProductGrid products={paginated} maxColumns={4} activeFilters={filters} />
+            <ProductGrid products={paginated} maxColumns={colsPerRow} activeFilters={filters} />
           )}
 
           {totalPages > 1 && (
@@ -1051,7 +1074,7 @@ export default function CategoryTemplate() {
           )}
 
           {richtextHtml ? (
-            <Desc dangerouslySetInnerHTML={{ __html: richtextHtml }} />
+            <Desc $align={richtextAlign} $maxWidth={richtextMaxW} dangerouslySetInnerHTML={{ __html: richtextHtml }} />
           ) : null}
         </Body>
       </ContentWrap>

@@ -437,9 +437,38 @@ function CollectionCarousel({ container, preloadedProducts }) {
 }
 
 function CollectionsCarousel({ container }) {
-  const collections = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
+  const snapshots = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
   const itemsPerRow = container.items_per_row || 4;
   const ratio = container.card_aspect_ratio || "4/5";
+
+  // Fetch live collection data so title/image changes in admin are reflected immediately.
+  const [liveCollections, setLiveCollections] = useState(null);
+
+  useEffect(() => {
+    if (!snapshots.length) return;
+    fetch("/api/store-collections", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        const all = Array.isArray(data?.collections) ? data.collections : [];
+        if (!all.length) return;
+        const byId = new Map(all.map((c) => [c.id, c]));
+        const merged = snapshots.map((snap) => {
+          const live = byId.get(snap.id);
+          if (!live) return snap;
+          return {
+            ...snap,
+            title: live.display_title || live.title || snap.title,
+            handle: live.handle || snap.handle,
+            image: live.banner || live.image_url || live.banner_image_url || snap.image,
+          };
+        });
+        setLiveCollections(merged);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [container.id]);
+
+  const collections = liveCollections ?? snapshots;
 
   if (!collections.length) return null;
 
