@@ -765,7 +765,7 @@ export default function CategoryTemplate() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
+                gridTemplateColumns: `repeat(${colsPerRow}, 1fr)`,
                 gap: 1,
                 background: "#e8e8e6",
               }}

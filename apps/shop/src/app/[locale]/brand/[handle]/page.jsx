@@ -158,6 +158,10 @@ const FilterBtn = styled.button`
 
   svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
   &:hover { color: #111; }
+
+  @media (min-width: 1025px) {
+    display: none;
+  }
 `;
 
 const SortWrap = styled.div`
@@ -201,6 +205,10 @@ const FilterPanel = styled.div`
   overflow: hidden;
   max-height: ${(p) => (p.$open ? "600px" : "0")};
   transition: max-height 0.35s ease;
+
+  @media (min-width: 1025px) {
+    display: none;
+  }
 `;
 
 const FilterPanelInner = styled.div`
@@ -277,8 +285,26 @@ const Body = styled.div`
   padding: 0 32px 80px;
   width: 100%;
   box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 32px;
+  align-items: start;
 
-  @media (max-width: 600px) { padding: 0 16px 60px; }
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 0 16px 60px;
+  }
+`;
+
+const SidebarCol = styled.aside`
+  @media (max-width: 1024px) {
+    display: none;
+  }
+`;
+
+const MainCol = styled.div`
+  min-width: 0;
 `;
 
 /* ─── Chips ──────────────────────────────────────────────── */
@@ -618,70 +644,104 @@ export default function BrandPage() {
         </FilterBar>
 
         {/* ── Body ── */}
-        <Body ref={bodyRef}>
+        <Body>
+          <SidebarCol>
+            {hasFacets ? (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
+                  Filter
+                  {activeCount > 0 && (
+                    <ClearAllBtn
+                      type="button"
+                      onClick={() => { setFilters({}); setPage(1); }}
+                      style={{ float: "right", padding: "2px 8px", fontSize: 10 }}
+                    >
+                      Clear all
+                    </ClearAllBtn>
+                  )}
+                </div>
+                {Object.entries(facets).map(([key, vals]) => (
+                  <FilterGroup key={key}>
+                    <FilterGroupTitle>{key.replace(/_/g, " ")}</FilterGroupTitle>
+                    {vals.map((val) => {
+                      const on = (filters[key] || []).includes(val);
+                      return (
+                        <CheckRow key={val} $on={on}>
+                          <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
+                          {val}
+                        </CheckRow>
+                      );
+                    })}
+                  </FilterGroup>
+                ))}
+              </div>
+            ) : null}
+          </SidebarCol>
 
-          {activeCount > 0 && (
-            <ChipBar>
-              {Object.entries(filters).flatMap(([k, vals]) =>
-                (vals || []).map(v => (
-                  <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
-                    {v} ×
-                  </Chip>
-                ))
-              )}
-            </ChipBar>
-          )}
-
-          <ResultBar>
-            {total} {total === 1 ? "product" : "products"}
-          </ResultBar>
-
-          {paginated.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "80px 0", color: "#bbb", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-              No products match your filters.
-            </div>
-          ) : (
-            <ProductGrid products={paginated} maxColumns={4} />
-          )}
-
-          {totalPages > 1 && (
-            <Pager>
-              <PBtn
-                type="button"
-                disabled={curPage <= 1}
-                onClick={() => { setPage(p => p - 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-              >‹</PBtn>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - curPage) <= 2)
-                .reduce((acc, p, idx, arr) => {
-                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p, i) =>
-                  p === "…"
-                    ? <span key={`d${i}`} style={{ width: 36, textAlign: "center", color: "#bbb", fontSize: 12 }}>…</span>
-                    : <PBtn key={p} type="button" $on={p === curPage}
-                        onClick={() => { setPage(p); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}>
-                        {p}
-                      </PBtn>
+          <MainCol ref={bodyRef}>
+            {activeCount > 0 && (
+              <ChipBar>
+                {Object.entries(filters).flatMap(([k, vals]) =>
+                  (vals || []).map(v => (
+                    <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
+                      {v} ×
+                    </Chip>
+                  ))
                 )}
+              </ChipBar>
+            )}
 
-              <PBtn
-                type="button"
-                disabled={curPage >= totalPages}
-                onClick={() => { setPage(p => p + 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-              >›</PBtn>
-            </Pager>
-          )}
+            <ResultBar>
+              {total} {total === 1 ? "product" : "products"}
+            </ResultBar>
 
-          {brand?.address && (
-            <Desc>
-              <strong>{title}</strong><br />
-              {brand.address}
-            </Desc>
-          )}
+            {paginated.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "80px 0", color: "#bbb", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                No products match your filters.
+              </div>
+            ) : (
+              <ProductGrid products={paginated} maxColumns={4} />
+            )}
+
+            {totalPages > 1 && (
+              <Pager>
+                <PBtn
+                  type="button"
+                  disabled={curPage <= 1}
+                  onClick={() => { setPage(p => p - 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                >‹</PBtn>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - curPage) <= 2)
+                  .reduce((acc, p, idx, arr) => {
+                    if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    p === "…"
+                      ? <span key={`d${i}`} style={{ width: 36, textAlign: "center", color: "#bbb", fontSize: 12 }}>…</span>
+                      : <PBtn key={p} type="button" $on={p === curPage}
+                          onClick={() => { setPage(p); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}>
+                          {p}
+                        </PBtn>
+                  )}
+
+                <PBtn
+                  type="button"
+                  disabled={curPage >= totalPages}
+                  onClick={() => { setPage(p => p + 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                >›</PBtn>
+              </Pager>
+            )}
+
+            {brand?.address && (
+              <Desc>
+                <strong>{title}</strong><br />
+                {brand.address}
+              </Desc>
+            )}
+          </MainCol>
         </Body>
       </Main>
       <Footer />

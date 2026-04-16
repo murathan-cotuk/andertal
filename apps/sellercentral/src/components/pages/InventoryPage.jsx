@@ -383,6 +383,8 @@ function InventoryProductRow({
   medusaClient,
   openDuplicateModal,
   setProducts,
+  pendingChangeRequests,
+  onOpenChangeRequests,
 }) {
   const [variantsOpen, setVariantsOpen] = useState(false);
   const shopBaseUrl = getDefaultShopUrl();
@@ -397,6 +399,8 @@ function InventoryProductRow({
     openVariants: l === "tr" ? "Varyasyonları aç" : l === "de" ? "Variationen öffnen" : "Open variations",
     closeVariants: l === "tr" ? "Varyasyonları kapat" : l === "de" ? "Variationen schließen" : "Close variations",
     noVariants: l === "tr" ? "Varyasyon yok" : l === "de" ? "Keine Variationen" : "No variations",
+    changeProposed: l === "tr" ? "Değişiklik önerildi" : l === "de" ? "Änderung vorgeschlagen" : "Change proposed",
+    changeProposedShort: l === "tr" ? "Öneri" : l === "de" ? "Vorschlag" : "Proposal",
   };
   const localizeStatus = (k) => {
     if (k === "active") return i18n.active;
@@ -427,6 +431,7 @@ function InventoryProductRow({
     ? meta.variation_groups.map((g) => g?.name).filter(Boolean).join(" / ")
     : "—";
   const hasVariants = Array.isArray(product.variants) && product.variants.filter((v) => Array.isArray(v.option_values) && v.option_values.length > 0).length > 0;
+  const pendingCount = Array.isArray(pendingChangeRequests) ? pendingChangeRequests.length : 0;
   return (
     <div style={{ background: "#fff", borderBottom: EXCEL_BORDER }}>
       <div style={{ display: "grid", gridTemplateColumns: INVENTORY_ROW_GRID, gap: 0, alignItems: "center" }}>
@@ -509,7 +514,51 @@ function InventoryProductRow({
             icon={EditPencilIcon}
             accessibilityLabel="Edit product"
           />
+          {pendingCount > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenChangeRequests(product.id);
+              }}
+              title={`${i18n.changeProposed} (${pendingCount})`}
+              style={{
+                width: 44,
+                height: 28,
+                borderRadius: 6,
+                border: '1px solid #dc2626',
+                background: '#fee2e2',
+                color: '#b91c1c',
+                cursor: 'pointer',
+                fontSize: 10,
+                fontWeight: 700,
+                lineHeight: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+              }}
+            >
+              {i18n.changeProposedShort}
+            </button>
+          )}
           <Box position="relative">
+            {pendingCount > 0 && (
+              <span
+                title={`${pendingCount} change proposal(s) pending`}
+                style={{
+                  position: "absolute",
+                  top: 1,
+                  right: 1,
+                  width: 8,
+                  height: 8,
+                  borderRadius: 999,
+                  background: "#dc2626",
+                  boxShadow: "0 0 0 2px #fff",
+                  zIndex: 2,
+                }}
+              />
+            )}
             <Button
               variant="tertiary"
               onClick={(e) => {
@@ -534,6 +583,30 @@ function InventoryProductRow({
                   overflow: "hidden",
                 }}
               >
+                {pendingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenChangeRequests(product.id);
+                      setMenuOpenId(null);
+                    }}
+                    style={{
+                      width: "100%",
+                      height: 36,
+                      border: "none",
+                      background: "#fff",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      padding: "0 12px",
+                      fontSize: 13,
+                      color: "#dc2626",
+                    }}
+                    title="View proposed changes"
+                  >
+                    {i18n.changeProposed} ({pendingCount})
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -633,6 +706,11 @@ export default function InventoryPage() {
   const [exporting, setExporting] = useState(false);
   const medusaClient = getMedusaAdminClient();
   const l = String(locale || "en").toLowerCase();
+
+  const [pendingChangeRequestsByProductId, setPendingChangeRequestsByProductId] = useState({});
+  const [changeRequestsModalOpen, setChangeRequestsModalOpen] = useState(false);
+  const [changeRequestsModalProductId, setChangeRequestsModalProductId] = useState(null);
+  const [changeRequestsModalItems, setChangeRequestsModalItems] = useState([]);
   const rowHead = {
     select: l === "tr" ? "Seç" : l === "de" ? "Ausw." : "Select",
     status: l === "tr" ? "Durum" : l === "de" ? "Status" : "Status",
@@ -771,6 +849,70 @@ export default function InventoryPage() {
     fetchProducts();
   }, []);
 
+  const refetchPendingChangeRequests = async () => {
+    try {
+      const data = await medusaClient.request('/admin-hub/v1/product-change-requests?status=pending');
+      const map = {};
+      for (const cr of (data?.change_requests || [])) {
+        const pid = String(cr?.product_id || '');
+        if (!pid) continue;
+        if (!map[pid]) map[pid] = [];
+        map[pid].push(cr);
+      }
+      setPendingChangeRequestsByProductId(map);
+      return map;
+    } catch (e) {
+      // Non-critical: inventory should still work if proposal backend fails.
+      console.warn('Failed to load pending change requests:', e?.message || e);
+      return {};
+    }
+  };
+
+  useEffect(() => {
+    refetchPendingChangeRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openChangeRequestsModal = async (productId) => {
+    const pid = String(productId || '');
+    const product = products.find((p) => String(p?.id || '') === pid) || null;
+    setChangeRequestsModalProductId(pid || null);
+    setChangeRequestsModalItems(pendingChangeRequestsByProductId[pid] || []);
+    setChangeRequestsModalOpen(true);
+  };
+
+  const approveChangeRequest = async (id) => {
+    try {
+      await medusaClient.request(`/admin-hub/v1/product-change-requests/${encodeURIComponent(id)}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({ reviewer_note: 'Approved via inventory' }),
+      });
+      const data = await medusaClient.getAdminHubProducts();
+      setProducts(data.products || []);
+      const map = await refetchPendingChangeRequests();
+      if (changeRequestsModalProductId) {
+        setChangeRequestsModalItems(map[String(changeRequestsModalProductId)] || []);
+      }
+    } catch (e) {
+      setError(e?.message || 'Approval failed');
+    }
+  };
+
+  const rejectChangeRequest = async (id) => {
+    try {
+      await medusaClient.request(`/admin-hub/v1/product-change-requests/${encodeURIComponent(id)}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reviewer_note: 'Rejected via inventory' }),
+      });
+      const map = await refetchPendingChangeRequests();
+      if (changeRequestsModalProductId) {
+        setChangeRequestsModalItems(map[String(changeRequestsModalProductId)] || []);
+      }
+    } catch (e) {
+      setError(e?.message || 'Rejection failed');
+    }
+  };
+
   useEffect(() => {
     if (!duplicateModalOpen || !duplicateSourceId) {
       setDuplicateFullProduct(null);
@@ -872,6 +1014,11 @@ export default function InventoryPage() {
       medusaClient={medusaClient}
       openDuplicateModal={openDuplicateModal}
       setProducts={setProducts}
+      pendingChangeRequests={pendingChangeRequestsByProductId[product.id] || []}
+      onOpenChangeRequests={(pid) => {
+        setMenuOpenId(null);
+        openChangeRequestsModal(pid);
+      }}
     />
   );
 
@@ -1254,6 +1401,76 @@ export default function InventoryPage() {
                   onChange={(v) => setDuplicateOptions((o) => ({ ...o, variants: v }))}
                 />
               </BlockStack>
+            )}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={changeRequestsModalOpen}
+        onClose={() => setChangeRequestsModalOpen(false)}
+        title={
+          changeRequestsModalProductId
+            ? `Proposed changes (${products.find((p) => String(p?.id || '') === String(changeRequestsModalProductId))?.title || 'Product'})`
+            : 'Proposed changes'
+        }
+        primaryAction={isSuperuser ? { content: 'Close', onAction: () => setChangeRequestsModalOpen(false) } : { content: 'Close', onAction: () => setChangeRequestsModalOpen(false) }}
+        secondaryActions={[]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            {changeRequestsModalItems.length === 0 ? (
+              <Text as="p" tone="subdued">
+                No pending change proposals.
+              </Text>
+            ) : (
+              changeRequestsModalItems.map((cr) => {
+                const field = String(cr.field_name || '');
+                const oldVal = cr.old_value ?? '';
+                const newVal = cr.new_value ?? '';
+                return (
+                  <Card key={cr.id} padding="300" background="bg-surface-secondary" borderRadius="200">
+                    <BlockStack gap="200">
+                      <Text as="h3" variant="bodyMd" fontWeight="semibold">
+                        {field}
+                      </Text>
+                      <Divider />
+                      <BlockStack gap="100">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Current
+                        </Text>
+                        <pre style={{ margin: 0, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{oldVal}</pre>
+                      </BlockStack>
+                      <BlockStack gap="100">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Proposed
+                        </Text>
+                        <pre style={{ margin: 0, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{newVal}</pre>
+                      </BlockStack>
+                      {isSuperuser && (
+                        <InlineStack gap="200">
+                          <Button
+                            variant="primary"
+                            tone="success"
+                            size="slim"
+                            onClick={() => approveChangeRequest(cr.id)}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            tone="critical"
+                            size="slim"
+                            onClick={() => rejectChangeRequest(cr.id)}
+                          >
+                            Reject
+                          </Button>
+                        </InlineStack>
+                      )}
+                    </BlockStack>
+                  </Card>
+                );
+              })
             )}
           </BlockStack>
         </Modal.Section>

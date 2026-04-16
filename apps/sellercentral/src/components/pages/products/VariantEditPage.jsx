@@ -81,6 +81,15 @@ const STATUS_OPTIONS = [
   { label: "Inactive", value: "archived" },
 ];
 
+const UNIT_TYPE_OPTIONS = [
+  { label: "— None —", value: "" },
+  { label: "kg", value: "kg" },
+  { label: "g", value: "g" },
+  { label: "L", value: "L" },
+  { label: "ml", value: "ml" },
+  { label: "Piece", value: "stück" },
+];
+
 function normalizeForCompareProduct(p) {
   if (!p) return p;
   const { updated_at, created_at, ...rest } = p;
@@ -711,6 +720,39 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                   + Bullet
                 </Button>
               )}
+
+              <Divider />
+
+              <Text as="h2" variant="bodyMd" fontWeight="regular">
+                Content per unit
+              </Text>
+
+              <TextField
+                label="Amount"
+                labelHidden
+                type="number"
+                value={vm.unit_value != null ? String(vm.unit_value) : ""}
+                onChange={(v) => updateVariantMeta("unit_value", v)}
+                placeholder="e.g. 200"
+                helpText="Numeric amount (e.g. 200 for 200 g)"
+              />
+
+              <Select
+                label="Unit"
+                options={UNIT_TYPE_OPTIONS}
+                value={vm.unit_type ?? ""}
+                onChange={(v) => updateVariantMeta("unit_type", v)}
+              />
+
+              <TextField
+                label="Reference quantity"
+                labelHidden
+                type="number"
+                value={vm.unit_reference != null ? String(vm.unit_reference) : "1"}
+                onChange={(v) => updateVariantMeta("unit_reference", v)}
+                placeholder="1"
+                helpText="Reference for price per unit (e.g. 1 = per 1 kg when unit is kg)"
+              />
 
               <Divider />
 

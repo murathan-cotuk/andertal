@@ -89,6 +89,8 @@ export default function IntegrationsSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [billbeeLoading, setBillbeeLoading] = useState(false);
+  const [billbeeWebhookLoading, setBillbeeWebhookLoading] = useState(false);
+  const [billbeeWebhookUrl, setBillbeeWebhookUrl] = useState("");
   const [testResult, setTestResult] = useState(null);
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState("all");
@@ -123,6 +125,19 @@ export default function IntegrationsSettingsPage() {
     setBillbeeLoading(false);
   };
 
+  const loadBillbeeWebhookUrl = async () => {
+    setBillbeeWebhookLoading(true);
+    setErr("");
+    try {
+      const client = getMedusaAdminClient();
+      const data = await client.getBillbeeWebhookUrl();
+      setBillbeeWebhookUrl(data?.url || "");
+    } catch (e) {
+      setErr(e?.message || "Billbee Webhook-URL konnte nicht geladen werden.");
+    }
+    setBillbeeWebhookLoading(false);
+  };
+
   const regenerateBillbeeCredentials = async () => {
     setBillbeeLoading(true);
     setErr("");
@@ -151,6 +166,7 @@ export default function IntegrationsSettingsPage() {
     setErr("");
     if (app.slug === "billbee") {
       loadBillbeeCredentials();
+      loadBillbeeWebhookUrl();
     }
   };
 
@@ -322,7 +338,6 @@ export default function IntegrationsSettingsPage() {
                   value={form.api_key}
                   onChange={e => setForm(f => ({ ...f, api_key: e.target.value }))}
                   placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.api_key_placeholder || "API Key eingeben…")}
-                  readOnly={modal.app.slug === "billbee"}
                 />
               </div>
               {modal.app.slug === "billbee" && (
@@ -334,7 +349,6 @@ export default function IntegrationsSettingsPage() {
                     value={form.basic_auth_username}
                     onChange={e => setForm(f => ({ ...f, basic_auth_username: e.target.value }))}
                     placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.basic_auth_username_placeholder || "Benutzername eingeben…")}
-                    readOnly
                   />
                 </div>
               )}
@@ -346,7 +360,6 @@ export default function IntegrationsSettingsPage() {
                   value={form.api_secret}
                   onChange={e => setForm(f => ({ ...f, api_secret: e.target.value }))}
                   placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.api_secret_placeholder || "API Secret eingeben…")}
-                  readOnly={modal.app.slug === "billbee"}
                 />
               </div>
               {!modal.app.fieldLabels && (
@@ -359,31 +372,26 @@ export default function IntegrationsSettingsPage() {
               )}
               {modal.app.slug === "billbee" && (
                 <div style={{ display: "grid", gap: 10 }}>
+                  <div>
+                    <label style={lbl}>URL (Webhook)</label>
+                    <input
+                      style={inp}
+                      value={billbeeWebhookLoading ? "..." : billbeeWebhookUrl}
+                      readOnly
+                    />
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
+                      Billbee bei neuer API-Anbindung in das Feld „URL“ eintragen.
+                    </div>
+                  </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <button
-                      onClick={regenerateBillbeeCredentials}
-                      disabled={billbeeLoading}
-                      style={{ padding: "7px 14px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 12, cursor: billbeeLoading ? "default" : "pointer", background: "#fff", fontWeight: 600 }}
-                    >
-                      {billbeeLoading ? "Zugangsdaten werden erzeugt…" : "Neue Zugangsdaten erzeugen"}
-                    </button>
-                    <button
                       onClick={handleBillbeeTest}
-                      disabled={testing || billbeeLoading}
+                      disabled={testing}
                       style={{ padding: "7px 14px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 12, cursor: testing || billbeeLoading ? "default" : "pointer", background: "#fff", fontWeight: 600 }}
                     >
                       {testing ? "Verbindung wird getestet…" : "Verbindung testen"}
                     </button>
                   </div>
-                  <button
-                    onClick={async () => {
-                      const txt = `Schlüssel: ${form.api_key}\nBasic Auth Benutzername: ${form.basic_auth_username}\nBasic Auth Passwort: ${form.api_secret}`;
-                      await navigator.clipboard.writeText(txt);
-                    }}
-                    style={{ padding: "7px 14px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 12, cursor: "pointer", background: "#fff", fontWeight: 600, justifySelf: "start" }}
-                  >
-                    Zugangsdaten kopieren
-                  </button>
                   {testResult && (
                     <span style={{ fontSize: 12, color: testResult.ok ? "#15803d" : "#b91c1c" }}>
                       {testResult.ok ? "✓ " : "✕ "}
@@ -391,7 +399,7 @@ export default function IntegrationsSettingsPage() {
                     </span>
                   )}
                   <span style={{ fontSize: 12, color: "#6b7280" }}>
-                    Diese Werte werden automatisch von Belucha erzeugt. In Billbee bei neuer API-Anbindung exakt diese 3 Werte eintragen.
+                    URL (Webhook) alanına bu URL’yi gir; Schlüssel + Basic Auth Daten alanlarına Billbee’den aldığın değerleri gir.
                   </span>
                 </div>
               )}

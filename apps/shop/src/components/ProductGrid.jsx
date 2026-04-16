@@ -13,7 +13,7 @@ const Grid = styled.div`
 
   /* Tablet: up to 3 */
   @media (min-width: 640px) {
-    grid-template-columns: repeat(${(p) => Math.min(p.$cols, 3)}, 1fr);
+    grid-template-columns: repeat(${(p) => Math.min(p.$cols, 4)}, 1fr);
   }
 
   /* Desktop: full column count */

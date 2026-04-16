@@ -4,6 +4,17 @@ const LANGS = ["de", "en", "tr", "fr", "it", "es"];
 const COUNTRIES = ["DE", "FR", "IT", "ES", "TR"];
 const DEFAULT_BACKEND = "https://belucha-medusa-backend.onrender.com";
 
+function computeUnitReference(unitTypeRaw) {
+  const unitType = String(unitTypeRaw || "").trim().toLowerCase();
+  // For "grundpreis" UI we want a normalized base:
+  // - grams: show per 1000 g
+  // - milliliters: show per 1000 ml
+  // - kilograms / liters / pieces: show per 1 unit
+  if (unitType === "g" || unitType === "ml") return 1000;
+  if (unitType === "kg" || unitType === "l" || unitType === "stück" || unitType === "piece") return 1;
+  return 1;
+}
+
 function getBackendBase() {
   return (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || DEFAULT_BACKEND).replace(/\/$/, "");
 }
@@ -136,6 +147,8 @@ function groupRows(rows, headers) {
     if (key === "manufacturer") idx.hersteller = i;
     if (key === "manufacturer_information") idx.hersteller_information = i;
     if (key === "responsible_person_information") idx.verantwortliche_person_information = i;
+    // Excel template input uses `per_unit`; internally we store it as `unit_reference`.
+    if (key === "per_unit") idx.unit_reference = i;
     const m = key.match(/^variation(\d+)_(name|value)$/i);
     if (m) {
       // Backward/forward compatibility: template may expose variationN_* labels,
@@ -364,6 +377,7 @@ function computeChildPresent(childRow, idx) {
     dim_height: kp("dim_height_cm"),
     unit_type: kp("unit_type"),
     unit_value: kp("unit_value"),
+    unit_reference: kp("unit_reference"),
     prices: Object.fromEntries(COUNTRIES.map((c) => [c, kp(`price_brutto_${c}`) || kp(`price_uvp_${c}`) || kp(`price_sale_${c}`)])),
     seo,
     variantMetafieldTouched,
@@ -465,7 +479,7 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
     const commonTouched =
       pres.brand || pres.category_slug || pres.shipping_group || pres.type ||
       pres.weight_grams || pres.dim_length || pres.dim_width || pres.dim_height ||
-      pres.unit_type || pres.unit_value || Object.values(pres.prices || {}).some(Boolean);
+      pres.unit_type || pres.unit_value || pres.unit_reference || Object.values(pres.prices || {}).some(Boolean);
     if (commonTouched) {
       const md = out.metadata && typeof out.metadata === "object" ? { ...out.metadata } : {};
       const invMd = inv.metadata && typeof inv.metadata === "object" ? inv.metadata : {};
@@ -480,6 +494,7 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
       if (pres.dim_height && invMd.dimensions_height != null) md.dimensions_height = invMd.dimensions_height;
       if (pres.unit_type && invMd.unit_type) md.unit_type = invMd.unit_type;
       if (pres.unit_value && invMd.unit_value != null) md.unit_value = invMd.unit_value;
+      if (pres.unit_reference && invMd.unit_reference != null) md.unit_reference = invMd.unit_reference;
       if (invMd.prices && typeof invMd.prices === "object") {
         md.prices = md.prices && typeof md.prices === "object" ? { ...md.prices } : {};
         for (const c of COUNTRIES) {
@@ -572,8 +587,11 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
       while (nextOv.length && nextOv[nextOv.length - 1] == null) nextOv.pop();
       out.option_values = nextOv.length ? nextOv : out.option_values;
     }
-    if (inv.price_cents != null && Object.values(pres.prices || {}).some(Boolean)) {
-      out.price_cents = inv.price_cents;
+    // If any price column is touched in Excel, update whatever price fields exist
+    // in the incoming variant. This allows UVP-only updates where `price_cents`
+    // is null but `compare_at_price_cents` is present.
+    if (Object.values(pres.prices || {}).some(Boolean)) {
+      if (inv.price_cents != null) out.price_cents = inv.price_cents;
       if (inv.compare_at_price_cents != null) out.compare_at_price_cents = inv.compare_at_price_cents;
     }
     bySku.set(sk, out);
@@ -647,6 +665,13 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
     m.translations[lang] = prev;
   }
 
+  // Bridge DE SEO translations into top-level meta fields.
+  // ProductEditPage reads `metadata.seo_meta_*`, not `metadata.translations[de].seo_*`.
+  const deTr = m.translations?.de;
+  if (deTr?.seo_title) m.seo_meta_title = deTr.seo_title;
+  if (deTr?.seo_description) m.seo_meta_description = deTr.seo_description;
+  if (deTr?.seo_keywords) m.seo_keywords = deTr.seo_keywords;
+
   m.prices = m.prices && typeof m.prices === "object" ? { ...m.prices } : {};
   for (const c of COUNTRIES) {
     if (!parentPresent.prices[c]) continue;
@@ -689,6 +714,7 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
   if (parentPresent.dim_height && pm.dimensions_height != null) m.dimensions_height = pm.dimensions_height;
   if (parentPresent.unit_type && pm.unit_type) m.unit_type = pm.unit_type;
   if (parentPresent.unit_value && pm.unit_value != null) m.unit_value = pm.unit_value;
+  if (parentPresent.unit_type && pm.unit_reference != null) m.unit_reference = pm.unit_reference;
 
   if (parentPresent.brand && pm.brand_id) m.brand_id = pm.brand_id;
   if (parentPresent.category_slug) {
@@ -857,6 +883,14 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     if (parseNum(cGet("dim_height_cm")) != null) variantMeta.dimensions_height = parseNum(cGet("dim_height_cm"));
     if (str(cGet("unit_type"))) variantMeta.unit_type = str(cGet("unit_type"));
     if (parseNum(cGet("unit_value")) != null) variantMeta.unit_value = parseNum(cGet("unit_value"));
+    // In case the Excel child row doesn't include unit fields, inherit them from the parent row.
+    if (!variantMeta.unit_type && str(G("unit_type"))) variantMeta.unit_type = str(G("unit_type"));
+    if (variantMeta.unit_value == null && parseNum(G("unit_value")) != null) variantMeta.unit_value = parseNum(G("unit_value"));
+    const childPerUnit = parseNum(cGet("per_unit") || cGet("unit_reference"));
+    const parentPerUnit = parseNum(G("per_unit") || G("unit_reference"));
+    if (variantMeta.unit_reference == null && childPerUnit != null) variantMeta.unit_reference = childPerUnit;
+    if (variantMeta.unit_reference == null && parentPerUnit != null) variantMeta.unit_reference = parentPerUnit;
+    if (variantMeta.unit_type && variantMeta.unit_reference == null) variantMeta.unit_reference = computeUnitReference(variantMeta.unit_type);
     if (Object.keys(cPrices).length) variantMeta.prices = cPrices;
     const cGallery = Object.values(cImageSlots).filter(Boolean);
     if (cGallery.length) variantMeta.media = cGallery;
@@ -890,10 +924,20 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     dimensions_height: parseNum(G("dim_height_cm")),
     unit_type: G("unit_type") || undefined,
     unit_value: parseNum(G("unit_value")),
+    unit_reference: (() => {
+      const per = parseNum(G("per_unit") || G("unit_reference"));
+      if (per != null) return per;
+      const ut = G("unit_type");
+      if (!ut) return undefined;
+      return computeUnitReference(ut);
+    })(),
     variation_groups: variationGroups.length ? variationGroups : undefined,
-    seo_meta_title: G("seo_title") || undefined,
-    seo_meta_description: G("seo_description") || undefined,
-    seo_keywords: G("seo_keywords") || undefined,
+    // ProductEditPage reads top-level `metadata.seo_meta_*`.
+    // Template/import uses `seo_title_{lang}` / `seo_description_{lang}` / `seo_keywords_{lang}` instead,
+    // so we bridge DE values to the top-level fields.
+    seo_meta_title: (translations.de?.seo_title || G("seo_title") || undefined),
+    seo_meta_description: (translations.de?.seo_description || G("seo_description") || undefined),
+    seo_keywords: (translations.de?.seo_keywords || G("seo_keywords") || undefined),
     hersteller: G("hersteller") || undefined,
     hersteller_information: G("hersteller_information") || undefined,
     verantwortliche_person_information: G("verantwortliche_person_information") || undefined,

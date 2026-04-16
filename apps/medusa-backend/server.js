@@ -3185,9 +3185,206 @@ async function start() {
         const isSuperuserCaller = sellerPayload?.is_superuser || false
         const callerSellerId = (!isSuperuserCaller && sellerPayload?.seller_id) ? String(sellerPayload.seller_id).trim() : null
         const existing = await getAdminHubProductByIdOrHandleDb(req.params.id)
+
+        // EAN immutability: once created, EANs can never be changed by anyone.
+        if (existing) {
+          const normalizeEan = (v) => {
+            if (v == null) return ''
+            return String(v).trim()
+          }
+          const existingMeta = existing && existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}
+          const existingVariants = Array.isArray(existing?.variants) ? existing.variants : []
+          const incomingMeta = body?.metadata && typeof body.metadata === 'object' ? body.metadata : {}
+          const incomingVariants = Array.isArray(body?.variants) ? body.variants : []
+
+          const exMetaEan = normalizeEan(existingMeta?.ean)
+          const inMetaEan = normalizeEan(incomingMeta?.ean)
+          if (inMetaEan && exMetaEan && inMetaEan !== exMetaEan) {
+            return res.status(400).json({ message: 'EAN cannot be changed.' })
+          }
+
+          // Compare variant EANs by SKU
+          const exBySku = new Map(
+            existingVariants
+              .filter((v) => v && String(v.sku || '').trim())
+              .map((v) => [String(v.sku || '').trim(), v])
+          )
+          for (const iv of incomingVariants) {
+            const sku = String(iv?.sku || '').trim()
+            const inEan = normalizeEan(iv?.ean)
+            if (!sku || !inEan) continue
+            const ev = exBySku.get(sku)
+            if (!ev) continue
+            const exEan = normalizeEan(ev?.ean)
+            if (exEan && inEan !== exEan) {
+              return res.status(400).json({ message: 'EAN cannot be changed.' })
+            }
+          }
+        }
+
         // Seller-specific fields that can be saved to the listing without superuser approval
         const SELLER_LISTING_FIELDS = ['price', 'inventory', 'status', 'sku']
         const SELLER_LISTING_META_FIELDS = ['shipping_group_id', 'brand_id', 'publish_date', 'seller_name', 'shop_name']
+
+        // Non-owner sellers may only propose shared changes (shared content); never update shared content directly.
+        if (callerSellerId && existing && existing.seller_id && String(existing.seller_id).trim() !== callerSellerId && !isSuperuserCaller) {
+          const existingMeta = existing && existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}
+          const incomingMeta = body?.metadata && typeof body.metadata === 'object' ? body.metadata : {}
+
+          const stringifyVal = (v) => {
+            if (v == null) return ''
+            if (typeof v === 'object') return JSON.stringify(v)
+            return String(v)
+          }
+
+          const mergePrices = (a, b) => {
+            const out = { ...(a || {}) }
+            const inPrices = (b && typeof b === 'object') ? b : {}
+            for (const [country, val] of Object.entries(inPrices)) {
+              out[country] = { ...(out[country] || {}), ...(val && typeof val === 'object' ? val : {}) }
+            }
+            return out
+          }
+
+          const mergeTranslations = (a, b) => {
+            const out = { ...(a || {}) }
+            const inTr = (b && typeof b === 'object') ? b : {}
+            for (const [lang, val] of Object.entries(inTr)) {
+              out[lang] = { ...(out[lang] || {}), ...(val && typeof val === 'object' ? val : {}) }
+            }
+            return out
+          }
+
+          const sharedMetaKeys = Object.keys(incomingMeta).filter((k) => !SELLER_LISTING_META_FIELDS.includes(k))
+          const sharedTitleChanged = body?.title !== undefined && String(body.title || '').trim() !== String(existing?.title || '').trim()
+          const sharedDescChanged = body?.description !== undefined && String(body.description || '') !== String(existing?.description || '')
+
+          // If seller tries to change any shared content key → create change requests and block direct update.
+          const sharedMetaKeysChanged = sharedMetaKeys.filter((metaKey) => {
+            const oldVal = existingMeta?.[metaKey]
+            let newVal = incomingMeta?.[metaKey]
+            if (metaKey === 'prices') newVal = mergePrices(existingMeta?.prices, newVal)
+            if (metaKey === 'translations') newVal = mergeTranslations(existingMeta?.translations, newVal)
+            const oldStr = stringifyVal(oldVal)
+            const newStr = stringifyVal(newVal)
+            return oldStr !== newStr
+          })
+          const wantsSharedChange = sharedTitleChanged || sharedDescChanged || sharedMetaKeysChanged.length > 0
+          if (wantsSharedChange) {
+            const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+            const { Client } = require('pg')
+            const qc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+            try {
+              await qc.connect()
+              // title/description
+              if (sharedTitleChanged) {
+                await qc.query(
+                  `INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value)
+                   VALUES ($1,$2,'pending','title',$3,$4)`,
+                  [existing.id, callerSellerId, existing.title || null, body.title || '']
+                )
+              }
+              if (sharedDescChanged) {
+                await qc.query(
+                  `INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value)
+                   VALUES ($1,$2,'pending','description',$3,$4)`,
+                  [existing.id, callerSellerId, existing.description || null, body.description || '']
+                )
+              }
+              // metadata keys
+              for (const metaKey of sharedMetaKeysChanged) {
+                const oldVal = existingMeta?.[metaKey]
+                let newVal = incomingMeta?.[metaKey]
+                // Prevent wiping unrelated object content on approval by merging.
+                if (metaKey === 'prices') newVal = mergePrices(existingMeta?.prices, newVal)
+                if (metaKey === 'translations') newVal = mergeTranslations(existingMeta?.translations, newVal)
+                await qc.query(
+                  `INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value)
+                   VALUES ($1,$2,'pending',$3,$4,$5)`,
+                  [
+                    existing.id,
+                    callerSellerId,
+                    `metadata.${metaKey}`,
+                    oldVal == null ? null : String(typeof oldVal === 'object' ? JSON.stringify(oldVal) : oldVal),
+                    newVal == null ? '' : String(typeof newVal === 'object' ? JSON.stringify(newVal) : newVal),
+                  ]
+                )
+              }
+            } finally {
+              try { await qc.end() } catch (_) {}
+            }
+            return res.status(202).json({ message: 'Change proposal submitted. A superuser will review it.', suggestion_submitted: true })
+          }
+
+          // Shared content change yoksa: sadece satıcıya özel listing alanlarını güncelle.
+          // (Bu sayede non-owner doğrudan shared ürün verisini değiştiremez.)
+          const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+          const { Client } = require('pg')
+          const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await lc.connect()
+          const existingListing = await lc.query(
+            'SELECT id FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 LIMIT 1',
+            [existing.id, callerSellerId]
+          )
+          const priceCents = body.price !== undefined ? Math.max(0, Math.round(Number(body.price || 0) * 100)) : null
+          const inventory = body.inventory !== undefined ? Math.max(0, parseInt(body.inventory, 10) || 0) : null
+          const status = body.status !== undefined ? String(body.status || 'active') : null
+          const skuVal = body.sku !== undefined ? (body.sku || null) : null
+          const meta = body.metadata && typeof body.metadata === 'object' ? body.metadata : {}
+          const shippingGroupId = meta.shipping_group_id !== undefined ? (meta.shipping_group_id || null) : null
+          const brandId = meta.brand_id !== undefined ? (meta.brand_id || null) : null
+          const publishDate = meta.publish_date !== undefined ? (meta.publish_date || null) : null
+
+          let listing = null
+          if (existingListing.rows[0]) {
+            const lid = existingListing.rows[0].id
+            const ur = await lc.query(
+              `UPDATE admin_hub_seller_listings
+               SET price_cents = COALESCE($1, price_cents),
+                   inventory = COALESCE($2, inventory),
+                   status = COALESCE($3, status),
+                   sku = COALESCE($4, sku),
+                   shipping_group_id = COALESCE($5, shipping_group_id),
+                   brand_id = COALESCE($6, brand_id),
+                   publish_date = COALESCE($7, publish_date),
+                   updated_at = now()
+               WHERE id = $8
+               RETURNING *`,
+              [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, lid]
+            )
+            listing = ur.rows[0] || null
+          } else {
+            const ir = await lc.query(
+              `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+               RETURNING *`,
+              [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate]
+            )
+            listing = ir.rows[0] || null
+          }
+          await lc.end()
+
+          res.json({
+            product: {
+              ...existing,
+              price: (listing?.price_cents || 0) / 100,
+              price_cents: listing?.price_cents || 0,
+              inventory: listing?.inventory || 0,
+              status: listing?.status || existing.status,
+              sku: listing?.sku || null,
+              metadata: {
+                ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+                ...(listing?.shipping_group_id ? { shipping_group_id: listing.shipping_group_id } : {}),
+                ...(listing?.brand_id ? { brand_id: listing.brand_id } : {}),
+                ...(listing?.publish_date ? { publish_date: listing.publish_date } : {}),
+              },
+            },
+            listing,
+            listing_saved: true,
+            shared_change_blocked: true,
+          })
+        }
+
         if (callerSellerId && existing && !existing.seller_id) {
           // Master product: non-superuser may only persist seller-owned listing fields.
           // Check if only seller-specific fields are being changed
@@ -3361,6 +3558,31 @@ async function start() {
         if (callerSellerId && existing.seller_id && String(existing.seller_id).trim() !== callerSellerId) {
           return res.status(403).json({ message: 'Forbidden' })
         }
+
+        // EAN immutability for variant-level updates
+        const normalizeEan = (v) => {
+          if (v == null) return ''
+          return String(v).trim()
+        }
+        const existingVariants = Array.isArray(existing?.variants) ? existing.variants : []
+        const incomingVariants = Array.isArray(body?.variants) ? body.variants : []
+        const existingBySku = new Map(
+          existingVariants
+            .filter((v) => v && String(v?.sku || '').trim())
+            .map((v) => [String(v.sku || '').trim(), v])
+        )
+        for (const iv of incomingVariants) {
+          const sku = String(iv?.sku || '').trim()
+          const inEan = normalizeEan(iv?.ean)
+          if (!sku || !inEan) continue
+          const ev = existingBySku.get(sku)
+          if (!ev) continue
+          const exEan = normalizeEan(ev?.ean)
+          if (exEan && inEan !== exEan) {
+            return res.status(400).json({ message: 'EAN cannot be changed.' })
+          }
+        }
+
         const client = getProductsDbClient()
         if (!client) return res.status(503).json({ message: 'Database not configured' })
         await client.connect()
@@ -9259,8 +9481,38 @@ async function start() {
            RETURNING id, name, slug, logo_url, is_active, category, created_at, updated_at`,
           [name, slug, logo_url||null, api_key||null, api_secret||null, webhook_url||null, config ? JSON.stringify(config) : '{}', is_active, category]
         )
+        const integration = r.rows && r.rows[0] ? r.rows[0] : null
+
+        // Persist Billbee credentials per seller.
+        // Our Billbee webhook verifier reads from admin_hub_seller_settings.
+        if (integration?.slug && String(integration.slug).toLowerCase() === 'billbee') {
+          const auth = req.headers['authorization'] || ''
+          const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+          const payload = token ? verifySellerToken(token) : null
+          const sellerId = (payload?.seller_id || 'default').toString().trim() || 'default'
+
+          const cfg = config && typeof config === 'object' ? config : {}
+          const basicUsername = cfg.basic_auth_username || cfg.username || ''
+          const basicPassword = cfg.basic_auth_password || cfg.password || ''
+          const billbeeApiKey = api_key || ''
+
+          if (billbeeApiKey && basicUsername && basicPassword) {
+            await client.query(
+              `INSERT INTO admin_hub_seller_settings (seller_id, billbee_api_key, billbee_basic_username, billbee_basic_password, billbee_updated_at, updated_at)
+               VALUES ($1, $2, $3, $4, now(), now())
+               ON CONFLICT (seller_id) DO UPDATE SET
+                 billbee_api_key = EXCLUDED.billbee_api_key,
+                 billbee_basic_username = EXCLUDED.billbee_basic_username,
+                 billbee_basic_password = EXCLUDED.billbee_basic_password,
+                 billbee_updated_at = now(),
+                 updated_at = now()`,
+              [sellerId, billbeeApiKey, basicUsername, basicPassword],
+            )
+          }
+        }
+
         await client.end()
-        res.json({ integration: r.rows[0] })
+        res.json({ integration })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -9284,9 +9536,37 @@ async function start() {
         const r = await client.query(
           `UPDATE store_integrations SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${vals.length}::uuid RETURNING id, name, slug, logo_url, is_active, category, updated_at`, vals
         )
+        if (!r.rows[0]) { await client.end(); return res.status(404).json({ message: 'Not found' }) }
+        const integration = r.rows[0]
+
+        if (integration?.slug && String(integration.slug).toLowerCase() === 'billbee') {
+          const auth = req.headers['authorization'] || ''
+          const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+          const payload = token ? verifySellerToken(token) : null
+          const sellerId = (payload?.seller_id || 'default').toString().trim() || 'default'
+
+          const cfg = body.config && typeof body.config === 'object' ? body.config : {}
+          const basicUsername = cfg.basic_auth_username || cfg.username || ''
+          const basicPassword = cfg.basic_auth_password || cfg.password || ''
+          const billbeeApiKey = body.api_key || ''
+
+          if (billbeeApiKey && basicUsername && basicPassword) {
+            await client.query(
+              `INSERT INTO admin_hub_seller_settings (seller_id, billbee_api_key, billbee_basic_username, billbee_basic_password, billbee_updated_at, updated_at)
+               VALUES ($1, $2, $3, $4, now(), now())
+               ON CONFLICT (seller_id) DO UPDATE SET
+                 billbee_api_key = EXCLUDED.billbee_api_key,
+                 billbee_basic_username = EXCLUDED.billbee_basic_username,
+                 billbee_basic_password = EXCLUDED.billbee_basic_password,
+                 billbee_updated_at = now(),
+                 updated_at = now()`,
+              [sellerId, billbeeApiKey, basicUsername, basicPassword],
+            )
+          }
+        }
+
         await client.end()
-        if (!r.rows[0]) return res.status(404).json({ message: 'Not found' })
-        res.json({ integration: r.rows[0] })
+        res.json({ integration })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -9324,25 +9604,23 @@ async function start() {
           basic_auth_password: String(row.billbee_basic_password),
         }
       }
+      // We cannot invent Billbee credentials. They must come from the Billbee integration UI.
+      // If credentials are missing, return empty values so the user can enter them manually.
+      if (!hasAll) {
+        if (forceRegenerate) {
+          throw new Error('Billbee credentials are missing. Please enter the credentials from Billbee (Schlüssel + Basic Auth username/password) and save.');
+        }
+        return { api_key: '', basic_auth_username: '', basic_auth_password: '' }
+      }
 
-      const crypto = require('crypto')
-      const apiKey = `bbk_${crypto.randomBytes(24).toString('hex')}`
-      const username = `billbee_${String(sellerId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32)}_${crypto.randomBytes(4).toString('hex')}`
-      const password = crypto.randomBytes(24).toString('base64url')
-
-      await client.query(
-        `INSERT INTO admin_hub_seller_settings (
-           seller_id, billbee_api_key, billbee_basic_username, billbee_basic_password, billbee_updated_at, updated_at
-         ) VALUES ($1, $2, $3, $4, now(), now())
-         ON CONFLICT (seller_id) DO UPDATE SET
-           billbee_api_key = EXCLUDED.billbee_api_key,
-           billbee_basic_username = EXCLUDED.billbee_basic_username,
-           billbee_basic_password = EXCLUDED.billbee_basic_password,
-           billbee_updated_at = now(),
-           updated_at = now()`,
-        [sellerId, apiKey, username, password],
-      )
-      return { api_key: apiKey, basic_auth_username: username, basic_auth_password: password }
+      // If only regenerate was requested but we already have values, keep them.
+      if (hasAll && forceRegenerate) {
+        return {
+          api_key: String(row.billbee_api_key),
+          basic_auth_username: String(row.billbee_basic_username),
+          basic_auth_password: String(row.billbee_basic_password),
+        }
+      }
     }
 
     const adminHubBillbeeCredentialsGET = async (req, res) => {
@@ -9409,6 +9687,90 @@ async function start() {
       } catch (e) {
         return res.status(500).json({ message: e?.message || 'Billbee test failed' })
       }
+    }
+
+    const getBillbeeAuthFromReq = (req) => {
+      // Billbee fields:
+      // - "Schlüssel" -> API key (we accept X-Billbee-Api-Key header)
+      // - Basic Auth Benutzername/Passwort -> HTTP Basic auth
+      const apiKey =
+        String(req.headers['x-billbee-api-key'] || req.headers['x-billbee-apikey'] || req.query?.api_key || '').trim()
+      const authHeader = String(req.headers.authorization || '')
+      if (!authHeader.startsWith('Basic ')) {
+        return { apiKey, username: '', password: '', basicOk: false }
+      }
+      try {
+        const raw = Buffer.from(authHeader.slice('Basic '.length), 'base64').toString('utf8')
+        const idx = raw.indexOf(':')
+        const username = idx >= 0 ? raw.slice(0, idx) : raw
+        const password = idx >= 0 ? raw.slice(idx + 1) : ''
+        return { apiKey, username: String(username).trim(), password: String(password), basicOk: true }
+      } catch {
+        return { apiKey, username: '', password: '', basicOk: false }
+      }
+    }
+
+    const adminHubBillbeeWebhookGET = async (req, res) => {
+      // Connection test / health-check endpoint.
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+
+        const { apiKey, username, password, basicOk } = getBillbeeAuthFromReq(req)
+        if (!basicOk || !username || !password) {
+          return res.status(401).json({ message: 'Unauthorized' })
+        }
+
+        let q
+        if (apiKey) {
+          q = await client.query(
+            `SELECT seller_id, billbee_basic_username, billbee_basic_password
+             FROM admin_hub_seller_settings
+             WHERE billbee_api_key = $1::text
+             LIMIT 1`,
+            [apiKey],
+          )
+        } else {
+          q = await client.query(
+            `SELECT seller_id, billbee_basic_username, billbee_basic_password
+             FROM admin_hub_seller_settings
+             WHERE billbee_basic_username = $1::text AND billbee_basic_password = $2::text
+             LIMIT 1`,
+            [username, password],
+          )
+        }
+        const row = q.rows && q.rows[0]
+        if (!row) return res.status(401).json({ message: 'Unauthorized' })
+        const ok = String(row.billbee_basic_username || '') === username && String(row.billbee_basic_password || '') === password
+        if (!ok) return res.status(401).json({ message: 'Unauthorized' })
+
+        await client.end()
+        res.json({ ok: true, type: 'billbee_webhook', message: 'Billbee connection ok.' })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Billbee webhook error' })
+      }
+    }
+
+    const adminHubBillbeeWebhookPOST = async (req, res) => {
+      // For now we only accept & acknowledge events.
+      // Later we can map payload -> orders/labels in admin-hub tables.
+      return adminHubBillbeeWebhookGET(req, res)
+    }
+
+    const adminHubBillbeeWebhookUrlGET = async (req, res) => {
+      const base =
+        (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '')
+          .replace(/\/$/, '') ||
+        'https://belucha-medusa-backend.onrender.com'
+      return res.json({
+        url: `${base}/admin-hub/v1/integrations/billbee/webhook`,
+        method: 'POST (Billbee may also call GET)',
+      })
     }
 
     // ── Admin Hub Abandoned Carts ─────────────────────────────────
@@ -9735,6 +10097,11 @@ async function start() {
     httpApp.get('/admin-hub/v1/integrations/billbee/credentials', requireSellerAuth, adminHubBillbeeCredentialsGET)
     httpApp.post('/admin-hub/v1/integrations/billbee/credentials', requireSellerAuth, adminHubBillbeeCredentialsPOST)
     httpApp.post('/admin-hub/v1/integrations/billbee/test', requireSellerAuth, adminHubBillbeeIntegrationTestPOST)
+    // Billbee calls this URL to verify/authenticate the integration.
+    // Must be reachable from the Billbee backend.
+    httpApp.get('/admin-hub/v1/integrations/billbee/webhook-url', requireSellerAuth, adminHubBillbeeWebhookUrlGET)
+    httpApp.get('/admin-hub/v1/integrations/billbee/webhook', adminHubBillbeeWebhookGET)
+    httpApp.post('/admin-hub/v1/integrations/billbee/webhook', adminHubBillbeeWebhookPOST)
     httpApp.get('/admin-hub/v1/abandoned-carts', adminHubAbandonedCartsGET)
     // POST /admin-hub/v1/returns/:id/send-label — mark label sent + send email to customer
     const adminHubReturnSendLabelPOST = async (req, res) => {

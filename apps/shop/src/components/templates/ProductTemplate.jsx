@@ -580,6 +580,7 @@ function sanitizeHtml(html) {
 const META_ATTR_KEYS = ["material", "farbe", "colour", "color", "size", "gewicht", "cart", "curt", "stoff", "typ"];
 
 const META_HIDDEN_KEYS = [
+  "category_slug",
   "category_id", "admin_category_id", "collection_id", "collection_ids",
   "seller_id", "product_id", "media", "bullet_points", "uvp_cents", "rabattpreis_cents",
   "ean", "brand", "seller_name", "shop_name", "return_days", "return_cost", "return_kostenlos",
@@ -724,6 +725,31 @@ function BrandRow({ brandName, brandHandle, brandLogo, reviewCount }) {
   );
 }
 
+function findCategoryNodeBySlug(nodes, slug) {
+  const norm = String(slug || "").replace(/^\//, "");
+  for (const n of nodes || []) {
+    if (!n) continue;
+    const s = String(n.slug || n.handle || "").replace(/^\//, "");
+    if (s === norm) return n;
+    const child = findCategoryNodeBySlug(n.children, slug);
+    if (child) return child;
+  }
+  return null;
+}
+
+/** Returns ancestor nodes (root → direct parent) for a given slug, or null if not found. */
+function findAncestors(nodes, slug, path = []) {
+  const norm = String(slug || "").replace(/^\//, "");
+  for (const n of nodes || []) {
+    if (!n) continue;
+    const s = String(n.slug || n.handle || "").replace(/^\//, "");
+    if (s === norm) return path;
+    const found = findAncestors(n.children || [], slug, [...path, n]);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
 export default function ProductTemplate() {
   const params = useParams();
   const locale = useLocale();
@@ -748,6 +774,8 @@ export default function ProductTemplate() {
   const [multiOffer, setMultiOffer] = useState(null);
   const [selectedSellerId, setSelectedSellerId] = useState(null);
   const [otherSellersOpen, setOtherSellersOpen] = useState(false);
+  const [categoryAncestors, setCategoryAncestors] = useState([]);
+  const [categoryCurrentNode, setCategoryCurrentNode] = useState(null);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
@@ -815,6 +843,38 @@ export default function ProductTemplate() {
     }
     link.href = href;
   }, [product, locale]);
+
+  // Breadcrumb: show full category chain (root → … → current) if product has `metadata.category_slug`.
+  useEffect(() => {
+    const categorySlug = product?.metadata?.category_slug;
+    if (!categorySlug) {
+      setCategoryAncestors([]);
+      setCategoryCurrentNode(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetch("/api/store-categories?tree=true&is_visible=true", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const tree = data?.tree || data?.categories || [];
+        const roots = Array.isArray(tree) ? tree : [tree];
+        const ancestors = findAncestors(roots, categorySlug) || [];
+        const currentNode = findCategoryNodeBySlug(roots, categorySlug) || null;
+        setCategoryAncestors(ancestors);
+        setCategoryCurrentNode(currentNode);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCategoryAncestors([]);
+        setCategoryCurrentNode(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [product?.id, product?.metadata?.category_slug]);
 
   useEffect(() => {
     if (!product?.variation_groups?.length || !product?.variants?.length) return;
@@ -1001,7 +1061,9 @@ export default function ProductTemplate() {
     const h = meta.dimensions_height != null && meta.dimensions_height !== "" ? String(meta.dimensions_height).replace(".", ",") : null;
     const w = meta.dimensions_width  != null && meta.dimensions_width  !== "" ? String(meta.dimensions_width).replace(".", ",")  : null;
     const l = meta.dimensions_length != null && meta.dimensions_length !== "" ? String(meta.dimensions_length).replace(".", ",") : null;
-    const parts = [h, w, l].filter(Boolean);
+    // Keep the same order as the Excel template columns:
+    // length -> width -> height
+    const parts = [l, w, h].filter(Boolean);
     if (!parts.length) return null;
     return parts.join(" × ") + " cm";
   })();
@@ -1064,15 +1126,27 @@ export default function ProductTemplate() {
     }
   };
 
+  const categorySlugNorm = meta.category_slug ? String(meta.category_slug).replace(/^\//, "") : "";
+  const categoryCurrentLabel =
+    categoryCurrentNode?.name ||
+    meta.category_name ||
+    (categorySlugNorm
+      ? categorySlugNorm.replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase())
+      : "");
+
+  const collectionHandleNorm = product.collection?.handle ? String(product.collection.handle).replace(/^\//, "") : "";
+  const includeCollection = Boolean(product.collection) && collectionHandleNorm && collectionHandleNorm !== categorySlugNorm;
+
   const breadcrumbItems = [
     { label: "Home", href: "/" },
-    ...(meta.category_slug
-      ? [{
-          label: (meta.category_name || String(meta.category_slug).replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase())),
-          href: `/${meta.category_slug}`,
-        }]
+    ...(categoryAncestors || []).map((anc) => {
+      const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
+      return { label: anc.name || ancSlug, href: ancSlug ? `/${ancSlug}` : null };
+    }),
+    ...(categorySlugNorm
+      ? [{ label: categoryCurrentLabel, href: `/${categorySlugNorm}` }]
       : []),
-    ...(product.collection ? [{ label: product.collection.title, href: `/${product.collection.handle}` }] : []),
+    ...(includeCollection ? [{ label: product.collection.title, href: `/${product.collection.handle}` }] : []),
     { label: displayTitle, href: null },
   ];
 

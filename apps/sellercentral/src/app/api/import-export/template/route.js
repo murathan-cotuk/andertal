@@ -132,6 +132,7 @@ function buildColumns() {
     { key: "option6_value", label: "variation6_value", note: "Child: variation 6 value", width: 18, group: "variations" },
     { key: "unit_type", label: "unit_type", note: "Dropdown: kg | g | L | ml | piece", width: 12, group: "core" },
     { key: "unit_value", label: "unit_value", note: "e.g. 200", width: 12, group: "core" },
+    { key: "per_unit", label: "per_unit", note: "Reference quantity for price per unit (g/ml => 1000, kg/l/piece => 1)", width: 12, group: "core" },
   ];
   cols.push(...core);
 
@@ -473,6 +474,9 @@ async function buildWorkbook({
     type: "T-Shirt",
     category_slug: exCat,
     shipping_group: exShip,
+    unit_type: "g",
+    unit_value: 200,
+    per_unit: 1000,
     weight_grams: 200,
     image_url_1: "https://example.com/img/shirt-001.jpg",
     option1_name: "Farbe",

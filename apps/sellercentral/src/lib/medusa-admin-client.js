@@ -836,6 +836,10 @@ class MedusaAdminClient {
     })
   }
 
+  async getBillbeeWebhookUrl() {
+    return this.request('/admin-hub/v1/integrations/billbee/webhook-url')
+  }
+
   async getAbandonedCarts() {
     return this.request('/admin-hub/v1/abandoned-carts')
   }
