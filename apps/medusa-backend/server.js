@@ -174,7 +174,9 @@ async function start() {
     }
 
     const app = express()
-    app.use(express.json())
+    const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '10mb'
+    app.use(express.json({ limit: jsonBodyLimit }))
+    app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }))
     const allowedOrigins = getAllowedOrigins()
     const allowAllOrigins = allowedOrigins === null
     if (allowAllOrigins) {
