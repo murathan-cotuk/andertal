@@ -4,7 +4,22 @@ import React, { useState, useEffect } from "react";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const CATALOG = [
-  { name: "billbee", slug: "billbee", logo: "🐝", category: "erp", description: "Multichannel-Auftragsabwicklung & Lagerverwaltung" },
+  {
+    name: "billbee",
+    slug: "billbee",
+    logo: "🐝",
+    category: "erp",
+    description: "Multichannel-Auftragsabwicklung & Lagerverwaltung",
+    fieldLabels: {
+      api_key: "Schlüssel",
+      api_key_placeholder: "Billbee API-Schlüssel…",
+      api_secret: "Basic Auth Passwort",
+      api_secret_placeholder: "••••••••",
+      basic_auth_username: "Basic Auth Benutzername",
+      basic_auth_username_placeholder: "Benutzername eingeben…",
+    },
+    helpText: "Billbee benötigt: API-Schlüssel + Basic-Auth Benutzername + Basic-Auth Passwort.",
+  },
   { name: "xentral", slug: "xentral", logo: "⚡", category: "erp", description: "ERP-System für E-Commerce" },
   { name: "JTL-Wawi", slug: "jtl-wawi", logo: "🏪", category: "erp", description: "Warenwirtschaft & Fulfillment" },
   { name: "Shopify", slug: "shopify", logo: "🛍", category: "marketplace", description: "E-Commerce-Plattform" },
@@ -70,8 +85,10 @@ export default function IntegrationsSettingsPage() {
   const [integrations, setIntegrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // { app, integration? }
-  const [form, setForm] = useState({ api_key: "", api_secret: "", webhook_url: "" });
+  const [form, setForm] = useState({ api_key: "", api_secret: "", webhook_url: "", basic_auth_username: "", basic_auth_password: "" });
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState("all");
 
@@ -88,8 +105,9 @@ export default function IntegrationsSettingsPage() {
 
   const openModal = (app) => {
     const existing = getIntegration(app.slug);
-    setForm({ api_key: "", api_secret: "", webhook_url: existing?.webhook_url || "" });
+    setForm({ api_key: "", api_secret: "", webhook_url: existing?.webhook_url || "", basic_auth_username: "", basic_auth_password: "" });
     setModal({ app, integration: existing });
+    setTestResult(null);
     setErr("");
   };
 
@@ -97,9 +115,32 @@ export default function IntegrationsSettingsPage() {
     setSaving(true); setErr("");
     try {
       const client = getMedusaAdminClient();
-      const payload = { name: modal.app.name, slug: modal.app.slug, logo_url: modal.app.logo, category: modal.app.category, is_active: true, ...form };
+      const isBillbee = modal.app.slug === "billbee";
+      const billbeeConfig = isBillbee
+        ? {
+          ...(form.basic_auth_username ? { basic_auth_username: form.basic_auth_username } : {}),
+          ...(form.basic_auth_password ? { basic_auth_password: form.basic_auth_password } : {}),
+        }
+        : undefined;
+      const payload = {
+        name: modal.app.name,
+        slug: modal.app.slug,
+        logo_url: modal.app.logo,
+        category: modal.app.category,
+        is_active: true,
+        api_key: form.api_key,
+        api_secret: form.api_secret,
+        webhook_url: form.webhook_url,
+        ...(billbeeConfig ? { config: billbeeConfig } : {}),
+      };
       if (modal.integration) {
-        await client.updateIntegration(modal.integration.id, { api_key: form.api_key || undefined, api_secret: form.api_secret || undefined, webhook_url: form.webhook_url, is_active: true });
+        await client.updateIntegration(modal.integration.id, {
+          api_key: form.api_key || undefined,
+          api_secret: form.api_secret || undefined,
+          webhook_url: form.webhook_url,
+          is_active: true,
+          ...(billbeeConfig ? { config: billbeeConfig } : {}),
+        });
       } else {
         await client.saveIntegration(payload);
       }
@@ -107,6 +148,25 @@ export default function IntegrationsSettingsPage() {
       setModal(null);
     } catch (e) { setErr(e?.message || "Fehler"); }
     setSaving(false);
+  };
+
+  const handleBillbeeTest = async () => {
+    if (!modal || modal.app.slug !== "billbee") return;
+    setTesting(true);
+    setErr("");
+    setTestResult(null);
+    try {
+      const client = getMedusaAdminClient();
+      const result = await client.testBillbeeIntegration({
+        api_key: form.api_key || "",
+        basic_auth_username: form.basic_auth_username || "",
+        basic_auth_password: form.api_secret || "",
+      });
+      setTestResult({ ok: true, message: result?.message || "Verbindung erfolgreich." });
+    } catch (e) {
+      setTestResult({ ok: false, message: e?.message || "Verbindung fehlgeschlagen." });
+    }
+    setTesting(false);
   };
 
   const handleToggle = async (integration) => {
@@ -215,6 +275,18 @@ export default function IntegrationsSettingsPage() {
                 <label style={lbl}>{modal.app.fieldLabels?.api_key || "API-Schlüssel"}</label>
                 <input style={inp} type={modal.app.slug === "trustpilot" ? "text" : "password"} value={form.api_key} onChange={e => setForm(f => ({ ...f, api_key: e.target.value }))} placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.api_key_placeholder || "API Key eingeben…")} />
               </div>
+              {modal.app.slug === "billbee" && (
+                <div>
+                  <label style={lbl}>{modal.app.fieldLabels?.basic_auth_username || "Basic Auth Benutzername"}</label>
+                  <input
+                    style={inp}
+                    type="text"
+                    value={form.basic_auth_username}
+                    onChange={e => setForm(f => ({ ...f, basic_auth_username: e.target.value }))}
+                    placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.basic_auth_username_placeholder || "Benutzername eingeben…")}
+                  />
+                </div>
+              )}
               <div>
                 <label style={lbl}>{modal.app.fieldLabels?.api_secret || "API-Geheimnis / Secret"}</label>
                 <input style={inp} type="password" value={form.api_secret} onChange={e => setForm(f => ({ ...f, api_secret: e.target.value }))} placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.api_secret_placeholder || "API Secret eingeben…")} />
@@ -225,6 +297,23 @@ export default function IntegrationsSettingsPage() {
               {modal.integration && (
                 <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 7, padding: "10px 14px", fontSize: 12, color: "#6b7280" }}>
                   ✓ Bereits verbunden. Felder leer lassen um bestehende Zugangsdaten zu behalten.
+                </div>
+              )}
+              {modal.app.slug === "billbee" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    onClick={handleBillbeeTest}
+                    disabled={testing}
+                    style={{ padding: "7px 14px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 12, cursor: testing ? "default" : "pointer", background: "#fff", fontWeight: 600 }}
+                  >
+                    {testing ? "Verbindung wird getestet…" : "Verbindung testen"}
+                  </button>
+                  {testResult && (
+                    <span style={{ fontSize: 12, color: testResult.ok ? "#15803d" : "#b91c1c" }}>
+                      {testResult.ok ? "✓ " : "✕ "}
+                      {testResult.message}
+                    </span>
+                  )}
                 </div>
               )}
             </div>

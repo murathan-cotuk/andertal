@@ -9,6 +9,14 @@ const monorepoRoot = path.join(__dirname, "../..");
 const nextConfig = {
   outputFileTracingRoot: monorepoRoot,
   reactStrictMode: true,
+  experimental: {
+    // Allow larger multipart/form-data payloads for Excel import route handlers.
+    proxyClientMaxBodySize: 50 * 1024 * 1024, // 50MB
+    // Keep in sync for potential server action usage.
+    serverActions: {
+      bodySizeLimit: "50mb",
+    },
+  },
   transpilePackages: ["@belucha/ui", "@belucha/lib"],
   compiler: {
     styledComponents: true,

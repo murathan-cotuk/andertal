@@ -818,6 +818,13 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/integrations/${encodeURIComponent(id)}`, { method: 'DELETE' })
   }
 
+  async testBillbeeIntegration(data) {
+    return this.request('/admin-hub/v1/integrations/billbee/test', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    })
+  }
+
   async getAbandonedCarts() {
     return this.request('/admin-hub/v1/abandoned-carts')
   }

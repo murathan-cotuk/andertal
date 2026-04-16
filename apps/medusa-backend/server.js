@@ -9304,6 +9304,38 @@ async function start() {
       }
     }
 
+    const adminHubBillbeeIntegrationTestPOST = async (req, res) => {
+      try {
+        const body = req.body || {}
+        const apiKey = String(body.api_key || '').trim()
+        const username = String(body.basic_auth_username || '').trim()
+        const password = String(body.basic_auth_password || '').trim()
+        if (!apiKey || !username || !password) {
+          return res.status(400).json({ message: 'api_key, basic_auth_username and basic_auth_password are required' })
+        }
+
+        const authBase64 = Buffer.from(`${username}:${password}`).toString('base64')
+        const response = await fetch('https://app.billbee.io/api/v1/orders?top=1', {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            'X-Billbee-Api-Key': apiKey,
+            Authorization: `Basic ${authBase64}`,
+          },
+        })
+
+        if (!response.ok) {
+          const raw = await response.text().catch(() => '')
+          const detail = raw ? ` — ${String(raw).slice(0, 180)}` : ''
+          return res.status(400).json({ message: `Billbee connection failed (HTTP ${response.status})${detail}` })
+        }
+
+        return res.json({ ok: true, message: 'Billbee connection successful.' })
+      } catch (e) {
+        return res.status(500).json({ message: e?.message || 'Billbee test failed' })
+      }
+    }
+
     // ── Admin Hub Abandoned Carts ─────────────────────────────────
     const adminHubAbandonedCartsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -9625,6 +9657,7 @@ async function start() {
     httpApp.post('/admin-hub/v1/integrations', adminHubIntegrationPOST)
     httpApp.patch('/admin-hub/v1/integrations/:id', adminHubIntegrationPATCH)
     httpApp.delete('/admin-hub/v1/integrations/:id', adminHubIntegrationDELETE)
+    httpApp.post('/admin-hub/v1/integrations/billbee/test', requireSellerAuth, adminHubBillbeeIntegrationTestPOST)
     httpApp.get('/admin-hub/v1/abandoned-carts', adminHubAbandonedCartsGET)
     // POST /admin-hub/v1/returns/:id/send-label — mark label sent + send email to customer
     const adminHubReturnSendLabelPOST = async (req, res) => {

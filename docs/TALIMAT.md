@@ -1,5 +1,7 @@
 16.04.
 
+- 2fa
+- billbee entegrasyonu
 -- bir siparis geldiginde ve sellercentralde trackingnummer girildiginde o trackingnummer in kargo güncellemelerinin görüntülenebilmesini ve gönderi durumuna göre siparis durumunun da güncellenmesini istiyorum. gönderildiginde "versendet", teslim edildiginde "zugestellet" olmali lieferstatus. bunun takibinin yapilabilecegi sekilde ayarla sellerin sisteme kaydettigi versandmethodeler ile
 -- /landing-page sayfasindaki templates sekmelerinde yaptigim degisiklikler shopa yansimiyor. ayrica diger konteyner ayarlari da burada bulunabilsin. inhalt volle breite mi zentriert mi falan secilebilsin ve daha estetik bir yerlesim yap
 -- shopta görünen kategori template i koleksiyon template inden biraz farkli. koleksiyon templateindeki sidebar cok güzel duruyor. sola yapisik vs. ancak kategori template inde öyle degil. kategori templateindeki sidebar da kolkesiyon template i gibi olsun ancak su anki gibi ortadan ikiye bölünmüs, üstte sub kategoriler altta filtreler kalmaya devam edecek. 
