@@ -32,6 +32,8 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
   const [loading, setLoading] = useState(true);
   const [addingEvent, setAddingEvent] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState("");
   const [deletingId, setDeletingId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({ status: "in_transit", description: "", location: "" });
@@ -74,6 +76,26 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
     setSaving(false);
   };
 
+  const handleRefreshTracking = async () => {
+    setRefreshing(true);
+    setRefreshMsg("");
+    setError("");
+    try {
+      const client = getMedusaAdminClient();
+      const data = await client.refreshTracking(orderId);
+      const msg = data?.inserted > 0
+        ? `${data.inserted} neue${data.inserted === 1 ? "s" : ""} Ereignis${data.inserted === 1 ? "" : "se"} von DHL importiert`
+        : (data?.message || "Keine neuen Ereignisse");
+      setRefreshMsg(msg);
+      if (data?.events) setEvents(data.events);
+      if (data?.trackingUrl) setTrackingUrl(data.trackingUrl);
+      if (onOrderStatusChanged) onOrderStatusChanged();
+    } catch (e) {
+      setError(e?.message || "Fehler beim Abrufen der Tracking-Daten");
+    }
+    setRefreshing(false);
+  };
+
   const handleDelete = async (eventId) => {
     if (!confirm("Ereignis löschen?")) return;
     setDeletingId(eventId);
@@ -92,19 +114,33 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
 
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111827" }}>Sendungsverfolgung</h3>
-        {trackingUrl && (
-          <a
-            href={trackingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: 12, fontWeight: 600, color: "#1d4ed8", textDecoration: "none", padding: "5px 12px", border: "1px solid #bfdbfe", borderRadius: 6, background: "#eff6ff", display: "flex", alignItems: "center", gap: 5 }}
-          >
-            🔗 Paket verfolgen
-          </a>
-        )}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {order?.tracking_number && (
+            <button
+              onClick={handleRefreshTracking}
+              disabled={refreshing}
+              style={{ fontSize: 11, fontWeight: 600, color: "#374151", padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#f9fafb", cursor: "pointer", opacity: refreshing ? 0.6 : 1 }}
+            >
+              {refreshing ? "Wird abgerufen…" : "↻ Aktualisieren"}
+            </button>
+          )}
+          {trackingUrl && (
+            <a
+              href={trackingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 12, fontWeight: 600, color: "#1d4ed8", textDecoration: "none", padding: "5px 12px", border: "1px solid #bfdbfe", borderRadius: 6, background: "#eff6ff", display: "flex", alignItems: "center", gap: 5 }}
+            >
+              🔗 Paket verfolgen
+            </a>
+          )}
+        </div>
       </div>
+      {refreshMsg && (
+        <div style={{ marginBottom: 10, padding: "6px 12px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, fontSize: 12, color: "#15803d" }}>{refreshMsg}</div>
+      )}
 
       {/* Carrier + Tracking info */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16, padding: "10px 14px", background: "#f9fafb", borderRadius: 8, fontSize: 13 }}>

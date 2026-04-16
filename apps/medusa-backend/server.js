@@ -3340,7 +3340,35 @@ async function start() {
     httpApp.get('/admin-hub/products/:id', adminHubProductByIdGET)
     httpApp.put('/admin-hub/products/:id', adminHubProductByIdPUT)
     httpApp.delete('/admin-hub/products/:id', adminHubProductByIdDELETE)
-    console.log('Admin Hub routes: GET/POST /admin-hub/products, GET/PUT/DELETE /admin-hub/products/:id')
+    // PATCH /admin-hub/products/:id/variants — variant-only update (no GPSR validation)
+    httpApp.patch('/admin-hub/products/:id/variants', requireSellerAuth, async (req, res) => {
+      try {
+        const body = req.body || {}
+        if (!Array.isArray(body.variants)) {
+          return res.status(400).json({ message: 'variants array required' })
+        }
+        const existing = await getAdminHubProductByIdOrHandleDb(req.params.id)
+        if (!existing) return res.status(404).json({ message: 'Product not found' })
+        const isSuperuser = req.sellerUser?.is_superuser || false
+        const callerSellerId = (!isSuperuser && req.sellerUser?.seller_id) ? String(req.sellerUser.seller_id).trim() : null
+        // Sellers can only update their own products
+        if (callerSellerId && existing.seller_id && String(existing.seller_id).trim() !== callerSellerId) {
+          return res.status(403).json({ message: 'Forbidden' })
+        }
+        const client = getProductsDbClient()
+        if (!client) return res.status(503).json({ message: 'Database not configured' })
+        await client.connect()
+        const variantsJson = JSON.stringify(body.variants)
+        await client.query('UPDATE admin_hub_products SET variants = $1, updated_at = now() WHERE id = $2', [variantsJson, existing.id])
+        await client.end()
+        const updated = await getAdminHubProductByIdOrHandleDb(existing.id)
+        res.json({ product: updated })
+      } catch (err) {
+        console.error('PATCH product variants error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    })
+    console.log('Admin Hub routes: GET/POST /admin-hub/products, GET/PUT/DELETE /admin-hub/products/:id, PATCH /admin-hub/products/:id/variants')
 
     /** ISO2 uppercase; UK → GB. Invalid → ''. */
     const normalizeHubCountryCode = (code) => {
@@ -6143,49 +6171,15 @@ async function start() {
         const shopName = process.env.SHOP_INVOICE_NAME || 'Belucha'
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="Rechnung-${on}.pdf"`)
-        const doc = new PDFDocument({ margin: 48, size: 'A4' })
+        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
         doc.pipe(res)
-        doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Rechnung'), { align: 'right' })
-        doc.moveDown(0.2)
-        doc.fontSize(9).fillColor('#666').text(pdfDeLatin(shopName), { align: 'right' })
-        doc.fillColor('#111')
-        doc.moveDown(1.2)
-        doc.fontSize(10).text(`Rechnungs-Nr.: ${on}`)
-        doc.text(`Datum: ${pdfFmtDate(row.created_at)}`)
-        doc.text(`Bestell-ID: ${orderId}`)
-        doc.moveDown(0.6)
-        const custName = [row.first_name, row.last_name].filter(Boolean).join(' ')
-        doc.text(`Kunde: ${pdfDeLatin(custName || '—')}`)
-        if (row.email) doc.text(`E-Mail: ${pdfDeLatin(row.email)}`)
-        doc.moveDown(0.6)
-        doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Lieferadresse'))
-        doc.font('Helvetica').fontSize(9)
-        ;[custName, row.address_line1, row.address_line2, [row.postal_code, row.city].filter(Boolean).join(' '), row.country].filter(Boolean).forEach((line) => doc.text(pdfDeLatin(line)))
-        const billDiff = row.billing_same_as_shipping === false && row.billing_address_line1
-        if (billDiff) {
-          doc.moveDown(0.5)
-          doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Rechnungsadresse'))
-          doc.font('Helvetica').fontSize(9)
-          ;[[row.first_name, row.last_name].filter(Boolean).join(' '), row.billing_address_line1, row.billing_address_line2, [row.billing_postal_code, row.billing_city].filter(Boolean).join(' '), row.billing_country].filter(Boolean).forEach((line) => doc.text(pdfDeLatin(line)))
-        }
-        doc.moveDown(0.8)
-        doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Positionen'))
-        doc.font('Helvetica').fontSize(9)
-        itemRows.forEach((it) => {
-          const qty = Number(it.quantity || 1)
-          const unit = Number(it.unit_price_cents || 0)
-          doc.text(`${qty} x ${pdfDeLatin(it.title || 'Artikel')} — ${pdfCents(unit)} / Stk. — ${pdfCents(unit * qty)}`, { width: 500 })
+        renderInvoicePdfDocument(doc, {
+          row,
+          itemRows,
+          orderId,
+          invoiceNumber: on,
+          shopName,
         })
-        doc.moveDown(0.6)
-        const sub = row.subtotal_cents != null ? Number(row.subtotal_cents) : itemRows.reduce((s, it) => s + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
-        const ship = Number(row.shipping_cents || 0)
-        const disc = Number(row.discount_cents || 0)
-        doc.text(`Zwischensumme: ${pdfCents(sub)}`)
-        doc.text(`Versand: ${ship > 0 ? pdfCents(ship) : '0,00 EUR (kostenlos)'}`)
-        if (disc > 0) doc.text(`Rabatt: -${pdfCents(disc)}`)
-        doc.font('Helvetica-Bold').fontSize(11).text(`Gesamt: ${pdfCents(row.total_cents != null ? row.total_cents : sub + ship - disc)}`)
-        doc.font('Helvetica').fontSize(8).fillColor('#666').moveDown(1)
-        doc.text(pdfDeLatin('Hinweis: Es handelt sich um eine vereinfachte Rechnung. Bei Fragen wenden Sie sich an den Verkäufer.'), { width: 480 })
         doc.end()
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -8004,6 +7998,141 @@ async function start() {
       }
     }
     const pdfCents = (c) => (Number(c || 0) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' EUR'
+    function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, shopName }) {
+      const left = doc.page.margins.left
+      const right = doc.page.width - doc.page.margins.right
+      const contentWidth = right - left
+      const invoiceMetaWidth = 220
+      const tableTop = 292
+      const tableTitleW = Math.round(contentWidth * 0.54)
+      const tableQtyW = 52
+      const tableUnitW = 110
+      const tableTotalW = contentWidth - tableTitleW - tableQtyW - tableUnitW
+      const tableUnitX = right - tableTotalW - tableUnitW
+      const tableTotalX = right - tableTotalW
+      const customerName = [row.first_name, row.last_name].filter(Boolean).join(' ')
+      const billingAddressDifferent = row.billing_same_as_shipping === false && row.billing_address_line1
+      const subtotal = row.subtotal_cents != null ? Number(row.subtotal_cents) : itemRows.reduce((sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
+      const shipping = Number(row.shipping_cents || 0)
+      const discount = Number(row.discount_cents || 0)
+      const grandTotal = row.total_cents != null ? Number(row.total_cents) : subtotal + shipping - discount
+      const ensureY = (minY) => {
+        if (doc.y > minY) {
+          doc.addPage()
+        }
+      }
+
+      doc.rect(left, 34, contentWidth, 44).fill('#111827')
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16).text(pdfDeLatin(shopName || 'Belucha'), left + 14, 49, { width: contentWidth - 28, align: 'left' })
+
+      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(25).text('RECHNUNG', left, 94)
+      doc.font('Helvetica').fontSize(10).fillColor('#4b5563').text(`Rechnungs-Nr.: ${invoiceNumber}`, right - invoiceMetaWidth, 96, { width: invoiceMetaWidth, align: 'right' })
+      doc.text(`Datum: ${pdfFmtDate(row.created_at)}`, right - invoiceMetaWidth, 111, { width: invoiceMetaWidth, align: 'right' })
+      doc.text(`Bestell-ID: ${orderId}`, right - invoiceMetaWidth, 126, { width: invoiceMetaWidth, align: 'right' })
+
+      doc.fillColor('#111827').font('Helvetica-Bold').fontSize(10).text('KUNDE', left, 152)
+      doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
+      ;[customerName || '—', row.email || null].filter(Boolean).forEach((line) => {
+        doc.text(pdfDeLatin(line), left, doc.y + 1)
+      })
+
+      const addressTop = 152
+      const rightColumnX = left + Math.round(contentWidth / 2) + 8
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text('LIEFERADRESSE', rightColumnX, addressTop)
+      doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
+      ;[
+        customerName,
+        row.address_line1,
+        row.address_line2,
+        [row.postal_code, row.city].filter(Boolean).join(' '),
+        row.country,
+      ]
+        .filter(Boolean)
+        .forEach((line) => doc.text(pdfDeLatin(line), rightColumnX, doc.y + 1))
+
+      if (billingAddressDifferent) {
+        const nextY = Math.max(doc.y, 216)
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text('RECHNUNGSADRESSE', rightColumnX, nextY)
+        doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
+        ;[
+          [row.first_name, row.last_name].filter(Boolean).join(' '),
+          row.billing_address_line1,
+          row.billing_address_line2,
+          [row.billing_postal_code, row.billing_city].filter(Boolean).join(' '),
+          row.billing_country,
+        ]
+          .filter(Boolean)
+          .forEach((line) => doc.text(pdfDeLatin(line), rightColumnX, doc.y + 1))
+      }
+
+      ensureY(tableTop)
+      doc.rect(left, tableTop, contentWidth, 22).fill('#f3f4f6')
+      doc.fillColor('#111827').font('Helvetica-Bold').fontSize(9)
+      doc.text('ARTIKEL', left + 8, tableTop + 7, { width: tableTitleW - 16 })
+      doc.text('MENGE', left + tableTitleW + 4, tableTop + 7, { width: tableQtyW - 8, align: 'right' })
+      doc.text('EINZELPREIS', tableUnitX + 4, tableTop + 7, { width: tableUnitW - 8, align: 'right' })
+      doc.text('GESAMT', tableTotalX + 4, tableTop + 7, { width: tableTotalW - 8, align: 'right' })
+      doc.y = tableTop + 27
+
+      const drawItemRow = (it) => {
+        const qty = Number(it.quantity || 1)
+        const unit = Number(it.unit_price_cents || 0)
+        const lineTotal = unit * qty
+        const title = pdfDeLatin(it.title || 'Artikel')
+        const titleHeight = doc.heightOfString(title, { width: tableTitleW - 16, align: 'left' })
+        const rowHeight = Math.max(20, titleHeight + 8)
+        const y = doc.y
+        if (y + rowHeight + 120 > doc.page.height - doc.page.margins.bottom) {
+          doc.addPage()
+          doc.rect(left, doc.page.margins.top, contentWidth, 22).fill('#f3f4f6')
+          doc.fillColor('#111827').font('Helvetica-Bold').fontSize(9)
+          doc.text('ARTIKEL', left + 8, doc.page.margins.top + 7, { width: tableTitleW - 16 })
+          doc.text('MENGE', left + tableTitleW + 4, doc.page.margins.top + 7, { width: tableQtyW - 8, align: 'right' })
+          doc.text('EINZELPREIS', tableUnitX + 4, doc.page.margins.top + 7, { width: tableUnitW - 8, align: 'right' })
+          doc.text('GESAMT', tableTotalX + 4, doc.page.margins.top + 7, { width: tableTotalW - 8, align: 'right' })
+          doc.y = doc.page.margins.top + 27
+        }
+        const rowY = doc.y
+        doc.font('Helvetica').fontSize(10).fillColor('#111827').text(title, left + 8, rowY + 4, { width: tableTitleW - 16 })
+        doc.text(String(qty), left + tableTitleW + 4, rowY + 4, { width: tableQtyW - 8, align: 'right' })
+        doc.text(pdfCents(unit), tableUnitX + 4, rowY + 4, { width: tableUnitW - 8, align: 'right' })
+        doc.text(pdfCents(lineTotal), tableTotalX + 4, rowY + 4, { width: tableTotalW - 8, align: 'right' })
+        doc.moveTo(left, rowY + rowHeight).lineTo(right, rowY + rowHeight).lineWidth(0.5).strokeColor('#e5e7eb').stroke()
+        doc.y = rowY + rowHeight + 2
+      }
+
+      if (!itemRows.length) {
+        drawItemRow({ title: 'Keine Artikel', quantity: 1, unit_price_cents: 0 })
+      } else {
+        itemRows.forEach(drawItemRow)
+      }
+
+      if (doc.y + 120 > doc.page.height - doc.page.margins.bottom) doc.addPage()
+      const totalsWidth = 250
+      const totalsX = right - totalsWidth
+      const drawTotalLine = (label, value, bold = false) => {
+        const y = doc.y
+        doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 11 : 10).fillColor('#111827')
+        doc.text(label, totalsX, y, { width: totalsWidth * 0.55, align: 'left' })
+        doc.text(value, totalsX + totalsWidth * 0.55, y, { width: totalsWidth * 0.45, align: 'right' })
+        doc.y = y + (bold ? 18 : 16)
+      }
+      doc.moveDown(0.4)
+      drawTotalLine('Zwischensumme', pdfCents(subtotal))
+      drawTotalLine('Versand', shipping > 0 ? pdfCents(shipping) : '0,00 EUR (kostenlos)')
+      if (discount > 0) drawTotalLine('Rabatt', `-${pdfCents(discount)}`)
+      doc.moveTo(totalsX, doc.y).lineTo(right, doc.y).lineWidth(1).strokeColor('#d1d5db').stroke()
+      doc.y += 4
+      drawTotalLine('Gesamt', pdfCents(grandTotal), true)
+
+      doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
+      doc.text(
+        pdfDeLatin('Hinweis: Dies ist eine vereinfachte Rechnung. Bei Rueckfragen wenden Sie sich bitte an den Verkaeufer.'),
+        left,
+        doc.page.height - doc.page.margins.bottom - 22,
+        { width: contentWidth, align: 'left' },
+      )
+    }
 
     const adminHubOrderPdfInvoiceGET = async (req, res) => {
       const id = (req.params.id || '').trim()
@@ -8030,62 +8159,15 @@ async function start() {
         const shopName = process.env.SHOP_INVOICE_NAME || 'Belucha'
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="Rechnung-${on}.pdf"`)
-        const doc = new PDFDocument({ margin: 48, size: 'A4' })
+        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
         doc.pipe(res)
-        doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Rechnung'), { align: 'right' })
-        doc.moveDown(0.2)
-        doc.fontSize(9).fillColor('#666').text(pdfDeLatin(shopName), { align: 'right' })
-        doc.fillColor('#111')
-        doc.moveDown(1.2)
-        doc.fontSize(10).text(`Rechnungs-Nr.: ${on}`)
-        doc.text(`Datum: ${pdfFmtDate(row.created_at)}`)
-        doc.text(`Bestell-ID: ${id}`)
-        doc.moveDown(0.6)
-        const custName = [row.first_name, row.last_name].filter(Boolean).join(' ')
-        doc.text(`Kunde: ${pdfDeLatin(custName || '—')}`)
-        if (row.email) doc.text(`E-Mail: ${pdfDeLatin(row.email)}`)
-        doc.moveDown(0.6)
-        doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Lieferadresse'))
-        doc.font('Helvetica').fontSize(9)
-        ;[custName, row.address_line1, row.address_line2, [row.postal_code, row.city].filter(Boolean).join(' '), row.country].filter(Boolean).forEach((line) => doc.text(pdfDeLatin(line)))
-        const billDiff = row.billing_same_as_shipping === false && row.billing_address_line1
-        if (billDiff) {
-          doc.moveDown(0.5)
-          doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Rechnungsadresse'))
-          doc.font('Helvetica').fontSize(9)
-          ;[
-            [row.first_name, row.last_name].filter(Boolean).join(' '),
-            row.billing_address_line1,
-            row.billing_address_line2,
-            [row.billing_postal_code, row.billing_city].filter(Boolean).join(' '),
-            row.billing_country,
-          ]
-            .filter(Boolean)
-            .forEach((line) => doc.text(pdfDeLatin(line)))
-        }
-        doc.moveDown(0.8)
-        doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Positionen'))
-        doc.font('Helvetica').fontSize(9)
-        itemRows.forEach((it) => {
-          const qty = Number(it.quantity || 1)
-          const unit = Number(it.unit_price_cents || 0)
-          const lineTotal = unit * qty
-          doc.text(
-            `${qty} x ${pdfDeLatin(it.title || 'Artikel')} — ${pdfCents(unit)} / Stk. — ${pdfCents(lineTotal)}`,
-            { width: 500 },
-          )
+        renderInvoicePdfDocument(doc, {
+          row,
+          itemRows,
+          orderId: id,
+          invoiceNumber: on,
+          shopName,
         })
-        doc.moveDown(0.6)
-        const sub = row.subtotal_cents != null ? Number(row.subtotal_cents) : itemRows.reduce((s, it) => s + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
-        const ship = Number(row.shipping_cents || 0)
-        const disc = Number(row.discount_cents || 0)
-        doc.text(`Zwischensumme: ${pdfCents(sub)}`)
-        doc.text(`Versand: ${ship > 0 ? pdfCents(ship) : '0,00 EUR (kostenlos)'}`)
-        if (disc > 0) doc.text(`Rabatt: -${pdfCents(disc)}`)
-        doc.font('Helvetica-Bold').fontSize(11).text(`Gesamt: ${pdfCents(row.total_cents != null ? row.total_cents : sub + ship - disc)}`)
-        doc.font('Helvetica').fontSize(8).fillColor('#666')
-        doc.moveDown(1)
-        doc.text(pdfDeLatin('Hinweis: Es handelt sich um eine vereinfachte Rechnung. Bei Fragen wenden Sie sich an den Verkäufer.'), { width: 480 })
         doc.end()
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -9012,6 +9094,131 @@ async function start() {
       }
     }
 
+    // ─── Carrier API Tracking Refresh ─────────────────────────────────────────
+
+    /**
+     * Maps DHL event status codes / descriptions to our internal status values.
+     * https://developer.dhl.com/api-reference/shipment-tracking
+     */
+    function mapDhlStatus(event) {
+      const code = String(event?.status?.statusCode || '').toUpperCase()
+      const desc = String(event?.status?.description || event?.status?.status || '').toLowerCase()
+      if (code === 'delivered' || desc.includes('zugestellt') || desc.includes('delivered')) return 'zugestellt'
+      if (code === 'out-for-delivery' || desc.includes('zur zustellung') || desc.includes('out for delivery')) return 'in_transit'
+      if (code === 'in-transit' || desc.includes('transport') || desc.includes('weitertransport') || desc.includes('in transit')) return 'in_transit'
+      if (code === 'transit') return 'in_transit'
+      if (code === 'exception' || desc.includes('ausnahme') || desc.includes('exception') || desc.includes('fehler')) return 'exception'
+      if (code === 'pre-transit' || desc.includes('aufgegeben') || desc.includes('pre-transit') || desc.includes('vorbereitung')) return 'versendet'
+      return 'in_transit'
+    }
+
+    const adminHubOrderRefreshTrackingPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = isSuperuser ? null : (req.sellerUser?.seller_id || null)
+      const id = (req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'order id required' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const ownerQ = await client.query(
+          'SELECT id, carrier_name, tracking_number FROM store_orders WHERE id=$1::uuid' + (isSuperuser ? '' : ' AND seller_id=$2'),
+          isSuperuser ? [id] : [id, callerSellerId]
+        )
+        if (!ownerQ.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const order = ownerQ.rows[0]
+        if (!order.tracking_number) { await client.end(); return res.json({ events: [], message: 'No tracking number' }) }
+
+        // Look up carrier API key + tracking URL template from DB
+        const carrierQ = await client.query(
+          'SELECT name, tracking_url_template, api_key FROM store_shipping_carriers WHERE LOWER(TRIM(name))=LOWER(TRIM($1)) AND is_active=true LIMIT 1',
+          [order.carrier_name || '']
+        )
+        const carrierRow = carrierQ.rows[0] || {}
+        const apiKey = carrierRow.api_key || null
+        const carrierName = String(order.carrier_name || '').trim().toLowerCase()
+        const trackingNumber = String(order.tracking_number || '').trim()
+
+        let newEvents = []
+        let fetchError = null
+
+        // ── DHL API ──────────────────────────────────────────────────────────
+        if ((carrierName === 'dhl' || carrierName.startsWith('dhl')) && apiKey) {
+          try {
+            const https = require('https')
+            const dhlUrl = `https://api-eu.dhl.com/track/shipments?trackingNumber=${encodeURIComponent(trackingNumber)}`
+            const dhlData = await new Promise((resolve, reject) => {
+              const reqOpts = new URL(dhlUrl)
+              const r = https.request({ hostname: reqOpts.hostname, path: reqOpts.pathname + reqOpts.search, method: 'GET', headers: { 'DHL-API-Key': apiKey, 'Accept': 'application/json' } }, (resp) => {
+                let body = ''
+                resp.on('data', d => { body += d })
+                resp.on('end', () => {
+                  try { resolve(JSON.parse(body)) } catch { resolve({ error: body }) }
+                })
+              })
+              r.on('error', reject)
+              r.end()
+            })
+            const shipment = dhlData?.shipments?.[0]
+            const events = shipment?.events || []
+            for (const ev of events) {
+              const ts = ev.timestamp ? new Date(ev.timestamp).toISOString() : new Date().toISOString()
+              const location = [ev.location?.address?.addressLocality, ev.location?.address?.countryCode].filter(Boolean).join(', ')
+              const desc = ev.description || ev.status?.description || ''
+              const status = mapDhlStatus(ev)
+              newEvents.push({ status, description: desc, location: location || null, event_time: ts })
+            }
+          } catch (e) {
+            fetchError = e?.message || 'DHL API error'
+          }
+        }
+        // ── DPD API ──────────────────────────────────────────────────────────
+        // (DPD uses a SOAP API — add api_key support here if needed)
+        // ── UPS API ──────────────────────────────────────────────────────────
+        // (UPS uses OAuth2 — add here if needed)
+
+        if (!newEvents.length) {
+          await client.end()
+          return res.json({ events: [], message: fetchError || 'No tracking data available — check API key in carrier settings', trackingUrl: buildTrackingUrl(order.carrier_name, trackingNumber, carrierRow.tracking_url_template) })
+        }
+
+        // Upsert events: insert only new ones (match by event_time + status)
+        let inserted = 0
+        let latestStatus = null
+        for (const ev of newEvents) {
+          const exists = await client.query(
+            `SELECT id FROM store_shipment_events WHERE order_id=$1::uuid AND status=$2 AND event_time=$3::timestamp LIMIT 1`,
+            [id, ev.status, ev.event_time]
+          )
+          if (!exists.rows.length) {
+            await client.query(
+              `INSERT INTO store_shipment_events (order_id, status, description, location, event_time, source) VALUES ($1::uuid, $2, $3, $4, $5::timestamp, 'api')`,
+              [id, ev.status, ev.description || null, ev.location || null, ev.event_time]
+            )
+            inserted++
+          }
+          latestStatus = ev.status // last event is newest (DHL sends newest last? let's take the array's last item)
+        }
+        // DHL events are newest-last, take the most recent
+        const mostRecentEvent = newEvents[newEvents.length - 1]
+        const mostRecentStatus = mostRecentEvent?.status
+        if (mostRecentStatus === 'zugestellt') {
+          await client.query(`UPDATE store_orders SET delivery_status='zugestellt', updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
+          await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [id])
+        } else if (mostRecentStatus === 'versendet' || mostRecentStatus === 'in_transit') {
+          await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [id])
+        }
+        const allEvents = await client.query('SELECT * FROM store_shipment_events WHERE order_id=$1::uuid ORDER BY event_time ASC, created_at ASC', [id])
+        await client.end()
+        res.json({ events: allEvents.rows || [], inserted, trackingUrl: buildTrackingUrl(order.carrier_name, trackingNumber, carrierRow.tracking_url_template) })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
 
     const adminHubIntegrationsGET = async (req, res) => {
@@ -9399,6 +9606,7 @@ async function start() {
     httpApp.get('/admin-hub/v1/orders/:id/shipment-events', requireSellerAuth, adminHubShipmentEventsGET)
     httpApp.post('/admin-hub/v1/orders/:id/shipment-events', requireSellerAuth, adminHubShipmentEventPOST)
     httpApp.delete('/admin-hub/v1/shipment-events/:eventId', requireSellerAuth, adminHubShipmentEventDELETE)
+    httpApp.post('/admin-hub/v1/orders/:id/refresh-tracking', requireSellerAuth, adminHubOrderRefreshTrackingPOST)
     httpApp.get('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomersGET)
     httpApp.post('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomerPOST)
     httpApp.patch('/admin-hub/v1/customers/:id', requireSellerAuth, adminHubCustomerPATCH)

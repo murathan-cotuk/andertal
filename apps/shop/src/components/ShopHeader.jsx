@@ -147,6 +147,8 @@ const MiddleBarWrap = styled.div`
   background-color: var(--header-bg, ${MIDDLE_BAR_BG});
   color: var(--header-text, #111827);
   transition: background-color 0.3s ease, color 0.3s ease;
+  position: relative;
+  z-index: 2; /* above SubNavWrap so dropdowns (z-index:99999 inside here) render on top */
 `;
 
 const MiddleBarInner = styled.div`
@@ -670,6 +672,8 @@ const SubNavWrap = styled.div`
   color: var(--second-nav-text, #374151);
   font-size: var(--second-nav-fs, 15px);
   font-weight: var(--second-nav-fw, 500);
+  position: relative;
+  z-index: 1; /* below MiddleBarWrap (z-index:2) so dropdowns always appear on top */
 `;
 
 const SecondMenuRowInner = styled.div`

@@ -505,6 +505,10 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
         tr[lang] = prev;
       }
       md.translations = tr;
+      // Bridge German SEO to top-level variant metadata (VariantEditPage reads vm.seo_meta_title etc.)
+      if (tr.de?.seo_title) md.seo_meta_title = tr.de.seo_title;
+      if (tr.de?.seo_description) md.seo_meta_description = tr.de.seo_description;
+      if (tr.de?.seo_keywords) md.seo_keywords = tr.de.seo_keywords;
       out.metadata = md;
     }
     const trTouched = LANGS.some((lang) => Object.values(pres.translations?.[lang] || {}).some(Boolean));
@@ -532,6 +536,10 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
         tr[lang] = prev;
       }
       md.translations = tr;
+      // Bridge German translation fields to top-level variant metadata (VariantEditPage reads
+      // v.metadata.description and v.metadata.bullet_points for the DE locale)
+      if (tr.de?.description != null && tr.de.description !== "") md.description = tr.de.description;
+      if (Array.isArray(tr.de?.bullet_points) && tr.de.bullet_points.length) md.bullet_points = tr.de.bullet_points;
       out.metadata = md;
       if (tr.de?.title) out.title = tr.de.title;
       if (tr.de?.description) out.description = tr.de.description;
@@ -800,6 +808,16 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     const variantMeta = {};
     if (Object.keys(variantTranslations).length) variantMeta.translations = variantTranslations;
     if (variantMetafields?.length) variantMeta.metafields = variantMetafields;
+    // Bridge German translations to top-level variant metadata fields (VariantEditPage reads
+    // v.metadata.description / bullet_points / seo_meta_title etc. for the DE locale)
+    const deTrans = variantTranslations["de"];
+    if (deTrans) {
+      if (deTrans.description) variantMeta.description = deTrans.description;
+      if (Array.isArray(deTrans.bullet_points) && deTrans.bullet_points.length) variantMeta.bullet_points = deTrans.bullet_points;
+      if (deTrans.seo_title) variantMeta.seo_meta_title = deTrans.seo_title;
+      if (deTrans.seo_description) variantMeta.seo_meta_description = deTrans.seo_description;
+      if (deTrans.seo_keywords) variantMeta.seo_keywords = deTrans.seo_keywords;
+    }
     const cImageSlots = collectImageSlotsFromRow(cRow, idx);
     const cImage = cImageSlots[1] || "";
     const cBrand = str(cGet("brand"));
@@ -1011,6 +1029,23 @@ export async function POST(request) {
           });
           if (!res.ok) {
             const err = await res.json().catch(() => ({ message: res.statusText }));
+            // If full PUT failed due to GPSR validation but we have variant data, try variant-only PATCH
+            // This allows updating variant translations for products that lack GPSR fields
+            const isGpsrError = err?.message && String(err.message).toLowerCase().includes("gpsr");
+            if (isGpsrError && Array.isArray(body.variants) && body.variants.length > 0) {
+              try {
+                const vRes = await fetch(`${backendUrl}/admin-hub/products/${existingProduct.id}/variants`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json", ...authHeaders },
+                  body: JSON.stringify({ variants: body.variants }),
+                });
+                if (vRes.ok) {
+                  results.updated++;
+                  results.errors.push({ sku, error: `Warnung: Varianten aktualisiert, aber GPSR-Felder fehlen noch: ${err.message}` });
+                  continue;
+                }
+              } catch (_) {}
+            }
             results.failed++;
             results.errors.push({ sku, error: err?.message || `HTTP ${res.status}` });
           } else {

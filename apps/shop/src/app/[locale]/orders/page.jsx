@@ -392,6 +392,10 @@ export default function OrdersPage() {
       return "retoure_anfrage";
     }
     if (order.order_status === "retoure" || order.order_status === "retoure_anfrage") return order.order_status;
+    // Delivery status takes priority when package is in transit or delivered
+    const ds = String(order.delivery_status || "").toLowerCase();
+    if (ds === "zugestellt") return "zugestellt";
+    if (ds === "versendet") return "versendet";
     const os = String(order.order_status || "").toLowerCase();
     const ps = String(order.payment_status || "").toLowerCase();
     const paidFlag = ps === "bezahlt" || order.status === "paid";

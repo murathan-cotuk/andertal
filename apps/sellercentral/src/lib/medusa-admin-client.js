@@ -161,6 +161,14 @@ class MedusaAdminClient {
     return res;
   }
 
+  /** PATCH /admin-hub/products/:id/variants — variant-only update, no GPSR validation */
+  async patchProductVariants(idOrHandle, variants) {
+    return this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}/variants`, {
+      method: 'PATCH',
+      body: JSON.stringify({ variants }),
+    });
+  }
+
   /** DELETE /admin-hub/products/:id */
   async deleteAdminHubProduct(idOrHandle) {
     return this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}`, { method: 'DELETE' });
@@ -714,6 +722,10 @@ class MedusaAdminClient {
 
   async deleteShipmentEvent(eventId) {
     return this.request(`/admin-hub/v1/shipment-events/${encodeURIComponent(eventId)}`, { method: 'DELETE' })
+  }
+
+  async refreshTracking(orderId) {
+    return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/refresh-tracking`, { method: 'POST' })
   }
 
   async getCustomers(params = {}) {

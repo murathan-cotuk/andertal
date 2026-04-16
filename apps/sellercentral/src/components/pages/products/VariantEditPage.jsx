@@ -172,7 +172,8 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       ? (v?.title ?? "")
       : (vTr.title ?? "");
 
-  const canonicalDesc = vm.description ?? "";
+  // For DE: prefer v.metadata.description, fall back to translations.de.description (set by Excel import)
+  const canonicalDesc = vm.description ?? vTr.description ?? "";
   const editingDescription =
     locale === "de" ? canonicalDesc : (vTr.description ?? "");
 
@@ -341,14 +342,12 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       ? Object.entries(vm.metafields).map(([k, val]) => ({ key: k, value: val }))
       : [];
 
+  // For DE: prefer v.metadata.bullet_points, fall back to translations.de.bullet_points (set by Excel import)
   const bullets =
     locale === "de"
-      ? Array.isArray(vm.bullet_points)
-        ? vm.bullet_points
-        : []
-      : Array.isArray(vTr.bullet_points)
-        ? vTr.bullet_points
-        : [];
+      ? Array.isArray(vm.bullet_points) ? vm.bullet_points
+        : Array.isArray(vTr.bullet_points) ? vTr.bullet_points : []
+      : Array.isArray(vTr.bullet_points) ? vTr.bullet_points : [];
 
   if (optionKeyParts == null) {
     return (
@@ -771,18 +770,18 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
               </Text>
               <TextField
                 label="Meta title"
-                value={vm.seo_meta_title ?? ""}
+                value={vm.seo_meta_title ?? vTr.seo_title ?? ""}
                 onChange={(t) => updateVariantMeta("seo_meta_title", t || undefined)}
               />
               <TextField
                 label="Meta description"
-                value={vm.seo_meta_description ?? ""}
+                value={vm.seo_meta_description ?? vTr.seo_description ?? ""}
                 onChange={(t) => updateVariantMeta("seo_meta_description", t || undefined)}
                 multiline={2}
               />
               <TextField
                 label="Keywords"
-                value={vm.seo_keywords ?? ""}
+                value={vm.seo_keywords ?? vTr.seo_keywords ?? ""}
                 onChange={(t) => updateVariantMeta("seo_keywords", t || undefined)}
               />
             </BlockStack>
