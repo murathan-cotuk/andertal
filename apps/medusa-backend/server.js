@@ -730,6 +730,10 @@ async function start() {
           );
         `).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS notifications_seen_at timestamp;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_api_key text;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_basic_username text;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_basic_password text;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_updated_at timestamp;`).catch(() => {})
         await client.query(`CREATE TABLE IF NOT EXISTS admin_hub_notifications (
           id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
           type varchar(50) NOT NULL,
@@ -9306,6 +9310,75 @@ async function start() {
       }
     }
 
+    const ensureSellerBillbeeCredentials = async (client, sellerId, forceRegenerate = false) => {
+      const existing = await client.query(
+        'SELECT billbee_api_key, billbee_basic_username, billbee_basic_password FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1',
+        [sellerId],
+      )
+      const row = existing.rows && existing.rows[0]
+      const hasAll = row && row.billbee_api_key && row.billbee_basic_username && row.billbee_basic_password
+      if (hasAll && !forceRegenerate) {
+        return {
+          api_key: String(row.billbee_api_key),
+          basic_auth_username: String(row.billbee_basic_username),
+          basic_auth_password: String(row.billbee_basic_password),
+        }
+      }
+
+      const crypto = require('crypto')
+      const apiKey = `bbk_${crypto.randomBytes(24).toString('hex')}`
+      const username = `billbee_${String(sellerId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32)}_${crypto.randomBytes(4).toString('hex')}`
+      const password = crypto.randomBytes(24).toString('base64url')
+
+      await client.query(
+        `INSERT INTO admin_hub_seller_settings (
+           seller_id, billbee_api_key, billbee_basic_username, billbee_basic_password, billbee_updated_at, updated_at
+         ) VALUES ($1, $2, $3, $4, now(), now())
+         ON CONFLICT (seller_id) DO UPDATE SET
+           billbee_api_key = EXCLUDED.billbee_api_key,
+           billbee_basic_username = EXCLUDED.billbee_basic_username,
+           billbee_basic_password = EXCLUDED.billbee_basic_password,
+           billbee_updated_at = now(),
+           updated_at = now()`,
+        [sellerId, apiKey, username, password],
+      )
+      return { api_key: apiKey, basic_auth_username: username, basic_auth_password: password }
+    }
+
+    const adminHubBillbeeCredentialsGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const sellerId = (req.sellerUser?.seller_id || 'default').toString().trim() || 'default'
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const creds = await ensureSellerBillbeeCredentials(client, sellerId, false)
+        await client.end()
+        return res.json({ credentials: creds, seller_id: sellerId, generated: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        return res.status(500).json({ message: e?.message || 'Billbee credentials unavailable' })
+      }
+    }
+
+    const adminHubBillbeeCredentialsPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const sellerId = (req.sellerUser?.seller_id || 'default').toString().trim() || 'default'
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const creds = await ensureSellerBillbeeCredentials(client, sellerId, true)
+        await client.end()
+        return res.json({ credentials: creds, seller_id: sellerId, regenerated: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        return res.status(500).json({ message: e?.message || 'Billbee credentials could not be regenerated' })
+      }
+    }
+
     const adminHubBillbeeIntegrationTestPOST = async (req, res) => {
       try {
         const body = req.body || {}
@@ -9659,6 +9732,8 @@ async function start() {
     httpApp.post('/admin-hub/v1/integrations', adminHubIntegrationPOST)
     httpApp.patch('/admin-hub/v1/integrations/:id', adminHubIntegrationPATCH)
     httpApp.delete('/admin-hub/v1/integrations/:id', adminHubIntegrationDELETE)
+    httpApp.get('/admin-hub/v1/integrations/billbee/credentials', requireSellerAuth, adminHubBillbeeCredentialsGET)
+    httpApp.post('/admin-hub/v1/integrations/billbee/credentials', requireSellerAuth, adminHubBillbeeCredentialsPOST)
     httpApp.post('/admin-hub/v1/integrations/billbee/test', requireSellerAuth, adminHubBillbeeIntegrationTestPOST)
     httpApp.get('/admin-hub/v1/abandoned-carts', adminHubAbandonedCartsGET)
     // POST /admin-hub/v1/returns/:id/send-label — mark label sent + send email to customer

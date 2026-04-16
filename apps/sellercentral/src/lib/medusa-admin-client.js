@@ -825,6 +825,17 @@ class MedusaAdminClient {
     })
   }
 
+  async getBillbeeCredentials() {
+    return this.request('/admin-hub/v1/integrations/billbee/credentials')
+  }
+
+  async regenerateBillbeeCredentials() {
+    return this.request('/admin-hub/v1/integrations/billbee/credentials', {
+      method: 'POST',
+      body: JSON.stringify({ regenerate: true }),
+    })
+  }
+
   async getAbandonedCarts() {
     return this.request('/admin-hub/v1/abandoned-carts')
   }
