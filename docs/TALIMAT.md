@@ -1,11 +1,13 @@
 16.04.
 
+-- excelle ürün yükledigimde ekledigim url görsellerini media klasörü altinda göremiyorum sellercentralde. exceli kim yüklediyse o saticida gözüksün sadece görseller. superuser icinde o saticinin klasörü icine listelensin
+-- 1 ürünün birden fazla saticisi var ancak shopta diger saticilar gözükmüyor. sadece en son kim eklediyse o gözüküyor satici olarak. buyboxu neden otomatik en son ekleyene verdin?
 -- excel ile ürün eklemede de unit_type ve unit_value degerlerinde hemen sonra per_unit degeri ekleyelim. bu sellercentral ürün sayfasindaki bahsettigimiz 1000 g kismina tekabül etsin.
 -- sellercentralde /content/landing-page sayfasi icinde templates tabina gectim ve kategorie-template icin produkte pro zeile yi 4 sectim. ancak 3 tane gösteriliyor. neden? sellercentral üzerinden shop yönetimini düzgün ayarla ve tam yetki ver
 -- brand sayfalarinin template ini koleksiyon template i gibi yap. yani filtreler solda görünsün.
 -- excel ile yükledigim ürünü ilk yükleyen satici "satici A" idi. sonra "satici B" ile ürün bilgileri güncelledim, tekrar excel ekledim ancak superusera bir onay gelmedi ve ürün bilgileri degisti. yani ürünü sonradan ekleyen biri eanini da degistirebiliyor marka adini da. böyle olmamali. zaten sisteme girilen bir ürünün eani asla ama asla degistirilememli. ancak ürün bir kere sisteme eklendikten sonra ürün seuperusera aittir. sadece ilk ekleyen satici ürün üzerinde sorgusuz degisiklik hakkina sahiptir. baska saticilar bir sey degistirecekse sadece tavsiye verebilirler. baska saticilar ayni eana sahip ürünleri (child, parent yani hepsi) eklediginde sistemde onaylanmis bilgiler ile bir listeleme gerceklesmeli shopa. eger üründe degisiklik önerisi yaptiysa superuser a bildirim gelmedi, inventory sayfasinda ilgili ürünün saginda kirmizi bir bildirim isareti belirmeli ve "degisikliklik önerildi" tarzinda bi buton olmali. bastigimizda mevcut deger vs. önerilen degisiklik seklinde bir sayfa görmeliyiz. onaylarsak eger ürün önerilen seklinde görünmeli.
-- 2fa
-- billbee entegrasyonu
+-- 2fa
+-- billbee entegrasyonu
 -- bir siparis geldiginde ve sellercentralde trackingnummer girildiginde o trackingnummer in kargo güncellemelerinin görüntülenebilmesini ve gönderi durumuna göre siparis durumunun da güncellenmesini istiyorum. gönderildiginde "versendet", teslim edildiginde "zugestellet" olmali lieferstatus. bunun takibinin yapilabilecegi sekilde ayarla sellerin sisteme kaydettigi versandmethodeler ile
 -- /landing-page sayfasindaki templates sekmelerinde yaptigim degisiklikler shopa yansimiyor. ayrica diger konteyner ayarlari da burada bulunabilsin. inhalt volle breite mi zentriert mi falan secilebilsin ve daha estetik bir yerlesim yap
 -- shopta görünen kategori template i koleksiyon template inden biraz farkli. koleksiyon templateindeki sidebar cok güzel duruyor. sola yapisik vs. ancak kategori template inde öyle degil. kategori templateindeki sidebar da kolkesiyon template i gibi olsun ancak su anki gibi ortadan ikiye bölünmüs, üstte sub kategoriler altta filtreler kalmaya devam edecek. 

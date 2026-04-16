@@ -46,18 +46,20 @@
     "dotenv": "^17.2.3",
     "express": "^4.22.1",
     "express-rate-limit": "^8.3.2",
+    "ioredis": "^5.6.1",
     "medusa": "^0.0.3",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.14",
-    "resend": "^4.5.1",
-    "pino": "^9.7.0",
-    "pino-pretty": "^13.0.0",
-    "zod": "^3.25.3",
-    "ioredis": "^5.6.1",
     "pdfkit": "^0.15.0",
     "pg": "^8.13.1",
+    "pino": "^9.7.0",
+    "pino-pretty": "^13.0.0",
+    "qrcode": "^1.5.4",
+    "resend": "^4.5.1",
+    "speakeasy": "^2.0.0",
     "stripe": "^20.4.1",
     "ts-node": "^10.9.2",
-    "typeorm": "^0.3.20"
+    "typeorm": "^0.3.20",
+    "zod": "^3.25.3"
   }
 }

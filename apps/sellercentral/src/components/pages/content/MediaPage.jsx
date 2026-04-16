@@ -336,6 +336,7 @@ export default function MediaPage() {
 
   const sellerBuckets = useMemo(() => {
     const map = new Map();
+    // Add sellers from media items
     for (const i of rawMedia) {
       const sid = i.seller_id;
       if (!sid) {
@@ -349,8 +350,17 @@ export default function MediaPage() {
         map.get(sid).count++;
       }
     }
+    // Also add sellers who have folders but no media in current page
+    for (const f of folders) {
+      const sid = f.seller_id;
+      if (!sid) {
+        if (!map.has("__null")) map.set("__null", { key: "__null", label: "Platform / admin", count: 0 });
+      } else if (!map.has(sid)) {
+        map.set(sid, { key: sid, label: (f.seller_store_name || "").trim() || sid, count: 0 });
+      }
+    }
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [rawMedia]);
+  }, [rawMedia, folders]);
 
   const fetchAll = useCallback(async () => {
     try {

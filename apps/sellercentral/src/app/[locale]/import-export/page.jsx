@@ -229,6 +229,13 @@ function ImportResult({ result }) {
           {" "}(Toplam: {result.total})
         </Text>
       </Banner>
+      {result.media && result.media.registered > 0 && (
+        <div style={{ padding: "8px 12px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, fontSize: 12, color: "#15803d" }}>
+          📁 <strong>{result.media.registered}</strong> görsel medya kütüphanesine eklendi
+          {result.media.folder && <> — <em>"{result.media.folder.name}"</em> klasörüne</>}
+          {result.media.skipped > 0 && <>, {result.media.skipped} zaten mevcut</>}
+        </div>
+      )}
       {hasErrors && (
         <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #fee2e2", borderRadius: 8, padding: 12, background: "#fff5f5" }}>
           {result.errors.map((e, i) => (

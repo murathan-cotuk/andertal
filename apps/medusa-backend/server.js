@@ -781,6 +781,9 @@ async function start() {
         // Stripe Connect columns
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_account_id varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_onboarding_complete boolean NOT NULL DEFAULT false;`).catch(() => {})
+        // 2FA / TOTP columns
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS totp_secret text DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS totp_enabled boolean NOT NULL DEFAULT false;`).catch(() => {})
 
         // ── Ranking infrastructure ──────────────────────────────────────────────
         await client.query(`
@@ -2963,7 +2966,10 @@ async function start() {
 
         if (incomingEan) {
           const allProds = await listAdminHubProductsDb({ limit: 5000 })
-          masterProduct = allProds.find((p) => extractEanFromHubProductRow(p) === incomingEan) || null
+          // Prefer true master products (seller_id = null) — they are the canonical catalog entry
+          // Fall back to any product with this EAN (legacy mode where sellers own their rows)
+          const truemaster = allProds.find((p) => extractEanFromHubProductRow(p) === incomingEan && !p.seller_id)
+          masterProduct = truemaster || allProds.find((p) => extractEanFromHubProductRow(p) === incomingEan) || null
         }
 
         if (masterProduct) {
@@ -3643,7 +3649,7 @@ async function start() {
            FROM seller_users
            WHERE seller_id IS NOT NULL
              AND LENGTH(TRIM(seller_id)) > 0
-             AND LOWER(COALESCE(approval_status, '')) = 'approved'`
+             AND LOWER(COALESCE(approval_status, '')) NOT IN ('rejected', 'suspended')`
         )
         await client.end()
         return new Set((res.rows || []).map((r) => String(r.seller_id || '').trim()).filter(Boolean))
@@ -3942,17 +3948,31 @@ async function start() {
       const body = req.body || {}
       const email = (body.email || '').trim().toLowerCase()
       const password = (body.password || '').toString()
+      const totpCode = String(body.totp_code || '').trim().replace(/\s/g, '')
       if (!email || !password) return res.status(400).json({ message: 'Email and password are required' })
       const client = getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
-        const r = await client.query('SELECT id, email, password_hash, store_name, seller_id, sub_of_seller_id, is_superuser, permissions FROM seller_users WHERE email = $1', [email])
+        const r = await client.query('SELECT id, email, password_hash, store_name, seller_id, sub_of_seller_id, is_superuser, permissions, totp_secret, totp_enabled FROM seller_users WHERE email = $1', [email])
         const user = r.rows[0]
         if (!user) { await client.end(); return res.status(401).json({ message: 'Invalid email or password' }) }
         // Check if email is in initial superuser list (in case they registered before the list was set)
         const shouldBeSuperuser = user.is_superuser || INITIAL_SUPERUSER_EMAILS.includes(email)
         if (!verifySellerPassword(password, user.password_hash)) { await client.end(); return res.status(401).json({ message: 'Invalid email or password' }) }
+        // 2FA check: if user has TOTP enabled, require the code
+        if (user.totp_enabled && user.totp_secret) {
+          if (!totpCode) {
+            await client.end()
+            return res.status(200).json({ totp_required: true, message: 'Two-factor authentication code required.' })
+          }
+          const speakeasy = require('speakeasy')
+          const valid = speakeasy.totp.verify({ secret: user.totp_secret, encoding: 'base32', token: totpCode, window: 1 })
+          if (!valid) {
+            await client.end()
+            return res.status(401).json({ message: 'Invalid two-factor authentication code.' })
+          }
+        }
         // Ensure superuser flag is up-to-date
         if (shouldBeSuperuser && !user.is_superuser) {
           await client.query('UPDATE seller_users SET is_superuser = true WHERE id = $1', [user.id]).catch(() => {})
@@ -3990,6 +4010,111 @@ async function start() {
       const user = req.sellerUser
       if (!user) return res.status(401).json({ message: 'Unauthorized' })
       res.json({ user })
+    }
+
+    // POST /admin-hub/auth/2fa/setup — generate a TOTP secret + QR code for the logged-in user
+    const sellerAuth2faSetupPOST = async (req, res) => {
+      const sellerUser = req.sellerUser
+      if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+      try {
+        const speakeasy = require('speakeasy')
+        const QRCode = require('qrcode')
+        const secret = speakeasy.generateSecret({
+          name: `Belucha Sellercentral (${sellerUser.email})`,
+          issuer: 'Belucha',
+          length: 32,
+        })
+        // Store secret temporarily — it's confirmed/activated in the verify step
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        const { Client } = require('pg')
+        const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await lc.connect()
+        // Save pending (not yet enabled) secret
+        await lc.query(`UPDATE seller_users SET totp_secret = $1, totp_enabled = false WHERE id = $2`, [secret.base32, sellerUser.id])
+        await lc.end()
+        const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url)
+        res.json({ secret: secret.base32, qr_code: qrDataUrl })
+      } catch (err) {
+        console.error('2fa setup:', err)
+        res.status(500).json({ message: err?.message || '2FA setup failed' })
+      }
+    }
+
+    // POST /admin-hub/auth/2fa/verify — verify TOTP code and enable 2FA
+    const sellerAuth2faVerifyPOST = async (req, res) => {
+      const sellerUser = req.sellerUser
+      if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+      const code = String(req.body?.code || '').trim().replace(/\s/g, '')
+      if (!code) return res.status(400).json({ message: 'Code is required' })
+      try {
+        const speakeasy = require('speakeasy')
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        const { Client } = require('pg')
+        const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await lc.connect()
+        const ur = await lc.query('SELECT totp_secret, totp_enabled FROM seller_users WHERE id = $1', [sellerUser.id])
+        const row = ur.rows[0]
+        if (!row || !row.totp_secret) { await lc.end(); return res.status(400).json({ message: 'No pending 2FA setup. Run setup first.' }) }
+        const valid = speakeasy.totp.verify({ secret: row.totp_secret, encoding: 'base32', token: code, window: 1 })
+        if (!valid) { await lc.end(); return res.status(400).json({ message: 'Invalid code. Check your authenticator app.' }) }
+        await lc.query('UPDATE seller_users SET totp_enabled = true WHERE id = $1', [sellerUser.id])
+        await lc.end()
+        res.json({ ok: true, message: '2FA enabled successfully.' })
+      } catch (err) {
+        console.error('2fa verify:', err)
+        res.status(500).json({ message: err?.message || '2FA verify failed' })
+      }
+    }
+
+    // POST /admin-hub/auth/2fa/disable — disable 2FA (requires current TOTP code or password)
+    const sellerAuth2faDisablePOST = async (req, res) => {
+      const sellerUser = req.sellerUser
+      if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+      const code = String(req.body?.code || '').trim().replace(/\s/g, '')
+      const password = String(req.body?.password || '')
+      if (!code && !password) return res.status(400).json({ message: 'Provide current TOTP code or password to disable 2FA.' })
+      try {
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        const { Client } = require('pg')
+        const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await lc.connect()
+        const ur = await lc.query('SELECT totp_secret, totp_enabled, password_hash FROM seller_users WHERE id = $1', [sellerUser.id])
+        const row = ur.rows[0]
+        if (!row) { await lc.end(); return res.status(404).json({ message: 'User not found' }) }
+        if (!row.totp_enabled) { await lc.end(); return res.status(400).json({ message: '2FA is not enabled.' }) }
+        let authorized = false
+        if (code && row.totp_secret) {
+          const speakeasy = require('speakeasy')
+          authorized = speakeasy.totp.verify({ secret: row.totp_secret, encoding: 'base32', token: code, window: 1 })
+        }
+        if (!authorized && password) {
+          authorized = verifySellerPassword(password, row.password_hash)
+        }
+        if (!authorized) { await lc.end(); return res.status(401).json({ message: 'Invalid code or password.' }) }
+        await lc.query('UPDATE seller_users SET totp_secret = NULL, totp_enabled = false WHERE id = $1', [sellerUser.id])
+        await lc.end()
+        res.json({ ok: true, message: '2FA disabled.' })
+      } catch (err) {
+        console.error('2fa disable:', err)
+        res.status(500).json({ message: err?.message || '2FA disable failed' })
+      }
+    }
+
+    // GET /admin-hub/auth/2fa/status — returns 2FA enabled status for current user
+    const sellerAuth2faStatusGET = async (req, res) => {
+      const sellerUser = req.sellerUser
+      if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+      try {
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        const { Client } = require('pg')
+        const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await lc.connect()
+        const ur = await lc.query('SELECT totp_enabled FROM seller_users WHERE id = $1', [sellerUser.id])
+        await lc.end()
+        res.json({ totp_enabled: ur.rows[0]?.totp_enabled || false })
+      } catch (err) {
+        res.status(500).json({ message: err?.message })
+      }
     }
 
     // GET /admin-hub/users — list all seller users (superuser only)
@@ -4129,6 +4254,10 @@ async function start() {
     httpApp.post('/admin-hub/auth/register', sellerAuthRegisterPOST)
     httpApp.post('/admin-hub/auth/login', sellerAuthLoginPOST)
     httpApp.get('/admin-hub/auth/me', requireSellerAuth, sellerAuthMeGET)
+    httpApp.get('/admin-hub/auth/2fa/status', requireSellerAuth, sellerAuth2faStatusGET)
+    httpApp.post('/admin-hub/auth/2fa/setup', requireSellerAuth, sellerAuth2faSetupPOST)
+    httpApp.post('/admin-hub/auth/2fa/verify', requireSellerAuth, sellerAuth2faVerifyPOST)
+    httpApp.post('/admin-hub/auth/2fa/disable', requireSellerAuth, sellerAuth2faDisablePOST)
     httpApp.get('/admin-hub/users', requireSellerAuth, requireSuperuser, sellerUsersGET)
     httpApp.post('/admin-hub/users', requireSellerAuth, requireSuperuser, sellerUserCreatePOST)
     httpApp.patch('/admin-hub/users/:id', requireSellerAuth, requireSuperuser, sellerUserUpdatePATCH)
@@ -4878,14 +5007,20 @@ async function start() {
     const findEanOffersFromHub = async (canonicalEan, approvedSellerIds) => {
       const ean = normalizeStoreEan(canonicalEan)
       if (!ean) return []
-      // First: legacy scan (product rows per seller, old model)
+      // First: scan all published + visible products
       let list = await listAdminHubProductsDb({ limit: 5000 })
       list = list.filter((row) => (row.status || '').toLowerCase() === 'published' && isStoreVisibleSellerProduct(row, approvedSellerIds))
       const legacyOffers = list.filter((row) => extractEanFromHubProductRow(row) === ean && row.seller_id)
-      // Second: listings table (new model — master product + per-seller listings)
+      // Second: listings table — query for both true master (seller_id=null) AND legacy products
+      // This covers both new-model (master+listings) and old-model (seller product used as listings base)
       const masterRow = list.find((row) => extractEanFromHubProductRow(row) === ean && !row.seller_id)
+      // Also include legacy products that could have listings (e.g. created before deduplication)
+      const allEanPublishedRows = masterRow
+        ? [masterRow, ...legacyOffers]
+        : legacyOffers
       let listingOffers = []
-      if (masterRow) {
+      const productIdsForListings = [...new Set(allEanPublishedRows.map((r) => String(r.id)))]
+      if (productIdsForListings.length > 0) {
         const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
         if (dbUrl && dbUrl.startsWith('postgres')) {
           try {
@@ -4893,21 +5028,28 @@ async function start() {
             const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
             await lc.connect()
             const lr = await lc.query(
-              `SELECT seller_id, price_cents, inventory, status, orders_count FROM admin_hub_seller_listings WHERE product_id = $1 AND status = 'active'`,
-              [masterRow.id]
+              `SELECT seller_id, price_cents, inventory, status, orders_count, product_id::text AS product_id
+               FROM admin_hub_seller_listings
+               WHERE product_id = ANY($1::uuid[]) AND status = 'active'`,
+              [productIdsForListings]
             )
             await lc.end()
+            // Build a map from product_id → product row (prefer masterRow for catalog data)
+            const productById = new Map(allEanPublishedRows.map((r) => [String(r.id), r]))
             listingOffers = (lr.rows || [])
-              .filter((l) => !approvedSellerIds || approvedSellerIds.has(l.seller_id))
-              .map((l) => ({
-                ...masterRow,
-                id: masterRow.id + '-listing-' + l.seller_id, // synthetic id for scoring
-                _listing_id: masterRow.id,
-                seller_id: l.seller_id,
-                price_cents: l.price_cents,
-                inventory: l.inventory,
-                _orders_count: l.orders_count,
-              }))
+              .filter((l) => !approvedSellerIds || approvedSellerIds.size === 0 || approvedSellerIds.has(l.seller_id))
+              .map((l) => {
+                const baseRow = productById.get(String(l.product_id)) || masterRow || legacyOffers[0]
+                return {
+                  ...baseRow,
+                  id: String(l.product_id) + '-listing-' + l.seller_id, // synthetic id for scoring
+                  _listing_id: String(l.product_id),
+                  seller_id: l.seller_id,
+                  price_cents: l.price_cents,
+                  inventory: l.inventory,
+                  _orders_count: l.orders_count,
+                }
+              })
           } catch (_) {}
         }
       }
@@ -4985,7 +5127,7 @@ async function start() {
 
         if (canonicalEan) {
           const offers = await findEanOffersFromHub(canonicalEan, approvedSellerIds)
-          if (offers.length > 1) {
+          if (offers.length >= 1) {
             const sellerKeys = offers.map((p) => String(p.seller_id || 'default').trim() || 'default')
             const statsMap = await loadSellerReviewStatsBatch(sellerKeys)
             const scored = offers.map((p) => {
@@ -5003,7 +5145,7 @@ async function start() {
             await Promise.all(uniqueSellers.map(async (sid) => {
               storeNames[sid] = (await getSellerStoreName(sid)) || sid
             }))
-            const reviewProductIds = offers.map((p) => String(p.id))
+            const reviewProductIds = offers.map((p) => String(p._listing_id || p.id))
             const otherSellers = scored.slice(1).map(({ p, price, stats, sid }) => {
               const realProductId = p._listing_id || String(p.id)
               const masterP = p._listing_id ? (scored.find((x) => String(x.p.id) === p._listing_id)?.p || p) : p
@@ -5024,12 +5166,15 @@ async function start() {
                 thumbnail: thumb || null,
               }
             })
-            multiOffer = {
-              canonical_ean: canonicalEan,
-              review_product_ids: reviewProductIds,
-              landed_product_id: String(landed.id),
-              buy_box_product_id: String(winnerRow.id),
-              other_sellers: otherSellers,
+            // Only set multiOffer (shows "Other sellers" card) when there are 2+ sellers
+            if (offers.length > 1) {
+              multiOffer = {
+                canonical_ean: canonicalEan,
+                review_product_ids: reviewProductIds,
+                landed_product_id: String(landed.id),
+                buy_box_product_id: String(winnerRow._listing_id || winnerRow.id),
+                other_sellers: otherSellers,
+              }
             }
           }
         }
@@ -7984,9 +8129,17 @@ async function start() {
         const callerSellerId = req.sellerUser?.seller_id
         let r
         if (isSuperuserReq) {
-          r = await client.query('SELECT f.*, COUNT(m.id)::int AS media_count FROM admin_hub_media_folders f LEFT JOIN admin_hub_media m ON m.folder_id = f.id GROUP BY f.id ORDER BY f.name ASC')
+          r = await client.query(`SELECT f.*, COUNT(m.id)::int AS media_count, sh.store_name AS seller_store_name
+            FROM admin_hub_media_folders f
+            LEFT JOIN admin_hub_media m ON m.folder_id = f.id
+            LEFT JOIN admin_hub_seller_settings sh ON sh.seller_id = f.seller_id
+            GROUP BY f.id, sh.store_name ORDER BY f.seller_id NULLS FIRST, f.name ASC`)
         } else {
-          r = await client.query('SELECT f.*, COUNT(m.id)::int AS media_count FROM admin_hub_media_folders f LEFT JOIN admin_hub_media m ON m.folder_id = f.id WHERE f.seller_id = $1 GROUP BY f.id ORDER BY f.name ASC', [callerSellerId])
+          r = await client.query(`SELECT f.*, COUNT(m.id)::int AS media_count, sh.store_name AS seller_store_name
+            FROM admin_hub_media_folders f
+            LEFT JOIN admin_hub_media m ON m.folder_id = f.id
+            LEFT JOIN admin_hub_seller_settings sh ON sh.seller_id = f.seller_id
+            WHERE f.seller_id = $1 GROUP BY f.id, sh.store_name ORDER BY f.name ASC`, [callerSellerId])
         }
         res.json({ folders: r.rows })
       } catch { res.json({ folders: [] }) } finally { await client.end().catch(() => {}) }
@@ -8106,6 +8259,71 @@ async function start() {
       }
     }
 
+    // Batch-register image URLs from Excel import into seller's media folder
+    const mediaImportUrlsPOST = async (req, res) => {
+      const { urls, folder_name } = req.body || {}
+      if (!Array.isArray(urls) || urls.length === 0) return res.status(400).json({ message: 'urls array required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const u = req.sellerUser
+        const sellerId = u?.is_superuser ? null : (u?.seller_id || null)
+        // Resolve folder: get or create "Excel Import" folder for this seller
+        let folderName = (folder_name || '').trim()
+        if (!folderName) {
+          // Use seller's store name if available
+          let storeName = null
+          if (sellerId) {
+            const sRow = await client.query('SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1', [sellerId])
+            storeName = sRow.rows[0]?.store_name || null
+          }
+          folderName = storeName ? `${storeName} — Excel Import` : 'Excel Import'
+        }
+        // Get or create the folder
+        let folder = null
+        const fCheck = sellerId
+          ? await client.query('SELECT * FROM admin_hub_media_folders WHERE name = $1 AND seller_id = $2 LIMIT 1', [folderName, sellerId])
+          : await client.query('SELECT * FROM admin_hub_media_folders WHERE name = $1 AND seller_id IS NULL LIMIT 1', [folderName])
+        if (fCheck.rows[0]) {
+          folder = fCheck.rows[0]
+        } else {
+          const fIns = await client.query(
+            'INSERT INTO admin_hub_media_folders (name, seller_id) VALUES ($1, $2) RETURNING *',
+            [folderName, sellerId]
+          )
+          folder = fIns.rows[0]
+        }
+        // Register each URL (skip duplicates for this seller)
+        let registered = 0, skipped = 0
+        for (const rawUrl of urls) {
+          const url = (rawUrl || '').trim()
+          if (!url || !url.startsWith('http')) { skipped++; continue }
+          // Check duplicate
+          const dupCheck = sellerId
+            ? await client.query('SELECT id FROM admin_hub_media WHERE url = $1 AND seller_id = $2 LIMIT 1', [url, sellerId])
+            : await client.query('SELECT id FROM admin_hub_media WHERE url = $1 AND seller_id IS NULL LIMIT 1', [url])
+          if (dupCheck.rows[0]) { skipped++; continue }
+          const filename = url.split('/').pop()?.split('?')[0] || 'image'
+          // Detect image mime type from extension
+          const ext = (filename.split('.').pop() || '').toLowerCase()
+          const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', avif: 'image/avif' }
+          const mimeType = mimeMap[ext] || 'image/jpeg'
+          await client.query(
+            'INSERT INTO admin_hub_media (filename, url, source_url, mime_type, size, folder_id, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [filename, url, url, mimeType, 0, folder.id, sellerId]
+          )
+          registered++
+        }
+        res.json({ ok: true, registered, skipped, folder: { id: folder.id, name: folder.name } })
+      } catch (e) {
+        console.error('mediaImportUrlsPOST error:', e)
+        res.status(500).json({ message: e?.message || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
+
     httpApp.get('/admin-hub/v1/media', requireSellerAuth, mediaListWithFolderGET)
     httpApp.post('/admin-hub/v1/media', requireSellerAuth, prepareSellerMediaUploadPath, upload.single('file'), mediaUploadPOST)
     httpApp.get('/admin-hub/v1/media/folders', requireSellerAuth, mediaFoldersGET)
@@ -8114,8 +8332,9 @@ async function start() {
     httpApp.get('/admin-hub/v1/media/:id', requireSellerAuth, mediaByIdGET)
     httpApp.patch('/admin-hub/v1/media/:id', requireSellerAuth, mediaPATCH)
     httpApp.post('/admin-hub/v1/media/add-url', requireSellerAuth, mediaAddByUrlPOST)
+    httpApp.post('/admin-hub/v1/media/import-urls', requireSellerAuth, mediaImportUrlsPOST)
     httpApp.delete('/admin-hub/v1/media/:id', requireSellerAuth, mediaByIdDELETE)
-    console.log('Admin Hub routes: GET/POST /admin-hub/v1/media, GET/DELETE /admin-hub/v1/media/:id')
+    console.log('Admin Hub routes: GET/POST /admin-hub/v1/media, GET/DELETE /admin-hub/v1/media/:id, POST /admin-hub/v1/media/import-urls')
 
     // ── Admin Hub Orders ──────────────────────────────────────────
     const adminHubOrdersGET = async (req, res) => {

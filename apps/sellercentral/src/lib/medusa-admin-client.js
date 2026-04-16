@@ -1017,10 +1017,10 @@ class MedusaAdminClient {
   }
 
   // ── Seller Auth ─────────────────────────────────────────────────────────────
-  async loginSeller(email, password) {
+  async loginSeller(email, password, extra = {}) {
     return this.request('/admin-hub/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, ...extra }),
     });
   }
 
@@ -1033,6 +1033,29 @@ class MedusaAdminClient {
 
   async getSellerMe() {
     return this.request('/admin-hub/auth/me');
+  }
+
+  // ── 2FA / TOTP ───────────────────────────────────────────────────────────────
+  async get2faStatus() {
+    return this.request('/admin-hub/auth/2fa/status');
+  }
+
+  async setup2fa() {
+    return this.request('/admin-hub/auth/2fa/setup', { method: 'POST' });
+  }
+
+  async verify2fa(code) {
+    return this.request('/admin-hub/auth/2fa/verify', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  async disable2fa({ code, password } = {}) {
+    return this.request('/admin-hub/auth/2fa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ code, password }),
+    });
   }
 
   /** Superuser: Shop-Checkout (Stripe-Keys, Zahlarten) */

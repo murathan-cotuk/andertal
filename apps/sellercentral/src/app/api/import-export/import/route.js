@@ -1037,6 +1037,7 @@ export async function POST(request) {
 
     const results = { created: 0, updated: 0, failed: 0, errors: [] };
     const authHeaders = sellerToken ? { Authorization: `Bearer ${sellerToken}` } : {};
+    const collectedImageUrls = new Set(); // all image URLs from this import batch
 
     for (const [sku, parentRow] of parents) {
       const childRows = children.get(sku) || [];
@@ -1048,6 +1049,19 @@ export async function POST(request) {
       }
       const { payload } = built;
       const parentPresent = computeParentPresent(parentRow, idx);
+      // Collect image URLs from parent and child rows for media registration
+      for (let n = 1; n <= 5; n++) {
+        const u = get(parentRow, `image_url_${n}`);
+        if (u && u.startsWith("http")) collectedImageUrls.add(u);
+      }
+      for (const cRow of children.get(sku) || []) {
+        for (let n = 1; n <= 5; n++) {
+          const u = get(cRow, `image_url_${n}`);
+          if (u && u.startsWith("http")) collectedImageUrls.add(u);
+        }
+        const sw = get(cRow, "swatch_image_url");
+        if (sw && sw.startsWith("http")) collectedImageUrls.add(sw);
+      }
 
       let existingProduct = null;
       try {
@@ -1131,6 +1145,19 @@ export async function POST(request) {
       }
     }
 
+    // Register collected image URLs in the seller's media library
+    let mediaResult = null;
+    if (collectedImageUrls.size > 0 && sellerToken) {
+      try {
+        const mr = await fetch(`${backendUrl}/admin-hub/v1/media/import-urls`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          body: JSON.stringify({ urls: [...collectedImageUrls] }),
+        });
+        if (mr.ok) mediaResult = await mr.json();
+      } catch (_) {}
+    }
+
     return Response.json({
       ok: true,
       total: parents.size,
@@ -1138,6 +1165,7 @@ export async function POST(request) {
       updated: results.updated,
       failed: results.failed,
       errors: results.errors,
+      media: mediaResult ? { registered: mediaResult.registered, skipped: mediaResult.skipped, folder: mediaResult.folder } : null,
     });
   } catch (e) {
     console.error("Import error:", e);
