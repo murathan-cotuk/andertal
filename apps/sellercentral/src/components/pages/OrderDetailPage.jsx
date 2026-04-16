@@ -6,6 +6,7 @@ import { Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
+import TrackingSection from "@/components/orders/TrackingSection";
 
 function fmtCents(c) {
   return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
@@ -347,19 +348,17 @@ export default function OrderDetailPage() {
             </div>
           </Section>
 
-          <Section title="Versand">
-            <InfoRow label="Versanddienst" value={order?.carrier_name?.trim() ? order.carrier_name : "—"} />
-            <InfoRow
-              label="Trackingnummer"
-              value={order?.tracking_number?.trim() ? order.tracking_number : "—"}
-            />
-            {order?.shipped_at && <InfoRow label="Versanddatum" value={fmtDate(order.shipped_at)} />}
-            <div style={{ marginTop: 14 }}>
-              <Button variant="primary" onClick={() => setShipModalOpen(true)}>
-                Versand bearbeiten / als versendet markieren
-              </Button>
-            </div>
-          </Section>
+          <TrackingSection
+            orderId={id}
+            order={order}
+            onOrderStatusChanged={loadOrder}
+          />
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+            <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>Versand bearbeiten oder als versendet markieren</span>
+            <Button variant="primary" onClick={() => setShipModalOpen(true)}>
+              Versand bearbeiten
+            </Button>
+          </div>
 
           {/* Payment info */}
           <Section title="Zahlungsinfo">

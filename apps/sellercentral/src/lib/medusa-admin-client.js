@@ -704,6 +704,18 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/orders/${id}`, { method: 'DELETE' })
   }
 
+  async getShipmentEvents(orderId) {
+    return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/shipment-events`)
+  }
+
+  async addShipmentEvent(orderId, data) {
+    return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/shipment-events`, { method: 'POST', body: JSON.stringify(data) })
+  }
+
+  async deleteShipmentEvent(eventId) {
+    return this.request(`/admin-hub/v1/shipment-events/${encodeURIComponent(eventId)}`, { method: 'DELETE' })
+  }
+
   async getCustomers(params = {}) {
     const queryParams = new URLSearchParams(params).toString()
     return this.request(`/admin-hub/v1/customers${queryParams ? `?${queryParams}` : ''}`)

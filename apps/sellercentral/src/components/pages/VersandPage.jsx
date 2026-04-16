@@ -10,7 +10,7 @@ function fmtCents(c) {
   return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
 }
 
-const CARRIERS = ["DHL", "DPD", "GLS", "UPS", "FedEx", "Hermes", "Go! Express", "Sonstige"];
+const FALLBACK_CARRIERS = ["DHL", "DPD", "GLS", "UPS", "FedEx", "Hermes", "Go! Express", "Sonstige"];
 
 export default function VersandPage() {
   const router = useRouter();
@@ -32,6 +32,17 @@ export default function VersandPage() {
   const [saved, setSaved] = useState({});
   const [phase, setPhase] = useState("scan"); // "scan" | "ship" | "done"
   const barcodeRef = useRef(null);
+  const [dbCarriers, setDbCarriers] = useState([]);
+
+  useEffect(() => {
+    getMedusaAdminClient().getCarriers().then(data => {
+      const active = (data?.carriers || []).filter(c => c.is_active);
+      if (active.length > 0) {
+        setDbCarriers(active);
+        setCarrier(active[0].name);
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     // Load orders passed via sessionStorage or fetch pending orders
@@ -226,7 +237,7 @@ export default function VersandPage() {
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Versanddienstleister</div>
         <InlineStack gap="200" wrap blockAlign="center">
-          {CARRIERS.map((c) => (
+          {(dbCarriers.length > 0 ? [...dbCarriers.map(dc => dc.name), "Sonstige"] : FALLBACK_CARRIERS).map((c) => (
             <Button key={c} size="slim" variant={carrier === c ? "primary" : "secondary"} onClick={() => setCarrier(c)}>
               {c}
             </Button>

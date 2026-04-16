@@ -587,6 +587,20 @@ async function start() {
         `).catch(() => {})
         await client.query(`ALTER TABLE store_shipping_carriers ADD COLUMN IF NOT EXISTS seller_id varchar(255)`).catch(() => {})
         await client.query(`
+          CREATE TABLE IF NOT EXISTS store_shipment_events (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            order_id uuid REFERENCES store_orders(id) ON DELETE CASCADE,
+            status varchar(50) NOT NULL DEFAULT 'manual',
+            description text,
+            location varchar(200),
+            event_time timestamp DEFAULT now(),
+            source varchar(50) DEFAULT 'manual',
+            created_at timestamp DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_shipment_events_order ON store_shipment_events(order_id)`).catch(() => {})
+        await client.query(`ALTER TABLE store_shipping_carriers ADD COLUMN IF NOT EXISTS logo_url text`).catch(() => {})
+        await client.query(`
           CREATE TABLE IF NOT EXISTS store_integrations (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
             name varchar(100) NOT NULL,
@@ -8164,6 +8178,9 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        // Fetch previous state to detect tracking_number changes
+        const prevRes = await client.query('SELECT tracking_number, carrier_name, delivery_status FROM store_orders WHERE id = $1::uuid', [id])
+        const prevRow = prevRes.rows[0] || {}
         await client.query(`UPDATE store_orders SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
         // Auto-complete: if payment is paid and delivery is delivered, mark order as completed — do not override Retoure / Rückgabe / Erstattung
         await client.query(
@@ -8172,6 +8189,33 @@ async function start() {
            AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`,
           [id]
         )
+        // Auto-create shipment events for status transitions
+        const newTracking = tracking_number !== undefined ? String(tracking_number || '').trim() : (prevRow.tracking_number || '')
+        const newCarrier = carrier_name !== undefined ? String(carrier_name || '').trim() : (prevRow.carrier_name || '')
+        const effectiveDeliveryStatus = delivery_status || prevRow.delivery_status
+        // Create "versendet" event if tracking number newly set or delivery_status newly set to versendet
+        const trackingChanged = tracking_number !== undefined && String(tracking_number || '').trim() && String(tracking_number || '').trim() !== String(prevRow.tracking_number || '').trim()
+        const deliveryStatusChangedToVersendet = delivery_status === 'versendet' && prevRow.delivery_status !== 'versendet'
+        const deliveryStatusChangedToZugestellt = delivery_status === 'zugestellt' && prevRow.delivery_status !== 'zugestellt'
+        if (trackingChanged || deliveryStatusChangedToVersendet) {
+          const existingVersendet = await client.query(`SELECT id FROM store_shipment_events WHERE order_id=$1::uuid AND status='versendet' LIMIT 1`, [id])
+          if (!existingVersendet.rows.length) {
+            const desc = newCarrier ? `Paket bei ${newCarrier} aufgegeben${newTracking ? ` (${newTracking})` : ''}` : 'Paket wurde versendet'
+            await client.query(
+              `INSERT INTO store_shipment_events (order_id, status, description, source, event_time) VALUES ($1::uuid, 'versendet', $2, 'auto', now())`,
+              [id, desc]
+            )
+          }
+        }
+        if (deliveryStatusChangedToZugestellt) {
+          const existingZugestellt = await client.query(`SELECT id FROM store_shipment_events WHERE order_id=$1::uuid AND status='zugestellt' LIMIT 1`, [id])
+          if (!existingZugestellt.rows.length) {
+            await client.query(
+              `INSERT INTO store_shipment_events (order_id, status, description, source, event_time) VALUES ($1::uuid, 'zugestellt', 'Paket wurde zugestellt', 'auto', now())`,
+              [id]
+            )
+          }
+        }
         const oRes = await client.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
         const row = oRes.rows && oRes.rows[0]
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
@@ -8854,6 +8898,122 @@ async function start() {
       }
     }
 
+    // ─── Shipment Events & Tracking ───────────────────────────────────────────
+
+    const DEFAULT_TRACKING_URLS = {
+      'dhl': 'https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?lang=de&idc={tracking_number}',
+      'dpd': 'https://tracking.dpd.de/status/de_DE/parcel/{tracking_number}',
+      'gls': 'https://gls-group.com/track/{tracking_number}',
+      'ups': 'https://www.ups.com/track?tracknum={tracking_number}&loc=de_DE',
+      'fedex': 'https://www.fedex.com/fedextrack/?trknbr={tracking_number}',
+      'hermes': 'https://www.myhermes.de/empfangen/sendungsverfolgung/#/search?trackNumber={tracking_number}',
+      'go! express': 'https://www.general-overnight.com/sendungsverfolgung/?tracking={tracking_number}',
+      'go express': 'https://www.general-overnight.com/sendungsverfolgung/?tracking={tracking_number}',
+    }
+    function buildTrackingUrl(carrierName, trackingNumber, urlTemplate) {
+      if (!trackingNumber) return null
+      const tn = encodeURIComponent(String(trackingNumber).trim())
+      const applyTemplate = (tpl) => tpl.replace(/\{tracking_number\}/g, tn).replace(/\{tracking\}/g, tn)
+      if (urlTemplate) return applyTemplate(urlTemplate)
+      const key = (carrierName || '').toLowerCase().trim()
+      const tpl = DEFAULT_TRACKING_URLS[key]
+      if (tpl) return applyTemplate(tpl)
+      return null
+    }
+
+    const adminHubShipmentEventsGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = isSuperuser ? null : (req.sellerUser?.seller_id || null)
+      const id = (req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'order id required' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const ownerCheck = await client.query(
+          'SELECT id, carrier_name, tracking_number FROM store_orders WHERE id=$1::uuid' + (isSuperuser ? '' : ' AND seller_id=$2'),
+          isSuperuser ? [id] : [id, callerSellerId]
+        )
+        if (!ownerCheck.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const order = ownerCheck.rows[0]
+        const evRes = await client.query('SELECT * FROM store_shipment_events WHERE order_id=$1::uuid ORDER BY event_time ASC, created_at ASC', [id])
+        const carrierRes = await client.query(`SELECT tracking_url_template FROM store_shipping_carriers WHERE LOWER(TRIM(name))=LOWER(TRIM($1)) AND is_active=true LIMIT 1`, [order.carrier_name || ''])
+        const urlTemplate = carrierRes.rows[0]?.tracking_url_template || null
+        const trackingUrl = buildTrackingUrl(order.carrier_name, order.tracking_number, urlTemplate)
+        await client.end()
+        res.json({ events: evRes.rows || [], trackingUrl })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubShipmentEventPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = isSuperuser ? null : (req.sellerUser?.seller_id || null)
+      const id = (req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'order id required' })
+      const { status, description, location, event_time } = req.body || {}
+      if (!status) return res.status(400).json({ message: 'status required' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const ownerCheck = await client.query(
+          'SELECT id FROM store_orders WHERE id=$1::uuid' + (isSuperuser ? '' : ' AND seller_id=$2'),
+          isSuperuser ? [id] : [id, callerSellerId]
+        )
+        if (!ownerCheck.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const evRes = await client.query(
+          `INSERT INTO store_shipment_events (order_id, status, description, location, event_time, source) VALUES ($1::uuid, $2, $3, $4, $5, 'manual') RETURNING *`,
+          [id, status, description || null, location || null, event_time ? new Date(event_time).toISOString() : new Date().toISOString()]
+        )
+        const event = evRes.rows[0]
+        if (status === 'zugestellt') {
+          await client.query(`UPDATE store_orders SET delivery_status='zugestellt', updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
+          await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [id])
+        } else if (status === 'versendet') {
+          await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [id])
+        }
+        await client.end()
+        res.json({ event })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubShipmentEventDELETE = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = isSuperuser ? null : (req.sellerUser?.seller_id || null)
+      const eventId = (req.params.eventId || '').trim()
+      if (!eventId) return res.status(400).json({ message: 'eventId required' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const ownerCheck = await client.query(
+          `SELECT e.id FROM store_shipment_events e JOIN store_orders o ON o.id=e.order_id WHERE e.id=$1::uuid` + (isSuperuser ? '' : ' AND o.seller_id=$2'),
+          isSuperuser ? [eventId] : [eventId, callerSellerId]
+        )
+        if (!ownerCheck.rows[0]) { await client.end(); return res.status(404).json({ message: 'Event not found' }) }
+        await client.query('DELETE FROM store_shipment_events WHERE id=$1::uuid', [eventId])
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+
     const adminHubIntegrationsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       let client
@@ -9236,6 +9396,9 @@ async function start() {
     httpApp.get('/admin-hub/v1/orders/:id', adminHubOrderByIdGET)
     httpApp.patch('/admin-hub/v1/orders/:id', adminHubOrderPATCH)
     httpApp.delete('/admin-hub/v1/orders/:id', adminHubOrderDELETE)
+    httpApp.get('/admin-hub/v1/orders/:id/shipment-events', requireSellerAuth, adminHubShipmentEventsGET)
+    httpApp.post('/admin-hub/v1/orders/:id/shipment-events', requireSellerAuth, adminHubShipmentEventPOST)
+    httpApp.delete('/admin-hub/v1/shipment-events/:eventId', requireSellerAuth, adminHubShipmentEventDELETE)
     httpApp.get('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomersGET)
     httpApp.post('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomerPOST)
     httpApp.patch('/admin-hub/v1/customers/:id', requireSellerAuth, adminHubCustomerPATCH)

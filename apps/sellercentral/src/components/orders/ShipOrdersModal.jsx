@@ -5,13 +5,14 @@ import { Button, InlineStack, BlockStack, Text } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { buildShipLabelsHtml, buildShipLieferscheinHtml, openShipCombinedPrintWindow } from "@/lib/ship-print-html";
 
-const CARRIER_OPTIONS = ["DHL", "DPD", "GLS", "UPS", "FedEx", "Hermes", "Go! Express", "Sonstige"];
+const FALLBACK_CARRIER_OPTIONS = ["DHL", "DPD", "GLS", "UPS", "FedEx", "Hermes", "Go! Express", "Sonstige"];
 
 /**
  * Versand-Dialog: Carrier + Tracking speichern, Etikett/Lieferschein drucken (Polaris).
  * @param {{ orders: object[], onClose: () => void, onDone?: () => void }} props
  */
 export default function ShipOrdersModal({ orders, onClose, onDone }) {
+  const [dbCarriers, setDbCarriers] = useState([]);
   const [carrier, setCarrier] = useState("DHL");
   const [customCarrier, setCustomCarrier] = useState("");
   const [trackings, setTrackings] = useState(() => Object.fromEntries(orders.map((o) => [o.id, o.tracking_number || ""])));
@@ -20,6 +21,17 @@ export default function ShipOrdersModal({ orders, onClose, onDone }) {
   const [saveError, setSaveError] = useState("");
   const [isSuperuser, setIsSuperuser] = useState(false);
   useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
+
+  // Load registered carriers from DB
+  useEffect(() => {
+    getMedusaAdminClient().getCarriers().then(data => {
+      const active = (data?.carriers || []).filter(c => c.is_active);
+      if (active.length > 0) {
+        setDbCarriers(active);
+        setCarrier(active[0].name);
+      }
+    }).catch(() => {});
+  }, []);
   const [resolvedOrders, setResolvedOrders] = useState(() =>
     orders.map((o) => ({ ...o, _items: o._items || o.items || [] })),
   );
@@ -57,6 +69,7 @@ export default function ShipOrdersModal({ orders, onClose, onDone }) {
     };
   }, [orderIdsKey]);
 
+  const carrierOptions = dbCarriers.length > 0 ? [...dbCarriers.map(c => c.name), "Sonstige"] : FALLBACK_CARRIER_OPTIONS;
   const carrierName = carrier === "Sonstige" ? customCarrier.trim() || "Sonstige" : carrier;
 
   const dateStr = useMemo(() => new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }), []);
@@ -143,7 +156,7 @@ export default function ShipOrdersModal({ orders, onClose, onDone }) {
                 Versanddienstleister
               </Text>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                {CARRIER_OPTIONS.map((c) => (
+                {carrierOptions.map((c) => (
                   <Button key={c} size="slim" variant={carrier === c ? "primary" : "secondary"} onClick={() => setCarrier(c)}>
                     {c}
                   </Button>
