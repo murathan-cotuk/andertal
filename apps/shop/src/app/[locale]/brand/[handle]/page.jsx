@@ -7,6 +7,14 @@ import { Link } from "@/i18n/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useParams, notFound } from "next/navigation";
 import { resolveImageUrl } from "@/lib/image-url";
+import {
+  SORT_OPTIONS,
+  PER_PAGE,
+  buildFacetsFromProducts,
+  filterProductsByFacets,
+  applyCatalogSort,
+  getFacetGroupTitle,
+} from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
 
 /* ─────────────────────────────────────────────────────────── */
@@ -60,10 +68,38 @@ const HeroText = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 24px 32px;
+  align-items: flex-start;
+  padding: 24px 32px 36px;
+
+  @media (max-width: 600px) {
+    padding: 20px 16px 28px;
+  }
+`;
+
+const HeroBranding = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: min(100%, 720px);
 
   h1 {
-    margin: 0 0 4px;
+    margin: 0;
+  }
+`;
+
+const BannerLogo = styled.img`
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+
+  @media (max-width: 600px) {
+    width: 46px;
+    height: 46px;
   }
 `;
 
@@ -140,7 +176,7 @@ const FilterBarInner = styled.div`
 `;
 
 const FilterBtn = styled.button`
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 7px;
   padding: 12px 0;
@@ -159,8 +195,8 @@ const FilterBtn = styled.button`
   svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
   &:hover { color: #111; }
 
-  @media (min-width: 1025px) {
-    display: none;
+  @media (max-width: 767px) {
+    display: inline-flex;
   }
 `;
 
@@ -170,6 +206,7 @@ const SortWrap = styled.div`
   gap: 8px;
   font-size: 12px;
   color: #666;
+  margin-left: auto;
 `;
 
 const SortLabel = styled.span`
@@ -198,39 +235,70 @@ const SortSelect = styled.select`
   background-position: right 4px center;
 `;
 
-/* ─── Filter panel ───────────────────────────────────────── */
-const FilterPanel = styled.div`
-  background: #fff;
-  border-bottom: 1px solid #e8e8e6;
-  overflow: hidden;
-  max-height: ${(p) => (p.$open ? "600px" : "0")};
-  transition: max-height 0.35s ease;
-
-  @media (min-width: 1025px) {
-    display: none;
+const SidebarOverlay = styled.div`
+  display: none;
+  @media (max-width: 767px) {
+    display: ${(p) => (p.$open ? "block" : "none")};
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 99;
   }
 `;
 
-const FilterPanelInner = styled.div`
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 20px 32px 24px;
+const SidebarHead = styled.div`
   display: flex;
-  flex-wrap: wrap;
-  gap: 32px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8e8e6;
 
-  @media (max-width: 600px) { padding: 16px 16px 20px; gap: 20px; }
+  @media (min-width: 768px) { display: none; }
 `;
 
-const FilterGroup = styled.div``;
+const FilterGroup = styled.div`
+  border-bottom: 1px solid #eceae7;
+`;
 
-const FilterGroupTitle = styled.div`
+const FilterGroupTitle = styled.button`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  background: none;
+  border: none;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #111;
-  margin-bottom: 10px;
+  cursor: pointer;
+  text-align: left;
+`;
+
+const FilterGroupHeading = styled.h4`
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+`;
+
+const FilterGroupBody = styled.div`
+  display: ${(p) => (p.$open ? "block" : "none")};
+  padding: 0 0 12px;
+`;
+
+const FilterChevron = styled.span`
+  font-size: 14px;
+  line-height: 1;
+  color: #666;
+  transform: rotate(${(p) => (p.$open ? "180deg" : "0deg")});
+  transition: transform 0.18s ease;
 `;
 
 const CheckRow = styled.label`
@@ -255,14 +323,6 @@ const CheckRow = styled.label`
   &:hover { color: #111; }
 `;
 
-const FilterActions = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 8px;
-  width: 100%;
-`;
-
 const ClearAllBtn = styled.button`
   background: none;
   border: 1px solid #ccc;
@@ -278,28 +338,43 @@ const ClearAllBtn = styled.button`
   &:hover { border-color: #111; color: #111; }
 `;
 
-/* ─── Body ───────────────────────────────────────────────── */
-const Body = styled.div`
+/* ─── Body (Kategorie-/Kollektion-Layout: flex + Sticky-Sidebar) ─ */
+const ContentWrap = styled.div`
   max-width: 1440px;
   margin: 0 auto;
-  padding: 0 32px 80px;
+  padding: 14px 32px 80px;
   width: 100%;
   box-sizing: border-box;
-  display: grid;
-  grid-template-columns: 280px 1fr;
+  display: flex;
   gap: 32px;
-  align-items: start;
+  align-items: flex-start;
 
-  @media (max-width: 1024px) {
-    grid-template-columns: 1fr;
-    gap: 0;
-    padding: 0 16px 60px;
+  @media (max-width: 767px) {
+    padding: 10px 16px 60px;
   }
 `;
 
 const SidebarCol = styled.aside`
-  @media (max-width: 1024px) {
-    display: none;
+  width: 280px;
+  flex-shrink: 0;
+  position: sticky;
+  top: ${HEADER_H + 68}px;
+  max-height: calc(100vh - ${HEADER_H + 68}px);
+  overflow-y: auto;
+
+  @media (max-width: 767px) {
+    position: fixed;
+    top: 0;
+    left: ${(p) => (p.$open ? "0" : "-260px")};
+    width: 250px;
+    height: 100vh;
+    max-height: 100vh;
+    z-index: 100;
+    background: #fff;
+    box-shadow: 4px 0 16px rgba(0,0,0,0.12);
+    transition: left 0.3s ease;
+    padding: 16px;
+    box-sizing: border-box;
   }
 `;
 
@@ -388,18 +463,6 @@ const Desc = styled.div`
   a { color: #111; text-decoration: underline; }
 `;
 
-/* ─────────────────────────────────────────────────────────── */
-const SORT_OPTIONS = [
-  { value: "default",      label: "Featured"          },
-  { value: "newest",       label: "Newest"            },
-  { value: "price_asc",    label: "Price: Low → High"  },
-  { value: "price_desc",   label: "Price: High → Low"  },
-  { value: "title_asc",    label: "Name A–Z"           },
-  { value: "title_desc",   label: "Name Z–A"           },
-];
-
-const PER_PAGE = 24;
-
 /* ─────────────────────────────────────────────────────────── *
  *  Page
  * ─────────────────────────────────────────────────────────── */
@@ -417,6 +480,7 @@ export default function BrandPage() {
   const [page,        setPage]        = useState(1);
   const [filters,     setFilters]     = useState({});
   const [panelOpen,   setPanelOpen]   = useState(false);
+  const [openFilterGroups, setOpenFilterGroups] = useState({});
 
   const bodyRef = useRef(null);
 
@@ -452,56 +516,41 @@ export default function BrandPage() {
     el.href = `${window.location.origin}/${locale}/brand/${brand.handle}`;
   }, [locale, brand?.handle]);
 
-  /* ── Facets ── */
-  const facets = (() => {
-    const SKIP = new Set(["media","image_url","image","review_count","review_avg",
-      "sold_last_month","rabattpreis_cents","is_new","badge","brand_id","brand_name","brand_logo","brand_handle","seller_id","seller_name","shop_name"]);
-    const f = {};
-    products.forEach(p => {
-      const meta = typeof p.metadata === "object" && p.metadata ? p.metadata : {};
-      Object.entries(meta).forEach(([k, v]) => {
-        if (SKIP.has(k)) return;
-        if (!f[k]) f[k] = new Set();
-        (Array.isArray(v) ? v : [v]).forEach(x => { const s = String(x).trim(); if (s) f[k].add(s); });
-      });
-    });
-    return Object.fromEntries(
-      Object.entries(f)
-        .map(([k, s]) => [k, [...s].sort()])
-        .filter(([, v]) => v.length > 0 && v.length <= 30)
-    );
-  })();
-
+  const facets = buildFacetsFromProducts(products);
   const hasFacets = Object.keys(facets).length > 0;
+  const showCatalogSidebar = hasFacets;
 
-  /* ── Filter ── */
+  useEffect(() => {
+    const facetKeys = Object.keys(facets);
+    setOpenFilterGroups((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      facetKeys.forEach((key) => {
+        if (!(key in next)) {
+          next[key] = Boolean(filters[key]?.length);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [facets, filters]);
+
   const toggle = (key, val) => {
-    setFilters(prev => {
-      const cur  = prev[key] || [];
-      const next = cur.includes(val) ? cur.filter(x => x !== val) : [...cur, val];
-      if (!next.length) { const u = { ...prev }; delete u[key]; return u; }
+    setFilters((prev) => {
+      const cur = prev[key] || [];
+      const next = cur.includes(val) ? cur.filter((x) => x !== val) : [...cur, val];
+      if (!next.length) {
+        const u = { ...prev };
+        delete u[key];
+        return u;
+      }
       return { ...prev, [key]: next };
     });
     setPage(1);
   };
 
-  let filtered = [...products];
-  Object.entries(filters).forEach(([k, vals]) => {
-    if (!vals?.length) return;
-    filtered = filtered.filter(p => {
-      const v = (p.metadata || {})[k];
-      if (v == null) return false;
-      return (Array.isArray(v) ? v : [v]).some(x => vals.includes(String(x).trim()));
-    });
-  });
-
-  /* ── Sort ── */
-  const sorted = [...filtered];
-  if (sort === "newest")     sorted.sort((a,b) => new Date(b.created_at||0) - new Date(a.created_at||0));
-  if (sort === "price_asc")  sorted.sort((a,b) => (a.variants?.[0]?.prices?.[0]?.amount ?? 0) - (b.variants?.[0]?.prices?.[0]?.amount ?? 0));
-  if (sort === "price_desc") sorted.sort((a,b) => (b.variants?.[0]?.prices?.[0]?.amount ?? 0) - (a.variants?.[0]?.prices?.[0]?.amount ?? 0));
-  if (sort === "title_asc")  sorted.sort((a,b) => (a.title||"").localeCompare(b.title||""));
-  if (sort === "title_desc") sorted.sort((a,b) => (b.title||"").localeCompare(a.title||""));
+  let filtered = filterProductsByFacets(products, filters);
+  const sorted = applyCatalogSort(filtered, sort, { bestsellerOnly: false });
 
   const total      = sorted.length;
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
@@ -522,12 +571,14 @@ export default function BrandPage() {
       <ShopHeader />
       <Main>
         <Bone style={{ height: 220 }} />
-        <Body>
-          <Bone style={{ height: 13, width: 200, margin: "24px 0 32px" }} />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, background: "#e8e8e6" }}>
-            {Array.from({ length: 6 }).map((_, i) => <Bone key={i} style={{ aspectRatio: "3/4" }} />)}
-          </div>
-        </Body>
+        <ContentWrap>
+          <MainCol>
+            <Bone style={{ height: 13, width: 200, margin: "24px 0 32px" }} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, background: "#e8e8e6" }}>
+              {Array.from({ length: 6 }).map((_, i) => <Bone key={i} style={{ aspectRatio: "3/4" }} />)}
+            </div>
+          </MainCol>
+        </ContentWrap>
       </Main>
       <Footer />
     </PageWrap>
@@ -537,11 +588,13 @@ export default function BrandPage() {
     <PageWrap>
       <ShopHeader />
       <Main>
-        <Body>
-          <p style={{ padding: "48px 0", color: "#b91c1c", fontSize: 13 }}>
-            {error || "Brand not found."}
-          </p>
-        </Body>
+        <ContentWrap>
+          <MainCol>
+            <p style={{ padding: "48px 0", color: "#b91c1c", fontSize: 13 }}>
+              {error || "Brand not found."}
+            </p>
+          </MainCol>
+        </ContentWrap>
       </Main>
       <Footer />
     </PageWrap>
@@ -558,12 +611,10 @@ export default function BrandPage() {
           <HeroBanner>
             <img src={bannerUrl} alt={title} />
             <HeroText>
-              <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">
-                {logoUrl && (
-                  <img src={logoUrl} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: "50%", verticalAlign: "middle", marginRight: 10, border: "2px solid rgba(255,255,255,0.8)" }} />
-                )}
-                {title}
-              </h1>
+              <HeroBranding>
+                {logoUrl && <BannerLogo src={logoUrl} alt="" />}
+                <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">{title}</h1>
+              </HeroBranding>
             </HeroText>
           </HeroBanner>
         ) : (
@@ -583,22 +634,24 @@ export default function BrandPage() {
         {/* ── Sticky filter/sort bar ── */}
         <FilterBar>
           <FilterBarInner>
-            <FilterBtn
-              type="button"
-              $active={panelOpen || activeCount > 0}
-              onClick={() => setPanelOpen(o => !o)}
-              aria-expanded={panelOpen}
-            >
-              <svg viewBox="0 0 16 12">
-                <line x1="0" y1="2"  x2="16" y2="2" />
-                <line x1="0" y1="6"  x2="16" y2="6" />
-                <line x1="0" y1="10" x2="16" y2="10"/>
-                <circle cx="5"  cy="2"  r="1.5" fill="#111" stroke="none"/>
-                <circle cx="11" cy="6"  r="1.5" fill="#111" stroke="none"/>
-                <circle cx="5"  cy="10" r="1.5" fill="#111" stroke="none"/>
-              </svg>
-              Filter {activeCount > 0 ? `(${activeCount})` : ""}
-            </FilterBtn>
+            {showCatalogSidebar && (
+              <FilterBtn
+                type="button"
+                $active={panelOpen || activeCount > 0}
+                onClick={() => setPanelOpen((o) => !o)}
+                aria-expanded={panelOpen}
+              >
+                <svg viewBox="0 0 16 12">
+                  <line x1="0" y1="2"  x2="16" y2="2" />
+                  <line x1="0" y1="6"  x2="16" y2="6" />
+                  <line x1="0" y1="10" x2="16" y2="10"/>
+                  <circle cx="5"  cy="2"  r="1.5" fill="#111" stroke="none"/>
+                  <circle cx="11" cy="6"  r="1.5" fill="#111" stroke="none"/>
+                  <circle cx="5"  cy="10" r="1.5" fill="#111" stroke="none"/>
+                </svg>
+                Filter {activeCount > 0 ? `(${activeCount})` : ""}
+              </FilterBtn>
+            )}
 
             <SortWrap>
               <SortLabel>Sort:</SortLabel>
@@ -613,40 +666,18 @@ export default function BrandPage() {
               </SortSelect>
             </SortWrap>
           </FilterBarInner>
-
-          {hasFacets && (
-            <FilterPanel $open={panelOpen}>
-              <FilterPanelInner>
-                {Object.entries(facets).map(([key, vals]) => (
-                  <FilterGroup key={key}>
-                    <FilterGroupTitle>{key.replace(/_/g, " ")}</FilterGroupTitle>
-                    {vals.map(val => {
-                      const on = (filters[key] || []).includes(val);
-                      return (
-                        <CheckRow key={val} $on={on}>
-                          <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
-                          {val}
-                        </CheckRow>
-                      );
-                    })}
-                  </FilterGroup>
-                ))}
-                {activeCount > 0 && (
-                  <FilterActions>
-                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }}>
-                      Clear all
-                    </ClearAllBtn>
-                  </FilterActions>
-                )}
-              </FilterPanelInner>
-            </FilterPanel>
-          )}
         </FilterBar>
 
-        {/* ── Body ── */}
-        <Body>
-          <SidebarCol>
-            {hasFacets ? (
+        {showCatalogSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
+        <ContentWrap ref={bodyRef}>
+          {showCatalogSidebar && (
+            <SidebarCol $open={panelOpen}>
+              <SidebarHead>
+                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                  Filter
+                </span>
+                <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555", lineHeight: 1 }} aria-label="Close filters">×</button>
+              </SidebarHead>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
                   Filter
@@ -656,29 +687,39 @@ export default function BrandPage() {
                       onClick={() => { setFilters({}); setPage(1); }}
                       style={{ float: "right", padding: "2px 8px", fontSize: 10 }}
                     >
-                      Clear all
+                      Clear
                     </ClearAllBtn>
                   )}
                 </div>
                 {Object.entries(facets).map(([key, vals]) => (
                   <FilterGroup key={key}>
-                    <FilterGroupTitle>{key.replace(/_/g, " ")}</FilterGroupTitle>
-                    {vals.map((val) => {
-                      const on = (filters[key] || []).includes(val);
-                      return (
-                        <CheckRow key={val} $on={on}>
-                          <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
-                          {val}
-                        </CheckRow>
-                      );
-                    })}
+                    <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
+                      <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
+                      <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
+                    </FilterGroupTitle>
+                    <FilterGroupBody $open={!!openFilterGroups[key]}>
+                      {vals.map((val) => {
+                        const on = (filters[key] || []).includes(val);
+                        return (
+                          <CheckRow key={val} $on={on}>
+                            <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
+                            {val}
+                          </CheckRow>
+                        );
+                      })}
+                    </FilterGroupBody>
                   </FilterGroup>
                 ))}
+                {activeCount > 0 && (
+                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
+                    Clear all filters
+                  </ClearAllBtn>
+                )}
               </div>
-            ) : null}
-          </SidebarCol>
+            </SidebarCol>
+          )}
 
-          <MainCol ref={bodyRef}>
+          <MainCol>
             {activeCount > 0 && (
               <ChipBar>
                 {Object.entries(filters).flatMap(([k, vals]) =>
@@ -700,7 +741,7 @@ export default function BrandPage() {
                 No products match your filters.
               </div>
             ) : (
-              <ProductGrid products={paginated} maxColumns={4} />
+              <ProductGrid products={paginated} maxColumns={4} activeFilters={filters} />
             )}
 
             {totalPages > 1 && (
@@ -742,7 +783,7 @@ export default function BrandPage() {
               </Desc>
             )}
           </MainCol>
-        </Body>
+        </ContentWrap>
       </Main>
       <Footer />
     </PageWrap>

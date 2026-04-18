@@ -12,6 +12,7 @@ import {
   buildFacetsFromProducts,
   filterProductsByFacets,
   applyCatalogSort,
+  getFacetGroupTitle,
 } from "@/lib/catalog-listing";
 import { normCatId } from "@/lib/category-product-ids";
 import LandingContainers from "@/components/landing/LandingContainers";
@@ -962,12 +963,7 @@ export default function CategoryTemplate() {
                     Object.entries(facets).map(([key, vals]) => (
                       <FilterGroup key={key}>
                         <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                          <FilterGroupHeading>{({
-                            brand_name: "Marke", farbe: "Farbe", colour: "Colour", color: "Color",
-                            material: "Material", size: "Größe", groesse: "Größe",
-                            typ: "Typ", style: "Style", gender: "Gender",
-                            age_group: "Altersgruppe", season: "Saison",
-                          })[key] ?? key.replace(/_/g, " ")}</FilterGroupHeading>
+                          <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
                           <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
                         </FilterGroupTitle>
                         <FilterGroupBody $open={!!openFilterGroups[key]}>

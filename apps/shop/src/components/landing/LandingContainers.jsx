@@ -67,6 +67,24 @@ function collectionHref(handle) {
   return value ? `/${value}` : "#";
 }
 
+/** Kollektionen-Karussell: Main image (metadata.image_url in Seller), not the collection page banner. */
+function collectionCarouselCardImageFromLive(live) {
+  if (!live) return "";
+  const main = live.image_url;
+  if (main) return resolveUrl(main);
+  return "";
+}
+
+const COLLECTIONS_CAROUSEL_ASPECT_RATIOS = new Set([
+  "4/5", "3/4", "2/3", "1/1", "4/3", "3/2", "16/9", "21/9",
+]);
+
+/** Normalizes CMS value (e.g. "4:5" or legacy) to a safe CSS aspect-ratio. */
+function normalizeCollectionsCarouselAspectRatio(raw) {
+  const s = String(raw || "4/5").trim().replace(/\s+/g, "").replace(/:/g, "/");
+  return COLLECTIONS_CAROUSEL_ASPECT_RATIOS.has(s) ? s : "4/5";
+}
+
 function blogBodyToPlainSnippet(html, maxLen = 400) {
   const t = String(html || "")
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
@@ -453,7 +471,9 @@ function CollectionCarousel({ container, preloadedProducts }) {
 function CollectionsCarousel({ container }) {
   const snapshots = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
   const itemsPerRow = container.items_per_row || 4;
-  const ratio = container.card_aspect_ratio || "4/5";
+  const ratio = normalizeCollectionsCarouselAspectRatio(container.card_aspect_ratio);
+  const imgObjectFit =
+    container.card_image_object_fit === "contain" ? "contain" : "cover";
 
   // Fetch live collection data so title/image changes in admin are reflected immediately.
   const [liveCollections, setLiveCollections] = useState(null);
@@ -469,11 +489,12 @@ function CollectionsCarousel({ container }) {
         const merged = snapshots.map((snap) => {
           const live = byId.get(snap.id);
           if (!live) return snap;
+          const fromMain = collectionCarouselCardImageFromLive(live);
           return {
             ...snap,
             title: live.display_title || live.title || snap.title,
             handle: live.handle || snap.handle,
-            image: live.banner || live.image_url || live.banner_image_url || snap.image,
+            image: fromMain || snap.image,
           };
         });
         setLiveCollections(merged);
@@ -512,7 +533,11 @@ function CollectionsCarousel({ container }) {
               }}
             >
               {image ? (
-                <img src={image} alt={collection.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                <img
+                  src={image}
+                  alt={collection.title || ""}
+                  style={{ width: "100%", height: "100%", objectFit: imgObjectFit, display: "block" }}
+                />
               ) : (
                 <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
                   Keine Vorschau

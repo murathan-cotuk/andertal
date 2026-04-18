@@ -72,6 +72,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       subNavigationItems: [
         { url: "/products/inventory", label: tx("inventory", "Inventory") },
         { url: "/products/collections", label: tx("collections", "Collections") },
+        { url: "/products/product-groups", label: "Produktgruppen" },
       ],
     },
     {
@@ -113,6 +114,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       icon: DiscountIcon,
       subNavigationItems: [
         { url: "/discounts/coupons", label: tx("coupons", "Coupons") },
+        { url: "/discounts/campaigns", label: "Aktionen" },
       ],
     },
     {
@@ -355,7 +357,11 @@ export default function PolarisLayout({ children }) {
       refreshNotifications();
     };
     window.addEventListener("belucha-msg-unread-refresh", onRefresh);
-    return () => window.removeEventListener("belucha-msg-unread-refresh", onRefresh);
+    window.addEventListener("belucha-notifications-refresh", onRefresh);
+    return () => {
+      window.removeEventListener("belucha-msg-unread-refresh", onRefresh);
+      window.removeEventListener("belucha-notifications-refresh", onRefresh);
+    };
   }, [isAuthenticated, refreshNotifications]);
 
   useEffect(() => {
@@ -486,7 +492,10 @@ export default function PolarisLayout({ children }) {
     LOCALES.find((l) => l.code === locale)?.label ?? String(locale || "").toUpperCase();
 
   const notifUnread = notifData
-    ? (notifData.orders || 0) + (notifData.returns || 0)
+    ? (notifData.orders || 0) +
+      (notifData.returns || 0) +
+      (notifData.verifications || 0) +
+      (notifData.change_requests || 0)
     : 0;
 
   const topBarIconStyle = {
@@ -564,7 +573,7 @@ export default function PolarisLayout({ children }) {
                 if (!notifOpen) {
                   try {
                     await getMedusaAdminClient().markNotificationsSeen();
-                    setNotifData((d) => d ? { ...d, orders: 0, returns: 0 } : d);
+                    await refreshNotifications();
                   } catch {
                     // ignore
                   }
@@ -586,7 +595,10 @@ export default function PolarisLayout({ children }) {
               <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, background: "#fff", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", border: "1px solid #e5e7eb", zIndex: 9999 }}>
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 13, fontWeight: 700, color: "#111827" }}>Benachrichtigungen</div>
                 <div style={{ maxHeight: 340, overflowY: "auto" }}>
-                  {(!notifData?.recent_orders?.length && !notifData?.recent_returns?.length && !notifData?.recent_verifications?.length) ? (
+                  {(!notifData?.recent_orders?.length &&
+                    !notifData?.recent_returns?.length &&
+                    !notifData?.recent_verifications?.length &&
+                    !notifData?.recent_product_change_requests?.length) ? (
                     <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Keine neuen Benachrichtigungen</div>
                   ) : (
                     <>
@@ -596,6 +608,32 @@ export default function PolarisLayout({ children }) {
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{v.title || "Evrak Gönderildi"}</div>
                             <div style={{ fontSize: 11, color: "#6b7280" }}>{v.body || "Satıcı doğrulama evraklarını gönderdi."}</div>
+                          </div>
+                        </Link>
+                      ))}
+                      {(notifData?.recent_product_change_requests || []).map((cr) => (
+                        <Link
+                          key={cr.id}
+                          href="/products/inventory"
+                          onClick={() => setNotifOpen(false)}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                        >
+                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>✏️</span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                              Produktänderung ausstehend
+                            </div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>
+                              {cr.product_title || "Produkt"}{" "}
+                              ·{" "}
+                              {cr.field_name === "title"
+                                ? "Titel"
+                                : cr.field_name === "description"
+                                  ? "Beschreibung"
+                                  : cr.field_name?.startsWith?.("metadata.")
+                                    ? `Metadaten (${String(cr.field_name).replace(/^metadata\./, "")})`
+                                    : cr.field_name || "—"}
+                            </div>
                           </div>
                         </Link>
                       ))}
@@ -621,7 +659,9 @@ export default function PolarisLayout({ children }) {
                   )}
                 </div>
                 <div style={{ padding: "10px 16px", borderTop: "1px solid #f3f4f6" }}>
-                  <Link href="/orders" onClick={() => setNotifOpen(false)} style={{ fontSize: 12, color: "#ff971c", textDecoration: "none", fontWeight: 600 }}>Alle Bestellungen →</Link>
+                  <Link href="/notifications" onClick={() => setNotifOpen(false)} style={{ fontSize: 12, color: "#0284c7", textDecoration: "none", fontWeight: 600 }}>
+                    Alle Benachrichtigungen →
+                  </Link>
                 </div>
               </div>
             )}

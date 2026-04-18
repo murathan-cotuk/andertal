@@ -33,6 +33,23 @@ function resolveUrl(url) {
   return `${BACKEND_URL}/uploads/${url}`;
 }
 
+/** Kollektionen-Karussell — maps to CSS aspect-ratio on the shop */
+const COLLECTIONS_CAROUSEL_ASPECT_OPTIONS = [
+  { label: "Hochformat — 4:5 (Standard)", value: "4/5" },
+  { label: "Hochformat — 3:4", value: "3/4" },
+  { label: "Hochformat — 2:3", value: "2/3" },
+  { label: "Quadrat — 1:1", value: "1/1" },
+  { label: "Querformat — 4:3", value: "4/3" },
+  { label: "Querformat — 3:2", value: "3/2" },
+  { label: "Querformat — 16:9 (breit)", value: "16/9" },
+  { label: "Querformat — 21:9 (Cinematic)", value: "21/9" },
+];
+
+const COLLECTIONS_CAROUSEL_OBJECT_FIT_OPTIONS = [
+  { label: "Füllen (Bild zuschneiden, wie im Shop üblich)", value: "cover" },
+  { label: "Einpassen (ganzes Bild sichtbar, ggf. Ränder)", value: "contain" },
+];
+
 const TEXT_POSITION_OPTIONS = [
   { label: "Oben Links",    value: "top-left" },
   { label: "Oben Mitte",   value: "top-center" },
@@ -159,7 +176,16 @@ function newContainer(type) {
     case "collection_carousel":
       return { ...base, title: "", collection_id: "", collection_handle: "", items_per_row: 4, padding: "32px 24px", content_layout: "full" };
     case "collections_carousel":
-      return { ...base, title: "", collections: [], items_per_row: 4, padding: "32px 24px", card_aspect_ratio: "4/5", content_layout: "full" };
+      return {
+        ...base,
+        title: "",
+        collections: [],
+        items_per_row: 4,
+        padding: "32px 24px",
+        card_aspect_ratio: "4/5",
+        card_image_object_fit: "cover",
+        content_layout: "full",
+      };
     case "accordion":
       return {
         ...base,
@@ -735,7 +761,7 @@ function CollectionsCarouselEditor({ container, onChange }) {
           id: col.id,
           title: col.title || "",
           handle: col.handle || "",
-          image: col.thumbnail || col.image_url || col.banner || col.banner_image_url || "",
+          image: col.image_url || col.thumbnail || col.banner_image_url || col.banner || "",
         },
       ],
     });
@@ -757,22 +783,26 @@ function CollectionsCarouselEditor({ container, onChange }) {
     onChange({ ...container, collections: next });
   };
 
+  const aspectValue = (() => {
+    const raw = String(container.card_aspect_ratio || "4/5").trim().replace(/:/g, "/");
+    const ok = COLLECTIONS_CAROUSEL_ASPECT_OPTIONS.some((o) => o.value === raw);
+    return ok ? raw : "4/5";
+  })();
+
   return (
     <BlockStack gap="400">
       <TextField label="Überschrift (optional)" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
-      <InlineStack gap="400" wrap={false}>
-        <div style={{ flex: 2 }}>
-          <Select
-            label="Kollektion hinzufügen"
-            options={availableOptions}
-            value={selectedId}
-            onChange={(id) => {
-              setSelectedId(id);
-              addCollection(id);
-            }}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
+      <Select
+        label="Kollektion hinzufügen"
+        options={availableOptions}
+        value={selectedId}
+        onChange={(id) => {
+          setSelectedId(id);
+          addCollection(id);
+        }}
+      />
+      <InlineStack gap="400" wrap>
+        <div style={{ flex: "1 1 200px", minWidth: 160 }}>
           <Select
             label="Karten pro Reihe"
             options={[2, 3, 4, 5, 6].map((n) => ({ label: String(n), value: String(n) }))}
@@ -780,22 +810,28 @@ function CollectionsCarouselEditor({ container, onChange }) {
             onChange={(v) => onChange({ ...container, items_per_row: Number(v) })}
           />
         </div>
-        <div style={{ flex: 1 }}>
-          <Select
-            label="Kartenformat"
-            options={[
-              { label: "Hochformat (4:5)", value: "4/5" },
-              { label: "Quadrat (1:1)", value: "1/1" },
-              { label: "Querformat (16:9)", value: "16/9" },
-            ]}
-            value={container.card_aspect_ratio || "4/5"}
-            onChange={(v) => onChange({ ...container, card_aspect_ratio: v })}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: "1 1 200px", minWidth: 160 }}>
           <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
         </div>
       </InlineStack>
+      <BlockStack gap="200">
+        <Text as="h3" variant="headingSm">Darstellung der Kollektions-Karten</Text>
+        <Text as="p" variant="bodySm" tone="subdued">
+          Seitenverhältnis und Bildausschnitt gelten für alle Karten in diesem Karussell (Live-Shop: Main-Bild der Kollektion).
+        </Text>
+        <Select
+          label="Seitenverhältnis (Hoch / Quadrat / Quer)"
+          options={COLLECTIONS_CAROUSEL_ASPECT_OPTIONS}
+          value={aspectValue}
+          onChange={(v) => onChange({ ...container, card_aspect_ratio: v })}
+        />
+        <Select
+          label="Bild im Rahmen"
+          options={COLLECTIONS_CAROUSEL_OBJECT_FIT_OPTIONS}
+          value={container.card_image_object_fit === "contain" ? "contain" : "cover"}
+          onChange={(v) => onChange({ ...container, card_image_object_fit: v })}
+        />
+      </BlockStack>
       <ContainerLayoutEditor container={container} onChange={onChange} />
 
       {chosen.length === 0 ? (

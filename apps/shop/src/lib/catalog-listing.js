@@ -13,6 +13,27 @@ export const SORT_OPTIONS = [
 
 export const PER_PAGE = 24;
 
+/** Display titles for normalized facet keys (matches CategoryTemplate / brand listing). */
+const FACET_GROUP_TITLE_OVERRIDES = {
+  brand_name: "Marke",
+  farbe: "Farbe",
+  colour: "Colour",
+  color: "Color",
+  material: "Material",
+  size: "Größe",
+  groesse: "Größe",
+  typ: "Typ",
+  style: "Style",
+  gender: "Gender",
+  age_group: "Altersgruppe",
+  season: "Saison",
+};
+
+export function getFacetGroupTitle(key) {
+  const k = String(key || "").trim();
+  return FACET_GROUP_TITLE_OVERRIDES[k] ?? k.replace(/_/g, " ");
+}
+
 export const FACET_SKIP = new Set([
   "media", "image_url", "image", "thumbnail",
   "review_count", "review_avg", "sold_last_month",
@@ -23,7 +44,7 @@ export const FACET_SKIP = new Set([
   "shipping_group_id",
   "collection_id", "collection_ids", "admin_category_id", "category_id",
   "seller_id", "product_id",
-  "brand", "brand_id", "brand_logo", "brand_handle",
+  "brand", "brand_id", "brand_name", "brand_logo", "brand_handle",
   "shop_name", "store_name", "seller_name",
   "hersteller", "hersteller_information", "verantwortliche_person_information",
   "seo_keywords", "seo_meta_title", "seo_meta_description",

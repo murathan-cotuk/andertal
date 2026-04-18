@@ -9,6 +9,7 @@
  *   onSelect    (urls: string[]) => void   — called with selected URL(s) when "Apply" is clicked
  *   multiple    boolean  default false — allow multiple selection
  *   title       string   modal title
+ *   uploadPurpose  optional "product" — server: square crop, min 1000px, WebP output (JPEG/PNG only)
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -45,12 +46,14 @@ export default function MediaPickerModal({
   multiple = false,
   title = "Select media",
   onUploadingChange,
+  uploadPurpose,
 }) {
   const client = getMedusaAdminClient();
 
   const [library, setLibrary] = useState([]);
   const [loadingLib, setLoadingLib] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [selected, setSelected] = useState(new Set()); // Set of resolved URLs
   const [urlInput, setUrlInput] = useState("");
 
@@ -59,6 +62,7 @@ export default function MediaPickerModal({
     if (!open) return;
     setSelected(new Set());
     setUrlInput("");
+    setUploadError("");
     setLoadingLib(true);
     client
       .getMedia({ limit: 1000 })
@@ -88,13 +92,15 @@ export default function MediaPickerModal({
     (files) => {
       const list = Array.isArray(files) ? files : [files];
       if (!list.length) return;
+      setUploadError("");
       setUploading(true);
       onUploadingChange?.(true);
+      const uploadOpts = uploadPurpose === "product" ? { purpose: "product" } : {};
       Promise.all(
         list.map((file) => {
           const fd = new FormData();
           fd.append("file", file);
-          return client.uploadMedia(fd).then((r) => r.url || null);
+          return client.uploadMedia(fd, uploadOpts).then((r) => r.url || null);
         })
       )
         .then((urls) => {
@@ -118,13 +124,15 @@ export default function MediaPickerModal({
             });
           }
         })
-        .catch(() => {})
+        .catch((e) => {
+          setUploadError(e?.message || "Upload fehlgeschlagen");
+        })
         .finally(() => {
           setUploading(false);
           onUploadingChange?.(false);
         });
     },
-    [client, multiple]
+    [client, multiple, uploadPurpose]
   );
 
   const handleApply = () => {
@@ -181,12 +189,24 @@ export default function MediaPickerModal({
         </div>
 
         <Divider />
+        {uploadPurpose === "product" && (
+          <Box paddingBlockEnd="200">
+            <Text as="p" variant="bodySm" tone="subdued">
+              Produktbilder: JPEG oder PNG, mindestens 1000×1000 px; Upload wird als quadratisches WebP (1000×1000) gespeichert.
+            </Text>
+          </Box>
+        )}
         <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">
           Medya kütüphanesinden seç
         </Text>
       </Modal.Section>
 
       <Modal.Section>
+        {uploadError && (
+          <Box paddingBlockEnd="300">
+            <Text as="p" variant="bodySm" tone="critical">{uploadError}</Text>
+          </Box>
+        )}
         {uploading && (
           <Box paddingBlockEnd="300">
             <Text as="p" variant="bodySm" tone="subdued">Yükleniyor…</Text>
@@ -201,7 +221,7 @@ export default function MediaPickerModal({
         >
           {/* Upload tile */}
           <DropZone
-            accept="image/*"
+            accept={uploadPurpose === "product" ? "image/jpeg,image/png" : "image/*"}
             type="image"
             onDropAccepted={handleUpload}
             allowMultiple={multiple}

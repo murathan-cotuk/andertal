@@ -10,8 +10,22 @@ import {
 } from "@belucha/shop-theme";
 import { ShopStylesContext } from "@/context/ShopStylesContext";
 
-// Fetch styles through the internal API route (handles backend URL + caching)
+// Fetch styles through the internal API route (handles backend URL; route is no-store)
 const STYLES_URL = "/api/store-styles";
+
+function loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink) {
+  fetch(STYLES_URL, { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      const raw = data?.styles || {};
+      const merged = mergeLoadedShopStyles(raw);
+      injectCss(buildShopThemeCSS(merged, { merge: false }));
+      const href = buildGoogleFontsLinkHrefForFamilies(collectTypographyGoogleFamilies(merged.typography));
+      ensureGoogleFontLink(href);
+      if (setStyles) setStyles(merged);
+    })
+    .catch(() => {});
+}
 
 const FONT_LINK_ID = "shop-google-font-link";
 
@@ -39,6 +53,7 @@ function ensureGoogleFontLink(href) {
 
 export default function ShopStylesInjector() {
   const ctx = useContext(ShopStylesContext);
+  const setStyles = ctx?.setStyles;
 
   // İlk boyamadan önce :root değişkenleri (H1–H5, body) hazır olsun; yoksa rich text h1 body fontuna düşer
   useLayoutEffect(() => {
@@ -48,19 +63,19 @@ export default function ShopStylesInjector() {
   }, []);
 
   useEffect(() => {
-    fetch(STYLES_URL)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        const raw = data?.styles || {};
-        const merged = mergeLoadedShopStyles(raw);
-        injectCss(buildShopThemeCSS(merged, { merge: false }));
-        const href = buildGoogleFontsLinkHrefForFamilies(collectTypographyGoogleFamilies(merged.typography));
-        ensureGoogleFontLink(href);
-        // Template ayarlarını context'e yaz (sidebar, banner, columns, vb.)
-        if (ctx?.setStyles) ctx.setStyles(merged);
-      })
-      .catch(() => {});
-  }, []);
+    loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink);
+  }, [setStyles]);
+
+  // Seller'da Templates kaydedilince sekmeye dönünce güncel sütun sayısı vb. yüklensin
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink);
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [setStyles]);
 
   return null;
 }

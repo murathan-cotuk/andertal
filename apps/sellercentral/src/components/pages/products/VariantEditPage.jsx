@@ -576,6 +576,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 onClose={() => setMediaPickerOpen(false)}
                 title="Select images"
                 multiple
+                uploadPurpose="product"
                 onSelect={(urls) => {
                   const toAdd = urls.slice(0, Math.max(0, 8 - variantMediaUrls.length));
                   if (!toAdd.length) return;
@@ -589,6 +590,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 onClose={() => setCoverPickerOpen(false)}
                 title="Select cover image"
                 multiple={false}
+                uploadPurpose="product"
                 onSelect={(urls) => {
                   const u = urls[0];
                   if (!u) return;

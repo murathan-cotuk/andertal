@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
+import styled from "styled-components";
+import { Card } from "@belucha/ui";
 import { Button, InlineStack } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
@@ -59,11 +61,169 @@ const STATUS_COLORS = {
 function StatusBadge({ value }) {
   const s = STATUS_COLORS[value] || { bg: "#f3f4f6", color: "#6b7280" };
   return (
-    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color, whiteSpace: "nowrap" }}>
+    <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color, whiteSpace: "nowrap" }}>
       {value || "—"}
     </span>
   );
 }
+
+/* ── Layout (Produkte-Seite: Container + Card + Raster) ───────── */
+const PageContainer = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  min-height: 100%;
+  background: #f9fafb;
+`;
+
+const PageHeader = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 32px;
+`;
+
+const PageTitle = styled.h1`
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0;
+  color: #1f2937;
+`;
+
+const HeaderMeta = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+`;
+
+const Section = styled(Card)`
+  padding: 24px;
+  margin-bottom: 24px;
+`;
+
+const SectionHeading = styled.h2`
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 16px;
+`;
+
+const FilterGrid = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const FilterField = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const FieldLabel = styled.span`
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+`;
+
+const FilterInput = styled.input`
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #fff;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  }
+  &::placeholder {
+    color: #9ca3af;
+  }
+`;
+
+const FilterSelect = styled.select`
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #fff;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  }
+`;
+
+const TableCard = styled(Card)`
+  padding: 0;
+  margin-bottom: 24px;
+  overflow: hidden;
+  border-radius: 12px;
+`;
+
+const BulkBar = styled.div`
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  background: #f0f9ff;
+  border: 2px solid #bae6fd;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06);
+`;
+
+const SuperuserSectionLabel = styled.td`
+  padding: 12px 20px !important;
+  background: #eff6ff !important;
+  border-bottom: 1px solid #bfdbfe !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  color: #1e40af !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+`;
+
+const SellerOrdersSectionLabel = styled.td`
+  padding: 12px 20px !important;
+  background: #f3f4f6 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  color: #374151 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+`;
+
+const SellerGroupHeader = styled.td`
+  padding: 0 !important;
+  background: #f9fafb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+`;
 
 
 function fmtCentsWithSymbol(c, symbol = "€") {
@@ -71,7 +231,23 @@ function fmtCentsWithSymbol(c, symbol = "€") {
   return symbol === "€" ? val + " €" : symbol + " " + val;
 }
 
-function ExpandedRow({ order, locale = "de" }) {
+/** Öffentliche Sendungsverfolgung (Carrier-Heuristik, gleiche Logik wie Backend-Defaults) */
+function buildCarrierTrackingUrl(carrierName, trackingNumber) {
+  const raw = String(trackingNumber || "").trim();
+  if (!raw) return null;
+  const tn = encodeURIComponent(raw);
+  const c = String(carrierName || "").toLowerCase().trim();
+  if (c.includes("dhl")) return `https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?lang=de&idc=${tn}`;
+  if (c.includes("dpd")) return `https://tracking.dpd.de/status/de_DE/parcel/${tn}`;
+  if (c.includes("gls")) return `https://gls-group.com/track/${tn}`;
+  if (c.includes("ups")) return `https://www.ups.com/track?tracknum=${tn}&loc=de_DE`;
+  if (c.includes("fedex")) return `https://www.fedex.com/fedextrack/?trknbr=${tn}`;
+  if (c.includes("hermes")) return `https://www.myhermes.de/empfangen/sendungsverfolgung/#/search?trackNumber=${tn}`;
+  if (c.includes("go") && c.includes("express")) return `https://www.general-overnight.com/sendungsverfolgung/?tracking=${tn}`;
+  return `https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?lang=de&idc=${tn}`;
+}
+
+function ExpandedRow({ order, locale = "de", onSaveFields }) {
   const items = order._items || [];
   const subtotal = items.reduce((s, it) => s + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0);
   const total = order.total_cents || order.subtotal_cents || 0;
@@ -79,16 +255,18 @@ function ExpandedRow({ order, locale = "de" }) {
   const totalNetto = vat.rate > 0 ? Math.round(total / (1 + vat.rate / 100)) : total;
   const totalVat = total - totalNetto;
 
-  const showShipBlock =
-    order.tracking_number ||
-    order.carrier_name ||
-    order.delivery_status === "versendet" ||
-    order.delivery_status === "zugestellt";
+  const [trackDraft, setTrackDraft] = useState(order.tracking_number || "");
+  const [savingTrack, setSavingTrack] = useState(false);
+  useEffect(() => {
+    setTrackDraft(order.tracking_number || "");
+  }, [order.id, order.tracking_number]);
+
+  const trackingUrl = buildCarrierTrackingUrl(order.carrier_name, order.tracking_number);
 
   return (
     <tr>
       <td colSpan={13} style={{ padding: 0, background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-        <div style={{ padding: "10px 24px 14px" }}>
+        <div style={{ padding: "16px 24px 20px" }}>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             <Button url={getOrderPdfDownloadUrl(order.id, "invoice")} external variant="secondary" size="slim">
               Rechnung (PDF)
@@ -103,33 +281,95 @@ function ExpandedRow({ order, locale = "de" }) {
               </span>
             </Button>
           </div>
-          {showShipBlock && (
-            <div
-              style={{
-                marginBottom: 12,
-                padding: "10px 14px",
-                background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
-                borderRadius: 8,
-                border: "1px solid var(--p-color-border, #e3e5e8)",
-                fontSize: 13,
-              }}
-            >
-              <div style={{ fontWeight: 700, color: "#374151", marginBottom: 4 }}>Versand</div>
-              <div style={{ color: "#111827" }}>
-                {order.carrier_name ? <span>{order.carrier_name}</span> : null}
-                {order.carrier_name && order.tracking_number ? <span> · </span> : null}
-                {order.tracking_number ? (
-                  <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 600 }}>{order.tracking_number}</span>
-                ) : null}
-                {!order.tracking_number && order.delivery_status === "versendet" && (
-                  <span style={{ color: "#6b7280" }}>Keine Trackingnummer hinterlegt</span>
-                )}
-              </div>
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "16px 18px",
+              background: "#fff",
+              borderRadius: 8,
+              border: "2px solid #e5e7eb",
+              fontSize: 13,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+            }}
+          >
+            <div style={{ fontWeight: 700, color: "#374151", marginBottom: 8, fontSize: 14 }}>Versand / Tracking</div>
+            {order.carrier_name ? (
+              <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 8 }}>Dienstleister: <strong style={{ color: "#111827" }}>{order.carrier_name}</strong></div>
+            ) : (
+              <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 8 }}>Kein Versanddienstleister hinterlegt</div>
+            )}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <input
+                type="text"
+                value={trackDraft}
+                onChange={(e) => setTrackDraft(e.target.value)}
+                placeholder="Trackingnummer eintragen"
+                autoComplete="off"
+                style={{
+                  flex: "1 1 200px",
+                  minWidth: 160,
+                  maxWidth: 360,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: "2px solid #e5e7eb",
+                  fontFamily: "ui-monospace, monospace",
+                  fontSize: 13,
+                }}
+              />
+              <button
+                type="button"
+                disabled={savingTrack || !onSaveFields}
+                onClick={async () => {
+                  if (!onSaveFields) return;
+                  setSavingTrack(true);
+                  try {
+                    await onSaveFields(order.id, { tracking_number: trackDraft.trim() || null });
+                  } catch {
+                    /* handleUpdate schluckt Fehler */
+                  }
+                  setSavingTrack(false);
+                }}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#0ea5e9",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: savingTrack ? "wait" : "pointer",
+                  opacity: savingTrack ? 0.7 : 1,
+                }}
+              >
+                {savingTrack ? "…" : "Speichern"}
+              </button>
             </div>
-          )}
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            {order.tracking_number ? (
+              <div style={{ marginTop: 10, fontSize: 12 }}>
+                <span style={{ color: "#6b7280", marginRight: 6 }}>Gespeichert:</span>
+                {trackingUrl ? (
+                  <a
+                    href={trackingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "#1d4ed8", textDecoration: "underline" }}
+                  >
+                    {order.tracking_number}
+                  </a>
+                ) : (
+                  <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 600 }}>{order.tracking_number}</span>
+                )}
+                {trackingUrl ? (
+                  <span style={{ color: "#9ca3af", marginLeft: 8 }}>— Klick öffnet die Sendungsverfolgung</span>
+                ) : null}
+              </div>
+            ) : (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#9ca3af" }}>Noch keine Trackingnummer gespeichert.</div>
+            )}
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, background: "#fff", borderRadius: 8, overflow: "hidden", border: "2px solid #e5e7eb" }}>
             <thead>
-              <tr style={{ color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <tr style={{ color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                 <th style={{ textAlign: "left", padding: "4px 8px" }}>Produkt</th>
                 <th style={{ textAlign: "right", padding: "4px 8px" }}>Menge</th>
                 <th style={{ textAlign: "right", padding: "4px 8px" }}>Einzelpreis (brutto)</th>
@@ -685,9 +925,9 @@ export default function OrdersPage() {
   const renderOrderRows = (list) =>
     sortOrdersClient(list).map((order) => (
       <React.Fragment key={order.id}>
-        <tr style={{ borderBottom: "1px solid #f3f4f6", cursor: "default", background: selected.has(order.id) ? "#f6f6f7" : "" }}
-          onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fafafa"; }}
-          onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = ""; }}
+        <tr style={{ borderBottom: "1px solid #e5e7eb", cursor: "default", background: selected.has(order.id) ? "#f0f9ff" : "#fff", transition: "background 0.15s ease" }}
+          onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#f9fafb"; }}
+          onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fff"; }}
         >
           <td style={{ padding: "10px 8px 10px 12px", width: 32 }} onClick={e => e.stopPropagation()}>
             <input type="checkbox" checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} style={{ cursor: "pointer" }} />
@@ -739,7 +979,7 @@ export default function OrdersPage() {
           </td>
           <td style={{ padding: "10px 12px", textAlign: "center" }}>
             {returnsMap[order.id] ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
                 Retoure
               </span>
@@ -789,12 +1029,12 @@ export default function OrdersPage() {
             </div>
           </td>
         </tr>
-        {expanded[order.id] && <ExpandedRow order={order} locale={locale} />}
+        {expanded[order.id] && <ExpandedRow order={order} locale={locale} onSaveFields={handleUpdate} />}
       </React.Fragment>
     ));
 
   return (
-    <div style={{ padding: 24, background: "#fff", minHeight: "100%" }}>
+    <PageContainer>
       {showNewOrder && (
         <ManualOrderModal
           onClose={() => setShowNewOrder(false)}
@@ -814,33 +1054,19 @@ export default function OrdersPage() {
           onClose={() => setReviewPopupOrderId(null)}
         />
       )}
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Bestellungen</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, color: "#6b7280" }}>{orders.length} Bestellungen</span>
+      <PageHeader>
+        <PageTitle>Bestellungen</PageTitle>
+        <HeaderMeta>
+          <span style={{ fontSize: 14, color: "#6b7280" }}>{orders.length} Bestellungen</span>
           <Button variant="primary" onClick={() => setShowNewOrder(true)}>
             Bestellung hinzufügen
           </Button>
-        </div>
-      </div>
+        </HeaderMeta>
+      </PageHeader>
 
-      {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 12,
-            padding: "10px 16px",
-            background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
-            borderRadius: 8,
-            marginBottom: 12,
-            border: "1px solid var(--p-color-border, #e3e5e8)",
-          }}
-        >
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>{selected.size} ausgewählt</span>
+        <BulkBar>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#1e3a8a" }}>{selected.size} ausgewählt</span>
           <InlineStack gap="200" wrap blockAlign="center">
             <Button variant="primary" onClick={() => setVersendModal(selectedOrders)}>
               Versenden
@@ -857,54 +1083,84 @@ export default function OrdersPage() {
               Auswahl aufheben
             </Button>
           </InlineStack>
-        </div>
+        </BulkBar>
       )}
 
-      {/* Filters */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-        <input
-          placeholder="Suche nach Name, Email, #..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ flex: 1, minWidth: 200, padding: "7px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13 }}
-        />
-        <select value={filterOrderStatus} onChange={e => setFilterOrderStatus(e.target.value)} style={selStyle}>
-          <option value="">Alle Status</option>
-          <option value="retoure">Retoure (aktiv)</option>
-          {ORDER_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={filterPayStatus} onChange={e => setFilterPayStatus(e.target.value)} style={selStyle}>
-          <option value="">Alle Zahlungen</option>
-          {PAYMENT_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={filterDelivery} onChange={e => setFilterDelivery(e.target.value)} style={selStyle}>
-          <option value="">Alle Lieferungen</option>
-          {DELIVERY_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </div>
+      <Section>
+        <SectionHeading>Filtern & sortieren</SectionHeading>
+        <FilterGrid>
+          <FilterField>
+            <FieldLabel>Suche</FieldLabel>
+            <FilterInput
+              placeholder="Name, E-Mail, Bestellnummer…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </FilterField>
+          <FilterField>
+            <FieldLabel>Bestellstatus</FieldLabel>
+            <FilterSelect value={filterOrderStatus} onChange={(e) => setFilterOrderStatus(e.target.value)}>
+              <option value="">Alle Status</option>
+              <option value="retoure">Retoure (aktiv)</option>
+              {ORDER_STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </FilterSelect>
+          </FilterField>
+          <FilterField>
+            <FieldLabel>Zahlung</FieldLabel>
+            <FilterSelect value={filterPayStatus} onChange={(e) => setFilterPayStatus(e.target.value)}>
+              <option value="">Alle Zahlungen</option>
+              {PAYMENT_STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </FilterSelect>
+          </FilterField>
+          <FilterField>
+            <FieldLabel>Lieferung</FieldLabel>
+            <FilterSelect value={filterDelivery} onChange={(e) => setFilterDelivery(e.target.value)}>
+              <option value="">Alle Lieferungen</option>
+              {DELIVERY_STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </FilterSelect>
+          </FilterField>
+        </FilterGrid>
 
-      {isSuperuser && (
-        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-          <select value={sellerGroupSort} onChange={(e) => setSellerGroupSort(e.target.value)} style={selStyle}>
-            <option value="created_at_desc">Sortierung: Neu zuerst</option>
-            <option value="created_at_asc">Sortierung: Älteste zuerst</option>
-            <option value="total_desc">Sortierung: Betrag ↓</option>
-            <option value="total_asc">Sortierung: Betrag ↑</option>
-          </select>
-          <input
-            placeholder="Verkäufer suchen (Name)…"
-            value={sellerSearchFilter}
-            onChange={(e) => setSellerSearchFilter(e.target.value)}
-            style={{ flex: 1, minWidth: 200, padding: "7px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13 }}
-          />
-        </div>
-      )}
+        {isSuperuser && (
+          <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.2fr)", gap: 16, alignItems: "end" }}>
+            <FilterField>
+              <FieldLabel>Verkäufer-Gruppen sortieren</FieldLabel>
+              <FilterSelect value={sellerGroupSort} onChange={(e) => setSellerGroupSort(e.target.value)}>
+                <option value="created_at_desc">Neu zuerst</option>
+                <option value="created_at_asc">Älteste zuerst</option>
+                <option value="total_desc">Betrag ↓</option>
+                <option value="total_asc">Betrag ↑</option>
+              </FilterSelect>
+            </FilterField>
+            <FilterField>
+              <FieldLabel>Verkäufer suchen</FieldLabel>
+              <FilterInput
+                placeholder="Name oder ID…"
+                value={sellerSearchFilter}
+                onChange={(e) => setSellerSearchFilter(e.target.value)}
+              />
+            </FilterField>
+          </div>
+        )}
+      </Section>
 
-      {/* Table */}
-      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflowX: "auto" }}>
+      <TableCard>
+        <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+            <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
               {COLS.map((c, i) => {
                 const isSortable = !!COL_SORT_KEY[i];
                 return (
@@ -941,21 +1197,9 @@ export default function OrdersPage() {
             {!loading && orders.length > 0 && isSuperuser && (
               <>
                 <tr>
-                  <td
-                    colSpan={13}
-                    style={{
-                      padding: "12px 16px",
-                      background: "#eef2ff",
-                      borderBottom: "1px solid #c7d2fe",
-                      fontWeight: 700,
-                      fontSize: 12,
-                      color: "#3730a3",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                    }}
-                  >
+                  <SuperuserSectionLabel colSpan={13}>
                     Ihr Superuser-Bereich — eigene Konto-Bestellungen und ohne Verkäufer-Zuordnung ({ownOrdersList.length})
-                  </td>
+                  </SuperuserSectionLabel>
                 </tr>
                 {ownOrdersList.length === 0 ? (
                   <tr>
@@ -967,21 +1211,9 @@ export default function OrdersPage() {
                   renderOrderRows(ownOrdersList)
                 )}
                 <tr>
-                  <td
-                    colSpan={13}
-                    style={{
-                      padding: "12px 16px",
-                      background: "#f3f4f6",
-                      borderBottom: "1px solid #e5e7eb",
-                      fontWeight: 700,
-                      fontSize: 12,
-                      color: "#374151",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                    }}
-                  >
+                  <SellerOrdersSectionLabel colSpan={13}>
                     Verkäufer-Bestellungen
-                  </td>
+                  </SellerOrdersSectionLabel>
                 </tr>
                 {filteredSellerOrderGroups.length === 0 ? (
                   <tr>
@@ -995,7 +1227,7 @@ export default function OrdersPage() {
                     const open = sellerSectionOpen[sellerId] !== false;
                     const headerRow = (
                       <tr key={`h-${sellerId}`}>
-                        <td colSpan={13} style={{ padding: 0, background: "#fafafa", borderBottom: "1px solid #e5e7eb" }}>
+                        <SellerGroupHeader colSpan={13}>
                           <button
                             type="button"
                             onClick={() => setSellerSectionOpen((prev) => ({ ...prev, [sellerId]: !open }))}
@@ -1004,7 +1236,7 @@ export default function OrdersPage() {
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "space-between",
-                              padding: "10px 16px",
+                              padding: "12px 20px",
                               background: "none",
                               border: "none",
                               cursor: "pointer",
@@ -1012,12 +1244,12 @@ export default function OrdersPage() {
                               textAlign: "left",
                             }}
                           >
-                            <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{label}</span>
-                            <span style={{ fontSize: 12, color: "#6b7280" }}>
+                            <span style={{ fontWeight: 600, fontSize: 15, color: "#111827" }}>{label}</span>
+                            <span style={{ fontSize: 13, color: "#6b7280" }}>
                               {open ? "▾" : "▸"} {items.length} Bestellung{items.length !== 1 ? "en" : ""}
                             </span>
                           </button>
-                        </td>
+                        </SellerGroupHeader>
                       </tr>
                     );
                     return open ? [headerRow, ...renderOrderRows(items)] : [headerRow];
@@ -1027,8 +1259,9 @@ export default function OrdersPage() {
             )}
           </tbody>
         </table>
-      </div>
-    </div>
+        </div>
+      </TableCard>
+    </PageContainer>
   );
 }
 

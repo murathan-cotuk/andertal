@@ -605,9 +605,12 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/media/${id}`)
   }
 
-  async uploadMedia(formData) {
+  async uploadMedia(formData, opts = {}) {
     const base = this.baseURL || getDefaultBaseUrl()
-    const url = `${base}/admin-hub/v1/media`
+    const qs = new URLSearchParams()
+    if (opts.purpose) qs.set('purpose', String(opts.purpose))
+    const q = qs.toString()
+    const url = `${base}/admin-hub/v1/media${q ? `?${q}` : ''}`
     const token = typeof window !== 'undefined' ? localStorage.getItem('sellerToken') : null
     const res = await fetch(url, {
       method: 'POST',
@@ -899,13 +902,17 @@ class MedusaAdminClient {
   }
 
   async getNotificationsUnread() {
-    const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';
-    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
-    const qs = (!isSuperuser && sellerId) ? `?seller_id=${encodeURIComponent(sellerId)}` : '';
-    return this.request(`/admin-hub/v1/notifications/unread${qs}`)
+    return this.request('/admin-hub/v1/notifications/unread')
   }
   async markNotificationsSeen() {
     return this.request('/admin-hub/v1/notifications/mark-seen', { method: 'POST' })
+  }
+  async getNotificationsFeed(params = {}) {
+    const qs = new URLSearchParams(params).toString()
+    return this.request(`/admin-hub/v1/notifications/feed${qs ? `?${qs}` : ''}`)
+  }
+  async deleteNotifications(payload) {
+    return this.request('/admin-hub/v1/notifications/delete', { method: 'POST', body: JSON.stringify(payload) })
   }
   async getMessages(params = {}) {
     const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';
@@ -1170,6 +1177,54 @@ class MedusaAdminClient {
       method: 'POST',
       body: JSON.stringify({ seller_id, action, note }),
     })
+  }
+
+  // ── Product Groups ──────────────────────────────────────────────────────────
+
+  async getProductGroups() {
+    return this.request('/admin-hub/v1/product-groups')
+  }
+
+  async createProductGroup(data) {
+    return this.request('/admin-hub/v1/product-groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateProductGroup(id, data) {
+    return this.request(`/admin-hub/v1/product-groups/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteProductGroup(id) {
+    return this.request(`/admin-hub/v1/product-groups/${id}`, { method: 'DELETE' })
+  }
+
+  // ── Campaigns ───────────────────────────────────────────────────────────────
+
+  async getCampaigns() {
+    return this.request('/admin-hub/v1/campaigns')
+  }
+
+  async createCampaign(data) {
+    return this.request('/admin-hub/v1/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateCampaign(id, data) {
+    return this.request(`/admin-hub/v1/campaigns/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteCampaign(id) {
+    return this.request(`/admin-hub/v1/campaigns/${id}`, { method: 'DELETE' })
   }
 }
 

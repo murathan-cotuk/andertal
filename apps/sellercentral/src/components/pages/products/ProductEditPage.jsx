@@ -797,6 +797,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       // Handle suggestion_submitted (superuser review needed for shared catalog changes)
       if (updatedRaw?.suggestion_submitted) {
         setMessage({ type: "success", text: "Dein Änderungsvorschlag wurde eingereicht. Ein Superuser wird ihn prüfen." });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("belucha-notifications-refresh"));
+        }
         setSaving(false);
         return;
       }
@@ -1722,6 +1725,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">Media</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Neue Bild-Uploads: JPEG oder PNG, mindestens 1000×1000 px; der Server speichert quadratisches WebP (1000×1000) für den Shop.
+              </Text>
               {locale !== "de" && (
                 <Text as="p" variant="bodySm" tone="subdued">
                   {hasLocaleMedia
@@ -1748,6 +1754,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 onClose={() => setMediaPickerOpen(false)}
                 title="Görsel seç"
                 multiple
+                uploadPurpose="product"
                 onSelect={(urls) => {
                   const toAdd = urls.slice(0, Math.max(0, 6 - mediaUrls.length));
                   if (!toAdd.length) return;
@@ -1767,6 +1774,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     : "Varyant görselleri"
                 }
                 multiple={true}
+                uploadPurpose="product"
                 onSelect={(urls) => {
                   if (!variantImgPickerTarget || !urls.length) {
                     setVariantImgPickerTarget(null);

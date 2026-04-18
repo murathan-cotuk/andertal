@@ -744,6 +744,17 @@ async function start() {
           seen_at timestamp,
           created_at timestamp NOT NULL DEFAULT now()
         )`).catch(() => {})
+        await client.query(`CREATE TABLE IF NOT EXISTS seller_hub_notification_state (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          recipient_key varchar(255) NOT NULL,
+          source_type varchar(64) NOT NULL,
+          source_id uuid NOT NULL,
+          read_at timestamptz,
+          deleted_at timestamptz,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          UNIQUE (recipient_key, source_type, source_id)
+        )`).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_seller_notif_state_recipient ON seller_hub_notification_state(recipient_key)`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS iban text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS commission_rate numeric(5,4) NOT NULL DEFAULT 0.12;`).catch(() => {})
@@ -1121,8 +1132,44 @@ async function start() {
     updated_at timestamp DEFAULT now()
   );
 `).catch(() => {})
+        // Seller product groups (dynamic product groups for campaigns)
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS seller_product_groups (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            seller_id text NOT NULL,
+            name text NOT NULL,
+            description text DEFAULT '',
+            product_ids jsonb NOT NULL DEFAULT '[]',
+            filter_rules jsonb DEFAULT '{}',
+            created_at timestamptz DEFAULT now(),
+            updated_at timestamptz DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_spg_seller ON seller_product_groups(seller_id)`).catch(() => {})
+        // Seller campaigns (Aktionen/Kampagnen)
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS seller_campaigns (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            seller_id text NOT NULL,
+            name text NOT NULL,
+            description text DEFAULT '',
+            status text NOT NULL DEFAULT 'draft',
+            start_at timestamptz,
+            end_at timestamptz,
+            discount_type text NOT NULL DEFAULT 'percentage',
+            discount_value numeric(10,2) NOT NULL DEFAULT 0,
+            target_type text NOT NULL DEFAULT 'products',
+            product_ids jsonb NOT NULL DEFAULT '[]',
+            group_ids jsonb NOT NULL DEFAULT '[]',
+            settings jsonb DEFAULT '{}',
+            created_at timestamptz DEFAULT now(),
+            updated_at timestamptz DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_sc_seller ON seller_campaigns(seller_id)`).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_sc_status ON seller_campaigns(status)`).catch(() => {})
         await client.end()
-        console.log('Admin Hub: admin_hub_menus, admin_hub_menu_locations, admin_hub_media, admin_hub_pages, admin_hub_collections, admin_hub_seller_settings, admin_hub_brands, store_carts, store_cart_items tabloları hazır')
+        console.log('Admin Hub: admin_hub_menus, admin_hub_menu_locations, admin_hub_media, admin_hub_pages, admin_hub_collections, admin_hub_seller_settings, admin_hub_brands, store_carts, store_cart_items, seller_product_groups, seller_campaigns tabloları hazır')
       } catch (migErr) {
         console.warn('Admin Hub migration (menus) skipped or failed:', migErr && migErr.message)
       }
@@ -5420,6 +5467,13 @@ async function start() {
       }
     }
 
+    /** Legacy ledger rows ended with " inkl. Versand (+N Punkte)" — strip for display/API. */
+    const stripLegacyBonusLedgerVersandSuffix = (desc) => {
+      if (desc == null || desc === '') return desc
+      const s = String(desc).replace(/\s+inkl\.\s*Versand\s*\(\+[0-9]+\s+Punkte\)\s*$/i, '').trim()
+      return s || desc
+    }
+
     const getCartWithItems = async (client, cartId) => {
       const cartRes = await client.query(
         'SELECT id, created_at, updated_at, COALESCE(bonus_points_reserved, 0) AS bonus_points_reserved, coupon_code, COALESCE(coupon_discount_cents, 0) AS coupon_discount_cents FROM store_carts WHERE id = $1',
@@ -6214,7 +6268,10 @@ async function start() {
              LIMIT 200`,
             [payload.id],
           )
-          bonus_ledger = lr.rows || []
+          bonus_ledger = (lr.rows || []).map((e) => ({
+            ...e,
+            description: stripLegacyBonusLedgerVersandSuffix(e.description),
+          }))
         } catch (_) {}
         await client.end()
         res.json({
@@ -8032,13 +8089,134 @@ async function start() {
       return String(sid) === String(u.seller_id)
     }
 
+    /** Product gallery / variant images: min 1000px edge, center square crop, store as WebP (JPEG/PNG in). */
+    const PRODUCT_IMAGE_MIN_EDGE = 1000
+    const PRODUCT_IMAGE_OUT_SIZE = 1000
+    const processProductImageToSquareWebp = async (inputBuffer, mimetype) => {
+      const mt = String(mimetype || '').toLowerCase()
+      if (mt !== 'image/jpeg' && mt !== 'image/png' && mt !== 'image/jpg') {
+        const err = new Error('PRODUCT_IMAGE_TYPE')
+        err.code = 'PRODUCT_IMAGE_TYPE'
+        throw err
+      }
+      let sharp
+      try {
+        sharp = require('sharp')
+      } catch (_) {
+        const err = new Error('SHARP_UNAVAILABLE')
+        err.code = 'SHARP_UNAVAILABLE'
+        throw err
+      }
+      const meta = await sharp(inputBuffer).metadata()
+      const w = meta.width || 0
+      const h = meta.height || 0
+      if (w < PRODUCT_IMAGE_MIN_EDGE || h < PRODUCT_IMAGE_MIN_EDGE) {
+        const err = new Error('PRODUCT_IMAGE_MIN_SIZE')
+        err.code = 'PRODUCT_IMAGE_MIN_SIZE'
+        throw err
+      }
+      const side = Math.min(w, h)
+      const left = Math.floor((w - side) / 2)
+      const top = Math.floor((h - side) / 2)
+      return sharp(inputBuffer)
+        .extract({ left, top, width: side, height: side })
+        .resize(PRODUCT_IMAGE_OUT_SIZE, PRODUCT_IMAGE_OUT_SIZE, { fit: 'fill' })
+        .webp({ quality: 85 })
+        .toBuffer()
+    }
+
     const mediaUploadPOST = async (req, res) => {
       if (!req.file) return res.status(400).json({ message: 'No file uploaded' })
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       const mediaSeg = req._sellerMediaFolderSegment || '_misc'
+      const purpose = String((req.query && req.query.purpose) || (req.body && req.body.purpose) || '').toLowerCase()
+      const isProductImage = purpose === 'product'
+
       let fileUrl
-      if (useS3 && req.file.buffer && process.env.S3_UPLOAD_BUCKET) {
+      let outFilename
+      let outMime = req.file.mimetype || null
+      let outSize = req.file.size || 0
+      let outBuffer = req.file.buffer || null
+      let diskPathWritten = null
+
+      if (isProductImage) {
+        let inputBuffer = outBuffer
+        if (!inputBuffer && req.file.path) {
+          try {
+            inputBuffer = fs.readFileSync(req.file.path)
+          } catch (e) {
+            return res.status(400).json({ message: 'Could not read uploaded file' })
+          }
+        }
+        if (!inputBuffer) return res.status(400).json({ message: 'No file data' })
+        try {
+          outBuffer = await processProductImageToSquareWebp(inputBuffer, req.file.mimetype)
+        } catch (pe) {
+          if (req.file.path && fs.existsSync(req.file.path)) {
+            try { fs.unlinkSync(req.file.path) } catch (_) {}
+          }
+          if (pe.code === 'PRODUCT_IMAGE_MIN_SIZE') {
+            return res.status(400).json({
+              message: `Produktbild: mindestens ${PRODUCT_IMAGE_MIN_EDGE}×${PRODUCT_IMAGE_MIN_EDGE} Pixel (JPEG oder PNG).`,
+            })
+          }
+          if (pe.code === 'PRODUCT_IMAGE_TYPE') {
+            return res.status(400).json({
+              message: 'Produktbild: nur JPEG- oder PNG-Dateien.',
+            })
+          }
+          if (pe.code === 'SHARP_UNAVAILABLE') {
+            console.error('sharp module missing; run npm install in medusa-backend')
+            return res.status(500).json({ message: 'Bildverarbeitung nicht verfügbar' })
+          }
+          console.error('processProductImageToSquareWebp:', pe)
+          return res.status(500).json({ message: (pe && pe.message) || 'Bildverarbeitung fehlgeschlagen' })
+        }
+        outMime = 'image/webp'
+        outSize = outBuffer.length
+        outFilename = `${Date.now()}-product.webp`
+        if (req.file.path && fs.existsSync(req.file.path)) {
+          try { fs.unlinkSync(req.file.path) } catch (_) {}
+        }
+        if (useS3 && process.env.S3_UPLOAD_BUCKET) {
+          try {
+            const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
+            const bucket = process.env.S3_UPLOAD_BUCKET
+            const region = process.env.S3_UPLOAD_REGION || 'eu-central-1'
+            const key = `media/${mediaSeg}/${outFilename}`
+            const s3 = new S3Client({
+              region,
+              ...(process.env.S3_UPLOAD_ENDPOINT && { endpoint: process.env.S3_UPLOAD_ENDPOINT }),
+              ...(process.env.S3_UPLOAD_ACCESS_KEY_ID && process.env.S3_UPLOAD_SECRET_ACCESS_KEY
+                ? { credentials: { accessKeyId: process.env.S3_UPLOAD_ACCESS_KEY_ID, secretAccessKey: process.env.S3_UPLOAD_SECRET_ACCESS_KEY } }
+                : {})
+            })
+            await s3.send(new PutObjectCommand({
+              Bucket: bucket,
+              Key: key,
+              Body: outBuffer,
+              ContentType: 'image/webp',
+              ...(process.env.S3_UPLOAD_ACL && { ACL: process.env.S3_UPLOAD_ACL })
+            }))
+            const baseUrl = process.env.S3_UPLOAD_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`
+            fileUrl = `${baseUrl.replace(/\/$/, '')}/${key}`
+          } catch (s3Err) {
+            console.error('S3 upload error (product webp):', s3Err)
+            return res.status(500).json({ message: 'Upload to storage failed' })
+          }
+        } else {
+          const destDir = path.join(uploadDir, 'media', mediaSeg)
+          try {
+            fs.mkdirSync(destDir, { recursive: true })
+          } catch (e) {
+            return res.status(500).json({ message: 'Could not create upload directory' })
+          }
+          diskPathWritten = path.join(destDir, outFilename)
+          fs.writeFileSync(diskPathWritten, outBuffer)
+          fileUrl = `/uploads/media/${mediaSeg}/${outFilename}`
+        }
+      } else if (useS3 && req.file.buffer && process.env.S3_UPLOAD_BUCKET) {
         try {
           const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
           const bucket = process.env.S3_UPLOAD_BUCKET
@@ -8067,19 +8245,24 @@ async function start() {
       } else {
         fileUrl = `/uploads/media/${mediaSeg}/${req.file.filename}`
       }
+
       const alt = (req.body && req.body.alt) || null
       const folderId = (req.body && req.body.folder_id) || null
       const uploadSellerId = req.sellerUser?.is_superuser ? null : (req.sellerUser?.seller_id || null)
+      const dbFilename = isProductImage ? outFilename : (req.file.originalname || req.file.filename)
       try {
         await client.connect()
         const r = await client.query(
           `INSERT INTO admin_hub_media (filename, url, mime_type, size, alt, folder_id, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING id, filename, url, mime_type, size, alt, folder_id, seller_id, created_at`,
-          [req.file.originalname || req.file.filename, fileUrl, req.file.mimetype || null, req.file.size || 0, alt, folderId, uploadSellerId]
+          [dbFilename, fileUrl, outMime, outSize, alt, folderId, uploadSellerId]
         )
         const row = r.rows[0]
         res.status(201).json({ id: row.id, url: row.url, filename: row.filename, mime_type: row.mime_type, size: row.size, folder_id: row.folder_id, created_at: row.created_at })
       } catch (err) {
+        if (diskPathWritten && fs.existsSync(diskPathWritten)) {
+          try { fs.unlinkSync(diskPathWritten) } catch (_) {}
+        }
         console.error('Media upload error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
       } finally {
@@ -9309,7 +9492,7 @@ async function start() {
               id: e.id,
               occurred_at: e.occurred_at,
               points_delta: Number(e.points_delta),
-              description: e.description,
+              description: stripLegacyBonusLedgerVersandSuffix(e.description),
               source: e.source,
               order_id: e.order_id,
               created_at: e.created_at,
@@ -9573,16 +9756,29 @@ async function start() {
     /**
      * Maps DHL event status codes / descriptions to our internal status values.
      * https://developer.dhl.com/api-reference/shipment-tracking
+     * Packstation/Filiale: pickup by consignee = final delivery for our order flow → zugestellt
      */
     function mapDhlStatus(event) {
-      const code = String(event?.status?.statusCode || '').toUpperCase()
-      const desc = String(event?.status?.description || event?.status?.status || '').toLowerCase()
-      if (code === 'delivered' || desc.includes('zugestellt') || desc.includes('delivered')) return 'zugestellt'
-      if (code === 'out-for-delivery' || desc.includes('zur zustellung') || desc.includes('out for delivery')) return 'in_transit'
-      if (code === 'in-transit' || desc.includes('transport') || desc.includes('weitertransport') || desc.includes('in transit')) return 'in_transit'
-      if (code === 'transit') return 'in_transit'
-      if (code === 'exception' || desc.includes('ausnahme') || desc.includes('exception') || desc.includes('fehler')) return 'exception'
-      if (code === 'pre-transit' || desc.includes('aufgegeben') || desc.includes('pre-transit') || desc.includes('vorbereitung')) return 'versendet'
+      const st = event?.status && typeof event.status === 'object' ? event.status : {}
+      const code = String(st.statusCode || event?.statusCode || '').toUpperCase().replace(/-/g, '_')
+      const desc = String(st.description || st.status || event?.description || '').toLowerCase()
+      // Delivered to door or parcel locker / Filiale pickup (customer has the parcel)
+      if (
+        code === 'DELIVERED' ||
+        code === 'PICKED_UP' ||
+        code === 'PICKED_UP_BY_CONSIGNEE' ||
+        code === 'CONSIGNMENT_PICKED_UP' ||
+        code === 'SUCCESSFULLY_DELIVERED'
+      ) return 'zugestellt'
+      if (desc.includes('zugestellt') || desc.includes('successfully delivered') || desc.includes('erfolgreich zugestellt')) return 'zugestellt'
+      if (desc.includes('abholung in der filiale') || desc.includes('abholung in der packstation')) return 'zugestellt'
+      if (desc.includes('filiale') && desc.includes('abholung') && (desc.includes('erfolgt') || desc.includes('erfolgreich'))) return 'zugestellt'
+      if (desc.includes('packstation') && (desc.includes('abgeholt') || desc.includes('abholung'))) return 'zugestellt'
+      if (desc.includes('wunschfiliale') && desc.includes('bereit')) return 'in_transit'
+      if (code === 'OUT_FOR_DELIVERY' || desc.includes('zur zustellung') || desc.includes('out for delivery')) return 'in_transit'
+      if (code === 'IN_TRANSIT' || code === 'TRANSIT' || desc.includes('transport') || desc.includes('weitertransport') || desc.includes('in transit')) return 'in_transit'
+      if (code === 'EXCEPTION' || desc.includes('ausnahme') || desc.includes('exception') || desc.includes('fehler')) return 'exception'
+      if (code === 'PRE_TRANSIT' || desc.includes('aufgegeben') || desc.includes('pre-transit') || desc.includes('vorbereitung') || desc.includes('elektronisch angekündigt')) return 'versendet'
       return 'in_transit'
     }
 
@@ -9598,51 +9794,76 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const ownerQ = await client.query(
-          'SELECT id, carrier_name, tracking_number FROM store_orders WHERE id=$1::uuid' + (isSuperuser ? '' : ' AND seller_id=$2'),
+          'SELECT id, carrier_name, tracking_number, postal_code FROM store_orders WHERE id=$1::uuid' + (isSuperuser ? '' : ' AND seller_id=$2'),
           isSuperuser ? [id] : [id, callerSellerId]
         )
         if (!ownerQ.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
         const order = ownerQ.rows[0]
         if (!order.tracking_number) { await client.end(); return res.json({ events: [], message: 'No tracking number' }) }
 
-        // Look up carrier API key + tracking URL template from DB
+        // Look up carrier API key + tracking URL template from DB (env fallback so tracking works without per-carrier key)
         const carrierQ = await client.query(
           'SELECT name, tracking_url_template, api_key FROM store_shipping_carriers WHERE LOWER(TRIM(name))=LOWER(TRIM($1)) AND is_active=true LIMIT 1',
           [order.carrier_name || '']
         )
         const carrierRow = carrierQ.rows[0] || {}
-        const apiKey = carrierRow.api_key || null
         const carrierName = String(order.carrier_name || '').trim().toLowerCase()
         const trackingNumber = String(order.tracking_number || '').trim()
+        const envDhlKey = (process.env.DHL_API_KEY || process.env.DHL_TRACK_API_KEY || process.env.DHLPARCEL_API_KEY || '').toString().trim()
+        const apiKey = (carrierRow.api_key && String(carrierRow.api_key).trim()) || envDhlKey || null
 
         let newEvents = []
         let fetchError = null
 
         // ── DHL API ──────────────────────────────────────────────────────────
-        if ((carrierName === 'dhl' || carrierName.startsWith('dhl')) && apiKey) {
-          try {
+        if (carrierName === 'dhl' || carrierName.startsWith('dhl')) {
+          if (!apiKey) {
+            fetchError = 'DHL-API-Key fehlt: unter Einstellungen → Versand → Versanddienstleister „DHL“ einen API-Key eintragen, oder Umgebungsvariable DHL_API_KEY setzen.'
+          } else try {
             const https = require('https')
-            const dhlUrl = `https://api-eu.dhl.com/track/shipments?trackingNumber=${encodeURIComponent(trackingNumber)}`
+            const pc = String(order.postal_code || '').trim().replace(/\s+/g, '')
+            let path = `/track/shipments?trackingNumber=${encodeURIComponent(trackingNumber)}`
+            if (pc) path += `&recipientPostalCode=${encodeURIComponent(pc)}`
             const dhlData = await new Promise((resolve, reject) => {
-              const reqOpts = new URL(dhlUrl)
-              const r = https.request({ hostname: reqOpts.hostname, path: reqOpts.pathname + reqOpts.search, method: 'GET', headers: { 'DHL-API-Key': apiKey, 'Accept': 'application/json' } }, (resp) => {
-                let body = ''
-                resp.on('data', d => { body += d })
-                resp.on('end', () => {
-                  try { resolve(JSON.parse(body)) } catch { resolve({ error: body }) }
-                })
-              })
+              const r = https.request(
+                { hostname: 'api-eu.dhl.com', path, method: 'GET', headers: { 'DHL-API-Key': apiKey, Accept: 'application/json' } },
+                (resp) => {
+                  let body = ''
+                  resp.on('data', (d) => { body += d })
+                  resp.on('end', () => {
+                    let parsed = {}
+                    try {
+                      parsed = JSON.parse(body || '{}')
+                    } catch {
+                      parsed = { _raw: body }
+                    }
+                    parsed._httpStatus = resp.statusCode
+                    resolve(parsed)
+                  })
+                }
+              )
               r.on('error', reject)
               r.end()
             })
-            const shipment = dhlData?.shipments?.[0]
-            const events = shipment?.events || []
-            for (const ev of events) {
-              const ts = ev.timestamp ? new Date(ev.timestamp).toISOString() : new Date().toISOString()
-              const location = [ev.location?.address?.addressLocality, ev.location?.address?.countryCode].filter(Boolean).join(', ')
-              const desc = ev.description || ev.status?.description || ''
-              const status = mapDhlStatus(ev)
-              newEvents.push({ status, description: desc, location: location || null, event_time: ts })
+            if (dhlData._httpStatus >= 400) {
+              const detail = dhlData.detail || dhlData.title || dhlData.message || JSON.stringify(dhlData).slice(0, 200)
+              fetchError = `DHL API (${dhlData._httpStatus}): ${detail}`
+            } else {
+              const shipment = dhlData?.shipments?.[0] || dhlData?.shipment || null
+              let events = Array.isArray(shipment?.events) ? shipment.events : []
+              if (!events.length && shipment?.status) {
+                events = [{ timestamp: shipment.timestamp, status: shipment.status, location: shipment.location }]
+              }
+              for (const ev of events) {
+                const tsRaw = ev.timestamp || ev.eventTimestamp || ev.status?.timestamp
+                const ts = tsRaw ? new Date(tsRaw).toISOString() : new Date().toISOString()
+                const addr = ev.location?.address || {}
+                const location = [addr.addressLocality, addr.countryCode].filter(Boolean).join(', ') || null
+                const desc = (ev.description || ev.status?.description || ev.status?.status || '').trim()
+                const status = mapDhlStatus(ev)
+                newEvents.push({ status, description: desc || '—', location, event_time: ts })
+              }
+              newEvents.sort((a, b) => new Date(a.event_time) - new Date(b.event_time))
             }
           } catch (e) {
             fetchError = e?.message || 'DHL API error'
@@ -9654,28 +9875,39 @@ async function start() {
         // (UPS uses OAuth2 — add here if needed)
 
         if (!newEvents.length) {
+          const evFallback = await client.query('SELECT * FROM store_shipment_events WHERE order_id=$1::uuid ORDER BY event_time ASC, created_at ASC', [id])
           await client.end()
-          return res.json({ events: [], message: fetchError || 'No tracking data available — check API key in carrier settings', trackingUrl: buildTrackingUrl(order.carrier_name, trackingNumber, carrierRow.tracking_url_template) })
+          let msg = fetchError
+          if (!msg) {
+            if (carrierName === 'dhl' || carrierName.startsWith('dhl')) {
+              msg = 'Keine neuen Ereignisse von DHL — ggf. bereits synchron oder Sendung noch nicht im DHL-System.'
+            } else {
+              msg = 'Automatischer API-Abruf für diesen Versanddienst ist noch nicht angebunden.'
+            }
+          }
+          return res.json({
+            events: evFallback.rows || [],
+            inserted: 0,
+            message: msg,
+            trackingUrl: buildTrackingUrl(order.carrier_name, trackingNumber, carrierRow.tracking_url_template),
+          })
         }
 
-        // Upsert events: insert only new ones (match by event_time + status)
+        // Upsert events: insert only new ones (Zeit + Status + Beschreibung wie DHL liefert)
         let inserted = 0
-        let latestStatus = null
         for (const ev of newEvents) {
           const exists = await client.query(
-            `SELECT id FROM store_shipment_events WHERE order_id=$1::uuid AND status=$2 AND event_time=$3::timestamp LIMIT 1`,
-            [id, ev.status, ev.event_time]
+            `SELECT id FROM store_shipment_events WHERE order_id=$1::uuid AND status=$2 AND event_time=$3::timestamptz AND description IS NOT DISTINCT FROM $4 LIMIT 1`,
+            [id, ev.status, ev.event_time, ev.description || null]
           )
           if (!exists.rows.length) {
             await client.query(
-              `INSERT INTO store_shipment_events (order_id, status, description, location, event_time, source) VALUES ($1::uuid, $2, $3, $4, $5::timestamp, 'api')`,
+              `INSERT INTO store_shipment_events (order_id, status, description, location, event_time, source) VALUES ($1::uuid, $2, $3, $4, $5::timestamptz, 'api')`,
               [id, ev.status, ev.description || null, ev.location || null, ev.event_time]
             )
             inserted++
           }
-          latestStatus = ev.status // last event is newest (DHL sends newest last? let's take the array's last item)
         }
-        // DHL events are newest-last, take the most recent
         const mostRecentEvent = newEvents[newEvents.length - 1]
         const mostRecentStatus = mostRecentEvent?.status
         if (mostRecentStatus === 'zugestellt') {
@@ -10627,7 +10859,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         )
         res.rows.forEach(row => {
           const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
-          const img = meta.image_url || meta.banner_image_url || null
+          // Main image only — not banner (carousel cards must match Kollektion “Main image” in Seller)
+          const img = meta.image_url || null
           if (img) imageMap[row.id] = img
         })
       } catch (_) {}
@@ -10869,6 +11102,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const r = await client.query('SELECT key, value FROM admin_hub_styles')
         const data = {}
         r.rows.forEach(row => { data[row.key] = row.value })
+        res.set('Cache-Control', 'no-store, max-age=0')
         res.json({ styles: data.styles || { colors: {}, buttons: {} } })
       } catch (err) {
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -10928,20 +11162,69 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
     console.log('Landing page routes: GET/PUT /admin-hub/landing-page, GET /store/landing-page, GET /store/styles, GET /store/trustpilot-config')
 
-    // ── Notifications ─────────────────────────────────────────────────────
+    // ── Notifications (per-recipient read/delete state: seller_hub_notification_state) ──
+    const getNotifRecipientContext = (req) => {
+      const u = req.sellerUser
+      if (!u) return null
+      const isSuperuser = !!u.is_superuser
+      const sellerId = String(u.seller_id || '').trim()
+      if (!isSuperuser && !sellerId) return null
+      return { isSuperuser, sellerId, recipientKey: isSuperuser ? '__superuser__' : sellerId }
+    }
+
+    const markAllNotificationsRead = async (client, recipientKey, isSuperuser, sellerId) => {
+      const sup = !!isSuperuser
+      const sid = sellerId || ''
+      await client.query(
+        `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+         SELECT $1::varchar, 'order', o.id, now() FROM store_orders o
+         WHERE ($2::boolean OR o.seller_id = $3)
+         ON CONFLICT (recipient_key, source_type, source_id)
+         DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+        [recipientKey, sup, sid],
+      )
+      await client.query(
+        `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+         SELECT $1::varchar, 'return', r.id, now()
+         FROM store_returns r INNER JOIN store_orders o ON o.id = r.order_id
+         WHERE ($2::boolean OR o.seller_id = $3)
+         ON CONFLICT (recipient_key, source_type, source_id)
+         DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+        [recipientKey, sup, sid],
+      )
+      if (sup) {
+        await client.query(
+          `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+           SELECT $1::varchar, 'verification', n.id, now()
+           FROM admin_hub_notifications n WHERE n.type = 'verification_submitted'
+           ON CONFLICT (recipient_key, source_type, source_id)
+           DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+          [recipientKey],
+        )
+      }
+      await client.query(
+        `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+         SELECT $1::varchar, 'product_change_request', cr.id, now()
+         FROM admin_hub_product_change_requests cr
+         WHERE cr.status = 'pending' AND ($2::boolean OR cr.seller_id = $3)
+         ON CONFLICT (recipient_key, source_type, source_id)
+         DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+        [recipientKey, sup, sid],
+      )
+    }
+
     const adminHubNotificationsUnreadGET = async (req, res) => {
+      const ctx = getNotifRecipientContext(req)
+      if (!ctx) return res.status(401).json({ message: 'Unauthorized' })
+      const { recipientKey: rk, isSuperuser: sup, sellerId: sid } = ctx
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const seenR = await client.query(`SELECT notifications_seen_at FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`)
-        const seenAt = seenR.rows[0]?.notifications_seen_at || new Date(0)
-        const sellerIdParam = (req.query.seller_id || '').toString().trim()
-        // Inbox badge: use per-message read flags only (not notifications_seen_at — that is for the bell’s orders/returns “since last open”).
         let messagesR
-        if (sellerIdParam) {
+        if (!sup) {
           messagesR = await client.query(
             `SELECT COUNT(*)::int AS c FROM store_messages m
              WHERE m.is_read_by_seller = false
@@ -10955,7 +11238,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                    m.channel = 'support' AND m.seller_id = $1 AND m.sender_type = 'seller'
                  )
                )`,
-            [sellerIdParam],
+            [sid],
           )
         } else {
           messagesR = await client.query(
@@ -10975,26 +11258,111 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                )`,
           )
         }
-        const [ordersR, returnsR, verificationsR] = await Promise.all([
-          client.query(`SELECT COUNT(*)::int AS c FROM store_orders WHERE created_at > $1`, [seenAt]),
-          client.query(`SELECT COUNT(*)::int AS c FROM store_returns WHERE created_at > $1`, [seenAt]),
-          client.query(`SELECT COUNT(*)::int AS c FROM admin_hub_notifications WHERE type = 'verification_submitted' AND seen_at IS NULL`).catch(() => ({ rows: [{ c: 0 }] })),
+        const ordersUnreadQ = `
+          SELECT COUNT(*)::int AS c FROM store_orders o
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'order' AND s.source_id = o.id
+          WHERE ($2::boolean OR o.seller_id = $3)
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
+        const returnsUnreadQ = `
+          SELECT COUNT(*)::int AS c FROM store_returns r
+          INNER JOIN store_orders o ON o.id = r.order_id
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'return' AND s.source_id = r.id
+          WHERE ($2::boolean OR o.seller_id = $3)
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
+        const verificationsUnreadQ = sup
+          ? `
+          SELECT COUNT(*)::int AS c FROM admin_hub_notifications n
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'verification' AND s.source_id = n.id
+          WHERE n.type = 'verification_submitted'
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
+          : `SELECT 0::int AS c`
+        const crUnreadQ = `
+          SELECT COUNT(*)::int AS c FROM admin_hub_product_change_requests cr
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'product_change_request' AND s.source_id = cr.id
+          WHERE cr.status = 'pending' AND ($2::boolean OR cr.seller_id = $3)
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
+
+        const [ordersR, returnsR, verificationsR, changeReqR] = await Promise.all([
+          client.query(ordersUnreadQ, [rk, sup, sid]),
+          client.query(returnsUnreadQ, [rk, sup, sid]),
+          sup ? client.query(verificationsUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
+          client.query(crUnreadQ, [rk, sup, sid]).catch(() => ({ rows: [{ c: 0 }] })),
         ])
-        const recentOrders = await client.query(`SELECT id, order_number, first_name, last_name, total_cents, created_at FROM store_orders WHERE created_at > $1 ORDER BY created_at DESC LIMIT 5`, [seenAt])
-        const recentReturns = await client.query(`SELECT r.id, r.return_number, r.status, r.created_at, o.order_number FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.created_at > $1 ORDER BY r.created_at DESC LIMIT 5`, [seenAt])
-        const recentVerifications = await client.query(`SELECT id, title, body, seller_id, created_at FROM admin_hub_notifications WHERE type = 'verification_submitted' AND seen_at IS NULL ORDER BY created_at DESC LIMIT 5`).catch(() => ({ rows: [] }))
+
+        const recentOrders = await client.query(
+          `SELECT o.id, o.order_number, o.first_name, o.last_name, o.total_cents, o.created_at,
+                  (s.read_at IS NOT NULL) AS read
+           FROM store_orders o
+           LEFT JOIN seller_hub_notification_state s
+             ON s.recipient_key = $1 AND s.source_type = 'order' AND s.source_id = o.id
+           WHERE ($2::boolean OR o.seller_id = $3)
+             AND (s.id IS NULL OR s.deleted_at IS NULL)
+           ORDER BY o.created_at DESC LIMIT 8`,
+          [rk, sup, sid],
+        )
+        const recentReturns = await client.query(
+          `SELECT r.id, r.return_number, r.status, r.created_at, o.order_number,
+                  (s.read_at IS NOT NULL) AS read
+           FROM store_returns r
+           INNER JOIN store_orders o ON o.id = r.order_id
+           LEFT JOIN seller_hub_notification_state s
+             ON s.recipient_key = $1 AND s.source_type = 'return' AND s.source_id = r.id
+           WHERE ($2::boolean OR o.seller_id = $3)
+             AND (s.id IS NULL OR s.deleted_at IS NULL)
+           ORDER BY r.created_at DESC LIMIT 8`,
+          [rk, sup, sid],
+        )
+        let recentVerifications = { rows: [] }
+        if (sup) {
+          recentVerifications = await client.query(
+            `SELECT n.id, n.title, n.body, n.seller_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'verification' AND s.source_id = n.id
+             WHERE n.type = 'verification_submitted'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 8`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        const recentChangeRequests = await client.query(
+          `SELECT cr.id, cr.product_id, cr.seller_id, cr.field_name, cr.created_at, p.title AS product_title,
+                  (s.read_at IS NOT NULL) AS read
+           FROM admin_hub_product_change_requests cr
+           LEFT JOIN admin_hub_products p ON p.id = cr.product_id
+           LEFT JOIN seller_hub_notification_state s
+             ON s.recipient_key = $1 AND s.source_type = 'product_change_request' AND s.source_id = cr.id
+           WHERE cr.status = 'pending' AND ($2::boolean OR cr.seller_id = $3)
+             AND (s.id IS NULL OR s.deleted_at IS NULL)
+           ORDER BY cr.created_at DESC LIMIT 8`,
+          [rk, sup, sid],
+        ).catch(() => ({ rows: [] }))
+
         await client.end()
         const verCount = verificationsR.rows[0]?.c || 0
+        const crCount = changeReqR.rows[0]?.c || 0
+        const ordCount = ordersR.rows[0]?.c || 0
+        const retCount = returnsR.rows[0]?.c || 0
         res.json({
-          unread: (ordersR.rows[0]?.c || 0) + (returnsR.rows[0]?.c || 0) + (messagesR.rows[0]?.c || 0) + verCount,
-          orders: ordersR.rows[0]?.c || 0,
-          returns: returnsR.rows[0]?.c || 0,
+          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount,
+          orders: ordCount,
+          returns: retCount,
           messages: messagesR.rows[0]?.c || 0,
           verifications: verCount,
-          recent_orders: recentOrders.rows.map(r => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null })),
-          recent_returns: recentReturns.rows.map(r => ({ ...r, return_number: r.return_number ? Number(r.return_number) : null, order_number: r.order_number ? Number(r.order_number) : null })),
+          change_requests: crCount,
+          recent_orders: recentOrders.rows.map((r) => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null })),
+          recent_returns: recentReturns.rows.map((r) => ({ ...r, return_number: r.return_number ? Number(r.return_number) : null, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_verifications: recentVerifications.rows,
-          seen_at: seenAt,
+          recent_product_change_requests: recentChangeRequests.rows || [],
         })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -11003,14 +11371,206 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     }
 
     const adminHubNotificationsMarkSeenPOST = async (req, res) => {
+      const ctx = getNotifRecipientContext(req)
+      if (!ctx) return res.status(401).json({ message: 'Unauthorized' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        await client.query(`INSERT INTO admin_hub_seller_settings (seller_id, notifications_seen_at) VALUES ('default', now()) ON CONFLICT (seller_id) DO UPDATE SET notifications_seen_at = now()`)
-        await client.query(`UPDATE admin_hub_notifications SET seen_at = now() WHERE seen_at IS NULL`).catch(() => {})
+        await markAllNotificationsRead(client, ctx.recipientKey, ctx.isSuperuser, ctx.sellerId)
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubNotificationsFeedGET = async (req, res) => {
+      const ctx = getNotifRecipientContext(req)
+      if (!ctx) return res.status(401).json({ message: 'Unauthorized' })
+      const lim = Math.min(Math.max(parseInt(req.query.limit, 10) || 40, 1), 200)
+      const off = Math.max(parseInt(req.query.offset, 10) || 0, 0)
+      const { recipientKey: rk, isSuperuser: sup, sellerId: sid } = ctx
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const ordersQ = await client.query(
+          `SELECT o.id, o.order_number, o.first_name, o.last_name, o.total_cents, o.created_at,
+                  (s.read_at IS NOT NULL) AS read
+           FROM store_orders o
+           LEFT JOIN seller_hub_notification_state s
+             ON s.recipient_key = $1 AND s.source_type = 'order' AND s.source_id = o.id
+           WHERE ($2::boolean OR o.seller_id = $3)
+             AND (s.id IS NULL OR s.deleted_at IS NULL)
+           ORDER BY o.created_at DESC LIMIT 500`,
+          [rk, sup, sid],
+        )
+        const returnsQ = await client.query(
+          `SELECT r.id, r.return_number, r.status, r.created_at, o.order_number,
+                  (s.read_at IS NOT NULL) AS read
+           FROM store_returns r
+           INNER JOIN store_orders o ON o.id = r.order_id
+           LEFT JOIN seller_hub_notification_state s
+             ON s.recipient_key = $1 AND s.source_type = 'return' AND s.source_id = r.id
+           WHERE ($2::boolean OR o.seller_id = $3)
+             AND (s.id IS NULL OR s.deleted_at IS NULL)
+           ORDER BY r.created_at DESC LIMIT 500`,
+          [rk, sup, sid],
+        )
+        let verQ = { rows: [] }
+        if (sup) {
+          verQ = await client.query(
+            `SELECT n.id, n.title, n.body, n.seller_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'verification' AND s.source_id = n.id
+             WHERE n.type = 'verification_submitted'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 500`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        const crQ = await client.query(
+          `SELECT cr.id, cr.product_id, cr.seller_id, cr.field_name, cr.created_at, p.title AS product_title,
+                  (s.read_at IS NOT NULL) AS read
+           FROM admin_hub_product_change_requests cr
+           LEFT JOIN admin_hub_products p ON p.id = cr.product_id
+           LEFT JOIN seller_hub_notification_state s
+             ON s.recipient_key = $1 AND s.source_type = 'product_change_request' AND s.source_id = cr.id
+           WHERE cr.status = 'pending' AND ($2::boolean OR cr.seller_id = $3)
+             AND (s.id IS NULL OR s.deleted_at IS NULL)
+           ORDER BY cr.created_at DESC LIMIT 500`,
+          [rk, sup, sid],
+        ).catch(() => ({ rows: [] }))
+        await client.end()
+
+        const items = []
+        for (const r of ordersQ.rows || []) {
+          items.push({
+            source_type: 'order',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: `Neue Bestellung #${r.order_number != null ? r.order_number : '—'}`,
+            subtitle: `${r.first_name || ''} ${r.last_name || ''}`.trim() + (r.total_cents ? ` · ${(Number(r.total_cents) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €` : ''),
+            href: `/orders/${r.id}`,
+          })
+        }
+        for (const r of returnsQ.rows || []) {
+          items.push({
+            source_type: 'return',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: `Rückgabeanfrage R-${r.return_number != null ? r.return_number : '—'}`,
+            subtitle: `Bestellung #${r.order_number != null ? r.order_number : '—'} · ${r.status || ''}`,
+            href: '/orders/returns',
+          })
+        }
+        for (const r of verQ.rows || []) {
+          items.push({
+            source_type: 'verification',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: r.title || 'Evrak',
+            subtitle: r.body || '',
+            href: r.seller_id ? `/sellers/${r.seller_id}` : '/sellers',
+          })
+        }
+        for (const r of crQ.rows || []) {
+          items.push({
+            source_type: 'product_change_request',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: 'Produktänderung ausstehend',
+            subtitle: `${r.product_title || 'Produkt'} · ${r.field_name || ''}`,
+            href: '/products/inventory',
+          })
+        }
+        items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        const total = items.length
+        const paged = items.slice(off, off + lim)
+        res.json({ items: paged, total, offset: off, limit: lim })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubNotificationsDeletePOST = async (req, res) => {
+      const ctx = getNotifRecipientContext(req)
+      if (!ctx) return res.status(401).json({ message: 'Unauthorized' })
+      const body = req.body || {}
+      const all = !!body.all
+      const items = Array.isArray(body.items) ? body.items : []
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const rk = ctx.recipientKey
+        const sup = ctx.isSuperuser
+        const sid = ctx.sellerId
+        const markDeleted = async (sourceType, sourceId) => {
+          await client.query(
+            `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+             VALUES ($1::varchar, $2::varchar, $3::uuid, now())
+             ON CONFLICT (recipient_key, source_type, source_id)
+             DO UPDATE SET deleted_at = now()`,
+            [rk, sourceType, sourceId],
+          )
+        }
+        if (all) {
+          await client.query(
+            `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+             SELECT $1::varchar, 'order', o.id, now() FROM store_orders o
+             WHERE ($2::boolean OR o.seller_id = $3)
+             ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+            [rk, sup, sid],
+          )
+          await client.query(
+            `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+             SELECT $1::varchar, 'return', r.id, now()
+             FROM store_returns r INNER JOIN store_orders o ON o.id = r.order_id
+             WHERE ($2::boolean OR o.seller_id = $3)
+             ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+            [rk, sup, sid],
+          )
+          if (sup) {
+            await client.query(
+              `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+               SELECT $1::varchar, 'verification', n.id, now()
+               FROM admin_hub_notifications n WHERE n.type = 'verification_submitted'
+               ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+              [rk],
+            )
+          }
+          await client.query(
+            `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+             SELECT $1::varchar, 'product_change_request', cr.id, now()
+             FROM admin_hub_product_change_requests cr
+             WHERE cr.status = 'pending' AND ($2::boolean OR cr.seller_id = $3)
+             ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+            [rk, sup, sid],
+          )
+        } else {
+          for (const it of items) {
+            const st = String(it.source_type || '').trim()
+            const id = it.source_id
+            if (!st || !id) continue
+            await markDeleted(st, id)
+          }
+        }
         await client.end()
         res.json({ success: true })
       } catch (e) {
@@ -11403,8 +11963,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
-    httpApp.get('/admin-hub/v1/notifications/unread', adminHubNotificationsUnreadGET)
-    httpApp.post('/admin-hub/v1/notifications/mark-seen', adminHubNotificationsMarkSeenPOST)
+    httpApp.get('/admin-hub/v1/notifications/unread', requireSellerAuth, adminHubNotificationsUnreadGET)
+    httpApp.post('/admin-hub/v1/notifications/mark-seen', requireSellerAuth, adminHubNotificationsMarkSeenPOST)
+    httpApp.get('/admin-hub/v1/notifications/feed', requireSellerAuth, adminHubNotificationsFeedGET)
+    httpApp.post('/admin-hub/v1/notifications/delete', requireSellerAuth, adminHubNotificationsDeletePOST)
     httpApp.get('/admin-hub/v1/messages', adminHubMessagesGET)
     httpApp.post('/admin-hub/v1/messages', adminHubMessagesPOST)
     httpApp.patch('/admin-hub/v1/messages/support/mark-read', adminHubSupportMessagesMarkReadPATCH)
@@ -11611,10 +12173,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const includePending = req.query.include_pending === 'true'
         const params = []
         const where = []
-        // Only paid orders
-        where.push(`o.payment_status = 'bezahlt'`)
-        // If include_pending: all paid orders; otherwise only delivered 14+ days ago
+        // If include_pending: show all orders; otherwise only bezahlt + delivered 14+ days
         if (!includePending) {
+          where.push(`o.payment_status = 'bezahlt'`)
           where.push(`o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days'`)
         }
         if (req.query.period_start) {
@@ -11641,6 +12202,37 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
            LIMIT 1000`,
           params
         )
+        // Also fetch returns for this seller in the same time window
+        const returnWhere = []
+        const returnParams = []
+        if (filterSellerId) { returnParams.push(filterSellerId); returnWhere.push(`o.seller_id = $${returnParams.length}`) }
+        if (req.query.period_start) {
+          returnParams.push(req.query.period_start)
+          returnWhere.push(`r.created_at >= $${returnParams.length}`)
+        }
+        if (req.query.period_end) {
+          returnParams.push(req.query.period_end)
+          returnWhere.push(`r.created_at < ($${returnParams.length}::date + interval '1 day')`)
+        }
+        const returnWhereClause = returnWhere.length ? `WHERE ${returnWhere.join(' AND ')}` : ''
+        let returnRows = []
+        try {
+          const rr = await client.query(
+            `SELECT r.id, r.return_number, r.order_id, r.status, r.created_at,
+                    o.order_number, o.seller_id, o.first_name, o.last_name, o.currency,
+                    s.commission_rate,
+                    COALESCE((SELECT SUM(ri.refund_amount_cents) FROM return_items ri WHERE ri.return_id = r.id), 0) AS refund_cents
+             FROM store_returns r
+             LEFT JOIN store_orders o ON o.id = r.order_id
+             LEFT JOIN seller_users s ON s.seller_id = o.seller_id
+             ${returnWhereClause}
+             ORDER BY r.created_at DESC
+             LIMIT 500`,
+            returnParams
+          )
+          returnRows = rr.rows
+        } catch (_) { /* returns table may not exist yet */ }
+
         const transactions = r.rows.map(row => {
           const commRate = parseFloat(row.commission_rate ?? 0.12)
           const sellerBasis = sellerOrderRevenueBasisCents(row)
@@ -11649,6 +12241,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           const payout = sellerBasis - commission
           return {
             id: row.id,
+            type: 'order',
             order_number: row.order_number,
             seller_id: row.seller_id,
             store_name: row.store_name || row.seller_id,
@@ -11660,6 +12253,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             commission_cents: commission,
             payout_cents: payout,
             payout_eligible: row.payout_eligible === true || row.payout_eligible === 't',
+            payment_status: row.payment_status || 'offen',
+            delivery_status: row.delivery_status || null,
             iban: isSuperuser ? row.iban : undefined,
             stripe_transfer_status: row.stripe_transfer_status || null,
             stripe_transfer_id: row.stripe_transfer_id || null,
@@ -11672,6 +12267,34 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             currency: row.currency || 'EUR',
           }
         })
+        // Append returns as negative transaction entries
+        for (const row of returnRows) {
+          const commRate = parseFloat(row.commission_rate ?? 0.12)
+          const refund = Number(row.refund_cents || 0)
+          transactions.push({
+            id: `return-${row.id}`,
+            type: 'return',
+            order_number: row.order_number,
+            return_number: row.return_number,
+            seller_id: row.seller_id,
+            total_cents: -refund,
+            shipping_cents: 0,
+            discount_cents: 0,
+            commission_rate: commRate,
+            commission_cents: refund > 0 ? -Math.round(refund * commRate) : 0,
+            payout_cents: refund > 0 ? -(refund - Math.round(refund * commRate)) : 0,
+            payout_eligible: false,
+            payment_status: row.status || 'return',
+            delivery_status: null,
+            delivery_date: null,
+            created_at: row.created_at,
+            first_name: row.first_name,
+            last_name: row.last_name,
+            currency: row.currency || 'EUR',
+          })
+        }
+        // Sort all by created_at desc
+        transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         // Group by seller if superuser
         const summary = {}
         for (const t of transactions) {
@@ -12485,6 +13108,223 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.patch('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserUpdatePATCH)
     httpApp.delete('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserDeleteDELETE)
     httpApp.delete('/admin-hub/v1/pending-invites/:id', requireSellerAuth, adminHubPendingInviteDeleteDELETE)
+
+    // ── Seller Product Groups ─────────────────────────────────────────────────
+    const pgDbClient = () => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      return new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    }
+
+    httpApp.get('/admin-hub/v1/product-groups', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id || null
+      const isSuperuser = req.sellerUser?.is_superuser || false
+      const c = pgDbClient(); try {
+        await c.connect()
+        const r = isSuperuser
+          ? await c.query(`SELECT * FROM seller_product_groups ORDER BY created_at DESC`)
+          : await c.query(`SELECT * FROM seller_product_groups WHERE seller_id = $1 ORDER BY created_at DESC`, [sellerId])
+        await c.end(); res.json({ groups: r.rows })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    httpApp.post('/admin-hub/v1/product-groups', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id || null
+      if (!sellerId) return res.status(403).json({ message: 'Seller ID required' })
+      const { name, description, product_ids, filter_rules } = req.body || {}
+      if (!name?.trim()) return res.status(400).json({ message: 'name required' })
+      const c = pgDbClient(); try {
+        await c.connect()
+        const r = await c.query(
+          `INSERT INTO seller_product_groups (seller_id, name, description, product_ids, filter_rules) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+          [sellerId, name.trim(), description || '', JSON.stringify(Array.isArray(product_ids) ? product_ids : []), JSON.stringify(filter_rules || {})]
+        )
+        await c.end(); res.status(201).json({ group: r.rows[0] })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    httpApp.get('/admin-hub/v1/product-groups/:id', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      const isSuperuser = req.sellerUser?.is_superuser
+      const c = pgDbClient(); try {
+        await c.connect()
+        const r = await c.query(`SELECT * FROM seller_product_groups WHERE id = $1`, [req.params.id])
+        await c.end()
+        const g = r.rows[0]
+        if (!g) return res.status(404).json({ message: 'Not found' })
+        if (!isSuperuser && g.seller_id !== sellerId) return res.status(403).json({ message: 'Forbidden' })
+        res.json({ group: g })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    httpApp.put('/admin-hub/v1/product-groups/:id', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      const isSuperuser = req.sellerUser?.is_superuser
+      const { name, description, product_ids, filter_rules } = req.body || {}
+      const c = pgDbClient(); try {
+        await c.connect()
+        const exist = await c.query(`SELECT * FROM seller_product_groups WHERE id = $1`, [req.params.id])
+        const g = exist.rows[0]
+        if (!g) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
+        if (!isSuperuser && g.seller_id !== sellerId) { await c.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        const r = await c.query(
+          `UPDATE seller_product_groups SET name=$1, description=$2, product_ids=$3, filter_rules=$4, updated_at=now() WHERE id=$5 RETURNING *`,
+          [name?.trim() || g.name, description ?? g.description, JSON.stringify(Array.isArray(product_ids) ? product_ids : g.product_ids), JSON.stringify(filter_rules || g.filter_rules || {}), req.params.id]
+        )
+        await c.end(); res.json({ group: r.rows[0] })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    httpApp.delete('/admin-hub/v1/product-groups/:id', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      const isSuperuser = req.sellerUser?.is_superuser
+      const c = pgDbClient(); try {
+        await c.connect()
+        const exist = await c.query(`SELECT * FROM seller_product_groups WHERE id = $1`, [req.params.id])
+        const g = exist.rows[0]
+        if (!g) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
+        if (!isSuperuser && g.seller_id !== sellerId) { await c.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        await c.query(`DELETE FROM seller_product_groups WHERE id=$1`, [req.params.id])
+        await c.end(); res.json({ deleted: true })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    // ── Seller Campaigns (Aktionen/Kampagnen) ─────────────────────────────────
+    // Helper: get all product IDs covered by a campaign (products + group products)
+    const resolveCampaignProductIds = async (c, campaign) => {
+      const ids = new Set(Array.isArray(campaign.product_ids) ? campaign.product_ids.map(String) : [])
+      const groupIds = Array.isArray(campaign.group_ids) ? campaign.group_ids : []
+      if (groupIds.length > 0) {
+        for (const gid of groupIds) {
+          const gr = await c.query(`SELECT product_ids FROM seller_product_groups WHERE id=$1`, [gid]).catch(() => ({ rows: [] }))
+          const gProds = Array.isArray(gr.rows[0]?.product_ids) ? gr.rows[0].product_ids : []
+          gProds.forEach((id) => ids.add(String(id)))
+        }
+      }
+      return [...ids]
+    }
+
+    httpApp.get('/admin-hub/v1/campaigns', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      const isSuperuser = req.sellerUser?.is_superuser
+      const c = pgDbClient(); try {
+        await c.connect()
+        const r = isSuperuser
+          ? await c.query(`SELECT * FROM seller_campaigns ORDER BY created_at DESC`)
+          : await c.query(`SELECT * FROM seller_campaigns WHERE seller_id=$1 ORDER BY created_at DESC`, [sellerId])
+        await c.end(); res.json({ campaigns: r.rows })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    httpApp.post('/admin-hub/v1/campaigns', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(403).json({ message: 'Seller ID required' })
+      const { name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, settings } = req.body || {}
+      if (!name?.trim()) return res.status(400).json({ message: 'name required' })
+      const dVal = parseFloat(discount_value) || 0
+      if (dVal < 0 || dVal > 100) return res.status(400).json({ message: 'discount_value must be 0–100' })
+      const c = pgDbClient(); try {
+        await c.connect()
+        const r = await c.query(
+          `INSERT INTO seller_campaigns (seller_id, name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, settings) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+          [sellerId, name.trim(), description || '', status || 'draft', start_at || null, end_at || null, discount_type || 'percentage', dVal, target_type || 'products', JSON.stringify(Array.isArray(product_ids) ? product_ids : []), JSON.stringify(Array.isArray(group_ids) ? group_ids : []), JSON.stringify(settings || {})]
+        )
+        await c.end(); res.status(201).json({ campaign: r.rows[0] })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    httpApp.get('/admin-hub/v1/campaigns/:id', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      const isSuperuser = req.sellerUser?.is_superuser
+      const c = pgDbClient(); try {
+        await c.connect()
+        const r = await c.query(`SELECT * FROM seller_campaigns WHERE id=$1`, [req.params.id])
+        await c.end()
+        const camp = r.rows[0]
+        if (!camp) return res.status(404).json({ message: 'Not found' })
+        if (!isSuperuser && camp.seller_id !== sellerId) return res.status(403).json({ message: 'Forbidden' })
+        res.json({ campaign: camp })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    httpApp.put('/admin-hub/v1/campaigns/:id', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      const isSuperuser = req.sellerUser?.is_superuser
+      const c = pgDbClient(); try {
+        await c.connect()
+        const exist = await c.query(`SELECT * FROM seller_campaigns WHERE id=$1`, [req.params.id])
+        const camp = exist.rows[0]
+        if (!camp) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
+        if (!isSuperuser && camp.seller_id !== sellerId) { await c.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        const b = req.body || {}
+        const dVal = b.discount_value !== undefined ? parseFloat(b.discount_value) : Number(camp.discount_value)
+        const r = await c.query(
+          `UPDATE seller_campaigns SET name=$1, description=$2, status=$3, start_at=$4, end_at=$5, discount_type=$6, discount_value=$7, target_type=$8, product_ids=$9, group_ids=$10, settings=$11, updated_at=now() WHERE id=$12 RETURNING *`,
+          [b.name?.trim() || camp.name, b.description ?? camp.description, b.status || camp.status, b.start_at !== undefined ? (b.start_at || null) : camp.start_at, b.end_at !== undefined ? (b.end_at || null) : camp.end_at, b.discount_type || camp.discount_type, dVal, b.target_type || camp.target_type, JSON.stringify(Array.isArray(b.product_ids) ? b.product_ids : camp.product_ids), JSON.stringify(Array.isArray(b.group_ids) ? b.group_ids : camp.group_ids), JSON.stringify(b.settings || camp.settings || {}), req.params.id]
+        )
+        await c.end(); res.json({ campaign: r.rows[0] })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    httpApp.delete('/admin-hub/v1/campaigns/:id', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      const isSuperuser = req.sellerUser?.is_superuser
+      const c = pgDbClient(); try {
+        await c.connect()
+        const exist = await c.query(`SELECT * FROM seller_campaigns WHERE id=$1`, [req.params.id])
+        const camp = exist.rows[0]
+        if (!camp) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
+        if (!isSuperuser && camp.seller_id !== sellerId) { await c.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        await c.query(`DELETE FROM seller_campaigns WHERE id=$1`, [req.params.id])
+        await c.end(); res.json({ deleted: true })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    // Store API: active campaign discounts for a product (used by shop)
+    httpApp.get('/store/campaigns/discount', async (req, res) => {
+      const { product_id } = req.query
+      if (!product_id) return res.status(400).json({ message: 'product_id required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        const now = new Date().toISOString()
+        // Find active campaigns where this product is included directly or via a group
+        const r = await c.query(`
+          SELECT sc.* FROM seller_campaigns sc
+          WHERE sc.status = 'active'
+            AND (sc.start_at IS NULL OR sc.start_at <= $1)
+            AND (sc.end_at IS NULL OR sc.end_at >= $1)
+          ORDER BY sc.discount_value DESC
+        `, [now])
+        const activeCampaigns = r.rows
+        let bestDiscount = null
+        for (const camp of activeCampaigns) {
+          const productIds = Array.isArray(camp.product_ids) ? camp.product_ids.map(String) : []
+          const groupIds = Array.isArray(camp.group_ids) ? camp.group_ids : []
+          let covered = productIds.includes(String(product_id))
+          if (!covered && groupIds.length > 0) {
+            for (const gid of groupIds) {
+              const gr = await c.query(`SELECT product_ids FROM seller_product_groups WHERE id=$1`, [gid]).catch(() => ({ rows: [] }))
+              const gProds = Array.isArray(gr.rows[0]?.product_ids) ? gr.rows[0].product_ids.map(String) : []
+              if (gProds.includes(String(product_id))) { covered = true; break }
+            }
+          }
+          if (covered) {
+            if (!bestDiscount || parseFloat(camp.discount_value) > parseFloat(bestDiscount.discount_value)) {
+              bestDiscount = camp
+            }
+          }
+        }
+        await c.end()
+        if (!bestDiscount) return res.json({ discount: null })
+        res.json({ discount: { campaign_id: bestDiscount.id, campaign_name: bestDiscount.name, discount_type: bestDiscount.discount_type, discount_value: parseFloat(bestDiscount.discount_value) } })
+      } catch (e) {
+        try { await c.end() } catch(_) {}
+        res.json({ discount: null })
+      }
+    })
 
     // ── Seller Listings CRUD ───────────────────────────────────────────────────
     httpApp.get('/admin-hub/v1/seller-listings', requireSellerAuth, async (req, res) => {

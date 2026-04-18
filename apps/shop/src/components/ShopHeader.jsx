@@ -141,6 +141,9 @@ const TopBarWrap = styled.div`
 
 /* —— Middle bar: zooplus-style (full-width colored bar) —— */
 
+/* Above MegaPanel / CategoryMegaPanel (2147483646–7) so locale + account dropdowns paint on top */
+const HEADER_MIDDLE_Z = 2147483648;
+
 const MiddleBarWrap = styled.div`
   width: 100%;
   min-height: 64px;
@@ -148,7 +151,7 @@ const MiddleBarWrap = styled.div`
   color: var(--header-text, #111827);
   transition: background-color 0.3s ease, color 0.3s ease;
   position: relative;
-  z-index: 2; /* above SubNavWrap so dropdowns (z-index:99999 inside here) render on top */
+  z-index: ${HEADER_MIDDLE_Z};
 `;
 
 const MiddleBarInner = styled.div`
@@ -618,7 +621,7 @@ const UserDropdown = styled(motion.div)`
   border-radius: 12px;
   box-shadow: ${tokens.shadow.hover};
   padding: 8px 0;
-  z-index: 99999;
+  z-index: 2147483647; /* top of header chrome; cart drawer uses 2147483700+ */
   display: ${(p) => (p.$open ? "block" : "none")};
 `;
 
@@ -673,7 +676,7 @@ const SubNavWrap = styled.div`
   font-size: var(--second-nav-fs, 15px);
   font-weight: var(--second-nav-fw, 500);
   position: relative;
-  z-index: 1; /* below MiddleBarWrap (z-index:2) so dropdowns always appear on top */
+  z-index: 1; /* below MiddleBarWrap (HEADER_MIDDLE_Z) */
 `;
 
 const SecondMenuRowInner = styled.div`
@@ -748,7 +751,7 @@ const LocaleDropdown = styled.div`
   border: 1px solid ${tokens.border.light};
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.18);
-  z-index: 99999;
+  z-index: 2147483647; /* top of header chrome; cart drawer uses 2147483700+ */
   display: ${(p) => (p.$open ? "flex" : "none")};
   overflow: hidden;
 `;

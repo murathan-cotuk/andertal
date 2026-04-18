@@ -83,10 +83,15 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
     try {
       const client = getMedusaAdminClient();
       const data = await client.refreshTracking(orderId);
-      const msg = data?.inserted > 0
-        ? `${data.inserted} neue${data.inserted === 1 ? "s" : ""} Ereignis${data.inserted === 1 ? "" : "se"} von DHL importiert`
-        : (data?.message || "Keine neuen Ereignisse");
-      setRefreshMsg(msg);
+      setRefreshMsg("");
+      if (data?.inserted > 0) {
+        setError("");
+        setRefreshMsg(
+          `${data.inserted} neue${data.inserted === 1 ? "s" : ""} Ereignis${data.inserted === 1 ? "" : "se"} von der Versand-API importiert`
+        );
+      } else if (data?.message) {
+        setError(data.message);
+      }
       if (data?.events) setEvents(data.events);
       if (data?.trackingUrl) setTrackingUrl(data.trackingUrl);
       if (onOrderStatusChanged) onOrderStatusChanged();
@@ -204,6 +209,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
                       {ev.location && <span style={{ fontSize: 11, color: "#6b7280" }}>📍 {ev.location}</span>}
                       <span style={{ fontSize: 11, color: "#9ca3af" }}>{fmtDateTime(ev.event_time)}</span>
                       {ev.source === "auto" && <span style={{ fontSize: 10, color: "#9ca3af", fontStyle: "italic" }}>auto</span>}
+                      {ev.source === "api" && <span style={{ fontSize: 10, color: "#0369a1", fontWeight: 600 }}>DHL API</span>}
                     </div>
                     {ev.description && (
                       <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>{ev.description}</div>

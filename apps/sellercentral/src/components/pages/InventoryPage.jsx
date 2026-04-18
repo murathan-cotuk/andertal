@@ -860,6 +860,9 @@ export default function InventoryPage() {
         map[pid].push(cr);
       }
       setPendingChangeRequestsByProductId(map);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("belucha-notifications-refresh"));
+      }
       return map;
     } catch (e) {
       // Non-critical: inventory should still work if proposal backend fails.
