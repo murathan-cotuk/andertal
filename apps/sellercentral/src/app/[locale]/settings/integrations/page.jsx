@@ -267,7 +267,7 @@ export default function IntegrationsSettingsPage() {
           </Card>
         ) : integrations.length === 0 ? (
           <Card>
-            <EmptyState heading="Noch keine Integrationen" image="">
+            <EmptyState heading="Noch keine Integrationen">
               <p>
                 Klicke auf „Integration anlegen" um externe Dienste, APIs oder Tools
                 mit deinem Shop zu verbinden.
