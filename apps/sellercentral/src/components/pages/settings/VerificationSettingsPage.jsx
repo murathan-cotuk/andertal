@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Spinner, Text, TextField } from "@shopify/polaris";
+import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Modal, Spinner, Text, TextField } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
@@ -28,7 +28,9 @@ const tByLocale = (l) => {
       subtitle: "Satışa başlayabilmek için yasal onay ve şirket evraklarını tamamlayın.",
       docsSent: "Evraklar gönderildi. İnceleme tamamlanınca burada statünüz güncellenecek.",
       agreementTitle: "Hukuki onay",
-      agreementText: "Satıcı ile platform arasındaki hukuki sözleşmeleri okudum ve onaylıyorum.",
+      agreementText: "Satıcı ile platform arasındaki {link} okudum ve onaylıyorum.",
+      agreementLink: "hukuki sözleşmeleri",
+      contractModalTitle: "Satıcı-Platform Sözleşmesi",
       companyTitle: "Şirket bilgileri",
       contactTitle: "İletişim ve adres",
       docsTitle: "Evraklar",
@@ -86,7 +88,9 @@ const tByLocale = (l) => {
       subtitle: "Schließe rechtliche Bestätigung und Unternehmensdokumente ab, um mit dem Verkauf zu starten.",
       docsSent: "Dokumente wurden gesendet. Der Status wird nach der Prüfung hier aktualisiert.",
       agreementTitle: "Rechtliche Bestätigung",
-      agreementText: "Ich habe die rechtlichen Vereinbarungen zwischen Verkäufer und Plattform gelesen und akzeptiere sie.",
+      agreementText: "Ich habe die {link} zwischen Verkäufer und Plattform gelesen und akzeptiere sie.",
+      agreementLink: "rechtlichen Vereinbarungen",
+      contractModalTitle: "Verkäufer-Plattform-Vereinbarung",
       companyTitle: "Firmendaten",
       contactTitle: "Kontakt & Adresse",
       docsTitle: "Dokumente",
@@ -143,7 +147,9 @@ const tByLocale = (l) => {
     subtitle: "Complete legal confirmation and company documents before you can start selling.",
     docsSent: "Documents submitted. Your status will be updated here after review.",
     agreementTitle: "Legal confirmation",
-    agreementText: "I have read and agree to the legal agreements between seller and platform.",
+    agreementText: "I have read and agree to the {link} between seller and platform.",
+    agreementLink: "legal agreements",
+    contractModalTitle: "Seller–Platform Agreement",
     companyTitle: "Company details",
     contactTitle: "Contact & address",
     docsTitle: "Documents",
@@ -206,6 +212,164 @@ const statusTone = (status) => {
 
 const DOC_TYPES = ["trade_register", "id_passport", "tax_document"];
 const DOC_REQUIRED = { trade_register: true, id_passport: true, tax_document: false };
+
+// ── EU-compliant Seller-Platform Contract ────────────────────────────────────
+const CONTRACT_SECTIONS = {
+  de: [
+    {
+      heading: "Präambel",
+      body: `Diese Vereinbarung regelt die Rechtsbeziehung zwischen dem Betreiber der Plattform Belucha (nachfolgend „Plattform") und dem registrierten Verkäufer (nachfolgend „Verkäufer"). Mit Abschluss der Verifizierung erklärt sich der Verkäufer mit allen nachfolgenden Bedingungen einverstanden. Die Vereinbarung entspricht den Anforderungen der Verordnung (EU) 2022/2065 (Digital Services Act), der Verordnung (EU) 2019/1150 (P2B-Verordnung), der DSGVO sowie dem deutschen Bürgerlichen Gesetzbuch (BGB).`,
+    },
+    {
+      heading: "§ 1 – Vertragsgegenstand",
+      body: `Die Plattform stellt dem Verkäufer eine technische Infrastruktur zum Anbieten, Verwalten und Verkaufen von Waren gegenüber Endverbrauchern zur Verfügung. Der Verkäufer tritt als eigenverantwortlicher Händler im eigenen Namen und auf eigene Rechnung auf. Die Plattform ist kein Vertragspartner der Kaufverträge zwischen Verkäufer und Endkunden.`,
+    },
+    {
+      heading: "§ 2 – Pflichten des Verkäufers",
+      body: `Der Verkäufer verpflichtet sich:\n• Ausschließlich legale Waren anzubieten und geltende Produktsicherheits-, Kennzeichnungs- und Verbraucherschutzvorschriften einzuhalten.\n• Vollständige und korrekte Geschäftsdaten (Impressum, Steuernummer, IBAN) bereitzustellen und aktuell zu halten.\n• Bestellungen innerhalb der angegebenen Lieferfristen zu erfüllen und Kunden bei Verzögerungen unverzüglich zu benachrichtigen.\n• Gesetzliche Gewährleistungsrechte (§§ 434 ff. BGB) zu beachten und ein 14-tägiges Widerrufsrecht gemäß § 312g BGB i.V.m. Art. 246a EGBGB zu gewähren.\n• Keine Preisabsprachen, Marktmanipulation oder unlauteren Wettbewerb zu betreiben (UWG).`,
+    },
+    {
+      heading: "§ 3 – Datenschutz (DSGVO)",
+      body: `Der Verkäufer verarbeitet personenbezogene Daten von Endkunden (Name, Adresse, Bestelldaten) ausschließlich zur Vertragserfüllung (Art. 6 Abs. 1 lit. b DSGVO). Eine Weitergabe an Dritte ohne Rechtsgrundlage ist untersagt. Auf Verlangen hat der Verkäufer Betroffenenanfragen (Auskunft, Löschung, Berichtigung) innerhalb von 30 Tagen zu beantworten. Zwischen Plattform und Verkäufer wird soweit erforderlich ein Auftragsverarbeitungsvertrag (AVV) gemäß Art. 28 DSGVO abgeschlossen.`,
+    },
+    {
+      heading: "§ 4 – Provisionen und Zahlungsbedingungen",
+      body: `Die Plattform erhebt eine Transaktionsgebühr gemäß der zum Zeitpunkt des Verkaufs gültigen Preisliste. Auszahlungen an den Verkäufer erfolgen nach Auftragsabschluss und Ablauf einer eventuellen Rückgabefrist. Die Plattform ist berechtigt, Beträge bei begründeten Rückforderungen (Chargebacks, Retouren, Betrug) einzubehalten. Bei Verzug mit Gebührenzahlungen werden Verzugszinsen gemäß § 288 BGB fällig.`,
+    },
+    {
+      heading: "§ 5 – Ranking und Sichtbarkeit (P2B-Verordnung)",
+      body: `Gemäß Art. 5 der EU-Verordnung 2019/1150 informiert die Plattform über die wesentlichen Parameter des Ranking-Algorithmus: Produktqualität, Kundenbewertungen, Bestellabwicklungsrate, Preisgestaltung, Aktualität des Sortiments und Konto-Compliance. Der Verkäufer kann das Ranking durch Verbesserung dieser Faktoren beeinflussen. Bezahltes Ranking wird als solches gekennzeichnet.`,
+    },
+    {
+      heading: "§ 6 – Kontosperrung und Kündigung",
+      body: `Die Plattform kann das Konto bei schwerwiegenden oder wiederholten Verstößen gegen diese Vereinbarung, bei rechtlich bedenklichen Inhalten oder auf behördliche Anordnung hin sperren oder kündigen. Vor einer Sperrung wird dem Verkäufer, sofern möglich, eine angemessene Frist zur Stellungnahme eingeräumt (Art. 4 P2B-VO). Der Verkäufer kann das Konto jederzeit mit einer Frist von 30 Tagen kündigen. Laufende Bestellungen sind auch nach Kündigung abzuwickeln.`,
+    },
+    {
+      heading: "§ 7 – Haftungsbeschränkung",
+      body: `Die Plattform haftet nicht für Schäden, die durch fehlerhafte Produktangaben des Verkäufers, Lieferverzögerungen, Produktmängel oder sonstige Pflichtverletzungen des Verkäufers entstehen. Die Haftung der Plattform für mittelbare Schäden und entgangenen Gewinn ist – außer bei Vorsatz und grober Fahrlässigkeit – ausgeschlossen (§ 276 BGB).`,
+    },
+    {
+      heading: "§ 8 – Streitbeilegung",
+      body: `Streitigkeiten zwischen Plattform und Verkäufer werden zunächst intern über den Support-Kanal behandelt. Die Plattform benennt gemäß Art. 11 P2B-VO als interne Beschwerdeführer: support@belucha.com. Als externe Streitbeilegungsstelle steht das Online-Streitbeilegungsportal der EU (https://ec.europa.eu/consumers/odr/) zur Verfügung. Es gilt deutsches Recht, Gerichtsstand ist Berlin.`,
+    },
+    {
+      heading: "§ 9 – Schlussbestimmungen",
+      body: `Änderungen dieser Vereinbarung werden dem Verkäufer mindestens 15 Tage vor Inkrafttreten in schriftlicher Form (E-Mail) mitgeteilt (Art. 3 P2B-VO). Sollten einzelne Bestimmungen unwirksam sein, bleiben die übrigen Bestimmungen wirksam (salvatorische Klausel, § 306 BGB). Letzte Aktualisierung: April 2026.`,
+    },
+  ],
+  tr: [
+    {
+      heading: "Önsöz",
+      body: `Bu sözleşme, Belucha platformunun işletmecisi (bundan böyle "Platform") ile kayıtlı satıcı (bundan böyle "Satıcı") arasındaki hukuki ilişkiyi düzenler. AB Dijital Hizmetler Yasası (DSA - (EU) 2022/2065), P2B Tüzüğü ((EU) 2019/1150), GDPR ve Türk Ticaret Kanunu çerçevesinde hazırlanmıştır.`,
+    },
+    {
+      heading: "Madde 1 – Sözleşmenin Konusu",
+      body: `Platform, Satıcıya son tüketicilere ürün sunma, yönetme ve satma amacıyla teknik bir altyapı sağlar. Satıcı, kendi adına ve kendi hesabına bağımsız bir satıcı olarak hareket eder. Platform, Satıcı ile son müşteri arasındaki satış sözleşmelerinin tarafı değildir.`,
+    },
+    {
+      heading: "Madde 2 – Satıcının Yükümlülükleri",
+      body: `Satıcı şunları taahhüt eder:\n• Yalnızca yasal ürünler sunmak ve geçerli ürün güvenliği, etiketleme ve tüketici koruma mevzuatına uymak.\n• Eksiksiz ve doğru ticari bilgiler (vergi numarası, IBAN, adres) sağlamak ve güncel tutmak.\n• Belirtilen teslimat sürelerinde siparişleri yerine getirmek; gecikme halinde müşteriyi derhal bilgilendirmek.\n• Yasal garanti haklarına ve 14 günlük cayma hakkına uymak.\n• Fiyat anlaşmaları, piyasa manipülasyonu veya haksız rekabet yapmamak.`,
+    },
+    {
+      heading: "Madde 3 – Kişisel Verilerin Korunması (KVKK / GDPR)",
+      body: `Satıcı, son müşterilere ait kişisel verileri (isim, adres, sipariş bilgileri) yalnızca sözleşmenin ifası amacıyla işler. Hukuki dayanak olmaksızın üçüncü taraflara veri aktarımı yasaktır. Veri sahibi talepleri (erişim, silme, düzeltme) 30 gün içinde yanıtlanmalıdır. Gerekli hallerde taraflar arasında Veri İşleme Sözleşmesi akdedilir.`,
+    },
+    {
+      heading: "Madde 4 – Komisyonlar ve Ödeme Koşulları",
+      body: `Platform, satış anında geçerli fiyat listesine göre işlem ücreti alır. Satıcıya ödemeler, sipariş tamamlandıktan ve olası iade süresi dolduktan sonra yapılır. İade, ters ibraz veya dolandırıcılık durumlarında Platform tutarları alıkoyma hakkını saklı tutar. Komisyon gecikmelerinde yasal gecikme faizi uygulanır.`,
+    },
+    {
+      heading: "Madde 5 – Sıralama ve Görünürlük (P2B Tüzüğü)",
+      body: `AB P2B Tüzüğü Madde 5 uyarınca Platform, sıralama algoritmasının temel parametrelerini şeffaf biçimde açıklar: ürün kalitesi, müşteri değerlendirmeleri, sipariş karşılama oranı, fiyatlandırma, güncel katalog ve hesap uyumluluğu. Ücretli sıralama ayrıca belirtilir.`,
+    },
+    {
+      heading: "Madde 6 – Hesap Askıya Alma ve Fesih",
+      body: `Platform; ağır veya tekrarlayan ihlaller, hukuka aykırı içerik veya yetkili makam kararı durumunda hesabı askıya alabilir ya da feshedebilir. Askıya almadan önce mümkün olan durumlarda Satıcıya savunma hakkı tanınır. Satıcı hesabını 30 gün önceden bildirerek istediği zaman feshedebilir. Devam eden siparişler fesih sonrasında da tamamlanmalıdır.`,
+    },
+    {
+      heading: "Madde 7 – Sorumluluk Sınırlaması",
+      body: `Platform; Satıcının hatalı ürün bilgilerinden, teslimat gecikmelerinden, ürün kusurlarından veya diğer yükümlülük ihlallerinden kaynaklanan zararlardan sorumlu değildir. Kasıt ve ağır ihmal dışında Platform'un dolaylı zararlar ve yoksun kalınan kar için sorumluluğu sınırlıdır.`,
+    },
+    {
+      heading: "Madde 8 – Uyuşmazlık Çözümü",
+      body: `Uyuşmazlıklar önce support@belucha.com üzerinden dahili destek kanalıyla çözülmeye çalışılır. Çözüme kavuşturulamazsa AB Çevrimiçi Uyuşmazlık Çözüm Platformu (https://ec.europa.eu/consumers/odr/) başvuru için kullanılabilir. Türk mevzuatı ve Almanya hukuku birlikte uygulanır; yetki mahkemesi Berlin'dir.`,
+    },
+    {
+      heading: "Madde 9 – Son Hükümler",
+      body: `Bu sözleşmedeki değişiklikler yürürlüğe girmeden en az 15 gün önce Satıcıya e-posta ile bildirilir. Herhangi bir hükmün geçersizliği diğer hükümlerin geçerliliğini etkilemez. Son güncelleme: Nisan 2026.`,
+    },
+  ],
+  en: [
+    {
+      heading: "Preamble",
+      body: `This Agreement governs the legal relationship between the operator of the Belucha platform (hereinafter "Platform") and the registered seller (hereinafter "Seller"). It is prepared in compliance with Regulation (EU) 2022/2065 (Digital Services Act), Regulation (EU) 2019/1150 (P2B Regulation), the GDPR, and applicable national law.`,
+    },
+    {
+      heading: "Article 1 – Subject Matter",
+      body: `The Platform provides the Seller with technical infrastructure to list, manage, and sell goods to end consumers. The Seller acts as an independent trader in their own name and on their own account. The Platform is not a party to sales contracts concluded between the Seller and end customers.`,
+    },
+    {
+      heading: "Article 2 – Seller Obligations",
+      body: `The Seller undertakes to:\n• Offer only lawful goods and comply with applicable product safety, labeling, and consumer protection regulations.\n• Provide complete and accurate business information (tax ID, IBAN, address) and keep it up to date.\n• Fulfill orders within stated delivery times and notify customers promptly in case of delay.\n• Respect statutory warranty rights and grant a 14-day right of withdrawal.\n• Refrain from price-fixing, market manipulation, or unfair competition.`,
+    },
+    {
+      heading: "Article 3 – Data Protection (GDPR)",
+      body: `The Seller processes personal data of end customers (name, address, order data) solely for the purpose of contract performance (Art. 6(1)(b) GDPR). Transfer to third parties without a legal basis is prohibited. Data subject requests (access, erasure, rectification) must be answered within 30 days. A Data Processing Agreement (DPA) pursuant to Art. 28 GDPR will be concluded where required.`,
+    },
+    {
+      heading: "Article 4 – Fees and Payment Terms",
+      body: `The Platform charges a transaction fee in accordance with the price list valid at the time of sale. Payouts to the Seller are made after order completion and expiry of any applicable return period. The Platform reserves the right to withhold amounts in justified cases of chargebacks, returns, or fraud. Late payment of fees incurs statutory default interest.`,
+    },
+    {
+      heading: "Article 5 – Ranking and Visibility (P2B Regulation)",
+      body: `Pursuant to Art. 5 of EU Regulation 2019/1150, the Platform discloses the main parameters of its ranking algorithm: product quality, customer reviews, order fulfillment rate, pricing, catalog freshness, and account compliance. Paid ranking is labeled as such.`,
+    },
+    {
+      heading: "Article 6 – Account Suspension and Termination",
+      body: `The Platform may suspend or terminate the account for serious or repeated violations of this Agreement, for unlawful content, or on governmental order. Where possible, the Seller is given reasonable opportunity to respond before suspension (Art. 4 P2B Regulation). The Seller may terminate the account at any time with 30 days' notice. Pending orders must be fulfilled even after termination.`,
+    },
+    {
+      heading: "Article 7 – Limitation of Liability",
+      body: `The Platform is not liable for damages arising from incorrect product information provided by the Seller, delivery delays, product defects, or other breaches of duty by the Seller. The Platform's liability for indirect damages and lost profits is excluded — except in cases of intent or gross negligence.`,
+    },
+    {
+      heading: "Article 8 – Dispute Resolution",
+      body: `Disputes between the Platform and the Seller are first addressed via the internal support channel at support@belucha.com. The EU Online Dispute Resolution platform (https://ec.europa.eu/consumers/odr/) is available for unresolved disputes. German law applies; the place of jurisdiction is Berlin.`,
+    },
+    {
+      heading: "Article 9 – Final Provisions",
+      body: `Changes to this Agreement will be communicated to the Seller in writing (email) at least 15 days before taking effect (Art. 3 P2B Regulation). If any provision is found invalid, the remaining provisions remain in force (severability). Last updated: April 2026.`,
+    },
+  ],
+};
+
+function ContractModal({ locale, title, onClose }) {
+  const sections = CONTRACT_SECTIONS[locale] || CONTRACT_SECTIONS.en;
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={title}
+      primaryAction={{ content: locale === "tr" ? "Kapat" : locale === "de" ? "Schließen" : "Close", onAction: onClose }}
+      large
+    >
+      <Modal.Section>
+        <div style={{ maxHeight: "60vh", overflowY: "auto", paddingRight: 4 }}>
+          <BlockStack gap="400">
+            {sections.map((sec) => (
+              <BlockStack gap="100" key={sec.heading}>
+                <Text as="h3" variant="headingSm" fontWeight="bold">{sec.heading}</Text>
+                <div style={{ whiteSpace: "pre-line" }}>
+                  <Text as="p" variant="bodySm" tone="subdued">{sec.body}</Text>
+                </div>
+              </BlockStack>
+            ))}
+          </BlockStack>
+        </div>
+      </Modal.Section>
+    </Modal>
+  );
+}
 
 /** Extracts dial code from a stored phone string. Returns { dialCode, number }. */
 function parseStoredPhone(phone) {
@@ -277,6 +441,7 @@ export default function VerificationSettingsPage() {
   const [success, setSuccess] = useState("");
   const [status, setStatus] = useState("registered");
   const [agreementAccepted, setAgreementAccepted] = useState(false);
+  const [contractOpen, setContractOpen] = useState(false);
   const [uploadingDocType, setUploadingDocType] = useState(null);
   const [initialSnapshot, setInitialSnapshot] = useState(null);
   const [phoneDialCode, setPhoneDialCode] = useState("+49");
@@ -547,12 +712,41 @@ export default function VerificationSettingsPage() {
             <BlockStack gap="300">
               <Text as="h3" variant="headingSm">{t.agreementTitle}</Text>
               <Checkbox
-                label={t.agreementText}
+                label={
+                  <span>
+                    {t.agreementText.replace("{link}", "").split("{link}")[0]}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); setContractOpen(true); }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        color: "#2563eb",
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                        fontSize: "inherit",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {t.agreementLink}
+                    </button>
+                    {t.agreementText.split("{link}")[1] || ""}
+                  </span>
+                }
                 checked={agreementAccepted}
                 onChange={setAgreementAccepted}
               />
             </BlockStack>
           </Card>
+
+          {contractOpen && (
+            <ContractModal
+              locale={locale}
+              title={t.contractModalTitle}
+              onClose={() => setContractOpen(false)}
+            />
+          )}
 
           {/* Company details */}
           <Card>
