@@ -853,6 +853,13 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/integrations/billbee/credentials')
   }
 
+  async patchBillbeeCredentials(data) {
+    return this.request('/admin-hub/v1/integrations/billbee/credentials', {
+      method: 'PATCH',
+      body: JSON.stringify(data || {}),
+    })
+  }
+
   async regenerateBillbeeCredentials() {
     return this.request('/admin-hub/v1/integrations/billbee/credentials', {
       method: 'POST',
@@ -862,6 +869,15 @@ class MedusaAdminClient {
 
   async getBillbeeWebhookUrl() {
     return this.request('/admin-hub/v1/integrations/billbee/webhook-url')
+  }
+
+  /** Belucha-issued Billbee marketplace API (GET /api/billbee/*) connection strings */
+  async getBillbeeMarketplaceConnection() {
+    return this.request('/admin-hub/v1/billbee/connection')
+  }
+
+  async rotateBillbeeMarketplaceSecret() {
+    return this.request('/admin-hub/v1/billbee/connection/rotate-secret', { method: 'POST' })
   }
 
   async getAbandonedCarts() {

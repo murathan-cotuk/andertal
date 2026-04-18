@@ -590,6 +590,7 @@ const CartBadge = styled.span`
 
 const UserMenu = styled.div`
   position: relative;
+  z-index: 9999;
 `;
 
 const UserBtn = styled.button`
@@ -716,6 +717,7 @@ const HeaderSpacer = styled.div`
 const LocaleCurrencyWrap = styled.div`
   position: relative;
   flex-shrink: 0;
+  z-index: 9999;
 `;
 
 const LocaleCurrencyBtn = styled.button`

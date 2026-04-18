@@ -734,6 +734,7 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_basic_username text;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_basic_password text;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_updated_at timestamp;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_connection_name text;`).catch(() => {})
         await client.query(`CREATE TABLE IF NOT EXISTS admin_hub_notifications (
           id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
           type varchar(50) NOT NULL,
@@ -795,6 +796,12 @@ async function start() {
         // 2FA / TOTP columns
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS totp_secret text DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS totp_enabled boolean NOT NULL DEFAULT false;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS belucha_billbee_api_key text`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS belucha_billbee_api_secret text`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS billbee_integration_enabled boolean NOT NULL DEFAULT true`).catch(() => {})
+        await client.query(
+          `CREATE UNIQUE INDEX IF NOT EXISTS idx_seller_users_belucha_billbee_api_key ON seller_users(belucha_billbee_api_key) WHERE belucha_billbee_api_key IS NOT NULL`,
+        ).catch(() => {})
 
         // ── Ranking infrastructure ──────────────────────────────────────────────
         await client.query(`
@@ -9927,6 +9934,16 @@ async function start() {
 
     // ──────────────────────────────────────────────────────────────────────────
 
+    /** Row key in admin_hub_seller_settings for Billbee: real seller_id, or billbee_user_<seller_users.id> if missing. Never "default". */
+    function getBillbeeAdminHubSellerSettingsKey(userPayload) {
+      if (!userPayload || typeof userPayload !== 'object') return null
+      const sid = userPayload.seller_id != null ? String(userPayload.seller_id).trim() : ''
+      if (sid) return sid
+      const uid = userPayload.id != null ? String(userPayload.id).trim() : ''
+      if (uid) return `billbee_user_${uid}`
+      return null
+    }
+
     const adminHubIntegrationsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       let client
@@ -9935,8 +9952,24 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const r = await client.query('SELECT id, name, slug, logo_url, is_active, category, created_at, updated_at FROM store_integrations ORDER BY name ASC')
+        let integrations = r.rows || []
+        const auth = req.headers['authorization'] || ''
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+        const payload = token ? verifySellerToken(token) : null
+        const scope = payload ? getBillbeeAdminHubSellerSettingsKey(payload) : null
+        if (scope) {
+          const hb = await client.query(
+            `SELECT billbee_api_key, billbee_basic_username, billbee_basic_password FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
+            [scope],
+          )
+          const row = hb.rows && hb.rows[0]
+          const hasBillbee = !!(row?.billbee_api_key && row?.billbee_basic_username && row?.billbee_basic_password)
+          integrations = integrations.map((int) =>
+            String(int.slug || '').toLowerCase() === 'billbee' ? { ...int, is_active: hasBillbee } : int,
+          )
+        }
         await client.end()
-        res.json({ integrations: r.rows || [] })
+        res.json({ integrations })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.json({ integrations: [] })
@@ -9945,6 +9978,8 @@ async function start() {
 
     const adminHubIntegrationPOST = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const settingsKey = getBillbeeAdminHubSellerSettingsKey(req.sellerUser)
+      if (!settingsKey) return res.status(401).json({ message: 'Invalid session' })
       let client
       try {
         const { Client } = require('pg')
@@ -9952,39 +9987,63 @@ async function start() {
         await client.connect()
         const { name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active = false, category = 'other' } = req.body || {}
         if (!name || !slug) return res.status(400).json({ message: 'name and slug required' })
-        const r = await client.query(
-          `INSERT INTO store_integrations (name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active, category)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-           ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, logo_url=EXCLUDED.logo_url, api_key=EXCLUDED.api_key, api_secret=EXCLUDED.api_secret, webhook_url=EXCLUDED.webhook_url, config=EXCLUDED.config, is_active=EXCLUDED.is_active, updated_at=NOW()
-           RETURNING id, name, slug, logo_url, is_active, category, created_at, updated_at`,
-          [name, slug, logo_url||null, api_key||null, api_secret||null, webhook_url||null, config ? JSON.stringify(config) : '{}', is_active, category]
-        )
-        const integration = r.rows && r.rows[0] ? r.rows[0] : null
+        const isBillbee = String(slug).toLowerCase() === 'billbee'
+        let integration
+        if (isBillbee) {
+          const r = await client.query(
+            `INSERT INTO store_integrations (name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active, category)
+             VALUES ($1,$2,$3,NULL,NULL,NULL,$4::jsonb,$5,$6)
+             ON CONFLICT (slug) DO UPDATE SET
+               name = EXCLUDED.name,
+               logo_url = EXCLUDED.logo_url,
+               config = EXCLUDED.config,
+               is_active = EXCLUDED.is_active,
+               category = EXCLUDED.category,
+               updated_at = NOW()
+             RETURNING id, name, slug, logo_url, is_active, category, created_at, updated_at`,
+            [name, slug, logo_url || null, config ? JSON.stringify(config) : '{}', is_active, category],
+          )
+          integration = r.rows && r.rows[0] ? r.rows[0] : null
+        } else {
+          const r = await client.query(
+            `INSERT INTO store_integrations (name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active, category)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+             ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, logo_url=EXCLUDED.logo_url, api_key=EXCLUDED.api_key, api_secret=EXCLUDED.api_secret, webhook_url=EXCLUDED.webhook_url, config=EXCLUDED.config, is_active=EXCLUDED.is_active, updated_at=NOW()
+             RETURNING id, name, slug, logo_url, is_active, category, created_at, updated_at`,
+            [name, slug, logo_url || null, api_key || null, api_secret || null, webhook_url || null, config ? JSON.stringify(config) : '{}', is_active, category],
+          )
+          integration = r.rows && r.rows[0] ? r.rows[0] : null
+        }
 
-        // Persist Billbee credentials per seller.
-        // Our Billbee webhook verifier reads from admin_hub_seller_settings.
+        // Persist Billbee credentials per seller (never in store_integrations).
         if (integration?.slug && String(integration.slug).toLowerCase() === 'billbee') {
-          const auth = req.headers['authorization'] || ''
-          const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
-          const payload = token ? verifySellerToken(token) : null
-          const sellerId = (payload?.seller_id || 'default').toString().trim() || 'default'
-
           const cfg = config && typeof config === 'object' ? config : {}
           const basicUsername = cfg.basic_auth_username || cfg.username || ''
           const basicPassword = cfg.basic_auth_password || cfg.password || ''
           const billbeeApiKey = api_key || ''
+          const billbeeConnName = (cfg.connection_name != null ? String(cfg.connection_name) : '').trim().slice(0, 200)
 
           if (billbeeApiKey && basicUsername && basicPassword) {
             await client.query(
-              `INSERT INTO admin_hub_seller_settings (seller_id, billbee_api_key, billbee_basic_username, billbee_basic_password, billbee_updated_at, updated_at)
-               VALUES ($1, $2, $3, $4, now(), now())
+              `INSERT INTO admin_hub_seller_settings (seller_id, billbee_api_key, billbee_basic_username, billbee_basic_password, billbee_connection_name, billbee_updated_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, now(), now())
                ON CONFLICT (seller_id) DO UPDATE SET
                  billbee_api_key = EXCLUDED.billbee_api_key,
                  billbee_basic_username = EXCLUDED.billbee_basic_username,
                  billbee_basic_password = EXCLUDED.billbee_basic_password,
+                 billbee_connection_name = COALESCE(NULLIF(EXCLUDED.billbee_connection_name, ''), admin_hub_seller_settings.billbee_connection_name),
                  billbee_updated_at = now(),
                  updated_at = now()`,
-              [sellerId, billbeeApiKey, basicUsername, basicPassword],
+              [settingsKey, billbeeApiKey, basicUsername, basicPassword, billbeeConnName || null],
+            )
+          } else if (billbeeConnName) {
+            await client.query(
+              `INSERT INTO admin_hub_seller_settings (seller_id, billbee_connection_name, updated_at)
+               VALUES ($1, $2, now())
+               ON CONFLICT (seller_id) DO UPDATE SET
+                 billbee_connection_name = EXCLUDED.billbee_connection_name,
+                 updated_at = now()`,
+              [settingsKey, billbeeConnName],
             )
           }
         }
@@ -9999,14 +10058,23 @@ async function start() {
 
     const adminHubIntegrationPATCH = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const settingsKey = getBillbeeAdminHubSellerSettingsKey(req.sellerUser)
+      if (!settingsKey) return res.status(401).json({ message: 'Invalid session' })
       const id = (req.params.id || '').trim()
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        const slugRow = await client.query('SELECT slug FROM store_integrations WHERE id = $1::uuid', [id])
+        const isBillbee = String(slugRow.rows[0]?.slug || '').toLowerCase() === 'billbee'
+        const body = { ...(req.body || {}) }
+        if (isBillbee) {
+          delete body.api_key
+          delete body.api_secret
+          delete body.webhook_url
+        }
         const allowed = ['name','logo_url','api_key','api_secret','webhook_url','config','is_active','category']
-        const body = req.body || {}
         const sets = []; const vals = []
         for (const key of allowed) { if (key in body) { vals.push(key === 'config' ? JSON.stringify(body[key]) : body[key]); sets.push(`${key} = $${vals.length}`) } }
         if (sets.length === 0) return res.status(400).json({ message: 'no fields to update' })
@@ -10018,27 +10086,33 @@ async function start() {
         const integration = r.rows[0]
 
         if (integration?.slug && String(integration.slug).toLowerCase() === 'billbee') {
-          const auth = req.headers['authorization'] || ''
-          const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
-          const payload = token ? verifySellerToken(token) : null
-          const sellerId = (payload?.seller_id || 'default').toString().trim() || 'default'
-
           const cfg = body.config && typeof body.config === 'object' ? body.config : {}
           const basicUsername = cfg.basic_auth_username || cfg.username || ''
           const basicPassword = cfg.basic_auth_password || cfg.password || ''
-          const billbeeApiKey = body.api_key || ''
+          const billbeeApiKey = (req.body || {}).api_key || ''
+          const billbeeConnName = (cfg.connection_name != null ? String(cfg.connection_name) : '').trim().slice(0, 200)
 
           if (billbeeApiKey && basicUsername && basicPassword) {
             await client.query(
-              `INSERT INTO admin_hub_seller_settings (seller_id, billbee_api_key, billbee_basic_username, billbee_basic_password, billbee_updated_at, updated_at)
-               VALUES ($1, $2, $3, $4, now(), now())
+              `INSERT INTO admin_hub_seller_settings (seller_id, billbee_api_key, billbee_basic_username, billbee_basic_password, billbee_connection_name, billbee_updated_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, now(), now())
                ON CONFLICT (seller_id) DO UPDATE SET
                  billbee_api_key = EXCLUDED.billbee_api_key,
                  billbee_basic_username = EXCLUDED.billbee_basic_username,
                  billbee_basic_password = EXCLUDED.billbee_basic_password,
+                 billbee_connection_name = COALESCE(NULLIF(EXCLUDED.billbee_connection_name, ''), admin_hub_seller_settings.billbee_connection_name),
                  billbee_updated_at = now(),
                  updated_at = now()`,
-              [sellerId, billbeeApiKey, basicUsername, basicPassword],
+              [settingsKey, billbeeApiKey, basicUsername, basicPassword, billbeeConnName || null],
+            )
+          } else if (billbeeConnName) {
+            await client.query(
+              `INSERT INTO admin_hub_seller_settings (seller_id, billbee_connection_name, updated_at)
+               VALUES ($1, $2, now())
+               ON CONFLICT (seller_id) DO UPDATE SET
+                 billbee_connection_name = EXCLUDED.billbee_connection_name,
+                 updated_at = now()`,
+              [settingsKey, billbeeConnName],
             )
           }
         }
@@ -10053,12 +10127,31 @@ async function start() {
 
     const adminHubIntegrationDELETE = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const settingsKey = getBillbeeAdminHubSellerSettingsKey(req.sellerUser)
+      if (!settingsKey) return res.status(401).json({ message: 'Invalid session' })
       const id = (req.params.id || '').trim()
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        const slugRow = await client.query('SELECT slug FROM store_integrations WHERE id = $1::uuid', [id])
+        if (!slugRow.rows[0]) { await client.end(); return res.status(404).json({ message: 'Not found' }) }
+        if (String(slugRow.rows[0].slug || '').toLowerCase() === 'billbee') {
+          await client.query(
+            `UPDATE admin_hub_seller_settings SET
+               billbee_api_key = NULL,
+               billbee_basic_username = NULL,
+               billbee_basic_password = NULL,
+               billbee_connection_name = NULL,
+               billbee_updated_at = NULL,
+               updated_at = now()
+             WHERE seller_id = $1`,
+            [settingsKey],
+          )
+          await client.end()
+          return res.json({ success: true })
+        }
         await client.query('DELETE FROM store_integrations WHERE id = $1::uuid', [id])
         await client.end()
         res.json({ success: true })
@@ -10101,34 +10194,150 @@ async function start() {
       }
     }
 
+    const getBillbeePublicBaseUrl = () =>
+      (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '').replace(/\/$/, '') || 'https://belucha-medusa-backend.onrender.com'
+
     const adminHubBillbeeCredentialsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-      const sellerId = (req.sellerUser?.seller_id || 'default').toString().trim() || 'default'
+      const settingsKey = getBillbeeAdminHubSellerSettingsKey(req.sellerUser)
+      if (!settingsKey) return res.status(401).json({ message: 'Invalid session' })
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const creds = await ensureSellerBillbeeCredentials(client, sellerId, false)
+        const r = await client.query(
+          `SELECT billbee_api_key, billbee_basic_username, billbee_basic_password, store_name, billbee_connection_name
+           FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
+          [settingsKey],
+        )
+        const row = r.rows && r.rows[0]
         await client.end()
-        return res.json({ credentials: creds, seller_id: sellerId, generated: true })
+        const creds =
+          row && row.billbee_api_key && row.billbee_basic_username && row.billbee_basic_password
+            ? {
+                api_key: String(row.billbee_api_key),
+                basic_auth_username: String(row.billbee_basic_username),
+                basic_auth_password: String(row.billbee_basic_password),
+              }
+            : { api_key: '', basic_auth_username: '', basic_auth_password: '' }
+        const store_name = row && row.store_name != null ? String(row.store_name).trim() : ''
+        const connection_name = row && row.billbee_connection_name != null ? String(row.billbee_connection_name).trim() : ''
+        const name_for_billbee = connection_name || store_name || 'Belucha'
+        const base = getBillbeePublicBaseUrl()
+        const webhook_url = `${base}/admin-hub/v1/integrations/billbee/webhook`
+        const has_credentials = !!(creds.api_key && creds.basic_auth_username && creds.basic_auth_password)
+        return res.json({
+          credentials: creds,
+          seller_id: settingsKey,
+          generated: has_credentials,
+          webhook_url,
+          connection_name,
+          name_for_billbee,
+          store_name,
+        })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         return res.status(500).json({ message: e?.message || 'Billbee credentials unavailable' })
       }
     }
 
-    const adminHubBillbeeCredentialsPOST = async (req, res) => {
+    const adminHubBillbeeCredentialsPATCH = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-      const sellerId = (req.sellerUser?.seller_id || 'default').toString().trim() || 'default'
+      const settingsKey = getBillbeeAdminHubSellerSettingsKey(req.sellerUser)
+      if (!settingsKey) return res.status(401).json({ message: 'Invalid session' })
+      const body = req.body || {}
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const creds = await ensureSellerBillbeeCredentials(client, sellerId, true)
+        const r = await client.query(
+          `SELECT billbee_api_key, billbee_basic_username, billbee_basic_password, store_name, billbee_connection_name
+           FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
+          [settingsKey],
+        )
+        const row = r.rows && r.rows[0] ? r.rows[0] : {}
+        let api = row.billbee_api_key != null ? String(row.billbee_api_key).trim() : ''
+        let user = row.billbee_basic_username != null ? String(row.billbee_basic_username).trim() : ''
+        let pass = row.billbee_basic_password != null ? String(row.billbee_basic_password) : ''
+        let conn = row.billbee_connection_name != null ? String(row.billbee_connection_name).trim() : ''
+
+        if ('api_key' in body) api = String(body.api_key ?? '').trim()
+        if ('basic_auth_username' in body) user = String(body.basic_auth_username ?? '').trim()
+        if ('basic_auth_password' in body && String(body.basic_auth_password ?? '').length > 0) {
+          pass = String(body.basic_auth_password)
+        }
+        if ('connection_name' in body) conn = String(body.connection_name ?? '').trim().slice(0, 200)
+
+        const credPresentInBody =
+          'api_key' in body ||
+          'basic_auth_username' in body ||
+          ('basic_auth_password' in body && String(body.basic_auth_password ?? '').length > 0)
+        if (credPresentInBody && (!api || !user || !pass)) {
+          await client.end()
+          return res.status(400).json({
+            message:
+              'Schlüssel, Basic-Auth Benutzername und Basic-Auth Passwort sind vollständig erforderlich, sobald du eines dieser Felder mitsendest.',
+          })
+        }
+
+        const billbeeUpdatedAt =
+          api && user && pass ? new Date() : null
+        await client.query(
+          `INSERT INTO admin_hub_seller_settings (
+             seller_id, billbee_api_key, billbee_basic_username, billbee_basic_password, billbee_connection_name, billbee_updated_at, updated_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, now())
+           ON CONFLICT (seller_id) DO UPDATE SET
+             billbee_api_key = $2::text,
+             billbee_basic_username = $3::text,
+             billbee_basic_password = $4::text,
+             billbee_connection_name = NULLIF($5::text, ''),
+             billbee_updated_at = CASE
+               WHEN $2::text <> '' AND $3::text <> '' AND $4::text <> '' THEN COALESCE($6::timestamp, now())
+               ELSE admin_hub_seller_settings.billbee_updated_at
+             END,
+             updated_at = now()`,
+          [settingsKey, api || null, user || null, pass || null, conn || null, billbeeUpdatedAt],
+        )
         await client.end()
-        return res.json({ credentials: creds, seller_id: sellerId, regenerated: true })
+
+        const base = getBillbeePublicBaseUrl()
+        const webhook_url = `${base}/admin-hub/v1/integrations/billbee/webhook`
+        const store_name = row.store_name != null ? String(row.store_name).trim() : ''
+        const name_for_billbee = conn || store_name || 'Belucha'
+        const has_credentials = !!(api && user && pass)
+        return res.json({
+          credentials: {
+            api_key: api,
+            basic_auth_username: user,
+            basic_auth_password: pass,
+          },
+          seller_id: settingsKey,
+          generated: has_credentials,
+          webhook_url,
+          connection_name: conn,
+          name_for_billbee,
+          store_name,
+        })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        return res.status(500).json({ message: e?.message || 'Billbee settings could not be saved' })
+      }
+    }
+
+    const adminHubBillbeeCredentialsPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const settingsKey = getBillbeeAdminHubSellerSettingsKey(req.sellerUser)
+      if (!settingsKey) return res.status(401).json({ message: 'Invalid session' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const creds = await ensureSellerBillbeeCredentials(client, settingsKey, true)
+        await client.end()
+        return res.json({ credentials: creds, seller_id: settingsKey, regenerated: true })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         return res.status(500).json({ message: e?.message || 'Billbee credentials could not be regenerated' })
@@ -10241,10 +10450,7 @@ async function start() {
     }
 
     const adminHubBillbeeWebhookUrlGET = async (req, res) => {
-      const base =
-        (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '')
-          .replace(/\/$/, '') ||
-        'https://belucha-medusa-backend.onrender.com'
+      const base = getBillbeePublicBaseUrl()
       return res.json({
         url: `${base}/admin-hub/v1/integrations/billbee/webhook`,
         method: 'POST (Billbee may also call GET)',
@@ -10569,10 +10775,11 @@ async function start() {
     httpApp.patch('/admin-hub/v1/shipping-carriers/:id', requireSellerAuth, adminHubCarrierPATCH)
     httpApp.delete('/admin-hub/v1/shipping-carriers/:id', requireSellerAuth, adminHubCarrierDELETE)
     httpApp.get('/admin-hub/v1/integrations', adminHubIntegrationsGET)
-    httpApp.post('/admin-hub/v1/integrations', adminHubIntegrationPOST)
-    httpApp.patch('/admin-hub/v1/integrations/:id', adminHubIntegrationPATCH)
-    httpApp.delete('/admin-hub/v1/integrations/:id', adminHubIntegrationDELETE)
+    httpApp.post('/admin-hub/v1/integrations', requireSellerAuth, adminHubIntegrationPOST)
+    httpApp.patch('/admin-hub/v1/integrations/:id', requireSellerAuth, adminHubIntegrationPATCH)
+    httpApp.delete('/admin-hub/v1/integrations/:id', requireSellerAuth, adminHubIntegrationDELETE)
     httpApp.get('/admin-hub/v1/integrations/billbee/credentials', requireSellerAuth, adminHubBillbeeCredentialsGET)
+    httpApp.patch('/admin-hub/v1/integrations/billbee/credentials', requireSellerAuth, adminHubBillbeeCredentialsPATCH)
     httpApp.post('/admin-hub/v1/integrations/billbee/credentials', requireSellerAuth, adminHubBillbeeCredentialsPOST)
     httpApp.post('/admin-hub/v1/integrations/billbee/test', requireSellerAuth, adminHubBillbeeIntegrationTestPOST)
     // Billbee calls this URL to verify/authenticate the integration.
@@ -10580,6 +10787,97 @@ async function start() {
     httpApp.get('/admin-hub/v1/integrations/billbee/webhook-url', requireSellerAuth, adminHubBillbeeWebhookUrlGET)
     httpApp.get('/admin-hub/v1/integrations/billbee/webhook', adminHubBillbeeWebhookGET)
     httpApp.post('/admin-hub/v1/integrations/billbee/webhook', adminHubBillbeeWebhookPOST)
+
+    const ensureBeluchaBillbeeApiKeys = async (client, userId) => {
+      const _c = require('crypto')
+      const r = await client.query(
+        `SELECT id, email, seller_id, belucha_billbee_api_key, belucha_billbee_api_secret FROM seller_users WHERE id = $1`,
+        [userId],
+      )
+      const row = r.rows && r.rows[0]
+      if (!row) return null
+      if (row.belucha_billbee_api_key && row.belucha_billbee_api_secret) return row
+      const k = `belucha_seller_${_c.randomBytes(12).toString('hex')}`
+      const sec = _c.randomBytes(24).toString('hex')
+      const u = await client.query(
+        `UPDATE seller_users SET belucha_billbee_api_key = $2, belucha_billbee_api_secret = $3, updated_at = now()
+         WHERE id = $1 AND (belucha_billbee_api_key IS NULL OR belucha_billbee_api_secret IS NULL)
+         RETURNING id, email, seller_id, belucha_billbee_api_key, belucha_billbee_api_secret`,
+        [userId, k, sec],
+      )
+      if (u.rows[0]) return u.rows[0]
+      const again = await client.query(
+        `SELECT id, email, seller_id, belucha_billbee_api_key, belucha_billbee_api_secret FROM seller_users WHERE id = $1`,
+        [userId],
+      )
+      return again.rows[0]
+    }
+
+    const publicBeluchaBillbeeApiBase = () =>
+      (process.env.PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '').replace(/\/$/, '') ||
+      'https://belucha-medusa-backend.onrender.com'
+
+    const adminHubBillbeeMarketplaceConnectionGET = async (req, res) => {
+      const userId = req.sellerUser?.id
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+      let client
+      try {
+        client = getSellerDbClient()
+        if (!client) return res.status(503).json({ message: 'Database unavailable' })
+        await client.connect()
+        const row = await ensureBeluchaBillbeeApiKeys(client, userId)
+        await client.end()
+        client = null
+        if (!row) return res.status(404).json({ message: 'User not found' })
+        const base = publicBeluchaBillbeeApiBase()
+        const apiBase = `${base}/api/billbee`
+        res.json({
+          name: 'Belucha Marketplace',
+          api_base_url: apiBase,
+          orders_url: `${base}/api/billbee/orders`,
+          products_url: `${base}/api/billbee/products`,
+          stock_url: `${base}/api/billbee/stock`,
+          webhook_url: `${base}/api/billbee/webhook/order-update`,
+          api_key: row.belucha_billbee_api_key,
+          basic_auth_username: row.email,
+          basic_auth_password: row.belucha_billbee_api_secret,
+          billbee_integration_enabled: true,
+          hint:
+            'Billbee Shopverbindung: URL oft die Basis-URL (api_base_url). Schlüssel = api_key. Basic Auth Benutzername = E-Mail, Passwort = gespeichertes Secret. Empfohlen: zusätzlich HTTP-Header X-Belucha-Api-Key mit demselben api_key.',
+        })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubBillbeeMarketplaceConnectionRotatePOST = async (req, res) => {
+      const userId = req.sellerUser?.id
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+      const _c = require('crypto')
+      let client
+      try {
+        client = getSellerDbClient()
+        if (!client) return res.status(503).json({ message: 'Database unavailable' })
+        await client.connect()
+        const sec = _c.randomBytes(24).toString('hex')
+        const r = await client.query(
+          `UPDATE seller_users SET belucha_billbee_api_secret = $2, updated_at = now() WHERE id = $1 RETURNING belucha_billbee_api_secret`,
+          [userId, sec],
+        )
+        await client.end()
+        client = null
+        if (!r.rows[0]) return res.status(404).json({ message: 'Not found' })
+        res.json({ ok: true, basic_auth_password: r.rows[0].belucha_billbee_api_secret })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    httpApp.get('/admin-hub/v1/billbee/connection', requireSellerAuth, adminHubBillbeeMarketplaceConnectionGET)
+    httpApp.post('/admin-hub/v1/billbee/connection/rotate-secret', requireSellerAuth, adminHubBillbeeMarketplaceConnectionRotatePOST)
+
     httpApp.get('/admin-hub/v1/abandoned-carts', adminHubAbandonedCartsGET)
     // POST /admin-hub/v1/returns/:id/send-label — mark label sent + send email to customer
     const adminHubReturnSendLabelPOST = async (req, res) => {
@@ -11201,16 +11499,16 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
            DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
           [recipientKey],
         )
+        await client.query(
+          `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+           SELECT $1::varchar, 'product_change_request', cr.id, now()
+           FROM admin_hub_product_change_requests cr
+           WHERE cr.status = 'pending'
+           ON CONFLICT (recipient_key, source_type, source_id)
+           DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+          [recipientKey],
+        )
       }
-      await client.query(
-        `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
-         SELECT $1::varchar, 'product_change_request', cr.id, now()
-         FROM admin_hub_product_change_requests cr
-         WHERE cr.status = 'pending' AND ($2::boolean OR cr.seller_id = $3)
-         ON CONFLICT (recipient_key, source_type, source_id)
-         DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
-        [recipientKey, sup, sid],
-      )
     }
 
     const adminHubNotificationsUnreadGET = async (req, res) => {
@@ -11286,7 +11584,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           SELECT COUNT(*)::int AS c FROM admin_hub_product_change_requests cr
           LEFT JOIN seller_hub_notification_state s
             ON s.recipient_key = $1 AND s.source_type = 'product_change_request' AND s.source_id = cr.id
-          WHERE cr.status = 'pending' AND ($2::boolean OR cr.seller_id = $3)
+          WHERE cr.status = 'pending'
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
 
@@ -11294,7 +11592,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           client.query(ordersUnreadQ, [rk, sup, sid]),
           client.query(returnsUnreadQ, [rk, sup, sid]),
           sup ? client.query(verificationsUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
-          client.query(crUnreadQ, [rk, sup, sid]).catch(() => ({ rows: [{ c: 0 }] })),
+          sup ? client.query(crUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
         ])
 
         const recentOrders = await client.query(
@@ -11334,18 +11632,21 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             [rk],
           ).catch(() => ({ rows: [] }))
         }
-        const recentChangeRequests = await client.query(
-          `SELECT cr.id, cr.product_id, cr.seller_id, cr.field_name, cr.created_at, p.title AS product_title,
-                  (s.read_at IS NOT NULL) AS read
-           FROM admin_hub_product_change_requests cr
-           LEFT JOIN admin_hub_products p ON p.id = cr.product_id
-           LEFT JOIN seller_hub_notification_state s
-             ON s.recipient_key = $1 AND s.source_type = 'product_change_request' AND s.source_id = cr.id
-           WHERE cr.status = 'pending' AND ($2::boolean OR cr.seller_id = $3)
-             AND (s.id IS NULL OR s.deleted_at IS NULL)
-           ORDER BY cr.created_at DESC LIMIT 8`,
-          [rk, sup, sid],
-        ).catch(() => ({ rows: [] }))
+        let recentChangeRequests = { rows: [] }
+        if (sup) {
+          recentChangeRequests = await client.query(
+            `SELECT cr.id, cr.product_id, cr.seller_id, cr.field_name, cr.old_value, cr.new_value, cr.created_at, p.title AS product_title,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_product_change_requests cr
+             LEFT JOIN admin_hub_products p ON p.id = cr.product_id
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'product_change_request' AND s.source_id = cr.id
+             WHERE cr.status = 'pending'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY cr.created_at DESC LIMIT 8`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
 
         await client.end()
         const verCount = verificationsR.rows[0]?.c || 0
@@ -11437,18 +11738,21 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             [rk],
           ).catch(() => ({ rows: [] }))
         }
-        const crQ = await client.query(
-          `SELECT cr.id, cr.product_id, cr.seller_id, cr.field_name, cr.created_at, p.title AS product_title,
-                  (s.read_at IS NOT NULL) AS read
-           FROM admin_hub_product_change_requests cr
-           LEFT JOIN admin_hub_products p ON p.id = cr.product_id
-           LEFT JOIN seller_hub_notification_state s
-             ON s.recipient_key = $1 AND s.source_type = 'product_change_request' AND s.source_id = cr.id
-           WHERE cr.status = 'pending' AND ($2::boolean OR cr.seller_id = $3)
-             AND (s.id IS NULL OR s.deleted_at IS NULL)
-           ORDER BY cr.created_at DESC LIMIT 500`,
-          [rk, sup, sid],
-        ).catch(() => ({ rows: [] }))
+        let crQ = { rows: [] }
+        if (sup) {
+          crQ = await client.query(
+            `SELECT cr.id, cr.product_id, cr.seller_id, cr.field_name, cr.old_value, cr.new_value, cr.created_at, p.title AS product_title,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_product_change_requests cr
+             LEFT JOIN admin_hub_products p ON p.id = cr.product_id
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'product_change_request' AND s.source_id = cr.id
+             WHERE cr.status = 'pending'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY cr.created_at DESC LIMIT 500`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
         await client.end()
 
         const items = []
@@ -11485,15 +11789,42 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             href: r.seller_id ? `/sellers/${r.seller_id}` : '/sellers',
           })
         }
+        const crShortVal = (val) => {
+          if (val == null || val === '') return '—'
+          const s = String(val).trim()
+          if (!s) return '—'
+          try {
+            const j = JSON.parse(s)
+            if (j !== null && typeof j === 'object') {
+              const t = JSON.stringify(j)
+              return t.length > 90 ? `${t.slice(0, 89)}…` : t
+            }
+          } catch (_) { /* plain string */ }
+          const one = s.replace(/\s+/g, ' ')
+          return one.length > 100 ? `${one.slice(0, 99)}…` : one
+        }
+        const crFieldDe = (fn) => {
+          const f = String(fn || '')
+          if (f === 'title') return 'Titel'
+          if (f === 'description') return 'Beschreibung'
+          if (f.startsWith('metadata.')) return `Meta (${f.replace(/^metadata\./, '')})`
+          return f || '—'
+        }
         for (const r of crQ.rows || []) {
+          const pid = r.product_id ? String(r.product_id) : ''
+          const sub = `${r.product_title || 'Produkt'} · ${crFieldDe(r.field_name)} — Aktuell: ${crShortVal(r.old_value)} → Vorschlag: ${crShortVal(r.new_value)}`
           items.push({
             source_type: 'product_change_request',
             source_id: r.id,
             read: !!r.read,
             created_at: r.created_at,
             title: 'Produktänderung ausstehend',
-            subtitle: `${r.product_title || 'Produkt'} · ${r.field_name || ''}`,
-            href: '/products/inventory',
+            subtitle: sub.length > 500 ? `${sub.slice(0, 499)}…` : sub,
+            href: pid ? `/products/${pid}` : '/products/inventory',
+            product_id: pid || undefined,
+            field_name: r.field_name,
+            old_value: r.old_value,
+            new_value: r.new_value,
           })
         }
         items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
@@ -11554,20 +11885,21 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
               [rk],
             )
+            await client.query(
+              `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+               SELECT $1::varchar, 'product_change_request', cr.id, now()
+               FROM admin_hub_product_change_requests cr
+               WHERE cr.status = 'pending'
+               ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+              [rk],
+            )
           }
-          await client.query(
-            `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
-             SELECT $1::varchar, 'product_change_request', cr.id, now()
-             FROM admin_hub_product_change_requests cr
-             WHERE cr.status = 'pending' AND ($2::boolean OR cr.seller_id = $3)
-             ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
-            [rk, sup, sid],
-          )
         } else {
           for (const it of items) {
             const st = String(it.source_type || '').trim()
             const id = it.source_id
             if (!st || !id) continue
+            if (!sup && st === 'product_change_request') continue
             await markDeleted(st, id)
           }
         }
@@ -14872,6 +15204,13 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       computeRankingFeatures().catch(() => {})
       setInterval(() => computeRankingFeatures().catch(() => {}), 2 * 60 * 60 * 1000)
     }, 30 * 1000) // 30s delay after startup
+
+    try {
+      const { mountBillbeeMarketplaceApi } = require(path.join(__dirname, 'billbee-marketplace-api'))
+      mountBillbeeMarketplaceApi(httpApp, { getSellerDbClient, getProductsDbClient })
+    } catch (e) {
+      console.warn('Billbee marketplace API mount failed:', e?.message || e)
+    }
 
     httpApp.listen(PORT, HOST, () => {
       console.log(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)

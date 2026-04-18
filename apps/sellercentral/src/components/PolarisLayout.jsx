@@ -13,6 +13,8 @@ import {
   Text,
   Popover,
   ActionList,
+  UnstyledLink,
+  Icon,
 } from "@shopify/polaris";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import {
@@ -27,17 +29,32 @@ import {
   ListBulletedIcon,
   ImportIcon,
   StoreIcon,
+  EditIcon,
 } from "@shopify/polaris-icons";
 import dynamic from "next/dynamic";
 import en from "@shopify/polaris/locales/en.json";
 import "@shopify/polaris/build/esm/styles.css";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { fieldNameDisplayLabel } from "@/lib/product-change-request-format";
 
 const discardBtnStyles = `
   .belucha-discard-topbar-btn,
   .belucha-discard-topbar-btn *,
   .belucha-discard-topbar-btn span { color: #ffffff !important; }
 `;
+
+/** Polaris Frame logo img: never pass empty/invalid src (React 19 + browser warning). */
+function normalizeSellerCentralLogoUrl(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  const low = s.toLowerCase();
+  if (low === "null" || low === "undefined" || low === "about:blank") return null;
+  if (s === "/") return null;
+  if (/^https?:\/\//i.test(s) || s.startsWith("data:image/")) return s;
+  if (/^\/\/[^/]/i.test(s)) return s;
+  if (s.startsWith("/") && s.length > 1) return s;
+  return null;
+}
 
 const GroupedDropdownSearch = dynamic(
   () => import("./GroupedDropdownSearch").then((m) => m.default),
@@ -297,8 +314,8 @@ export default function PolarisLayout({ children }) {
       .then((r) => r.json())
       .then((d) => {
         setPlatformBranding({
-          sellercentral_logo_url: d?.sellercentral_logo_url || "",
-          sellercentral_favicon_url: d?.sellercentral_favicon_url || "",
+          sellercentral_logo_url: normalizeSellerCentralLogoUrl(d?.sellercentral_logo_url) ?? "",
+          sellercentral_favicon_url: (d?.sellercentral_favicon_url || "").trim(),
           sellercentral_logo_height: d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 30,
         });
       })
@@ -543,10 +560,33 @@ export default function PolarisLayout({ children }) {
     </Popover>
   );
 
+  const frameLogoUrl = normalizeSellerCentralLogoUrl(platformBranding.sellercentral_logo_url);
+  const topBarLogoMaxH = Math.min(Math.max(platformBranding.sellercentral_logo_height || 30, 16), 44);
+
+  /** Polaris Frame `logo` makes TopBar + Navigation render Image with `topBarSource || ''` (empty src warning). Use contextControl on both instead. */
+  const polarisLogoContextControl = frameLogoUrl ? (
+    <div style={{ display: "flex", alignItems: "center" }}>
+      <UnstyledLink url="/dashboard" style={{ display: "block", width: 140, lineHeight: 0 }}>
+        <img
+          src={frameLogoUrl}
+          alt="Sellercentral"
+          style={{
+            display: "block",
+            width: "auto",
+            maxWidth: 140,
+            height: topBarLogoMaxH,
+            objectFit: "contain",
+          }}
+        />
+      </UnstyledLink>
+    </div>
+  ) : undefined;
+
   const topBarMarkup = (
     <TopBar
       showNavigationToggle
       onNavigationToggle={() => setShowMobileNav((v) => !v)}
+      contextControl={polarisLogoContextControl}
       userMenu={
         <div style={{ display: "flex", alignItems: "center", gap: 4, height: 56 }}>
           {/* Language selector */}
@@ -614,25 +654,33 @@ export default function PolarisLayout({ children }) {
                       {(notifData?.recent_product_change_requests || []).map((cr) => (
                         <Link
                           key={cr.id}
-                          href="/products/inventory"
+                          href={cr.product_id ? `/products/${cr.product_id}` : "/products/inventory"}
                           onClick={() => setNotifOpen(false)}
                           style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
                         >
-                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>✏️</span>
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                          <span
+                            style={{
+                              flexShrink: 0,
+                              marginTop: 1,
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              background: "var(--p-color-bg-fill-secondary)",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "var(--p-color-icon)",
+                            }}
+                            aria-hidden
+                          >
+                            <Icon source={EditIcon} tone="subdued" />
+                          </span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--p-color-text)" }}>
                               Produktänderung ausstehend
                             </div>
-                            <div style={{ fontSize: 11, color: "#6b7280" }}>
-                              {cr.product_title || "Produkt"}{" "}
-                              ·{" "}
-                              {cr.field_name === "title"
-                                ? "Titel"
-                                : cr.field_name === "description"
-                                  ? "Beschreibung"
-                                  : cr.field_name?.startsWith?.("metadata.")
-                                    ? `Metadaten (${String(cr.field_name).replace(/^metadata\./, "")})`
-                                    : cr.field_name || "—"}
+                            <div style={{ fontSize: 12, color: "var(--p-color-text-secondary)", lineHeight: 1.35, marginTop: 2 }}>
+                              {cr.product_title || "Produkt"} · {fieldNameDisplayLabel(cr.field_name, locale)}
                             </div>
                           </div>
                         </Link>
@@ -754,7 +802,11 @@ export default function PolarisLayout({ children }) {
   const navLocation = pathname && pathname !== "" ? pathname : "/";
 
   const navMarkup = (
-    <Navigation location={navLocation} onDismiss={() => setShowMobileNav(false)}>
+    <Navigation
+      location={navLocation}
+      onDismiss={() => setShowMobileNav(false)}
+      contextControl={polarisLogoContextControl}
+    >
       <Navigation.Section
         items={menuMain.map((item) => {
           const hasSub = item.subNavigationItems?.length > 0;
@@ -884,12 +936,6 @@ export default function PolarisLayout({ children }) {
         topBar={topBarMarkup}
         showMobileNavigation={showMobileNav}
         onNavigationDismiss={() => setShowMobileNav(false)}
-        logo={platformBranding.sellercentral_logo_url ? {
-          topBarSource: platformBranding.sellercentral_logo_url,
-          url: "/dashboard",
-          width: 140,
-          accessibilityLabel: "Sellercentral",
-        } : undefined}
       >
         {approvalBanner && (
           <div

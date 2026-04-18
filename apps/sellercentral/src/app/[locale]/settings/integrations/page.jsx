@@ -1,419 +1,445 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Page,
+  Card,
+  Text,
+  BlockStack,
+  InlineStack,
+  TextField,
+  Button,
+  Banner,
+  Badge,
+  Modal,
+  EmptyState,
+  Spinner,
+} from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
-const CATALOG = [
-  {
-    name: "billbee",
-    slug: "billbee",
-    logo: "🐝",
-    category: "erp",
-    description: "Multichannel-Auftragsabwicklung & Lagerverwaltung",
-    fieldLabels: {
-      api_key: "Schlüssel",
-      api_key_placeholder: "Billbee API-Schlüssel…",
-      api_secret: "Basic Auth Passwort",
-      api_secret_placeholder: "••••••••",
-      basic_auth_username: "Basic Auth Benutzername",
-      basic_auth_username_placeholder: "Benutzername eingeben…",
-    },
-    helpText: "Billbee benötigt: API-Schlüssel + Basic-Auth Benutzername + Basic-Auth Passwort.",
-  },
-  { name: "xentral", slug: "xentral", logo: "⚡", category: "erp", description: "ERP-System für E-Commerce" },
-  { name: "JTL-Wawi", slug: "jtl-wawi", logo: "🏪", category: "erp", description: "Warenwirtschaft & Fulfillment" },
-  { name: "Shopify", slug: "shopify", logo: "🛍", category: "marketplace", description: "E-Commerce-Plattform" },
-  { name: "Amazon", slug: "amazon", logo: "📦", category: "marketplace", description: "Amazon Seller Central" },
-  { name: "eBay", slug: "ebay", logo: "🔵", category: "marketplace", description: "Auktions- und Handelsplattform" },
-  { name: "Stripe", slug: "stripe", logo: "💳", category: "payment", description: "Online-Zahlungsabwicklung" },
-  { name: "PayPal", slug: "paypal", logo: "🅿", category: "payment", description: "PayPal Zahlungen" },
-  { name: "Klarna", slug: "klarna", logo: "🛒", category: "payment", description: "BNPL & Zahlungsabwicklung" },
-  { name: "Mailchimp", slug: "mailchimp", logo: "🐒", category: "marketing", description: "E-Mail-Marketing" },
-  { name: "Klaviyo", slug: "klaviyo", logo: "📧", category: "marketing", description: "E-Commerce E-Mail & SMS" },
-  { name: "Google Analytics", slug: "google-analytics", logo: "📊", category: "analytics", description: "Web-Analyse" },
-  {
-    name: "PostHog", slug: "posthog", logo: "🦔", category: "analytics",
-    description: "Product analytics, session replays & feature flags (GDPR-konform, EU-Cloud)",
-    fieldLabels: {
-      api_key: "Project API Key",
-      api_key_placeholder: "phc_xxxxxxxxxxxxxxxxxxxx",
-      api_secret: "Host (optional)",
-      api_secret_placeholder: "https://eu.i.posthog.com",
-    },
-    helpText: "Project API Key aus PostHog → Project Settings → Project API Key. EU-Host: https://eu.i.posthog.com (Standard). Wird im Shop als NEXT_PUBLIC_POSTHOG_KEY gesetzt.",
-  },
-  {
-    name: "Resend", slug: "resend", logo: "✉️", category: "marketing",
-    description: "Transaktions-E-Mails per API (Bestellbestätigungen, Passwort-Reset u. a.)",
-    fieldLabels: {
-      api_key: "API Key",
-      api_key_placeholder: "re_xxxxxxxxxxxxxxxxxxxx",
-      api_secret: "Standard-Absender",
-      api_secret_placeholder: "noreply@belucha.de",
-    },
-    helpText: "API Key aus Resend Dashboard → API Keys. Standard-Absender muss in Resend verifiziert sein.",
-  },
-  {
-    name: "Unkey", slug: "unkey", logo: "🔑", category: "automation",
-    description: "API Key Management — sichere externe Schnittstellen mit kurzlebigen API-Schlüsseln",
-    fieldLabels: {
-      api_key: "Root Key",
-      api_key_placeholder: "unkey_xxxxxxxxxxxxxxxxxxxx",
-      api_secret: "API ID",
-      api_secret_placeholder: "api_xxxxxxxxxxxxxxxxxxxx",
-    },
-    helpText: "Root Key + API ID aus Unkey Dashboard. Wird für programmatische API-Schlüssel-Ausstellung verwendet.",
-  },
-  { name: "Slack", slug: "slack", logo: "💬", category: "communication", description: "Team-Kommunikation" },
-  { name: "Zapier", slug: "zapier", logo: "⚡", category: "automation", description: "Workflow-Automatisierung" },
-  {
-    name: "Trustpilot", slug: "trustpilot", logo: "⭐", category: "reviews",
-    description: "Bewertungsplattform — zeige Trustpilot-Widgets in deinem Shop",
-    fieldLabels: {
-      api_key: "Business Unit ID",
-      api_key_placeholder: "z.B. 64a1b2c3d4e5f6a7b8c9d0e1",
-      api_secret: "API Secret (optional, für zukünftige Anbindung)",
-      api_secret_placeholder: "Trustpilot API Secret …",
-    },
-    helpText: "Business Unit ID: Trustpilot → Einstellungen → Unternehmensprofil. Optional: In der DB-Spalte `config` (JSON) z. B. {\"template_id\":\"DEIN_TEMPLATE_UUID\"} setzen — sonst Standard-Widget. Shop lädt /store/trustpilot-config.",
-  },
-];
+const EMPTY_FORM = {
+  name: "",
+  description: "",
+  api_key: "",
+  api_secret: "",
+  webhook_url: "",
+  config_json: "",
+};
 
-const CATEGORIES = { erp: "ERP & Warenwirtschaft", marketplace: "Marktplätze", payment: "Zahlungen", marketing: "Marketing", analytics: "Analytics", reviews: "Bewertungen", automation: "Automatisierung", communication: "Kommunikation" };
+function IntegrationCard({ integration, onEdit, onToggle, onDelete }) {
+  const initials = (integration.name || "?")
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: `1px solid ${integration.is_active ? "#d1fae5" : "#e5e7eb"}`,
+        borderRadius: 10,
+        padding: "16px 18px",
+        display: "flex",
+        gap: 14,
+        alignItems: "flex-start",
+      }}
+    >
+      {/* Avatar */}
+      <div
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 10,
+          background: integration.is_active ? "#ecfdf5" : "#f3f4f6",
+          border: `1px solid ${integration.is_active ? "#a7f3d0" : "#e5e7eb"}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: integration.logo_url?.length <= 2 ? 22 : 13,
+          fontWeight: 700,
+          color: integration.is_active ? "#065f46" : "#6b7280",
+          flexShrink: 0,
+        }}
+      >
+        {integration.logo_url || initials}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <InlineStack align="space-between" blockAlign="start">
+          <BlockStack gap="050">
+            <Text as="span" fontWeight="semibold" variant="bodyMd">
+              {integration.name}
+            </Text>
+            {integration.description && (
+              <Text as="p" tone="subdued" variant="bodySm">
+                {integration.description}
+              </Text>
+            )}
+          </BlockStack>
+          <Badge tone={integration.is_active ? "success" : "new"}>
+            {integration.is_active ? "Aktiv" : "Inaktiv"}
+          </Badge>
+        </InlineStack>
+
+        <div
+          style={{
+            marginTop: 8,
+            padding: "8px 12px",
+            background: "#f9fafb",
+            borderRadius: 6,
+            fontSize: 12,
+            color: "#6b7280",
+            display: "grid",
+            gridTemplateColumns: "auto 1fr",
+            gap: "4px 12px",
+          }}
+        >
+          {integration.api_key && (
+            <>
+              <span style={{ fontWeight: 600, color: "#374151" }}>API Key</span>
+              <span style={{ fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {integration.api_key.slice(0, 4)}{"•".repeat(Math.min(16, Math.max(4, integration.api_key.length - 4)))}
+              </span>
+            </>
+          )}
+          {integration.webhook_url && (
+            <>
+              <span style={{ fontWeight: 600, color: "#374151" }}>Webhook</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {integration.webhook_url}
+              </span>
+            </>
+          )}
+          {integration.slug && integration.slug !== integration.name?.toLowerCase().replace(/\s+/g, "-") && (
+            <>
+              <span style={{ fontWeight: 600, color: "#374151" }}>Slug</span>
+              <span style={{ fontFamily: "monospace" }}>{integration.slug}</span>
+            </>
+          )}
+        </div>
+
+        <InlineStack gap="200" blockAlign="center" style={{ marginTop: 10 }}>
+          <Button size="slim" onClick={() => onEdit(integration)}>
+            Bearbeiten
+          </Button>
+          <Button size="slim" onClick={() => onToggle(integration)}>
+            {integration.is_active ? "Deaktivieren" : "Aktivieren"}
+          </Button>
+          <Button size="slim" tone="critical" variant="plain" onClick={() => onDelete(integration)}>
+            Löschen
+          </Button>
+        </InlineStack>
+      </div>
+    </div>
+  );
+}
 
 export default function IntegrationsSettingsPage() {
   const [integrations, setIntegrations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null); // { app, integration? }
-  const [form, setForm] = useState({ api_key: "", api_secret: "", webhook_url: "", basic_auth_username: "", basic_auth_password: "" });
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [billbeeLoading, setBillbeeLoading] = useState(false);
-  const [billbeeWebhookLoading, setBillbeeWebhookLoading] = useState(false);
-  const [billbeeWebhookUrl, setBillbeeWebhookUrl] = useState("");
-  const [testResult, setTestResult] = useState(null);
-  const [err, setErr] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [msg, setMsg] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [jsonErr, setJsonErr] = useState("");
 
-  const load = async () => {
+  const client = getMedusaAdminClient();
+
+  const load = useCallback(async () => {
     setLoading(true);
-    const client = getMedusaAdminClient();
-    const data = await client.getIntegrations();
-    setIntegrations(data.integrations || []);
-    setLoading(false);
-  };
-  useEffect(() => { load(); }, []);
-
-  const getIntegration = (slug) => integrations.find(i => i.slug === slug);
-
-  const loadBillbeeCredentials = async () => {
-    setBillbeeLoading(true);
-    setErr("");
     try {
-      const client = getMedusaAdminClient();
-      const data = await client.getBillbeeCredentials();
-      const creds = data?.credentials || {};
-      setForm((f) => ({
-        ...f,
-        api_key: creds.api_key || "",
-        basic_auth_username: creds.basic_auth_username || "",
-        api_secret: creds.basic_auth_password || "",
-      }));
+      const data = await client.getIntegrations();
+      setIntegrations(data.integrations || []);
     } catch (e) {
-      setErr(e?.message || "Billbee-Zugangsdaten konnten nicht geladen werden.");
+      setMsg({ tone: "critical", text: e?.message || "Integrationen konnten nicht geladen werden." });
+    } finally {
+      setLoading(false);
     }
-    setBillbeeLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setJsonErr("");
+    setModalOpen(true);
   };
 
-  const loadBillbeeWebhookUrl = async () => {
-    setBillbeeWebhookLoading(true);
-    setErr("");
+  const openEdit = (integration) => {
+    setEditingId(integration.id);
+    setForm({
+      name: integration.name || "",
+      description: integration.description || "",
+      api_key: "",
+      api_secret: "",
+      webhook_url: integration.webhook_url || "",
+      config_json: integration.config ? JSON.stringify(integration.config, null, 2) : "",
+    });
+    setJsonErr("");
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setJsonErr("");
+  };
+
+  const setField = (key, value) => setForm((p) => ({ ...p, [key]: value }));
+
+  const save = async () => {
+    if (!form.name.trim()) {
+      setMsg({ tone: "warning", text: "Bitte einen Namen eingeben." });
+      return;
+    }
+
+    let parsedConfig = undefined;
+    if (form.config_json.trim()) {
+      try {
+        parsedConfig = JSON.parse(form.config_json);
+        setJsonErr("");
+      } catch {
+        setJsonErr("Ungültiges JSON-Format.");
+        return;
+      }
+    }
+
+    setSaving(true);
+    setMsg(null);
     try {
-      const client = getMedusaAdminClient();
-      const data = await client.getBillbeeWebhookUrl();
-      setBillbeeWebhookUrl(data?.url || "");
-    } catch (e) {
-      setErr(e?.message || "Billbee Webhook-URL konnte nicht geladen werden.");
-    }
-    setBillbeeWebhookLoading(false);
-  };
-
-  const regenerateBillbeeCredentials = async () => {
-    setBillbeeLoading(true);
-    setErr("");
-    setTestResult(null);
-    try {
-      const client = getMedusaAdminClient();
-      const data = await client.regenerateBillbeeCredentials();
-      const creds = data?.credentials || {};
-      setForm((f) => ({
-        ...f,
-        api_key: creds.api_key || "",
-        basic_auth_username: creds.basic_auth_username || "",
-        api_secret: creds.basic_auth_password || "",
-      }));
-    } catch (e) {
-      setErr(e?.message || "Billbee-Zugangsdaten konnten nicht erneuert werden.");
-    }
-    setBillbeeLoading(false);
-  };
-
-  const openModal = (app) => {
-    const existing = getIntegration(app.slug);
-    setForm({ api_key: "", api_secret: "", webhook_url: existing?.webhook_url || "", basic_auth_username: "", basic_auth_password: "" });
-    setModal({ app, integration: existing });
-    setTestResult(null);
-    setErr("");
-    if (app.slug === "billbee") {
-      loadBillbeeCredentials();
-      loadBillbeeWebhookUrl();
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true); setErr("");
-    try {
-      const client = getMedusaAdminClient();
-      const isBillbee = modal.app.slug === "billbee";
-      const billbeeConfig = isBillbee
-        ? {
-          ...(form.basic_auth_username ? { basic_auth_username: form.basic_auth_username } : {}),
-          ...(form.api_secret ? { basic_auth_password: form.api_secret } : {}),
-        }
-        : undefined;
-      const payload = {
-        name: modal.app.name,
-        slug: modal.app.slug,
-        logo_url: modal.app.logo,
-        category: modal.app.category,
-        is_active: true,
-        api_key: form.api_key,
-        api_secret: form.api_secret,
-        webhook_url: form.webhook_url,
-        ...(billbeeConfig ? { config: billbeeConfig } : {}),
-      };
-      if (modal.integration) {
-        await client.updateIntegration(modal.integration.id, {
-          api_key: form.api_key || undefined,
-          api_secret: form.api_secret || undefined,
-          webhook_url: form.webhook_url,
+      const slug = form.name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      if (editingId) {
+        await client.updateIntegration(editingId, {
+          name: form.name.trim(),
+          description: form.description.trim() || undefined,
+          ...(form.api_key ? { api_key: form.api_key } : {}),
+          ...(form.api_secret ? { api_secret: form.api_secret } : {}),
+          webhook_url: form.webhook_url.trim() || undefined,
+          ...(parsedConfig !== undefined ? { config: parsedConfig } : {}),
           is_active: true,
-          ...(billbeeConfig ? { config: billbeeConfig } : {}),
         });
       } else {
-        await client.saveIntegration(payload);
+        await client.saveIntegration({
+          name: form.name.trim(),
+          slug,
+          description: form.description.trim() || undefined,
+          category: "custom",
+          api_key: form.api_key || undefined,
+          api_secret: form.api_secret || undefined,
+          webhook_url: form.webhook_url.trim() || undefined,
+          config: parsedConfig,
+          is_active: true,
+        });
       }
+      setMsg({ tone: "success", text: editingId ? "Integration aktualisiert." : "Integration hinzugefügt." });
+      closeModal();
       await load();
-      setModal(null);
-    } catch (e) { setErr(e?.message || "Fehler"); }
-    setSaving(false);
-  };
-
-  const handleBillbeeTest = async () => {
-    if (!modal || modal.app.slug !== "billbee") return;
-    setTesting(true);
-    setErr("");
-    setTestResult(null);
-    try {
-      const client = getMedusaAdminClient();
-      const result = await client.testBillbeeIntegration({
-        api_key: form.api_key || "",
-        basic_auth_username: form.basic_auth_username || "",
-        basic_auth_password: form.api_secret || "",
-      });
-      setTestResult({ ok: true, message: result?.message || "Verbindung erfolgreich." });
     } catch (e) {
-      setTestResult({ ok: false, message: e?.message || "Verbindung fehlgeschlagen." });
+      setMsg({ tone: "critical", text: e?.message || "Fehler beim Speichern." });
+    } finally {
+      setSaving(false);
     }
-    setTesting(false);
   };
 
-  const handleToggle = async (integration) => {
-    const client = getMedusaAdminClient();
-    await client.updateIntegration(integration.id, { is_active: !integration.is_active });
-    setIntegrations(prev => prev.map(i => i.id === integration.id ? { ...i, is_active: !i.is_active } : i));
+  const toggleActive = async (integration) => {
+    try {
+      await client.updateIntegration(integration.id, { is_active: !integration.is_active });
+      setIntegrations((prev) =>
+        prev.map((i) => (i.id === integration.id ? { ...i, is_active: !i.is_active } : i))
+      );
+    } catch (e) {
+      setMsg({ tone: "critical", text: e?.message || "Status konnte nicht geändert werden." });
+    }
   };
 
-  const handleDisconnect = async (integration) => {
-    if (!confirm(`${integration.name} wirklich trennen?`)) return;
-    const client = getMedusaAdminClient();
-    await client.deleteIntegration(integration.id);
-    setIntegrations(prev => prev.filter(i => i.id !== integration.id));
+  const remove = async (integration) => {
+    if (!confirm(`"${integration.name}" wirklich löschen?`)) return;
+    try {
+      await client.deleteIntegration(integration.id);
+      setIntegrations((prev) => prev.filter((i) => i.id !== integration.id));
+      setMsg({ tone: "success", text: "Integration gelöscht." });
+    } catch (e) {
+      setMsg({ tone: "critical", text: e?.message || "Fehler beim Löschen." });
+    }
   };
 
-  const inp = { padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" };
-  const lbl = { fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 3 };
-
-  const filteredCatalog = filter === "all" ? CATALOG : CATALOG.filter(a => a.category === filter);
-  const connected = integrations.filter(i => i.is_active);
+  const active = integrations.filter((i) => i.is_active);
+  const inactive = integrations.filter((i) => !i.is_active);
 
   return (
-    <div style={{ maxWidth: 900 }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 4px" }}>Apps & Integrationen</h1>
-        <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>Verbinde externe Dienste und Plattformen mit deinem Shop.</p>
-      </div>
+    <Page
+      title="Apps & Integrationen"
+      primaryAction={{ content: "Integration anlegen", onAction: openCreate }}
+    >
+      <BlockStack gap="400">
+        {msg && (
+          <Banner tone={msg.tone} onDismiss={() => setMsg(null)}>
+            {msg.text}
+          </Banner>
+        )}
 
-      {/* Connected apps */}
-      {connected.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Verbunden ({connected.length})</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
-            {connected.map(i => {
-              const app = CATALOG.find(a => a.slug === i.slug) || { logo: "🔌", description: "" };
-              return (
-                <div key={i.id} style={{ background: "#fff", border: "1px solid #d1fae5", borderRadius: 10, padding: "14px 16px", display: "flex", gap: 12, alignItems: "flex-start" }}>
-                  <div style={{ fontSize: 24, flexShrink: 0 }}>{app.logo}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{i.name}</div>
-                    <div style={{ fontSize: 11, color: "#6b7280" }}>{app.description}</div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>● Verbunden</span>
-                      <button onClick={() => openModal(app)} style={{ fontSize: 11, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Einstellungen</button>
-                      <button onClick={() => handleDisconnect(i)} style={{ fontSize: 11, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Trennen</button>
-                    </div>
+        {loading ? (
+          <Card>
+            <div style={{ padding: 40, textAlign: "center" }}>
+              <Spinner size="small" />
+            </div>
+          </Card>
+        ) : integrations.length === 0 ? (
+          <Card>
+            <EmptyState heading="Noch keine Integrationen" image="">
+              <p>
+                Klicke auf „Integration anlegen" um externe Dienste, APIs oder Tools
+                mit deinem Shop zu verbinden.
+              </p>
+              <Button variant="primary" onClick={openCreate}>
+                Integration anlegen
+              </Button>
+            </EmptyState>
+          </Card>
+        ) : (
+          <>
+            {active.length > 0 && (
+              <Card>
+                <BlockStack gap="300">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="h2" variant="headingMd">
+                      Aktiv ({active.length})
+                    </Text>
+                    <Button size="slim" onClick={load} loading={loading}>
+                      Aktualisieren
+                    </Button>
+                  </InlineStack>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {active.map((i) => (
+                      <IntegrationCard
+                        key={i.id}
+                        integration={i}
+                        onEdit={openEdit}
+                        onToggle={toggleActive}
+                        onDelete={remove}
+                      />
+                    ))}
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                </BlockStack>
+              </Card>
+            )}
 
-      {/* Category filter */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <button onClick={() => setFilter("all")} style={{ padding: "5px 14px", borderRadius: 20, border: `1px solid ${filter === "all" ? "#2563eb" : "#e5e7eb"}`, background: filter === "all" ? "#eff6ff" : "#fff", color: filter === "all" ? "#1d4ed8" : "#374151", fontSize: 13, cursor: "pointer", fontWeight: filter === "all" ? 600 : 400 }}>Alle</button>
-        {Object.entries(CATEGORIES).map(([k, v]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{ padding: "5px 14px", borderRadius: 20, border: `1px solid ${filter === k ? "#2563eb" : "#e5e7eb"}`, background: filter === k ? "#eff6ff" : "#fff", color: filter === k ? "#1d4ed8" : "#374151", fontSize: 13, cursor: "pointer", fontWeight: filter === k ? 600 : 400 }}>{v}</button>
-        ))}
-      </div>
+            {inactive.length > 0 && (
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Inaktiv ({inactive.length})
+                  </Text>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {inactive.map((i) => (
+                      <IntegrationCard
+                        key={i.id}
+                        integration={i}
+                        onEdit={openEdit}
+                        onToggle={toggleActive}
+                        onDelete={remove}
+                      />
+                    ))}
+                  </div>
+                </BlockStack>
+              </Card>
+            )}
+          </>
+        )}
+      </BlockStack>
 
-      {/* App catalog */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
-        {filteredCatalog.map(app => {
-          const connected_integration = getIntegration(app.slug);
-          return (
-            <div key={app.slug} style={{ background: "#fff", border: `1px solid ${connected_integration ? "#bfdbfe" : "#e5e7eb"}`, borderRadius: 10, padding: "16px", display: "flex", gap: 14, alignItems: "flex-start" }}>
-              <div style={{ fontSize: 28, flexShrink: 0 }}>{app.logo}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{app.name}</div>
-                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, marginBottom: 10 }}>{app.description}</div>
-                {connected_integration ? (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>✓ Verbunden</span>
-                    <button onClick={() => openModal(app)} style={{ fontSize: 12, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}>Bearbeiten</button>
-                  </div>
-                ) : (
-                  <button onClick={() => openModal(app)} style={{ padding: "5px 14px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Verbinden</button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* Create / Edit Modal */}
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title={editingId ? "Integration bearbeiten" : "Integration anlegen"}
+        primaryAction={{ content: "Speichern", onAction: save, loading: saving }}
+        secondaryActions={[{ content: "Abbrechen", onAction: closeModal }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <TextField
+              label="Name *"
+              value={form.name}
+              onChange={(v) => setField("name", v)}
+              autoComplete="off"
+              placeholder="z. B. Billbee, Shopify, Eigene API…"
+              helpText="Anhand des Namens wird die Integration in der Liste angezeigt."
+            />
+            <TextField
+              label="Beschreibung"
+              value={form.description}
+              onChange={(v) => setField("description", v)}
+              autoComplete="off"
+              placeholder="Wofür wird diese Integration verwendet?"
+              multiline={2}
+            />
+          </BlockStack>
+        </Modal.Section>
 
-      {/* Modal */}
-      {modal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 12, width: 500, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ padding: "16px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", gap: 12, alignItems: "center" }}>
-              <span style={{ fontSize: 28 }}>{modal.app.logo}</span>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{modal.app.name}</h3>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>{modal.app.description}</div>
-              </div>
-              <button onClick={() => setModal(null)} style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>×</button>
-            </div>
-            <div style={{ padding: 24, display: "grid", gap: 14 }}>
-              {modal.app.helpText && (
-                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 7, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>
-                  ℹ️ {modal.app.helpText}
-                </div>
-              )}
-              <div>
-                <label style={lbl}>{modal.app.fieldLabels?.api_key || "API-Schlüssel"}</label>
-                <input
-                  style={inp}
-                  type={modal.app.slug === "trustpilot" || modal.app.slug === "billbee" ? "text" : "password"}
-                  value={form.api_key}
-                  onChange={e => setForm(f => ({ ...f, api_key: e.target.value }))}
-                  placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.api_key_placeholder || "API Key eingeben…")}
-                />
-              </div>
-              {modal.app.slug === "billbee" && (
-                <div>
-                  <label style={lbl}>{modal.app.fieldLabels?.basic_auth_username || "Basic Auth Benutzername"}</label>
-                  <input
-                    style={inp}
-                    type="text"
-                    value={form.basic_auth_username}
-                    onChange={e => setForm(f => ({ ...f, basic_auth_username: e.target.value }))}
-                    placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.basic_auth_username_placeholder || "Benutzername eingeben…")}
-                  />
-                </div>
-              )}
-              <div>
-                <label style={lbl}>{modal.app.fieldLabels?.api_secret || "API-Geheimnis / Secret"}</label>
-                <input
-                  style={inp}
-                  type={modal.app.slug === "billbee" ? "text" : "password"}
-                  value={form.api_secret}
-                  onChange={e => setForm(f => ({ ...f, api_secret: e.target.value }))}
-                  placeholder={modal.integration ? "Zum Ändern neu eingeben…" : (modal.app.fieldLabels?.api_secret_placeholder || "API Secret eingeben…")}
-                />
-              </div>
-              {!modal.app.fieldLabels && (
-                <div><label style={lbl}>Webhook-URL <span style={{ color: "#9ca3af" }}>(optional)</span></label><input style={inp} value={form.webhook_url} onChange={e => setForm(f => ({ ...f, webhook_url: e.target.value }))} placeholder="https://..." /></div>
-              )}
-              {modal.integration && (
-                <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 7, padding: "10px 14px", fontSize: 12, color: "#6b7280" }}>
-                  ✓ Bereits verbunden. Felder leer lassen um bestehende Zugangsdaten zu behalten.
-                </div>
-              )}
-              {modal.app.slug === "billbee" && (
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div>
-                    <label style={lbl}>URL (Webhook)</label>
-                    <input
-                      style={inp}
-                      value={billbeeWebhookLoading ? "..." : billbeeWebhookUrl}
-                      readOnly
-                    />
-                    <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
-                      Billbee bei neuer API-Anbindung in das Feld „URL“ eintragen.
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <button
-                      onClick={handleBillbeeTest}
-                      disabled={testing}
-                      style={{ padding: "7px 14px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 12, cursor: testing || billbeeLoading ? "default" : "pointer", background: "#fff", fontWeight: 600 }}
-                    >
-                      {testing ? "Verbindung wird getestet…" : "Verbindung testen"}
-                    </button>
-                  </div>
-                  {testResult && (
-                    <span style={{ fontSize: 12, color: testResult.ok ? "#15803d" : "#b91c1c" }}>
-                      {testResult.ok ? "✓ " : "✕ "}
-                      {testResult.message}
-                    </span>
-                  )}
-                  <span style={{ fontSize: 12, color: "#6b7280" }}>
-                    URL (Webhook) alanına bu URL’yi gir; Schlüssel + Basic Auth Daten alanlarına Billbee’den aldığın değerleri gir.
-                  </span>
-                </div>
-              )}
-            </div>
-            {err && <div style={{ margin: "0 24px 12px", color: "#ef4444", fontSize: 12 }}>{err}</div>}
-            <div style={{ padding: "12px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button onClick={() => setModal(null)} style={{ padding: "7px 16px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer" }}>Abbrechen</button>
-              <button onClick={handleSave} disabled={saving} style={{ padding: "7px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
-                {saving ? "…" : modal.integration ? "Aktualisieren" : "Verbinden"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="h3" variant="headingSm">
+              Zugangsdaten
+            </Text>
+            {editingId && (
+              <Banner tone="info">
+                Felder leer lassen um bestehende Zugangsdaten zu behalten.
+              </Banner>
+            )}
+            <TextField
+              label="API Key / Token"
+              value={form.api_key}
+              onChange={(v) => setField("api_key", v)}
+              type="password"
+              autoComplete="off"
+              placeholder={editingId ? "Zum Ändern neu eingeben…" : "API Key eingeben…"}
+            />
+            <TextField
+              label="API Secret / Passwort"
+              value={form.api_secret}
+              onChange={(v) => setField("api_secret", v)}
+              type="password"
+              autoComplete="off"
+              placeholder={editingId ? "Zum Ändern neu eingeben…" : "API Secret eingeben…"}
+            />
+            <TextField
+              label="Webhook-URL"
+              value={form.webhook_url}
+              onChange={(v) => setField("webhook_url", v)}
+              autoComplete="off"
+              placeholder="https://…"
+            />
+          </BlockStack>
+        </Modal.Section>
+
+        <Modal.Section>
+          <BlockStack gap="200">
+            <Text as="h3" variant="headingSm">
+              Weitere Konfiguration (JSON, optional)
+            </Text>
+            <Text as="p" tone="subdued" variant="bodySm">
+              Beliebige Zusatzfelder als JSON-Objekt. Beispiel: {"{"}"host": "https://api.example.com", "timeout": 5000{"}"}
+            </Text>
+            <TextField
+              label=""
+              labelHidden
+              value={form.config_json}
+              onChange={(v) => { setField("config_json", v); setJsonErr(""); }}
+              multiline={4}
+              autoComplete="off"
+              placeholder={`{\n  "key": "value"\n}`}
+              error={jsonErr || undefined}
+              monospaced
+            />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+    </Page>
   );
 }

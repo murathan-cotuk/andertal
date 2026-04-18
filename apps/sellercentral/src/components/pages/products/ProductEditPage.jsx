@@ -33,6 +33,7 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import { routing } from "@/i18n/routing";
 import { encodeVariantPathKey } from "@/lib/variant-path-key";
+import { ChangeRequestFieldBadge } from "@/components/ChangeRequestFieldBadge";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -139,6 +140,19 @@ const DEFAULT_DUPLICATE_OPTIONS = {
   media: true,
   variants: true,
 };
+
+/** Katalog-Metafeld-UI: Kategorie-Zuordnung läuft über Category-Feld, nicht über dieses Dropdown */
+const EXCLUDED_CATALOG_METAFIELD_KEYS = new Set(["category_ids", "category_slug"]);
+
+function filterMetaDefsForCatalog(definitions) {
+  if (!definitions || typeof definitions !== "object") return {};
+  const out = {};
+  for (const [k, v] of Object.entries(definitions)) {
+    if (EXCLUDED_CATALOG_METAFIELD_KEYS.has(String(k).trim().toLowerCase())) continue;
+    out[k] = v;
+  }
+  return out;
+}
 
 function stripSkuEanFromVariants(variants) {
   if (!Array.isArray(variants)) return [];
@@ -306,6 +320,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [newCatalogMetaKey, setNewCatalogMetaKey] = useState("");
   const [newCatalogMetaSaving, setNewCatalogMetaSaving] = useState(false);
   const [newCatalogMetaErr, setNewCatalogMetaErr] = useState("");
+  const [pendingChangeRequests, setPendingChangeRequests] = useState([]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -318,6 +333,25 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     if (typeof window === "undefined") return;
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
   }, []);
+
+  useEffect(() => {
+    if (isNew || !product?.id) {
+      setPendingChangeRequests([]);
+      return;
+    }
+    let cancelled = false;
+    client
+      .request(`/admin-hub/v1/product-change-requests?status=pending&product_id=${encodeURIComponent(product.id)}`)
+      .then((d) => {
+        if (!cancelled) setPendingChangeRequests(Array.isArray(d?.change_requests) ? d.change_requests : []);
+      })
+      .catch(() => {
+        if (!cancelled) setPendingChangeRequests([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isNew, product?.id, client]);
 
   // Sync from server when we switch product (id/handle) or locale. Merge translations[locale] into title/description.
   const initialProductId = initialProduct?.id ?? initialProduct?.handle ?? "";
@@ -367,7 +401,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   useEffect(() => {
     let cancelled = false;
     client.getMetafieldDefinitions().then((r) => {
-      if (!cancelled) setMetaDefs(r?.definitions || {});
+      if (!cancelled) setMetaDefs(filterMetaDefsForCatalog(r?.definitions || {}));
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [client]);
@@ -665,12 +699,16 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         delete m.category_id;
         delete m.admin_category_id;
         delete m.category_ids;
+        delete m.category_slug;
         return { ...prev, metadata: m };
       }
+      const byId = new Map((categories || []).map((c) => [String(c.id), c]));
+      const catNode = byId.get(selected);
       const lineage = categoryLineageIdsFromFlatList(categories, selected);
       m.category_id = selected;
       m.admin_category_id = selected;
       m.category_ids = lineage.length > 0 ? lineage : [selected];
+      if (catNode?.slug) m.category_slug = String(catNode.slug).replace(/^\//, "");
       return { ...prev, metadata: m };
     });
   }, [categories]);
@@ -691,10 +729,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       const metadata = { ...(product.metadata || {}) };
       const selectedCategoryId = String(metadata.category_id || "").trim();
       if (selectedCategoryId) {
+        const byId = new Map((categories || []).map((c) => [String(c.id), c]));
+        const catNode = byId.get(selectedCategoryId);
         const lineage = categoryLineageIdsFromFlatList(categories, selectedCategoryId);
         metadata.category_id = selectedCategoryId;
         metadata.admin_category_id = selectedCategoryId;
         metadata.category_ids = lineage.length > 0 ? lineage : [selectedCategoryId];
+        if (catNode?.slug) metadata.category_slug = String(catNode.slug).replace(/^\//, "");
       }
       const storeName = (typeof window !== "undefined" ? (localStorage.getItem("storeName") || "").trim() : "") || "";
       if (storeName) {
@@ -800,6 +841,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("belucha-notifications-refresh"));
         }
+        try {
+          const d = await client.request(`/admin-hub/v1/product-change-requests?status=pending&product_id=${encodeURIComponent(product.id)}`);
+          setPendingChangeRequests(Array.isArray(d?.change_requests) ? d.change_requests : []);
+        } catch (_) { /* ignore */ }
         setSaving(false);
         return;
       }
@@ -825,6 +870,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       initialSnapshotRef.current = JSON.stringify(normalizeForCompare(savedProduct));
       unsavedRef.current?.setDirty(false);
       setMessage({ type: "success", text: updatedRaw?.listing_saved ? "Preis, Bestand und eigene Daten gespeichert." : "Saved" });
+      try {
+        const d = await client.request(`/admin-hub/v1/product-change-requests?status=pending&product_id=${encodeURIComponent(savedProduct.id)}`);
+        setPendingChangeRequests(Array.isArray(d?.change_requests) ? d.change_requests : []);
+      } catch (_) { /* ignore */ }
       onReload?.();
     } catch (err) {
       setMessage({ type: "error", text: err?.message || "Save failed" });
@@ -924,6 +973,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setNewCatalogMetaErr("Ungültiger Key.");
       return;
     }
+    if (EXCLUDED_CATALOG_METAFIELD_KEYS.has(key)) {
+      setNewCatalogMetaErr("Dieser Key ist für die Kategorie-Zuordnung reserviert und kann nicht als Metafeld angelegt werden.");
+      return;
+    }
     setNewCatalogMetaSaving(true);
     try {
       const others = metafieldsList.filter((m) => m.key !== key);
@@ -935,7 +988,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         values: [value],
       });
       const defs = await client.getMetafieldDefinitions().catch(() => null);
-      if (defs?.definitions) setMetaDefs(defs.definitions);
+      if (defs?.definitions) setMetaDefs(filterMetaDefsForCatalog(defs.definitions));
       setNewCatalogMetaOpen(false);
       setNewCatalogMetaLabel("");
       setNewCatalogMetaValue("");
@@ -1425,6 +1478,18 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         </Box>
       )}
 
+      {!isNew && pendingChangeRequests.length > 0 && (
+        <Box paddingBlockEnd="200">
+          <Banner tone="warning">
+            {locale === "tr"
+              ? "Onay bekleyen alan değişiklikleri var. İlgili alanların yanındaki kırmızı işarete tıklayarak mevcut ve önerilen değerleri görebilirsiniz."
+              : locale === "de"
+                ? "Ausstehende Feldänderungen: Klicken Sie auf das rote Symbol neben dem Feld für aktuelle und vorgeschlagene Werte."
+                : "Pending field changes: click the red marker beside a field to see current and proposed values."}
+          </Banner>
+        </Box>
+      )}
+
       <div className="product-edit-header">
         <Link href="/products/inventory" className="product-edit-title-link" style={{ marginRight: 4 }}>
           <span style={{ display: "flex", alignItems: "center", width: 20, height: 20 }}><ProductIcon /></span>
@@ -1464,7 +1529,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         <Layout.Section>
           <Card>
             <BlockStack gap="300">
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Title</Text>
+              <InlineStack gap="200" blockAlign="center" wrap={false}>
+                <Text as="h2" variant="bodyMd" fontWeight="regular">Title</Text>
+                <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="title" />
+              </InlineStack>
               <TextField label="Title" labelHidden value={editingTitle} onChange={(v) => updateLocaleField("title", v)} placeholder="e.g. Cotton T-Shirt" autoComplete="off" />
 
               <Divider />
@@ -1475,8 +1543,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 </Box>
                 <Box minWidth="240px" flex="1">
                   <TextField
-                    label="EAN"
-                    labelHidden
+                    label={
+                      <InlineStack gap="200" blockAlign="center" wrap={false}>
+                        <span>EAN</span>
+                        <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.ean" />
+                      </InlineStack>
+                    }
                     value={getMeta(product, "ean")}
                     onChange={(v) => { updateMeta("ean", v); setEanLookupState(null); }}
                     onBlur={handleEanBlur}
@@ -1492,7 +1564,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               </InlineStack>
 
               <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Produkt-Etikett</Text>
+              <InlineStack gap="200" blockAlign="center" wrap={false}>
+                <Text as="h2" variant="bodyMd" fontWeight="regular">Produkt-Etikett</Text>
+                <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.badge" />
+              </InlineStack>
               <Select
                 label="Badge / Etikett"
                 labelHidden
@@ -1659,7 +1734,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
               <Divider />
               <BlockStack gap="200">
-                <Text as="h2" variant="bodyMd" fontWeight="regular">Description</Text>
+                <InlineStack gap="200" blockAlign="center" wrap={false}>
+                  <Text as="h2" variant="bodyMd" fontWeight="regular">Description</Text>
+                  <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="description" />
+                </InlineStack>
                 <div className="product-description-box">
                   <div className="product-description-toolbar">
                     <div className="product-description-toolbar-left">
@@ -2315,136 +2393,203 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               })()}
 
               <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Metafields (catalog)</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen“ ausgewählte — werden angezeigt (nicht der gesamte Katalog).
-              </Text>
-              <InlineStack gap="300" blockAlign="center" wrap>
-                <Button size="slim" variant="primary" onClick={() => { setNewCatalogMetaErr(""); setNewCatalogMetaOpen(true); }}>
-                  + Neues Metafeld (Katalog)
-                </Button>
-                {!isSuperuser ? (
-                  <Text as="span" variant="bodySm" tone="subdued">
-                    Als Verkäufer: neuer Katalog-Eintrag wird vom Superuser unter Content → Metaobjects freigegeben.
+              <BlockStack gap="400">
+                <BlockStack gap="150">
+                  <Text as="h2" variant="headingSm">Metafelder (Katalog)</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen“ ausgewählte — werden angezeigt (nicht der gesamte Katalog).
                   </Text>
-                ) : null}
-              </InlineStack>
-              {Object.keys(metaDefs).length === 0 ? (
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Noch keine Katalog-Definitionen — du kannst mit „Neues Metafeld (Katalog)“ Titel und Wert anlegen (Superuser: sofort aktiv; Verkäufer: Freigabe nötig).
-                </Text>
-              ) : (
-                <BlockStack gap="400">
-                  {visibleMetaDefEntries.length === 0 && (
-                    <Text as="p" variant="bodySm" tone="subdued">Keine Metafelder für dieses Produkt. Unten kannst du welche hinzufügen.</Text>
-                  )}
-                  {visibleMetaDefEntries.map(([defKey, def]) => {
-                    const selected = metafieldsList.filter(m => m.key === defKey).map(m => m.value).filter(Boolean);
-                    const isOpen = !!metaDefPopover[defKey];
-                    const search = metaDefSearch[defKey] || "";
-                    const availableVals = (def.values || []).filter(v => !selected.includes(v) && v.toLowerCase().includes(search.toLowerCase()));
-                    const canAddCustom = search.trim() && !selected.includes(search.trim()) && !(def.values || []).includes(search.trim());
-                    const toggleVal = (val) => {
-                      const others = metafieldsList.filter(m => m.key !== defKey);
-                      const cur = selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val];
-                      updateMeta("metafields", [...others, ...cur.map(v => ({ key: defKey, value: v }))]);
-                    };
-                    return (
-                      <Box key={defKey}>
-                        <BlockStack gap="200">
-                          <Text as="p" variant="bodySm" fontWeight="semibold">{def.label}</Text>
-                          {selected.length > 0 && (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                              {selected.map(val => (
-                                <Tag key={val} onRemove={() => {
-                                  const others = metafieldsList.filter(m => m.key !== defKey);
-                                  updateMeta("metafields", [...others, ...selected.filter(v => v !== val).map(v => ({ key: defKey, value: v }))]);
-                                }}>{val}</Tag>
-                              ))}
-                            </div>
-                          )}
+                </BlockStack>
+                {Object.keys(metaDefs).length === 0 ? (
+                  <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Noch keine Katalog-Definitionen — du kannst mit „Neues Metafeld (Katalog)“ Titel und Wert anlegen (Superuser: sofort aktiv; Verkäufer: Freigabe nötig).
+                    </Text>
+                  </Box>
+                ) : (
+                  <Box padding="400" background="bg-surface-secondary" borderRadius="300">
+                    <BlockStack gap="400">
+                      {visibleMetaDefEntries.length === 0 && (
+                        <Text as="p" variant="bodySm" tone="subdued">Keine Metafelder für dieses Produkt. Unten kannst du welche hinzufügen.</Text>
+                      )}
+                      {visibleMetaDefEntries.map(([defKey, def]) => {
+                        const selected = metafieldsList.filter(m => m.key === defKey).map(m => m.value).filter(Boolean);
+                        const isOpen = !!metaDefPopover[defKey];
+                        const search = metaDefSearch[defKey] || "";
+                        const availableVals = (def.values || []).filter(v => !selected.includes(v) && v.toLowerCase().includes(search.toLowerCase()));
+                        const canAddCustom = search.trim() && !selected.includes(search.trim()) && !(def.values || []).includes(search.trim());
+                        const toggleVal = (val) => {
+                          const others = metafieldsList.filter(m => m.key !== defKey);
+                          const cur = selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val];
+                          updateMeta("metafields", [...others, ...cur.map(v => ({ key: defKey, value: v }))]);
+                        };
+                        return (
+                          <Box
+                            key={defKey}
+                            padding="400"
+                            background="bg-surface"
+                            borderRadius="200"
+                            borderWidth="025"
+                            borderColor="border"
+                          >
+                            <BlockStack gap="300">
+                              <BlockStack gap="050">
+                                <InlineStack gap="200" blockAlign="center" wrap={false}>
+                                  <Text as="p" variant="bodyMd" fontWeight="semibold">{def.label}</Text>
+                                  <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName={`metadata.${defKey}`} />
+                                </InlineStack>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  Key: <span style={{ fontFamily: "ui-monospace, monospace", fontSize: "12px" }}>{defKey}</span>
+                                </Text>
+                              </BlockStack>
+                              {selected.length > 0 && (
+                                <InlineStack gap="200" wrap>
+                                  {selected.map(val => (
+                                    <Tag key={val} onRemove={() => {
+                                      const others = metafieldsList.filter(m => m.key !== defKey);
+                                      updateMeta("metafields", [...others, ...selected.filter(v => v !== val).map(v => ({ key: defKey, value: v }))]);
+                                    }}>{val}</Tag>
+                                  ))}
+                                </InlineStack>
+                              )}
+                              <Popover
+                                active={isOpen}
+                                onClose={() => setMetaDefPopover(p => ({ ...p, [defKey]: false }))}
+                                activator={
+                                  <Button size="slim" variant="secondary" onClick={() => setMetaDefPopover(p => ({ ...p, [defKey]: !p[defKey] }))}>
+                                    + Wert wählen
+                                  </Button>
+                                }
+                              >
+                                <Box padding="300" minWidth="220px">
+                                  <BlockStack gap="200">
+                                    <TextField
+                                      label="Suchen"
+                                      labelHidden
+                                      placeholder="Suchen oder eingeben…"
+                                      value={search}
+                                      onChange={v => setMetaDefSearch(p => ({ ...p, [defKey]: v }))}
+                                      autoComplete="off"
+                                      size="slim"
+                                    />
+                                    <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                                      {availableVals.map(val => (
+                                        <div
+                                          key={val}
+                                          role="button"
+                                          tabIndex={0}
+                                          style={{ padding: "8px 10px", cursor: "pointer", borderRadius: 6, fontSize: 13 }}
+                                          onMouseEnter={e => { e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"; }}
+                                          onMouseLeave={e => { e.currentTarget.style.background = ""; }}
+                                          onMouseDown={e => {
+                                            e.preventDefault();
+                                            toggleVal(val);
+                                            setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
+                                            setMetaDefPopover(p => ({ ...p, [defKey]: false }));
+                                          }}
+                                        >{val}</div>
+                                      ))}
+                                      {canAddCustom && (
+                                        <div
+                                          role="button"
+                                          tabIndex={0}
+                                          style={{ padding: "8px 10px", cursor: "pointer", borderRadius: 6, fontSize: 13, fontStyle: "italic", color: "var(--p-color-text-subdued)" }}
+                                          onMouseEnter={e => { e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"; }}
+                                          onMouseLeave={e => { e.currentTarget.style.background = ""; }}
+                                          onMouseDown={e => {
+                                            e.preventDefault();
+                                            toggleVal(search.trim());
+                                            setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
+                                            setMetaDefPopover(p => ({ ...p, [defKey]: false }));
+                                          }}
+                                        >"{search.trim()}" hinzufügen</div>
+                                      )}
+                                      {availableVals.length === 0 && !canAddCustom && (
+                                        <div style={{ padding: "8px 10px", fontSize: 13, color: "var(--p-color-text-subdued)" }}>Keine weiteren Optionen</div>
+                                      )}
+                                    </div>
+                                  </BlockStack>
+                                </Box>
+                              </Popover>
+                            </BlockStack>
+                          </Box>
+                        );
+                      })}
+                      {hiddenMetaDefKeys.length > 0 && (
+                        <Box paddingBlockStart="100">
                           <Popover
-                            active={isOpen}
-                            onClose={() => setMetaDefPopover(p => ({ ...p, [defKey]: false }))}
+                            active={addMetaDefPopoverOpen}
+                            preferredPosition="below"
+                            preferredAlignment="left"
+                            onClose={() => setAddMetaDefPopoverOpen(false)}
                             activator={
-                              <Button size="slim" variant="secondary" onClick={() => setMetaDefPopover(p => ({ ...p, [defKey]: !p[defKey] }))}>
-                                + Wert wählen
+                              <Button size="slim" variant="secondary" onClick={() => setAddMetaDefPopoverOpen((o) => !o)}>
+                                + Metafeld hinzufügen
                               </Button>
                             }
                           >
-                            <div style={{ padding: 10, minWidth: 220 }}>
-                              <TextField
-                                label="Suchen"
-                                labelHidden
-                                placeholder="Suchen oder eingeben…"
-                                value={search}
-                                onChange={v => setMetaDefSearch(p => ({ ...p, [defKey]: v }))}
-                                autoComplete="off"
-                                size="slim"
-                              />
-                              <div style={{ marginTop: 8, maxHeight: 200, overflowY: "auto" }}>
-                                {availableVals.map(val => (
-                                  <div
-                                    key={val}
-                                    style={{ padding: "6px 10px", cursor: "pointer", borderRadius: 4, fontSize: 13 }}
-                                    onMouseEnter={e => e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"}
-                                    onMouseLeave={e => e.currentTarget.style.background = ""}
-                                    onMouseDown={e => {
-                                      e.preventDefault();
-                                      toggleVal(val);
-                                      setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
-                                      setMetaDefPopover(p => ({ ...p, [defKey]: false }));
-                                    }}
-                                  >{val}</div>
-                                ))}
-                                {canAddCustom && (
-                                  <div
-                                    style={{ padding: "6px 10px", cursor: "pointer", borderRadius: 4, fontSize: 13, fontStyle: "italic", color: "var(--p-color-text-subdued)" }}
-                                    onMouseEnter={e => e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"}
-                                    onMouseLeave={e => e.currentTarget.style.background = ""}
-                                    onMouseDown={e => {
-                                      e.preventDefault();
-                                      toggleVal(search.trim());
-                                      setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
-                                      setMetaDefPopover(p => ({ ...p, [defKey]: false }));
-                                    }}
-                                  >"{search.trim()}" hinzufügen</div>
-                                )}
-                                {availableVals.length === 0 && !canAddCustom && (
-                                  <div style={{ padding: "6px 10px", fontSize: 13, color: "var(--p-color-text-subdued)" }}>Keine weiteren Optionen</div>
-                                )}
-                              </div>
-                            </div>
+                            <Box
+                              padding="500"
+                              minWidth="min(440px, calc(100vw - 32px))"
+                              maxWidth="520px"
+                              background="bg-surface"
+                              borderRadius="300"
+                              shadow="400"
+                            >
+                              <BlockStack gap="400">
+                                <BlockStack gap="150">
+                                  <Text variant="headingSm" as="h3">
+                                    Metafeld auswählen
+                                  </Text>
+                                  <Text variant="bodySm" tone="subdued">
+                                    Wähle ein Feld aus dem Katalog. Es erscheint darunter als eigene Zeile zum Bearbeiten.
+                                  </Text>
+                                </BlockStack>
+                                <div
+                                  style={{
+                                    maxHeight: 360,
+                                    overflowY: "auto",
+                                    marginInline: -4,
+                                    paddingInline: 4,
+                                    borderRadius: 8,
+                                    border: "1px solid var(--p-color-border-secondary)",
+                                    background: "var(--p-color-bg-surface-secondary)",
+                                  }}
+                                >
+                                  <ActionList
+                                    actionRole="menu"
+                                    items={hiddenMetaDefKeys.map((k) => {
+                                      const label = String(metaDefs[k]?.label || k).trim() || k;
+                                      return {
+                                        content: label,
+                                        helpText: label !== k ? k : undefined,
+                                        onAction: () => {
+                                          setExtraVisibleMetaDefKeys((p) => ({ ...p, [k]: true }));
+                                          setAddMetaDefPopoverOpen(false);
+                                        },
+                                      };
+                                    })}
+                                  />
+                                </div>
+                              </BlockStack>
+                            </Box>
                           </Popover>
-                        </BlockStack>
-                      </Box>
-                    );
-                  })}
-                  {hiddenMetaDefKeys.length > 0 && (
-                    <Popover
-                      active={addMetaDefPopoverOpen}
-                      onClose={() => setAddMetaDefPopoverOpen(false)}
-                      activator={
-                        <Button size="slim" variant="secondary" onClick={() => setAddMetaDefPopoverOpen((o) => !o)}>
-                          + Metafeld hinzufügen
-                        </Button>
-                      }
-                    >
-                      <div style={{ maxHeight: 280, overflowY: "auto", minWidth: 220 }}>
-                        <ActionList
-                          items={hiddenMetaDefKeys.map((k) => ({
-                            content: metaDefs[k]?.label || k,
-                            onAction: () => {
-                              setExtraVisibleMetaDefKeys((p) => ({ ...p, [k]: true }));
-                              setAddMetaDefPopoverOpen(false);
-                            },
-                          }))}
-                        />
-                      </div>
-                    </Popover>
-                  )}
-                </BlockStack>
-              )}
+                        </Box>
+                      )}
+                    </BlockStack>
+                  </Box>
+                )}
+                <InlineStack gap="300" blockAlign="center" wrap>
+                  <Button size="slim" variant="primary" onClick={() => { setNewCatalogMetaErr(""); setNewCatalogMetaOpen(true); }}>
+                    + Neues Metafeld (Katalog)
+                  </Button>
+                  {!isSuperuser ? (
+                    <Text as="span" variant="bodySm" tone="subdued">
+                      Als Verkäufer: neuer Katalog-Eintrag wird vom Superuser unter Content → Metaobjects freigegeben.
+                    </Text>
+                  ) : null}
+                </InlineStack>
+              </BlockStack>
 
               <Modal
                 open={newCatalogMetaOpen}
@@ -2487,9 +2632,45 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">Produktsicherheitsinformationen (GPSR)</Text>
-              <TextField label="Hersteller" requiredIndicator value={meta.hersteller ?? ""} onChange={(v) => updateMeta("hersteller", v || undefined)} placeholder="Hersteller" autoComplete="off" />
-              <TextField label="Hersteller-Informationen" requiredIndicator value={meta.hersteller_information ?? ""} onChange={(v) => updateMeta("hersteller_information", v || undefined)} placeholder="Hersteller-Informationen" multiline={2} />
-              <TextField label="Verantwortliche Person (EU)" requiredIndicator value={meta.verantwortliche_person_information ?? ""} onChange={(v) => updateMeta("verantwortliche_person_information", v || undefined)} placeholder="Verantwortliche Person Information" multiline={2} />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Hersteller</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.hersteller" />
+                  </InlineStack>
+                }
+                requiredIndicator
+                value={meta.hersteller ?? ""}
+                onChange={(v) => updateMeta("hersteller", v || undefined)}
+                placeholder="Hersteller"
+                autoComplete="off"
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Hersteller-Informationen</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.hersteller_information" />
+                  </InlineStack>
+                }
+                requiredIndicator
+                value={meta.hersteller_information ?? ""}
+                onChange={(v) => updateMeta("hersteller_information", v || undefined)}
+                placeholder="Hersteller-Informationen"
+                multiline={2}
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Verantwortliche Person (EU)</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.verantwortliche_person_information" />
+                  </InlineStack>
+                }
+                requiredIndicator
+                value={meta.verantwortliche_person_information ?? ""}
+                onChange={(v) => updateMeta("verantwortliche_person_information", v || undefined)}
+                placeholder="Verantwortliche Person Information"
+                multiline={2}
+              />
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">SEO</Text>
@@ -2555,9 +2736,42 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   </div>
                 </div>
               ) : null}
-              <TextField label="Meta title" value={meta.seo_meta_title ?? ""} onChange={(v) => updateMeta("seo_meta_title", v)} placeholder="Meta title" autoComplete="off" />
-              <TextField label="Meta description" value={meta.seo_meta_description ?? ""} onChange={(v) => updateMeta("seo_meta_description", v)} placeholder="Meta description" multiline={2} />
-              <TextField label="Keywords" value={meta.seo_keywords ?? ""} onChange={(v) => updateMeta("seo_keywords", v)} placeholder="keyword1, keyword2" autoComplete="off" />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Meta title</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_meta_title" />
+                  </InlineStack>
+                }
+                value={meta.seo_meta_title ?? ""}
+                onChange={(v) => updateMeta("seo_meta_title", v)}
+                placeholder="Meta title"
+                autoComplete="off"
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Meta description</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_meta_description" />
+                  </InlineStack>
+                }
+                value={meta.seo_meta_description ?? ""}
+                onChange={(v) => updateMeta("seo_meta_description", v)}
+                placeholder="Meta description"
+                multiline={2}
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Keywords</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_keywords" />
+                  </InlineStack>
+                }
+                value={meta.seo_keywords ?? ""}
+                onChange={(v) => updateMeta("seo_keywords", v)}
+                placeholder="keyword1, keyword2"
+                autoComplete="off"
+              />
             </BlockStack>
           </Card>
         </Layout.Section>
