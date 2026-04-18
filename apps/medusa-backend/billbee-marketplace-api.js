@@ -67,17 +67,25 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
   }
 
   async function authenticate(req, res, next) {
-    const basic = parseBasicAuth(req)
-    if (!basic || !basic.username) {
-      res.setHeader('WWW-Authenticate', 'Basic realm="Belucha API"')
-      return res.status(401).json({ error: 'Unauthorized', message: 'Basic authentication required' })
-    }
-
     const { Client } = require('pg')
     const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+    const basic = parseBasicAuth(req)
 
-    // ── Path A: username = belucha_zug_ api_key ──────────────────────────────
-    if (basic.username.startsWith('belucha_zug_') && dbUrl) {
+    // Collect api_key from all possible sources Billbee might use
+    const apiKey = String(
+      (basic?.username?.startsWith('belucha_zug_') ? basic.username : '') ||
+      req.headers['x-api-key'] || req.headers['x-billbee-api-key'] ||
+      req.headers['x-belucha-api-key'] ||
+      req.query.api_key || req.query.apiKey || req.query.billbee_api_key || req.query.key || '',
+    ).trim()
+
+    // The secret can come from Basic Auth password or query param
+    const apiSecret = String(
+      basic?.password || req.query.api_secret || req.query.secret || '',
+    ).trim()
+
+    // ── Path A: api_key lookup (any source) ───────────────────────────────────
+    if (apiKey.startsWith('belucha_zug_') && dbUrl) {
       let c
       try {
         c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
@@ -85,12 +93,18 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         const r = await c.query(
           `SELECT api_key, api_secret, seller_scope_key FROM store_integrations
            WHERE api_key = $1 AND is_active = true AND api_secret IS NOT NULL LIMIT 1`,
-          [basic.username],
+          [apiKey],
         )
         await c.end(); c = null
         const row = r.rows[0]
-        if (!row || !row.api_secret || !safeEqual(basic.password, row.api_secret)) {
-          logEvent('api.auth.failed', { reason: 'bad_api_credentials' })
+        if (!row) {
+          logEvent('api.auth.failed', { reason: 'api_key_not_found', apiKey: apiKey.slice(0, 20) })
+          res.setHeader('WWW-Authenticate', 'Basic realm="Belucha API"')
+          return res.status(401).json({ error: 'Unauthorized', message: 'Invalid API key' })
+        }
+        // If a secret was provided it must match; if no secret provided, api_key alone is sufficient
+        if (apiSecret && row.api_secret && !safeEqual(apiSecret, row.api_secret)) {
+          logEvent('api.auth.failed', { reason: 'bad_api_secret' })
           res.setHeader('WWW-Authenticate', 'Basic realm="Belucha API"')
           return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials' })
         }
@@ -107,7 +121,12 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       }
     }
 
-    // ── Path B: username = email or seller_id ─────────────────────────────────
+    // ── Path B: Basic Auth with email or seller_id ────────────────────────────
+    if (!basic || !basic.username) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="Belucha API"')
+      return res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' })
+    }
+
     let client
     try {
       client = getSellerDbClient()
