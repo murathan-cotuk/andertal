@@ -201,72 +201,124 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
     }
   }
 
+  // Map internal order status → Billbee OrderState integer
+  function toBillbeeOrderState(orderStatus, paymentStatus, deliveryStatus) {
+    const s = String(orderStatus || '').toLowerCase()
+    const p = String(paymentStatus || '').toLowerCase()
+    const d = String(deliveryStatus || '').toLowerCase()
+    if (s === 'cancelled' || s === 'storniert') return 6
+    if (d === 'delivered' || d === 'geliefert') return 5
+    if (d === 'shipped' || d === 'versendet') return 4
+    if (p === 'bezahlt' || p === 'paid') return 3
+    if (s === 'processing' || s === 'confirmed') return 2
+    return 1 // open
+  }
+
   async function handleOrders(req, res) {
     const sid = req.beluchaBillbeeSeller.seller_id
+    const page = Math.max(1, parseInt(req.query.page || '1', 10))
+    const pageSize = Math.min(250, Math.max(1, parseInt(req.query.pageSize || '50', 10)))
+    const minDate = req.query.minDate || req.query.mindate || null
     let client
     try {
       client = getProductsDbClient()
       await client.connect()
+
+      const where = ['seller_id = $1']
+      const params = [sid]
+      if (minDate) { params.push(minDate); where.push(`created_at >= $${params.length}`) }
+
+      const countRes = await client.query(
+        `SELECT COUNT(*) FROM store_orders WHERE ${where.join(' AND ')}`, params)
+      const totalRows = parseInt(countRes.rows[0]?.count || '0', 10)
+      const totalPages = Math.ceil(totalRows / pageSize) || 1
+
+      params.push(pageSize); params.push((page - 1) * pageSize)
       const oRes = await client.query(
         `SELECT id, order_number, email, first_name, last_name, phone, status, order_status, payment_status, delivery_status,
-                total_cents, currency, subtotal_cents, shipping_cents, discount_cents, created_at, updated_at, seller_id
+                total_cents, currency, subtotal_cents, shipping_cents, discount_cents,
+                shipping_first_name, shipping_last_name, shipping_address1, shipping_address2,
+                shipping_city, shipping_zip, shipping_country_code, shipping_phone,
+                billing_first_name, billing_last_name, billing_address1, billing_address2,
+                billing_city, billing_zip, billing_country_code,
+                created_at, updated_at
          FROM store_orders
-         WHERE seller_id = $1
+         WHERE ${where.join(' AND ')}
          ORDER BY created_at DESC
-         LIMIT 200`,
-        [sid],
+         LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params,
       )
       const orders = oRes.rows || []
       const ids = orders.map((o) => o.id)
       let itemsByOrder = {}
       if (ids.length) {
         const iRes = await client.query(
-          `SELECT order_id, product_id, variant_id, quantity, unit_price_cents, title, product_handle, thumbnail
+          `SELECT order_id, product_id, variant_id, quantity, unit_price_cents, title, sku
            FROM store_order_items
            WHERE order_id = ANY($1::uuid[])`,
           [ids],
         )
         for (const it of iRes.rows || []) {
-          const oid = it.order_id
-          if (!itemsByOrder[oid]) itemsByOrder[oid] = []
-          itemsByOrder[oid].push({
-            product_id: it.product_id,
-            variant_id: it.variant_id,
-            quantity: it.quantity,
-            unit_price_cents: it.unit_price_cents,
-            title: it.title,
-            product_handle: it.product_handle,
-            thumbnail: it.thumbnail,
-          })
+          if (!itemsByOrder[it.order_id]) itemsByOrder[it.order_id] = []
+          itemsByOrder[it.order_id].push(it)
         }
       }
       await client.end()
       client = null
 
-      const body = {
-        orders: orders.map((o) => ({
-          order_id: o.id,
-          order_number: o.order_number,
-          customer: {
-            email: o.email,
-            name: [o.first_name, o.last_name].filter(Boolean).join(' ').trim() || null,
-            phone: o.phone,
-          },
-          items: itemsByOrder[o.id] || [],
-          total_cents: o.total_cents,
-          subtotal_cents: o.subtotal_cents,
-          shipping_cents: o.shipping_cents,
-          discount_cents: o.discount_cents,
-          currency: o.currency || 'eur',
-          status: o.order_status || o.status,
-          payment_status: o.payment_status,
-          delivery_status: o.delivery_status,
-          created_at: o.created_at,
-          updated_at: o.updated_at,
-        })),
-      }
-      logBillbeeEvent('billbee.orders.fetch', { seller_id: sid, count: body.orders.length })
-      res.json(body)
+      const data = orders.map((o) => {
+        const cur = String(o.currency || 'EUR').toUpperCase()
+        const toEur = (cents) => cents != null ? Math.round(Number(cents)) / 100 : 0
+        const addr = (fn, ln, a1, a2, city, zip, cc, phone, email) => ({
+          FirstName: fn || '',
+          LastName: ln || '',
+          Street: a1 || '',
+          Street2: a2 || '',
+          City: city || '',
+          Zip: zip || '',
+          CountryISO2: cc || 'DE',
+          Phone: phone || '',
+          Email: email || '',
+        })
+        return {
+          BillbeeId: null,
+          ExternalId: String(o.id),
+          OrderNumber: o.order_number || String(o.id),
+          State: toBillbeeOrderState(o.order_status || o.status, o.payment_status, o.delivery_status),
+          Currency: cur,
+          TotalCost: toEur(o.total_cents),
+          ShippingCost: toEur(o.shipping_cents),
+          CreatedAt: o.created_at,
+          UpdatedAt: o.updated_at,
+          InvoiceAddress: addr(
+            o.billing_first_name || o.first_name,
+            o.billing_last_name || o.last_name,
+            o.billing_address1, o.billing_address2,
+            o.billing_city, o.billing_zip, o.billing_country_code,
+            o.phone, o.email,
+          ),
+          ShippingAddress: addr(
+            o.shipping_first_name || o.first_name,
+            o.shipping_last_name || o.last_name,
+            o.shipping_address1, o.shipping_address2,
+            o.shipping_city, o.shipping_zip, o.shipping_country_code,
+            o.shipping_phone || o.phone, o.email,
+          ),
+          OrderItems: (itemsByOrder[o.id] || []).map((it) => ({
+            BillbeeId: null,
+            ExternalId: String(it.product_id || ''),
+            Quantity: Number(it.quantity) || 1,
+            UnitPrice: toEur(it.unit_price_cents),
+            TotalPrice: toEur(it.unit_price_cents) * (Number(it.quantity) || 1),
+            Title: it.title || '',
+            SKU: it.sku || '',
+            ProductId: String(it.product_id || ''),
+          })),
+        }
+      })
+
+      logBillbeeEvent('billbee.orders.fetch', { seller_id: sid, count: data.length })
+      res.json({ Paging: { Page: page, TotalPages: totalPages, TotalRows: totalRows, PageSize: pageSize }, Data: data })
     } catch (e) {
       if (client) try { await client.end() } catch (_) {}
       logBillbeeEvent('billbee.error', { route: 'orders', message: e?.message })
@@ -276,36 +328,43 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
 
   async function handleProducts(req, res) {
     const sid = req.beluchaBillbeeSeller.seller_id
+    const page = Math.max(1, parseInt(req.query.page || '1', 10))
+    const pageSize = Math.min(250, Math.max(1, parseInt(req.query.pageSize || '50', 10)))
     let client
     try {
       client = getProductsDbClient()
       await client.connect()
+      const countRes = await client.query(`SELECT COUNT(*) FROM admin_hub_products WHERE seller_id = $1`, [sid])
+      const totalRows = parseInt(countRes.rows[0]?.count || '0', 10)
+      const totalPages = Math.ceil(totalRows / pageSize) || 1
       const r = await client.query(
-        `SELECT id, title, handle, sku, description, status, seller_id, price_cents, inventory, metadata, variants, created_at, updated_at
+        `SELECT id, title, handle, sku, description, status, price_cents, inventory, metadata, created_at, updated_at
          FROM admin_hub_products
          WHERE seller_id = $1
          ORDER BY updated_at DESC
-         LIMIT 2000`,
-        [sid],
+         LIMIT $2 OFFSET $3`,
+        [sid, pageSize, (page - 1) * pageSize],
       )
       await client.end()
       client = null
-      const products = (r.rows || []).map((p) => ({
-        id: p.id,
-        title: p.title,
-        handle: p.handle,
-        sku: p.sku,
-        description: p.description,
-        status: p.status,
-        price_cents: p.price_cents,
-        inventory: p.inventory,
-        metadata: p.metadata,
-        variants: p.variants,
-        created_at: p.created_at,
-        updated_at: p.updated_at,
+
+      const data = (r.rows || []).map((p) => ({
+        BillbeeId: null,
+        Id: String(p.id),
+        Title: p.title || '',
+        SKU: p.sku || '',
+        EAN: null,
+        ShortDescription: p.description || '',
+        Price: p.price_cents != null ? Math.round(Number(p.price_cents)) / 100 : 0,
+        Quantity: Number(p.inventory) || 0,
+        IsActive: String(p.status || '').toLowerCase() === 'active' || String(p.status || '').toLowerCase() === 'published',
+        MainImage: p.metadata?.thumbnail || p.metadata?.image_url || null,
+        CreatedAt: p.created_at,
+        LastModifiedAt: p.updated_at,
       }))
-      logBillbeeEvent('billbee.products.fetch', { seller_id: sid, count: products.length })
-      res.json({ products })
+
+      logBillbeeEvent('billbee.products.fetch', { seller_id: sid, count: data.length })
+      res.json({ Paging: { Page: page, TotalPages: totalPages, TotalRows: totalRows, PageSize: pageSize }, Data: data })
     } catch (e) {
       if (client) try { await client.end() } catch (_) {}
       logBillbeeEvent('billbee.error', { route: 'products', message: e?.message })
