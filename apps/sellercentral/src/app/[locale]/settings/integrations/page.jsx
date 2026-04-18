@@ -261,8 +261,8 @@ export default function IntegrationsSettingsPage() {
 
         {loading ? (
           <Card>
-            <div style={{ padding: 40, textAlign: "center" }}>
-              <Spinner size="small" />
+            <div style={{ padding: 40, textAlign: "center", color: "#6d7175", fontSize: 13 }}>
+              Laden…
             </div>
           </Card>
         ) : integrations.length === 0 ? (
