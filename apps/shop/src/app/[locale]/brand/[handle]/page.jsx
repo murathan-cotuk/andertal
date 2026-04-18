@@ -4,7 +4,7 @@ import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Link } from "@/i18n/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, notFound } from "next/navigation";
 import { resolveImageUrl } from "@/lib/image-url";
 import {
@@ -68,38 +68,10 @@ const HeroText = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  align-items: flex-start;
-  padding: 24px 32px 36px;
-
-  @media (max-width: 600px) {
-    padding: 20px 16px 28px;
-  }
-`;
-
-const HeroBranding = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  max-width: min(100%, 720px);
+  padding: 24px 32px;
 
   h1 {
-    margin: 0;
-  }
-`;
-
-const BannerLogo = styled.img`
-  width: 52px;
-  height: 52px;
-  object-fit: cover;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-  flex-shrink: 0;
-
-  @media (max-width: 600px) {
-    width: 46px;
-    height: 46px;
+    margin: 0 0 4px;
   }
 `;
 
@@ -481,6 +453,8 @@ export default function BrandPage() {
   const [filters,     setFilters]     = useState({});
   const [panelOpen,   setPanelOpen]   = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
 
   const bodyRef = useRef(null);
 
@@ -516,24 +490,27 @@ export default function BrandPage() {
     el.href = `${window.location.origin}/${locale}/brand/${brand.handle}`;
   }, [locale, brand?.handle]);
 
-  const facets = buildFacetsFromProducts(products);
+  const facets = useMemo(() => buildFacetsFromProducts(products), [products]);
   const hasFacets = Object.keys(facets).length > 0;
   const showCatalogSidebar = hasFacets;
 
+  // facets her render’da yeni obje olmamalı — [facets] deps ile aksi halde max update depth.
+  // Yeni facet anahtarı geldiğinde açık/kapalı için filters’ı ref’ten oku (deps’e gerek yok).
   useEffect(() => {
     const facetKeys = Object.keys(facets);
     setOpenFilterGroups((prev) => {
+      const f = filtersRef.current;
       let changed = false;
       const next = { ...prev };
       facetKeys.forEach((key) => {
         if (!(key in next)) {
-          next[key] = Boolean(filters[key]?.length);
+          next[key] = Boolean(f[key]?.length);
           changed = true;
         }
       });
       return changed ? next : prev;
     });
-  }, [facets, filters]);
+  }, [facets]);
 
   const toggle = (key, val) => {
     setFilters((prev) => {
@@ -611,10 +588,24 @@ export default function BrandPage() {
           <HeroBanner>
             <img src={bannerUrl} alt={title} />
             <HeroText>
-              <HeroBranding>
-                {logoUrl && <BannerLogo src={logoUrl} alt="" />}
-                <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">{title}</h1>
-              </HeroBranding>
+              <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">
+                {logoUrl && (
+                  <img
+                    src={logoUrl}
+                    alt=""
+                    style={{
+                      width: 36,
+                      height: 36,
+                      objectFit: "cover",
+                      borderRadius: "50%",
+                      verticalAlign: "middle",
+                      marginRight: 10,
+                      border: "2px solid rgba(255,255,255,0.8)",
+                    }}
+                  />
+                )}
+                {title}
+              </h1>
             </HeroText>
           </HeroBanner>
         ) : (

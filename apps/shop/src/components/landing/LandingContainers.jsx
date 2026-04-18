@@ -1347,7 +1347,7 @@ export default function LandingContainers({ pageId, categoryId }) {
     }
     setContainers(null);
     getMedusaClient()
-      .request(endpoint)
+      .request(endpoint, { cache: "no-store" })
       .then((data) => {
         const showBar = data?.settings?.show_filter_bar !== false;
         setLandingHeaderFilterBar(showBar);
