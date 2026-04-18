@@ -13,17 +13,13 @@ import {
   Badge,
   Modal,
   EmptyState,
-  Spinner,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const EMPTY_FORM = {
   name: "",
-  description: "",
   api_key: "",
   api_secret: "",
-  webhook_url: "",
-  config_json: "",
 };
 
 function IntegrationCard({ integration, onEdit, onToggle, onDelete }) {
@@ -98,7 +94,7 @@ function IntegrationCard({ integration, onEdit, onToggle, onDelete }) {
         >
           {integration.api_key && (
             <>
-              <span style={{ fontWeight: 600, color: "#374151" }}>API Key</span>
+              <span style={{ fontWeight: 600, color: "#374151" }}>Zugangs-ID</span>
               <span style={{ fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {integration.api_key.slice(0, 4)}{"•".repeat(Math.min(16, Math.max(4, integration.api_key.length - 4)))}
               </span>
@@ -144,6 +140,7 @@ export default function IntegrationsSettingsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  // eslint-disable-next-line no-unused-vars
   const [jsonErr, setJsonErr] = useState("");
 
   const client = getMedusaAdminClient();
@@ -173,11 +170,8 @@ export default function IntegrationsSettingsPage() {
     setEditingId(integration.id);
     setForm({
       name: integration.name || "",
-      description: integration.description || "",
       api_key: "",
       api_secret: "",
-      webhook_url: integration.webhook_url || "",
-      config_json: integration.config ? JSON.stringify(integration.config, null, 2) : "",
     });
     setJsonErr("");
     setModalOpen(true);
@@ -197,18 +191,6 @@ export default function IntegrationsSettingsPage() {
       setMsg({ tone: "warning", text: "Bitte einen Namen eingeben." });
       return;
     }
-
-    let parsedConfig = undefined;
-    if (form.config_json.trim()) {
-      try {
-        parsedConfig = JSON.parse(form.config_json);
-        setJsonErr("");
-      } catch {
-        setJsonErr("Ungültiges JSON-Format.");
-        return;
-      }
-    }
-
     setSaving(true);
     setMsg(null);
     try {
@@ -216,23 +198,17 @@ export default function IntegrationsSettingsPage() {
       if (editingId) {
         await client.updateIntegration(editingId, {
           name: form.name.trim(),
-          description: form.description.trim() || undefined,
           ...(form.api_key ? { api_key: form.api_key } : {}),
           ...(form.api_secret ? { api_secret: form.api_secret } : {}),
-          webhook_url: form.webhook_url.trim() || undefined,
-          ...(parsedConfig !== undefined ? { config: parsedConfig } : {}),
           is_active: true,
         });
       } else {
         await client.saveIntegration({
           name: form.name.trim(),
           slug,
-          description: form.description.trim() || undefined,
           category: "custom",
           api_key: form.api_key || undefined,
           api_secret: form.api_secret || undefined,
-          webhook_url: form.webhook_url.trim() || undefined,
-          config: parsedConfig,
           is_active: true,
         });
       }
@@ -364,79 +340,32 @@ export default function IntegrationsSettingsPage() {
         <Modal.Section>
           <BlockStack gap="400">
             <TextField
-              label="Name *"
+              label="Name"
               value={form.name}
               onChange={(v) => setField("name", v)}
               autoComplete="off"
               placeholder="z. B. Billbee, Shopify, Eigene API…"
-              helpText="Anhand des Namens wird die Integration in der Liste angezeigt."
             />
             <TextField
-              label="Beschreibung"
-              value={form.description}
-              onChange={(v) => setField("description", v)}
-              autoComplete="off"
-              placeholder="Wofür wird diese Integration verwendet?"
-              multiline={2}
-            />
-          </BlockStack>
-        </Modal.Section>
-
-        <Modal.Section>
-          <BlockStack gap="400">
-            <Text as="h3" variant="headingSm">
-              Zugangsdaten
-            </Text>
-            {editingId && (
-              <Banner tone="info">
-                Felder leer lassen um bestehende Zugangsdaten zu behalten.
-              </Banner>
-            )}
-            <TextField
-              label="API Key / Token"
+              label="Zugangs-ID"
               value={form.api_key}
               onChange={(v) => setField("api_key", v)}
-              type="password"
               autoComplete="off"
-              placeholder={editingId ? "Zum Ändern neu eingeben…" : "API Key eingeben…"}
+              placeholder={editingId ? "Zum Ändern neu eingeben…" : ""}
             />
             <TextField
-              label="API Secret / Passwort"
+              label="Sicherheitsschlüssel"
               value={form.api_secret}
               onChange={(v) => setField("api_secret", v)}
               type="password"
               autoComplete="off"
-              placeholder={editingId ? "Zum Ändern neu eingeben…" : "API Secret eingeben…"}
+              placeholder={editingId ? "Zum Ändern neu eingeben…" : ""}
             />
-            <TextField
-              label="Webhook-URL"
-              value={form.webhook_url}
-              onChange={(v) => setField("webhook_url", v)}
-              autoComplete="off"
-              placeholder="https://…"
-            />
-          </BlockStack>
-        </Modal.Section>
-
-        <Modal.Section>
-          <BlockStack gap="200">
-            <Text as="h3" variant="headingSm">
-              Weitere Konfiguration (JSON, optional)
-            </Text>
-            <Text as="p" tone="subdued" variant="bodySm">
-              Beliebige Zusatzfelder als JSON-Objekt. Beispiel: {"{"}"host": "https://api.example.com", "timeout": 5000{"}"}
-            </Text>
-            <TextField
-              label=""
-              labelHidden
-              value={form.config_json}
-              onChange={(v) => { setField("config_json", v); setJsonErr(""); }}
-              multiline={4}
-              autoComplete="off"
-              placeholder={`{\n  "key": "value"\n}`}
-              error={jsonErr || undefined}
-              monospaced
-            />
+            {editingId && (
+              <Text as="p" tone="subdued" variant="bodySm">
+                Felder leer lassen um bestehende Zugangsdaten zu behalten.
+              </Text>
+            )}
           </BlockStack>
         </Modal.Section>
       </Modal>
