@@ -873,7 +873,6 @@ export default function InventoryPage() {
 
   useEffect(() => {
     refetchPendingChangeRequests();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const openChangeRequestsModal = async (productId) => {
