@@ -340,8 +340,8 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
     }
   }
 
-  httpApp.get('/api/billbee', authenticateBeluchaBillbee, (req, res) => {
-    res.json({ ok: true, name: 'Belucha Marketplace API', version: '1.0', seller_id: req.beluchaBillbeeSeller?.seller_id })
+  httpApp.get('/api/billbee', (req, res) => {
+    res.json({ ok: true, name: 'Belucha Marketplace API', version: '1.0' })
   })
 
   httpApp.get('/api/billbee/orders', authenticateBeluchaBillbee, handleOrders)
