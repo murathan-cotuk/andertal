@@ -1,5 +1,6 @@
 18.04.
 
+- ir sistem ile entegre oldugunda hangi verilere get ve post yapilmasi gerektigi cok asikar. sen de gayet iyi biliyorsun. bildigini uygula.
 -- brand sayasinda bannerda sol altta marka adi yaziyor ve üstünde de marka logosu var. o marka logosu biraz daha üstte ve biraz daha büyük olsun
 -- sellercentralde produkte altinda dynamische produktgruppe ekle. burada bir grup olusturulsun ve icine ürünler yazilsin. olusturulan ürün gruplatini otomatik olarak tanimalamakta kullanilacak bu fonksiyon.  rabatte menüsünün  altina da aktion/kampagnen diye bir menü ekle. burada kampanya olusturabilsin sellerlar. sadece kendileri görecek ve kendi ürünleri icin olacak. kampanya adi, baslangic-bitis tarihi/saati, ürün ya da dynamische produktgruppe olarak ürünler secilsin, indirim orani belirlensin ve bu menü icin gerekli baska bir cok ayar yapilabilsin. buradan olusturulan indirimler secilen ürünlere shopta tanimlansin. sepette ve faturada vs bir pozisyon olarak bu indirimin adi, orani, ve tutari yazsin. indirim product cardda, ürün sayfasinda, sepette her yerde gözükecek. 
 -- excelle ürün yükledigimde ekledigim url görsellerini media klasörü altinda göremiyorum sellercentralde. exceli kim yüklediyse o saticida gözüksün sadece görseller. superuser icinde o saticinin klasörü icine listelensin
