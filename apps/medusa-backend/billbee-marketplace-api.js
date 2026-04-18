@@ -96,20 +96,53 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         return res.status(403).json({ error: 'Forbidden', message: 'Seller account is not active' })
       }
 
-      if (!row.belucha_billbee_api_key || !row.belucha_billbee_api_secret) {
-        logBillbeeEvent('billbee.auth.failed', { reason: 'keys_not_provisioned' })
-        return res.status(403).json({ error: 'Forbidden', message: 'Billbee API keys not provisioned for this account' })
-      }
+      // Primary check: seller_users dedicated Billbee keys
+      const primaryOk = row.belucha_billbee_api_key && row.belucha_billbee_api_secret &&
+        timingSafeEqualString(basic.password, row.belucha_billbee_api_secret) &&
+        (!apiKeyHeader || apiKeyHeader === row.belucha_billbee_api_key)
 
-      if (!timingSafeEqualString(basic.password, row.belucha_billbee_api_secret)) {
-        logBillbeeEvent('billbee.auth.failed', { reason: 'bad_password' })
-        res.setHeader('WWW-Authenticate', 'Basic realm="Belucha Billbee API"')
-        return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials' })
-      }
+      if (!primaryOk) {
+        // Fallback: check store_integrations (credentials from "Integration anlegen" page)
+        // These use DATABASE_URL — same DB as store_integrations table
+        const effectiveScopeKey = row.sub_of_seller_id
+          ? String(row.sub_of_seller_id).trim()
+          : String(row.seller_id || `billbee_user_${row.id}`).trim()
 
-      if (apiKeyHeader && apiKeyHeader !== row.belucha_billbee_api_key) {
-        logBillbeeEvent('billbee.auth.failed', { reason: 'api_key_mismatch' })
-        return res.status(401).json({ error: 'Unauthorized', message: 'X-Belucha-Api-Key does not match' })
+        let integClient
+        let integOk = false
+        try {
+          const { Client } = require('pg')
+          const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+          if (dbUrl) {
+            integClient = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+            await integClient.connect()
+            const ir = await integClient.query(
+              `SELECT api_key, api_secret FROM store_integrations
+               WHERE seller_scope_key = $1 AND is_active = true AND api_secret IS NOT NULL
+               LIMIT 20`,
+              [effectiveScopeKey],
+            )
+            await integClient.end()
+            integClient = null
+            for (const integ of (ir.rows || [])) {
+              const secretOk = integ.api_secret && timingSafeEqualString(basic.password, integ.api_secret)
+              const keyOk = !apiKeyHeader || (integ.api_key && apiKeyHeader === integ.api_key)
+              if (secretOk && keyOk) { integOk = true; break }
+            }
+          }
+        } catch (_) {
+          if (integClient) try { await integClient.end() } catch (__) {}
+        }
+
+        if (!integOk) {
+          if (!row.belucha_billbee_api_key || !row.belucha_billbee_api_secret) {
+            logBillbeeEvent('billbee.auth.failed', { reason: 'keys_not_provisioned' })
+            return res.status(403).json({ error: 'Forbidden', message: 'Billbee API keys not provisioned for this account' })
+          }
+          logBillbeeEvent('billbee.auth.failed', { reason: 'bad_password' })
+          res.setHeader('WWW-Authenticate', 'Basic realm="Belucha Billbee API"')
+          return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials' })
+        }
       }
 
       const effectiveSellerId = row.sub_of_seller_id ? String(row.sub_of_seller_id).trim() : String(row.seller_id).trim()
