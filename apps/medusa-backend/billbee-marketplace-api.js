@@ -64,6 +64,45 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       return res.status(401).json({ error: 'Unauthorized', message: 'Basic authentication required' })
     }
 
+    const { Client } = require('pg')
+    const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+
+    // ── Path A: username looks like a belucha_zug_ api_key → direct store_integrations lookup ──
+    if (basic.username.startsWith('belucha_zug_') && dbUrl) {
+      let integClient
+      try {
+        integClient = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await integClient.connect()
+        const ir = await integClient.query(
+          `SELECT id, api_key, api_secret, seller_scope_key FROM store_integrations
+           WHERE api_key = $1 AND is_active = true AND api_secret IS NOT NULL
+           LIMIT 1`,
+          [basic.username],
+        )
+        await integClient.end()
+        integClient = null
+        const integ = ir.rows && ir.rows[0]
+        if (!integ || !integ.api_secret || !timingSafeEqualString(basic.password, integ.api_secret)) {
+          logBillbeeEvent('billbee.auth.failed', { reason: 'bad_api_credentials' })
+          res.setHeader('WWW-Authenticate', 'Basic realm="Belucha Billbee API"')
+          return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials' })
+        }
+        const sellerId = String(integ.seller_scope_key || '').trim()
+        if (!sellerId) return res.status(403).json({ error: 'Forbidden', message: 'No seller scope' })
+        if (!checkRateLimit(sellerId)) {
+          return res.status(429).json({ error: 'Too Many Requests' })
+        }
+        req.beluchaBillbeeSeller = { seller_id: sellerId }
+        logBillbeeEvent('billbee.auth.success', { seller_id: sellerId, via: 'api_key' })
+        return next()
+      } catch (e) {
+        if (integClient) try { await integClient.end() } catch (__) {}
+        logBillbeeEvent('billbee.auth.failed', { reason: 'exception', message: e?.message })
+        return res.status(500).json({ error: 'Internal Server Error' })
+      }
+    }
+
+    // ── Path B: username is email or seller_id → seller_users lookup ──
     const apiKeyHeader = String(
       req.headers['x-belucha-api-key'] || req.headers['x-api-key'] || '',
     ).trim()
@@ -96,24 +135,21 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         return res.status(403).json({ error: 'Forbidden', message: 'Seller account is not active' })
       }
 
-      // Primary check: seller_users dedicated Billbee keys
+      // Check seller_users dedicated Billbee keys
       const primaryOk = row.belucha_billbee_api_key && row.belucha_billbee_api_secret &&
         timingSafeEqualString(basic.password, row.belucha_billbee_api_secret) &&
         (!apiKeyHeader || apiKeyHeader === row.belucha_billbee_api_key)
 
       if (!primaryOk) {
-        // Fallback: check store_integrations (credentials from "Integration anlegen" page)
-        // These use DATABASE_URL — same DB as store_integrations table
+        // Fallback: check store_integrations by seller_scope_key
         const effectiveScopeKey = row.sub_of_seller_id
           ? String(row.sub_of_seller_id).trim()
           : String(row.seller_id || `billbee_user_${row.id}`).trim()
 
         let integClient
         let integOk = false
-        try {
-          const { Client } = require('pg')
-          const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-          if (dbUrl) {
+        if (dbUrl) {
+          try {
             integClient = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
             await integClient.connect()
             const ir = await integClient.query(
@@ -129,16 +165,12 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
               const keyOk = !apiKeyHeader || (integ.api_key && apiKeyHeader === integ.api_key)
               if (secretOk && keyOk) { integOk = true; break }
             }
+          } catch (_) {
+            if (integClient) try { await integClient.end() } catch (__) {}
           }
-        } catch (_) {
-          if (integClient) try { await integClient.end() } catch (__) {}
         }
 
         if (!integOk) {
-          if (!row.belucha_billbee_api_key || !row.belucha_billbee_api_secret) {
-            logBillbeeEvent('billbee.auth.failed', { reason: 'keys_not_provisioned' })
-            return res.status(403).json({ error: 'Forbidden', message: 'Billbee API keys not provisioned for this account' })
-          }
           logBillbeeEvent('billbee.auth.failed', { reason: 'bad_password' })
           res.setHeader('WWW-Authenticate', 'Basic realm="Belucha Billbee API"')
           return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials' })
@@ -160,7 +192,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         email: row.email,
         seller_id: effectiveSellerId,
       }
-      logBillbeeEvent('billbee.auth.success', { seller_id: effectiveSellerId })
+      logBillbeeEvent('billbee.auth.success', { seller_id: effectiveSellerId, via: 'email' })
       next()
     } catch (e) {
       if (client) try { await client.end() } catch (_) {}
@@ -307,6 +339,10 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       res.status(500).json({ error: 'Internal Server Error' })
     }
   }
+
+  httpApp.get('/api/billbee', authenticateBeluchaBillbee, (req, res) => {
+    res.json({ ok: true, name: 'Belucha Marketplace API', version: '1.0', seller_id: req.beluchaBillbeeSeller?.seller_id })
+  })
 
   httpApp.get('/api/billbee/orders', authenticateBeluchaBillbee, handleOrders)
   httpApp.get('/api/billbee/products', authenticateBeluchaBillbee, handleProducts)
