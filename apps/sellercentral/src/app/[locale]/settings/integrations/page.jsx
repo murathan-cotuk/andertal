@@ -16,13 +16,13 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
-const EMPTY_FORM = {
-  name: "",
-  api_key: "",
-  api_secret: "",
-};
+function maskKey(val) {
+  const s = String(val || "");
+  if (s.length <= 8) return "••••••••";
+  return `${s.slice(0, 4)}${"•".repeat(Math.min(20, s.length - 8))}${s.slice(-4)}`;
+}
 
-function IntegrationCard({ integration, onEdit, onToggle, onDelete }) {
+function IntegrationCard({ integration, onEdit, onToggle, onDelete, onRotateSecret }) {
   const initials = (integration.name || "?")
     .split(/\s+/)
     .map((w) => w[0])
@@ -42,7 +42,6 @@ function IntegrationCard({ integration, onEdit, onToggle, onDelete }) {
         alignItems: "flex-start",
       }}
     >
-      {/* Avatar */}
       <div
         style={{
           width: 44,
@@ -68,11 +67,6 @@ function IntegrationCard({ integration, onEdit, onToggle, onDelete }) {
             <Text as="span" fontWeight="semibold" variant="bodyMd">
               {integration.name}
             </Text>
-            {integration.description && (
-              <Text as="p" tone="subdued" variant="bodySm">
-                {integration.description}
-              </Text>
-            )}
           </BlockStack>
           <Badge tone={integration.is_active ? "success" : "new"}>
             {integration.is_active ? "Aktiv" : "Inaktiv"}
@@ -95,25 +89,22 @@ function IntegrationCard({ integration, onEdit, onToggle, onDelete }) {
           {integration.api_key && (
             <>
               <span style={{ fontWeight: 600, color: "#374151" }}>Zugangs-ID</span>
-              <span style={{ fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {integration.api_key.slice(0, 4)}{"•".repeat(Math.min(16, Math.max(4, integration.api_key.length - 4)))}
+              <span
+                style={{
+                  fontFamily: "ui-monospace, monospace",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {maskKey(integration.api_key)}
               </span>
             </>
           )}
-          {integration.webhook_url && (
-            <>
-              <span style={{ fontWeight: 600, color: "#374151" }}>Webhook</span>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {integration.webhook_url}
-              </span>
-            </>
-          )}
-          {integration.slug && integration.slug !== integration.name?.toLowerCase().replace(/\s+/g, "-") && (
-            <>
-              <span style={{ fontWeight: 600, color: "#374151" }}>Slug</span>
-              <span style={{ fontFamily: "monospace" }}>{integration.slug}</span>
-            </>
-          )}
+          <span style={{ fontWeight: 600, color: "#374151" }}>Sicherheitsschlüssel</span>
+          <span style={{ color: "#9ca3af" }}>
+            Gespeichert — bei Bedarf neu erzeugen (Bearbeiten)
+          </span>
         </div>
 
         <InlineStack gap="200" blockAlign="center" style={{ marginTop: 10 }}>
@@ -122,6 +113,9 @@ function IntegrationCard({ integration, onEdit, onToggle, onDelete }) {
           </Button>
           <Button size="slim" onClick={() => onToggle(integration)}>
             {integration.is_active ? "Deaktivieren" : "Aktivieren"}
+          </Button>
+          <Button size="slim" onClick={() => onRotateSecret(integration)}>
+            Neuer Sicherheitsschlüssel
           </Button>
           <Button size="slim" tone="critical" variant="plain" onClick={() => onDelete(integration)}>
             Löschen
@@ -139,9 +133,8 @@ export default function IntegrationsSettingsPage() {
   const [msg, setMsg] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  // eslint-disable-next-line no-unused-vars
-  const [jsonErr, setJsonErr] = useState("");
+  const [formName, setFormName] = useState("");
+  const [createdCreds, setCreatedCreds] = useState(null);
 
   const client = getMedusaAdminClient();
 
@@ -157,68 +150,90 @@ export default function IntegrationsSettingsPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const openCreate = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
-    setJsonErr("");
+    setFormName("");
+    setCreatedCreds(null);
     setModalOpen(true);
   };
 
   const openEdit = (integration) => {
     setEditingId(integration.id);
-    setForm({
-      name: integration.name || "",
-      api_key: "",
-      api_secret: "",
-    });
-    setJsonErr("");
+    setFormName(integration.name || "");
+    setCreatedCreds(null);
     setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setEditingId(null);
-    setForm(EMPTY_FORM);
-    setJsonErr("");
+    setFormName("");
+    setCreatedCreds(null);
   };
 
-  const setField = (key, value) => setForm((p) => ({ ...p, [key]: value }));
-
   const save = async () => {
-    if (!form.name.trim()) {
+    if (!formName.trim()) {
       setMsg({ tone: "warning", text: "Bitte einen Namen eingeben." });
       return;
     }
     setSaving(true);
     setMsg(null);
     try {
-      const slug = form.name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
       if (editingId) {
         await client.updateIntegration(editingId, {
-          name: form.name.trim(),
-          ...(form.api_key ? { api_key: form.api_key } : {}),
-          ...(form.api_secret ? { api_secret: form.api_secret } : {}),
+          name: formName.trim(),
           is_active: true,
         });
+        setMsg({ tone: "success", text: "Integration aktualisiert." });
+        closeModal();
+        await load();
       } else {
-        await client.saveIntegration({
-          name: form.name.trim(),
-          slug,
+        const data = await client.saveIntegration({
+          name: formName.trim(),
           category: "custom",
-          api_key: form.api_key || undefined,
-          api_secret: form.api_secret || undefined,
           is_active: true,
         });
+        const integ = data?.integration;
+        if (integ?.api_key && integ?.api_secret) {
+          setCreatedCreds({
+            name: integ.name,
+            zugang: integ.api_key,
+            secret: integ.api_secret,
+          });
+        }
+        setMsg({ tone: "success", text: "Zugangsdaten wurden erzeugt." });
+        await load();
       }
-      setMsg({ tone: "success", text: editingId ? "Integration aktualisiert." : "Integration hinzugefügt." });
-      closeModal();
-      await load();
     } catch (e) {
       setMsg({ tone: "critical", text: e?.message || "Fehler beim Speichern." });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const rotateSecret = async (integration) => {
+    if (!confirm("Neuen Sicherheitsschlüssel erzeugen? Der alte Wert verliert sofort die Gültigkeit.")) return;
+    try {
+      const data = await client.updateIntegration(integration.id, { regenerate_secret: true });
+      const sec = data?.integration?.api_secret;
+      if (sec) {
+        setCreatedCreds({
+          name: integration.name,
+          zugang: data.integration?.api_key || integration.api_key,
+          secret: sec,
+        });
+        setModalOpen(true);
+        setEditingId(null);
+        setFormName("");
+      }
+      setMsg({ tone: "success", text: "Neuer Sicherheitsschlüssel gespeichert. Bitte kopieren." });
+      await load();
+    } catch (e) {
+      setMsg({ tone: "critical", text: e?.message || "Konnte nicht erneuern." });
     }
   };
 
@@ -234,7 +249,7 @@ export default function IntegrationsSettingsPage() {
   };
 
   const remove = async (integration) => {
-    if (!confirm(`"${integration.name}" wirklich löschen?`)) return;
+    if (!confirm(`„${integration.name}“ wirklich löschen?`)) return;
     try {
       await client.deleteIntegration(integration.id);
       setIntegrations((prev) => prev.filter((i) => i.id !== integration.id));
@@ -242,6 +257,11 @@ export default function IntegrationsSettingsPage() {
     } catch (e) {
       setMsg({ tone: "critical", text: e?.message || "Fehler beim Löschen." });
     }
+  };
+
+  const copy = (text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(String(text));
   };
 
   const active = integrations.filter((i) => i.is_active);
@@ -259,6 +279,15 @@ export default function IntegrationsSettingsPage() {
           </Banner>
         )}
 
+        <Card>
+          <BlockStack gap="200">
+            <Text as="p" variant="bodySm" tone="subdued">
+              Lege eine Integration mit <strong>freiem Namen</strong> an. Belucha erzeugt automatisch eine{" "}
+              <strong>Zugangs-ID</strong> und einen <strong>Sicherheitsschlüssel</strong> — keine vorgefertigte App-Liste.
+            </Text>
+          </BlockStack>
+        </Card>
+
         {loading ? (
           <Card>
             <div style={{ padding: 40, textAlign: "center", color: "#6d7175", fontSize: 13 }}>
@@ -269,8 +298,8 @@ export default function IntegrationsSettingsPage() {
           <Card>
             <EmptyState heading="Noch keine Integrationen">
               <p>
-                Klicke auf „Integration anlegen" um externe Dienste, APIs oder Tools
-                mit deinem Shop zu verbinden.
+                Eine Integration anlegen: nur den Namen eingeben — Zugangs-ID und Sicherheitsschlüssel werden für dich
+                generiert.
               </p>
               <Button variant="primary" onClick={openCreate}>
                 Integration anlegen
@@ -298,6 +327,7 @@ export default function IntegrationsSettingsPage() {
                         onEdit={openEdit}
                         onToggle={toggleActive}
                         onDelete={remove}
+                        onRotateSecret={rotateSecret}
                       />
                     ))}
                   </div>
@@ -319,6 +349,7 @@ export default function IntegrationsSettingsPage() {
                         onEdit={openEdit}
                         onToggle={toggleActive}
                         onDelete={remove}
+                        onRotateSecret={rotateSecret}
                       />
                     ))}
                   </div>
@@ -329,44 +360,70 @@ export default function IntegrationsSettingsPage() {
         )}
       </BlockStack>
 
-      {/* Create / Edit Modal */}
       <Modal
         open={modalOpen}
         onClose={closeModal}
-        title={editingId ? "Integration bearbeiten" : "Integration anlegen"}
-        primaryAction={{ content: "Speichern", onAction: save, loading: saving }}
-        secondaryActions={[{ content: "Abbrechen", onAction: closeModal }]}
+        title={
+          createdCreds
+            ? "Zugangsdaten"
+            : editingId
+              ? "Integration bearbeiten"
+              : "Integration anlegen"
+        }
+        primaryAction={
+          createdCreds
+            ? { content: "Schließen", onAction: closeModal }
+            : { content: "Speichern", onAction: save, loading: saving }
+        }
+        secondaryActions={
+          createdCreds ? [] : [{ content: "Abbrechen", onAction: closeModal }]
+        }
       >
         <Modal.Section>
-          <BlockStack gap="400">
-            <TextField
-              label="Name"
-              value={form.name}
-              onChange={(v) => setField("name", v)}
-              autoComplete="off"
-              placeholder="z. B. Billbee, Shopify, Eigene API…"
-            />
-            <TextField
-              label="Zugangs-ID"
-              value={form.api_key}
-              onChange={(v) => setField("api_key", v)}
-              autoComplete="off"
-              placeholder={editingId ? "Zum Ändern neu eingeben…" : ""}
-            />
-            <TextField
-              label="Sicherheitsschlüssel"
-              value={form.api_secret}
-              onChange={(v) => setField("api_secret", v)}
-              type="password"
-              autoComplete="off"
-              placeholder={editingId ? "Zum Ändern neu eingeben…" : ""}
-            />
-            {editingId && (
-              <Text as="p" tone="subdued" variant="bodySm">
-                Felder leer lassen um bestehende Zugangsdaten zu behalten.
+          {createdCreds ? (
+            <BlockStack gap="400">
+              <Banner tone="warning">
+                Einmalig anzeigen: notiere den Sicherheitsschlüssel sicher. Bei Verlust kannst du einen neuen erzeugen
+                (Liste → Neuer Sicherheitsschlüssel).
+              </Banner>
+              <Text as="p" variant="bodyMd">
+                <strong>{createdCreds.name}</strong>
               </Text>
-            )}
-          </BlockStack>
+              <TextField
+                label="Zugangs-ID"
+                value={createdCreds.zugang}
+                readOnly
+                autoComplete="off"
+                multiline={2}
+              />
+              <Button onClick={() => copy(createdCreds.zugang)}>Zugangs-ID kopieren</Button>
+              <TextField
+                label="Sicherheitsschlüssel"
+                value={createdCreds.secret}
+                readOnly
+                autoComplete="off"
+                multiline={3}
+              />
+              <Button onClick={() => copy(createdCreds.secret)}>Sicherheitsschlüssel kopieren</Button>
+            </BlockStack>
+          ) : (
+            <BlockStack gap="400">
+              <TextField
+                label="Name"
+                value={formName}
+                onChange={setFormName}
+                autoComplete="off"
+                placeholder="z. B. Warenwirtschaft XY, Eigenes Tool…"
+                helpText="Belucha erzeugt Zugangs-ID und Sicherheitsschlüssel automatisch nach dem Speichern."
+              />
+              {editingId && (
+                <Text as="p" tone="subdued" variant="bodySm">
+                  Der Name kann geändert werden. Zugangs-ID bleibt gleich; einen neuen Sicherheitsschlüssel erzeugst du in
+                  der Liste über „Neuer Sicherheitsschlüssel“.
+                </Text>
+              )}
+            </BlockStack>
+          )}
         </Modal.Section>
       </Modal>
     </Page>

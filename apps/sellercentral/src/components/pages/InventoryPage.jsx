@@ -25,6 +25,11 @@ import {
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { formatDecimal } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
+import { Link as I18nLink } from "@/i18n/navigation";
+import {
+  formatChangeRequestValueForDisplay,
+  fieldNameDisplayLabel,
+} from "@/lib/product-change-request-format";
 
 const INVENTORY_ROW_GRID = "40px 56px 110px 72px minmax(320px, 2fr) minmax(140px, 0.9fr) minmax(150px, 1fr) minmax(200px, 1.2fr) 108px";
 const EXCEL_BORDER = "1px solid #e5e7eb";
@@ -1421,6 +1426,20 @@ export default function InventoryPage() {
       >
         <Modal.Section>
           <BlockStack gap="400">
+            {changeRequestsModalProductId ? (
+              <Box paddingBlockEnd="200">
+                <I18nLink
+                  href={`/products/${changeRequestsModalProductId}`}
+                  style={{ fontSize: 13, fontWeight: 600, color: "#0284c7", textDecoration: "none" }}
+                >
+                  {l === "tr"
+                    ? "Ürün düzenleme sayfasına git →"
+                    : l === "de"
+                      ? "Zur Produktbearbeitung →"
+                      : "Open product edit page →"}
+                </I18nLink>
+              </Box>
+            ) : null}
             {changeRequestsModalItems.length === 0 ? (
               <Text as="p" tone="subdued">
                 No pending change proposals.
@@ -1428,26 +1447,28 @@ export default function InventoryPage() {
             ) : (
               changeRequestsModalItems.map((cr) => {
                 const field = String(cr.field_name || '');
-                const oldVal = cr.old_value ?? '';
-                const newVal = cr.new_value ?? '';
                 return (
                   <Card key={cr.id} padding="300" background="bg-surface-secondary" borderRadius="200">
                     <BlockStack gap="200">
                       <Text as="h3" variant="bodyMd" fontWeight="semibold">
-                        {field}
+                        {fieldNameDisplayLabel(field, l)}
                       </Text>
                       <Divider />
                       <BlockStack gap="100">
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Current
+                          {l === "tr" ? "Mevcut değer" : l === "de" ? "Aktueller Wert" : "Current value"}
                         </Text>
-                        <pre style={{ margin: 0, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{oldVal}</pre>
+                        <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                          {formatChangeRequestValueForDisplay(cr.old_value)}
+                        </div>
                       </BlockStack>
                       <BlockStack gap="100">
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Proposed
+                          {l === "tr" ? "Önerilen değer" : l === "de" ? "Vorgeschlagener Wert" : "Proposed value"}
                         </Text>
-                        <pre style={{ margin: 0, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{newVal}</pre>
+                        <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word", fontWeight: 600 }}>
+                          {formatChangeRequestValueForDisplay(cr.new_value)}
+                        </div>
                       </BlockStack>
                       {isSuperuser && (
                         <InlineStack gap="200">

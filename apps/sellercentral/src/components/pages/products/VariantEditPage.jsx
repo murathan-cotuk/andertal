@@ -758,54 +758,78 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
               <Divider />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Metafields
-              </Text>
-              {metafieldsList.map((item, i) => (
-                <InlineStack key={i} gap="200" wrap>
-                  <TextField
-                    label="Key"
-                    labelHidden
-                    value={item.key || ""}
-                    onChange={(keyVal) => {
-                      const arr = [...metafieldsList];
-                      arr[i] = { ...arr[i], key: keyVal };
-                      patchVariant((cur) => ({
-                        ...cur,
-                        metadata: { ...(cur.metadata || {}), metafields: arr },
-                      }));
-                    }}
-                  />
-                  <TextField
-                    label="Value"
-                    labelHidden
-                    value={String(item.value ?? "")}
-                    onChange={(val) => {
-                      const arr = [...metafieldsList];
-                      arr[i] = { ...arr[i], value: val };
-                      patchVariant((cur) => ({
-                        ...cur,
-                        metadata: { ...(cur.metadata || {}), metafields: arr },
-                      }));
-                    }}
-                  />
-                </InlineStack>
-              ))}
-              <Button
-                size="slim"
-                variant="secondary"
-                onClick={() =>
-                  patchVariant((cur) => ({
-                    ...cur,
-                    metadata: {
-                      ...(cur.metadata || {}),
-                      metafields: [...metafieldsList, { key: "", value: "" }],
-                    },
-                  }))
-                }
-              >
-                + Metafield
-              </Button>
+              <BlockStack gap="400">
+                <BlockStack gap="150">
+                  <Text as="h2" variant="headingSm">Metafelder (Variante)</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Optionale Key/Value-Paare nur für diese Variante (z. B. shop-spezifische Attribute).
+                  </Text>
+                </BlockStack>
+                <Box padding="400" background="bg-surface-secondary" borderRadius="300">
+                  <BlockStack gap="300">
+                    {metafieldsList.map((item, i) => (
+                      <Box
+                        key={i}
+                        padding="400"
+                        background="bg-surface"
+                        borderRadius="200"
+                        borderWidth="025"
+                        borderColor="border"
+                      >
+                        <InlineStack gap="400" wrap blockAlign="start">
+                          <Box minWidth="160px" flex="1">
+                            <TextField
+                              label="Key"
+                              value={item.key || ""}
+                              onChange={(keyVal) => {
+                                const arr = [...metafieldsList];
+                                arr[i] = { ...arr[i], key: keyVal };
+                                patchVariant((cur) => ({
+                                  ...cur,
+                                  metadata: { ...(cur.metadata || {}), metafields: arr },
+                                }));
+                              }}
+                              autoComplete="off"
+                            />
+                          </Box>
+                          <Box minWidth="200px" flex="2">
+                            <TextField
+                              label="Value"
+                              value={String(item.value ?? "")}
+                              onChange={(val) => {
+                                const arr = [...metafieldsList];
+                                arr[i] = { ...arr[i], value: val };
+                                patchVariant((cur) => ({
+                                  ...cur,
+                                  metadata: { ...(cur.metadata || {}), metafields: arr },
+                                }));
+                              }}
+                              autoComplete="off"
+                            />
+                          </Box>
+                        </InlineStack>
+                      </Box>
+                    ))}
+                    <InlineStack>
+                      <Button
+                        size="slim"
+                        variant="secondary"
+                        onClick={() =>
+                          patchVariant((cur) => ({
+                            ...cur,
+                            metadata: {
+                              ...(cur.metadata || {}),
+                              metafields: [...metafieldsList, { key: "", value: "" }],
+                            },
+                          }))
+                        }
+                      >
+                        + Metafeld hinzufügen
+                      </Button>
+                    </InlineStack>
+                  </BlockStack>
+                </Box>
+              </BlockStack>
 
               <Divider />
 

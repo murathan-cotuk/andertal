@@ -16,6 +16,8 @@ export const PER_PAGE = 24;
 /** Display titles for normalized facet keys (matches CategoryTemplate / brand listing). */
 const FACET_GROUP_TITLE_OVERRIDES = {
   brand_name: "Marke",
+  category_slug: "Category",
+  category: "Category",
   farbe: "Farbe",
   colour: "Colour",
   color: "Color",
@@ -32,6 +34,41 @@ const FACET_GROUP_TITLE_OVERRIDES = {
 export function getFacetGroupTitle(key) {
   const k = String(key || "").trim();
   return FACET_GROUP_TITLE_OVERRIDES[k] ?? k.replace(/_/g, " ");
+}
+
+/** Walk /store/categories tree → Map(slug lower → display name). */
+export function buildCategorySlugToNameMap(tree) {
+  const m = new Map();
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    for (const n of nodes) {
+      if (!n) continue;
+      const slug = String(n.slug || "")
+        .replace(/^\//, "")
+        .trim()
+        .toLowerCase();
+      const name = String(n.name || n.title || "").trim();
+      if (slug && name) m.set(slug, name);
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(tree);
+  return m;
+}
+
+/** Sidebar / chip label: category facet values show category name, not slug. */
+export function formatFacetOptionLabel(facetKey, rawValue, categorySlugToName) {
+  const k = String(facetKey || "")
+    .trim()
+    .toLowerCase();
+  if ((k === "category_slug" || k === "category") && categorySlugToName instanceof Map && categorySlugToName.size > 0) {
+    const slug = String(rawValue || "")
+      .replace(/^\//, "")
+      .trim()
+      .toLowerCase();
+    return categorySlugToName.get(slug) || rawValue;
+  }
+  return rawValue;
 }
 
 export const FACET_SKIP = new Set([

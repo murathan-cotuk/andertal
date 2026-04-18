@@ -11,8 +11,10 @@ import {
   SORT_OPTIONS,
   PER_PAGE,
   buildFacetsFromProducts,
+  buildCategorySlugToNameMap,
   filterProductsByFacets,
   applyCatalogSort,
+  formatFacetOptionLabel,
   getFacetGroupTitle,
 } from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
@@ -453,6 +455,7 @@ export default function BrandPage() {
   const [filters,     setFilters]     = useState({});
   const [panelOpen,   setPanelOpen]   = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
+  const [categorySlugToName, setCategorySlugToName] = useState(() => new Map());
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
 
@@ -489,6 +492,20 @@ export default function BrandPage() {
     if (!el) { el = document.createElement("link"); el.rel = "canonical"; document.head.appendChild(el); }
     el.href = `${window.location.origin}/${locale}/brand/${brand.handle}`;
   }, [locale, brand?.handle]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/store-categories?tree=true&is_visible=true", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setCategorySlugToName(buildCategorySlugToNameMap(data.tree || []));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const facets = useMemo(() => buildFacetsFromProducts(products), [products]);
   const hasFacets = Object.keys(facets).length > 0;
@@ -691,10 +708,11 @@ export default function BrandPage() {
                     <FilterGroupBody $open={!!openFilterGroups[key]}>
                       {vals.map((val) => {
                         const on = (filters[key] || []).includes(val);
+                        const label = formatFacetOptionLabel(key, val, categorySlugToName);
                         return (
                           <CheckRow key={val} $on={on}>
                             <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
-                            {val}
+                            {label}
                           </CheckRow>
                         );
                       })}
@@ -714,9 +732,9 @@ export default function BrandPage() {
             {activeCount > 0 && (
               <ChipBar>
                 {Object.entries(filters).flatMap(([k, vals]) =>
-                  (vals || []).map(v => (
+                  (vals || []).map((v) => (
                     <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
-                      {v} ×
+                      {formatFacetOptionLabel(k, v, categorySlugToName)} ×
                     </Chip>
                   ))
                 )}

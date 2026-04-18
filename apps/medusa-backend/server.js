@@ -618,6 +618,7 @@ async function start() {
             updated_at timestamp DEFAULT now()
           );
         `).catch(() => {})
+        await client.query(`ALTER TABLE store_integrations ADD COLUMN IF NOT EXISTS seller_scope_key text`).catch(() => {})
         // customer_number may be missing if table was created before this column was added
         await client.query(`
           DO $$ BEGIN
@@ -9946,30 +9947,25 @@ async function start() {
 
     const adminHubIntegrationsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const auth = req.headers['authorization'] || ''
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+      const payload = token ? verifySellerToken(token) : null
+      const scope = payload ? getBillbeeAdminHubSellerSettingsKey(payload) : null
+      if (!scope) return res.json({ integrations: [] })
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const r = await client.query('SELECT id, name, slug, logo_url, is_active, category, created_at, updated_at FROM store_integrations ORDER BY name ASC')
-        let integrations = r.rows || []
-        const auth = req.headers['authorization'] || ''
-        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
-        const payload = token ? verifySellerToken(token) : null
-        const scope = payload ? getBillbeeAdminHubSellerSettingsKey(payload) : null
-        if (scope) {
-          const hb = await client.query(
-            `SELECT billbee_api_key, billbee_basic_username, billbee_basic_password FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
-            [scope],
-          )
-          const row = hb.rows && hb.rows[0]
-          const hasBillbee = !!(row?.billbee_api_key && row?.billbee_basic_username && row?.billbee_basic_password)
-          integrations = integrations.map((int) =>
-            String(int.slug || '').toLowerCase() === 'billbee' ? { ...int, is_active: hasBillbee } : int,
-          )
-        }
+        const r = await client.query(
+          `SELECT id, name, slug, logo_url, api_key, is_active, category, created_at, updated_at
+           FROM store_integrations
+           WHERE seller_scope_key = $1
+           ORDER BY name ASC`,
+          [scope],
+        )
         await client.end()
-        res.json({ integrations })
+        res.json({ integrations: r.rows || [] })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.json({ integrations: [] })
@@ -9980,73 +9976,35 @@ async function start() {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const settingsKey = getBillbeeAdminHubSellerSettingsKey(req.sellerUser)
       if (!settingsKey) return res.status(401).json({ message: 'Invalid session' })
+      const _c = require('crypto')
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const { name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active = false, category = 'other' } = req.body || {}
-        if (!name || !slug) return res.status(400).json({ message: 'name and slug required' })
-        const isBillbee = String(slug).toLowerCase() === 'billbee'
-        let integration
-        if (isBillbee) {
-          const r = await client.query(
-            `INSERT INTO store_integrations (name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active, category)
-             VALUES ($1,$2,$3,NULL,NULL,NULL,$4::jsonb,$5,$6)
-             ON CONFLICT (slug) DO UPDATE SET
-               name = EXCLUDED.name,
-               logo_url = EXCLUDED.logo_url,
-               config = EXCLUDED.config,
-               is_active = EXCLUDED.is_active,
-               category = EXCLUDED.category,
-               updated_at = NOW()
-             RETURNING id, name, slug, logo_url, is_active, category, created_at, updated_at`,
-            [name, slug, logo_url || null, config ? JSON.stringify(config) : '{}', is_active, category],
-          )
-          integration = r.rows && r.rows[0] ? r.rows[0] : null
-        } else {
-          const r = await client.query(
-            `INSERT INTO store_integrations (name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active, category)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-             ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, logo_url=EXCLUDED.logo_url, api_key=EXCLUDED.api_key, api_secret=EXCLUDED.api_secret, webhook_url=EXCLUDED.webhook_url, config=EXCLUDED.config, is_active=EXCLUDED.is_active, updated_at=NOW()
-             RETURNING id, name, slug, logo_url, is_active, category, created_at, updated_at`,
-            [name, slug, logo_url || null, api_key || null, api_secret || null, webhook_url || null, config ? JSON.stringify(config) : '{}', is_active, category],
-          )
-          integration = r.rows && r.rows[0] ? r.rows[0] : null
-        }
-
-        // Persist Billbee credentials per seller (never in store_integrations).
-        if (integration?.slug && String(integration.slug).toLowerCase() === 'billbee') {
-          const cfg = config && typeof config === 'object' ? config : {}
-          const basicUsername = cfg.basic_auth_username || cfg.username || ''
-          const basicPassword = cfg.basic_auth_password || cfg.password || ''
-          const billbeeApiKey = api_key || ''
-          const billbeeConnName = (cfg.connection_name != null ? String(cfg.connection_name) : '').trim().slice(0, 200)
-
-          if (billbeeApiKey && basicUsername && basicPassword) {
-            await client.query(
-              `INSERT INTO admin_hub_seller_settings (seller_id, billbee_api_key, billbee_basic_username, billbee_basic_password, billbee_connection_name, billbee_updated_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, now(), now())
-               ON CONFLICT (seller_id) DO UPDATE SET
-                 billbee_api_key = EXCLUDED.billbee_api_key,
-                 billbee_basic_username = EXCLUDED.billbee_basic_username,
-                 billbee_basic_password = EXCLUDED.billbee_basic_password,
-                 billbee_connection_name = COALESCE(NULLIF(EXCLUDED.billbee_connection_name, ''), admin_hub_seller_settings.billbee_connection_name),
-                 billbee_updated_at = now(),
-                 updated_at = now()`,
-              [settingsKey, billbeeApiKey, basicUsername, basicPassword, billbeeConnName || null],
-            )
-          } else if (billbeeConnName) {
-            await client.query(
-              `INSERT INTO admin_hub_seller_settings (seller_id, billbee_connection_name, updated_at)
-               VALUES ($1, $2, now())
-               ON CONFLICT (seller_id) DO UPDATE SET
-                 billbee_connection_name = EXCLUDED.billbee_connection_name,
-                 updated_at = now()`,
-              [settingsKey, billbeeConnName],
-            )
-          }
-        }
+        const { name, logo_url, webhook_url, config, is_active = true, category = 'custom' } = req.body || {}
+        if (!name || !String(name).trim()) return res.status(400).json({ message: 'name required' })
+        const genSlug = `int_${_c.randomBytes(16).toString('hex')}`
+        const genKey = `belucha_zug_${_c.randomBytes(12).toString('hex')}`
+        const genSec = `belucha_ssk_${_c.randomBytes(18).toString('hex')}`
+        const r = await client.query(
+          `INSERT INTO store_integrations (name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active, category, seller_scope_key)
+           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)
+           RETURNING id, name, slug, logo_url, api_key, api_secret, is_active, category, created_at, updated_at`,
+          [
+            String(name).trim(),
+            genSlug,
+            logo_url || null,
+            genKey,
+            genSec,
+            webhook_url || null,
+            config ? JSON.stringify(config) : '{}',
+            is_active !== false,
+            category || 'custom',
+            settingsKey,
+          ],
+        )
+        const integration = r.rows && r.rows[0] ? r.rows[0] : null
 
         await client.end()
         res.json({ integration })
@@ -10061,23 +10019,47 @@ async function start() {
       const settingsKey = getBillbeeAdminHubSellerSettingsKey(req.sellerUser)
       if (!settingsKey) return res.status(401).json({ message: 'Invalid session' })
       const id = (req.params.id || '').trim()
+      const _c = require('crypto')
       let client
       try {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const slugRow = await client.query('SELECT slug FROM store_integrations WHERE id = $1::uuid', [id])
-        const isBillbee = String(slugRow.rows[0]?.slug || '').toLowerCase() === 'billbee'
+        const slugRow = await client.query(
+          'SELECT slug, seller_scope_key FROM store_integrations WHERE id = $1::uuid',
+          [id],
+        )
+        if (!slugRow.rows[0]) { await client.end(); return res.status(404).json({ message: 'Not found' }) }
+        const rowSlug = slugRow.rows[0]
+        const isBillbee = String(rowSlug.slug || '').toLowerCase() === 'billbee'
+        if (!isBillbee && rowSlug.seller_scope_key !== settingsKey) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
         const body = { ...(req.body || {}) }
+        if (body.regenerate_secret === true || body.regenerate_secret === 'true') {
+          const newSec = `belucha_ssk_${_c.randomBytes(18).toString('hex')}`
+          const ur = await client.query(
+            `UPDATE store_integrations SET api_secret = $2, updated_at = NOW() WHERE id = $1::uuid RETURNING id, name, slug, logo_url, api_key, api_secret, is_active, category, created_at, updated_at`,
+            [id, newSec],
+          )
+          await client.end()
+          if (!ur.rows[0]) return res.status(404).json({ message: 'Not found' })
+          return res.json({ integration: ur.rows[0] })
+        }
         if (isBillbee) {
           delete body.api_key
           delete body.api_secret
           delete body.webhook_url
+        } else {
+          delete body.api_key
+          delete body.api_secret
         }
+        delete body.regenerate_secret
         const allowed = ['name','logo_url','api_key','api_secret','webhook_url','config','is_active','category']
         const sets = []; const vals = []
         for (const key of allowed) { if (key in body) { vals.push(key === 'config' ? JSON.stringify(body[key]) : body[key]); sets.push(`${key} = $${vals.length}`) } }
-        if (sets.length === 0) return res.status(400).json({ message: 'no fields to update' })
+        if (sets.length === 0) { await client.end(); return res.status(400).json({ message: 'no fields to update' }) }
         vals.push(id)
         const r = await client.query(
           `UPDATE store_integrations SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${vals.length}::uuid RETURNING id, name, slug, logo_url, is_active, category, updated_at`, vals
@@ -10135,9 +10117,17 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const slugRow = await client.query('SELECT slug FROM store_integrations WHERE id = $1::uuid', [id])
+        const slugRow = await client.query(
+          'SELECT slug, seller_scope_key FROM store_integrations WHERE id = $1::uuid',
+          [id],
+        )
         if (!slugRow.rows[0]) { await client.end(); return res.status(404).json({ message: 'Not found' }) }
-        if (String(slugRow.rows[0].slug || '').toLowerCase() === 'billbee') {
+        const isBillbee = String(slugRow.rows[0].slug || '').toLowerCase() === 'billbee'
+        if (!isBillbee && slugRow.rows[0].seller_scope_key !== settingsKey) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
+        if (isBillbee) {
           await client.query(
             `UPDATE admin_hub_seller_settings SET
                billbee_api_key = NULL,
