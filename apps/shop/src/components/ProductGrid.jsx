@@ -11,9 +11,14 @@ const Grid = styled.div`
   /* Mobile always 2 columns */
   grid-template-columns: repeat(2, 1fr);
 
-  /* Tablet: up to 3 */
+  /* Tablet: up to 4 */
   @media (min-width: 640px) {
     grid-template-columns: repeat(${(p) => Math.min(p.$cols, 4)}, 1fr);
+  }
+
+  /* Medium desktop: full column count */
+  @media (min-width: 900px) {
+    grid-template-columns: repeat(${(p) => p.$cols}, 1fr);
   }
 
   /* Desktop: full column count */

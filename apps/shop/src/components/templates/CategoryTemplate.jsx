@@ -654,7 +654,7 @@ export default function CategoryTemplate() {
   const showCatBanner   = catBannerStyle !== "none" && !!bannerUrl;
   const showSidebar     = tmpl.show_sidebar !== false;
   const sidebarWidth    = tmpl.sidebar_width || "280px";
-  const colsPerRow      = Number(tmpl.products_per_row) || 3;
+  const colsPerRow      = Number(tmpl.products_per_row) || 4;
   const richtextAlign   = tmpl.richtext_align || "left";
   const richtextMaxW    = tmpl.richtext_max_width || "700px";
   const contentPadX     = tmpl.content_padding_x || "32px";

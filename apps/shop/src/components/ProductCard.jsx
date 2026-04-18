@@ -42,7 +42,7 @@ const Card = styled.article`
 const ImgBlock = styled.div`
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
   background: #fff;
   isolation: isolate;
@@ -92,8 +92,8 @@ const ImgPlaceholder = styled.div`
 /* Add to cart — always visible, minimal */
 const AddToCartBtn = styled.button`
   width: calc(100% - 4px);
-  margin: 6px 2px 0;
-  padding: 8px 10px;
+  margin: 5px 2px 0;
+  padding: 7px 10px;
   background: #111;
   color: #fff;
   border: none;
@@ -120,8 +120,8 @@ const QtyRow = styled.div`
 `;
 
 const QtyBtn = styled.button`
-  width: 34px;
-  height: 30px;
+  width: 30px;
+  height: 28px;
   border: 0;
   background: transparent;
   color: #6b7280;
@@ -227,7 +227,7 @@ const Badge = styled.span`
 
 /* Info block below image */
 const Info = styled.div`
-  padding: 10px 2px 14px;
+  padding: 8px 2px 8px;
 `;
 
 const Name = styled.h3`
@@ -618,13 +618,11 @@ export function ProductCard({ product, activeFilters = {} }) {
           </CurrentPrice>
         </Prices>
 
-        <ReviewRow>
-          <StarRating average={reviewAvg} count={reviewCount} />
-        </ReviewRow>
-
-        <DescriptionPreview>
-          {localizedDescription ? `${htmlToText(localizedDescription).slice(0, 100)}${htmlToText(localizedDescription).length > 100 ? "…" : ""}` : ""}
-        </DescriptionPreview>
+        {reviewCount > 0 && (
+          <ReviewRow>
+            <StarRating average={reviewAvg} count={reviewCount} />
+          </ReviewRow>
+        )}
 
         {showPills && (
           variationGroups ? (
