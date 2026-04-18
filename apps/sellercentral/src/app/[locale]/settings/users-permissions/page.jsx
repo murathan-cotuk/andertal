@@ -541,6 +541,8 @@ function KybReviewModal({ user, onClose, onApproved }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function UsersPermissionsPage() {
   const [isSuperuser, setIsSuperuser] = useState(false);
+  const [myEmail, setMyEmail] = useState("");
+  const [myStoreName, setMyStoreName] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -567,8 +569,11 @@ export default function UsersPermissionsPage() {
   const [approvingId, setApprovingId] = useState(null);
 
   useEffect(() => {
-    const su = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
+    if (typeof window === "undefined") return;
+    const su = localStorage.getItem("sellerIsSuperuser") === "true";
     setIsSuperuser(su);
+    setMyEmail(localStorage.getItem("sellerEmail") || "");
+    setMyStoreName(localStorage.getItem("storeName") || "");
     if (su) fetchSuperuserData();
     else fetchSellerData();
   }, []);
@@ -734,20 +739,25 @@ export default function UsersPermissionsPage() {
                   </Text>
                 </Box>
               ) : (
-                filtered.map((user, i) => (
-                  <div
-                    key={user.id}
-                    style={{
-                      padding: "14px 20px",
-                      borderBottom: i < filtered.length - 1 ? "1px solid #f9fafb" : "none",
-                      display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center",
-                    }}
-                  >
+                (() => {
+                  const myUser = myEmail ? filtered.find((u) => u.email === myEmail) : null;
+                  const otherUsers = myEmail ? filtered.filter((u) => u.email !== myEmail) : filtered;
+                  const renderRow = (user, i, arr) => (
+                    <div
+                      key={user.id}
+                      style={{
+                        padding: "14px 20px",
+                        borderBottom: i < arr.length - 1 ? "1px solid #f9fafb" : "none",
+                        display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center",
+                        background: user.email === myEmail ? "#f0fdf4" : undefined,
+                      }}
+                    >
                     <div>
                       <InlineStack gap="200" blockAlign="center">
                         <Text variant="bodyMd" fontWeight="semibold">
                           {user.is_superuser ? user.email : (user.store_name || user.email)}
                         </Text>
+                        {user.email === myEmail && <Badge tone="success">Sie</Badge>}
                         {user.is_superuser
                           ? <Badge tone="attention">Superuser</Badge>
                           : <Badge tone="info">Seller</Badge>
@@ -784,7 +794,17 @@ export default function UsersPermissionsPage() {
                       </Button>
                     </InlineStack>
                   </div>
-                ))
+                  );
+                  return (
+                    <>
+                      {myUser && renderRow(myUser, 0, [myUser])}
+                      {myUser && otherUsers.length > 0 && (
+                        <div style={{ height: 1, background: "#d1fae5", margin: "0 20px" }} />
+                      )}
+                      {otherUsers.map((u, i) => renderRow(u, i, otherUsers))}
+                    </>
+                  );
+                })()
               )}
             </Card>
           </Layout.Section>
@@ -821,13 +841,37 @@ export default function UsersPermissionsPage() {
           {/* Active sub-users */}
           <Card padding="0">
             <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Text variant="headingMd" as="h2">Aktive Benutzer ({subusers.length})</Text>
+              <Text variant="headingMd" as="h2">Aktive Benutzer ({subusers.length + 1})</Text>
               <Button onClick={fetchSellerData} loading={loading} size="slim">Aktualisieren</Button>
             </div>
+
+            {/* ── Current account row (always first) ── */}
+            <div style={{
+              padding: "14px 20px",
+              borderBottom: "1px solid #f9fafb",
+              display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center",
+              background: "#f0fdf4",
+            }}>
+              <div>
+                <InlineStack gap="200" blockAlign="center">
+                  <Text variant="bodyMd" fontWeight="semibold">
+                    {myStoreName || myEmail}
+                  </Text>
+                  <Badge tone="success">Sie</Badge>
+                  <Badge tone="attention">Kontoinhaber</Badge>
+                </InlineStack>
+                {myStoreName && <Text variant="bodySm" tone="subdued">{myEmail}</Text>}
+                <Text variant="bodySm" tone="subdued">Voller Zugriff · Eigentümerkonto</Text>
+              </div>
+              <InlineStack gap="200">
+                <Button size="slim" disabled>Rechte</Button>
+              </InlineStack>
+            </div>
+
             {loading ? (
               <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
             ) : subusers.length === 0 ? (
-              <Box padding="400"><Text tone="subdued">Noch keine Benutzer hinzugefügt. Laden Sie einen Benutzer ein.</Text></Box>
+              <Box padding="400"><Text tone="subdued">Noch keine weiteren Benutzer hinzugefügt.</Text></Box>
             ) : (
               subusers.map((user, i) => (
                 <div
