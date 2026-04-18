@@ -270,6 +270,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const afterCleanRef = useRef(false);
   const [expandedVariantIndex, setExpandedVariantIndex] = useState(null);
   const dragGroupIdx = useRef(null);
+  const [eanLookupState, setEanLookupState] = useState(null); // null | "loading" | "found" | "not_found"
   // Variant image picker: null = closed, option_values[] = target variant being edited
   const [variantImgPickerTarget, setVariantImgPickerTarget] = useState(null);
   // Swatch image picker: null = closed, {gi, oi} = target group/option
@@ -478,6 +479,54 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const editingBullets = Array.isArray(editingTr.bullet_points)
     ? editingTr.bullet_points
     : (locale === "de" && Array.isArray(meta.bullet_points) ? meta.bullet_points : []);
+
+  // EAN lookup: when a new product's EAN is filled in, check if a master product exists and pre-fill form.
+  const handleEanBlur = useCallback(async () => {
+    if (!isNew) return;
+    const ean = getMeta(product, "ean");
+    if (!ean || String(ean).trim().length < 8) return;
+    setEanLookupState("loading");
+    try {
+      const match = await client.lookupProductByEan(String(ean).trim());
+      if (match) {
+        setEanLookupState("found");
+        // Pre-fill form with existing master product data (keep seller-owned fields empty)
+        setProduct((prev) => {
+          if (!prev) return prev;
+          const master = match;
+          const masterMeta = (master.metadata && typeof master.metadata === "object") ? { ...master.metadata } : {};
+          // Keep the new seller's own fields, copy catalog fields from master
+          const mergedMeta = {
+            ...masterMeta,
+            ean: String(ean).trim(),
+            sku: prev.metadata?.sku || "",
+            // clear seller-specific fields
+            seller_id: prev.metadata?.seller_id,
+            shop_name: prev.metadata?.shop_name,
+            seller_name: prev.metadata?.seller_name,
+            brand_id: prev.metadata?.brand_id,
+            shipping_group_id: prev.metadata?.shipping_group_id,
+            related_product_ids: [],
+          };
+          return {
+            ...prev,
+            title: master.title || prev.title,
+            description: master.description || prev.description,
+            handle: master.handle || prev.handle,
+            metadata: mergedMeta,
+            variants: Array.isArray(master.variants) && master.variants.length > 0
+              ? master.variants.map((v) => ({ ...v, sku: "", ean: "", inventory: 0, price: undefined, price_cents: 0 }))
+              : prev.variants,
+          };
+        });
+      } else {
+        setEanLookupState("not_found");
+        setTimeout(() => setEanLookupState(null), 3000);
+      }
+    } catch (_) {
+      setEanLookupState(null);
+    }
+  }, [isNew, product, client]);
 
   // New product: URL handle follows the current locale title automatically (SEO slug).
   useEffect(() => {
@@ -732,10 +781,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         ...(collectionId !== undefined && { collection_id: collectionId }),
       };
       if (isNew) {
-        const created = await client.createAdminHubProduct(payload);
-        setMessage({ type: "success", text: "Product created" });
+        const res = await client.createAdminHubProductRaw(payload);
+        const created = res?.product ?? res;
+        if (res?.deduplicated) {
+          setMessage({ type: "success", text: "Vorhandenes Produkt gefunden — alle Felder wurden automatisch befüllt." });
+        } else {
+          setMessage({ type: "success", text: "Produkt erstellt." });
+        }
         onReload?.();
-        router.push(`/products/${created?.id}`);
+        if (created?.id) router.push(`/products/${created.id}`);
         return;
       }
       const updatedRaw = await client.updateAdminHubProduct(idOrHandle, payload);
@@ -1417,9 +1471,37 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   <TextField label="SKU" labelHidden value={product.sku || ""} onChange={(v) => update({ sku: v })} placeholder="SKU" autoComplete="off" />
                 </Box>
                 <Box minWidth="240px" flex="1">
-                  <TextField label="EAN" labelHidden value={getMeta(product, "ean")} onChange={(v) => updateMeta("ean", v)} placeholder="EAN / Barcode" autoComplete="off" />
+                  <TextField
+                    label="EAN"
+                    labelHidden
+                    value={getMeta(product, "ean")}
+                    onChange={(v) => { updateMeta("ean", v); setEanLookupState(null); }}
+                    onBlur={handleEanBlur}
+                    placeholder="EAN / Barcode"
+                    autoComplete="off"
+                    suffix={
+                      eanLookupState === "loading" ? "⏳" :
+                      eanLookupState === "found" ? "✓ Produktdaten geladen" :
+                      eanLookupState === "not_found" ? "— Neu" : undefined
+                    }
+                  />
                 </Box>
               </InlineStack>
+
+              <Divider />
+              <Text as="h2" variant="bodyMd" fontWeight="regular">Produkt-Etikett</Text>
+              <Select
+                label="Badge / Etikett"
+                labelHidden
+                options={[
+                  { label: "Kein Etikett", value: "" },
+                  { label: "⭐ Bestseller", value: "bestseller" },
+                  { label: "🆕 Neu", value: "new" },
+                  { label: "🔥 Sale", value: "sale" },
+                ]}
+                value={getMeta(product, "badge") || ""}
+                onChange={(v) => updateMeta("badge", v || null)}
+              />
 
               <Divider />
               <Box padding="400" background="bg-surface-secondary" borderRadius="300" borderWidth="025" borderColor="border">

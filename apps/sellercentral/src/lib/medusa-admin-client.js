@@ -130,6 +130,16 @@ class MedusaAdminClient {
     }
   }
 
+  async lookupProductByEan(ean) {
+    try {
+      const res = await this.request(`/admin-hub/products/ean-lookup?ean=${encodeURIComponent(ean)}`);
+      return res?.product ?? null;
+    } catch (err) {
+      if (err?.statusCode === 404) return null;
+      return null;
+    }
+  }
+
   async createAdminHubProduct(data) {
     // Always tag the product with the current seller's ID (spread first so callers cannot overwrite seller_id)
     const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
@@ -143,6 +153,17 @@ class MedusaAdminClient {
       body: JSON.stringify(merged),
     });
     return res?.product ?? res;
+  }
+
+  // Like createAdminHubProduct but returns full response including deduplicated flag
+  async createAdminHubProductRaw(data) {
+    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
+    const merged = { ...(data && typeof data === 'object' ? data : {}) };
+    if (sellerId) {
+      merged.seller_id = sellerId;
+      merged.seller = sellerId;
+    }
+    return this.request('/admin-hub/products', { method: 'POST', body: JSON.stringify(merged) });
   }
 
   /** GET /admin-hub/products/:id – id (UUID) veya handle ile tek ürün (kısa URL için handle kullan) */

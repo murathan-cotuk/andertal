@@ -3546,6 +3546,33 @@ async function start() {
     }
     httpApp.get('/admin-hub/products', adminHubProductsGET)
     httpApp.post('/admin-hub/products', adminHubProductsPOST)
+    // EAN lookup — returns master product by EAN without seller filter (read-only, catalog fields only)
+    httpApp.get('/admin-hub/products/ean-lookup', requireSellerAuth, async (req, res) => {
+      try {
+        const ean = String(req.query.ean || '').trim()
+        if (!ean) return res.status(400).json({ message: 'ean query param required' })
+        const normEan = normalizeStoreEan(ean)
+        const allProds = await listAdminHubProductsDb({ limit: 5000 })
+        const master = allProds.find((p) => extractEanFromHubProductRow(p) === normEan && !p.seller_id)
+          || allProds.find((p) => extractEanFromHubProductRow(p) === normEan)
+          || null
+        if (!master) return res.status(404).json({ message: 'No product found with this EAN' })
+        // Return catalog-only fields (strip seller pricing)
+        const catalogProduct = {
+          id: master.id,
+          title: master.title,
+          handle: master.handle,
+          description: master.description,
+          metadata: master.metadata && typeof master.metadata === 'object' ? { ...master.metadata } : {},
+          variants: Array.isArray(master.variants)
+            ? master.variants.map((v) => ({ ...v, sku: undefined, ean: (v && v.ean) || undefined, price: undefined, price_cents: 0, inventory: 0, inventory_quantity: 0 }))
+            : [],
+        }
+        res.json({ product: catalogProduct, found: true })
+      } catch (err) {
+        res.status(500).json({ message: err?.message || 'Lookup failed' })
+      }
+    })
     httpApp.get('/admin-hub/products/:id', adminHubProductByIdGET)
     httpApp.put('/admin-hub/products/:id', adminHubProductByIdPUT)
     httpApp.delete('/admin-hub/products/:id', adminHubProductByIdDELETE)
