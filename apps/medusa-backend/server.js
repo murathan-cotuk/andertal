@@ -159,6 +159,29 @@ const log = {
   error: (...a) => console.error(...a),
 }
 
+// ── Zod validation helper ─────────────────────────────────────────────────────
+// Usage: const parsed = validate(MySchema, req.body, res)
+//        if (!parsed) return   ← res already sent with 400
+const { z } = require('zod')
+function validate(schema, body, res) {
+  const result = schema.safeParse(body)
+  if (!result.success) {
+    const first = result.error.errors[0]
+    const msg = first ? `${first.path.join('.') || 'field'}: ${first.message}` : 'Invalid input'
+    res.status(400).json({ message: msg })
+    return null
+  }
+  return result.data
+}
+
+// Common field schemas reused across multiple endpoints
+const zEmail    = z.string().email('Invalid email address').max(254)
+const zPassword = z.string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[a-zA-Z]/, 'Password must contain at least one letter')
+  .regex(/[0-9]/, 'Password must contain at least one number')
+const zUrl      = z.string().url('Invalid URL').or(z.literal('')).optional()
+
 // ── Production security check (startup) ───────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const missing = []
@@ -254,6 +277,21 @@ async function start() {
     app.use('/admin-hub/auth/register', registerLimiter)
     app.use('/store/customers', registerLimiter)   // customer register
     app.use('/store/payment-intent', paymentLimiter)
+
+    // ── DB connection helper ─────────────────────────────────────────────────
+    // Wraps connect → fn(client) → end in a guaranteed finally so connections
+    // are always released even on early returns or thrown errors.
+    // Usage: const result = await withClient(getSellerDbClient, async (client) => { ... })
+    async function withClient(getClient, fn) {
+      const client = getClient()
+      if (!client) throw Object.assign(new Error('Database not configured'), { status: 503 })
+      await client.connect()
+      try {
+        return await fn(client)
+      } finally {
+        await client.end().catch(() => {})
+      }
+    }
 
     // ── Password strength validation ──────────────────────────────────────────
     // Returns an error string if the password is too weak, or null if it's ok.
@@ -1552,12 +1590,13 @@ async function start() {
         const isRender = dbUrl.includes('render.com')
         const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const res = await client.query('SELECT id, title, handle, metadata FROM admin_hub_collections ORDER BY title')
-        await client.end()
-        return (res.rows || []).map(r => {
-          const meta = r.metadata && typeof r.metadata === 'object' ? r.metadata : {}
-          return { id: r.id, title: r.title, handle: r.handle, image_url: meta.image_url || null, banner_image_url: meta.banner_image_url || null }
-        })
+        try {
+          const res = await client.query('SELECT id, title, handle, metadata FROM admin_hub_collections ORDER BY title')
+          return (res.rows || []).map(r => {
+            const meta = r.metadata && typeof r.metadata === 'object' ? r.metadata : {}
+            return { id: r.id, title: r.title, handle: r.handle, image_url: meta.image_url || null, banner_image_url: meta.banner_image_url || null }
+          })
+        } finally { await client.end().catch(() => {}) }
       } catch (_) { return [] }
     }
     const createAdminHubCollectionDb = async (title, handle) => {
@@ -1568,12 +1607,13 @@ async function start() {
         const isRender = dbUrl.includes('render.com')
         const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const res = await client.query(
-          'INSERT INTO admin_hub_collections (title, handle) VALUES ($1, $2) ON CONFLICT (handle) DO UPDATE SET title = $1 RETURNING id, title, handle',
-          [title, handle]
-        )
-        await client.end()
-        return res.rows && res.rows[0] ? res.rows[0] : null
+        try {
+          const res = await client.query(
+            'INSERT INTO admin_hub_collections (title, handle) VALUES ($1, $2) ON CONFLICT (handle) DO UPDATE SET title = $1 RETURNING id, title, handle',
+            [title, handle]
+          )
+          return res.rows && res.rows[0] ? res.rows[0] : null
+        } finally { await client.end().catch(() => {}) }
       } catch (e) {
         console.warn('createAdminHubCollectionDb:', e && e.message)
         return null
@@ -1618,9 +1658,10 @@ async function start() {
         const isRender = dbUrl.includes('render.com')
         const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const res = await client.query('DELETE FROM admin_hub_collections WHERE id = $1 RETURNING id', [id])
-        await client.end()
-        return res.rowCount > 0
+        try {
+          const res = await client.query('DELETE FROM admin_hub_collections WHERE id = $1 RETURNING id', [id])
+          return res.rowCount > 0
+        } finally { await client.end().catch(() => {}) }
       } catch (e) {
         console.warn('deleteAdminHubCollectionDb:', e && e.message)
         return false
@@ -1672,9 +1713,10 @@ async function start() {
         const isRender = dbUrl.includes('render.com')
         const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const res = await client.query('SELECT id, title, handle, metadata FROM admin_hub_collections WHERE LOWER(handle) = LOWER($1)', [handle.trim()])
-        await client.end()
-        return res.rows && res.rows[0] ? res.rows[0] : null
+        try {
+          const res = await client.query('SELECT id, title, handle, metadata FROM admin_hub_collections WHERE LOWER(handle) = LOWER($1)', [handle.trim()])
+          return res.rows && res.rows[0] ? res.rows[0] : null
+        } finally { await client.end().catch(() => {}) }
       } catch (_) { return null }
     }
 
@@ -2815,10 +2857,11 @@ async function start() {
         const isRender = dbUrl.includes('render.com')
         const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const res = await client.query('SELECT id, slug, label, html_id, sort_order FROM admin_hub_menu_locations ORDER BY sort_order ASC, slug ASC')
-        const list = (res.rows || []).map((r) => ({ id: r.id, slug: r.slug, label: r.label, html_id: r.html_id || null, sort_order: r.sort_order ?? 0 }))
-        await client.end()
-        return list
+        try {
+          const res = await client.query('SELECT id, slug, label, html_id, sort_order FROM admin_hub_menu_locations ORDER BY sort_order ASC, slug ASC')
+          const list = (res.rows || []).map((r) => ({ id: r.id, slug: r.slug, label: r.label, html_id: r.html_id || null, sort_order: r.sort_order ?? 0 }))
+          return list
+        } finally { await client.end().catch(() => {}) }
       } catch (e) {
         console.warn('Menu locations from DB:', e && e.message)
         return null
@@ -3864,28 +3907,31 @@ async function start() {
     }
     httpApp.get('/store/approved-seller-ids', approvedSellerIdsStoreGET)
     const sellerSettingsGET = async (req, res) => {
+      const sellerId = (req.query.seller_id || 'default').toString().trim() || 'default'
+      const client = getProductsDbClient()
+      if (!client) return res.json({ store_name: '' })
       try {
-        const sellerId = (req.query.seller_id || 'default').toString().trim() || 'default'
-        const client = getProductsDbClient()
-        if (!client) return res.json({ store_name: '' })
         await client.connect()
-        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
-        await client.end()
-        const row = r.rows && r.rows[0]
-        const store_name = row && row.store_name != null ? String(row.store_name) : ''
-        let free_shipping_thresholds = (row && row.free_shipping_thresholds) || null
-        if (free_shipping_thresholds && typeof free_shipping_thresholds === 'object') {
-          free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
+        try {
+          const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+          const row = r.rows && r.rows[0]
+          const store_name = row && row.store_name != null ? String(row.store_name) : ''
+          let free_shipping_thresholds = (row && row.free_shipping_thresholds) || null
+          if (free_shipping_thresholds && typeof free_shipping_thresholds === 'object') {
+            free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
+          }
+          const shop_logo_url = row && row.shop_logo_url ? String(row.shop_logo_url) : ''
+          const shop_favicon_url = row && row.shop_favicon_url ? String(row.shop_favicon_url) : ''
+          const sellercentral_logo_url = row && row.sellercentral_logo_url ? String(row.sellercentral_logo_url) : ''
+          const sellercentral_favicon_url = row && row.sellercentral_favicon_url ? String(row.sellercentral_favicon_url) : ''
+          const shop_logo_height = row && row.shop_logo_height != null ? Number(row.shop_logo_height) : 34
+          const sellercentral_logo_height = row && row.sellercentral_logo_height != null ? Number(row.sellercentral_logo_height) : 30
+          const platform_name = row && row.platform_name ? String(row.platform_name) : ''
+          const support_email = row && row.support_email ? String(row.support_email) : ''
+          res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email })
+        } finally {
+          await client.end().catch(() => {})
         }
-        const shop_logo_url = row && row.shop_logo_url ? String(row.shop_logo_url) : ''
-        const shop_favicon_url = row && row.shop_favicon_url ? String(row.shop_favicon_url) : ''
-        const sellercentral_logo_url = row && row.sellercentral_logo_url ? String(row.sellercentral_logo_url) : ''
-        const sellercentral_favicon_url = row && row.sellercentral_favicon_url ? String(row.sellercentral_favicon_url) : ''
-        const shop_logo_height = row && row.shop_logo_height != null ? Number(row.shop_logo_height) : 34
-        const sellercentral_logo_height = row && row.sellercentral_logo_height != null ? Number(row.sellercentral_logo_height) : 30
-        const platform_name = row && row.platform_name ? String(row.platform_name) : ''
-        const support_email = row && row.support_email ? String(row.support_email) : ''
-        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height })
       } catch (err) {
         console.error('sellerSettingsGET:', err)
         res.json({ store_name: '', shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30 })
@@ -4035,17 +4081,27 @@ async function start() {
     }
 
     // POST /admin-hub/auth/register
+    const SellerRegisterSchema = z.object({
+      email:        zEmail,
+      password:     zPassword,
+      store_name:   z.string().max(120).optional(),
+      storeName:    z.string().max(120).optional(),
+      invite_token: z.string().max(200).optional(),
+      first_name:   z.string().max(60).optional(),
+      last_name:    z.string().max(60).optional(),
+      agreement_accepted: z.boolean().optional(),
+      agreement_version:  z.string().optional(),
+    })
     const sellerAuthRegisterPOST = async (req, res) => {
-      const body = req.body || {}
-      const email = (body.email || '').trim().toLowerCase()
-      const password = (body.password || '').toString()
+      const parsed = validate(SellerRegisterSchema, req.body || {}, res)
+      if (!parsed) return
+      const body = parsed
+      const email = body.email.trim().toLowerCase()
+      const password = body.password
       const store_name = (body.store_name || body.storeName || '').trim()
       const invite_token = (body.invite_token || '').trim()
       const first_name = (body.first_name || '').trim()
       const last_name = (body.last_name || '').trim()
-      if (!email || !password) return res.status(400).json({ message: 'Email and password are required' })
-      const pwErrReg = validatePasswordStrength(password)
-      if (pwErrReg) return res.status(400).json({ message: pwErrReg })
       const client = getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
@@ -4151,12 +4207,18 @@ async function start() {
     }
 
     // POST /admin-hub/auth/login
+    const SellerLoginSchema = z.object({
+      email:     zEmail,
+      password:  z.string().min(1, 'Password is required').max(256),
+      totp_code: z.string().max(8).optional(),
+    })
     const sellerAuthLoginPOST = async (req, res) => {
-      const body = req.body || {}
-      const email = (body.email || '').trim().toLowerCase()
-      const password = (body.password || '').toString()
-      const totpCode = String(body.totp_code || '').trim().replace(/\s/g, '')
-      if (!email || !password) return res.status(400).json({ message: 'Email and password are required' })
+      const parsed = validate(SellerLoginSchema, req.body || {}, res)
+      if (!parsed) return
+      const body = parsed
+      const email = body.email.trim().toLowerCase()
+      const password = body.password
+      const totpCode = (body.totp_code || '').trim().replace(/\s/g, '')
       const client = getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
@@ -6204,13 +6266,19 @@ async function start() {
     }
 
     // POST /store/customers — register customer
+    const CustomerRegisterSchema = z.object({
+      email:      zEmail,
+      password:   zPassword,
+      first_name: z.string().max(60).optional(),
+      last_name:  z.string().max(60).optional(),
+      phone:      z.string().max(30).optional(),
+    })
     const storeCustomerRegisterPOST = async (req, res) => {
-      const body = req.body || {}
-      const email = (body.email || '').trim().toLowerCase()
-      const password = (body.password || '').toString()
-      if (!email || !password) return res.status(400).json({ message: 'Email and password are required' })
-      const pwErrCust = validatePasswordStrength(password)
-      if (pwErrCust) return res.status(400).json({ message: pwErrCust })
+      const parsed = validate(CustomerRegisterSchema, req.body || {}, res)
+      if (!parsed) return
+      const body = parsed
+      const email = body.email.trim().toLowerCase()
+      const password = body.password
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
       let client
@@ -10523,39 +10591,39 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        try {
+          const { apiKey, username, password, basicOk } = getBillbeeAuthFromReq(req)
+          if (!basicOk || !username || !password) {
+            return res.status(401).json({ message: 'Unauthorized' })
+          }
 
-        const { apiKey, username, password, basicOk } = getBillbeeAuthFromReq(req)
-        if (!basicOk || !username || !password) {
-          return res.status(401).json({ message: 'Unauthorized' })
+          let q
+          if (apiKey) {
+            q = await client.query(
+              `SELECT seller_id, billbee_basic_username, billbee_basic_password
+               FROM admin_hub_seller_settings
+               WHERE billbee_api_key = $1::text
+               LIMIT 1`,
+              [apiKey],
+            )
+          } else {
+            q = await client.query(
+              `SELECT seller_id, billbee_basic_username, billbee_basic_password
+               FROM admin_hub_seller_settings
+               WHERE billbee_basic_username = $1::text AND billbee_basic_password = $2::text
+               LIMIT 1`,
+              [username, password],
+            )
+          }
+          const row = q.rows && q.rows[0]
+          if (!row) return res.status(401).json({ message: 'Unauthorized' })
+          const ok = String(row.billbee_basic_username || '') === username && String(row.billbee_basic_password || '') === password
+          if (!ok) return res.status(401).json({ message: 'Unauthorized' })
+          res.json({ ok: true, type: 'billbee_webhook', message: 'Billbee connection ok.' })
+        } finally {
+          await client.end().catch(() => {})
         }
-
-        let q
-        if (apiKey) {
-          q = await client.query(
-            `SELECT seller_id, billbee_basic_username, billbee_basic_password
-             FROM admin_hub_seller_settings
-             WHERE billbee_api_key = $1::text
-             LIMIT 1`,
-            [apiKey],
-          )
-        } else {
-          q = await client.query(
-            `SELECT seller_id, billbee_basic_username, billbee_basic_password
-             FROM admin_hub_seller_settings
-             WHERE billbee_basic_username = $1::text AND billbee_basic_password = $2::text
-             LIMIT 1`,
-            [username, password],
-          )
-        }
-        const row = q.rows && q.rows[0]
-        if (!row) return res.status(401).json({ message: 'Unauthorized' })
-        const ok = String(row.billbee_basic_username || '') === username && String(row.billbee_basic_password || '') === password
-        if (!ok) return res.status(401).json({ message: 'Unauthorized' })
-
-        await client.end()
-        res.json({ ok: true, type: 'billbee_webhook', message: 'Billbee connection ok.' })
       } catch (e) {
-        if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Billbee webhook error' })
       }
     }
@@ -13309,16 +13377,18 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    const PasswordChangeSchema = z.object({
+      current_password: z.string().min(1, 'Current password is required').max(256),
+      new_password:     zPassword,
+    })
     /** PATCH /admin-hub/v1/seller/password — eigenes Passwort (nur eingeloggter Benutzer) */
     const adminHubSellerPasswordPATCH = async (req, res) => {
       const userId = req.sellerUser?.id
       if (!userId) return res.status(401).json({ message: 'Unauthorized' })
-      const { current_password, new_password } = req.body || {}
-      const cur = (current_password || '').toString()
-      const neu = (new_password || '').toString()
-      if (!cur || !neu) return res.status(400).json({ message: 'Aktuelles und neues Passwort sind erforderlich.' })
-      const pwErrChange = validatePasswordStrength(neu)
-      if (pwErrChange) return res.status(400).json({ message: pwErrChange })
+      const parsed = validate(PasswordChangeSchema, req.body || {}, res)
+      if (!parsed) return
+      const cur = parsed.current_password
+      const neu = parsed.new_password
       const client = getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {

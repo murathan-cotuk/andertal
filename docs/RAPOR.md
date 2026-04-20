@@ -19,15 +19,15 @@ KRİTİK (Production'a çıkmadan mutlaka düzeltilmesi gereken)
   ---
   ÖNEMLİ (Kısa vadede ele alınması gereken)
 
-  5. typescript: { ignoreBuildErrors: true }
+  *5. DONE typescript: { ignoreBuildErrors: true }
   apps/shop/next.config.js:20 — TypeScript hataları build'de yakalanmıyor. Runtime crash'lere davetiye. apps/sellercentral/next.config.js'de 
   de aynı durum var mı kontrol edilmeli.
 
-  6. 182 console. Çağrısı — Sadece Backend'de*
+  *6. DONE 182 console. Çağrısı — Sadece Backend'de*
   Sensitive hata detayları, path bilgileri ve kullanıcı verileri production loglarına sızabiliyor. Pino zaten package.json'da var ama        
   kullanılmıyor; tüm console.log'ların pino'ya taşınması gerekiyor.
 
-  7. Register Endpoint'inde Rate Limit Yok
+  *7. DONE Register Endpoint'inde Rate Limit Yok
   Login için authLimiter var (server.js:208), ancak /admin-hub/auth/register sınırsız. Spam kayıt saldırısına açık.
 
   8. Zod Package'ı Var, Hiç Kullanılmıyor
