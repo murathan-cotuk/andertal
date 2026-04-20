@@ -148,10 +148,24 @@ const rateLimit = require('express-rate-limit')
 const PORT = process.env.PORT || 9000
 const HOST = process.env.HOST || '0.0.0.0'
 
+// ── Production security check (startup) ───────────────────────────────────────
+if (process.env.NODE_ENV === 'production') {
+  const missing = []
+  if (!process.env.SELLER_JWT_SECRET && !process.env.JWT_SECRET) missing.push('SELLER_JWT_SECRET')
+  if (!process.env.CUSTOMER_JWT_SECRET && !process.env.JWT_SECRET) missing.push('CUSTOMER_JWT_SECRET')
+  if (!process.env.DATABASE_URL) missing.push('DATABASE_URL')
+  if (missing.length) {
+    console.error(`[SECURITY] Missing required environment variables in production: ${missing.join(', ')}`)
+    console.error('[SECURITY] Server startup aborted. Set these variables in your deployment environment.')
+    process.exit(1)
+  }
+}
+
 // CORS: Vercel/Render'da frontend origin'leri env ile verin (virgülle ayrılmış).
 // Örnek: CORS_ORIGINS=https://belucha-sellercentral.vercel.app,https://belucha-shop.vercel.app
-// Render'da bu değişkeni ayarlamazsanız production'da tüm origin'lere izin verilir (güvenlik için ayarlamanız önerilir).
+// Production'da CORS_ORIGINS ayarlanmazsa yalnızca localhost'a izin verilir — "herkese aç" bırakılmaz.
 function getAllowedOrigins() {
+  const isProduction = process.env.NODE_ENV === 'production'
   const env = process.env.CORS_ORIGINS || process.env.ALLOWED_ORIGINS
   if (env) {
     return env.split(',').map((o) => o.trim()).filter(Boolean)
@@ -160,7 +174,11 @@ function getAllowedOrigins() {
   const admin = (process.env.ADMIN_CORS || '').split(',').map((o) => o.trim()).filter(Boolean)
   const combined = [...new Set([...store, ...admin])]
   if (combined.length) return combined
-  if (process.env.NODE_ENV === 'production') return null // null = allow all origins (Render'da CORS_ORIGINS yoksa)
+  if (isProduction) {
+    // Production'da hiçbir env tanımlanmamışsa: CORS'u kapat, boş liste = herkesi reddet
+    console.warn('[SECURITY] CORS_ORIGINS env var is not set in production! All cross-origin requests will be blocked. Set CORS_ORIGINS to allow your frontend domains.')
+    return []
+  }
   return ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002']
 }
 
@@ -178,17 +196,11 @@ async function start() {
     app.use(express.json({ limit: jsonBodyLimit }))
     app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }))
     const allowedOrigins = getAllowedOrigins()
-    const allowAllOrigins = allowedOrigins === null
-    if (allowAllOrigins) {
-      console.log('CORS: allowing all origins (production, CORS_ORIGINS not set). Set CORS_ORIGINS on Render for stricter security.')
-    } else {
-      console.log('CORS allowed origins:', allowedOrigins.join(', ') || '(none)')
-    }
+    console.log('CORS allowed origins:', allowedOrigins.length ? allowedOrigins.join(', ') : '(localhost only — set CORS_ORIGINS in production)')
     app.use(cors({
       origin: (origin, cb) => {
-        if (!origin) return cb(null, true) // same-origin / Postman
-        if (allowAllOrigins) return cb(null, true)
-        // Yerel geliştirme: localhost her zaman kabul (Render'da CORS_ORIGINS sadece Vercel olsa bile)
+        if (!origin) return cb(null, true) // same-origin / server-to-server / Postman
+        // Geliştirme ortamında localhost her zaman kabul edilir
         if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return cb(null, true)
         if (allowedOrigins.includes(origin)) return cb(null, true)
         return cb(null, false)
@@ -3843,7 +3855,17 @@ async function start() {
     console.log('Admin Hub routes: GET/PATCH /admin-hub/seller-settings')
 
     // ── Seller Auth ───────────────────────────────────────────────────────────
-    const SELLER_JWT_SECRET = (process.env.JWT_SECRET || 'belucha-seller-secret-2025')
+    const _isProduction = process.env.NODE_ENV === 'production'
+    const _rawSellerSecret = process.env.SELLER_JWT_SECRET || process.env.JWT_SECRET || ''
+    if (!_rawSellerSecret && _isProduction) {
+      console.error('[SECURITY] SELLER_JWT_SECRET env var is not set in production! Server cannot start safely.')
+      process.exit(1)
+    }
+    const SELLER_JWT_SECRET = _rawSellerSecret || 'dev-only-seller-secret-do-not-use-in-prod'
+
+    // Token lifetime: 7 days (previously 30 days — too long for stolen-token exposure window)
+    const SELLER_TOKEN_TTL_SECONDS = 7 * 24 * 3600
+
     // Initial superuser email(s) — can also be managed via DB
     const INITIAL_SUPERUSER_EMAILS = (process.env.SUPERUSER_EMAILS || 'murathan.cotuk@gmail.com')
       .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
@@ -3851,7 +3873,7 @@ async function start() {
     function signSellerToken(payload) {
       const _c = require('crypto')
       const header = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')
-      const body = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 30 * 24 * 3600 })).toString('base64url')
+      const body = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + SELLER_TOKEN_TTL_SECONDS })).toString('base64url')
       const sig = _c.createHmac('sha256', SELLER_JWT_SECRET).update(`${header}.${body}`).digest('base64url')
       return `${header}.${body}.${sig}`
     }
@@ -6027,7 +6049,14 @@ async function start() {
 
     // ── Customer Auth Helpers ─────────────────────────────────────────────
     const _crypto = require('crypto')
-    const CUSTOMER_JWT_SECRET = (process.env.JWT_SECRET || 'belucha-jwt-secret-change-in-prod')
+    const _rawCustomerSecret = process.env.CUSTOMER_JWT_SECRET || process.env.JWT_SECRET || ''
+    if (!_rawCustomerSecret && _isProduction) {
+      console.error('[SECURITY] CUSTOMER_JWT_SECRET env var is not set in production! Server cannot start safely.')
+      process.exit(1)
+    }
+    const CUSTOMER_JWT_SECRET = _rawCustomerSecret || 'dev-only-customer-secret-do-not-use-in-prod'
+    // Token lifetime: 7 days (same as seller tokens)
+    const CUSTOMER_TOKEN_TTL_SECONDS = 7 * 24 * 3600
 
     function hashPassword(password) {
       const salt = _crypto.randomBytes(16).toString('hex')
@@ -6046,7 +6075,7 @@ async function start() {
 
     function signCustomerToken(payload) {
       const header = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')
-      const body = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 30 * 24 * 3600 })).toString('base64url')
+      const body = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + CUSTOMER_TOKEN_TTL_SECONDS })).toString('base64url')
       const sig = _crypto.createHmac('sha256', CUSTOMER_JWT_SECRET).update(`${header}.${body}`).digest('base64url')
       return `${header}.${body}.${sig}`
     }
