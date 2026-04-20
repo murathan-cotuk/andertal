@@ -151,7 +151,7 @@
       "errorRequired": "E-Mail und Passwort sind Pflichtfelder",
       "errorStoreName": "Shop-Name ist ein Pflichtfeld",
       "errorName": "Vor- und Nachname sind Pflichtfelder",
-      "errorPasswordLength": "Passwort muss mindestens 6 Zeichen haben",
+      "errorPasswordLength": "Passwort muss mindestens 8 Zeichen, einen Buchstaben und eine Zahl enthalten",
       "errorTerms": "Bitte akzeptieren Sie die Nutzungsbedingungen und Datenschutzrichtlinie.",
       "errorFailed": "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut."
     }

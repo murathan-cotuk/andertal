@@ -343,8 +343,8 @@ export default function SecuritySettingsPage() {
       setErr("Die neuen Passwörter stimmen nicht überein.");
       return;
     }
-    if (newPw.length < 6) {
-      setErr("Neues Passwort muss mindestens 6 Zeichen haben.");
+    if (newPw.length < 8 || !/[a-zA-Z]/.test(newPw) || !/[0-9]/.test(newPw)) {
+      setErr("Neues Passwort muss mindestens 8 Zeichen, einen Buchstaben und eine Zahl enthalten.");
       return;
     }
     setSaving(true);
@@ -473,7 +473,7 @@ export default function SecuritySettingsPage() {
                 value={newPw}
                 onChange={setNewPw}
                 autoComplete="new-password"
-                helpText="Mindestens 6 Zeichen"
+                helpText="Mindestens 8 Zeichen, ein Buchstabe und eine Zahl"
               />
               <TextField
                 label="Neues Passwort bestätigen"

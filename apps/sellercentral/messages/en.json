@@ -151,7 +151,7 @@
       "errorRequired": "Email and password are required",
       "errorStoreName": "Store name is required",
       "errorName": "First and last name are required",
-      "errorPasswordLength": "Password must be at least 6 characters",
+      "errorPasswordLength": "Password must be at least 8 characters and contain a letter and a number",
       "errorTerms": "Please accept the Terms of Service and Privacy Policy.",
       "errorFailed": "Registration failed. Please try again."
     }

@@ -224,6 +224,13 @@ async function start() {
       legacyHeaders: false,
       message: { error: 'Too many login attempts. Please try again later.' },
     })
+    const registerLimiter = rateLimit({
+      windowMs: 60 * 60 * 1000, // 1 hour
+      max: 10,                  // 10 registration attempts per hour per IP
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      message: { error: 'Too many registration attempts. Please try again later.' },
+    })
     const paymentLimiter = rateLimit({
       windowMs: 60 * 1000,       // 1 minute
       max: 10,                   // 10 payment intents per minute per IP
@@ -233,7 +240,20 @@ async function start() {
     })
     app.use(generalLimiter)
     app.use('/admin-hub/auth/login', authLimiter)
+    app.use('/admin-hub/auth/register', registerLimiter)
+    app.use('/store/customers', registerLimiter)   // customer register
     app.use('/store/payment-intent', paymentLimiter)
+
+    // ── Password strength validation ──────────────────────────────────────────
+    // Returns an error string if the password is too weak, or null if it's ok.
+    // Rules: min 8 chars, at least 1 letter, at least 1 digit.
+    function validatePasswordStrength(password) {
+      if (!password || typeof password !== 'string') return 'Password is required.'
+      if (password.length < 8) return 'Password must be at least 8 characters.'
+      if (!/[a-zA-Z]/.test(password)) return 'Password must contain at least one letter.'
+      if (!/[0-9]/.test(password)) return 'Password must contain at least one number.'
+      return null
+    }
 
     // Root ve health: "Cannot GET /" yerine JSON döner
     app.get('/', (req, res) => {
@@ -3942,7 +3962,8 @@ async function start() {
       const first_name = (body.first_name || '').trim()
       const last_name = (body.last_name || '').trim()
       if (!email || !password) return res.status(400).json({ message: 'Email and password are required' })
-      if (password.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' })
+      const pwErrReg = validatePasswordStrength(password)
+      if (pwErrReg) return res.status(400).json({ message: pwErrReg })
       const client = getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
@@ -4266,7 +4287,8 @@ async function start() {
       const is_superuser = !!body.is_superuser
       const permissions = body.permissions || null
       if (!email || !password) return res.status(400).json({ message: 'Email and password required' })
-      if (password.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' })
+      const pwErrCreate = validatePasswordStrength(password)
+      if (pwErrCreate) return res.status(400).json({ message: pwErrCreate })
       const client = getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
@@ -4309,7 +4331,7 @@ async function start() {
         if (body.store_name !== undefined) { params.push(body.store_name || null); sets.push(`store_name = $${params.length}`) }
         if (body.is_superuser !== undefined) { params.push(!!body.is_superuser); sets.push(`is_superuser = $${params.length}`) }
         if (body.permissions !== undefined) { params.push(body.permissions ? JSON.stringify(body.permissions) : null); sets.push(`permissions = $${params.length}`) }
-        if (body.password && body.password.length >= 6) { params.push(hashSellerPassword(body.password)); sets.push(`password_hash = $${params.length}`) }
+        if (body.password && !validatePasswordStrength(body.password)) { params.push(hashSellerPassword(body.password)); sets.push(`password_hash = $${params.length}`) }
         params.push(id)
         const r = await client.query(
           `UPDATE seller_users SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING id, email, store_name, seller_id, is_superuser, permissions, created_at`,
@@ -6107,7 +6129,8 @@ async function start() {
       const email = (body.email || '').trim().toLowerCase()
       const password = (body.password || '').toString()
       if (!email || !password) return res.status(400).json({ message: 'Email and password are required' })
-      if (password.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' })
+      const pwErrCust = validatePasswordStrength(password)
+      if (pwErrCust) return res.status(400).json({ message: pwErrCust })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
       let client
@@ -13223,7 +13246,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const cur = (current_password || '').toString()
       const neu = (new_password || '').toString()
       if (!cur || !neu) return res.status(400).json({ message: 'Aktuelles und neues Passwort sind erforderlich.' })
-      if (neu.length < 6) return res.status(400).json({ message: 'Neues Passwort muss mindestens 6 Zeichen haben.' })
+      const pwErrChange = validatePasswordStrength(neu)
+      if (pwErrChange) return res.status(400).json({ message: pwErrChange })
       const client = getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {

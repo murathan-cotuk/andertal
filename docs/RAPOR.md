@@ -1,6 +1,6 @@
 KRİTİK (Production'a çıkmadan mutlaka düzeltilmesi gereken)
 
-  1. JWT Secret Hardcoded
+  *1. DONE JWT Secret Hardcoded
   server.js:3846 — JWT_SECRET env var yoksa 'belucha-seller-secret-2025' fallback kullanılıyor. Aynı secret hem seller hem customer token'ı  
   için kullanılıyor. Production'da bu secret bilinirse tüm hesaplar taklit edilebilir. Seller ve customer için ayrı, zorunlu env var'lar     
   olmalı.

@@ -379,7 +379,7 @@ function SuperUserModal({ user, onClose, onSaved }) {
             <TextField label={isEdit ? "Neues Passwort (leer = nicht ändern)" : "Passwort *"}
               type="password" value={form.password}
               onChange={(v) => set("password", v)} autoComplete="new-password"
-              helpText={isEdit ? "Leer lassen um nicht zu ändern" : "Mindestens 6 Zeichen"} />
+              helpText={isEdit ? "Leer lassen um nicht zu ändern" : "Min. 8 Zeichen, ein Buchstabe & eine Zahl"} />
           </div>
           <Checkbox
             label="Superuser (voller Zugriff, keine Beschränkungen)"

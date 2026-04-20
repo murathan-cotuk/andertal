@@ -151,7 +151,7 @@
       "errorRequired": "E-mail e password sono obbligatori",
       "errorStoreName": "Il nome del negozio è obbligatorio",
       "errorName": "Nome e cognome sono obbligatori",
-      "errorPasswordLength": "La password deve essere di almeno 6 caratteri",
+      "errorPasswordLength": "La password deve essere di almeno 8 caratteri, contenere una lettera e un numero",
       "errorTerms": "Accetta i termini di servizio e l'informativa sulla privacy.",
       "errorFailed": "Registrazione non riuscita. Riprova."
     }

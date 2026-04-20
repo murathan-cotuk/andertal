@@ -36,7 +36,7 @@ function RegisterForm() {
     if (!email || !password) { setError(t("errorRequired")); return; }
     if (!isInvited && !storeName) { setError(t("errorStoreName")); return; }
     if (isInvited && (!firstName || !lastName)) { setError(t("errorName")); return; }
-    if (password.length < 6) { setError(t("errorPasswordLength")); return; }
+    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) { setError(t("errorPasswordLength")); return; }
     if (!agreementAccepted) { setError(t("errorTerms")); return; }
     setLoading(true);
     try {

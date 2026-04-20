@@ -151,7 +151,7 @@
       "errorRequired": "E-posta ve şifre zorunludur",
       "errorStoreName": "Mağaza adı zorunludur",
       "errorName": "Ad ve soyad zorunludur",
-      "errorPasswordLength": "Şifre en az 6 karakter olmalıdır",
+      "errorPasswordLength": "Şifre en az 8 karakter olmalı ve bir harf ile bir rakam içermelidir",
       "errorTerms": "Lütfen Kullanım Koşulları ve Gizlilik Politikasını kabul edin.",
       "errorFailed": "Kayıt başarısız. Lütfen tekrar deneyin."
     }
