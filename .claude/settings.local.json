@@ -86,7 +86,8 @@
       "Bash(python3 -c \"import sys,json; v=json.load\\(sys.stdin\\); print\\(v[-1] if isinstance\\(v,list\\) else v\\)\")",
       "Bash(mkdir -p \"C:/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/sellercentral/src/app/[locale]/products/product-groups\")",
       "Bash(mkdir -p \"C:/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/sellercentral/src/app/[locale]/discounts/campaigns\")",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(xargs wc *)"
     ]
   }
 }

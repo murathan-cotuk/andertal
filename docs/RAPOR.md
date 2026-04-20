@@ -30,11 +30,11 @@ KRİTİK (Production'a çıkmadan mutlaka düzeltilmesi gereken)
   *7. DONE Register Endpoint'inde Rate Limit Yok
   Login için authLimiter var (server.js:208), ancak /admin-hub/auth/register sınırsız. Spam kayıt saldırısına açık.
 
-  8. Zod Package'ı Var, Hiç Kullanılmıyor
+  *8. DONE Zod Package'ı Var, Hiç Kullanılmıyor
   package.json'da zod tanımlı ama backend'de input validation yok. Email format, EAN uzunluğu, fiyat aralığı gibi temel validasyonlar çıplak 
   string işlemiyle yapılıyor.
 
-  9. Yarım Kalmış / Stub Sayfalar
+  *9. DONE Yarım Kalmış / Stub Sayfalar
   Sellercentral'da şu sayfalar içerik olarak boş:
   - BannersPage.jsx → "Banner management coming soon."
   - PlatformSettingsPage.jsx → "Platform settings coming soon."

@@ -21,10 +21,20 @@ import { findShippingGroup, resolveShippingQuoteCents, resolveShippingQuoteStric
 import Carousel from "@/components/Carousel";
 import { StarRating } from "@/components/ProductCard";
 import { ProductCard } from "@/components/ProductCard";
-import { Lightbox } from "@/components/Lightbox";
+import dynamic from "next/dynamic";
+// Lightbox only mounts when the user clicks an image — lazy-load to keep initial bundle lean.
+const Lightbox = dynamic(
+  () => import("@/components/Lightbox").then((m) => ({ default: m.Lightbox })),
+  { ssr: false }
+);
+// TrustpilotTrustBox injects a third-party script — defer until after hydration.
+const TrustpilotTrustBox = dynamic(() => import("@/components/TrustpilotTrustBox"), { ssr: false });
+const TrustpilotWordmark  = dynamic(
+  () => import("@/components/TrustpilotTrustBox").then((m) => ({ default: m.TrustpilotWordmark })),
+  { ssr: false }
+);
 import ToCartButton from "@/components/ui/To Cart Button";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
-import TrustpilotTrustBox, { TrustpilotWordmark } from "@/components/TrustpilotTrustBox";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 

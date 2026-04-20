@@ -5,6 +5,11 @@ const { withSentryConfig } = require("@sentry/nextjs");
 // Must be relative to app root so Turbopack alias resolves correctly at runtime
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.js");
 
+// Bundle analyzer — enable by running: ANALYZE=true npm run build
+const withBundleAnalyzer = process.env.ANALYZE === 'true'
+  ? require('@next/bundle-analyzer')({ enabled: true })
+  : (cfg) => cfg;
+
 /** Monorepo kökü — aksi halde Next, üst dizindeki başka package-lock.json'ı seçip yanlış root kullanıyor (Windows'ta 500 / tracing hataları). */
 const monorepoRoot = path.join(__dirname, "../..");
 
@@ -67,7 +72,7 @@ const nextConfig = {
   },
 };
 
-module.exports = withSentryConfig(withNextIntl(nextConfig), {
+const sentryWrapped = withSentryConfig(withNextIntl(nextConfig), {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
@@ -112,4 +117,8 @@ module.exports = withSentryConfig(withNextIntl(nextConfig), {
     return config;
   },
 });
+
+// Bundle analyzer — opt-in via: ANALYZE=true npm run build
+// Install when needed: npm add -D @next/bundle-analyzer
+module.exports = withBundleAnalyzer(sentryWrapped);
 
