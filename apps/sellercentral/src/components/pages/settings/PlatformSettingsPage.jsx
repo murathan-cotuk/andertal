@@ -1,54 +1,197 @@
 "use client";
 
-import React from "react";
-import styled from "styled-components";
-import { Card } from "@belucha/ui";
-
-const Container = styled.div`
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px;
-`;
-
-const Header = styled.div`
-  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-  color: white;
-  padding: 32px;
-  border-radius: 12px;
-  margin-bottom: 32px;
-`;
-
-const Title = styled.h1`
-  font-size: 36px;
-  font-weight: 700;
-  margin-bottom: 8px;
-`;
-
-const Subtitle = styled.p`
-  font-size: 16px;
-  color: #d1d5db;
-  margin: 0;
-`;
-
-const Section = styled(Card)`
-  padding: 24px;
-  margin-bottom: 24px;
-`;
+import { useState, useEffect, useCallback } from "react";
+import {
+  Page,
+  Layout,
+  Card,
+  Text,
+  BlockStack,
+  TextField,
+  Button,
+  Banner,
+  InlineStack,
+  Divider,
+  Box,
+} from "@shopify/polaris";
+import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 export default function PlatformSettingsPage() {
-  return (
-    <Container>
-      <Header>
-        <Title>Platform Settings</Title>
-        <Subtitle>Global platform configuration and settings</Subtitle>
-      </Header>
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState("");
 
-      <Section>
-        <h2 style={{ marginBottom: "16px", fontSize: "20px", fontWeight: "600" }}>
-          Platform Settings
-        </h2>
-        <p style={{ color: "#6b7280" }}>Platform settings coming soon.</p>
-      </Section>
-    </Container>
+  const [platformName, setPlatformName] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
+  const [storeName, setStoreName] = useState("");
+
+  const [snapshot, setSnapshot] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      const d = await getMedusaAdminClient().getSellerSettings("default");
+      const pn = d?.platform_name || "";
+      const se = d?.support_email || "";
+      const sn = d?.store_name || "";
+      setPlatformName(pn);
+      setSupportEmail(se);
+      setStoreName(sn);
+      setSnapshot(JSON.stringify({ pn, se, sn }));
+    } catch (e) {
+      setErr(e?.message || "Laden fehlgeschlagen.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const isDirty =
+    snapshot !== null &&
+    snapshot !== JSON.stringify({ pn: platformName, se: supportEmail, sn: storeName });
+
+  const save = async () => {
+    setSaving(true);
+    setErr("");
+    setOk("");
+    try {
+      await getMedusaAdminClient().updateSellerSettings({
+        seller_id: "default",
+        store_name: storeName.trim(),
+        platform_name: platformName.trim(),
+        support_email: supportEmail.trim(),
+      });
+      setOk("Einstellungen gespeichert.");
+      await load();
+    } catch (e) {
+      setErr(e?.message || "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const discard = () => {
+    if (!snapshot) return;
+    const s = JSON.parse(snapshot);
+    setPlatformName(s.pn);
+    setSupportEmail(s.se);
+    setStoreName(s.sn);
+    setErr("");
+    setOk("");
+  };
+
+  if (loading) {
+    return (
+      <Page title="Plattform-Einstellungen">
+        <Box padding="400">
+          <Text tone="subdued">Laden…</Text>
+        </Box>
+      </Page>
+    );
+  }
+
+  return (
+    <Page title="Plattform-Einstellungen">
+      <Layout>
+        <Layout.Section>
+          <BlockStack gap="400">
+            <Text as="p" tone="subdued">
+              Globale Einstellungen für die gesamte Plattform. Nur für Superuser
+              sichtbar.
+            </Text>
+
+            {err && (
+              <Banner tone="critical" onDismiss={() => setErr("")}>
+                <Text as="p">{err}</Text>
+              </Banner>
+            )}
+            {ok && (
+              <Banner tone="success" onDismiss={() => setOk("")}>
+                <Text as="p">{ok}</Text>
+              </Banner>
+            )}
+
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">
+                  Allgemeine Plattformdaten
+                </Text>
+                <Text as="p" tone="subdued">
+                  Diese Angaben erscheinen in E-Mails, Rechnungen und
+                  im öffentlichen Impressum.
+                </Text>
+                <TextField
+                  label="Plattformname"
+                  value={platformName}
+                  onChange={setPlatformName}
+                  placeholder="z. B. Belucha Marketplace"
+                  autoComplete="off"
+                  helpText="Anzeigename der Plattform (in E-Mails und im Shop sichtbar)"
+                />
+                <TextField
+                  label="Shop-/Anzeigename (intern)"
+                  value={storeName}
+                  onChange={setStoreName}
+                  placeholder="z. B. Belucha"
+                  autoComplete="off"
+                  helpText="Kurzname – wird im Sellercentral-Header angezeigt"
+                />
+                <TextField
+                  label="Support-E-Mail"
+                  value={supportEmail}
+                  onChange={setSupportEmail}
+                  type="email"
+                  placeholder="support@belucha.de"
+                  autoComplete="off"
+                  helpText="Kontakt-E-Mail für Käufer und automatische E-Mails"
+                />
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="300">
+                <Text variant="headingMd" as="h2">
+                  Weitere Einstellungen
+                </Text>
+                <Divider />
+                {[
+                  { label: "Checkout & Zahlungen", href: "/settings/checkout", desc: "Stripe, PayPal, Klarna" },
+                  { label: "Branding & Stile", href: "/content/styles", desc: "Logos, Farben, Favicon" },
+                  { label: "E-Mail (SMTP)", href: "/apps/smtp", desc: "Ausgehende E-Mail-Konfiguration" },
+                  { label: "Billbee-Integration", href: "/settings/billbee", desc: "Auftragsabwicklung & Versand" },
+                ].map((item) => (
+                  <InlineStack key={item.href} align="space-between" blockAlign="center" wrap={false}>
+                    <BlockStack gap="0">
+                      <Text variant="bodyMd" fontWeight="semibold">{item.label}</Text>
+                      <Text variant="bodySm" tone="subdued">{item.desc}</Text>
+                    </BlockStack>
+                    <Button
+                      variant="plain"
+                      url={item.href}
+                    >
+                      Öffnen
+                    </Button>
+                  </InlineStack>
+                ))}
+              </BlockStack>
+            </Card>
+
+            <InlineStack gap="300">
+              <Button variant="primary" onClick={save} loading={saving} disabled={!isDirty}>
+                Speichern
+              </Button>
+              {isDirty && (
+                <Button variant="plain" onClick={discard}>
+                  Verwerfen
+                </Button>
+              )}
+            </InlineStack>
+          </BlockStack>
+        </Layout.Section>
+      </Layout>
+    </Page>
   );
 }

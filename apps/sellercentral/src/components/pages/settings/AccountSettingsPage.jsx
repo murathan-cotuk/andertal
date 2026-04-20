@@ -1,166 +1,129 @@
 "use client";
 
-import React, { useState } from "react";
-import styled from "styled-components";
-import { Card, Button, Input } from "@belucha/ui";
+import { useState, useEffect } from "react";
+import {
+  Page,
+  Layout,
+  Card,
+  Text,
+  BlockStack,
+  Select,
+  Button,
+  Banner,
+  InlineStack,
+} from "@shopify/polaris";
+import { useRouter, usePathname } from "next/navigation";
 
-const Container = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-`;
-
-const Title = styled.h1`
-  font-size: 32px;
-  font-weight: 700;
-  margin-bottom: 32px;
-  color: #1f2937;
-`;
-
-const Section = styled(Card)`
-  padding: 24px;
-  margin-bottom: 24px;
-`;
-
-const Form = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-`;
-
-const FormRow = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-`;
+const LOCALE_OPTIONS = [
+  { label: "Deutsch", value: "de" },
+  { label: "English", value: "en" },
+  { label: "Türkçe", value: "tr" },
+  { label: "Français", value: "fr" },
+  { label: "Italiano", value: "it" },
+  { label: "Español", value: "es" },
+];
 
 export default function AccountSettingsPage() {
-  const [formData, setFormData] = useState({
-    language: "en",
-    timezone: "UTC",
-    currency: "EUR",
-    dateFormat: "DD/MM/YYYY",
-  });
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    // TODO: Implement settings update
-    alert("Settings saved successfully!");
+  const [locale, setLocale] = useState("de");
+  const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [initial, setInitial] = useState("de");
+
+  useEffect(() => {
+    // Derive current locale from URL prefix
+    const seg = pathname?.split("/")?.[1];
+    const match = LOCALE_OPTIONS.find((o) => o.value === seg);
+    const cur = match ? seg : "de";
+    setLocale(cur);
+    setInitial(cur);
+    // Persist to localStorage so other components can read it
+    if (typeof localStorage !== "undefined") {
+      const stored = localStorage.getItem("sellerLocale");
+      if (stored && LOCALE_OPTIONS.some((o) => o.value === stored)) {
+        setLocale(stored);
+        setInitial(stored);
+      }
+    }
+  }, [pathname]);
+
+  const handleLocaleChange = (v) => {
+    setLocale(v);
+    setDirty(v !== initial);
+    setSaved(false);
+  };
+
+  const save = () => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("sellerLocale", locale);
+    }
+    setInitial(locale);
+    setDirty(false);
+    setSaved(true);
+
+    // Navigate to same page with new locale
+    const segments = pathname?.split("/") || [];
+    if (segments[1] && LOCALE_OPTIONS.some((o) => o.value === segments[1])) {
+      segments[1] = locale;
+    }
+    router.push(segments.join("/") || `/${locale}/settings/account`);
+  };
+
+  const discard = () => {
+    setLocale(initial);
+    setDirty(false);
+    setSaved(false);
   };
 
   return (
-    <Container>
-      <Title>Account Settings</Title>
+    <Page title="Konto-Einstellungen">
+      <Layout>
+        <Layout.Section>
+          <BlockStack gap="400">
+            <Text as="p" tone="subdued">
+              Persönliche Einstellungen für Ihren Sellercentral-Account.
+            </Text>
 
-      <Section>
-        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "24px" }}>
-          Preferences
-        </h2>
+            {saved && (
+              <Banner tone="success" onDismiss={() => setSaved(false)}>
+                <Text as="p">Einstellungen gespeichert.</Text>
+              </Banner>
+            )}
 
-        <Form onSubmit={handleSubmit}>
-          <FormRow>
-            <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}>
-                Language
-              </label>
-              <select
-                value={formData.language}
-                onChange={(e) => setFormData({ ...formData, language: e.target.value })}
-                style={{
-                  width: "100%",
-                  padding: "12px 16px",
-                  border: "2px solid #e5e7eb",
-                  borderRadius: "8px",
-                  fontSize: "16px",
-                }}
-              >
-                <option value="en">English</option>
-                <option value="tr">Türkçe</option>
-                <option value="de">Deutsch</option>
-                <option value="fr">Français</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}>
-                Timezone
-              </label>
-              <select
-                value={formData.timezone}
-                onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                style={{
-                  width: "100%",
-                  padding: "12px 16px",
-                  border: "2px solid #e5e7eb",
-                  borderRadius: "8px",
-                  fontSize: "16px",
-                }}
-              >
-                <option value="UTC">UTC</option>
-                <option value="Europe/Istanbul">Europe/Istanbul</option>
-                <option value="America/New_York">America/New_York</option>
-                <option value="Europe/London">Europe/London</option>
-              </select>
-            </div>
-          </FormRow>
-
-          <FormRow>
-            <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}>
-                Currency
-              </label>
-              <select
-                value={formData.currency}
-                onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                style={{
-                  width: "100%",
-                  padding: "12px 16px",
-                  border: "2px solid #e5e7eb",
-                  borderRadius: "8px",
-                  fontSize: "16px",
-                }}
-              >
-                <option value="EUR">EUR (€)</option>
-                <option value="USD">USD ($)</option>
-                <option value="GBP">GBP (£)</option>
-                <option value="TRY">TRY (₺)</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}>
-                Date Format
-              </label>
-              <select
-                value={formData.dateFormat}
-                onChange={(e) => setFormData({ ...formData, dateFormat: e.target.value })}
-                style={{
-                  width: "100%",
-                  padding: "12px 16px",
-                  border: "2px solid #e5e7eb",
-                  borderRadius: "8px",
-                  fontSize: "16px",
-                }}
-              >
-                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-              </select>
-            </div>
-          </FormRow>
-
-          <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-            <Button type="button" variant="outline">
-              Cancel
-            </Button>
-            <Button type="submit">
-              Save Settings
-            </Button>
-          </div>
-        </Form>
-      </Section>
-    </Container>
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">
+                  Sprache der Benutzeroberfläche
+                </Text>
+                <Text as="p" tone="subdued">
+                  Wählen Sie die Sprache, in der Sellercentral angezeigt werden
+                  soll. Die Änderung tritt nach dem Speichern sofort in Kraft.
+                </Text>
+                <div style={{ maxWidth: 280 }}>
+                  <Select
+                    label="Sprache"
+                    options={LOCALE_OPTIONS}
+                    value={locale}
+                    onChange={handleLocaleChange}
+                  />
+                </div>
+                <InlineStack gap="300">
+                  <Button variant="primary" onClick={save} disabled={!dirty}>
+                    Speichern
+                  </Button>
+                  {dirty && (
+                    <Button variant="plain" onClick={discard}>
+                      Verwerfen
+                    </Button>
+                  )}
+                </InlineStack>
+              </BlockStack>
+            </Card>
+          </BlockStack>
+        </Layout.Section>
+      </Layout>
+    </Page>
   );
 }
-

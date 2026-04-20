@@ -69,52 +69,55 @@ function StatusBadge({ value }) {
 
 /* ── Layout (Produkte-Seite: Container + Card + Raster) ───────── */
 const PageContainer = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px 16px 48px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 8px 0 24px;
   min-height: 100%;
-  background: #f9fafb;
+  background: transparent;
 `;
 
 const PageHeader = styled.div`
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 32px;
+  gap: 12px;
+  margin-bottom: 16px;
 `;
 
 const PageTitle = styled.h1`
-  font-size: 32px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 650;
   margin: 0;
-  color: #1f2937;
+  color: #111827;
 `;
 
 const HeaderMeta = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 `;
 
 const Section = styled(Card)`
-  padding: 24px;
-  margin-bottom: 24px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
 `;
 
 const SectionHeading = styled.h2`
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
-  margin: 0 0 16px;
+  color: #111827;
+  margin: 0 0 12px;
 `;
 
 const FilterGrid = styled.div`
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
   align-items: end;
 
   @media (max-width: 1024px) {
@@ -132,17 +135,17 @@ const FilterField = styled.div`
 `;
 
 const FieldLabel = styled.span`
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
-  color: #374151;
+  color: #4b5563;
 `;
 
 const FilterInput = styled.input`
   width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #e5e7eb;
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   color: #1f2937;
   background: #fff;
   box-sizing: border-box;
@@ -150,8 +153,8 @@ const FilterInput = styled.input`
 
   &:focus {
     outline: none;
-    border-color: #0ea5e9;
-    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
   }
   &::placeholder {
     color: #9ca3af;
@@ -160,10 +163,10 @@ const FilterInput = styled.input`
 
 const FilterSelect = styled.select`
   width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #e5e7eb;
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   color: #1f2937;
   background: #fff;
   cursor: pointer;
@@ -172,16 +175,17 @@ const FilterSelect = styled.select`
 
   &:focus {
     outline: none;
-    border-color: #0ea5e9;
-    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
   }
 `;
 
 const TableCard = styled(Card)`
   padding: 0;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   overflow: hidden;
   border-radius: 12px;
+  border: 1px solid #e5e7eb;
 `;
 
 const BulkBar = styled.div`
@@ -189,12 +193,12 @@ const BulkBar = styled.div`
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 16px 20px;
-  margin-bottom: 24px;
-  background: #f0f9ff;
-  border: 2px solid #bae6fd;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
   border-radius: 12px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
 `;
 
 const SuperuserSectionLabel = styled.td`
@@ -925,7 +929,7 @@ export default function OrdersPage() {
   const renderOrderRows = (list) =>
     sortOrdersClient(list).map((order) => (
       <React.Fragment key={order.id}>
-        <tr style={{ borderBottom: "1px solid #e5e7eb", cursor: "default", background: selected.has(order.id) ? "#f0f9ff" : "#fff", transition: "background 0.15s ease" }}
+        <tr style={{ borderBottom: "1px solid #e5e7eb", cursor: "default", background: selected.has(order.id) ? "#eff6ff" : "#fff", transition: "background 0.15s ease" }}
           onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#f9fafb"; }}
           onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fff"; }}
         >
@@ -947,10 +951,10 @@ export default function OrdersPage() {
               </button>
             </div>
           </td>
-          <td style={{ padding: "10px 12px", minWidth: 240, maxWidth: 280 }}>
+          <td style={{ padding: "10px 10px", minWidth: 220, maxWidth: 280 }}>
             <CustomerCell order={order} locale={locale} router={router} isSuperuser={isSuperuser} />
           </td>
-          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12, lineHeight: 1.5 }}>
+          <td style={{ padding: "10px 10px", color: "#6b7280", fontSize: 12, lineHeight: 1.45, minWidth: 180 }}>
             {order.address_line1 ? (
               <>
                 <div>{order.address_line1}</div>
@@ -1157,17 +1161,17 @@ export default function OrdersPage() {
       </Section>
 
       <TableCard>
-        <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ overflowX: "auto", width: "100%" }}>
+        <table style={{ width: "100%", minWidth: 1160, borderCollapse: "collapse", fontSize: 13, tableLayout: "auto" }}>
           <thead>
-            <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+            <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
               {COLS.map((c, i) => {
                 const isSortable = !!COL_SORT_KEY[i];
                 return (
                   <th
                     key={i}
                     onClick={isSortable ? () => handleColSort(i) : undefined}
-                    style={{ padding: "10px 12px", textAlign: i >= 5 && i <= 10 ? "center" : "left", fontWeight: 600, fontSize: 11, color: isSortable ? "#374151" : "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap", cursor: isSortable ? "pointer" : "default", userSelect: "none" }}
+                    style={{ padding: "10px 10px", textAlign: i >= 5 && i <= 10 ? "center" : "left", fontWeight: 600, fontSize: 11, color: isSortable ? "#374151" : "#6b7280", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", cursor: isSortable ? "pointer" : "default", userSelect: "none", position: "sticky", top: 0, zIndex: 2, background: "#f9fafb" }}
                   >
                     {i === 0 ? (
                       <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ cursor: "pointer" }} />

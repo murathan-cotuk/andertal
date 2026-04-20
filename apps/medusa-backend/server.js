@@ -120,7 +120,7 @@ for (const medusaDir of allMedusaDirs) {
       pkg.exports['./link-modules'] = './link-modules.js'
       fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2))
     }
-    console.log('link-modules patch applied at:', medusaDir)
+    log.info('link-modules patch applied at:', medusaDir)
     patchApplied = true
   } catch (e) {
     console.warn('link-modules runtime patch skipped:', medusaDir, e.message)
@@ -147,6 +147,17 @@ const rateLimit = require('express-rate-limit')
 
 const PORT = process.env.PORT || 9000
 const HOST = process.env.HOST || '0.0.0.0'
+
+// ── Centralized logger ────────────────────────────────────────────────────────
+// info  → suppressed in production (dev/debug noise)
+// warn  → always shown (recoverable issues worth knowing)
+// error → always shown (failures that need attention)
+const _isProd = process.env.NODE_ENV === 'production'
+const log = {
+  info:  (...a) => { if (!_isProd) console.log(...a) },
+  warn:  (...a) => console.warn(...a),
+  error: (...a) => console.error(...a),
+}
 
 // ── Production security check (startup) ───────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
@@ -184,7 +195,7 @@ function getAllowedOrigins() {
 
 async function start() {
   try {
-    console.log('\n🚀 Medusa v2 backend başlatılıyor...\n')
+    log.info('\n🚀 Medusa v2 backend başlatılıyor...\n')
     await configLoader(path.resolve(__dirname), 'medusa-config')
     await pgConnectionLoader()
     if (!container.hasRegistration(ContainerRegistrationKeys.LOGGER)) {
@@ -196,7 +207,7 @@ async function start() {
     app.use(express.json({ limit: jsonBodyLimit }))
     app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }))
     const allowedOrigins = getAllowedOrigins()
-    console.log('CORS allowed origins:', allowedOrigins.length ? allowedOrigins.join(', ') : '(localhost only — set CORS_ORIGINS in production)')
+    log.info('CORS allowed origins:', allowedOrigins.length ? allowedOrigins.join(', ') : '(localhost only — set CORS_ORIGINS in production)')
     app.use(cors({
       origin: (origin, cb) => {
         if (!origin) return cb(null, true) // same-origin / server-to-server / Postman
@@ -604,6 +615,22 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS sellercentral_favicon_url text`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS shop_logo_height integer DEFAULT 34`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS sellercentral_logo_height integer DEFAULT 30`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS platform_name text`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS support_email text`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_banners (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            title text NOT NULL DEFAULT '',
+            subtitle text,
+            image_url text,
+            link_url text,
+            button_text text,
+            is_active boolean NOT NULL DEFAULT true,
+            position integer NOT NULL DEFAULT 0,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+          )
+        `).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS bonus_points_redeemed integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_shipping_carriers (
@@ -1209,7 +1236,7 @@ async function start() {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_sc_seller ON seller_campaigns(seller_id)`).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_sc_status ON seller_campaigns(status)`).catch(() => {})
         await client.end()
-        console.log('Admin Hub: admin_hub_menus, admin_hub_menu_locations, admin_hub_media, admin_hub_pages, admin_hub_collections, admin_hub_seller_settings, admin_hub_brands, store_carts, store_cart_items, seller_product_groups, seller_campaigns tabloları hazır')
+        log.info('Admin Hub: admin_hub_menus, admin_hub_menu_locations, admin_hub_media, admin_hub_pages, admin_hub_collections, admin_hub_seller_settings, admin_hub_brands, store_carts, store_cart_items, seller_product_groups, seller_campaigns tabloları hazır')
       } catch (migErr) {
         console.warn('Admin Hub migration (menus) skipped or failed:', migErr && migErr.message)
       }
@@ -1411,7 +1438,6 @@ async function start() {
     httpApp.get('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdGET(req, res))
     httpApp.put('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdPUT(req, res))
     httpApp.delete('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdDELETE(req, res))
-    console.log('Admin Hub categories routes: GET/POST /admin-hub/categories ve /admin-hub/v1/categories (+ :id GET/PUT/DELETE)')
 
     // --- Ürünler: fallback her zaman kayıtlı (404 önlenir); .ts route varsa kullanılır ---
     const runHandler = (handler, req, res) => {
@@ -1457,7 +1483,6 @@ async function start() {
       httpApp.get('/admin/products', (req, res) => runHandler(adminProducts.GET, req, res))
     } else {
       httpApp.get('/admin/products', adminProductsFallbackGET)
-      console.log('Admin route: GET /admin/products (fallback)')
     }
     if (adminProducts && typeof adminProducts.POST === 'function') {
       httpApp.post('/admin/products', (req, res) => runHandler(adminProducts.POST, req, res))
@@ -1508,7 +1533,6 @@ async function start() {
       }
     }
     httpApp.get('/admin/orders', (req, res) => adminOrdersGET(req, res))
-    console.log('Admin route: GET /admin/orders')
 
     // Title → URL handle (ü→u, ö→o, ı→i, ç→c, ğ→g, ä→ae, ß→ss)
     const slugifyTitle = (str) => {
@@ -2011,7 +2035,6 @@ async function start() {
     httpApp.post('/admin-hub/collections', (req, res) => adminCollectionsPOST(req, res))
     httpApp.patch('/admin-hub/collections/:id', (req, res) => adminCollectionByIdPATCH(req, res))
     httpApp.delete('/admin-hub/collections/:id', (req, res) => adminCollectionByIdDELETE(req, res))
-    console.log('Admin route: GET/POST/PATCH/DELETE /admin-hub/collections, GET /admin-hub/collections/:id')
 
     // --- Admin Hub Brands (serbest text yasak: product'ta sadece bu listeden seçilir) ---
     const getBrandsDbClient = () => {
@@ -2130,7 +2153,64 @@ async function start() {
     httpApp.post('/admin-hub/brands', requireSellerAuth, adminBrandsPOST)
     httpApp.patch('/admin-hub/brands/:id', requireSellerAuth, (req, res) => adminBrandsPatchDelete(req, res, true))
     httpApp.delete('/admin-hub/brands/:id', requireSellerAuth, (req, res) => adminBrandsPatchDelete(req, res, false))
-    console.log('Admin route: GET/POST /admin-hub/brands, PATCH/DELETE /admin-hub/brands/:id')
+
+    // ── Banners CRUD (superuser) ──────────────────────────────────────────────
+    const getBannersDb = async () => {
+      const client = getSellerDbClient()
+      if (!client) return []
+      try {
+        await client.connect()
+        const r = await client.query('SELECT id, title, subtitle, image_url, link_url, button_text, is_active, position, created_at FROM admin_hub_banners ORDER BY position ASC, created_at ASC')
+        await client.end()
+        return r.rows || []
+      } catch (e) { try { await client.end() } catch (_) {}; return [] }
+    }
+    httpApp.get('/admin-hub/v1/banners', requireSellerAuth, requireSuperuser, async (req, res) => {
+      res.json({ banners: await getBannersDb() })
+    })
+    httpApp.post('/admin-hub/v1/banners', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const b = req.body || {}
+      const title = (b.title || '').trim()
+      if (!title) return res.status(400).json({ message: 'Title is required' })
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `INSERT INTO admin_hub_banners (title, subtitle, image_url, link_url, button_text, is_active, position)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+          [title, b.subtitle || null, b.image_url || null, b.link_url || null, b.button_text || null, b.is_active !== false, Number(b.position) || 0]
+        )
+        await client.end()
+        res.status(201).json({ banner: r.rows[0] })
+      } catch (e) { try { await client.end() } catch (_) {}; console.error('Banners POST:', e); res.status(500).json({ message: e.message }) }
+    })
+    httpApp.put('/admin-hub/v1/banners/:id', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const { id } = req.params
+      const b = req.body || {}
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `UPDATE admin_hub_banners SET title=$1, subtitle=$2, image_url=$3, link_url=$4, button_text=$5, is_active=$6, position=$7, updated_at=now() WHERE id=$8 RETURNING *`,
+          [(b.title || '').trim() || null, b.subtitle || null, b.image_url || null, b.link_url || null, b.button_text || null, b.is_active !== false, Number(b.position) || 0, id]
+        )
+        await client.end()
+        if (!r.rows[0]) return res.status(404).json({ message: 'Not found' })
+        res.json({ banner: r.rows[0] })
+      } catch (e) { try { await client.end() } catch (_) {}; console.error('Banners PUT:', e); res.status(500).json({ message: e.message }) }
+    })
+    httpApp.delete('/admin-hub/v1/banners/:id', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        await client.query('DELETE FROM admin_hub_banners WHERE id=$1', [req.params.id])
+        await client.end()
+        res.json({ ok: true })
+      } catch (e) { try { await client.end() } catch (_) {}; console.error('Banners DELETE:', e); res.status(500).json({ message: e.message }) }
+    })
 
     // --- Metafield Definitions ---
     const dbQ = async (sql, params = []) => {
@@ -2423,7 +2503,6 @@ async function start() {
       }
     })
 
-    console.log('Admin route: GET/PUT/DELETE /admin-hub/metafield-definitions (+ pending, proposals)')
 
     // --- Admin Hub Menus (service or raw DB fallback when loader fails) ---
     const resolveMenuService = () => {
@@ -2766,7 +2845,6 @@ async function start() {
     }
     httpApp.get('/admin-hub/menu-locations', menuLocationsGET)
     httpApp.get('/store/menu-locations', menuLocationsGET)
-    console.log('Admin Hub routes: /admin-hub/menus (+ :id, :menuId/items, :itemId), /admin-hub/menu-locations, /store/menu-locations')
 
     // --- Admin Hub Products (DB: admin_hub_products, collections/menus gibi) ---
     const getProductsDbClient = () => {
@@ -3716,7 +3794,6 @@ async function start() {
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
       }
     })
-    console.log('Admin Hub routes: GET/POST /admin-hub/products, GET/PUT/DELETE /admin-hub/products/:id, PATCH /admin-hub/products/:id/variants')
 
     /** ISO2 uppercase; UK → GB. Invalid → ''. */
     const normalizeHubCountryCode = (code) => {
@@ -3792,7 +3869,7 @@ async function start() {
         const client = getProductsDbClient()
         if (!client) return res.json({ store_name: '' })
         await client.connect()
-        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
         await client.end()
         const row = r.rows && r.rows[0]
         const store_name = row && row.store_name != null ? String(row.store_name) : ''
@@ -3806,6 +3883,8 @@ async function start() {
         const sellercentral_favicon_url = row && row.sellercentral_favicon_url ? String(row.sellercentral_favicon_url) : ''
         const shop_logo_height = row && row.shop_logo_height != null ? Number(row.shop_logo_height) : 34
         const sellercentral_logo_height = row && row.sellercentral_logo_height != null ? Number(row.sellercentral_logo_height) : 30
+        const platform_name = row && row.platform_name ? String(row.platform_name) : ''
+        const support_email = row && row.support_email ? String(row.support_email) : ''
         res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height })
       } catch (err) {
         console.error('sellerSettingsGET:', err)
@@ -3829,6 +3908,8 @@ async function start() {
         const sellercentral_logo_height = body.sellercentral_logo_height !== undefined && body.sellercentral_logo_height !== null
           ? Math.max(20, Math.min(120, Number(body.sellercentral_logo_height) || 30))
           : undefined
+        const platform_name = body.platform_name !== undefined ? (body.platform_name ? String(body.platform_name).trim() : null) : undefined
+        const support_email = body.support_email !== undefined ? (body.support_email ? String(body.support_email).trim() : null) : undefined
         if (free_shipping_thresholds) {
           free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
         }
@@ -3836,11 +3917,11 @@ async function start() {
         if (!client) return res.status(500).json({ message: 'Database unavailable' })
         await client.connect()
         const thresholdsJson = free_shipping_thresholds ? JSON.stringify(free_shipping_thresholds) : null
-        console.log('[sellerSettingsPATCH] saving free_shipping_thresholds:', thresholdsJson)
+        log.info('[sellerSettingsPATCH] saving free_shipping_thresholds:', thresholdsJson)
         await client.query(
           `INSERT INTO admin_hub_seller_settings (
-             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, updated_at
-           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, now())
+             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, updated_at
+           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, now())
            ON CONFLICT (seller_id) DO UPDATE SET
              store_name = COALESCE($2, admin_hub_seller_settings.store_name),
              free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds),
@@ -3850,11 +3931,13 @@ async function start() {
              sellercentral_favicon_url = COALESCE($7, admin_hub_seller_settings.sellercentral_favicon_url),
              shop_logo_height = COALESCE($8, admin_hub_seller_settings.shop_logo_height),
              sellercentral_logo_height = COALESCE($9, admin_hub_seller_settings.sellercentral_logo_height),
+             platform_name = COALESCE($10, admin_hub_seller_settings.platform_name),
+             support_email = COALESCE($11, admin_hub_seller_settings.support_email),
              updated_at = now()`,
-          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height]
+          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email]
         )
         await client.end()
-        console.log('[sellerSettingsPATCH] saved OK')
+        log.info('[sellerSettingsPATCH] saved OK')
         res.json({
           store_name: store_name || '',
           free_shipping_thresholds,
@@ -3872,7 +3955,6 @@ async function start() {
     }
     httpApp.get('/admin-hub/seller-settings', sellerSettingsGET)
     httpApp.patch('/admin-hub/seller-settings', sellerSettingsPATCH)
-    console.log('Admin Hub routes: GET/PATCH /admin-hub/seller-settings')
 
     // ── Seller Auth ───────────────────────────────────────────────────────────
     const _isProduction = process.env.NODE_ENV === 'production'
@@ -4331,7 +4413,11 @@ async function start() {
         if (body.store_name !== undefined) { params.push(body.store_name || null); sets.push(`store_name = $${params.length}`) }
         if (body.is_superuser !== undefined) { params.push(!!body.is_superuser); sets.push(`is_superuser = $${params.length}`) }
         if (body.permissions !== undefined) { params.push(body.permissions ? JSON.stringify(body.permissions) : null); sets.push(`permissions = $${params.length}`) }
-        if (body.password && !validatePasswordStrength(body.password)) { params.push(hashSellerPassword(body.password)); sets.push(`password_hash = $${params.length}`) }
+        if (body.password) {
+          const pwErrUpdate = validatePasswordStrength(body.password)
+          if (pwErrUpdate) return res.status(400).json({ message: pwErrUpdate })
+          params.push(hashSellerPassword(body.password)); sets.push(`password_hash = $${params.length}`)
+        }
         params.push(id)
         const r = await client.query(
           `UPDATE seller_users SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING id, email, store_name, seller_id, is_superuser, permissions, created_at`,
@@ -4389,7 +4475,6 @@ async function start() {
     httpApp.patch('/admin-hub/users/:id', requireSellerAuth, requireSuperuser, sellerUserUpdatePATCH)
     httpApp.delete('/admin-hub/users/:id', requireSellerAuth, requireSuperuser, sellerUserDeleteDELETE)
     httpApp.patch('/admin-hub/users/:id/superuser', requireSellerAuth, requireSuperuser, sellerUserSuperuserPATCH)
-    console.log('Admin Hub routes: seller auth + users')
 
     const loadPlatformCheckoutRow = async (pgClient) => {
       const r = await pgClient.query(
@@ -4501,7 +4586,6 @@ async function start() {
 
     httpApp.get('/admin-hub/v1/platform-checkout-settings', requireSellerAuth, requireSuperuser, platformCheckoutSettingsGET)
     httpApp.put('/admin-hub/v1/platform-checkout-settings', requireSellerAuth, requireSuperuser, platformCheckoutSettingsPUT)
-    console.log('Admin Hub routes: platform-checkout-settings (superuser)')
 
     // Store API: public seller settings (store name) for "Sold by" on shop
     const storeSellerSettingsGET = async (req, res) => {
@@ -4526,7 +4610,7 @@ async function start() {
         const sellercentral_favicon_url = row && row.sellercentral_favicon_url ? String(row.sellercentral_favicon_url) : ''
         const shop_logo_height = row && row.shop_logo_height != null ? Number(row.shop_logo_height) : 34
         const sellercentral_logo_height = row && row.sellercentral_logo_height != null ? Number(row.sellercentral_logo_height) : 30
-        console.log('[storeSellerSettingsGET] free_shipping_thresholds:', JSON.stringify(free_shipping_thresholds))
+        log.info('[storeSellerSettingsGET] free_shipping_thresholds:', JSON.stringify(free_shipping_thresholds))
         res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height })
       } catch (err) {
         console.error('[storeSellerSettingsGET] error:', err && err.message)
@@ -4534,7 +4618,6 @@ async function start() {
       }
     }
     httpApp.get('/store/seller-settings', storeSellerSettingsGET)
-    console.log('Store routes: GET /store/seller-settings')
 
     // GET /store/seller-profile/:seller_id — public seller profile (info + reviews + products)
     const storeSellerProfileGET = async (req, res) => {
@@ -4608,7 +4691,6 @@ async function start() {
       }
     }
     httpApp.get('/store/seller-profile/:seller_id', storeSellerProfileGET)
-    console.log('Store routes: GET /store/seller-profile/:seller_id')
 
     const getBrandById = async (brandId) => {
       if (!brandId) return null
@@ -5401,7 +5483,6 @@ async function start() {
         res.status(500).json({ message: (e && e.message) || 'Internal server error' })
       }
     })
-    console.log('Store routes: GET /store/products, GET /store/products/:idOrHandle, GET /store/brands, GET /store/brands/:handle (from Admin Hub)')
 
     // --- Store Carts (session cart: create, get, add/update/remove line-items) ---
     const productIdFromVariantId = (variantId) => {
@@ -5880,7 +5961,6 @@ async function start() {
     httpApp.patch('/store/carts/:id/line-items/:lineId', storeCartLineItemPATCH)
     httpApp.delete('/store/carts/:id/line-items/:lineId', storeCartLineItemDELETE)
     httpApp.delete('/store/carts/:id/line-items', storeCartClearDELETE)
-    console.log('Store routes: POST/GET /store/carts, PATCH cart, POST/PATCH/DELETE line-items')
 
     // --- Store Payment Intent (Stripe) ---
     const storePaymentIntentPOST = async (req, res) => {
@@ -7664,7 +7744,6 @@ async function start() {
     httpApp.post('/store/orders', storeOrdersPOST)
     httpApp.get('/store/orders/me', storeOrdersMeGET)
     httpApp.get('/store/orders/:id', storeOrdersGET)
-    console.log('Store routes: GET /store/public-payment-config, POST /store/payment-intent, POST /store/orders, GET /store/orders/me, GET /store/orders/:id')
 
     const storeCollectionsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -7728,7 +7807,6 @@ async function start() {
       }
     }
     httpApp.get('/store/collections', storeCollectionsGET)
-    console.log('Store route: GET /store/collections')
 
     // GET /store/menus – Public menüler (Shop). Her menü SADECE kendi menu_id’sine ait item’ları alır (raw DB).
     let storeCategoriesTreeCache = { at: 0, payload: null }
@@ -7800,7 +7878,6 @@ async function start() {
       }
     }
     httpApp.get('/store/categories', storeCategoriesGET)
-    console.log('Store route: GET /store/categories')
 
     const getStoreMenusFromDb = async () => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -8046,7 +8123,6 @@ async function start() {
         res.json(pr.rows[0])
       } catch { res.status(404).json({ message: 'Not found' }) } finally { await client.end().catch(() => {}) }
     })
-    console.log('Store route: GET /store/menus, GET /store/page-by-label-slug/:slug')
 
     // --- Admin Hub Media (GET list, POST upload, GET :id, DELETE :id) ---
     const getDbClient = () => {
@@ -8604,7 +8680,6 @@ async function start() {
     httpApp.post('/admin-hub/v1/media/add-url', requireSellerAuth, mediaAddByUrlPOST)
     httpApp.post('/admin-hub/v1/media/import-urls', requireSellerAuth, mediaImportUrlsPOST)
     httpApp.delete('/admin-hub/v1/media/:id', requireSellerAuth, mediaByIdDELETE)
-    console.log('Admin Hub routes: GET/POST /admin-hub/v1/media, GET/DELETE /admin-hub/v1/media/:id, POST /admin-hub/v1/media/import-urls')
 
     // ── Admin Hub Orders ──────────────────────────────────────────
     const adminHubOrdersGET = async (req, res) => {
@@ -10987,7 +11062,6 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.post('/admin-hub/v1/returns', adminHubReturnsPOST)
     httpApp.patch('/admin-hub/v1/returns/:id', adminHubReturnPATCH)
     httpApp.post('/admin-hub/v1/returns/:id/send-label', adminHubReturnSendLabelPOST)
-    console.log('Admin Hub routes: orders, customers, abandoned-carts, returns')
 
     // --- Admin Hub Pages (CRUD) + Store pages (published only) ---
     const pagesListGET = async (req, res) => {
@@ -11129,7 +11203,6 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.get('/admin-hub/v1/pages/:id', pageByIdGET)
     httpApp.put('/admin-hub/v1/pages/:id', pageByIdPUT)
     httpApp.delete('/admin-hub/v1/pages/:id', pageByIdDELETE)
-    console.log('Admin Hub routes: GET/POST /admin-hub/v1/pages, GET/PUT/DELETE /admin-hub/v1/pages/:id')
 
     const storePagesListGET = async (req, res) => {
       const client = getDbClient()
@@ -11173,7 +11246,6 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
     httpApp.get('/store/pages', storePagesListGET)
     httpApp.get('/store/pages/:slug', storePageBySlugGET)
-    console.log('Store routes: GET /store/pages, GET /store/pages/:slug')
 
     // ── Landing Page CMS ──────────────────────────────────────────────────
 
@@ -11500,7 +11572,6 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     }
     httpApp.get('/store/trustpilot-config', storeTrustpilotConfigGET)
 
-    console.log('Landing page routes: GET/PUT /admin-hub/landing-page, GET /store/landing-page, GET /store/styles, GET /store/trustpilot-config')
 
     // ── Notifications (per-recipient read/delete state: seller_hub_notification_state) ──
     const getNotifRecipientContext = (req) => {
@@ -14170,7 +14241,6 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.patch('/admin-hub/v1/sellers/:id', requireSellerAuth, adminHubSellerPATCH)
     httpApp.patch('/admin-hub/v1/sellers/:id/approve', requireSellerAuth, adminHubSellerApprovePATCH)
     httpApp.patch('/admin-hub/v1/seller/company-info', requireSellerAuth, adminHubSellerCompanyInfoPATCH)
-    console.log('Seller mgmt routes: GET/PATCH /admin-hub/v1/sellers, PATCH /admin-hub/v1/sellers/:id/approve')
 
     // ── Verification Pipeline Routes ─────────────────────────────────────────
     // Lazy-load so the pipeline module is not required until first use
@@ -14773,7 +14843,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         `, [mx.max_sales, mx.max_gmv, mx.max_clicks, mx.max_review])
 
         await client.end()
-        console.log('[Ranking] Features computed for', (await (async () => {
+        log.info('[Ranking] Features computed for', (await (async () => {
           const c2 = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
           await c2.connect()
           const r = await c2.query('SELECT COUNT(*) FROM product_ranking_features')
@@ -15240,7 +15310,6 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.get('/admin-hub/v1/ranking/products', requireSellerAuth, adminRankingProductsGET)
     httpApp.post('/admin-hub/v1/ranking/compute', requireSellerAuth, adminRankingComputePOST)
     httpApp.get('/admin-hub/v1/ranking/products/:id/breakdown', requireSellerAuth, adminRankingBreakdownGET)
-    console.log('Ranking routes registered: /store/products/ranked, /store/events, /admin-hub/v1/ranking/*')
 
     // Auto-compute ranking features every 2 hours
     setTimeout(() => {
@@ -15256,16 +15325,16 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     }
 
     httpApp.listen(PORT, HOST, () => {
-      console.log(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)
-      console.log(`📍 Listening on ${HOST}:${PORT}\n`)
+      log.info(`\n✅ Medusa v2 backend başarıyla başlatıldı!`)
+      log.info(`📍 Listening on ${HOST}:${PORT}\n`)
     })
 
     process.on('SIGTERM', () => {
-      console.log('\nSIGTERM received, shutting down gracefully')
+      log.info('\nSIGTERM received, shutting down gracefully')
       httpApp.close(() => { process.exit(0) })
     })
     process.on('SIGINT', () => {
-      console.log('\nSIGINT received, shutting down gracefully')
+      log.info('\nSIGINT received, shutting down gracefully')
       httpApp.close(() => { process.exit(0) })
     })
   } catch (error) {

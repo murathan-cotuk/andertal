@@ -5,14 +5,14 @@ KRİTİK (Production'a çıkmadan mutlaka düzeltilmesi gereken)
   için kullanılıyor. Production'da bu secret bilinirse tüm hesaplar taklit edilebilir. Seller ve customer için ayrı, zorunlu env var'lar     
   olmalı.
 
-  2. CORS Boşluğu
+  *2. DONE CORS Boşluğu
   CORS_ORIGINS env var ayarlanmamışsa production'da tüm origin'lere izin veriliyor (return null). Bu, API'ye herhangi bir domain'den istek   
   atılmasına olanak tanır.
 
-  3. SSL Doğrulaması Kapalı
+  *3. DONE SSL Doğrulaması Kapalı
   Tüm DB bağlantılarında rejectUnauthorized: false var (Render.com tespiti için). Bu, database bağlantısında MITM saldırısına kapı açar.     
 
-  4. JWT Ömrü 30 Gün
+  *4. DONE JWT Ömrü 30 Gün
   server.js:3854 — Her iki token türü de 30 gün geçerli. Token çalındığında 30 gün boyunca geçerli kalır. Access token 15 dakika, refresh    
   token 7 gün olmalı.
 
