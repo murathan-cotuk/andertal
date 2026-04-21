@@ -118,9 +118,10 @@ function NavItem({ href, icon, children, onClick }) {
 /* ─── Main component ─────────────────────────────────────────── */
 export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen }) {
   const initials    = getInitials(user);
+  // Name never falls back to email — use "Mein Konto" if no name available
   const displayName = user
     ? [user.firstName || user.first_name, user.lastName || user.last_name]
-        .filter(Boolean).join(" ") || user.email || "My account"
+        .filter(Boolean).join(" ") || "Mein Konto"
     : "";
 
   return (
@@ -185,10 +186,9 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen }
                 <div className="w-9 h-9 rounded-full bg-orange-500 text-white text-[13px] font-bold flex items-center justify-center shrink-0 border-2 border-white shadow-sm">
                   {initials}
                 </div>
-                {/* Info — show email only if displayName is NOT already the email */}
                 <div className="flex-1 min-w-0">
                   <p className="text-[13.5px] font-bold text-gray-900 truncate leading-tight">{displayName}</p>
-                  {user?.email && displayName !== user.email && (
+                  {user?.email && (
                     <p className="text-[11.5px] text-gray-400 truncate mt-0.5">{user.email}</p>
                   )}
                 </div>
