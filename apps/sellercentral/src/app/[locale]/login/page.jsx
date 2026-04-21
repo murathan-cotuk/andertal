@@ -18,7 +18,7 @@ export default function Login() {
   const [totpRequired, setTotpRequired] = useState(false);
   const [totpCode, setTotpCode] = useState("");
 
-  const finishLogin = (data) => {
+  const finishLogin = async (data) => {
     localStorage.setItem("sellerToken", data.token);
     localStorage.setItem("sellerEmail", data.user.email);
     localStorage.setItem("sellerId", data.user.seller_id);
@@ -26,6 +26,12 @@ export default function Login() {
     localStorage.setItem("sellerIsSuperuser", data.user.is_superuser ? "true" : "false");
     localStorage.setItem("sellerPermissions", data.user.permissions ? JSON.stringify(data.user.permissions) : "null");
     localStorage.setItem("sellerLoggedIn", "true");
+    // Also persist token in httpOnly cookie (XSS-safe session gate)
+    await fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: data.token }),
+    }).catch(() => {}); // non-fatal — localStorage remains the primary auth source
     router.push("/dashboard");
   };
 

@@ -43,11 +43,41 @@ const nextConfig = {
     },
   },
   async headers() {
+    // Content-Security-Policy — split across named directives for readability.
+    // 'unsafe-inline' + 'unsafe-eval' are required by Next.js inline scripts and
+    // styled-components; nonce-based CSP would remove these but requires middleware
+    // changes that are out of scope here. The remaining directives still provide
+    // meaningful protection against clickjacking, base-tag injection, and data exfil.
+    const csp = [
+      "default-src 'self'",
+      // Next.js hydration, styled-components, Stripe SDK, Trustpilot widget
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://widget.trustpilot.com",
+      // Styled-components injects inline styles
+      "style-src 'self' 'unsafe-inline'",
+      // Product images from any HTTPS source; data URIs for QR codes / placeholders
+      "img-src 'self' data: blob: https:",
+      // Web fonts
+      "font-src 'self' data: https://fonts.gstatic.com",
+      // Fetch/XHR: backend API, Sentry tunnel, PostHog analytics, Stripe
+      "connect-src 'self' https: wss:",
+      // Stripe payment iframes, Trustpilot rating widget
+      "frame-src https://js.stripe.com https://hooks.stripe.com https://widget.trustpilot.com",
+      // No embedding of this page in foreign iframes
+      "frame-ancestors 'self'",
+      // Disable plugins (Flash, etc.)
+      "object-src 'none'",
+      // Prevent <base> tag injection
+      "base-uri 'self'",
+      // Only allow forms to submit to same origin or Stripe hosted checkout
+      "form-action 'self' https://checkout.stripe.com",
+    ].join("; ");
+
     return [
       {
         source: "/(.*)",
         headers: [
-          // Prevent clickjacking
+          { key: "Content-Security-Policy", value: csp },
+          // Prevent clickjacking (legacy browsers — frame-ancestors above covers modern ones)
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           // Prevent MIME-type sniffing
           { key: "X-Content-Type-Options", value: "nosniff" },

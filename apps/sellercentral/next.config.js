@@ -40,11 +40,31 @@ const nextConfig = {
     },
   },
   async headers() {
+    // Strict CSP for the admin/seller panel — no third-party embeds needed.
+    const csp = [
+      "default-src 'self'",
+      // Next.js hydration + Polaris + styled-components require unsafe-inline/eval
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      // User-uploaded images can come from the backend or any HTTPS CDN
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      // XHR/fetch to backend API; wss for any future WebSocket features
+      "connect-src 'self' https: wss:",
+      // Admin panel must never be embeddable in any frame
+      "frame-src 'none'",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; ");
+
     return [
       {
         source: "/(.*)",
         headers: [
-          { key: "X-Frame-Options", value: "DENY" }, // seller panel: stricter than shop
+          { key: "Content-Security-Policy", value: csp },
+          { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },

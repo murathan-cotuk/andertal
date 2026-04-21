@@ -464,7 +464,7 @@ export default function PolarisLayout({ children }) {
     };
   }, [pathname]);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
     localStorage.removeItem("sellerLoggedIn");
     localStorage.removeItem("sellerEmail");
     localStorage.removeItem("sellerId");
@@ -473,6 +473,8 @@ export default function PolarisLayout({ children }) {
     localStorage.removeItem("sellerIsSuperuser");
     localStorage.removeItem("sellerPermissions");
     localStorage.removeItem("sellerApprovalStatus");
+    // Clear httpOnly session cookie
+    await fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
     router.push("/login");
   }, [router]);
 

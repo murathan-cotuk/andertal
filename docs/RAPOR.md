@@ -41,14 +41,14 @@ KRİTİK (Production'a çıkmadan mutlaka düzeltilmesi gereken)
   - AccountSettingsPage.jsx → TODO yorumu, implement edilmemiş
   - GoogleAdsPage, MetaAdsPage, PinterestAdsPage, TikTokAdsPage → sadece API key input'u var, gerçek entegrasyon yok
 
-  10. Token'lar localStorage'da
+  *10. DONE Token'lar localStorage'da
   localStorage.setItem("sellerToken", ...) — XSS saldırısında token çalınabilir. httpOnly cookie ile saklanmalı.
 
-  11. TOTP Secret Düz Metin DB'de
+  *11. DONE TOTP Secret Düz Metin DB'de
   2FA secret'ı totp_secret text kolonu olarak şifrelenmeden saklanıyor. Database sızıntısında 2FA atlatılabilir. Encryption at rest veya en  
   azından app-level şifreleme gerekir.
 
-  12. Sitemap/robots.txt Klasör Yapısı Hatası
+  *12. DONE Sitemap/robots.txt Klasör Yapısı Hatası
   apps/shop/src/app/robots.txt/ ve apps/shop/src/app/sitemap.xml/ klasör olarak var — içlerinde route.js var. Bu Next.js App Router
   convention'ına aykırı değil (route handlers için geçerli), ama URL sonuna .txt ve .xml gelmesi için route.js içindeki Response
   header'larının doğru ayarlanması şart. Kontrol edilmeli.

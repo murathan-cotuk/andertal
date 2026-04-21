@@ -182,6 +182,55 @@ const zPassword = z.string()
   .regex(/[0-9]/, 'Password must contain at least one number')
 const zUrl      = z.string().url('Invalid URL').or(z.literal('')).optional()
 
+// ── TOTP secret encryption (AES-256-GCM) ─────────────────────────────────────
+// Env: TOTP_ENCRYPTION_KEY — exactly 64 hex chars (32 bytes).
+// REQUIRED in all environments — no fallback. Generate with:
+//   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+if (!process.env.TOTP_ENCRYPTION_KEY) {
+  throw new Error('TOTP_ENCRYPTION_KEY is required. Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
+}
+if (process.env.TOTP_ENCRYPTION_KEY.length !== 64) {
+  throw new Error('TOTP_ENCRYPTION_KEY must be exactly 64 hex chars (32 bytes)')
+}
+const _totpKeyBuf = Buffer.from(process.env.TOTP_ENCRYPTION_KEY, 'hex')
+
+/**
+ * Encrypt a TOTP base32 secret for storage.
+ * Returns: "enc:<iv_hex>:<authTag_hex>:<ciphertext_hex>"
+ */
+function encryptTotp(plaintext) {
+  const crypto = require('crypto')
+  const iv     = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', _totpKeyBuf, iv)
+  const enc    = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+  const tag    = cipher.getAuthTag()
+  return `enc:${iv.toString('hex')}:${tag.toString('hex')}:${enc.toString('hex')}`
+}
+
+/**
+ * Decrypt a stored TOTP secret.
+ * Backward-compat: if value doesn't start with "enc:", return as-is (legacy plain secrets).
+ * Returns null on decryption failure (invalid key or tampered data).
+ */
+function decryptTotp(stored) {
+  if (!stored || !stored.startsWith('enc:')) return stored // legacy plaintext — pass through
+  const crypto = require('crypto')
+  const parts  = stored.split(':')
+  if (parts.length !== 4) return stored // malformed — pass through
+  const [, ivHex, tagHex, ctHex] = parts
+  try {
+    const iv       = Buffer.from(ivHex, 'hex')
+    const tag      = Buffer.from(tagHex, 'hex')
+    const ct       = Buffer.from(ctHex, 'hex')
+    const decipher = crypto.createDecipheriv('aes-256-gcm', _totpKeyBuf, iv)
+    decipher.setAuthTag(tag)
+    return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8')
+  } catch (e) {
+    console.error('TOTP decrypt failed:', e.message)
+    return null
+  }
+}
+
 // ── Production security check (startup) ───────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const missing = []
@@ -243,40 +292,73 @@ async function start() {
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'sentry-trace', 'sentry-baggage'],
     }))
-    // Rate limiting — prevent brute-force and abuse
-    const generalLimiter = rateLimit({
-      windowMs: 60 * 1000,       // 1 minute
-      max: 300,                  // 300 requests per minute per IP (storefront + admin)
-      standardHeaders: 'draft-7',
-      legacyHeaders: false,
-      skip: (req) => req.path === '/health', // don't limit health checks
+    // ── Rate limiting — per-endpoint granular limits ──────────────────────────
+    const _rl = (opts) => rateLimit({ standardHeaders: 'draft-7', legacyHeaders: false, ...opts })
+
+    // General catch-all — high ceiling, just prevents floods
+    const generalLimiter = _rl({
+      windowMs: 60 * 1000,
+      max: 300,
+      skip: (req) => req.path === '/health',
     })
-    const authLimiter = rateLimit({
-      windowMs: 15 * 60 * 1000,  // 15 minutes
-      max: 20,                   // 20 login attempts per 15 min per IP
-      standardHeaders: 'draft-7',
-      legacyHeaders: false,
-      message: { error: 'Too many login attempts. Please try again later.' },
+
+    // Seller login — 10 attempts per 15 min; only failed requests count
+    const authLimiter = _rl({
+      windowMs: 15 * 60 * 1000,
+      max: 10,
+      skipSuccessfulRequests: true,
+      message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
     })
-    const registerLimiter = rateLimit({
-      windowMs: 60 * 60 * 1000, // 1 hour
-      max: 10,                  // 10 registration attempts per hour per IP
-      standardHeaders: 'draft-7',
-      legacyHeaders: false,
+
+    // New account registrations — 5 per hour per IP
+    const registerLimiter = _rl({
+      windowMs: 60 * 60 * 1000,
+      max: 5,
+      skipSuccessfulRequests: true,
       message: { error: 'Too many registration attempts. Please try again later.' },
     })
-    const paymentLimiter = rateLimit({
-      windowMs: 60 * 1000,       // 1 minute
-      max: 10,                   // 10 payment intents per minute per IP
-      standardHeaders: 'draft-7',
-      legacyHeaders: false,
+
+    // Customer login (/store/auth/token) — 15 attempts per 15 min
+    const customerAuthLimiter = _rl({
+      windowMs: 15 * 60 * 1000,
+      max: 15,
+      skipSuccessfulRequests: true,
+      message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+    })
+
+    // 2FA endpoints — TOTP has 1 000 000 combinations; tight window is the only defense
+    const totpLimiter = _rl({
+      windowMs: 15 * 60 * 1000,
+      max: 5,
+      skipSuccessfulRequests: true,
+      message: { error: 'Too many 2FA attempts. Please try again in 15 minutes.' },
+    })
+
+    // Password change — 5 per hour
+    const passwordChangeLimiter = _rl({
+      windowMs: 60 * 60 * 1000,
+      max: 5,
+      skipSuccessfulRequests: true,
+      message: { error: 'Too many password change attempts. Please try again later.' },
+    })
+
+    // Payment intent creation — 10 per minute
+    const paymentLimiter = _rl({
+      windowMs: 60 * 1000,
+      max: 10,
       message: { error: 'Too many payment requests. Please slow down.' },
     })
+
     app.use(generalLimiter)
-    app.use('/admin-hub/auth/login', authLimiter)
-    app.use('/admin-hub/auth/register', registerLimiter)
-    app.use('/store/customers', registerLimiter)   // customer register
-    app.use('/store/payment-intent', paymentLimiter)
+    app.use('/admin-hub/auth/login',           authLimiter)
+    app.use('/admin-hub/auth/register',        registerLimiter)
+    app.use('/admin-hub/auth/2fa/setup',       totpLimiter)
+    app.use('/admin-hub/auth/2fa/verify',      totpLimiter)
+    app.use('/admin-hub/auth/2fa/disable',     totpLimiter)
+    app.use('/admin-hub/v1/seller/password',   passwordChangeLimiter)
+    app.use('/store/customers',                registerLimiter)   // customer register
+    app.use('/store/auth/token',               customerAuthLimiter)
+    app.use('/store/payment-intent',           paymentLimiter)
 
     // ── DB connection helper ─────────────────────────────────────────────────
     // Wraps connect → fn(client) → end in a guaranteed finally so connections
@@ -4236,7 +4318,9 @@ async function start() {
             return res.status(200).json({ totp_required: true, message: 'Two-factor authentication code required.' })
           }
           const speakeasy = require('speakeasy')
-          const valid = speakeasy.totp.verify({ secret: user.totp_secret, encoding: 'base32', token: totpCode, window: 1 })
+          const totpPlain = decryptTotp(user.totp_secret)
+          if (!totpPlain) { await client.end(); return res.status(500).json({ message: 'Internal error during 2FA verification.' }) }
+          const valid = speakeasy.totp.verify({ secret: totpPlain, encoding: 'base32', token: totpCode, window: 1 })
           if (!valid) {
             await client.end()
             return res.status(401).json({ message: 'Invalid two-factor authentication code.' })
@@ -4298,11 +4382,15 @@ async function start() {
         const { Client } = require('pg')
         const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await lc.connect()
-        // Save pending (not yet enabled) secret
-        await lc.query(`UPDATE seller_users SET totp_secret = $1, totp_enabled = false WHERE id = $2`, [secret.base32, sellerUser.id])
+        // Encrypt and save pending (not yet enabled) secret
+        await lc.query(`UPDATE seller_users SET totp_secret = $1, totp_enabled = false WHERE id = $2`, [encryptTotp(secret.base32), sellerUser.id])
         await lc.end()
         const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url)
-        res.json({ secret: secret.base32, qr_code: qrDataUrl })
+        // Raw secret is only returned in dev for manual QR entry; production relies on the QR code
+        res.json({
+          qr_code: qrDataUrl,
+          ...(process.env.NODE_ENV !== 'production' && { secret: secret.base32 }),
+        })
       } catch (err) {
         console.error('2fa setup:', err)
         res.status(500).json({ message: err?.message || '2FA setup failed' })
@@ -4324,7 +4412,9 @@ async function start() {
         const ur = await lc.query('SELECT totp_secret, totp_enabled FROM seller_users WHERE id = $1', [sellerUser.id])
         const row = ur.rows[0]
         if (!row || !row.totp_secret) { await lc.end(); return res.status(400).json({ message: 'No pending 2FA setup. Run setup first.' }) }
-        const valid = speakeasy.totp.verify({ secret: row.totp_secret, encoding: 'base32', token: code, window: 1 })
+        const totpPlainVerify = decryptTotp(row.totp_secret)
+        if (!totpPlainVerify) { await lc.end(); return res.status(500).json({ message: 'Internal error during 2FA verification.' }) }
+        const valid = speakeasy.totp.verify({ secret: totpPlainVerify, encoding: 'base32', token: code, window: 1 })
         if (!valid) { await lc.end(); return res.status(400).json({ message: 'Invalid code. Check your authenticator app.' }) }
         await lc.query('UPDATE seller_users SET totp_enabled = true WHERE id = $1', [sellerUser.id])
         await lc.end()
@@ -4354,7 +4444,10 @@ async function start() {
         let authorized = false
         if (code && row.totp_secret) {
           const speakeasy = require('speakeasy')
-          authorized = speakeasy.totp.verify({ secret: row.totp_secret, encoding: 'base32', token: code, window: 1 })
+          const totpPlainDisable = decryptTotp(row.totp_secret)
+          if (totpPlainDisable) {
+            authorized = speakeasy.totp.verify({ secret: totpPlainDisable, encoding: 'base32', token: code, window: 1 })
+          }
         }
         if (!authorized && password) {
           authorized = verifySellerPassword(password, row.password_hash)
