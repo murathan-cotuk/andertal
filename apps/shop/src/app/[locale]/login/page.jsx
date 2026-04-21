@@ -143,8 +143,9 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 18 }}>
             {/* Email */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>E-Mail</label>
+              <label htmlFor="login-email" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>E-Mail</label>
               <input
+                id="login-email"
                 type="email"
                 placeholder="deine@email.de"
                 value={formData.email}
@@ -159,13 +160,14 @@ export default function LoginPage() {
             {/* Password */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Passwort</label>
+                <label htmlFor="login-password" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Passwort</label>
                 <Link href="/forgot-password" style={{ fontSize: 12, color: tokens.primary.DEFAULT, textDecoration: "none", fontWeight: 600 }}>
                   Vergessen?
                 </Link>
               </div>
               <div style={{ position: "relative" }}>
                 <input
+                  id="login-password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Dein Passwort"
                   value={formData.password}

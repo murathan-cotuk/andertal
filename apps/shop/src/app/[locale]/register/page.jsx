@@ -235,11 +235,11 @@ export default function RegisterPage() {
               <>
                 <div style={sectionLabel}>Unternehmensdaten</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Firmenname *</label>
+                  <label htmlFor="companyName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Firmenname *</label>
                   <input id="companyName" value={formData.companyName} onChange={set("companyName")} placeholder="Muster GmbH" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>USt-IdNr. (optional)</label>
+                  <label htmlFor="vatNumber" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>USt-IdNr. (optional)</label>
                   <input id="vatNumber" value={formData.vatNumber} onChange={set("vatNumber")} placeholder="DE123456789" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={sectionLabel}>Ansprechpartner</div>
@@ -249,11 +249,11 @@ export default function RegisterPage() {
             {/* Name row */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Vorname *</label>
+                <label htmlFor="firstName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Vorname *</label>
                 <input id="firstName" value={formData.firstName} onChange={set("firstName")} placeholder="Max" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Nachname *</label>
+                <label htmlFor="lastName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Nachname *</label>
                 <input id="lastName" value={formData.lastName} onChange={set("lastName")} placeholder="Mustermann" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
             </div>
@@ -261,7 +261,7 @@ export default function RegisterPage() {
             {/* Gender + Birthdate */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Geschlecht</label>
+                <label htmlFor="gender" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Geschlecht</label>
                 <select id="gender" value={formData.gender} onChange={set("gender")} style={selStyle} onFocus={focusStyle} onBlur={blurStyle}>
                   <option value="">Bitte wählen</option>
                   <option value="male">Männlich</option>
@@ -270,43 +270,43 @@ export default function RegisterPage() {
                 </select>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Geburtsdatum</label>
+                <label htmlFor="birthDate" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Geburtsdatum</label>
                 <input type="date" id="birthDate" value={formData.birthDate} onChange={set("birthDate")} style={inp} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
             </div>
 
             {/* Email */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>E-Mail *</label>
+              <label htmlFor="email" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>E-Mail *</label>
               <input type="email" id="email" value={formData.email} onChange={set("email")} placeholder="ihre@email.de" required autoComplete="email" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
 
             {/* Phone */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Telefonnummer</label>
+              <label htmlFor="phone" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Telefonnummer</label>
               <input type="tel" id="phone" value={formData.phone} onChange={set("phone")} placeholder="+49 123 456789" autoComplete="tel" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
 
             {/* Delivery address */}
             <div style={sectionLabel}>Lieferadresse</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Straße und Hausnummer</label>
+              <label htmlFor="address" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Straße und Hausnummer</label>
               <input id="address" value={formData.address} onChange={set("address")} placeholder="Musterstraße 1" autoComplete="street-address" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>PLZ</label>
+                <label htmlFor="zipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>PLZ</label>
                 <input id="zipCode" value={formData.zipCode} onChange={set("zipCode")} placeholder="12345" autoComplete="postal-code" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Stadt</label>
+                <label htmlFor="city" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Stadt</label>
                 <input id="city" value={formData.city} onChange={set("city")} placeholder="Berlin" autoComplete="address-level2" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Land</label>
+              <label htmlFor="country" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Land</label>
               <select id="country" value={shippableCountries.some((c) => c.code === formData.country) ? formData.country : (shippableCountries[0]?.code || "")} onChange={set("country")} autoComplete="country" style={selStyle} onFocus={focusStyle} onBlur={blurStyle} disabled={!shippableCountries.length}>
                 {shippableCountries.map((c) => (
                   <option key={c.code} value={c.code}>{c.flag ? `${c.flag} ` : ""}{c.label}</option>
@@ -332,21 +332,21 @@ export default function RegisterPage() {
               <>
                 <div style={sectionLabel}>Rechnungsadresse</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Straße und Hausnummer</label>
+                  <label htmlFor="billingAddress" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Straße und Hausnummer</label>
                   <input id="billingAddress" value={formData.billingAddress || ""} onChange={set("billingAddress")} placeholder="Musterstraße 1" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>PLZ</label>
+                    <label htmlFor="billingZipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>PLZ</label>
                     <input id="billingZipCode" value={formData.billingZipCode || ""} onChange={set("billingZipCode")} placeholder="12345" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Stadt</label>
+                    <label htmlFor="billingCity" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Stadt</label>
                     <input id="billingCity" value={formData.billingCity || ""} onChange={set("billingCity")} placeholder="Berlin" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                   </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Land</label>
+                  <label htmlFor="billingCountry" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Land</label>
                   <select id="billingCountry" value={(shippableCountries.find((c) => c.code === (formData.billingCountry || "")) || shippableCountries[0])?.code || ""} onChange={set("billingCountry")} style={selStyle} onFocus={focusStyle} onBlur={blurStyle} disabled={!shippableCountries.length}>
                     {shippableCountries.map((c) => (
                       <option key={c.code} value={c.code}>{c.flag ? `${c.flag} ` : ""}{c.label}</option>

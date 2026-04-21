@@ -7,6 +7,7 @@ import { useCustomerAuth as useAuth } from "@belucha/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
+import UserDropdown from "@/components/UserDropdown";
 
 const Nav = styled.nav`
   background-color: white;
@@ -174,94 +175,6 @@ const CartBadge = styled.span`
   font-weight: 600;
 `;
 
-const ProfileMenu = styled.div`
-  position: relative;
-  display: flex;
-  align-items: center;
-`;
-
-const ProfileButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: background-color 0.2s ease;
-  width: 40px;
-  height: 40px;
-
-  &:hover {
-    background-color: #f3f4f6;
-  }
-`;
-
-const DropdownMenu = styled.div`
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  min-width: 200px;
-  z-index: 1000;
-  overflow: hidden;
-  display: ${props => props.$isOpen ? 'block' : 'none'};
-`;
-
-const DropdownItem = styled(Link)`
-  display: block;
-  padding: 12px 16px;
-  color: #374151;
-  text-decoration: none;
-  transition: background-color 0.2s ease;
-  font-size: 14px;
-  font-weight: 500;
-
-  &:hover {
-    background-color: #f3f4f6;
-    color: #0ea5e9;
-  }
-
-  &:not(:last-child) {
-    border-bottom: 1px solid #f3f4f6;
-  }
-`;
-
-const DropdownButton = styled.button`
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 12px 16px;
-  color: #374151;
-  text-decoration: none;
-  transition: background-color 0.2s ease;
-  font-size: 14px;
-  font-weight: 500;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-
-  &:hover {
-    background-color: #f3f4f6;
-    color: #0ea5e9;
-  }
-
-  &:not(:last-child) {
-    border-bottom: 1px solid #f3f4f6;
-  }
-`;
-
-const UserName = styled.div`
-  padding: 12px 16px;
-  color: #1f2937;
-  font-size: 14px;
-  font-weight: 600;
-  border-bottom: 1px solid #f3f4f6;
-`;
 
 // link_type: 'url' | 'category' | 'collection' | ... → href; link_value may be JSON string
 function slugify(s) {
@@ -306,7 +219,6 @@ function menuItemHref(item) {
 }
 
 export default function Navbar() {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]); // { menu, items } from backend
   const [loading, setLoading] = useState(true);
@@ -346,19 +258,6 @@ export default function Navbar() {
     fetchMenusAndCategories();
   }, []);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isDropdownOpen && !event.target.closest('[data-dropdown]')) {
-        setIsDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isDropdownOpen]);
 
   return (
     <Nav>
@@ -394,57 +293,11 @@ export default function Navbar() {
           ) : null}
         </CategoriesMenu>
         <RightMenu>
-          <ProfileMenu data-dropdown>
-            <ProfileButton onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
-              <i className="fas fa-user-circle" style={{ fontSize: "24px", color: "#374151" }} />
-            </ProfileButton>
-            <DropdownMenu $isOpen={isDropdownOpen}>
-              {isAuthenticated ? (
-                <>
-                  {user && (
-                    <UserName>
-                      {user.firstName} {user.lastName}
-                    </UserName>
-                  )}
-              <DropdownItem href="/account" onClick={() => setIsDropdownOpen(false)}>
-                Übersicht
-              </DropdownItem>
-              <DropdownItem href="/orders" onClick={() => setIsDropdownOpen(false)}>
-                Meine Bestellungen
-              </DropdownItem>
-              <DropdownItem href="/merkzettel" onClick={() => setIsDropdownOpen(false)}>
-                Merkzettel
-              </DropdownItem>
-              <DropdownItem href="/addresses" onClick={() => setIsDropdownOpen(false)}>
-                Adressen
-              </DropdownItem>
-              <DropdownItem href="/reviews" onClick={() => setIsDropdownOpen(false)}>
-                Bewertungen
-              </DropdownItem>
-              <DropdownItem href="/bonus" onClick={() => setIsDropdownOpen(false)}>
-                Bonuspunkte
-              </DropdownItem>
-                  <DropdownButton
-                    onClick={() => {
-                      logout();
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    Abmelden
-                  </DropdownButton>
-                </>
-              ) : (
-                <>
-              <DropdownItem href="/login" onClick={() => setIsDropdownOpen(false)}>
-                Anmelden
-              </DropdownItem>
-                  <DropdownItem href="/register" onClick={() => setIsDropdownOpen(false)}>
-                    Registrieren
-                  </DropdownItem>
-                </>
-              )}
-            </DropdownMenu>
-          </ProfileMenu>
+          <UserDropdown
+            isAuthenticated={isAuthenticated}
+            user={user}
+            onLogout={logout}
+          />
           <CartButton as="button" type="button" onClick={openCartSidebar} title="Warenkorb">
             <i className="fas fa-shopping-cart" style={{ fontSize: "20px", color: "#374151" }} />
             <CartBadge>{itemCount > 0 ? itemCount : 0}</CartBadge>

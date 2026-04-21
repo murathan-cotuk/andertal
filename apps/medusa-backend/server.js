@@ -1431,6 +1431,35 @@ async function start() {
       next()
     })
 
+    // Public store endpoints: stale-while-revalidate cache headers
+    // Private paths (cart, orders, customer, payment) must NOT be cached publicly.
+    httpApp.use('/store', (req, res, next) => {
+      if (req.method !== 'GET') return next()
+      const p = req.path // e.g. /products, /products/my-handle, /collections
+      // Never cache personal / transactional endpoints
+      const noCache = ['/carts', '/orders', '/customers', '/payment', '/wishlist', '/payment-methods', '/public-payment-config']
+      if (noCache.some((prefix) => p === prefix || p.startsWith(prefix + '/'))) return next()
+      // Menus and categories change rarely
+      if (p === '/menus' || p === '/menu-locations') {
+        res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600')
+      } else if (p === '/categories' || p.startsWith('/categories/')) {
+        res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=600')
+      } else if (p === '/collections' || p.startsWith('/collections/')) {
+        res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=600')
+      } else if (p === '/brands' || p.startsWith('/brands/')) {
+        res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=600')
+      } else if (p === '/products' || p.startsWith('/products/')) {
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
+        res.set('Vary', 'Accept-Encoding')
+      } else if (p.startsWith('/seller-settings') || p.startsWith('/seller-profile') || p.startsWith('/approved-seller-ids')) {
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
+      } else if (p.startsWith('/page-by-label-slug/')) {
+        res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=3600')
+      }
+      // All others: no explicit cache header (Express default: no Cache-Control)
+      next()
+    })
+
     // --- Kategoriler: Route'lar her zaman kayıtlı; handler içinde adminHubService resolve edilir (404 yerine 503 döner) ---
     const resolveAdminHub = () => {
       try {

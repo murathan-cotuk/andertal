@@ -413,6 +413,7 @@ const MiddleBarIconBtn = styled.button`
 
 const MiddleBarAccountWrap = styled.div`
   position: relative;
+  z-index: 3;
 `;
 
 const MiddleBarCartBtn = styled(MiddleBarIconBtn)`
@@ -622,7 +623,7 @@ const UserDropdown = styled(motion.div)`
   border-radius: 12px;
   box-shadow: ${tokens.shadow.hover};
   padding: 8px 0;
-  z-index: 2147483647; /* top of header chrome; cart drawer uses 2147483700+ */
+  z-index: 3;
   display: ${(p) => (p.$open ? "block" : "none")};
 `;
 
@@ -677,7 +678,7 @@ const SubNavWrap = styled.div`
   font-size: var(--second-nav-fs, 15px);
   font-weight: var(--second-nav-fw, 500);
   position: relative;
-  z-index: 1; /* below MiddleBarWrap (HEADER_MIDDLE_Z) */
+  z-index: 2;
 `;
 
 const SecondMenuRowInner = styled.div`
@@ -717,7 +718,7 @@ const HeaderSpacer = styled.div`
 const LocaleCurrencyWrap = styled.div`
   position: relative;
   flex-shrink: 0;
-  z-index: 9999;
+  z-index: 3;
 `;
 
 const LocaleCurrencyBtn = styled.button`
@@ -753,7 +754,7 @@ const LocaleDropdown = styled.div`
   border: 1px solid ${tokens.border.light};
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.18);
-  z-index: 2147483647; /* top of header chrome; cart drawer uses 2147483700+ */
+  z-index: 3;
   display: ${(p) => (p.$open ? "flex" : "none")};
   overflow: hidden;
 `;

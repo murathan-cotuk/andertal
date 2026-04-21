@@ -87,7 +87,21 @@
       "Bash(mkdir -p \"C:/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/sellercentral/src/app/[locale]/products/product-groups\")",
       "Bash(mkdir -p \"C:/Users/Lenovo/Desktop/Ortam/Yazilim/belucha/apps/sellercentral/src/app/[locale]/discounts/campaigns\")",
       "Bash(python3 *)",
-      "Bash(xargs wc *)"
+      "Bash(xargs wc *)",
+      "Bash(sed -n '540,548p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/components/landing/LandingContainers.jsx\")",
+      "Bash(sed -n '1280,1290p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/components/landing/LandingContainers.jsx\")",
+      "Bash(sed -n '608,615p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/app/[locale]/brand/[handle]/page.jsx\")",
+      "Bash(sed -n '1127,1135p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/components/ShopHeader.jsx\")",
+      "Bash(sed -n '709,716p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/components/templates/ProductTemplate.jsx\")",
+      "Bash(sed -n '606,618p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/app/[locale]/brand/[handle]/page.jsx\")",
+      "Bash(sed -n '83,90p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/app/[locale]/pages/[slug]/page.jsx\")",
+      "Bash(sed -n '484,492p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/app/[locale]/orders/page.jsx\")",
+      "Bash(sed -n '55,80p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/components/ProductWishlistHeart.jsx\")",
+      "Bash(sed -n '80,100p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/components/account/AccountSidebar.jsx\")",
+      "Bash(sed -n '865,875p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/components/templates/CategoryTemplate.jsx\")",
+      "Bash(sed -n '918,930p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/app/[locale]/checkout/page.jsx\")",
+      "Bash(sed -n '1345,1360p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/app/[locale]/checkout/page.jsx\")",
+      "Bash(sed -n '1388,1400p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/app/[locale]/checkout/page.jsx\")"
     ]
   }
 }

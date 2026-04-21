@@ -867,7 +867,7 @@ export default function CategoryTemplate() {
               <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
                 Navigation
               </span>
-              <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555", lineHeight: 1 }}>×</button>
+              <button type="button" aria-label="Filter schließen" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555", lineHeight: 1 }}>×</button>
             </SidebarHead>
             <SidebarSplit>
               {(hasSubcategories || parentCategory) && (

@@ -1349,6 +1349,7 @@ export default function CheckoutPage() {
                       <input
                         type="text"
                         inputMode="numeric"
+                        aria-label="Bonuspunkte einlösen"
                         value={bonusDraft}
                         onChange={(e) => setBonusDraft(e.target.value)}
                         placeholder={t("bonusPlaceholder")}
@@ -1391,6 +1392,7 @@ export default function CheckoutPage() {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <input
                     type="text"
+                    aria-label="Coupon-Code"
                     value={couponDraft}
                     onChange={(e) => setCouponDraft(e.target.value)}
                     placeholder="z. B. SAVE10"

@@ -46,7 +46,7 @@ let config = {
   projectConfig: {
     databaseUrl,
     databaseDriverOptions: getDatabaseDriverOptions(),
-    redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
+    ...(process.env.REDIS_URL ? { redisUrl: process.env.REDIS_URL } : {}),
     http: {
       storeCors: process.env.STORE_CORS || "http://localhost:3000",
       adminCors: process.env.ADMIN_CORS || "http://localhost:3002",

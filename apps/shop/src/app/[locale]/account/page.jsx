@@ -270,20 +270,20 @@ export default function AccountPage() {
                   <div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
                       <div>
-                        <label style={lbl}>Vorname</label>
-                        <input style={inp} value={form.first_name} onChange={e => set("first_name", e.target.value)} />
+                        <label htmlFor="acc-first_name" style={lbl}>Vorname</label>
+                        <input id="acc-first_name" style={inp} value={form.first_name} onChange={e => set("first_name", e.target.value)} />
                       </div>
                       <div>
-                        <label style={lbl}>Nachname</label>
-                        <input style={inp} value={form.last_name} onChange={e => set("last_name", e.target.value)} />
+                        <label htmlFor="acc-last_name" style={lbl}>Nachname</label>
+                        <input id="acc-last_name" style={inp} value={form.last_name} onChange={e => set("last_name", e.target.value)} />
                       </div>
                       <div>
-                        <label style={lbl}>Telefon</label>
-                        <input style={inp} value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="+49 123 456789" />
+                        <label htmlFor="acc-phone" style={lbl}>Telefon</label>
+                        <input id="acc-phone" style={inp} value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="+49 123 456789" />
                       </div>
                       <div>
-                        <label style={lbl}>Kontotyp</label>
-                        <select style={inp} value={form.account_type} onChange={e => set("account_type", e.target.value)}>
+                        <label htmlFor="acc-account_type" style={lbl}>Kontotyp</label>
+                        <select id="acc-account_type" style={inp} value={form.account_type} onChange={e => set("account_type", e.target.value)}>
                           <option value="privat">Privatkunde</option>
                           <option value="gewerbe">Gewerbekunde</option>
                         </select>
@@ -291,12 +291,12 @@ export default function AccountPage() {
                       {form.account_type === "gewerbe" && (
                         <>
                           <div>
-                            <label style={lbl}>Firmenname</label>
-                            <input style={inp} value={form.company_name} onChange={e => set("company_name", e.target.value)} />
+                            <label htmlFor="acc-company_name" style={lbl}>Firmenname</label>
+                            <input id="acc-company_name" style={inp} value={form.company_name} onChange={e => set("company_name", e.target.value)} />
                           </div>
                           <div>
-                            <label style={lbl}>USt-IdNr.</label>
-                            <input style={inp} value={form.vat_number} onChange={e => set("vat_number", e.target.value)} />
+                            <label htmlFor="acc-vat_number" style={lbl}>USt-IdNr.</label>
+                            <input id="acc-vat_number" style={inp} value={form.vat_number} onChange={e => set("vat_number", e.target.value)} />
                           </div>
                         </>
                       )}

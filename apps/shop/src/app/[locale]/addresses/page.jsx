@@ -224,8 +224,9 @@ export default function AddressesPage() {
                 <div style={{ marginTop: 24, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, maxWidth: 520 }}>
                   <h2 style={{ margin: "0 0 16px", fontSize: 16 }}>Neue Adresse</h2>
                   <div style={{ display: "grid", gap: 12 }}>
-                    <input style={inp} placeholder="Bezeichnung (optional)" value={form.label} onChange={(e) => set("label", e.target.value)} />
+                    <input aria-label="Bezeichnung" style={inp} placeholder="Bezeichnung (optional)" value={form.label} onChange={(e) => set("label", e.target.value)} />
                     <input
+                      aria-label="Straße und Hausnummer"
                       style={inp}
                       name="address_line1"
                       autoComplete="address-line1"
@@ -234,6 +235,7 @@ export default function AddressesPage() {
                       onChange={(e) => set("address_line1", e.target.value)}
                     />
                     <input
+                      aria-label="Adresszusatz"
                       style={inp}
                       name="address_line2"
                       autoComplete="address-line2"
@@ -242,10 +244,10 @@ export default function AddressesPage() {
                       onChange={(e) => set("address_line2", e.target.value)}
                     />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <input style={inp} name="zip_code" autoComplete="postal-code" placeholder="PLZ" value={form.zip_code} onChange={(e) => set("zip_code", e.target.value)} />
-                      <input style={inp} name="city" autoComplete="address-level2" placeholder="Stadt" value={form.city} onChange={(e) => set("city", e.target.value)} />
+                      <input aria-label="Postleitzahl" style={inp} name="zip_code" autoComplete="postal-code" placeholder="PLZ" value={form.zip_code} onChange={(e) => set("zip_code", e.target.value)} />
+                      <input aria-label="Stadt" style={inp} name="city" autoComplete="address-level2" placeholder="Stadt" value={form.city} onChange={(e) => set("city", e.target.value)} />
                     </div>
-                    <select style={inp} name="country" autoComplete="country" value={shippableCountries.some((c) => c.code === form.country) ? form.country : (shippableCountries[0]?.code || "")} onChange={(e) => set("country", e.target.value)} disabled={!shippableCountries.length}>
+                    <select aria-label="Land" style={inp} name="country" autoComplete="country" value={shippableCountries.some((c) => c.code === form.country) ? form.country : (shippableCountries[0]?.code || "")} onChange={(e) => set("country", e.target.value)} disabled={!shippableCountries.length}>
                       {shippableCountries.map((c) => (
                         <option key={c.code} value={c.code}>{c.flag ? `${c.flag} ` : ""}{c.label}</option>
                       ))}
