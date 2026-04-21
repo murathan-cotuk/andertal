@@ -58,6 +58,16 @@ const ICONS = {
       <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
     </svg>
   ),
+  payment: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+    </svg>
+  ),
+  messages: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+  ),
   logout: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -187,15 +197,17 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen }
 
               <div className="h-px bg-gray-100 my-1" />
 
-              <NavItem href="/account" icon={ICONS.overview}>Overview</NavItem>
-              <NavItem href="/orders"  icon={ICONS.orders}>My Orders</NavItem>
-              <NavItem href="/merkzettel" icon={ICONS.wishlist}>Wishlist</NavItem>
+              <NavItem href="/account"         icon={ICONS.overview}>Übersicht</NavItem>
+              <NavItem href="/orders"          icon={ICONS.orders}>Meine Bestellungen</NavItem>
+              <NavItem href="/merkzettel"      icon={ICONS.wishlist}>Merkzettel</NavItem>
 
               <div className="h-px bg-gray-100 my-1" />
 
-              <NavItem href="/addresses" icon={ICONS.addresses}>Addresses</NavItem>
-              <NavItem href="/reviews"   icon={ICONS.reviews}>Reviews</NavItem>
-              <NavItem href="/bonus"     icon={ICONS.bonus}>Bonus Points</NavItem>
+              <NavItem href="/addresses"       icon={ICONS.addresses}>Adressen</NavItem>
+              <NavItem href="/payment-methods" icon={ICONS.payment}>Zahlungsmethoden</NavItem>
+              <NavItem href="/nachrichten"     icon={ICONS.messages}>Nachrichten</NavItem>
+              <NavItem href="/reviews"         icon={ICONS.reviews}>Bewertungen</NavItem>
+              <NavItem href="/bonus"           icon={ICONS.bonus}>Bonuspunkte</NavItem>
 
               {/* ── Logout — inside card, separated by border ─── */}
               <div className="h-px bg-gray-100 mt-1 mb-0" />
