@@ -94,7 +94,7 @@ function NavItem({ href, icon, children, onClick }) {
 }
 
 /* ─── Main component ─────────────────────────────────────────── */
-export default function UserDropdown({ isAuthenticated, user, onLogout }) {
+export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen }) {
   const initials    = getInitials(user);
   const displayName = user
     ? [user.firstName || user.first_name, user.lastName || user.last_name]
@@ -102,7 +102,7 @@ export default function UserDropdown({ isAuthenticated, user, onLogout }) {
     : "";
 
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root onOpenChange={(open) => { if (open && onOpen) onOpen(); }}>
       {/* ── Trigger ───────────────────────────────────────────── */}
       <DropdownMenu.Trigger asChild>
         <button

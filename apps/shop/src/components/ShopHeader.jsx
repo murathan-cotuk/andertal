@@ -15,6 +15,7 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
 import TopBar from "@/components/TopBar";
+import UserDropdownPanel from "@/components/UserDropdown";
 import { tokens } from "@/design-system/tokens";
 import { routing } from "@/i18n/routing";
 import {
@@ -411,11 +412,6 @@ const MiddleBarIconBtn = styled.button`
   }
 `;
 
-const MiddleBarAccountWrap = styled.div`
-  position: relative;
-  z-index: 3;
-`;
-
 const MiddleBarCartBtn = styled(MiddleBarIconBtn)`
   position: relative;
 `;
@@ -436,33 +432,6 @@ const MiddleBarCartBadge = styled.span`
   justify-content: center;
 `;
 
-const MiddleBarAccountBtn = styled(MiddleBarIconBtn)`
-  position: relative;
-`;
-
-/** Green check on profile when customer is signed in */
-const AccountSignedInBadge = styled.span`
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: linear-gradient(160deg, #4ade80 0%, #22c55e 100%);
-  border: 2px solid ${MIDDLE_BAR_BG};
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  pointer-events: none;
-
-  svg {
-    width: 9px;
-    height: 9px;
-    flex-shrink: 0;
-  }
-`;
 
 /* Locale dropdown trigger – sadece ikon */
 const MiddleBarLocaleBtn = styled(MiddleBarIconBtn)``;
@@ -613,55 +582,6 @@ const UserBtn = styled.button`
   }
 `;
 
-const UserDropdown = styled(motion.div)`
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  min-width: 220px;
-  background: ${tokens.background.card};
-  border: 1px solid ${tokens.border.light};
-  border-radius: 12px;
-  box-shadow: ${tokens.shadow.hover};
-  padding: 8px 0;
-  z-index: 3;
-  display: ${(p) => (p.$open ? "block" : "none")};
-`;
-
-const UserDropdownItem = styled(Link)`
-  display: block;
-  padding: ${tokens.spacing.sm} ${tokens.spacing.md};
-  font-size: ${tokens.fontSize.small};
-  color: ${tokens.dark[700]};
-  font-family: ${tokens.fontFamily.sans};
-  text-decoration: none;
-  transition: background ${tokens.transition.base}, color ${tokens.transition.base};
-
-  &:hover {
-    background: ${tokens.background.soft};
-    color: ${tokens.primary.DEFAULT};
-    text-decoration: underline;
-  }
-`;
-
-const UserDropdownBtn = styled.button`
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: ${tokens.spacing.sm} ${tokens.spacing.md};
-  font-size: ${tokens.fontSize.small};
-  color: ${tokens.dark[700]};
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-family: ${tokens.fontFamily.sans};
-  transition: background ${tokens.transition.base}, color ${tokens.transition.base};
-
-  &:hover {
-    background: ${tokens.background.soft};
-    color: ${tokens.primary.DEFAULT};
-    text-decoration: underline;
-  }
-`;
 
 const SubNavWrap = styled.div`
   width: 100%;
@@ -825,7 +745,7 @@ export default function ShopHeader() {
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [hoveredMenuItemId, setHoveredMenuItemId] = useState(null);
   const [shopBranding, setShopBranding] = useState({ shop_logo_url: "", shop_favicon_url: "", shop_logo_height: 34 });
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  // userMenuOpen state removed — now managed by Radix DropdownMenu in UserDropdownPanel
   const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
   const [mainMenuAllItems, setMainMenuAllItems] = useState([]);
   const [mainMenuConfig, setMainMenuConfig] = useState(null);
@@ -992,7 +912,6 @@ export default function ShopHeader() {
   useEffect(() => {
     const close = () => {
       setMainMenuOpen(false);
-      setUserMenuOpen(false);
       setLocaleDropdownOpen(false);
       setHoveredMenuItemId(null);
     };
@@ -1144,7 +1063,6 @@ export default function ShopHeader() {
                   type="button"
                   onClick={() => {
                     setLocaleDropdownOpen(false);
-                    setUserMenuOpen(false);
                     setHoveredMenuItemId(null);
                     setDrillCategoryId(null);
                     setMainMenuOpen((v) => !v);
@@ -1221,7 +1139,7 @@ export default function ShopHeader() {
 
             <MiddleBarRight>
               <LocaleCurrencyWrap data-locale-dropdown>
-                <MiddleBarLocaleBtn type="button" onClick={() => { setUserMenuOpen(false); setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={`${tLocale("label")} · Währung`} aria-label="Land, Sprache, Währung" aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
+                <MiddleBarLocaleBtn type="button" onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={`${tLocale("label")} · Währung`} aria-label="Land, Sprache, Währung" aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
                   </svg>
@@ -1295,50 +1213,15 @@ export default function ShopHeader() {
                   </div>
                 </LocaleDropdown>
               </LocaleCurrencyWrap>
-              <MiddleBarAccountWrap data-user-menu>
-                <MiddleBarAccountBtn
-                  type="button"
-                  onClick={() => { setLocaleDropdownOpen(false); setMainMenuOpen(false); setUserMenuOpen((v) => !v); }}
-                  title={isAuthenticated ? "Mein Konto — angemeldet" : "Mein Konto"}
-                  aria-label={isAuthenticated ? "Mein Konto, angemeldet" : "Mein Konto"}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                  </svg>
-                  {isAuthenticated && (
-                    <AccountSignedInBadge aria-hidden="true">
-                      <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </AccountSignedInBadge>
-                  )}
-                </MiddleBarAccountBtn>
-                <UserDropdown $open={userMenuOpen}>
-                  {isAuthenticated ? (
-                    <>
-                      {user && (
-                        <div style={{ padding: "12px 20px", fontSize: 14, fontWeight: 600, color: tokens.dark[800], borderBottom: `1px solid ${tokens.border.light}` }}>
-                          {user.firstName} {user.lastName}
-                        </div>
-                      )}
-                      <UserDropdownItem href="/account" onClick={() => setUserMenuOpen(false)}>Übersicht</UserDropdownItem>
-                      <UserDropdownItem href="/orders" onClick={() => setUserMenuOpen(false)}>Meine Bestellungen</UserDropdownItem>
-                      <UserDropdownItem href="/merkzettel" onClick={() => setUserMenuOpen(false)}>Merkzettel</UserDropdownItem>
-                      <UserDropdownItem href="/addresses" onClick={() => setUserMenuOpen(false)}>Adressen</UserDropdownItem>
-                      <UserDropdownItem href="/payment-methods" onClick={() => setUserMenuOpen(false)}>Zahlungsmethoden</UserDropdownItem>
-                      <UserDropdownItem href="/nachrichten" onClick={() => setUserMenuOpen(false)}>Nachrichten</UserDropdownItem>
-                      <UserDropdownItem href="/reviews" onClick={() => setUserMenuOpen(false)}>Bewertungen</UserDropdownItem>
-                      <UserDropdownItem href="/bonus" onClick={() => setUserMenuOpen(false)}>Bonuspunkte</UserDropdownItem>
-                      <UserDropdownBtn onClick={() => { document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax"; logout(); setUserMenuOpen(false); }}>Abmelden</UserDropdownBtn>
-                    </>
-                  ) : (
-                    <>
-                      <UserDropdownItem href="/login" onClick={() => setUserMenuOpen(false)}>Anmelden</UserDropdownItem>
-                      <UserDropdownItem href="/register" onClick={() => setUserMenuOpen(false)}>Registrieren</UserDropdownItem>
-                    </>
-                  )}
-                </UserDropdown>
-              </MiddleBarAccountWrap>
+              <UserDropdownPanel
+                isAuthenticated={isAuthenticated}
+                user={user}
+                onLogout={() => {
+                  document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax";
+                  logout();
+                }}
+                onOpen={() => { setLocaleDropdownOpen(false); setMainMenuOpen(false); }}
+              />
               <MiddleBarCartBtn type="button" onClick={openCartSidebar} title="Warenkorb" aria-label="Warenkorb">
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path fillRule="evenodd" clipRule="evenodd" d="M1 2.75C1 2.33579 1.33579 2 1.75 2H2.27029C3.34283 2 4.26626 2.75703 4.4766 3.80874L4.71485 5H20.2676C21.3791 5 22.209 6.02281 21.98 7.11052L20.5682 13.8165C20.3003 15.0891 19.1777 16 17.8772 16H7.63961C6.32874 16 5.20009 15.0747 4.94301 13.7893L3.00573 4.10291C2.93562 3.75234 2.6278 3.5 2.27029 3.5H1.75C1.33579 3.5 1 3.16421 1 2.75ZM6 19C6 17.8954 6.89543 17 8 17C9.10457 17 10 17.8954 10 19C10 20.1046 9.10457 21 8 21C6.89543 21 6 20.1046 6 19ZM15 19C15 17.8954 15.8954 17 17 17C18.1046 17 19 17.8954 19 19C19 20.1046 18.1046 21 17 21C15.8954 21 15 20.1046 15 19Z" />
