@@ -41,6 +41,7 @@ export default function CategoryDrilldownSelect({
 }) {
   const wrapperRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const [search, setSearch] = useState("");
   const [pathIds, setPathIds] = useState([]);
 
@@ -133,7 +134,14 @@ export default function CategoryDrilldownSelect({
       )}
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open && wrapperRef.current) {
+            const rect = wrapperRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            setOpenUpward(spaceBelow < 340);
+          }
+          setOpen((v) => !v);
+        }}
         style={{
           width: "100%",
           minHeight: 36,
@@ -158,10 +166,11 @@ export default function CategoryDrilldownSelect({
         <div
           style={{
             position: "absolute",
-            top: "100%",
+            ...(openUpward
+              ? { bottom: "100%", marginBottom: 4 }
+              : { top: "100%", marginTop: 4 }),
             left: 0,
             right: 0,
-            marginTop: 4,
             zIndex: 10020,
             background: "var(--p-color-bg-surface)",
             border: "1px solid var(--p-color-border)",

@@ -59,7 +59,8 @@ const nextConfig = {
       // Web fonts
       "font-src 'self' data: https://fonts.gstatic.com",
       // Fetch/XHR: backend API, Sentry tunnel, PostHog analytics, Stripe
-      "connect-src 'self' https: wss:",
+      // In development also allow http://localhost:* for the local backend
+      `connect-src 'self' https: wss:${process.env.NODE_ENV !== 'production' ? ' http://localhost:9000 http://localhost:* ws://localhost:*' : ''}`,
       // Stripe payment iframes, Trustpilot rating widget
       "frame-src https://js.stripe.com https://hooks.stripe.com https://widget.trustpilot.com",
       // No embedding of this page in foreign iframes

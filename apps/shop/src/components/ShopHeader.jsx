@@ -142,8 +142,8 @@ const TopBarWrap = styled.div`
 
 /* —— Middle bar: zooplus-style (full-width colored bar) —— */
 
-/* Above MegaPanel / CategoryMegaPanel (2147483646–7) so locale + account dropdowns paint on top */
-const HEADER_MIDDLE_Z = 2147483648;
+/* Keep middle bar above mega panels so icon dropdowns render on top */
+const HEADER_MIDDLE_Z = 3;
 
 const MiddleBarWrap = styled.div`
   width: 100%;
@@ -275,7 +275,7 @@ const MegaPanel = styled.div`
   background: #fff;
   border-top: 3px solid var(--shop-primary, #1b8880);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.13);
-  z-index: 2147483646;
+  z-index: 5000;
   overflow: hidden;
   max-height: ${(p) => (p.$open ? "480px" : "0")};
   transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
@@ -447,7 +447,7 @@ const CategoryMegaPanel = styled.div`
   background: #fff;
   border-top: 3px solid var(--shop-primary, #1b8880);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.13);
-  z-index: 2147483647;
+  z-index: 2;
   overflow: hidden;
   max-height: ${(p) => (p.$open ? "600px" : "0")};
   transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
