@@ -56,7 +56,7 @@ KRİTİK (Production'a çıkmadan mutlaka düzeltilmesi gereken)
   ---
   İYİLEŞTİRME ÖNERİLERİ (Orta-uzun vadeli)
 
-  13. Reklam Sayfaları Sadece Form — Backend Entegrasyon Yok
+  *13. DONE Reklam Sayfaları Sadece Form — Backend Entegrasyon Yok
   Google Ads, Meta Ads, Pinterest, TikTok sayfalarında API key kaydediliyor ama bu key'lerle hiçbir şey yapılmıyor. Ya gerçek entegrasyon    
   yapılmalı ya da sayfalar kaldırılmalı — şu haliyle müşteriyi yanıltıcı.
 

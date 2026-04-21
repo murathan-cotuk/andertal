@@ -36,6 +36,7 @@ const Card = styled.article`
   background: #fff;
   border-radius: 10px;
   overflow: hidden;
+  height: 100%;
 `;
 
 /* Image block: keep full image visible (no crop). */
@@ -190,7 +191,7 @@ const DescriptionPreview = styled.p`
 
 const ReviewRow = styled.div`
   margin-top: 2px;
-  min-height: 22px;
+  height: 22px;
 `;
 
 /* Badges */
@@ -225,9 +226,12 @@ const Badge = styled.span`
     p.$sale ? "#e53e3e" : p.$sold ? "#999" : p.$comingSoon ? "#c2410c" : "#111"};
 `;
 
-/* Info block below image */
+/* Info block below image — flex: 1 so all cards in a row share the same height */
 const Info = styled.div`
   padding: 8px 2px 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 `;
 
 const Name = styled.h3`
@@ -240,6 +244,7 @@ const Name = styled.h3`
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  min-height: calc(13px * 1.4 * 2);
 `;
 
 const Prices = styled.div`
@@ -261,12 +266,14 @@ const OriginalPrice = styled.span`
   text-decoration: line-through;
 `;
 
-/* Variant groups area */
+/* Variant groups area — capped height so different pill counts don't change card size */
 const VariantGroups = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 5px;
+  max-height: 120px;
+  overflow: hidden;
 `;
 
 const VGroupRow = styled.div``;
@@ -618,11 +625,9 @@ export function ProductCard({ product, activeFilters = {} }) {
           </CurrentPrice>
         </Prices>
 
-        {reviewCount > 0 && (
-          <ReviewRow>
-            <StarRating average={reviewAvg} count={reviewCount} />
-          </ReviewRow>
-        )}
+        <ReviewRow>
+          {reviewCount > 0 && <StarRating average={reviewAvg} count={reviewCount} />}
+        </ReviewRow>
 
         {showPills && (
           variationGroups ? (

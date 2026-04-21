@@ -482,6 +482,7 @@ const SectionTitle = styled.h2`
 
 const DescriptionSection = styled.section`
   margin-bottom: 48px;
+  max-width: 780px;
   color: var(--body-color, #4b5563);
   line-height: var(--body-lh, 1.7);
   font-size: var(--body-fs, 1rem);
