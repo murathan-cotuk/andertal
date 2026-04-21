@@ -5,13 +5,22 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 
-/* ─── Icons ──────────────────────────────────────────────────── */
-function UserIcon() {
+/* ─── Trigger icon — same as original ShopHeader person icon ─── */
+function PersonIcon({ isAuthenticated }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-      <circle cx="12" cy="7" r="4"/>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="26"
+      height="26"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
     </svg>
   );
 }
@@ -103,34 +112,51 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen }
 
   return (
     <DropdownMenu.Root onOpenChange={(open) => { if (open && onOpen) onOpen(); }}>
-      {/* ── Trigger ───────────────────────────────────────────── */}
+      {/* ── Trigger: original ShopHeader person icon style ─────── */}
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          aria-label="User account"
-          className={cn(
-            "relative flex items-center justify-center",
-            "w-9 h-9 rounded-full border-2 outline-none",
-            "text-[13px] font-bold tracking-wide",
-            "transition-all duration-150 cursor-pointer",
-            isAuthenticated
-              ? "border-orange-300 bg-orange-500 text-white hover:border-orange-400 hover:shadow-[0_0_0_3px_rgba(249,115,22,0.2)]"
-              : "border-gray-200 bg-gray-100 text-gray-500 hover:border-gray-300 hover:bg-gray-200"
-          )}
+          aria-label={isAuthenticated ? "Mein Konto, angemeldet" : "Mein Konto"}
+          title={isAuthenticated ? "Mein Konto — angemeldet" : "Mein Konto"}
+          style={{
+            position: "relative",
+            width: 46, height: 46,
+            border: "none", background: "transparent",
+            color: "#fff", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            borderRadius: 8,
+            transition: "background 0.2s ease",
+            outline: "none",
+            flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.15)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
         >
-          {isAuthenticated ? initials : <UserIcon />}
+          <PersonIcon />
+          {isAuthenticated && (
+            <span aria-hidden="true" style={{
+              position: "absolute", top: 5, right: 5,
+              width: 15, height: 15, borderRadius: "50%",
+              background: "linear-gradient(160deg,#4ade80 0%,#22c55e 100%)",
+              border: "2px solid #1b7a72",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", pointerEvents: "none",
+            }}>
+              <svg viewBox="0 0 12 12" fill="none" width="9" height="9">
+                <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </span>
+          )}
         </button>
       </DropdownMenu.Trigger>
 
-      {/* ── Content ───────────────────────────────────────────── */}
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
+      {/* ── Content: no Portal → positions directly below trigger ─ */}
+      <DropdownMenu.Content
           align="end"
-          sideOffset={10}
+          sideOffset={8}
+          style={{ zIndex: 2147483647 }}
           className={cn(
-            "w-72 z-[9999] outline-none",
-            "flex flex-col gap-1.5",
-            /* open/close animation via Radix data attributes */
+            "w-72 outline-none flex flex-col gap-1.5",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
             "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
@@ -226,7 +252,6 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen }
             </div>
           )}
         </DropdownMenu.Content>
-      </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
 }

@@ -391,6 +391,8 @@ const MiddleBarRight = styled.div`
   justify-content: flex-end;
   gap: 4px;
   min-width: 0;
+  position: relative;
+  z-index: 10;
 `;
 
 const MiddleBarIconBtn = styled.button`
@@ -598,7 +600,7 @@ const SubNavWrap = styled.div`
   font-size: var(--second-nav-fs, 15px);
   font-weight: var(--second-nav-fw, 500);
   position: relative;
-  z-index: 2;
+  z-index: 0;
 `;
 
 const SecondMenuRowInner = styled.div`
