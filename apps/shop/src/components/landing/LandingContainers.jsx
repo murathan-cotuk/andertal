@@ -164,7 +164,14 @@ function HeroBanner({ container }) {
                 <img src={resolveUrl(s.image)} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               </>
             );
-            const wrapStyle = { position: "absolute", inset: 0, opacity: i === current ? 1 : 0, transition: "opacity 0.7s ease" };
+            const wrapStyle = {
+              position: "absolute",
+              inset: 0,
+              opacity: i === current ? 1 : 0,
+              transition: "opacity 0.7s ease",
+              // Only the active slide can receive clicks; hidden slides must not block interactions.
+              pointerEvents: i === current ? "auto" : "none",
+            };
             return s.btn_url ? (
               <a key={i} href={s.btn_url} style={{ ...wrapStyle, display: "block" }}>{imgEl}</a>
             ) : (

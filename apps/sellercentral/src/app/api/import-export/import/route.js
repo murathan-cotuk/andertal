@@ -989,6 +989,35 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
   return { payload };
 }
 
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_XLSX_MIME = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/octet-stream", // some browsers / OS send this for .xlsx
+]);
+const XLSX_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]); // PK\x03\x04 (ZIP header)
+
+function validateXlsxFile(file, buf) {
+  // 1. Extension
+  const name = typeof file.name === "string" ? file.name.toLowerCase() : "";
+  if (!name.endsWith(".xlsx")) {
+    return "Only .xlsx files are allowed.";
+  }
+  // 2. MIME type (browsers may send octet-stream for xlsx — accept both)
+  const mime = (file.type || "").toLowerCase();
+  if (mime && !ALLOWED_XLSX_MIME.has(mime)) {
+    return "Invalid file type. Please upload an .xlsx file.";
+  }
+  // 3. Size
+  if (buf.length > MAX_UPLOAD_BYTES) {
+    return `File too large. Maximum allowed size is ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.`;
+  }
+  // 4. Magic bytes — confirms the file is actually a ZIP/XLSX regardless of extension
+  if (buf.length < 4 || !buf.slice(0, 4).equals(XLSX_MAGIC)) {
+    return "File does not appear to be a valid .xlsx file.";
+  }
+  return null; // valid
+}
+
 export async function POST(request) {
   try {
     const formData = await request.formData();
@@ -1001,6 +1030,12 @@ export async function POST(request) {
     }
 
     const buf = Buffer.from(await file.arrayBuffer());
+
+    const fileError = validateXlsxFile(file, buf);
+    if (fileError) {
+      return Response.json({ error: fileError }, { status: 400 });
+    }
+
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buf);
 
