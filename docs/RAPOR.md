@@ -56,7 +56,7 @@ KRİTİK (Production'a çıkmadan mutlaka düzeltilmesi gereken)
   ---
   İYİLEŞTİRME ÖNERİLERİ (Orta-uzun vadeli)
 
-  *13. DONE Reklam Sayfaları Sadece Form — Backend Entegrasyon Yok
+  13. Reklam Sayfaları Sadece Form — Backend Entegrasyon Yok
   Google Ads, Meta Ads, Pinterest, TikTok sayfalarında API key kaydediliyor ama bu key'lerle hiçbir şey yapılmıyor. Ya gerçek entegrasyon    
   yapılmalı ya da sayfalar kaldırılmalı — şu haliyle müşteriyi yanıltıcı.
 
@@ -103,3 +103,14 @@ KRİTİK (Production'a çıkmadan mutlaka düzeltilmesi gereken)
   └────────────────┴────────────────────────────────────────────────────────────────────────────────────┴──────────────┘
 
   Hangisinden başlamak istiyorsun?
+
+  ────┼────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 14  │ robots.txt & sitemap.xml — Next.js yerleşik mekanizmasına geçiş                                │
+  ├─────┼────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 15  │ Seller approval e-posta bildirimi                                                              │
+  ├─────┼────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 16  │ Import/export route'larında file type validation (şu an sadece .xlsx kabul ettiğini doğrulama) │
+  ├─────┼────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 17  │ Stale-while-revalidate cache stratejisi — collection/product endpoint'lerine cache header ekle │
+  ├─────┼────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 18  │ Accessibility — img alt tag audit, button aria-label eksikleri  

@@ -386,6 +386,51 @@ async function start() {
       return null
     }
 
+    // ── Seller registration email notification ────────────────────────────────
+    // Sends an email to every SUPERUSER_EMAILS address when a new seller registers.
+    // Requires SMTP_HOST (and optionally SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM).
+    // If SMTP is not configured the function silently skips — registration still works.
+    async function notifySuperusersNewSeller({ email, store_name, seller_id, first_name, last_name }) {
+      if (!process.env.SMTP_HOST) return // SMTP not configured — skip silently
+      const superuserEmails = (process.env.SUPERUSER_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)
+      if (!superuserEmails.length) return
+      const nodemailer = require('nodemailer')
+      const transport = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+      })
+      const sellerCentralUrl = process.env.SELLER_CENTRAL_URL || 'https://belucha-sellercentral.vercel.app'
+      const displayName = [first_name, last_name].filter(Boolean).join(' ') || email
+      const subject = `Neuer Seller registriert: ${store_name || email}`
+      const html = `
+<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#1f2937">
+  <div style="font-size:22px;font-weight:900;letter-spacing:0.14em;color:#111;margin-bottom:24px">BELUCHA</div>
+  <h2 style="font-size:17px;font-weight:700;margin:0 0 16px">Neuer Seller registriert</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
+    <tr><td style="padding:7px 0;color:#6b7280;width:120px">Name</td><td style="padding:7px 0;font-weight:500">${displayName}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">E-Mail</td><td style="padding:7px 0">${email}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">Shop-Name</td><td style="padding:7px 0">${store_name || '—'}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">Seller ID</td><td style="padding:7px 0;font-family:monospace;font-size:12px">${seller_id}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">Registriert</td><td style="padding:7px 0">${new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}</td></tr>
+  </table>
+  <a href="${sellerCentralUrl}/de/settings/users-permissions"
+     style="display:inline-block;padding:11px 22px;background:#ff971c;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">
+    Seller freischalten →
+  </a>
+  <p style="margin-top:24px;font-size:12px;color:#9ca3af">Diese E-Mail wurde automatisch generiert.</p>
+</div>`
+      await transport.sendMail({
+        from: process.env.SMTP_FROM || '"Belucha Sellercentral" <noreply@belucha.de>',
+        to: superuserEmails.join(', '),
+        subject,
+        html,
+        text: `Neuer Seller registriert\n\nName: ${displayName}\nE-Mail: ${email}\nShop: ${store_name || '—'}\nSeller ID: ${seller_id}\n\nFreischalten: ${sellerCentralUrl}/de/settings/users-permissions`,
+      })
+      log.info(`[notify] Seller registration email sent to ${superuserEmails.join(', ')}`)
+    }
+
     // Root ve health: "Cannot GET /" yerine JSON döner
     app.get('/', (req, res) => {
       res.json({ ok: true, service: 'medusa-backend', timestamp: new Date().toISOString() })
@@ -4281,6 +4326,17 @@ async function start() {
         await client.end()
         const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName })
         res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName } })
+
+        // Notify superusers about new seller registration (non-blocking — fires after response)
+        if (!is_superuser && !sub_of_seller_id) {
+          notifySuperusersNewSeller({
+            email: user.email,
+            store_name: displayStoreName,
+            seller_id: effectiveSellerId,
+            first_name: user.first_name,
+            last_name: user.last_name,
+          }).catch((e) => log.error('notifySuperusersNewSeller:', e.message))
+        }
       } catch (err) {
         try { await client.end() } catch (_) {}
         console.error('sellerAuthRegisterPOST:', err)
