@@ -164,63 +164,60 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen }
           )}
         >
           {isAuthenticated ? (
-            <>
-              {/* ── User card ─────────────────────────────────── */}
-              <div className="bg-white border border-gray-100 rounded-2xl shadow-[0_8px_24px_rgba(17,24,39,0.10),0_2px_8px_rgba(17,24,39,0.05)] p-1.5 overflow-hidden">
-                {/* User header */}
-                <div className="flex items-center gap-2.5 px-2.5 py-2.5">
-                  {/* Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-orange-500 text-white text-[13px] font-bold flex items-center justify-center shrink-0 border-2 border-white shadow-sm">
-                    {initials}
-                  </div>
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13.5px] font-bold text-gray-900 truncate leading-tight">{displayName}</p>
-                    {user?.email && (
-                      <p className="text-[11.5px] text-gray-400 truncate mt-0.5">{user.email}</p>
-                    )}
-                  </div>
-                  {/* Badge */}
-                  <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                    Online
-                  </span>
+            /* ── Single unified card ──────────────────────────── */
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-[0_8px_24px_rgba(17,24,39,0.10),0_2px_8px_rgba(17,24,39,0.05)] p-1.5 overflow-hidden">
+              {/* User header */}
+              <div className="flex items-center gap-2.5 px-2.5 py-2.5">
+                {/* Avatar */}
+                <div className="w-9 h-9 rounded-full bg-orange-500 text-white text-[13px] font-bold flex items-center justify-center shrink-0 border-2 border-white shadow-sm">
+                  {initials}
                 </div>
-
-                <div className="h-px bg-gray-100 my-1" />
-
-                <NavItem href="/account" icon={ICONS.overview}>Overview</NavItem>
-                <NavItem href="/orders"  icon={ICONS.orders}>My Orders</NavItem>
-                <NavItem href="/merkzettel" icon={ICONS.wishlist}>Wishlist</NavItem>
-
-                <div className="h-px bg-gray-100 my-1" />
-
-                <NavItem href="/addresses" icon={ICONS.addresses}>Addresses</NavItem>
-                <NavItem href="/reviews"   icon={ICONS.reviews}>Reviews</NavItem>
-                <NavItem href="/bonus"     icon={ICONS.bonus}>Bonus Points</NavItem>
+                {/* Info — show email only if displayName is NOT already the email */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13.5px] font-bold text-gray-900 truncate leading-tight">{displayName}</p>
+                  {user?.email && displayName !== user.email && (
+                    <p className="text-[11.5px] text-gray-400 truncate mt-0.5">{user.email}</p>
+                  )}
+                </div>
+                {/* Badge */}
+                <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                  Online
+                </span>
               </div>
 
-              {/* ── Logout card ───────────────────────────────── */}
-              <div className="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden p-1.5">
-                <DropdownMenu.Item asChild>
-                  <button
-                    type="button"
-                    onClick={onLogout}
-                    className={cn(
-                      "flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg",
-                      "text-[13.5px] font-medium text-red-500 text-left",
-                      "outline-none cursor-pointer select-none",
-                      "transition-colors duration-100",
-                      "hover:bg-red-50 hover:text-red-600",
-                      "focus:bg-red-50 focus:text-red-600",
-                      "[&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0"
-                    )}
-                  >
-                    {ICONS.logout}
-                    Log out
-                  </button>
-                </DropdownMenu.Item>
-              </div>
-            </>
+              <div className="h-px bg-gray-100 my-1" />
+
+              <NavItem href="/account" icon={ICONS.overview}>Overview</NavItem>
+              <NavItem href="/orders"  icon={ICONS.orders}>My Orders</NavItem>
+              <NavItem href="/merkzettel" icon={ICONS.wishlist}>Wishlist</NavItem>
+
+              <div className="h-px bg-gray-100 my-1" />
+
+              <NavItem href="/addresses" icon={ICONS.addresses}>Addresses</NavItem>
+              <NavItem href="/reviews"   icon={ICONS.reviews}>Reviews</NavItem>
+              <NavItem href="/bonus"     icon={ICONS.bonus}>Bonus Points</NavItem>
+
+              {/* ── Logout — inside card, separated by border ─── */}
+              <div className="h-px bg-gray-100 mt-1 mb-0" />
+              <DropdownMenu.Item asChild>
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className={cn(
+                    "flex items-center gap-2.5 w-full px-2.5 py-2 mt-1 rounded-lg",
+                    "text-[13.5px] font-medium text-red-500 text-left",
+                    "outline-none cursor-pointer select-none",
+                    "transition-colors duration-100",
+                    "hover:bg-red-50 hover:text-red-600",
+                    "focus:bg-red-50 focus:text-red-600",
+                    "[&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0"
+                  )}
+                >
+                  {ICONS.logout}
+                  Abmelden
+                </button>
+              </DropdownMenu.Item>
+            </div>
           ) : (
             /* ── Guest card ───────────────────────────────────── */
             <div className="bg-white border border-gray-100 rounded-2xl shadow-[0_8px_24px_rgba(17,24,39,0.10),0_2px_8px_rgba(17,24,39,0.05)] overflow-hidden">
