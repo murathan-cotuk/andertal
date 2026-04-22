@@ -125,3 +125,188 @@ a {
   0%   { background-position: -800px 0; }
   100% { background-position:  800px 0; }
 }
+
+/* ══════════════════════════════════════════════════════
+   MOBILE NAV — show/hide rules
+   ══════════════════════════════════════════════════════ */
+
+/* Mobile nav root: visible only on ≤767px */
+.belucha-mobile-nav-root {
+  display: none;
+}
+@media (max-width: 767px) {
+  .belucha-mobile-nav-root {
+    display: block;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   SHOP HEADER — mobile tweaks
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Reduce horizontal padding of MiddleBarInner on very small screens */
+  .shop-header-main > div {
+    padding-left: 12px !important;
+    padding-right: 8px !important;
+  }
+
+  /* Reduce search bar left margin on mobile */
+  .shop-header-main [class*="MiddleBarCenter"] {
+    margin-left: 8px !important;
+    margin-right: 2px !important;
+  }
+
+  /* Shrink icon buttons on mobile for more search space */
+  .shop-header-main [class*="MiddleBarRight"] {
+    gap: 0 !important;
+  }
+
+  /* Locale dropdown: stack columns on mobile */
+  [data-locale-dropdown] > div {
+    flex-direction: column !important;
+    max-width: 98vw !important;
+    max-height: 80vh !important;
+    overflow-y: auto !important;
+  }
+  [data-locale-dropdown] > div > div {
+    border-right: none !important;
+    border-bottom: 1px solid #e5e7eb !important;
+  }
+  [data-locale-dropdown] > div > div:last-child {
+    border-bottom: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   PRODUCT PAGE — mobile layout improvements
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Tighter page padding on mobile */
+  [class*="Container__"] {
+    padding: 16px 12px 48px !important;
+  }
+
+  /* Product grid: reduce gap and reorder for conversion */
+  [class*="ThreeCol__"] {
+    gap: 16px !important;
+  }
+
+  /* Product thumbnails: smaller on mobile */
+  [class*="Thumbnails__"] {
+    gap: 6px !important;
+  }
+
+  /* BuyBox: ensure full width, good padding */
+  [class*="BuyboxCard__"] {
+    padding: 14px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Make add-to-cart button bigger / easier to tap */
+  [class*="BuyboxCard__"] button[type="submit"],
+  [class*="BuyboxCard__"] button[class*="ToCart"] {
+    min-height: 48px !important;
+    font-size: 16px !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   CATEGORY / LISTING PAGE — mobile improvements
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Remove gap between hidden sidebar and grid */
+  [class*="ContentWrap__"] {
+    gap: 0 !important;
+    padding: 8px 12px 48px !important;
+  }
+
+  /* Tighter header area */
+  [class*="ColHeader__"] {
+    padding: 16px 12px 0 !important;
+  }
+
+  /* Category hero banner: sensible mobile height */
+  [class*="HeroBanner__"] {
+    aspect-ratio: 3 / 1 !important;
+    min-height: 80px !important;
+    max-height: 180px !important;
+  }
+
+  /* Sort bar: tighter on mobile */
+  [class*="SortBar__"] {
+    padding: 0 12px !important;
+    gap: 8px !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   PRODUCT CARD — mobile tweaks
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  /* 2-column grid stays but cards get tighter */
+  [class*="ProductGrid__"] {
+    gap: 10px !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   CART SIDEBAR — full-width on very small screens
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 400px) {
+  /* Cart drawer width is already max-width:100vw via styled-component,
+     but ensure internal padding is comfortable */
+  [class*="Drawer__"] {
+    padding: 0 !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   HERO SECTION — mobile improvements
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Hero grid: stack to single column */
+  [class*="TopRow__"] {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    gap: 24px !important;
+  }
+
+  /* Hero headline: smaller on mobile */
+  [class*="Headline__"] {
+    font-size: clamp(26px, 7vw, 38px) !important;
+    margin-bottom: 12px !important;
+  }
+  [class*="Subline__"] {
+    font-size: 15px !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   GENERAL LAYOUT — mobile spacing
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Prevent long words from overflowing */
+  h1, h2, h3, h4 {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /* Touch-friendly focus rings */
+  button, a, input, select {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:focus-visible, a:focus-visible {
+    outline: 2px solid #1b8880;
+    outline-offset: 2px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   FOOTER — mobile
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Ensure footer doesn't overlap with bottom nav */
+  footer {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}

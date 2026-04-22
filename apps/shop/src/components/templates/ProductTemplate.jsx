@@ -41,6 +41,9 @@ import { isBestsellerMetadata } from "@/lib/bestseller";
 const Container = styled.div`
   max-width: 100%;
   padding: 32px 24px 64px;
+  @media (max-width: 767px) {
+    padding: 16px 12px 80px;
+  }
   @media (min-width: 1200px) {
     padding-left: 150px;
     padding-right: 150px;
@@ -58,6 +61,8 @@ const ThreeCol = styled.div`
   }
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
   }
 `;
 
@@ -72,6 +77,10 @@ const GalleryCol = styled.div`
     position: static;
     top: auto;
     margin-left: 0;
+  }
+  /* Mobile: gallery first */
+  @media (max-width: 768px) {
+    order: 1;
   }
 `;
 
@@ -117,6 +126,10 @@ const CenterCol = styled.div`
   flex-direction: column;
   gap: 12px;
   min-height: 200px;
+  /* Mobile: description goes after gallery + buybox for better conversion */
+  @media (max-width: 768px) {
+    order: 3;
+  }
 `;
 
 const Title = styled.h1.attrs({ className: "shop-typo-product-title" })``;
@@ -249,7 +262,12 @@ const RightCol = styled.div`
   @media (max-width: 1024px) {
     grid-column: 1 / -1;
   }
+  /* Mobile: show buybox immediately after gallery (order 2, center col goes last) */
+  @media (max-width: 768px) {
+    order: 2;
+  }
 `;
+
 
 const BuyboxCard = styled.aside`
   position: static;

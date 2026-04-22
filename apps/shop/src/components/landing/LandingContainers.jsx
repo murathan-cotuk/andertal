@@ -70,7 +70,8 @@ function collectionHref(handle) {
 /** Kollektionen-Karussell: Main image (metadata.image_url in Seller), not the collection page banner. */
 function collectionCarouselCardImageFromLive(live) {
   if (!live) return "";
-  const main = live.image_url;
+  const meta = live.metadata && typeof live.metadata === "object" ? live.metadata : {};
+  const main = live.image_url || live.image || live.thumbnail || meta.image_url || meta.image || "";
   if (main) return resolveUrl(main);
   return "";
 }
@@ -501,7 +502,7 @@ function CollectionsCarousel({ container }) {
             ...snap,
             title: live.display_title || live.title || snap.title,
             handle: live.handle || snap.handle,
-            image: fromMain || snap.image,
+            image: fromMain || "",
           };
         });
         setLiveCollections(merged);

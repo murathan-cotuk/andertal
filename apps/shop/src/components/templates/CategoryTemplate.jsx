@@ -45,6 +45,13 @@ const HeroBanner = styled.div`
   position: relative;
   background: #f4f4f2;
 
+  /* Mobile: use sensible banner height regardless of desktop preset */
+  @media (max-width: 767px) {
+    aspect-ratio: 3 / 1 !important;
+    min-height: 80px !important;
+    max-height: 160px !important;
+  }
+
   img {
     width: 100%;
     height: 100%;
@@ -74,6 +81,10 @@ const ColHeader = styled.div`
   width: 100%;
   box-sizing: border-box;
 
+  @media (max-width: 767px) {
+    padding: 16px 12px 0;
+  }
+
   h1 {
     margin: 0;
   }
@@ -100,6 +111,11 @@ const SortBar = styled.div`
   background: #fff;
   border-top: 1px solid #e8e8e6;
   border-bottom: 1px solid #e8e8e6;
+
+  /* Mobile: header is shorter (no TopBar), reduce sticky offset */
+  @media (max-width: 767px) {
+    top: 72px;
+  }
 `;
 
 const SortBarInner = styled.div`
@@ -189,7 +205,10 @@ const ContentWrap = styled.div`
   gap: 32px;
   align-items: flex-start;
 
-  @media (max-width: 767px) { padding: 10px 16px 60px; }
+  @media (max-width: 767px) {
+    padding: 8px 12px 80px;
+    gap: 0;
+  }
 `;
 
 const Sidebar = styled.aside`

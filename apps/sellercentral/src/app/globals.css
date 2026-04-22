@@ -289,3 +289,192 @@ body[data-pathname]:not([data-pathname="/"]) .Polaris-Frame .Polaris-Navigation 
   text-align: center;
 }
 
+/* ══════════════════════════════════════════════════════
+   SELLER CENTRAL — MOBILE RESPONSIVENESS
+   ══════════════════════════════════════════════════════ */
+
+/* ── Polaris mobile nav ── */
+/* Polaris Frame handles the hamburger + drawer natively.
+   These overrides improve the experience for our custom layout. */
+
+@media (max-width: 767px) {
+  /* Reset our custom desktop-only sidebar positioning so Polaris can
+     manage the navigation drawer natively on mobile. */
+  #AppFrameNav {
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    flex: none !important;
+    overflow: visible !important;
+    border-top-left-radius: 0 !important;
+  }
+  #AppFrameMain {
+    padding-left: 0 !important;
+  }
+  .Polaris-Frame:has(#AppFrameNav) > div:has(#AppFrameNav) {
+    flex: none !important;
+    width: auto !important;
+    min-width: auto !important;
+  }
+
+  /* Content area: no rounded corners on mobile (full bleed feel) */
+  .belucha-page-content {
+    border-radius: 0 !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  /* Full-width content */
+  .Polaris-Frame__Content {
+    padding: 0 !important;
+  }
+}
+
+/* ── Tables: horizontal scroll on mobile ── */
+@media (max-width: 767px) {
+  /* Polaris DataTable: enable horizontal scroll */
+  .Polaris-DataTable__ScrollContainer,
+  .Polaris-DataTable {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Polaris IndexTable: horizontal scroll */
+  .Polaris-IndexTable,
+  .Polaris-IndexTable__ScrollContainer {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Prevent table cells from shrinking too much */
+  .Polaris-DataTable__Cell,
+  .Polaris-IndexTable__TableCell {
+    white-space: nowrap;
+    min-width: 80px;
+  }
+
+  /* Table first cell (checkbox/title): don't shrink */
+  .Polaris-IndexTable__TableCell:first-child,
+  .Polaris-DataTable__Cell--firstColumn {
+    min-width: 140px;
+  }
+}
+
+/* ── Forms: full width on mobile ── */
+@media (max-width: 767px) {
+  /* Polaris form fields: full width */
+  .Polaris-FormLayout {
+    gap: 12px !important;
+  }
+  .Polaris-FormLayout__Item {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+  .Polaris-FormLayout__Items {
+    flex-direction: column !important;
+  }
+
+  /* Polaris page actions: stack on mobile */
+  .Polaris-PageActions {
+    flex-direction: column-reverse !important;
+    gap: 8px !important;
+  }
+  .Polaris-PageActions .Polaris-ButtonGroup {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+  .Polaris-PageActions button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Page header: stack title + actions */
+  .Polaris-Page-Header__RightAlign {
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+  }
+}
+
+/* ── Cards / sections ── */
+@media (max-width: 767px) {
+  /* Tighter card padding */
+  .Polaris-Card__Section,
+  .Polaris-LegacyCard__Section {
+    padding: 12px !important;
+  }
+
+  /* Stack layout columns */
+  .Polaris-Layout__Section {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  /* Polaris Inline: wrap on mobile */
+  .Polaris-InlineStack {
+    flex-wrap: wrap !important;
+  }
+
+  /* Polaris Grid: 1 column on mobile */
+  .Polaris-Grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Top bar search: simpler on mobile ── */
+@media (max-width: 480px) {
+  .belucha-search-wrap {
+    max-width: 100% !important;
+  }
+  .Polaris-TopBar__Contents {
+    gap: 8px !important;
+  }
+}
+
+/* ── Touch targets ── */
+@media (max-width: 767px) {
+  /* Ensure all interactive elements are at least 44px tall */
+  .Polaris-Button,
+  .Polaris-Navigation__Link,
+  .Polaris-TopBar-Menu__Activator,
+  .Polaris-IndexTable__TableRow td button {
+    min-height: 44px !important;
+  }
+
+  /* Checkbox: bigger hit area */
+  .Polaris-Checkbox__Input {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  /* Remove hover states that don't work on touch */
+  @media (hover: none) {
+    .Polaris-Navigation__Item:hover .Polaris-Navigation__Link {
+      background: transparent !important;
+    }
+  }
+}
+
+/* ── Specific page improvements ── */
+@media (max-width: 767px) {
+  /* Order detail: full width sections */
+  .Polaris-Layout {
+    flex-direction: column !important;
+  }
+  .Polaris-Layout__Section--secondary {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Image upload area: full width */
+  .Polaris-DropZone {
+    min-height: 120px !important;
+  }
+
+  /* Stats/metric cards: 2 column grid */
+  .Polaris-Layout__Section--oneThird {
+    flex: 1 1 calc(50% - 8px) !important;
+    max-width: calc(50% - 8px) !important;
+  }
+}
+

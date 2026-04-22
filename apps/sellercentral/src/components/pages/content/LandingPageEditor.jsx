@@ -761,7 +761,7 @@ function CollectionsCarouselEditor({ container, onChange }) {
           id: col.id,
           title: col.title || "",
           handle: col.handle || "",
-          image: col.image_url || col.thumbnail || col.banner_image_url || col.banner || "",
+          image: col.image_url || col.image || col.thumbnail || "",
         },
       ],
     });

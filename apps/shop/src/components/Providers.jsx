@@ -14,6 +14,7 @@ import PostHogProvider from "@/components/PostHogProvider";
 const CartSidebar      = dynamic(() => import("@/components/CartSidebar"),      { ssr: false });
 const ScrollToTopButton = dynamic(() => import("@/components/ScrollToTopButton"), { ssr: false });
 const CookieBanner     = dynamic(() => import("@/components/CookieBanner"),     { ssr: false });
+const MobileNav        = dynamic(() => import("@/components/MobileNav"),        { ssr: false });
 
 function LenisInit() {
   useLenis();
@@ -36,6 +37,7 @@ export default function Providers({ children }) {
             <CartSidebar />
             <ScrollToTopButton />
             <CookieBanner />
+            <MobileNav />
           </CartProvider>
         </WishlistProvider>
       </CustomerAuthProvider>
