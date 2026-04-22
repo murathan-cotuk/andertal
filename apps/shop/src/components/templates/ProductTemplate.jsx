@@ -1740,10 +1740,13 @@ export default function ProductTemplate() {
           <Carousel
             contained={false}
             title="Kunden, die diesen Artikel gekauft haben, kauften auch"
-            itemWidth={260}
+            visibleCount={2}
+            gap={16}
+            showFade={false}
+            navOnSides
           >
             {alsoBought.map((p) => (
-              <ProductCard key={p.id} product={p} compact />
+              <ProductCard key={p.id} product={p} plainImage />
             ))}
           </Carousel>
         </div>

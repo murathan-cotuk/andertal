@@ -190,7 +190,8 @@ export default function SalesPage() {
             contained={false}
             navOnSides
             gap={16}
-            visibleCount={5}
+            visibleCount={2}
+            showFade={false}
             ariaLabel={collection.title || collection.name || collection.handle || "Sales category"}
             header={(
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
@@ -202,7 +203,7 @@ export default function SalesPage() {
             )}
           >
             {list.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <ProductCard key={p.id} product={p} plainImage />
             ))}
           </Carousel>
         ))}

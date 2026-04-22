@@ -6,6 +6,8 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { useLandingChrome } from "@/context/LandingChromeContext";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
+import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
+import { useIsNarrow } from "@/hooks/useIsNarrow";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
 
@@ -424,7 +426,9 @@ function BannerCta({ container }) {
 function CollectionCarousel({ container, preloadedProducts }) {
   // undefined = still loading, [] = loaded but empty, [...] = has products
   const [products, setProducts] = useState(preloadedProducts);
-  const itemsPerRow = container.items_per_row || 4;
+  const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
+  const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
+  const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
 
   useEffect(() => {
     if (Array.isArray(preloadedProducts)) {
@@ -465,10 +469,11 @@ function CollectionCarousel({ container, preloadedProducts }) {
           visibleCount={itemsPerRow}
           navOnSides
           gap={16}
+          showFade={false}
           ariaLabel={container.title?.trim() || "Collection carousel"}
         >
           {products.map((product, i) => (
-            <ProductCard key={product.id || i} product={product} />
+            <ProductCard key={product.id || i} product={product} plainImage />
           ))}
         </Carousel>
       </div>
@@ -478,7 +483,9 @@ function CollectionCarousel({ container, preloadedProducts }) {
 
 function CollectionsCarousel({ container }) {
   const snapshots = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
-  const itemsPerRow = container.items_per_row || 4;
+  const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
+  const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
+  const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
   const ratio = normalizeCollectionsCarouselAspectRatio(container.card_aspect_ratio);
   const imgObjectFit =
     container.card_image_object_fit === "contain" ? "contain" : "cover";
@@ -642,7 +649,9 @@ function BlogCarousel({ container }) {
   const posts = Array.isArray(container.posts)
     ? container.posts.filter((p) => p && (p.title || p.image || p.excerpt || p.body))
     : [];
-  const itemsPerRow = container.items_per_row || 3;
+  const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 3;
+  const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 1;
+  const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
   const gap = 16;
 
   if (!posts.length) return null;
@@ -1307,8 +1316,11 @@ function Testimonials({ container }) {
 }
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
-function renderContainer(c, preload = {}) {
+function renderContainer(c, preload = {}, ctx = {}) {
   if (!c.visible) return null;
+  const v = c.visible_on || "both";
+  if (v === "desktop" && ctx.isNarrow) return null;
+  if (v === "mobile" && !ctx.isNarrow) return null;
   let inner = null;
   const collectionKey = `${String(c.collection_id || "").trim()}|${String(c.collection_handle || "").trim()}`;
   const singleKey = String(c.product_id || c.product_handle || "").trim();
@@ -1345,6 +1357,7 @@ export default function LandingContainers({ pageId, categoryId }) {
   const [containers, setContainers] = useState(null);
   const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
   const { setLandingHeaderFilterBar } = useLandingChrome();
+  const isNarrow = useIsNarrow(1023);
 
   useEffect(() => {
     let endpoint = "/store/landing-page";
@@ -1429,7 +1442,7 @@ export default function LandingContainers({ pageId, categoryId }) {
 
   return (
     <div>
-      {containers.map((c) => renderContainer(c, preload))}
+      {containers.map((c) => renderContainer(c, preload, { isNarrow }))}
     </div>
   );
 }

@@ -92,15 +92,14 @@ export default function FlashSaleSection({
   return (
     <Carousel
       header={header}
-      visibleCount={4}
+      visibleCount={2}
       navOnSides
-      autoPlay
-      autoPlayInterval={8000}
-      gap={20}
+      gap={16}
+      showFade={false}
       ariaLabel={title}
     >
       {list.map((product, i) => (
-        <ProductCard key={product.id || i} product={product} compact />
+        <ProductCard key={product.id || i} product={product} plainImage />
       ))}
     </Carousel>
   );

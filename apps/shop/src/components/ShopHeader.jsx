@@ -1,7 +1,9 @@
 "use client";
 
 /**
- * Navbar — At top: full header. Scroll down: header hides completely. Scroll up: header shows.
+ * Navbar — Desktop: scroll down → header slides away; scroll up → shows.
+ * Mobile/tablet (≤1023px): header stays fixed; scroll down past threshold → only thin
+ * search bar (site color + slight transparency). Scroll up / near top → full bar again.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -31,55 +33,13 @@ import {
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useLandingChrome } from "@/context/LandingChromeContext";
 import { getShippableCountries } from "@/lib/countries";
+import { menuItemHref } from "@/lib/shop-menu-href";
 
 const SCROLL_THRESHOLD = 60;
 const SCROLL_DELTA = 8; /* px; only toggle direction after this much scroll to avoid jitter */
 const MIDDLE_BAR_BG = "#1b8880";
-
-function slugify(s) {
-  return (s || "")
-    .replace(/[äÄ]/g, "ae").replace(/[öÖ]/g, "oe").replace(/[üÜ]/g, "ue").replace(/ß/g, "ss")
-    .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-}
-function menuItemHref(item) {
-  if (!item) return "#";
-  const raw = item.link_value;
-  let value = raw;
-  let parsed = null;
-  const itemSlug = String(item.slug || "").trim();
-  if (typeof raw === "string" && raw.trim().startsWith("{")) {
-    try { parsed = JSON.parse(raw); } catch (_) {}
-  }
-  if (item.link_type === "page") {
-    const labelSlug = itemSlug || parsed?.label_slug || slugify(item.label);
-    return labelSlug ? `/${labelSlug}` : "#";
-  }
-  if (item.link_type === "api") {
-    const fn = String(parsed?.function || parsed?.api_function || value || "").trim().toLowerCase();
-    if (fn === "brand" || fn === "marke" || fn === "brands") return "/brands";
-    if (fn === "sales") return "/sales";
-    if (fn === "neuheiten") return "/neuheiten";
-    if (fn === "bestsellers") return "/bestsellers";
-    return "#";
-  }
-  if (parsed) {
-    if (itemSlug) value = itemSlug;
-    else if (parsed.handle) value = parsed.handle;
-    else if (parsed.slug) value = parsed.slug;
-  } else if (itemSlug) {
-    value = itemSlug;
-  }
-  if (item.link_type === "url" && value) return String(value).startsWith("http") ? value : `/${String(value).replace(/^\//, "")}`;
-  if (item.link_type === "product" && value) return `/produkt/${value}`;
-  if (item.link_type === "category") {
-    const slug = value ? String(value).replace(/^\//, "").trim() : "";
-    return slug ? `/${slug}` : "#";
-  }
-  if (item.link_type === "collection") {
-    return value ? `/${String(value).replace(/^\//, "")}` : "#";
-  }
-  return value ? `/${String(value).replace(/^\//, "")}` : "#";
-}
+/** @media (max-width) for mobile/tablet header chrome (matches mega menu breakpoint) */
+const HEADER_NARROW_MQ = 1023;
 
 function categoryRefFromMenuItem(item) {
   if (!item || String(item.link_type || "").toLowerCase() !== "category") return "";
@@ -129,6 +89,15 @@ const HeaderWrap = styled.header`
   will-change: transform;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: visible;
+
+  /* Thin search row: no white layer above the semi-transparent site-color bar */
+  &[data-mobile-compact="true"] {
+    @media (max-width: ${HEADER_NARROW_MQ}px) {
+      background: transparent;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
 `;
 
 /* TopBar wrapper — always in DOM, slides up smoothly when not at top */
@@ -150,9 +119,21 @@ const MiddleBarWrap = styled.div`
   min-height: 64px;
   background-color: var(--header-bg, ${MIDDLE_BAR_BG});
   color: var(--header-text, #111827);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.28s ease, color 0.28s ease, backdrop-filter 0.28s ease, min-height 0.28s ease;
   position: relative;
   z-index: ${HEADER_MIDDLE_Z};
+
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    ${(p) =>
+      p.$mobileSearchCompact
+        ? `
+      min-height: 0;
+      background: color-mix(in srgb, var(--header-bg, ${MIDDLE_BAR_BG}) 78%, transparent);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    `
+        : ""}
+  }
 `;
 
 const MiddleBarInner = styled.div`
@@ -162,6 +143,10 @@ const MiddleBarInner = styled.div`
   min-height: 72px;
   display: flex;
   align-items: center;
+
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    ${(p) => (p.$mobileSearchCompact ? `min-height: 46px; padding: 0 12px;` : "")}
+  }
 `;
 
 const MiddleBarLeft = styled.div`
@@ -198,6 +183,27 @@ const MiddleBarCenter = styled.div`
   margin-left: 28px;
   margin-right: 4px;
   gap: 0;
+
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    ${(p) =>
+      p.$mobileSearchCompact
+        ? `
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      flex: 1 1 100%;
+    `
+        : ""}
+  }
+`;
+
+/* Logo, hamburger row, locale/user/cart — hidden in mobile “search-only” compact bar */
+const NarrowHeaderChrome = styled.div`
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    ${(p) => (p.$hide ? `display: none !important;` : "")}
+  }
 `;
 
 /* Kategorien dropdown hemen search bar'ın solunda */
@@ -342,10 +348,14 @@ const SearchBarForm = styled.div`
   background: #fff;
   border-radius: 9999px;
   box-shadow: 0 1px 8px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, height 0.2s ease;
 
   &:focus-within {
     box-shadow: 0 2px 14px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    ${(p) => (p.$mobileCompact ? `height: 32px; padding: 0 2px 0 10px;` : "")}
   }
 `;
 
@@ -740,8 +750,10 @@ export default function ShopHeader() {
   const router = useRouter();
   const [scrollY, setScrollY] = useState(0);
   const [scrollingDown, setScrollingDown] = useState(false);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const lastScrollYRef = useRef(0);
   const headerRef = useRef(null);
+  const middleBarRef = useRef(null);
   const megaMenuTimerRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(116);
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
@@ -895,6 +907,14 @@ export default function ShopHeader() {
   }, []);
 
   useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${HEADER_NARROW_MQ}px)`);
+    const apply = () => setIsNarrowViewport(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
     setDrillCategoryId(null);
   }, [pathname]);
 
@@ -928,6 +948,11 @@ export default function ShopHeader() {
   const showSubNav = !scrollingDown;
   /* Header only visible when scrolling up (or initial load when scrollingDown is false) */
   const showHeader = !scrollingDown;
+  /** Mobile/tablet: thin search-only row while scrolling down (not on wide desktop) */
+  const isMobileSearchCompact =
+    isNarrowViewport && scrollingDown && scrollY > SCROLL_THRESHOLD;
+  /** Only desktop hides the whole header on scroll down; narrow keeps a fixed (compact) search bar */
+  const hideHeaderCompletely = !isNarrowViewport && !showHeader;
 
   const algoliaAttributes = {
     primaryText: "title",
@@ -1037,49 +1062,66 @@ export default function ShopHeader() {
   };
   const keepMegaMenuOpen = () => clearTimeout(megaMenuTimerRef.current);
 
+  useEffect(() => {
+    if (!isMobileSearchCompact) return;
+    setMainMenuOpen(false);
+    setLocaleDropdownOpen(false);
+    setHoveredMenuItemId(null);
+  }, [isMobileSearchCompact]);
+
   return (
     <>
-      <HeaderWrap ref={headerRef} style={{ transform: showHeader ? "translateY(0)" : "translateY(-100%)" }}>
+      <HeaderWrap
+        ref={headerRef}
+        data-mobile-compact={isMobileSearchCompact ? "true" : "false"}
+        style={{ transform: hideHeaderCompletely ? "translateY(-100%)" : "translateY(0)" }}
+      >
         <TopBarWrap $visible={atTop}>
           <TopBar />
         </TopBarWrap>
-        <MiddleBarWrap className="shop-header-main">
-          <MiddleBarInner>
-            <MiddleBarLeft>
-              <MiddleBarLogo href="/">
-                {shopBranding.shop_logo_url ? (
-                  <img
-                    src={shopBranding.shop_logo_url}
-                    alt="Shop logo"
-                    style={{ height: Math.min(shopBranding.shop_logo_height || 34, 56), maxHeight: 56, width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
-                  />
-                ) : (
-                  "Belucha"
-                )}
-              </MiddleBarLogo>
-            </MiddleBarLeft>
+        <MiddleBarWrap ref={middleBarRef} className="shop-header-main" $mobileSearchCompact={isMobileSearchCompact}>
+          <MiddleBarInner $mobileSearchCompact={isMobileSearchCompact}>
+            <NarrowHeaderChrome $hide={isMobileSearchCompact}>
+              <MiddleBarLeft>
+                <MiddleBarLogo href="/">
+                  {shopBranding.shop_logo_url ? (
+                    <img
+                      src={shopBranding.shop_logo_url}
+                      alt="Shop logo"
+                      style={{ height: Math.min(shopBranding.shop_logo_height || 34, 56), maxHeight: 56, width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
+                    />
+                  ) : (
+                    "Belucha"
+                  )}
+                </MiddleBarLogo>
+              </MiddleBarLeft>
+            </NarrowHeaderChrome>
 
-            <MiddleBarCenter>
-              <CategoriesDropdown data-categories-dropdown $megaActive={hasMegaNav}>
-                <CategoriesButton
-                  type="button"
-                  onClick={() => {
-                    setLocaleDropdownOpen(false);
-                    setHoveredMenuItemId(null);
-                    setDrillCategoryId(null);
-                    setMainMenuOpen((v) => !v);
-                  }}
-                  aria-expanded={mainMenuOpen}
-                  aria-label="Kategorien"
-                >
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" clipRule="evenodd" d="M2 5.75C2 5.33579 2.33579 5 2.75 5H21.25C21.6642 5 22 5.33579 22 5.75C22 6.16421 21.6642 6.5 21.25 6.5H2.75C2.33579 6.5 2 6.16421 2 5.75ZM2 12C2 11.5858 2.33579 11.25 2.75 11.25H21.25C21.6642 11.25 22 11.5858 22 12C22 12.4142 21.6642 12.75 21.25 12.75H2.75C2.33579 12.75 2 12.4142 2 12ZM2 18.25C2 17.8358 2.33579 17.5 2.75 17.5H21.25C21.6642 17.5 22 17.8358 22 18.25C22 18.6642 21.6642 19 21.25 19H2.75C2.33579 19 2 18.6642 2 18.25Z" />
-                  </svg>
-                </CategoriesButton>
-              </CategoriesDropdown>
+            <MiddleBarCenter $mobileSearchCompact={isMobileSearchCompact}>
+              <NarrowHeaderChrome
+                $hide={isMobileSearchCompact}
+                style={{ gap: 0, minWidth: 0 }}
+              >
+                <CategoriesDropdown data-categories-dropdown $megaActive={hasMegaNav}>
+                  <CategoriesButton
+                    type="button"
+                    onClick={() => {
+                      setLocaleDropdownOpen(false);
+                      setHoveredMenuItemId(null);
+                      setDrillCategoryId(null);
+                      setMainMenuOpen((v) => !v);
+                    }}
+                    aria-expanded={mainMenuOpen}
+                    aria-label="Kategorien"
+                  >
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" clipRule="evenodd" d="M2 5.75C2 5.33579 2.33579 5 2.75 5H21.25C21.6642 5 22 5.33579 22 5.75C22 6.16421 21.6642 6.5 21.25 6.5H2.75C2.33579 6.5 2 6.16421 2 5.75ZM2 12C2 11.5858 2.33579 11.25 2.75 11.25H21.25C21.6642 11.25 22 11.5858 22 12C22 12.4142 21.6642 12.75 21.25 12.75H2.75C2.33579 12.75 2 12.4142 2 12ZM2 18.25C2 17.8358 2.33579 17.5 2.75 17.5H21.25C21.6642 17.5 22 17.8358 22 18.25C22 18.6642 21.6642 19 21.25 19H2.75C2.33579 19 2 18.6642 2 18.25Z" />
+                    </svg>
+                  </CategoriesButton>
+                </CategoriesDropdown>
 
-              {/* Desktop mega nav */}
-              {hasMegaNav && (
+                {/* Desktop mega nav */}
+                {hasMegaNav && (
                 <MegaNav data-mega-nav>
                   {menuPanelItems.map((item) => {
                     const children = menuChildrenByParent.get(String(item.id)) || [];
@@ -1114,8 +1156,10 @@ export default function ShopHeader() {
                 </MegaNav>
               )}
 
+              </NarrowHeaderChrome>
+
               <MiddleBarSearch>
-                <SearchBarForm role="search">
+                <SearchBarForm $mobileCompact={isMobileSearchCompact} role="search">
                   <SearchBarButton
                     type="button"
                     aria-label="Suchen"
@@ -1139,6 +1183,7 @@ export default function ShopHeader() {
               </MiddleBarSearch>
             </MiddleBarCenter>
 
+            <NarrowHeaderChrome $hide={isMobileSearchCompact}>
             <MiddleBarRight>
               <LocaleCurrencyWrap data-locale-dropdown>
                 <MiddleBarLocaleBtn type="button" onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={`${tLocale("label")} · Währung`} aria-label="Land, Sprache, Währung" aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
@@ -1216,6 +1261,7 @@ export default function ShopHeader() {
                 </LocaleDropdown>
               </LocaleCurrencyWrap>
               <UserDropdownPanel
+                layoutAnchorRef={middleBarRef}
                 isAuthenticated={isAuthenticated}
                 user={user}
                 onLogout={() => {
@@ -1231,6 +1277,7 @@ export default function ShopHeader() {
                 {itemCount > 0 && <MiddleBarCartBadge>{itemCount}</MiddleBarCartBadge>}
               </MiddleBarCartBtn>
             </MiddleBarRight>
+            </NarrowHeaderChrome>
           </MiddleBarInner>
         </MiddleBarWrap>
 

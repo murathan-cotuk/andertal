@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import styled, { keyframes } from "styled-components";
-import { ProductGrid } from "@/components/ProductGrid";
+import { CategoryProductListing } from "@/components/CategoryProductListing";
 import { Link } from "@/i18n/navigation";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
 import {
@@ -94,6 +94,7 @@ const ColHeader = styled.div`
 
 const Breadcrumb = styled.nav`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   font-size: 11px;
@@ -102,6 +103,21 @@ const Breadcrumb = styled.nav`
 
   a { color: #999; text-decoration: none; transition: color 0.12s; &:hover { color: #111; } }
   b { color: #444; font-weight: 500; }
+`;
+
+/** Full-width strip below filter/sort bar, above product grid (breadcrumb only). */
+const BreadcrumbRow = styled.div`
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 32px 10px;
+  background: #fff;
+  border-bottom: 1px solid #e8e8e6;
+
+  @media (max-width: 600px) {
+    padding: 6px 16px 8px;
+  }
 `;
 
 const SortBar = styled.div`
@@ -206,7 +222,8 @@ const ContentWrap = styled.div`
   align-items: flex-start;
 
   @media (max-width: 767px) {
-    padding: 8px 12px 80px;
+    /* Daha geniş ürün kartları: yatay padding az */
+    padding: 6px 6px 80px;
     gap: 0;
   }
 `;
@@ -215,8 +232,8 @@ const Sidebar = styled.aside`
   width: ${(p) => p.$width || "280px"};
   flex-shrink: 0;
   position: sticky;
-  top: ${HEADER_H + 68}px;
-  max-height: calc(100vh - ${HEADER_H + 68}px);
+  top: ${HEADER_H + 100}px;
+  max-height: calc(100vh - ${HEADER_H + 100}px);
   overflow-y: auto;
 
   @media (max-width: 767px) {
@@ -229,9 +246,13 @@ const Sidebar = styled.aside`
     z-index: 100;
     background: #fff;
     box-shadow: 4px 0 16px rgba(0,0,0,0.12);
-    transition: left 0.3s ease;
+    transition: left var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
     padding: 16px;
     box-sizing: border-box;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
   }
 `;
 
@@ -253,11 +274,18 @@ const SidebarPane = styled.section`
 const SidebarOverlay = styled.div`
   display: none;
   @media (max-width: 767px) {
-    display: ${(p) => (p.$open ? "block" : "none")};
+    display: block;
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.35);
     z-index: 99;
+    opacity: ${(p) => (p.$open ? 1 : 0)};
+    pointer-events: ${(p) => (p.$open ? "auto" : "none")};
+    transition: opacity var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
   }
 `;
 
@@ -674,6 +702,7 @@ export default function CategoryTemplate() {
   const showSidebar     = tmpl.show_sidebar !== false;
   const sidebarWidth    = tmpl.sidebar_width || "280px";
   const colsPerRow      = Number(tmpl.products_per_row) || 4;
+  const colsPerRowMobile = Number(tmpl.products_per_row_mobile) || 1;
   const richtextAlign   = tmpl.richtext_align || "left";
   const richtextMaxW    = tmpl.richtext_max_width || "700px";
   const contentPadX     = tmpl.content_padding_x || "32px";
@@ -736,6 +765,15 @@ export default function CategoryTemplate() {
   const hasFacets = Object.keys(facets).length > 0;
   const hasSubcategories = subcategories.length > 0;
   const showCatalogSidebar = hasFacets || hasSubcategories || !!parentCategory;
+
+  /* Mobile: keep category / subcategory nav drawer open on load & when navigating (subcategories visible) */
+  useEffect(() => {
+    if (loading || !category) return;
+    if (!showSidebar || !showCatalogSidebar) return;
+    if (typeof window === "undefined" || !window.matchMedia("(max-width: 767px)").matches) return;
+    if (!hasSubcategories && !parentCategory) return;
+    setPanelOpen(true);
+  }, [loading, slug, category?.id, hasSubcategories, parentCategory?.id, showSidebar, showCatalogSidebar]);
 
   useEffect(() => {
     const facetKeys = Object.keys(facets);
@@ -852,20 +890,6 @@ export default function CategoryTemplate() {
                 Navigation {activeCount > 0 ? `(${activeCount})` : ""}
               </FilterBtn>
             )}
-            <Breadcrumb aria-label="Breadcrumb">
-              <Link href={`/${locale}`}>Home</Link>
-              {ancestors.map((anc) => {
-                const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
-                return (
-                  <React.Fragment key={anc.id || ancSlug}>
-                    <span style={{ color: "#ccc" }}>/</span>
-                    <Link href={`/${ancSlug}`}>{anc.name || ancSlug}</Link>
-                  </React.Fragment>
-                );
-              })}
-              <span style={{ color: "#ccc" }}>/</span>
-              <b>{displayTitle}</b>
-            </Breadcrumb>
           </SortBarLeft>
           <SortWrap>
             <SortLabel>Sort:</SortLabel>
@@ -877,6 +901,23 @@ export default function CategoryTemplate() {
           </SortWrap>
         </SortBarInner>
       </SortBar>
+
+      <BreadcrumbRow style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
+        <Breadcrumb aria-label="Breadcrumb">
+          <Link href={`/${locale}`}>Home</Link>
+          {ancestors.map((anc) => {
+            const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
+            return (
+              <React.Fragment key={anc.id || ancSlug}>
+                <span style={{ color: "#ccc" }}>/</span>
+                <Link href={`/${ancSlug}`}>{anc.name || ancSlug}</Link>
+              </React.Fragment>
+            );
+          })}
+          <span style={{ color: "#ccc" }}>/</span>
+          <b>{displayTitle}</b>
+        </Breadcrumb>
+      </BreadcrumbRow>
 
       {showCatalogSidebar && showSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
       <ContentWrap ref={bodyRef} style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
@@ -1036,7 +1077,12 @@ export default function CategoryTemplate() {
               No products match your filters.
             </div>
           ) : (
-            <ProductGrid products={paginated} maxColumns={colsPerRow} activeFilters={filters} />
+            <CategoryProductListing
+              products={paginated}
+              activeFilters={filters}
+              maxColumns={colsPerRow}
+              maxColumnsMobile={colsPerRowMobile}
+            />
           )}
 
           {totalPages > 1 && (

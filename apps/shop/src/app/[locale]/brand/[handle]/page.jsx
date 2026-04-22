@@ -107,24 +107,27 @@ const LogoCircle = styled.div`
   img { width: 100%; height: 100%; object-fit: cover; display: block; }
 `;
 
-/* ─── Breadcrumb ─────────────────────────────────────────── */
+/* ─── Breadcrumb (below filter bar, above product grid) ── */
 const Breadcrumb = styled.nav`
-  padding: 10px 32px;
+  padding: 8px 32px 10px;
   max-width: 1440px;
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   font-size: 11px;
   color: #999;
   letter-spacing: 0.02em;
+  background: #fff;
+  border-bottom: 1px solid #e8e8e6;
 
   a { color: #999; text-decoration: none; transition: color 0.12s; &:hover { color: #111; } }
   b { color: #444; font-weight: 500; }
 
-  @media (max-width: 600px) { padding: 8px 16px; }
+  @media (max-width: 600px) { padding: 6px 16px 8px; }
 `;
 
 /* ─── Filter bar ─────────────────────────────────────────── */
@@ -332,8 +335,8 @@ const SidebarCol = styled.aside`
   width: 280px;
   flex-shrink: 0;
   position: sticky;
-  top: ${HEADER_H + 68}px;
-  max-height: calc(100vh - ${HEADER_H + 68}px);
+  top: ${HEADER_H + 100}px;
+  max-height: calc(100vh - ${HEADER_H + 100}px);
   overflow-y: auto;
 
   @media (max-width: 767px) {
@@ -632,13 +635,6 @@ export default function BrandPage() {
           </ColHeader>
         )}
 
-        {/* ── Breadcrumb ── */}
-        <Breadcrumb aria-label="Breadcrumb">
-          <Link href="/">Home</Link>
-          <span style={{ color: "#ccc" }}>/</span>
-          <b>{title}</b>
-        </Breadcrumb>
-
         {/* ── Sticky filter/sort bar ── */}
         <FilterBar>
           <FilterBarInner>
@@ -675,6 +671,12 @@ export default function BrandPage() {
             </SortWrap>
           </FilterBarInner>
         </FilterBar>
+
+        <Breadcrumb aria-label="Breadcrumb">
+          <Link href={`/${locale}`}>Home</Link>
+          <span style={{ color: "#ccc" }}>/</span>
+          <b>{title}</b>
+        </Breadcrumb>
 
         {showCatalogSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
         <ContentWrap ref={bodyRef}>

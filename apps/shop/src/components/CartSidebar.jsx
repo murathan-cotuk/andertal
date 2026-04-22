@@ -24,7 +24,11 @@ const Overlay = styled.div`
   z-index: ${CART_Z_OVERLAY};
   opacity: ${(p) => (p.$open ? 1 : 0)};
   pointer-events: ${(p) => (p.$open ? "auto" : "none")};
-  transition: opacity 0.2s ease;
+  transition: opacity var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `;
 
 const Drawer = styled.aside`
@@ -40,7 +44,11 @@ const Drawer = styled.aside`
   display: flex;
   flex-direction: column;
   transform: translateX(${(p) => (p.$open ? 0 : "100%")});
-  transition: transform 0.25s ease;
+  transition: transform var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `;
 
 const Header = styled.div`

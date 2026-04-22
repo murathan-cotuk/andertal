@@ -15,7 +15,7 @@ import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-pr
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
-import styled from "styled-components";
+import styled, { css } from "styled-components";
 
 /* ─────────────────────────────────────────────────────────── *
  *  Helpers
@@ -37,6 +37,9 @@ const Card = styled.article`
   border-radius: 10px;
   overflow: hidden;
   height: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 `;
 
 /* Image block: keep full image visible (no crop). */
@@ -55,7 +58,7 @@ const ImgBlock = styled.div`
     height: 100%;
     object-fit: contain;
     background: #fff;
-    padding: 6px;
+    padding: 2px;
     box-sizing: border-box;
     display: block;
     transition: transform 0.45s ease, opacity 0.35s ease;
@@ -76,6 +79,12 @@ const ImgBlock = styled.div`
     opacity: 1;
     transform: scale(1.01);
   }
+  ${(p) => p.$plain
+    && css`
+    img { transition: none; }
+    img.img-secondary { display: none !important; }
+    &:hover img.img-primary { opacity: 1 !important; transform: none !important; }
+  `}
 `;
 
 const ImgPlaceholder = styled.div`
@@ -92,8 +101,8 @@ const ImgPlaceholder = styled.div`
 
 /* Add to cart — always visible, minimal */
 const AddToCartBtn = styled.button`
-  width: calc(100% - 4px);
-  margin: 5px 2px 0;
+  width: calc(100% - 12px);
+  margin: 5px 6px 0;
   padding: 7px 10px;
   background: #111;
   color: #fff;
@@ -109,8 +118,8 @@ const AddToCartBtn = styled.button`
 `;
 
 const QtyRow = styled.div`
-  width: calc(100% - 4px);
-  margin: 6px 2px 0;
+  width: calc(100% - 12px);
+  margin: 4px 6px 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -190,8 +199,8 @@ const DescriptionPreview = styled.p`
 `;
 
 const ReviewRow = styled.div`
-  margin-top: 2px;
-  height: 22px;
+  margin-top: 1px;
+  height: 20px;
 `;
 
 /* Badges */
@@ -228,10 +237,14 @@ const Badge = styled.span`
 
 /* Info block below image — flex: 1 so all cards in a row share the same height */
 const Info = styled.div`
-  padding: 8px 2px 8px;
+  padding: 6px 6px 4px;
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const Name = styled.h3`
@@ -239,7 +252,7 @@ const Name = styled.h3`
   font-weight: 500;
   color: #111;
   line-height: 1.4;
-  margin: 0 0 3px;
+  margin: 0 0 2px;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -250,14 +263,20 @@ const Name = styled.h3`
 const Prices = styled.div`
   display: flex;
   align-items: baseline;
-  gap: 7px;
-  margin-bottom: 2px;
+  gap: 6px;
+  margin-top: 2px;
+  margin-bottom: 1px;
 `;
 
 const CurrentPrice = styled.span`
   font-size: 13.5px;
   font-weight: 600;
   color: ${(p) => (p.$sale ? "#e53e3e" : "#111")};
+
+  @media (min-width: 768px) {
+    font-size: 16px;
+    font-weight: 700;
+  }
 `;
 
 const OriginalPrice = styled.span`
@@ -266,25 +285,36 @@ const OriginalPrice = styled.span`
   text-decoration: line-through;
 `;
 
-/* Variant groups area — capped height so different pill counts don't change card size */
+/* Variant groups area */
 const VariantGroups = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 5px;
-  max-height: 120px;
-  overflow: hidden;
+  gap: 5px;
+  margin-top: 4px;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
-const VGroupRow = styled.div``;
+const VGroupRow = styled.div`
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+`;
 
 const VGroupLabel = styled.div`
   font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #00000;
-  margin-bottom: 5px;
+  color: #888;
+  margin-bottom: 3px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 /* Variant pills */
@@ -292,14 +322,19 @@ const Pills = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const Pill = styled.button`
-  padding: ${(p) => (p.$swatch ? "0" : "7px 13px")};
-  width: ${(p) => (p.$swatch ? "32px" : "auto")};
-  height: ${(p) => (p.$swatch ? "32px" : "auto")};
-  min-width: ${(p) => (p.$swatch ? "32px" : "36px")};
-  min-height: ${(p) => (p.$swatch ? "32px" : "32px")};
+  padding: ${(p) => (p.$swatch ? "0" : "7px 10px")};
+  width: ${(p) => (p.$swatch ? "26px" : "auto")};
+  height: ${(p) => (p.$swatch ? "26px" : "auto")};
+  min-width: ${(p) => (p.$swatch ? "26px" : "0")};
+  max-width: ${(p) => (p.$swatch ? "26px" : "100%")};
+  min-height: ${(p) => (p.$swatch ? "26px" : "32px")};
   font-size: 11.5px;
   font-weight: 500;
   line-height: 1.1;
@@ -311,13 +346,22 @@ const Pill = styled.button`
   color: ${(p) => (p.$on ? "#fff" : p.$outOfStock ? "#bbb" : "#555")};
   cursor: pointer;
   transition: border-color 0.12s, background 0.12s, color 0.12s, transform 0.12s;
-  transform: ${(p) => (p.$swatch && p.$on ? "scale(1.1)" : "scale(1)")};
+  transform: ${(p) => (p.$swatch && p.$on ? "scale(1.05)" : "scale(1)")};
   text-decoration: ${(p) => (p.$outOfStock && !p.$on ? "line-through" : "none")};
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  flex-shrink: 0;
+  ${(p) => (p.$swatch
+    ? css`flex-shrink: 0;`
+    : css`
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      `)}
   opacity: ${(p) => (p.$outOfStock && !p.$on ? 0.5 : 1)};
 
   &:hover {
@@ -326,20 +370,33 @@ const Pill = styled.button`
   }
 `;
 
-const MorePill = styled.span`
-  padding: 2px 6px;
-  font-size: 10px;
-  color: #aaa;
+const MorePill = styled.button`
+  padding: 0 9px;
+  height: 26px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #555;
+  background: #f5f5f5;
   border: 1px solid #e0e0e0;
-  border-radius: 2px;
-  line-height: 1.5;
+  border-radius: 6px;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+
+  &:hover {
+    background: #ebebeb;
+    border-color: #bbb;
+    color: #111;
+  }
 `;
 
 /* ─────────────────────────────────────────────────────────── *
  *  Component
  * ─────────────────────────────────────────────────────────── */
 
-export function ProductCard({ product, activeFilters = {} }) {
+export function ProductCard({ product, activeFilters = {}, plainImage = false }) {
   const locale = useLocale();
   const marketPrefixVal = useMarketPrefix();
   const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
@@ -385,6 +442,8 @@ export function ProductCard({ product, activeFilters = {} }) {
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
   const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
+  const [expandedGroups, setExpandedGroups] = useState({});
+  const [expandedFlat, setExpandedFlat] = useState(false);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
 
   // For grouped display: track selected option per group index
@@ -526,13 +585,13 @@ export function ProductCard({ product, activeFilters = {} }) {
   return (
     <Card>
       {/* ── Image ── */}
-      <ImgBlock>
+      <ImgBlock $plain={plainImage}>
         {productUrl ? (
           <Link href={productUrl} aria-label={displayTitle} style={{ position: "absolute", inset: 0, zIndex: 0 }}>
             {imgSrc ? (
               <>
                 <img className="img-primary" src={imgSrc} alt={displayTitle} loading="lazy" />
-                {imgSrc2 && <img className="img-secondary" src={imgSrc2} alt="" aria-hidden />}
+                {imgSrc2 && !plainImage ? <img className="img-secondary" src={imgSrc2} alt="" aria-hidden /> : null}
               </>
             ) : (
               <ImgPlaceholder>No image</ImgPlaceholder>
@@ -543,7 +602,7 @@ export function ProductCard({ product, activeFilters = {} }) {
             {imgSrc ? (
               <>
                 <img className="img-primary" src={imgSrc} alt={displayTitle} loading="lazy" />
-                {imgSrc2 && <img className="img-secondary" src={imgSrc2} alt="" aria-hidden />}
+                {imgSrc2 && !plainImage ? <img className="img-secondary" src={imgSrc2} alt="" aria-hidden /> : null}
               </>
             ) : (
               <ImgPlaceholder>No image</ImgPlaceholder>
@@ -579,35 +638,6 @@ export function ProductCard({ product, activeFilters = {} }) {
         {adding ? "…" : isComingSoon ? "Pek yakında" : shippingUnavailable ? "Nicht lieferbar" : outOfStock ? "Sold out" : "Add to cart"}
       </AddToCartBtn>
 
-      <QtyRow>
-        <QtyBtn
-          type="button"
-          onClick={() => setQuantity((q) => clampQty(q - 1))}
-          disabled={quantity <= 1 || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-          aria-label="Menge verringern"
-        >
-          −
-        </QtyBtn>
-        <QtyInput
-          type="number"
-          min={1}
-
-          value={quantity}
-          onChange={(e) => setQuantity(clampQty(e.target.value))}
-          onBlur={(e) => setQuantity(clampQty(e.target.value))}
-          disabled={outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-          aria-label="Menge"
-        />
-        <QtyBtn
-          type="button"
-          onClick={() => setQuantity((q) => clampQty(q + 1))}
-          disabled={quantity >= maxQty || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-          aria-label="Menge erhöhen"
-        >
-          +
-        </QtyBtn>
-      </QtyRow>
-
       <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice>
 
       {/* ── Info ── */}
@@ -615,6 +645,10 @@ export function ProductCard({ product, activeFilters = {} }) {
         <Link href={productUrl} style={{ textDecoration: "none" }}>
           <Name>{displayTitle}</Name>
         </Link>
+
+        <ReviewRow>
+          {reviewCount > 0 && <StarRating average={reviewAvg} count={reviewCount} />}
+        </ReviewRow>
 
         <Prices>
           {hasSale && (
@@ -625,18 +659,16 @@ export function ProductCard({ product, activeFilters = {} }) {
           </CurrentPrice>
         </Prices>
 
-        <ReviewRow>
-          {reviewCount > 0 && <StarRating average={reviewAvg} count={reviewCount} />}
-        </ReviewRow>
-
         {showPills && (
           variationGroups ? (
             /* Grouped display: one row per variation group */
             <VariantGroups>
               {variationGroups.map((group, gIdx) => {
+                const isExpanded = !!expandedGroups[gIdx];
+                const allOpts = group.options || [];
                 const MAX_OPTS = 5;
-                const opts = (group.options || []).slice(0, MAX_OPTS);
-                const extra = Math.max(0, (group.options || []).length - MAX_OPTS);
+                const opts = isExpanded ? allOpts : allOpts.slice(0, MAX_OPTS);
+                const extra = isExpanded ? 0 : Math.max(0, allOpts.length - MAX_OPTS);
                 const pMeta = product.metadata || {};
                 return (
                   <VGroupRow key={gIdx}>
@@ -647,7 +679,6 @@ export function ProductCard({ product, activeFilters = {} }) {
                         const displayStr = optionDisplayLabel(opt, locale) || val;
                         const swatchUrl = typeof opt === "object" && opt.swatch_image ? resolveImg(opt.swatch_image) : null;
                         const isOn = (selectedOpts[gIdx] || "").toLowerCase() === val.toLowerCase();
-                        // Check stock for this option (any variant with this option value)
                         const hasStock = normalizedVariants.some((v) => {
                           const ov = Array.isArray(v.option_values) ? v.option_values : [];
                           if (String(ov[gIdx] || "").toLowerCase() !== val.toLowerCase()) return false;
@@ -673,7 +704,14 @@ export function ProductCard({ product, activeFilters = {} }) {
                           </Pill>
                         );
                       })}
-                      {extra > 0 && <MorePill>+{extra}</MorePill>}
+                      {extra > 0 && (
+                        <MorePill
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); setExpandedGroups((prev) => ({ ...prev, [gIdx]: true })); }}
+                        >
+                          +{extra}
+                        </MorePill>
+                      )}
                     </Pills>
                   </VGroupRow>
                 );
@@ -681,8 +719,8 @@ export function ProductCard({ product, activeFilters = {} }) {
             </VariantGroups>
           ) : (
             /* Legacy: flat pill list */
-            <Pills style={{ marginTop: 12 }}>
-              {normalizedVariants.slice(0, 5).map((v, i) => {
+            <Pills style={{ marginTop: 4 }}>
+              {normalizedVariants.slice(0, expandedFlat ? undefined : 5).map((v, i) => {
                 const qty = v.inventory_quantity ?? v.inventory ?? 0;
                 const outOfStock = Number(qty) <= 0;
                 const swatchUrl = v.swatch_image_url ? resolveImg(v.swatch_image_url) : null;
@@ -702,11 +740,46 @@ export function ProductCard({ product, activeFilters = {} }) {
                   </Pill>
                 );
               })}
-              {normalizedVariants.length > 5 && <MorePill>+{normalizedVariants.length - 5}</MorePill>}
+              {!expandedFlat && normalizedVariants.length > 5 && (
+                <MorePill
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setExpandedFlat(true); }}
+                >
+                  +{normalizedVariants.length - 5}
+                </MorePill>
+              )}
             </Pills>
           )
         )}
       </Info>
+
+      <QtyRow>
+        <QtyBtn
+          type="button"
+          onClick={() => setQuantity((q) => clampQty(q - 1))}
+          disabled={quantity <= 1 || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
+          aria-label="Menge verringern"
+        >
+          −
+        </QtyBtn>
+        <QtyInput
+          type="number"
+          min={1}
+          value={quantity}
+          onChange={(e) => setQuantity(clampQty(e.target.value))}
+          onBlur={(e) => setQuantity(clampQty(e.target.value))}
+          disabled={outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
+          aria-label="Menge"
+        />
+        <QtyBtn
+          type="button"
+          onClick={() => setQuantity((q) => clampQty(q + 1))}
+          disabled={quantity >= maxQty || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
+          aria-label="Menge erhöhen"
+        >
+          +
+        </QtyBtn>
+      </QtyRow>
     </Card>
   );
 }

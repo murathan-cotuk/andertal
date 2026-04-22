@@ -150,7 +150,6 @@ export default function HeroSection({
             gap={16}
             showNav={false}
             showFade
-            animateItems={false}
             fadeBgColor={tokens.background.main}
           >
           {collections.slice(0, 6).map((col, i) => (

@@ -2,6 +2,8 @@
 
 /**
  * MobileNav — Bottom navigation bar + slide-in drawer for mobile (≤767px).
+ * Bar: Home, Menü, Warenkorb, Merkzettel, Profil (search lives in ShopHeader).
+ * Drawer: Kategorien (+ category image thumbs) then Mein Konto; no CMS “Menü” / Service links.
  * Rendered as a sibling of page content via Providers.jsx (display:none on desktop).
  */
 
@@ -9,6 +11,10 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useCustomerAuth as useAuth } from "@belucha/lib";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
+import { restPathFromPathname } from "@/lib/shop-market";
+import { useVisualViewportBottomInset } from "@/hooks/useVisualViewportBottomInset";
+import { resolveImageUrl } from "@/lib/image-url";
 
 const TEAL = "#1b8880";
 
@@ -16,10 +22,10 @@ const TEAL = "#1b8880";
 
 const css = {
   /* Bottom bar */
-  bar: {
+  bar: (bottomInsetPx = 0) => ({
     display: "flex",
     position: "fixed",
-    bottom: 0,
+    bottom: bottomInsetPx,
     left: 0,
     right: 0,
     height: "calc(58px + env(safe-area-inset-bottom, 0px))",
@@ -29,7 +35,8 @@ const css = {
     boxShadow: "0 -2px 12px rgba(0,0,0,0.07)",
     zIndex: 2147483640,
     alignItems: "stretch",
-  },
+    transition: "bottom 0.12s ease-out",
+  }),
   barBtn: (active) => ({
     flex: 1,
     display: "flex",
@@ -68,27 +75,27 @@ const css = {
   },
 
   /* Overlay */
-  overlay: (open) => ({
+  overlay: (open, reducedMotion) => ({
     position: "fixed",
     inset: 0,
     background: "rgba(0,0,0,0.52)",
     zIndex: 2147483700,
     opacity: open ? 1 : 0,
     pointerEvents: open ? "auto" : "none",
-    transition: "opacity 0.25s ease",
+    transition: reducedMotion ? "none" : "opacity 0.3s cubic-bezier(0.4,0,0.2,1)",
   }),
 
   /* Drawer */
-  drawer: (open) => ({
+  drawer: (open, reducedMotion) => ({
     position: "fixed",
     top: 0,
     left: 0,
-    width: "min(320px, 88vw)",
+    width: "min(360px, 90vw)",
     height: "100dvh",
     background: "#fff",
     zIndex: 2147483701,
     transform: open ? "translateX(0)" : "translateX(-100%)",
-    transition: "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
+    transition: reducedMotion ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
     boxShadow: "4px 0 32px rgba(0,0,0,0.16)",
     display: "flex",
     flexDirection: "column",
@@ -133,6 +140,38 @@ const css = {
     borderBottom: "1px solid #f9fafb",
   },
 
+  /** Category row: thumb (square) + label — comfortable tap height */
+  categoryRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 56,
+    padding: "10px 16px",
+    fontSize: 15,
+    fontWeight: 500,
+    color: "#111827",
+    textDecoration: "none",
+    transition: "background 0.1s",
+    borderBottom: "1px solid #f3f4f6",
+  },
+
+  categoryThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    objectFit: "cover",
+    background: "#e5e7eb",
+    flexShrink: 0,
+  },
+
+  categoryThumbPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    background: "linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)",
+    flexShrink: 0,
+  },
+
   drawerBtn: {
     display: "flex",
     alignItems: "center",
@@ -160,10 +199,10 @@ const css = {
   },
 
   /* Body-level bottom padding so content isn't hidden under the bar */
-  bodyPad: {
-    height: "calc(58px + env(safe-area-inset-bottom, 0px))",
+  bodyPad: (extraBottomPx = 0) => ({
+    height: `calc(58px + env(safe-area-inset-bottom, 0px) + ${extraBottomPx}px)`,
     flexShrink: 0,
-  },
+  }),
 };
 
 /* ─── Icons ──────────────────────────────────────────────── */
@@ -180,12 +219,6 @@ const IcoMenu = () => (
   </svg>
 );
 
-const IcoSearch = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
-
 const IcoCart = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
     <path fillRule="evenodd" clipRule="evenodd" d="M1 2.75A.75.75 0 0 1 1.75 2h.52a2.25 2.25 0 0 1 2.21 1.81L4.71 5h15.56a2 2 0 0 1 1.97 2.33l-1.41 6.71A3 3 0 0 1 17.88 16H7.64a3 3 0 0 1-2.95-2.46L2.76 3.6A.75.75 0 0 0 2.27 3H1.75A.75.75 0 0 1 1 2.75ZM6 19a2 2 0 1 1 4 0 2 2 0 0 1-4 0Zm9 0a2 2 0 1 1 4 0 2 2 0 0 1-4 0Z" />
@@ -195,6 +228,13 @@ const IcoCart = () => (
 const IcoUser = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+  </svg>
+);
+
+/** Heart — Merkzettel / wishlist */
+const IcoHeart = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
   </svg>
 );
 
@@ -243,18 +283,45 @@ function HoverBtn({ style, ...props }) {
   );
 }
 
+function appPathFromPathname(pathname) {
+  if (!pathname) return "/";
+  const rest = restPathFromPathname(pathname);
+  return rest === "" ? "/" : rest.startsWith("/") ? rest : `/${rest}`;
+}
+
+/** Seller "Category image" (metadata.image_url) + fallbacks from Admin Hub category */
+function categoryListImageUrl(node) {
+  if (!node) return "";
+  const meta = node.metadata && typeof node.metadata === "object" ? node.metadata : {};
+  const a = meta.image_url || meta.imageUrl;
+  const b = node.banner_image_url || meta.banner_image_url;
+  const raw = a || b || "";
+  return String(raw).trim();
+}
+
 /* ─── Main component ─────────────────────────────────────── */
 export default function MobileNav() {
   const pathname = usePathname();
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount } = useCart();
+  const { ids: wishlistIds } = useWishlist();
+  const vvBottomInset = useVisualViewportBottomInset();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [menuItems, setMenuItems] = useState([]);
   const [logo, setLogo] = useState("");
   const [logoHeight, setLogoHeight] = useState(30);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const drawerRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const onChange = () => setReducedMotion(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   /* Fetch data once */
   useEffect(() => {
@@ -272,19 +339,17 @@ export default function MobileNav() {
         const tree = d?.tree || [];
         const roots = tree
           .filter((n) => n && !n.parent_id && n.has_products !== false && n.slug)
-          .map((n) => ({ id: n.id, label: n.name || n.slug, href: `/${n.slug}` }))
+          .map((n) => {
+            const imageRaw = categoryListImageUrl(n);
+            return {
+              id: n.id,
+              label: n.name || n.slug,
+              href: `/${String(n.slug).replace(/^\//, "")}`,
+              imageUrl: imageRaw ? resolveImageUrl(imageRaw) : "",
+            };
+          })
           .sort((a, b) => a.label.localeCompare(b.label));
         setCategories(roots);
-      })
-      .catch(() => {});
-
-    fetch("/api/store-menus")
-      .then((r) => r.json())
-      .then((d) => {
-        const menus = Array.isArray(d?.menus) ? d.menus : [];
-        const main = menus.find((m) => m?.location === "main") || menus[0];
-        const rootItems = (main?.items || []).filter((i) => !i?.parent_id).slice(0, 12);
-        setMenuItems(rootItems);
       })
       .catch(() => {});
   }, []);
@@ -311,20 +376,44 @@ export default function MobileNav() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
+  /* Expose extra bottom gap for global CSS (footer) — matches visual viewport */
+  useEffect(() => {
+    document.documentElement.style.setProperty("--belucha-vv-bottom-inset", `${vvBottomInset}px`);
+  }, [vvBottomInset]);
+  useEffect(() => {
+    return () => {
+      document.documentElement.style.removeProperty("--belucha-vv-bottom-inset");
+    };
+  }, []);
+
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
   const displayName = user
     ? [user.first_name || user.firstName, user.last_name || user.lastName].filter(Boolean).join(" ") || user.email || "Mein Konto"
     : null;
 
-  const isHome = pathname === "/" || pathname === "";
+  const appPath = appPathFromPathname(pathname);
+  const isHome = appPath === "/" || appPath === "";
+  const isMerkzettel =
+    appPath === "/merkzettel" || appPath === "/favorites" || appPath === "/wishlist";
+  const isCart = appPath === "/cart" || appPath.startsWith("/cart/");
+  const isProfile =
+    !isMerkzettel &&
+    (appPath === "/account" ||
+      appPath.startsWith("/account/") ||
+      appPath === "/login" ||
+      appPath === "/register" ||
+      ["/orders", "/addresses", "/payment-methods", "/nachrichten", "/reviews", "/bonus", "/invoices"].some(
+        (h) => appPath === h || appPath.startsWith(`${h}/`),
+      ));
+  const wishlistCount = wishlistIds?.size ?? 0;
 
   return (
     /* Only rendered/visible on mobile — display:none injected via globals.css on desktop */
     <div className="belucha-mobile-nav-root">
       {/* ── Drawer Overlay ── */}
       <div
-        style={css.overlay(drawerOpen)}
+        style={css.overlay(drawerOpen, reducedMotion)}
         onClick={closeDrawer}
         aria-hidden="true"
       />
@@ -332,7 +421,7 @@ export default function MobileNav() {
       {/* ── Side Drawer ── */}
       <div
         ref={drawerRef}
-        style={css.drawer(drawerOpen)}
+        style={css.drawer(drawerOpen, reducedMotion)}
         role="dialog"
         aria-modal="true"
         aria-label="Navigation"
@@ -356,60 +445,46 @@ export default function MobileNav() {
           </button>
         </div>
 
-        {/* Drawer scrollable body */}
+        {/* Drawer scrollable body: categories first, Mein Konto at bottom (no CMS “Menü” / no Service) */}
         <div style={css.drawerBody}>
-
-          {/* User greeting */}
-          {isAuthenticated && displayName && (
-            <div style={{ padding: "14px 16px 10px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6" }}>
-              <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 500, marginBottom: 2 }}>Angemeldet als</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", truncate: "ellipsis" }}>{displayName}</div>
-            </div>
-          )}
-
-          {/* Categories */}
           {categories.length > 0 && (
             <>
               <div style={css.sectionLabel}>Kategorien</div>
               {categories.slice(0, 18).map((cat) => (
-                <HoverLink key={cat.id} href={cat.href} onClick={closeDrawer} style={css.drawerLink}>
-                  <span>{cat.label}</span>
+                <HoverLink
+                  key={cat.id}
+                  href={cat.href}
+                  onClick={closeDrawer}
+                  style={css.categoryRow}
+                >
+                  {cat.imageUrl ? (
+                    <img src={cat.imageUrl} alt="" style={css.categoryThumb} />
+                  ) : (
+                    <div style={css.categoryThumbPlaceholder} aria-hidden />
+                  )}
+                  <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
                   <IcoChevron />
                 </HoverLink>
               ))}
             </>
           )}
 
-          {/* Menu items (if different from categories) */}
-          {menuItems.length > 0 && (
-            <>
-              <div style={css.divider} />
-              <div style={css.sectionLabel}>Menü</div>
-              {menuItems.map((item) => {
-                let href = "#";
-                if (item.link_type === "url" && item.link_value) href = item.link_value;
-                else if (item.slug) href = `/${item.slug}`;
-                else if (item.link_value && !item.link_value.startsWith("{")) href = `/${item.link_value.replace(/^\//, "")}`;
-                return (
-                  <HoverLink key={item.id} href={href === "#" ? "/" : href} onClick={closeDrawer} style={css.drawerLink}>
-                    <span>{item.label}</span>
-                    <IcoChevron />
-                  </HoverLink>
-                );
-              })}
-            </>
-          )}
+          {categories.length > 0 && <div style={css.divider} />}
 
-          {/* Account section */}
-          <div style={css.divider} />
           {isAuthenticated ? (
             <>
               <div style={css.sectionLabel}>Mein Konto</div>
-              <HoverLink href="/account"       onClick={closeDrawer} style={css.drawerLink}><span>Übersicht</span><IcoChevron /></HoverLink>
-              <HoverLink href="/orders"        onClick={closeDrawer} style={css.drawerLink}><span>Bestellungen</span><IcoChevron /></HoverLink>
-              <HoverLink href="/addresses"     onClick={closeDrawer} style={css.drawerLink}><span>Adressen</span><IcoChevron /></HoverLink>
-              <HoverLink href="/merkzettel"    onClick={closeDrawer} style={css.drawerLink}><span>Merkzettel</span><IcoChevron /></HoverLink>
-              <HoverLink href="/nachrichten"   onClick={closeDrawer} style={css.drawerLink}><span>Nachrichten</span><IcoChevron /></HoverLink>
+              {displayName && (
+                <div style={{ padding: "0 16px 10px", marginTop: -4 }}>
+                  <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Angemeldet als</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginTop: 2 }}>{displayName}</div>
+                </div>
+              )}
+              <HoverLink href="/account"     onClick={closeDrawer} style={css.drawerLink}><span>Übersicht</span><IcoChevron /></HoverLink>
+              <HoverLink href="/orders"      onClick={closeDrawer} style={css.drawerLink}><span>Bestellungen</span><IcoChevron /></HoverLink>
+              <HoverLink href="/addresses"   onClick={closeDrawer} style={css.drawerLink}><span>Adressen</span><IcoChevron /></HoverLink>
+              <HoverLink href="/merkzettel"   onClick={closeDrawer} style={css.drawerLink}><span>Merkzettel</span><IcoChevron /></HoverLink>
+              <HoverLink href="/nachrichten"  onClick={closeDrawer} style={css.drawerLink}><span>Nachrichten</span><IcoChevron /></HoverLink>
               <div style={css.divider} />
               <HoverBtn
                 style={{ ...css.drawerBtn, color: "#ef4444" }}
@@ -435,23 +510,12 @@ export default function MobileNav() {
             </>
           )}
 
-          {/* Quick links */}
-          <div style={css.divider} />
-          <div style={css.sectionLabel}>Service</div>
-          <HoverLink href="/search" onClick={closeDrawer} style={{ ...css.drawerLink, fontSize: 14, color: "#6b7280" }}>
-            <span>Suche</span><IcoChevron />
-          </HoverLink>
-          <HoverLink href="/bestsellers" onClick={closeDrawer} style={{ ...css.drawerLink, fontSize: 14, color: "#6b7280" }}>
-            <span>Bestseller</span><IcoChevron />
-          </HoverLink>
-
-          {/* Bottom padding */}
           <div style={{ height: 24 }} />
         </div>
       </div>
 
       {/* ── Bottom Navigation Bar ── */}
-      <nav style={css.bar} aria-label="Mobile Navigation">
+      <nav style={css.bar(vvBottomInset)} aria-label="Mobile Navigation">
         {/* Home */}
         <Link href="/" style={css.barBtn(isHome)} aria-label="Startseite">
           <IcoHome />
@@ -470,16 +534,10 @@ export default function MobileNav() {
           <span>Menü</span>
         </button>
 
-        {/* Search */}
-        <Link href="/search" style={css.barBtn(false)} aria-label="Suchen">
-          <IcoSearch />
-          <span>Suchen</span>
-        </Link>
-
-        {/* Cart */}
+        {/* Warenkorb */}
         <button
           type="button"
-          style={css.barBtn(false)}
+          style={css.barBtn(isCart)}
           onClick={openCartSidebar}
           aria-label="Warenkorb"
         >
@@ -492,11 +550,22 @@ export default function MobileNav() {
           <span>Warenkorb</span>
         </button>
 
-        {/* Account */}
+        {/* Merkzettel */}
+        <Link href="/merkzettel" style={css.barBtn(isMerkzettel)} aria-label="Merkzettel">
+          <div style={{ position: "relative", display: "inline-flex" }}>
+            <IcoHeart />
+            {wishlistCount > 0 && (
+              <span style={css.cartBadge}>{wishlistCount > 99 ? "99+" : wishlistCount}</span>
+            )}
+          </div>
+          <span>Merkzettel</span>
+        </Link>
+
+        {/* Profil */}
         <Link
           href={isAuthenticated ? "/account" : "/login"}
-          style={css.barBtn(false)}
-          aria-label={isAuthenticated ? "Mein Konto" : "Anmelden"}
+          style={css.barBtn(isProfile)}
+          aria-label={isAuthenticated ? "Profil" : "Anmelden"}
         >
           <div style={{ position: "relative", display: "inline-flex" }}>
             <IcoUser />
@@ -504,12 +573,12 @@ export default function MobileNav() {
               <span style={{ ...css.cartBadge, background: "#22c55e", minWidth: 10, height: 10, top: -2, right: -4 }} />
             )}
           </div>
-          <span>{isAuthenticated ? "Konto" : "Login"}</span>
+          <span>Profil</span>
         </Link>
       </nav>
 
       {/* Spacer so content isn't hidden under bottom bar */}
-      <div className="belucha-mobile-nav-pad" style={css.bodyPad} aria-hidden="true" />
+      <div className="belucha-mobile-nav-pad" style={css.bodyPad(vvBottomInset)} aria-hidden="true" />
     </div>
   );
 }

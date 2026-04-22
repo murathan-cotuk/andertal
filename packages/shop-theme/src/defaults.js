@@ -136,6 +136,7 @@ export const DEFAULT_SHOP_STYLES = {
     show_sidebar: true,
     sidebar_width: "220px",
     products_per_row: 4,
+    products_per_row_mobile: 2,
     richtext_align: "left",   // "left" | "center"
     richtext_max_width: "700px",
     content_padding_x: "32px",
@@ -145,7 +146,8 @@ export const DEFAULT_SHOP_STYLES = {
     banner_style: "strip",
     show_sidebar: true,
     sidebar_width: "280px",
-    products_per_row: 3,
+    products_per_row: 4,
+    products_per_row_mobile: 2,
     richtext_align: "left",
     richtext_max_width: "700px",
     content_padding_x: "32px",

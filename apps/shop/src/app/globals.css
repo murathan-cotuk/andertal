@@ -94,6 +94,23 @@
   --z-modal: 400;
   --z-toast: 500;
   --z-tooltip: 600;
+
+  /* App / PWA parity — yüzeyler, çekmeceler, barlar (Amazon/Otto hissi) */
+  --app-ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --app-ease-spring: cubic-bezier(0.2, 0, 0, 1);
+  --app-duration-surface: 0.3s;
+  --app-duration-tap: 0.2s;
+}
+
+/* Sayfa anchor / hash kaydırmaları; native app’e yakın pürüzlülük yok */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 * {
@@ -243,8 +260,8 @@ a {
    PRODUCT CARD — mobile tweaks
    ══════════════════════════════════════════════════════ */
 @media (max-width: 480px) {
-  /* 2-column grid stays but cards get tighter */
-  [class*="ProductGrid__"] {
+  /* Horizontal strip: tighter card gap on very small screens */
+  .product-grid-strip {
     gap: 10px !important;
   }
 }
@@ -307,6 +324,6 @@ a {
 @media (max-width: 767px) {
   /* Ensure footer doesn't overlap with bottom nav */
   footer {
-    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px) + var(--belucha-vv-bottom-inset, 0px)) !important;
   }
 }

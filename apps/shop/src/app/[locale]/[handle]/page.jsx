@@ -121,6 +121,7 @@ const ColHeader = styled.div`
 /* ─── Breadcrumb ─────────────────────────────────────────── */
 const Breadcrumb = styled.nav`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   font-size: 11px;
@@ -129,6 +130,20 @@ const Breadcrumb = styled.nav`
 
   a { color: #999; text-decoration: none; transition: color 0.12s; &:hover { color: #111; } }
   b { color: #444; font-weight: 500; }
+`;
+
+const BreadcrumbRow = styled.div`
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 32px 10px;
+  background: #fff;
+  border-bottom: 1px solid #e8e8e6;
+
+  @media (max-width: 600px) {
+    padding: 6px 16px 8px;
+  }
 `;
 
 /* ─── Sort bar (top, sticky) ─────────────────────────────── */
@@ -230,7 +245,7 @@ const ContentWrap = styled.div`
   gap: 32px;
   align-items: flex-start;
 
-  @media (max-width: 767px) { padding: 10px 16px 60px; }
+  @media (max-width: 767px) { padding: 8px 6px 60px; }
 `;
 
 /* Left filter sidebar */
@@ -238,8 +253,8 @@ const Sidebar = styled.aside`
   width: ${(p) => p.$width || "220px"};
   flex-shrink: 0;
   position: sticky;
-  top: ${HEADER_H + 68}px;
-  max-height: calc(100vh - ${HEADER_H + 68}px);
+  top: ${HEADER_H + 100}px;
+  max-height: calc(100vh - ${HEADER_H + 100}px);
   overflow-y: auto;
 
   /* Mobile: hidden overlay drawer */
@@ -768,6 +783,7 @@ export default function CollectionPage() {
   const showSidebar   = tmpl.show_sidebar !== false;
   const sidebarWidth  = tmpl.sidebar_width || "220px";
   const colsPerRow    = Number(tmpl.products_per_row) || 4;
+  const colsPerRowMobile = Number(tmpl.products_per_row_mobile) || 2;
   const richtextAlign = tmpl.richtext_align || "left";
   const richtextMaxW  = tmpl.richtext_max_width || "700px";
   const contentPadX   = tmpl.content_padding_x || "32px";
@@ -810,7 +826,7 @@ export default function CollectionPage() {
           <Bone style={{ height: 13, width: 200, margin: "24px 0 32px" }} />
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: `repeat(${Math.min(Math.max(Number(tmpl.products_per_row) || 4, 1), 6)}, 1fr)`,
             gap: 1,
             background: "#e8e8e6",
           }}>
@@ -887,11 +903,6 @@ export default function CollectionPage() {
                   </>
                 </FilterBtn>
               )}
-              <Breadcrumb aria-label="Breadcrumb">
-                <Link href={`/${locale}`}>Home</Link>
-                <span style={{ color: "#ccc" }}>/</span>
-                <b>{title}</b>
-              </Breadcrumb>
             </SortBarLeft>
             <SortWrap>
               <SortLabel>Sort:</SortLabel>
@@ -907,6 +918,14 @@ export default function CollectionPage() {
             </SortWrap>
           </SortBarInner>
         </SortBar>
+
+        <BreadcrumbRow style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
+          <Breadcrumb aria-label="Breadcrumb">
+            <Link href={`/${locale}`}>Home</Link>
+            <span style={{ color: "#ccc" }}>/</span>
+            <b>{title}</b>
+          </Breadcrumb>
+        </BreadcrumbRow>
 
         {/* ── Sidebar + content ── */}
         {showCatalogSidebar && showSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
@@ -991,14 +1010,19 @@ export default function CollectionPage() {
                 No products match your filters.
               </div>
             ) : (
-              <ProductGrid products={paginated} maxColumns={colsPerRow} activeFilters={filters} />
+              <ProductGrid
+                products={paginated}
+                maxColumns={colsPerRow}
+                maxColumnsMobile={colsPerRowMobile}
+                activeFilters={filters}
+              />
             )}
 
             {/* Önerilen ürünler */}
             {recommendedProducts.length > 0 && (
               <section style={{ marginTop: 48, marginBottom: 24 }}>
                 <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 16, color: "#111" }}>Önerilen ürünler</h2>
-                <ProductGrid products={recommendedProducts} maxColumns={4} />
+                <ProductGrid products={recommendedProducts} maxColumns={4} maxColumnsMobile={1} />
               </section>
             )}
 

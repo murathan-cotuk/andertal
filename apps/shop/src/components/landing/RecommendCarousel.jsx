@@ -13,15 +13,14 @@ export default function RecommendCarousel({
   return (
     <Carousel
       title={title}
-      visibleCount={4}
+      visibleCount={2}
       navOnSides
-      autoPlay
-      autoPlayInterval={7500}
-      gap={20}
+      gap={16}
+      showFade={false}
       ariaLabel={title}
     >
       {list.map((product, i) => (
-        <ProductCard key={product.id || i} product={product} compact />
+        <ProductCard key={product.id || i} product={product} plainImage />
       ))}
     </Carousel>
   );

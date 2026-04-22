@@ -2,7 +2,6 @@
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
-import { motion } from "framer-motion";
 import { tokens } from "@/design-system/tokens";
 
 /* ─── Section & layout ─────────────────────────────────────────────────── */
@@ -44,34 +43,35 @@ const Title = styled.h2`
 
 /* ─── Nav buttons: AAA focus, touch target 44px, subtle depth ───────────── */
 const NavBtn = styled.button`
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
   border: 1px solid ${tokens.border.light};
-  background: ${tokens.background.card};
+  background: #fff;
   color: ${tokens.dark[700]};
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  transition:
-    background ${tokens.transition.base},
-    border-color ${tokens.transition.base},
-    color ${tokens.transition.base},
-    box-shadow ${tokens.transition.base},
-    transform 0.2s ease;
+  transition: background ${tokens.transition.base}, border-color ${tokens.transition.base},
+    color ${tokens.transition.base};
 
   &:hover:not(:disabled) {
     background: ${tokens.background.soft};
     border-color: #d1d5db;
     color: ${tokens.dark[900]};
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    transform: scale(1.06);
   }
   &:active:not(:disabled) {
+    background: #f3f4f6;
     transform: scale(0.98);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background ${tokens.transition.base},
+      border-color ${tokens.transition.base},
+      color ${tokens.transition.base},
+      transform 0.18s var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
   }
   &:focus {
     outline: none;
@@ -81,13 +81,12 @@ const NavBtn = styled.button`
     outline-offset: 2px;
   }
   &:disabled {
-    opacity: 0.35;
+    opacity: 0.3;
     cursor: not-allowed;
-    transform: none;
   }
   svg {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
   }
 `;
 
@@ -98,16 +97,14 @@ const CarouselWrap = styled.div`
   margin: 0 -${tokens.containerPadding};
 `;
 
-/* Nav buttons: sol/sağ kenarda, dikey ortada — hover'da sadece büyüsün, kaymasın */
 const NavSide = styled(NavBtn)`
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
 
   &:hover:not(:disabled) {
-    transform: translateY(-50%) scale(1.08);
+    transform: translateY(-50%);
   }
   &:active:not(:disabled) {
     transform: translateY(-50%) scale(0.98);
@@ -123,21 +120,21 @@ const NavRightSide = styled(NavSide)`
   right: ${tokens.containerPadding};
 `;
 
-/* ─── Scroll track: smooth, snap, no scrollbar, touch-friendly ───────────── */
-const Scroll = styled(motion.div)`
+/* ─── Scroll track: programatik kaydırma + CSS smooth (a11y: reduce’da anında) ─ */
+const Scroll = styled.div`
   display: flex;
   gap: ${(p) => p.$gap ?? 20}px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 12px ${(p) => (p.$navOnSides ? SIDE_NAV_WIDTH : tokens.containerPadding)}px 28px;
+  padding: 12px ${(p) => (p.$navOnSides ? SIDE_NAV_WIDTH : tokens.containerPadding)}px 20px;
   scroll-snap-type: x mandatory;
   scroll-padding-inline: ${(p) => (p.$navOnSides ? SIDE_NAV_WIDTH : 0)}px;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   scroll-behavior: smooth;
 
-  &::-webkit-scrollbar {
-    display: none;
+  @media (prefers-reduced-motion: reduce) {
+    scroll-behavior: auto;
   }
 
   & > * {
@@ -146,7 +143,7 @@ const Scroll = styled(motion.div)`
   }
 `;
 
-const SlideWrapper = styled(motion.div)`
+const SlideWrapper = styled.div`
   width: ${(p) =>
     p.$visibleCount
       ? `calc((100% - ${(p.$visibleCount - 1) * (p.$gap ?? 20)}px) / ${p.$visibleCount})`
@@ -164,8 +161,12 @@ const FadeEdge = styled.div`
   pointer-events: none;
   z-index: 1;
   opacity: ${(p) => (p.$visible ? 1 : 0)};
-  transition: opacity 0.3s ease;
   background: ${(p) => p.$gradient};
+  transition: opacity var(--app-duration-tap, 0.2s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `;
 const FadeLeft = styled(FadeEdge)`
   left: 0;
@@ -190,7 +191,11 @@ const ProgressFill = styled.div`
   background: ${tokens.primary.DEFAULT};
   border-radius: 2px;
   width: ${(p) => p.$percent}%;
-  transition: width 0.15s ease-out;
+  transition: width var(--app-duration-tap, 0.2s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `;
 
 /* ─── Icons ──────────────────────────────────────────────────────────────── */
@@ -206,7 +211,7 @@ const NavRightSvg = () => (
 );
 
 /**
- * AAA-quality horizontal carousel: accessibility, keyboard, progress, reduced motion.
+ * AAA-quality horizontal carousel: smooth scroll, fade edges, progress, reduced motion.
  *
  * @param {string} [title] - Section title (if no custom header)
  * @param {React.ReactNode} [header] - Custom header content (left side)
@@ -221,7 +226,6 @@ const NavRightSvg = () => (
  * @param {number} [gap=20] - Kartlar arası boşluk
  * @param {string} [fadeBgColor] - Fade rengi
  * @param {boolean} [contained=true] - Section wrapper
- * @param {boolean} [animateItems=true] - Slide animasyonu
  * @param {string} [ariaLabel] - Erişilebilirlik etiketi
  * @param {React.ReactNode} children - Slide content
  */
@@ -233,13 +237,12 @@ export default function Carousel({
   visibleCount,
   autoPlay = false,
   autoPlayInterval = 4500,
-  showFade = true,
+  showFade = false,
   showProgressBar = false,
   itemWidth = 260,
   gap = 20,
   fadeBgColor = "rgba(255,255,255,0.97)",
   contained = true,
-  animateItems = true,
   ariaLabel,
   children,
   className,
@@ -301,7 +304,8 @@ export default function Carousel({
       const step = visibleCount
         ? (el.clientWidth - (visibleCount - 1) * gap) / visibleCount + gap
         : itemWidth + gap;
-      el.scrollBy({ left: dir * step, behavior: prefersReducedMotion ? "auto" : "smooth" });
+      const behavior = prefersReducedMotion ? "auto" : "smooth";
+      el.scrollBy({ left: dir * step, behavior });
     },
     [visibleCount, itemWidth, gap, prefersReducedMotion]
   );
@@ -321,6 +325,7 @@ export default function Carousel({
     (e) => {
       const el = scrollRef.current;
       if (!el) return;
+      const edgeBehavior = prefersReducedMotion ? "auto" : "smooth";
       switch (e.key) {
         case "ArrowLeft":
           e.preventDefault();
@@ -332,11 +337,11 @@ export default function Carousel({
           break;
         case "Home":
           e.preventDefault();
-          el.scrollTo({ left: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
+          el.scrollTo({ left: 0, behavior: edgeBehavior });
           break;
         case "End":
           e.preventDefault();
-          el.scrollTo({ left: el.scrollWidth - el.clientWidth, behavior: prefersReducedMotion ? "auto" : "smooth" });
+          el.scrollTo({ left: el.scrollWidth - el.clientWidth, behavior: edgeBehavior });
           break;
         default:
           break;
@@ -347,8 +352,6 @@ export default function Carousel({
 
   const gradientLeft = `linear-gradient(to right, ${fadeBgColor}, transparent)`;
   const gradientRight = `linear-gradient(to left, ${fadeBgColor}, transparent)`;
-  const shouldAnimate = animateItems && !prefersReducedMotion;
-
   const navInHeader = showNav && !useSideNav;
 
   const hasTitle = title != null && String(title).trim() !== "";
@@ -425,14 +428,6 @@ export default function Carousel({
               $itemWidth={itemWidth}
               $visibleCount={visibleCount}
               $gap={gap}
-              initial={shouldAnimate ? { opacity: 0, y: 14 } : undefined}
-              whileInView={shouldAnimate ? { opacity: 1, y: 0 } : undefined}
-              viewport={shouldAnimate ? { once: true, margin: "-30px" } : undefined}
-              transition={
-                shouldAnimate
-                  ? { duration: 0.4, delay: Math.min(i * 0.045, 0.35), ease: [0.25, 0.1, 0.25, 1] }
-                  : undefined
-              }
             >
               {child}
             </SlideWrapper>

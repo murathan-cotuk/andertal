@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Page,
   Layout,
@@ -174,13 +174,14 @@ function newContainer(type) {
     case "banner_cta":
       return { ...base, title: "", subtitle: "", btn_text: "", btn_url: "", bg_color: "#ff971c", text_color: "#ffffff", text_position: "center", padding: "32px 48px 40px 48px", btn_bg: "#ffffff", btn_color: "#111827", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "collection_carousel":
-      return { ...base, title: "", collection_id: "", collection_handle: "", items_per_row: 4, padding: "32px 24px", content_layout: "full" };
+      return { ...base, title: "", collection_id: "", collection_handle: "", items_per_row: 4, items_per_row_mobile: 2, padding: "32px 24px", content_layout: "full" };
     case "collections_carousel":
       return {
         ...base,
         title: "",
         collections: [],
         items_per_row: 4,
+        items_per_row_mobile: 2,
         padding: "32px 24px",
         card_aspect_ratio: "4/5",
         card_image_object_fit: "cover",
@@ -208,6 +209,7 @@ function newContainer(type) {
         title: "Blog",
         posts: [],
         items_per_row: 3,
+        items_per_row_mobile: 1,
         bg_color: "#ffffff",
         text_color: "#111827",
         padding: "40px 24px",
@@ -713,10 +715,18 @@ function CollectionCarouselEditor({ container, onChange }) {
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}>
           <Select
-            label="Produkte pro Reihe"
+            label="Produkte pro Reihe (Desktop)"
             options={[2, 3, 4, 5, 6].map((n) => ({ label: String(n), value: String(n) }))}
             value={String(container.items_per_row || 4)}
             onChange={(v) => onChange({ ...container, items_per_row: Number(v) })}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <Select
+            label="Produkte sichtbar (Mobil, ≤1023px)"
+            options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+            value={String(container.items_per_row_mobile ?? 2)}
+            onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) })}
           />
         </div>
         <div style={{ flex: 1 }}>
@@ -804,10 +814,18 @@ function CollectionsCarouselEditor({ container, onChange }) {
       <InlineStack gap="400" wrap>
         <div style={{ flex: "1 1 200px", minWidth: 160 }}>
           <Select
-            label="Karten pro Reihe"
+            label="Karten pro Reihe (Desktop)"
             options={[2, 3, 4, 5, 6].map((n) => ({ label: String(n), value: String(n) }))}
             value={String(container.items_per_row || 4)}
             onChange={(v) => onChange({ ...container, items_per_row: Number(v) })}
+          />
+        </div>
+        <div style={{ flex: "1 1 200px", minWidth: 160 }}>
+          <Select
+            label="Karten sichtbar (Mobil, ≤1023px)"
+            options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+            value={String(container.items_per_row_mobile ?? 2)}
+            onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) })}
           />
         </div>
         <div style={{ flex: "1 1 200px", minWidth: 160 }}>
@@ -1113,10 +1131,18 @@ function BlogCarouselEditor({ container, onChange }) {
           <InlineStack gap="400" wrap={false}>
             <div style={{ flex: 1 }}>
               <Select
-                label="Karten pro Reihe"
+                label="Karten pro Reihe (Desktop)"
                 options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
                 value={String(container.items_per_row || 3)}
                 onChange={(v) => onChange({ ...container, items_per_row: Number(v) })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Select
+                label="Karten sichtbar (Mobil, ≤1023px)"
+                options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+                value={String(container.items_per_row_mobile ?? 1)}
+                onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) })}
               />
             </div>
             <div style={{ flex: 1 }}><ColorField label="Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
@@ -1529,6 +1555,19 @@ function ContainerSpacingEditor({ container, onChange }) {
     <div>
       <Divider />
       <Box paddingBlockStart="400">
+        <Select
+          label="Sichtbarkeit (Viewport)"
+          helpText="Legt fest, in welchem Reiter auf der Seite „Landing Page“ (Desktop/Mobil) der Block erscheint. „Nur Desktop“/„Nur schmal“ nur in einem Reiter. „Überall“: in beiden Reitern sichtbar und bearbeitbar."
+          options={[
+            { label: "Überall (Desktop & Mobil)", value: "both" },
+            { label: "Nur Desktop (≥1024px)", value: "desktop" },
+            { label: "Nur schmal (≤1023px)", value: "mobile" },
+          ]}
+          value={container.visible_on || "both"}
+          onChange={(v) => onChange({ ...container, visible_on: v })}
+        />
+      </Box>
+      <Box paddingBlockStart="400">
         <Text variant="headingSm" as="h3">Außenabstand (Margin)</Text>
         <Box paddingBlockStart="300">
           <InlineStack gap="300" wrap={false}>
@@ -1582,8 +1621,26 @@ function ContainerEditor({ container, onChange }) {
 const DEFAULT_PAGE_ID = "__default__"; // shop homepage (legacy single-row table)
 
 const TEMPLATE_DEFAULTS = {
-  collection_template: { banner_style: "strip", show_sidebar: true, sidebar_width: "220px", products_per_row: 4, richtext_align: "left", richtext_max_width: "700px", content_padding_x: "32px" },
-  category_template:   { banner_style: "strip", show_sidebar: true, sidebar_width: "280px", products_per_row: 3, richtext_align: "left", richtext_max_width: "700px", content_padding_x: "32px" },
+  collection_template: {
+    banner_style: "strip",
+    show_sidebar: true,
+    sidebar_width: "220px",
+    products_per_row: 4,
+    products_per_row_mobile: 2,
+    richtext_align: "left",
+    richtext_max_width: "700px",
+    content_padding_x: "32px",
+  },
+  category_template: {
+    banner_style: "strip",
+    show_sidebar: true,
+    sidebar_width: "280px",
+    products_per_row: 4,
+    products_per_row_mobile: 2,
+    richtext_align: "left",
+    richtext_max_width: "700px",
+    content_padding_x: "32px",
+  },
 };
 
 export default function LandingPageEditor() {
@@ -1592,6 +1649,8 @@ export default function LandingPageEditor() {
 
   // ── Top-level tab: 0 = Seiten, 1 = Templates
   const [mainTab, setMainTab] = useState(0);
+  // Templates: 0 = Desktop, 1 = Mobil (Kollektions- / Kategorie-Raster)
+  const [templateDeviceTab, setTemplateDeviceTab] = useState(0);
 
   // ── Template settings (collection + category)
   const [tmpl, setTmpl] = useState(TEMPLATE_DEFAULTS);
@@ -1649,6 +1708,8 @@ export default function LandingPageEditor() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
+  /** Seiten → Container: 0 = Desktop, 1 = Mobil (siehe sichtbarkeit im Shop ≤1023px) */
+  const [seitenDeviceTab, setSeitenDeviceTab] = useState(0);
   const [categoryRows, setCategoryRows] = useState([]);
   const [categorySettings, setCategorySettings] = useState({ show_submenu_left: false });
 
@@ -1740,13 +1801,28 @@ export default function LandingPageEditor() {
     return () => unsaved?.clearHandlers();
   }, [isDirty, handleSave, handleDiscard]);
 
-  // Reset dirty state when switching pages
+  // Reset dirty state and viewport-Tab when switching pages
   useEffect(() => {
     setIsDirty(false);
+    setSeitenDeviceTab(0);
   }, [selectedPageId]);
 
+  const matchContainerSeitenTab = (c, tab) => {
+    const v = c.visible_on || "both";
+    if (tab === 0) return v === "both" || v === "desktop";
+    return v === "both" || v === "mobile";
+  };
+
+  const filteredSeitenContainers = useMemo(() => {
+    if (!Array.isArray(containers)) return [];
+    return containers.filter((c) => matchContainerSeitenTab(c, seitenDeviceTab));
+  }, [containers, seitenDeviceTab]);
+
   const addContainer = (type) => {
-    const c = newContainer(type);
+    const c = {
+      ...newContainer(type),
+      visible_on: seitenDeviceTab === 0 ? "desktop" : "mobile",
+    };
     setContainers((prev) => [...prev, c]);
     setExpandedId(c.id);
     setAddModalOpen(false);
@@ -1755,15 +1831,23 @@ export default function LandingPageEditor() {
 
   const updateContainer = (id, updated) => { setContainers((prev) => prev.map((c) => c.id === id ? updated : c)); setIsDirty(true); };
   const removeContainer = (id) => { setContainers((prev) => prev.filter((c) => c.id !== id)); if (expandedId === id) setExpandedId(null); setIsDirty(true); };
-  const moveContainer = (id, dir) => {
+
+  /** Reihenfolge nur unter Containern derselben Sichtbarkeit (wie in der jeweiligen Desktop/Mobil-Liste). */
+  const moveContainerInSeitenTab = (id, dir) => {
     setContainers((prev) => {
-      const idx = prev.findIndex((c) => c.id === id);
-      if (idx < 0) return prev;
-      const next = [...prev];
-      const target = idx + dir;
-      if (target < 0 || target >= next.length) return prev;
-      [next[idx], next[target]] = [next[target], next[idx]];
-      return next;
+      const inTab = prev.filter((c) => matchContainerSeitenTab(c, seitenDeviceTab));
+      const pos = inTab.findIndex((c) => c.id === id);
+      if (pos < 0) return prev;
+      const newPos = pos + dir;
+      if (newPos < 0 || newPos >= inTab.length) return prev;
+      const idA = id;
+      const idB = inTab[newPos].id;
+      const iA = prev.findIndex((c) => c.id === idA);
+      const iB = prev.findIndex((c) => c.id === idB);
+      if (iA < 0 || iB < 0) return prev;
+      const n = [...prev];
+      [n[iA], n[iB]] = [n[iB], n[iA]];
+      return n;
     });
     setIsDirty(true);
   };
@@ -1884,9 +1968,28 @@ export default function LandingPageEditor() {
                         <Box paddingBlock="600"><Text as="p" tone="subdued" alignment="center">Laden…</Text></Box>
                       ) : (
                         <BlockStack gap="400">
+                          <Card>
+                            <PolarisTabs
+                              tabs={[
+                                { id: "seiten-d", content: "Desktop" },
+                                { id: "seiten-m", content: "Mobil" },
+                              ]}
+                              selected={seitenDeviceTab}
+                              onSelect={setSeitenDeviceTab}
+                            />
+                            <Box paddingBlockStart="300">
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                {seitenDeviceTab === 0
+                                  ? "Hier: Container nur für den Desktop-Viewport (ab ca. 1024px) und Blöcke mit „alle Viewports“. „Container hinzufügen“ legt standardmäßig einen Desktop-Block an."
+                                  : "Hier: Container nur für den schmalen Viewport (max. 1023px) und Blöcke mit „alle Viewports“. Neu angelegt = nur Mobil. „Alle Viewports“ erscheinen in beiden Reitern."}
+                              </Text>
+                            </Box>
+                          </Card>
+
                           {isCategorySelection && (
                             <Banner tone="success">Container gelten für diese Kategorie auf der zugehörigen Kollektionsseite im Shop (über dem Katalog).</Banner>
                           )}
+
                           {containers.length === 0 && (
                             <Box paddingBlock="600">
                               <BlockStack gap="300" align="center">
@@ -1898,23 +2001,39 @@ export default function LandingPageEditor() {
                             </Box>
                           )}
 
-                          {containers.map((c, idx) => {
+                          {containers.length > 0 && filteredSeitenContainers.length === 0 && (
+                            <Banner tone="info">
+                              {seitenDeviceTab === 0
+                                ? "Für den Desktop-Reiter sind keine passenden Container vorhanden. Wechsel zu „Mobil“, lege mit „+ Container“ einen an, oder stelle in einem Block unter Abstände die Sichtbarkeit auf „Überall“ / „Nur Desktop“."
+                                : "Für den Mobil-Reiter sind keine passenden Container vorhanden. Wechsel zu „Desktop“, füge einen an, oder nutze in den Abständen die Sichtbarkeit „Nur Mobil“ bzw. „Überall“."}
+                            </Banner>
+                          )}
+
+                          {filteredSeitenContainers.map((c, idx) => {
                             const info = typeInfo(c.type);
                             const isExpanded = expandedId === c.id;
+                            const vis = c.visible_on || "both";
+                            const scopeBadge = vis === "both"
+                              ? { label: "Alle Viewports", tone: "info" }
+                              : vis === "desktop"
+                                ? { label: "Nur Desktop", tone: "attention" }
+                                : { label: "Nur Mobil", tone: "attention" };
+                            const last = idx === filteredSeitenContainers.length - 1;
                             return (
                               <Card key={c.id}>
                                 <BlockStack gap="0">
                                   <Box paddingBlockEnd={isExpanded ? "400" : "0"}>
                                     <InlineStack align="space-between" blockAlign="center" gap="300">
-                                      <InlineStack gap="300" blockAlign="center">
+                                      <InlineStack gap="300" blockAlign="center" wrap>
                                         <Text as="h3" variant="headingSm">{info.label}</Text>
                                         <Badge tone={c.visible ? "success" : undefined}>{c.visible ? "Sichtbar" : "Versteckt"}</Badge>
+                                        <Badge tone={scopeBadge.tone}>{scopeBadge.label}</Badge>
                                         <Text as="span" variant="bodySm" tone="subdued">#{idx + 1}</Text>
                                       </InlineStack>
                                       <InlineStack gap="200" blockAlign="center">
                                         <Button size="slim" onClick={() => { updateContainer(c.id, { ...c, visible: !c.visible }); }}>{c.visible ? "Verstecken" : "Einblenden"}</Button>
-                                        <Button size="slim" disabled={idx === 0} onClick={() => moveContainer(c.id, -1)}>↑</Button>
-                                        <Button size="slim" disabled={idx === containers.length - 1} onClick={() => moveContainer(c.id, 1)}>↓</Button>
+                                        <Button size="slim" disabled={idx === 0} onClick={() => moveContainerInSeitenTab(c.id, -1)}>↑</Button>
+                                        <Button size="slim" disabled={last} onClick={() => moveContainerInSeitenTab(c.id, 1)}>↓</Button>
                                         <Button size="slim" tone="critical" onClick={() => { if (confirm("Container entfernen?")) removeContainer(c.id); }}>Entfernen</Button>
                                         <Button size="slim" variant={isExpanded ? "primary" : "secondary"} onClick={() => setExpandedId(isExpanded ? null : c.id)}>
                                           {isExpanded ? "Einklappen" : "Bearbeiten"}
@@ -1935,7 +2054,7 @@ export default function LandingPageEditor() {
                             );
                           })}
 
-                          {containers.length > 0 && (
+                          {!loading && containers.length > 0 && (
                             <InlineStack>
                               <Button onClick={() => setAddModalOpen(true)}>+ Container hinzufügen</Button>
                             </InlineStack>
@@ -1953,7 +2072,29 @@ export default function LandingPageEditor() {
         {/* ── TAB 1: Templates ── */}
         {mainTab === 1 && (
           <>
-            {/* Kollektion-Template */}
+            <Layout.Section>
+              <Card>
+                <PolarisTabs
+                  tabs={[
+                    { id: "t-desktop", content: "Desktop" },
+                    { id: "t-mobil", content: "Mobil" },
+                  ]}
+                  selected={templateDeviceTab}
+                  onSelect={setTemplateDeviceTab}
+                />
+                <Box paddingBlockStart="300">
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {templateDeviceTab === 0
+                      ? "Layout ab ca. 1024px Breite: Raster, Seitenleisten, Banners."
+                      : "Schmaler Viewport (Produkt-Streifen, Karussell-Karten pro sichtbarer Zeile) — max. 1023px im Shop."}
+                  </Text>
+                </Box>
+              </Card>
+            </Layout.Section>
+
+            {templateDeviceTab === 0 && (
+            <>
+            {/* Kollektion-Template — Desktop */}
             <Layout.Section>
               <Card>
                 <BlockStack gap="400">
@@ -2030,14 +2171,14 @@ export default function LandingPageEditor() {
               </Card>
             </Layout.Section>
 
-            {/* Kategorie-Template */}
+            {/* Kategorie-Template — Desktop */}
             <Layout.Section>
               <Card>
                 <BlockStack gap="400">
                   <BlockStack gap="100">
                     <Text as="h2" variant="headingMd">Kategorie-Template</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Gilt für alle Kategorieseiten (z. B. /schuhe, /damen).
+                      Gilt für alle Kategorieseiten (z. B. /schuhe, /damen). Ab ca. 1024px: Produktkarten im Raster. Darunter: horizontal scrollbarer Streifen; Spaltenzahl unter „Mobil“.
                     </Text>
                   </BlockStack>
                   <Divider />
@@ -2056,7 +2197,7 @@ export default function LandingPageEditor() {
                     <Select
                       label="Produkte pro Zeile (Desktop)"
                       options={[2,3,4,5,6].map((n) => ({ label: String(n), value: String(n) }))}
-                      value={String(tmpl.category_template.products_per_row)}
+                      value={String(tmpl.category_template.products_per_row ?? 4)}
                       onChange={(v) => updateTmpl("category_template", "products_per_row", Number(v))}
                     />
                     <Select
@@ -2106,6 +2247,45 @@ export default function LandingPageEditor() {
                 </BlockStack>
               </Card>
             </Layout.Section>
+            </>
+            )}
+
+            {templateDeviceTab === 1 && (
+            <>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h2" variant="headingMd">Kollektion-Template (Mobil)</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">Produkte nebeneinander im waagerechten Streifen (viewport ≤ 1023px).</Text>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                    <Select
+                      label="Sichtbar nebeneinander (Mobil)"
+                      options={[1,2,3,4].map((n) => ({ label: String(n), value: String(n) }))}
+                      value={String(tmpl.collection_template.products_per_row_mobile ?? 2)}
+                      onChange={(v) => updateTmpl("collection_template", "products_per_row_mobile", Number(v))}
+                    />
+                  </div>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h2" variant="headingMd">Kategorie-Template (Mobil)</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">Gleiches Raster wie Suche und Kollektion auf schmalen Viewports.</Text>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                    <Select
+                      label="Sichtbar nebeneinander (Mobil)"
+                      options={[1,2,3,4].map((n) => ({ label: String(n), value: String(n) }))}
+                      value={String(tmpl.category_template.products_per_row_mobile ?? 2)}
+                      onChange={(v) => updateTmpl("category_template", "products_per_row_mobile", Number(v))}
+                    />
+                  </div>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+            </>
+            )}
           </>
         )}
 
