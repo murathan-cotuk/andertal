@@ -3,7 +3,7 @@
 SHOP APP MOBIL GÖRÜNÜMÜNÜ MOBILE APP GIBI GELISTIRECEGIZ. ILERIDE MOBILE APP DE YAPACAGIMIZ ICIN WEB VERSIYONU DA MOBILE APP GIBI GÖRÜNMELI ANCAK DESKTOP VERSIYONU ASLA BOZULMAMALI BEN "DESKTOP ICIN BU DEGISIKLIGI YAP" DEMEDIKCE. MOBILE VE TABLETE UYGUN RESPONSIVE TASARIM YAPACAGIZ.
 
 - ürün sayfasi altindaki "Kunden, die diesen Artikel gekauft haben, kauften auch" carouselinde desktopta carouseldeki ürünler cok büyük duruyor. ben mobilde 2 tane görünmesini istemistim ancak desktopta 5 tane görünmeli ayni anda.
-
+ 
 -- mobilde ürün sayfasi yerlesimi amazonun mobil uygulamasi gibi olmali. yani sol üstte marka (logo, isim yan yana) tiklanabilir, hemen saginda reviewler. markanin altinda ürün ismi, onun altinda solda etiket (bestseller, nich lieferbar vs.) saginda ise icinde bulundugu kategori yazacak. onun altinda mobil ekran genisliginde ürün görseli(saga sola kaydirilabilmeli), sag altinda merkzettel ve paylas iconlari, altta ferahca ayarlanmis varyasyonlar. onun altinda fiyat, gönderim yöntemi, kismi ean vs buyboxtaki seyler iste  ve adet ile satin alma butonlari olacak. devaminda ise bullet, eigenschaften, beschreibungen, "Kunden, die diesen Artikel gekauft haben, kauften auch" courseli olacak. 
 -- Alltaki menü her zaman her yerde görünür olmali, sabit olmali. (sepette, profilde, menüde) Mobil tarayicinin alttaki kismi yukari dogru cikarsa o da yukari cikmali tarayicinin altinda kalmamali.
 - navbardaki Search bar her zaman her yerde görünür olmali. scroll down yapildiginda diger seylerin gözükmesine gerek yok sadece search bar gözüksün ince bir sekilde. scroll top yaptigimda diger header bilesenleri gözükecek. search bar arka plani belirledigimiz website renginde olacak ancak scroll downda biraz saydam bir görüntü olsun.
