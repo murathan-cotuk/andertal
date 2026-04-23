@@ -2140,11 +2140,11 @@ export default function LandingPageEditor() {
                               selected={seitenDeviceTab}
                               onSelect={setSeitenDeviceTab}
                             />
-                            <Box paddingBlockStart=”300”>
-                              <Text as=”p” variant=”bodySm” tone=”subdued”>
+                            <Box paddingBlockStart="300">
+                              <Text as="p" variant="bodySm" tone="subdued">
                                 {seitenDeviceTab === 0
-                                  ? “Desktop-Container (ab ca. 1024px). Änderungen hier betreffen nur den Desktop. Klicke „📱 Mobil”, um eine unabhängige Mobilversion zu erstellen.”
-                                  : “Mobil-Container (max. 1023px). Änderungen hier betreffen nur Mobilgeräte. Klicke „🖥 Desktop”, um eine unabhängige Desktop-Version zu erstellen.”}
+                                  ? "Desktop-Container (ab ca. 1024px). Änderungen hier betreffen nur den Desktop. Klicke „📱 Mobil“, um eine unabhängige Mobilversion zu erstellen."
+                                  : "Mobil-Container (max. 1023px). Änderungen hier betreffen nur Mobilgeräte. Klicke „🖥 Desktop“, um eine unabhängige Desktop-Version zu erstellen."}
                               </Text>
                             </Box>
                           </Card>
@@ -2165,10 +2165,10 @@ export default function LandingPageEditor() {
                           )}
 
                           {containers.length > 0 && filteredSeitenContainers.length === 0 && (
-                            <Banner tone=”info”>
+                            <Banner tone="info">
                               {seitenDeviceTab === 0
-                                ? “Keine Desktop-Container vorhanden. Lege einen an oder wechsle zu „Mobil” und nutze „🖥 Desktop” um einen aus einer Mobilversion zu erstellen.”
-                                : “Keine Mobil-Container vorhanden. Wechsle zu „Desktop” und klicke „📱 Mobil” bei einem Container, um eine unabhängige Mobilversion zu erstellen.”}
+                                ? "Keine Desktop-Container vorhanden. Lege einen an oder wechsle zu „Mobil“ und nutze „🖥 Desktop“ um einen aus einer Mobilversion zu erstellen."
+                                : "Keine Mobil-Container vorhanden. Wechsle zu „Desktop“ und klicke „📱 Mobil“ bei einem Container, um eine unabhängige Mobilversion zu erstellen."}
                             </Banner>
                           )}
 
