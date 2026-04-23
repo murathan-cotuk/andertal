@@ -76,6 +76,10 @@ const Breadcrumb = styled.nav`
   letter-spacing: 0.02em;
   a { color: #999; text-decoration: none; transition: color 0.12s; &:hover { color: #111; } }
   b { color: #444; font-weight: 500; }
+
+  @media (max-width: 767px) {
+    display: none;
+  }
 `;
 
 const BreadcrumbRow = styled.div`
@@ -87,6 +91,8 @@ const BreadcrumbRow = styled.div`
   background: #fff;
   border-bottom: 1px solid #e8e8e6;
   @media (max-width: 600px) { padding: 6px 16px 8px; }
+
+  @media (max-width: 767px) { display: none; }
 `;
 
 const StickyControlStack = styled.div`

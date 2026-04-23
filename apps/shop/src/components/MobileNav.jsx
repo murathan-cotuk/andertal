@@ -152,6 +152,34 @@ const css = {
     transition: "background 0.1s",
     borderBottom: "1px solid #f3f4f6",
   },
+  categoryRowBtn: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 56,
+    padding: "10px 16px",
+    fontSize: 15,
+    fontWeight: 600,
+    color: "#111827",
+    background: "none",
+    border: "none",
+    borderBottom: "1px solid #f3f4f6",
+    textAlign: "left",
+    fontFamily: "inherit",
+    cursor: "pointer",
+  },
+  subCategoryLink: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "9px 16px 9px 76px",
+    fontSize: 14,
+    fontWeight: 500,
+    color: "#374151",
+    textDecoration: "none",
+    borderBottom: "1px solid #f9fafb",
+  },
 
   categoryThumb: {
     width: 48,
@@ -306,11 +334,13 @@ export default function MobileNav() {
   const vvBottomInset = useVisualViewportBottomInset();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTarget, setDrawerTarget] = useState("menu"); // "menu" | "account"
   const [categories, setCategories] = useState([]);
-  const [logo, setLogo] = useState("");
-  const [logoHeight, setLogoHeight] = useState(30);
+  const [expandedCategoryId, setExpandedCategoryId] = useState(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   const drawerRef = useRef(null);
+  const drawerBodyRef = useRef(null);
+  const accountSectionRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -323,14 +353,6 @@ export default function MobileNav() {
 
   /* Fetch data once */
   useEffect(() => {
-    fetch("/api/store-seller-settings?seller_id=default", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        setLogo(d?.shop_logo_url || "");
-        setLogoHeight(d?.shop_logo_height ? Math.min(Number(d.shop_logo_height), 36) : 30);
-      })
-      .catch(() => {});
-
     fetch("/api/store-categories?tree=true&is_visible=true")
       .then((r) => r.json())
       .then((d) => {
@@ -339,11 +361,21 @@ export default function MobileNav() {
           .filter((n) => n && !n.parent_id && n.has_products !== false && n.slug)
           .map((n) => {
             const imageRaw = categoryListImageUrl(n);
+            const children = Array.isArray(n.children)
+              ? n.children
+                  .filter((c) => c && c.has_products !== false && c.slug)
+                  .map((c) => ({
+                    id: c.id,
+                    label: c.name || c.slug,
+                    href: `/${String(c.slug).replace(/^\//, "")}`,
+                  }))
+              : [];
             return {
               id: n.id,
               label: n.name || n.slug,
               href: `/${String(n.slug).replace(/^\//, "")}`,
               imageUrl: imageRaw ? resolveImageUrl(imageRaw) : "",
+              children,
             };
           })
           .sort((a, b) => a.label.localeCompare(b.label));
@@ -355,6 +387,8 @@ export default function MobileNav() {
   /* Close drawer on route change */
   useEffect(() => {
     setDrawerOpen(false);
+    setExpandedCategoryId(null);
+    setDrawerTarget("menu");
   }, [pathname]);
 
   /* Body scroll lock when drawer open */
@@ -386,9 +420,13 @@ export default function MobileNav() {
 
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
-  const displayName = user
-    ? [user.first_name || user.firstName, user.last_name || user.lastName].filter(Boolean).join(" ") || user.email || "Mein Konto"
-    : null;
+  useEffect(() => {
+    if (!drawerOpen || drawerTarget !== "account") return;
+    const t = setTimeout(() => {
+      accountSectionRef.current?.scrollIntoView({ block: "start", behavior: reducedMotion ? "auto" : "smooth" });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [drawerOpen, drawerTarget, reducedMotion]);
 
   const appPath = appPathFromPathname(pathname);
   const isHome = appPath === "/" || appPath === "";
@@ -426,13 +464,7 @@ export default function MobileNav() {
       >
         {/* Drawer head */}
         <div style={css.drawerHead}>
-          <Link href="/" onClick={closeDrawer} style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
-            {logo ? (
-              <img src={logo} alt="Logo" style={{ height: logoHeight, maxWidth: 160, objectFit: "contain" }} />
-            ) : (
-              <span style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: "-0.03em" }}>Belucha</span>
-            )}
-          </Link>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: "0.01em" }}>Menü</span>
           <button
             type="button"
             onClick={closeDrawer}
@@ -444,25 +476,50 @@ export default function MobileNav() {
         </div>
 
         {/* Drawer scrollable body: categories first, Mein Konto at bottom (no CMS “Menü” / no Service) */}
-        <div style={css.drawerBody}>
+        <div ref={drawerBodyRef} style={css.drawerBody}>
           {categories.length > 0 && (
             <>
               <div style={css.sectionLabel}>Kategorien</div>
               {categories.slice(0, 18).map((cat) => (
-                <HoverLink
-                  key={cat.id}
-                  href={cat.href}
-                  onClick={closeDrawer}
-                  style={css.categoryRow}
-                >
+                <div key={cat.id}>
                   {cat.imageUrl ? (
-                    <img src={cat.imageUrl} alt="" style={css.categoryThumb} />
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCategoryId((prev) => (prev === cat.id ? null : cat.id))}
+                      style={{ ...css.categoryRowBtn, background: expandedCategoryId === cat.id ? "#f9fafb" : "transparent" }}
+                    >
+                      <img src={cat.imageUrl} alt="" style={css.categoryThumb} />
+                      <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
+                      <span style={{ transform: expandedCategoryId === cat.id ? "rotate(90deg)" : "none", transition: "transform 0.15s ease" }}>
+                        <IcoChevron />
+                      </span>
+                    </button>
                   ) : (
-                    <div style={css.categoryThumbPlaceholder} aria-hidden />
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCategoryId((prev) => (prev === cat.id ? null : cat.id))}
+                      style={{ ...css.categoryRowBtn, background: expandedCategoryId === cat.id ? "#f9fafb" : "transparent" }}
+                    >
+                      <div style={css.categoryThumbPlaceholder} aria-hidden />
+                      <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
+                      <span style={{ transform: expandedCategoryId === cat.id ? "rotate(90deg)" : "none", transition: "transform 0.15s ease" }}>
+                        <IcoChevron />
+                      </span>
+                    </button>
                   )}
-                  <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
-                  <IcoChevron />
-                </HoverLink>
+                  {expandedCategoryId === cat.id && (
+                    <>
+                      <HoverLink href={cat.href} onClick={closeDrawer} style={{ ...css.subCategoryLink, fontWeight: 700, color: TEAL }}>
+                        Alle anzeigen
+                      </HoverLink>
+                      {(cat.children || []).map((sub) => (
+                        <HoverLink key={sub.id} href={sub.href} onClick={closeDrawer} style={css.subCategoryLink}>
+                          {sub.label}
+                        </HoverLink>
+                      ))}
+                    </>
+                  )}
+                </div>
               ))}
             </>
           )}
@@ -471,18 +528,15 @@ export default function MobileNav() {
 
           {isAuthenticated ? (
             <>
-              <div style={css.sectionLabel}>Mein Konto</div>
-              {displayName && (
-                <div style={{ padding: "0 16px 10px", marginTop: -4 }}>
-                  <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Angemeldet als</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginTop: 2 }}>{displayName}</div>
-                </div>
-              )}
+              <div ref={accountSectionRef} style={css.sectionLabel}>Mein Konto</div>
               <HoverLink href="/account"     onClick={closeDrawer} style={css.drawerLink}><span>Übersicht</span><IcoChevron /></HoverLink>
               <HoverLink href="/orders"      onClick={closeDrawer} style={css.drawerLink}><span>Bestellungen</span><IcoChevron /></HoverLink>
-              <HoverLink href="/addresses"   onClick={closeDrawer} style={css.drawerLink}><span>Adressen</span><IcoChevron /></HoverLink>
               <HoverLink href="/merkzettel"   onClick={closeDrawer} style={css.drawerLink}><span>Merkzettel</span><IcoChevron /></HoverLink>
+              <HoverLink href="/addresses"   onClick={closeDrawer} style={css.drawerLink}><span>Adressen</span><IcoChevron /></HoverLink>
+              <HoverLink href="/payment-methods" onClick={closeDrawer} style={css.drawerLink}><span>Zahlungsmethoden</span><IcoChevron /></HoverLink>
               <HoverLink href="/nachrichten"  onClick={closeDrawer} style={css.drawerLink}><span>Nachrichten</span><IcoChevron /></HoverLink>
+              <HoverLink href="/reviews"      onClick={closeDrawer} style={css.drawerLink}><span>Bewertungen</span><IcoChevron /></HoverLink>
+              <HoverLink href="/bonus"        onClick={closeDrawer} style={css.drawerLink}><span>Bonuspunkte</span><IcoChevron /></HoverLink>
               <div style={css.divider} />
               <HoverBtn
                 style={{ ...css.drawerBtn, color: "#ef4444" }}
@@ -522,8 +576,11 @@ export default function MobileNav() {
         {/* Categories / Menu */}
         <button
           type="button"
-          style={css.barBtn(drawerOpen)}
-          onClick={() => setDrawerOpen((v) => !v)}
+          style={css.barBtn(drawerOpen && drawerTarget === "menu")}
+          onClick={() => {
+            setDrawerTarget("menu");
+            setDrawerOpen((v) => !v);
+          }}
           aria-label="Menü öffnen"
           aria-expanded={drawerOpen}
         >
@@ -556,18 +613,32 @@ export default function MobileNav() {
         </Link>
 
         {/* Profil */}
-        <Link
-          href={isAuthenticated ? "/account" : "/login"}
-          style={css.barBtn(isProfile)}
-          aria-label={isAuthenticated ? "Profil" : "Anmelden"}
-        >
-          <div style={{ position: "relative", display: "inline-flex" }}>
-            <IcoUser />
-            {isAuthenticated && (
+        {isAuthenticated ? (
+          <button
+            type="button"
+            style={css.barBtn(drawerOpen && drawerTarget === "account")}
+            aria-label="Profil"
+            onClick={() => {
+              setDrawerTarget("account");
+              setDrawerOpen(true);
+            }}
+          >
+            <div style={{ position: "relative", display: "inline-flex" }}>
+              <IcoUser />
               <span style={{ ...css.cartBadge, background: "#22c55e", minWidth: 10, height: 10, top: -2, right: -4 }} />
-            )}
-          </div>
-        </Link>
+            </div>
+          </button>
+        ) : (
+          <Link
+            href="/login"
+            style={css.barBtn(isProfile)}
+            aria-label="Anmelden"
+          >
+            <div style={{ position: "relative", display: "inline-flex" }}>
+              <IcoUser />
+            </div>
+          </Link>
+        )}
       </nav>
 
       {/* Spacer so content isn't hidden under bottom bar */}

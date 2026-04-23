@@ -26,7 +26,7 @@ function normalizePath(pathname) {
   return rest === "" ? "/" : rest.startsWith("/") ? rest : `/${rest}`;
 }
 
-export default function AccountSidebar({ onLogout }) {
+export default function AccountSidebar({ onLogout, onNavigate }) {
   const pathname = usePathname() || "/";
   const appPath = normalizePath(pathname);
   const { user } = useAuth();
@@ -59,6 +59,7 @@ export default function AccountSidebar({ onLogout }) {
           <Link
             key={item.href}
             href={item.href}
+            onClick={() => onNavigate?.()}
             style={{
               display: "flex", alignItems: "center", gap: 10,
               padding: "14px 18px", fontSize: 14, fontWeight: 500,
@@ -86,6 +87,7 @@ export default function AccountSidebar({ onLogout }) {
         type="button"
         onClick={() => {
           document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax";
+          onNavigate?.();
           onLogout?.();
         }}
         style={{

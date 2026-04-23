@@ -37,7 +37,7 @@ export default function Breadcrumbs({ title, items: customItems }) {
   if (items.length <= 1) return null;
 
   return (
-    <nav aria-label="Breadcrumb" className="text-sm text-gray-500 mb-4">
+    <nav aria-label="Breadcrumb" className="hidden md:block text-sm text-gray-500 mb-4">
       <ol className="flex flex-wrap items-center gap-1">
         {items.map((item, i) => (
           <li key={i} className="flex items-center gap-1">

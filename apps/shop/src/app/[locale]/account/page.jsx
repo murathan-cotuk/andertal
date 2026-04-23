@@ -134,6 +134,15 @@ export default function AccountPage() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const apply = () => setIsMobile(window.innerWidth <= 1023);
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, []);
 
   useEffect(() => {
     const fetchCustomer = async () => {
@@ -242,8 +251,8 @@ export default function AccountPage() {
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 24, alignItems: "start" }}>
-            <AccountSidebar onLogout={handleLogout} />
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "220px 1fr", gap: 24, alignItems: "start" }}>
+            {!isMobile && <AccountSidebar onLogout={handleLogout} />}
 
             {/* Main content */}
             <div>

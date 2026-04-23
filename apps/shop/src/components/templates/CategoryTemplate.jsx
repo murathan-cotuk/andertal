@@ -103,6 +103,10 @@ const Breadcrumb = styled.nav`
 
   a { color: #999; text-decoration: none; transition: color 0.12s; &:hover { color: #111; } }
   b { color: #444; font-weight: 500; }
+
+  @media (max-width: 767px) {
+    display: none;
+  }
 `;
 
 /** Full-width strip below filter/sort bar, above product grid (breadcrumb only). */
@@ -117,6 +121,10 @@ const BreadcrumbRow = styled.div`
 
   @media (max-width: 600px) {
     padding: 6px 16px 8px;
+  }
+
+  @media (max-width: 767px) {
+    display: none;
   }
 `;
 

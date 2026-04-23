@@ -128,6 +128,7 @@ const Breadcrumb = styled.nav`
   b { color: #444; font-weight: 500; }
 
   @media (max-width: 600px) { padding: 6px 16px 8px; }
+  @media (max-width: 767px) { display: none; }
 `;
 
 /* ─── Filter bar ─────────────────────────────────────────── */

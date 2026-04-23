@@ -77,12 +77,12 @@ const CloseBtn = styled.button`
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #6b7280;
+  color: #111827;
   border-radius: 8px;
   -webkit-tap-highlight-color: transparent;
   &:hover {
     background: #f3f4f6;
-    color: #374151;
+    color: #000;
   }
 `;
 

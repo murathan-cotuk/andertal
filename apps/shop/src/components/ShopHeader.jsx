@@ -149,7 +149,14 @@ const MiddleBarInner = styled.div`
   align-items: center;
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) => (p.$mobileSearchCompact ? `min-height: 46px; padding: 0 12px;` : "")}
+    ${(p) =>
+      p.$mobileSearchCompact
+        ? `
+      min-height: 46px;
+      padding: 6px 12px;
+      align-items: center;
+    `
+        : ""}
   }
 `;
 
@@ -634,6 +641,7 @@ const SubNavWrap = styled.div`
   @media (max-width: 767px) {
     font-size: 13px;
     max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 40px)")};
+    border-top: none;
     border-bottom: none;
   }
 `;
