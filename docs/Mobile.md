@@ -1,9 +1,8 @@
-22.04.
+23.04.
 
 SHOP APP MOBIL GÖRÜNÜMÜNÜ MOBILE APP GIBI GELISTIRECEGIZ. ILERIDE MOBILE APP DE YAPACAGIMIZ ICIN WEB VERSIYONU DA MOBILE APP GIBI GÖRÜNMELI ANCAK DESKTOP VERSIYONU ASLA BOZULMAMALI BEN "DESKTOP ICIN BU DEGISIKLIGI YAP" DEMEDIKCE. MOBILE VE TABLETE UYGUN RESPONSIVE TASARIM YAPACAGIZ.
 
-- Altta gözüken menüler sirasiyla söyle olsun: Home, Menü, Warenkorb, Merkzettel, Profil Icon.
-- Alltaki menü her zaman her yerde görünür olmali, sabit olmali. Mobil tarayicinin alttaki kismi yukari dogru cikarsa o da yukari cikmali tarayicinin altinda kalmamali.
+-- Alltaki menü her zaman her yerde görünür olmali, sabit olmali. (sepette, profilde, menüde) Mobil tarayicinin alttaki kismi yukari dogru cikarsa o da yukari cikmali tarayicinin altinda kalmamali.
 - Search bar her zaman her yerde görünür olmali. scroll down yapildiginda diger seylerin gözükmesine gerek yok sadece search bar gözüksün ince bir sekilde. scroll top yaptigimda diger header bilesenleri gözükecek. search bar arka plani belirledigimiz website renginde olacak ancak scroll downda biraz saydam bir görüntü olsun.
 - category menü acildigi zaman kategorien, menu ayri ayri gözüküyor. burada yalnizca kategoriler gözüksün. en altta mein konto itemleri gözükebilir. onun altindaki service suche bestseller kisimlari gözükmesin. kategorilerin yanlarinda kategorilere eklenen "Category image" kismi gözükmeli kücük kare seklinde. cok dar olmamali yani kategori satirlari.
 - bir kategori secildiginde o kategori sayfasina gitmeli kateogori sidebar acik kalmali. sidebarda subkategorileri gösterilmeli.
@@ -19,4 +18,4 @@ SHOP APP MOBIL GÖRÜNÜMÜNÜ MOBILE APP GIBI GELISTIRECEGIZ. ILERIDE MOBILE AP
 - mobile de product cardlar cok uzun, cok yer kapliyor. daha compact ve kisa yap. varyasyon seciciler iki satira kaymasin. tek satir olsun, kaydirilabilsin. ayrica cok dar duruyor. yan bosluklari biraz daha azalt daha genis dursunlar. 
 - product cardda görseller cok kücük duruyor ve arka planda duruyor. prdouct cardda en göze carpan sey görseller olmali ve görseller saga sola kaydirilabilmeli. üstüne gelinde ikinci görseli gösterme fonksiyonunu kaldirabiliriz yani. DESKTOP ICIN BU DEGISIKLIGI YAP. 
 
-BURAYA KADAR KONTROL
+BURAYA KADAR KONTROL-----------------------------------------

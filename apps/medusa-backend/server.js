@@ -782,6 +782,7 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS sellercentral_logo_height integer DEFAULT 30`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS platform_name text`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS support_email text`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS announcement_bar_items jsonb`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_banners (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -4112,6 +4113,9 @@ async function start() {
           : undefined
         const platform_name = body.platform_name !== undefined ? (body.platform_name ? String(body.platform_name).trim() : null) : undefined
         const support_email = body.support_email !== undefined ? (body.support_email ? String(body.support_email).trim() : null) : undefined
+        const announcement_bar_items = body.announcement_bar_items !== undefined
+          ? (Array.isArray(body.announcement_bar_items) ? body.announcement_bar_items : null)
+          : undefined
         if (free_shipping_thresholds) {
           free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
         }
@@ -4120,10 +4124,11 @@ async function start() {
         await client.connect()
         const thresholdsJson = free_shipping_thresholds ? JSON.stringify(free_shipping_thresholds) : null
         log.info('[sellerSettingsPATCH] saving free_shipping_thresholds:', thresholdsJson)
+        const announcementJson = announcement_bar_items !== undefined ? JSON.stringify(announcement_bar_items) : undefined
         await client.query(
           `INSERT INTO admin_hub_seller_settings (
-             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, updated_at
-           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, now())
+             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, updated_at
+           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, now())
            ON CONFLICT (seller_id) DO UPDATE SET
              store_name = COALESCE($2, admin_hub_seller_settings.store_name),
              free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds),
@@ -4135,8 +4140,9 @@ async function start() {
              sellercentral_logo_height = COALESCE($9, admin_hub_seller_settings.sellercentral_logo_height),
              platform_name = COALESCE($10, admin_hub_seller_settings.platform_name),
              support_email = COALESCE($11, admin_hub_seller_settings.support_email),
+             announcement_bar_items = COALESCE($12::jsonb, admin_hub_seller_settings.announcement_bar_items),
              updated_at = now()`,
-          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email]
+          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null]
         )
         await client.end()
         log.info('[sellerSettingsPATCH] saved OK')
@@ -4836,7 +4842,7 @@ async function start() {
         const { Client } = require('pg')
         const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
         await client.end()
         const row = r.rows && r.rows[0]
         const store_name = row && row.store_name != null ? String(row.store_name) : ''
@@ -4850,8 +4856,9 @@ async function start() {
         const sellercentral_favicon_url = row && row.sellercentral_favicon_url ? String(row.sellercentral_favicon_url) : ''
         const shop_logo_height = row && row.shop_logo_height != null ? Number(row.shop_logo_height) : 34
         const sellercentral_logo_height = row && row.sellercentral_logo_height != null ? Number(row.sellercentral_logo_height) : 30
+        const announcement_bar_items = Array.isArray(row && row.announcement_bar_items) ? row.announcement_bar_items : []
         log.info('[storeSellerSettingsGET] free_shipping_thresholds:', JSON.stringify(free_shipping_thresholds))
-        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height })
+        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items })
       } catch (err) {
         console.error('[storeSellerSettingsGET] error:', err && err.message)
         res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30 })

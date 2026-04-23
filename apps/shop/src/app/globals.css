@@ -144,6 +144,29 @@ a {
 }
 
 /* ══════════════════════════════════════════════════════
+   SHOP HEADER — mobile-only overrides
+   Bottom nav (MobileNav) handles cart/account/locale on ≤767px,
+   so we hide those icons from the header on mobile.
+   ══════════════════════════════════════════════════════ */
+
+@media (max-width: 767px) {
+  /* User dropdown panel (data-user-menu) — handled by bottom nav drawer */
+  [data-user-menu] {
+    display: none !important;
+  }
+
+  /* Logo: slightly smaller on mobile */
+  .shop-header-main img[alt="Shop logo"] {
+    max-height: 32px !important;
+  }
+
+  /* Search bar: full width, no left margin when compact */
+  .shop-header-main [class*="MiddleBarCenter"] {
+    margin-left: 0 !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
    MOBILE NAV — show/hide rules
    ══════════════════════════════════════════════════════ */
 

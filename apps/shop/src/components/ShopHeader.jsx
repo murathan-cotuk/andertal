@@ -107,6 +107,10 @@ const TopBarWrap = styled.div`
   opacity: ${(p) => (p.$visible ? 1 : 0)};
   transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
   pointer-events: ${(p) => (p.$visible ? "auto" : "none")};
+
+  @media (max-width: 767px) {
+    display: none !important;
+  }
 `;
 
 /* —— Middle bar: zooplus-style (full-width colored bar) —— */
@@ -217,6 +221,11 @@ const CategoriesDropdown = styled.div`
     p.$megaActive
       ? `@media (min-width: 1024px) { display: none; }`
       : ""}
+
+  /* On mobile the bottom nav handles menu; hide header hamburger */
+  @media (max-width: 767px) {
+    display: none !important;
+  }
 `;
 
 /* ── Mega menu nav (desktop only) ─────────────────────────── */
@@ -426,6 +435,9 @@ const MiddleBarIconBtn = styled.button`
 
 const MiddleBarCartBtn = styled(MiddleBarIconBtn)`
   position: relative;
+  @media (max-width: 767px) {
+    display: none !important;
+  }
 `;
 
 const MiddleBarCartBadge = styled.span`
@@ -446,7 +458,11 @@ const MiddleBarCartBadge = styled.span`
 
 
 /* Locale dropdown trigger – sadece ikon */
-const MiddleBarLocaleBtn = styled(MiddleBarIconBtn)``;
+const MiddleBarLocaleBtn = styled(MiddleBarIconBtn)`
+  @media (max-width: 767px) {
+    display: none !important;
+  }
+`;
 
 /* Full-width category mega panel — positioned absolute on HeaderWrap */
 const CategoryMegaPanel = styled.div`
@@ -611,6 +627,10 @@ const SubNavWrap = styled.div`
   font-weight: var(--second-nav-fw, 500);
   position: relative;
   z-index: 0;
+
+  @media (max-width: 767px) {
+    display: none !important;
+  }
 `;
 
 const SecondMenuRowInner = styled.div`
@@ -624,6 +644,16 @@ const SecondMenuRowInner = styled.div`
   justify-content: flex-start;
   font-size: 15px;
   min-height: 42px;
+
+  @media (max-width: 1023px) {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0 12px;
+    gap: 16px;
+    &::-webkit-scrollbar { display: none; }
+  }
 `;
 
 const SecondLink = styled(Link)`
@@ -635,6 +665,8 @@ const SecondLink = styled(Link)`
   display: inline-flex;
   align-items: center;
   line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &:hover {
     color: var(--second-nav-active, ${tokens.primary.DEFAULT});

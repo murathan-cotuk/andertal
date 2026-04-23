@@ -650,6 +650,7 @@ export default function StylesPage() {
     sellercentral_favicon_url: "",
     shop_logo_height: 34,
     sellercentral_logo_height: 30,
+    announcement_bar_items: [],
   });
   const [brandingSnapshot, setBrandingSnapshot] = useState(null);
   const [brandingPickerTarget, setBrandingPickerTarget] = useState(null);
@@ -670,6 +671,7 @@ export default function StylesPage() {
         sellercentral_favicon_url: settings?.sellercentral_favicon_url || "",
         shop_logo_height: settings?.shop_logo_height != null ? Number(settings.shop_logo_height) : 34,
         sellercentral_logo_height: settings?.sellercentral_logo_height != null ? Number(settings.sellercentral_logo_height) : 30,
+        announcement_bar_items: Array.isArray(settings?.announcement_bar_items) ? settings.announcement_bar_items : [],
       };
       setBranding(loadedBranding);
       setBrandingSnapshot(JSON.stringify(loadedBranding));
@@ -677,7 +679,7 @@ export default function StylesPage() {
       const merged = mergeLoadedShopStyles({});
       setStyles(merged);
       setSavedSnapshot(JSON.stringify(merged));
-      const emptyBranding = { shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "", shop_logo_height: 34, sellercentral_logo_height: 30 };
+      const emptyBranding = { shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "", shop_logo_height: 34, sellercentral_logo_height: 30, announcement_bar_items: [] };
       setBranding(emptyBranding);
       setBrandingSnapshot(JSON.stringify(emptyBranding));
     }
@@ -1079,6 +1081,94 @@ export default function StylesPage() {
                   autoComplete="off"
                 />
               </div>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        {/* Ankündigungs-Banner Inhalte */}
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Ankündigungs-Banner Inhalte</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Auf Mobilgeräten werden die Einträge einzeln angezeigt und wechseln alle 5 Sekunden. Auf dem Desktop sind alle sichtbar.
+              </Text>
+              <Divider />
+              <BlockStack gap="300">
+                {(branding.announcement_bar_items || []).map((item, idx) => (
+                  <div key={idx} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <TextField
+                        label={idx === 0 ? "Text" : undefined}
+                        placeholder="z.B. Kostenloser Versand ab 50 €"
+                        value={item.text || ""}
+                        onChange={(v) => {
+                          const next = [...(branding.announcement_bar_items || [])];
+                          next[idx] = { ...next[idx], text: v };
+                          setBranding((b) => ({ ...b, announcement_bar_items: next }));
+                        }}
+                        autoComplete="off"
+                      />
+                      <TextField
+                        label={idx === 0 ? "Link (href)" : undefined}
+                        placeholder="z.B. /shipping"
+                        value={item.href || ""}
+                        onChange={(v) => {
+                          const next = [...(branding.announcement_bar_items || [])];
+                          next[idx] = { ...next[idx], href: v };
+                          setBranding((b) => ({ ...b, announcement_bar_items: next }));
+                        }}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: 4, paddingTop: idx === 0 ? 22 : 0 }}>
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => {
+                          const next = [...(branding.announcement_bar_items || [])];
+                          [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                          setBranding((b) => ({ ...b, announcement_bar_items: next }));
+                        }}
+                        title="Nach oben"
+                        style={{ padding: "4px 8px", cursor: idx === 0 ? "default" : "pointer", opacity: idx === 0 ? 0.3 : 1, border: "1px solid #d1d5db", borderRadius: 4, background: "#f9fafb" }}
+                      >↑</button>
+                      <button
+                        type="button"
+                        disabled={idx === (branding.announcement_bar_items || []).length - 1}
+                        onClick={() => {
+                          const next = [...(branding.announcement_bar_items || [])];
+                          [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+                          setBranding((b) => ({ ...b, announcement_bar_items: next }));
+                        }}
+                        title="Nach unten"
+                        style={{ padding: "4px 8px", cursor: idx === (branding.announcement_bar_items || []).length - 1 ? "default" : "pointer", opacity: idx === (branding.announcement_bar_items || []).length - 1 ? 0.3 : 1, border: "1px solid #d1d5db", borderRadius: 4, background: "#f9fafb" }}
+                      >↓</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = (branding.announcement_bar_items || []).filter((_, i) => i !== idx);
+                          setBranding((b) => ({ ...b, announcement_bar_items: next }));
+                        }}
+                        title="Entfernen"
+                        style={{ padding: "4px 8px", cursor: "pointer", border: "1px solid #fca5a5", borderRadius: 4, background: "#fef2f2", color: "#dc2626" }}
+                      >✕</button>
+                    </div>
+                  </div>
+                ))}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = [...(branding.announcement_bar_items || []), { text: "", href: "" }];
+                      setBranding((b) => ({ ...b, announcement_bar_items: next }));
+                    }}
+                    style={{ padding: "6px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#f9fafb", cursor: "pointer", fontSize: 13 }}
+                  >
+                    + Eintrag hinzufügen
+                  </button>
+                </div>
+              </BlockStack>
             </BlockStack>
           </Card>
         </Layout.Section>

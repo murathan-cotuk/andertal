@@ -32,6 +32,7 @@ export async function GET(req) {
       sellercentral_favicon_url: data?.sellercentral_favicon_url || "",
       shop_logo_height: data?.shop_logo_height != null ? Number(data.shop_logo_height) : 34,
       sellercentral_logo_height: data?.sellercentral_logo_height != null ? Number(data.sellercentral_logo_height) : 30,
+      announcement_bar_items: Array.isArray(data?.announcement_bar_items) ? data.announcement_bar_items : [],
     };
     settingsCache.set(sellerId, { data: result, expiresAt: now + SETTINGS_TTL });
     return NextResponse.json(result, { status: r.ok ? 200 : r.status });

@@ -43,14 +43,12 @@ const css = {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
+    gap: 0,
     border: "none",
     background: "transparent",
     cursor: "pointer",
     padding: "0 4px",
     color: active ? TEAL : "#6b7280",
-    fontSize: 10,
-    fontWeight: active ? 700 : 500,
     fontFamily: "inherit",
     WebkitTapHighlightColor: "transparent",
     transition: "color 0.15s",
@@ -519,7 +517,6 @@ export default function MobileNav() {
         {/* Home */}
         <Link href="/" style={css.barBtn(isHome)} aria-label="Startseite">
           <IcoHome />
-          <span>Home</span>
         </Link>
 
         {/* Categories / Menu */}
@@ -531,7 +528,6 @@ export default function MobileNav() {
           aria-expanded={drawerOpen}
         >
           <IcoMenu />
-          <span>Menü</span>
         </button>
 
         {/* Warenkorb */}
@@ -547,7 +543,6 @@ export default function MobileNav() {
               <span style={css.cartBadge}>{itemCount > 99 ? "99+" : itemCount}</span>
             )}
           </div>
-          <span>Warenkorb</span>
         </button>
 
         {/* Merkzettel */}
@@ -558,7 +553,6 @@ export default function MobileNav() {
               <span style={css.cartBadge}>{wishlistCount > 99 ? "99+" : wishlistCount}</span>
             )}
           </div>
-          <span>Merkzettel</span>
         </Link>
 
         {/* Profil */}
@@ -573,7 +567,6 @@ export default function MobileNav() {
               <span style={{ ...css.cartBadge, background: "#22c55e", minWidth: 10, height: 10, top: -2, right: -4 }} />
             )}
           </div>
-          <span>Profil</span>
         </Link>
       </nav>
 

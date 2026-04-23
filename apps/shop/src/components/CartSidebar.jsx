@@ -13,9 +13,9 @@ import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-pri
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 
-/* Above ShopHeader (2147483600) and its dropdowns (2147483647) so Warenkorb is fully usable */
-const CART_Z_OVERLAY = 2147483700;
-const CART_Z_DRAWER = 2147483701;
+/* Above ShopHeader (2147483600) but below MobileNav bar (2147483640) so bar stays visible */
+const CART_Z_OVERLAY = 2147483636;
+const CART_Z_DRAWER = 2147483637;
 
 const Overlay = styled.div`
   position: fixed;
