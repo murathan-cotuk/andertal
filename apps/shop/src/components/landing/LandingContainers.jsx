@@ -132,47 +132,167 @@ function btnAlignSelf(justifyContent) {
 function HeroBanner({ container }) {
   const [current, setCurrent] = useState(0);
   const timerRef = useRef(null);
+  const touchRef = useRef({ x: 0, y: 0, dragging: false });
+  const isMobile = useIsNarrow(767);
   const slides = (container.slides || []).filter((s) => s.image);
   const height = container.height || "500px";
+  const mobileHeight = container.mobile_height || "200px";
 
-  const goTo = useCallback((idx) => {
-    setCurrent(idx);
+  const scheduleNext = useCallback((delay) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (container.autoplay !== false && slides.length > 1) {
-      timerRef.current = setTimeout(() => setCurrent((c) => (c + 1) % slides.length), container.delay || 4000);
+      timerRef.current = setTimeout(() => setCurrent((c) => (c + 1) % slides.length), delay || container.delay || 4000);
     }
   }, [slides.length, container.autoplay, container.delay]);
 
+  const goTo = useCallback((idx) => {
+    setCurrent(idx);
+    scheduleNext();
+  }, [scheduleNext]);
+
   useEffect(() => {
-    if (slides.length > 1 && container.autoplay !== false) {
-      timerRef.current = setTimeout(() => setCurrent((c) => (c + 1) % slides.length), container.delay || 4000);
-    }
+    scheduleNext();
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [current, slides.length, container.autoplay, container.delay]);
+  }, [current, scheduleNext]);
 
   if (slides.length === 0) return null;
 
+  // ── Touch handlers (mobile swipe) ──────────────────────────────────────────
+  const onTouchStart = (e) => {
+    touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, dragging: true };
+  };
+  const onTouchEnd = (e) => {
+    if (!touchRef.current.dragging) return;
+    touchRef.current.dragging = false;
+    const dx = e.changedTouches[0].clientX - touchRef.current.x;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchRef.current.y);
+    if (Math.abs(dx) > 40 && Math.abs(dx) > dy) {
+      goTo(dx < 0 ? (current + 1) % slides.length : (current - 1 + slides.length) % slides.length);
+    }
+  };
+
+  // ── Slide content overlay ──────────────────────────────────────────────────
+  function SlideOverlay({ s, posStyle, contentPad }) {
+    return (slide.title || slide.subtitle || slide.btn_text) ? (
+      <div style={{
+        position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+        padding: contentPad, pointerEvents: "none", ...posStyle,
+      }}>
+        {s.title && (
+          <h2 style={{
+            fontSize: isMobile ? "clamp(16px,5vw,28px)" : (s.title_size || "clamp(24px,4vw,56px)"),
+            fontWeight: 900, color: s.text_color || "#fff", margin: 0, lineHeight: 1.1,
+            marginBottom: s.subtitle ? 8 : (s.btn_text ? 12 : 0),
+          }}>{s.title}</h2>
+        )}
+        {s.subtitle && (
+          <p style={{
+            fontSize: isMobile ? "clamp(12px,3vw,16px)" : (s.subtitle_size || "clamp(14px,2vw,22px)"),
+            color: s.subtitle_color || s.text_color || "#fff",
+            margin: s.btn_text ? "0 0 12px" : 0, maxWidth: 600,
+          }}>{s.subtitle}</p>
+        )}
+        {s.btn_text && (
+          <a href={s.btn_url || "#"} style={{
+            pointerEvents: "auto", display: "inline-block",
+            padding: isMobile ? "8px 18px" : (s.btn_padding || "12px 28px"),
+            background: s.btn_bg || "#ff971c", color: s.btn_color || "#fff",
+            border: s.btn_border || "2px solid #000",
+            borderRadius: s.btn_radius || 8, fontWeight: 800,
+            fontSize: isMobile ? 13 : 15, textDecoration: "none",
+            boxShadow: "0 3px 0 2px #000",
+            alignSelf: btnAlignSelf(posStyle.justifyContent),
+          }}>{s.btn_text}</a>
+        )}
+      </div>
+    ) : null;
+  }
+
   const slide = slides[current];
   const posStyle = getPositionStyle(slide.text_position || "center");
-  const contentPad = slide.content_padding || "32px 48px";
+  const contentPad = isMobile ? "16px" : (slide.content_padding || "32px 48px");
 
+  // ── Dots ───────────────────────────────────────────────────────────────────
+  const Dots = slides.length > 1 ? (
+    <div style={{
+      position: "absolute", bottom: isMobile ? 10 : 16,
+      left: "50%", transform: "translateX(-50%)",
+      display: "flex", gap: isMobile ? 6 : 8, zIndex: 5,
+    }}>
+      {slides.map((_, i) => (
+        <button
+          key={i} type="button"
+          onClick={() => goTo(i)}
+          aria-label={`Slide ${i + 1}`}
+          aria-current={i === current ? "true" : undefined}
+          style={{
+            width: i === current ? (isMobile ? 20 : 24) : (isMobile ? 6 : 10),
+            height: isMobile ? 6 : 10,
+            borderRadius: isMobile ? 3 : 5,
+            border: "none", cursor: "pointer",
+            background: i === current ? "#ff971c" : "rgba(255,255,255,0.6)",
+            transition: "all .3s", padding: 0,
+          }}
+        />
+      ))}
+    </div>
+  ) : null;
+
+  // ── MOBILE: horizontal translateX carousel ─────────────────────────────────
+  if (isMobile) {
+    return (
+      <div style={getContainerPadding(container, "0px")}>
+        <div
+          style={{
+            position: "relative", width: "100%", height: mobileHeight,
+            overflow: "hidden", touchAction: "pan-y",
+            borderRadius: container.mobile_radius ? `${container.mobile_radius}px` : 0,
+          }}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          {/* Slide track */}
+          <div style={{
+            display: "flex", height: "100%",
+            transform: `translateX(-${current * 100}%)`,
+            transition: "transform 0.38s cubic-bezier(0.4,0,0.2,1)",
+            willChange: "transform",
+          }}>
+            {slides.map((s, i) => {
+              const inner = (
+                <>
+                  <img
+                    src={resolveUrl(s.image)} alt={s.title || ""}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", flexShrink: 0 }}
+                    draggable="false"
+                  />
+                  <SlideOverlay s={s} posStyle={getPositionStyle(s.text_position || "center")} contentPad="16px" />
+                </>
+              );
+              return s.btn_url ? (
+                <a key={i} href={s.btn_url} style={{ flexShrink: 0, width: "100%", height: "100%", display: "block", position: "relative" }}>{inner}</a>
+              ) : (
+                <div key={i} style={{ flexShrink: 0, width: "100%", height: "100%", position: "relative" }}>{inner}</div>
+              );
+            })}
+          </div>
+          {Dots}
+        </div>
+      </div>
+    );
+  }
+
+  // ── DESKTOP: original opacity cross-fade slider ────────────────────────────
   return (
     <div style={getContainerPadding(container, "0px 0px 0px 0px")}>
       <div style={getContentInnerStyle(container, 1600)}>
         <div style={{ position: "relative", width: "100%", height, overflow: "hidden" }}>
-          {/* Slides */}
           {slides.map((s, i) => {
-            const imgEl = (
-              <>
-                <img src={resolveUrl(s.image)} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              </>
-            );
+            const imgEl = <img src={resolveUrl(s.image)} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
             const wrapStyle = {
-              position: "absolute",
-              inset: 0,
+              position: "absolute", inset: 0,
               opacity: i === current ? 1 : 0,
               transition: "opacity 0.7s ease",
-              // Only the active slide can receive clicks; hidden slides must not block interactions.
               pointerEvents: i === current ? "auto" : "none",
             };
             return s.btn_url ? (
@@ -182,66 +302,47 @@ function HeroBanner({ container }) {
             );
           })}
 
-          {/* Text content */}
+          {/* Text overlay on active slide */}
           {(slide.title || slide.subtitle || slide.btn_text) && (
             <div style={{
               position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-              padding: contentPad, pointerEvents: "none",
-              ...posStyle,
+              padding: contentPad, pointerEvents: "none", ...posStyle,
             }}>
               {slide.title && (
                 <h2 style={{
                   fontSize: slide.title_size || "clamp(24px,4vw,56px)", fontWeight: 900,
                   color: slide.text_color || "#fff", margin: 0, lineHeight: 1.1,
                   marginBottom: slide.subtitle ? 12 : (slide.btn_text ? 20 : 0),
-                }}>
-                  {slide.title}
-                </h2>
+                }}>{slide.title}</h2>
               )}
               {slide.subtitle && (
                 <p style={{
                   fontSize: slide.subtitle_size || "clamp(14px,2vw,22px)",
                   color: slide.subtitle_color || slide.text_color || "#fff",
                   margin: slide.btn_text ? "0 0 20px" : 0, maxWidth: 600,
-                }}>
-                  {slide.subtitle}
-                </p>
+                }}>{slide.subtitle}</p>
               )}
               {slide.btn_text && (
-                <a
-                  href={slide.btn_url || "#"}
-                  style={{
-                    pointerEvents: "auto", display: "inline-block",
-                    padding: slide.btn_padding || "12px 28px",
-                    background: slide.btn_bg || "#ff971c",
-                    color: slide.btn_color || "#fff",
-                    border: slide.btn_border || "2px solid #000",
-                    borderRadius: slide.btn_radius || 8,
-                    fontWeight: 800, fontSize: 15, textDecoration: "none",
-                    boxShadow: "0 3px 0 2px #000",
-                    alignSelf: btnAlignSelf(posStyle.justifyContent),
-                  }}
-                >
-                  {slide.btn_text}
-                </a>
+                <a href={slide.btn_url || "#"} style={{
+                  pointerEvents: "auto", display: "inline-block",
+                  padding: slide.btn_padding || "12px 28px",
+                  background: slide.btn_bg || "#ff971c", color: slide.btn_color || "#fff",
+                  border: slide.btn_border || "2px solid #000",
+                  borderRadius: slide.btn_radius || 8, fontWeight: 800, fontSize: 15,
+                  textDecoration: "none", boxShadow: "0 3px 0 2px #000",
+                  alignSelf: btnAlignSelf(posStyle.justifyContent),
+                }}>{slide.btn_text}</a>
               )}
             </div>
           )}
 
-          {/* Dots */}
-          {slides.length > 1 && (
-            <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8, zIndex: 5 }}>
-              {slides.map((_, i) => (
-                <button key={i} type="button" onClick={() => goTo(i)} aria-label={`Slide ${i + 1}`} aria-current={i === current ? "true" : undefined} style={{ width: i === current ? 24 : 10, height: 10, borderRadius: 5, border: "none", cursor: "pointer", background: i === current ? "#ff971c" : "rgba(255,255,255,0.6)", transition: "all .3s", padding: 0 }} />
-              ))}
-            </div>
-          )}
+          {Dots}
 
-          {/* Arrows */}
+          {/* Arrows — desktop only */}
           {slides.length > 1 && (
             <>
-              <button type="button" aria-label="Vorherige Folie" onClick={() => goTo((current - 1 + slides.length) % slides.length)} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }} aria-hidden="false">‹</button>
-              <button type="button" aria-label="Nächste Folie" onClick={() => goTo((current + 1) % slides.length)} style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }} aria-hidden="false">›</button>
+              <button type="button" aria-label="Vorherige Folie" onClick={() => goTo((current - 1 + slides.length) % slides.length)} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>‹</button>
+              <button type="button" aria-label="Nächste Folie" onClick={() => goTo((current + 1) % slides.length)} style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>›</button>
             </>
           )}
         </div>

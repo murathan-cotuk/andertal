@@ -458,7 +458,10 @@ const MiddleBarCartBadge = styled.span`
 
 
 /* Locale dropdown trigger – sadece ikon */
-const MiddleBarLocaleBtn = styled(MiddleBarIconBtn)`
+const MiddleBarLocaleBtn = styled(MiddleBarIconBtn)``;
+
+/* User dropdown — hidden on mobile (bottom nav handles account) */
+const MiddleBarUserWrap = styled.div`
   @media (max-width: 767px) {
     display: none !important;
   }
@@ -629,7 +632,8 @@ const SubNavWrap = styled.div`
   z-index: 0;
 
   @media (max-width: 767px) {
-    display: none !important;
+    font-size: 13px;
+    max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 40px)")};
   }
 `;
 
@@ -1292,16 +1296,18 @@ export default function ShopHeader() {
                   </div>
                 </LocaleDropdown>
               </LocaleCurrencyWrap>
-              <UserDropdownPanel
-                layoutAnchorRef={middleBarRef}
-                isAuthenticated={isAuthenticated}
-                user={user}
-                onLogout={() => {
-                  document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax";
-                  logout();
-                }}
-                onOpen={() => { setLocaleDropdownOpen(false); setMainMenuOpen(false); }}
-              />
+              <MiddleBarUserWrap>
+                <UserDropdownPanel
+                  layoutAnchorRef={middleBarRef}
+                  isAuthenticated={isAuthenticated}
+                  user={user}
+                  onLogout={() => {
+                    document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax";
+                    logout();
+                  }}
+                  onOpen={() => { setLocaleDropdownOpen(false); setMainMenuOpen(false); }}
+                />
+              </MiddleBarUserWrap>
               <MiddleBarCartBtn type="button" onClick={openCartSidebar} title="Warenkorb" aria-label="Warenkorb">
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path fillRule="evenodd" clipRule="evenodd" d="M1 2.75C1 2.33579 1.33579 2 1.75 2H2.27029C3.34283 2 4.26626 2.75703 4.4766 3.80874L4.71485 5H20.2676C21.3791 5 22.209 6.02281 21.98 7.11052L20.5682 13.8165C20.3003 15.0891 19.1777 16 17.8772 16H7.63961C6.32874 16 5.20009 15.0747 4.94301 13.7893L3.00573 4.10291C2.93562 3.75234 2.6278 3.5 2.27029 3.5H1.75C1.33579 3.5 1 3.16421 1 2.75ZM6 19C6 17.8954 6.89543 17 8 17C9.10457 17 10 17.8954 10 19C10 20.1046 9.10457 21 8 21C6.89543 21 6 20.1046 6 19ZM15 19C15 17.8954 15.8954 17 17 17C18.1046 17 19 17.8954 19 19C19 20.1046 18.1046 21 17 21C15.8954 21 15 20.1046 15 19Z" />

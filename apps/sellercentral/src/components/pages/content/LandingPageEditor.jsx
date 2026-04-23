@@ -332,6 +332,7 @@ function ColorField({ label, value, onChange }) {
 // ── Hero Banner editor ──────────────────────────────────────────────────────
 function HeroBannerEditor({ container, onChange }) {
   const [pickerIdx, setPickerIdx] = useState(null);
+  const [settingsTab, setSettingsTab] = useState(0);
 
   const updateSlide = (idx, key, val) => {
     const slides = [...(container.slides || [])];
@@ -352,6 +353,13 @@ function HeroBannerEditor({ container, onChange }) {
     onChange({ ...container, slides });
   };
 
+  const MOBILE_RADIUS_OPTIONS = [
+    { label: "Eckig (0px)", value: "0" },
+    { label: "Leicht gerundet (8px)", value: "8" },
+    { label: "Gerundet (12px)", value: "12" },
+    { label: "Stark gerundet (20px)", value: "20" },
+  ];
+
   return (
     <BlockStack gap="400">
       {pickerIdx !== null && (
@@ -361,19 +369,52 @@ function HeroBannerEditor({ container, onChange }) {
       <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">Slider-Einstellungen</Text>
-          <InlineStack gap="400" wrap={false}>
-            <div style={{ flex: 1 }}>
-              <TextField label="Höhe" value={container.height || "500px"} onChange={(v) => onChange({ ...container, height: v })} helpText="z.B. 500px, 60vh" autoComplete="off" />
+          <PolarisTabs
+            tabs={[
+              { id: "desktop", content: "🖥 Desktop" },
+              { id: "mobile",  content: "📱 Mobil" },
+            ]}
+            selected={settingsTab}
+            onSelect={setSettingsTab}
+            fitted
+          >
+            <div style={{ paddingTop: 16 }}>
+              {settingsTab === 0 && (
+                <BlockStack gap="300">
+                  <InlineStack gap="400" wrap={false}>
+                    <div style={{ flex: 1 }}>
+                      <TextField label="Höhe (Desktop)" value={container.height || "500px"} onChange={(v) => onChange({ ...container, height: v })} helpText="z.B. 500px, 60vh" autoComplete="off" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Select label="Autoplay" options={[{ label: "An", value: "true" }, { label: "Aus", value: "false" }]} value={container.autoplay !== false ? "true" : "false"} onChange={(v) => onChange({ ...container, autoplay: v === "true" })} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <TextField label="Verzögerung (ms)" type="number" value={String(container.delay || 4000)} onChange={(v) => onChange({ ...container, delay: Number(v) || 4000 })} autoComplete="off" />
+                    </div>
+                  </InlineStack>
+                  <PaddingEditor label="Seitenabstand" value={container.padding || "0px 0px 0px 0px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="0px 0px 0px 0px" horizontalOnly />
+                  <ContainerLayoutEditor container={container} onChange={onChange} />
+                </BlockStack>
+              )}
+              {settingsTab === 1 && (
+                <BlockStack gap="300">
+                  <InlineStack gap="400" wrap={false}>
+                    <div style={{ flex: 1 }}>
+                      <TextField label="Höhe (Mobil)" value={container.mobile_height || "200px"} onChange={(v) => onChange({ ...container, mobile_height: v })} helpText="z.B. 200px, 40vw" autoComplete="off" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Select
+                        label="Ecken (Mobil)"
+                        options={MOBILE_RADIUS_OPTIONS}
+                        value={String(container.mobile_radius ?? "0")}
+                        onChange={(v) => onChange({ ...container, mobile_radius: v === "0" ? 0 : Number(v) })}
+                      />
+                    </div>
+                  </InlineStack>
+                </BlockStack>
+              )}
             </div>
-            <div style={{ flex: 1 }}>
-              <Select label="Autoplay" options={[{ label: "An", value: "true" }, { label: "Aus", value: "false" }]} value={container.autoplay !== false ? "true" : "false"} onChange={(v) => onChange({ ...container, autoplay: v === "true" })} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <TextField label="Verzögerung (ms)" type="number" value={String(container.delay || 4000)} onChange={(v) => onChange({ ...container, delay: Number(v) || 4000 })} autoComplete="off" />
-            </div>
-          </InlineStack>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "0px 0px 0px 0px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="0px 0px 0px 0px" horizontalOnly />
-          <ContainerLayoutEditor container={container} onChange={onChange} />
+          </PolarisTabs>
         </BlockStack>
       </Card>
 
