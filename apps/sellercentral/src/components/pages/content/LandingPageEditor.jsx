@@ -117,6 +117,7 @@ const CONTAINER_TYPES = [
   { type: "text_block",          label: "Text-Block",            description: "Überschrift, Fließtext (HTML) und optionaler Button" },
   { type: "image_text",          label: "Bild + Text",           description: "Bild links oder rechts, Text (HTML) daneben" },
   { type: "image_grid",          label: "Bild-Raster",           description: "2–4 Bilder nebeneinander mit Seitenverhältnis-Auswahl" },
+  { type: "image_carousel",      label: "Bild-Karussell",        description: "Scrollbares Karussell mit eigenen Bildern (wie Produkt-Karussell)" },
   { type: "banner_cta",          label: "CTA-Banner",            description: "Farbiger Banner mit Handlungsaufforderung und Positionierung" },
   { type: "collection_carousel", label: "Kollektion-Karussell",  description: "Produkte einer Kollektion als Karussell" },
   { type: "collections_carousel", label: "Kollektionen-Karussell", description: "Mehrere Kollektionen als anklickbare Karten nebeneinander" },
@@ -156,6 +157,7 @@ function normalizeLandingPageSettings(raw) {
     ...s,
     show_submenu_left: s.show_submenu_left === true,
     show_filter_bar: s.show_filter_bar !== false,
+    page_padding_top: s.page_padding_top || "",
   };
 }
 
@@ -171,6 +173,8 @@ function newContainer(type) {
       return { ...base, image: "", title: "", body: "", btn_text: "", btn_url: "", image_side: "left", bg_color: "#ffffff", text_color: "#111827", text_align: "left", padding: "48px 24px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "image_grid":
       return { ...base, images: [{ url: "", link: "", aspect_ratio: "1/1" }, { url: "", link: "", aspect_ratio: "1/1" }], cols: 2, gap: 16, padding: "32px 24px", content_layout: "full" };
+    case "image_carousel":
+      return { ...base, title: "", images: [{ url: "", link: "", aspect_ratio: "4/5" }, { url: "", link: "", aspect_ratio: "4/5" }], items_per_row: 4, items_per_row_mobile: 2, gap: 16, padding: "32px 24px", content_layout: "full" };
     case "banner_cta":
       return { ...base, title: "", subtitle: "", btn_text: "", btn_url: "", bg_color: "#ff971c", text_color: "#ffffff", text_position: "center", padding: "32px 48px 40px 48px", btn_bg: "#ffffff", btn_color: "#111827", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "collection_carousel":
@@ -671,6 +675,62 @@ function ImageGridEditor({ container, onChange }) {
             </InlineStack>
             <TextField label="Überschrift (optional)" value={img.title || ""} onChange={(v) => updateImg(idx, "title", v)} autoComplete="off" placeholder="z. B. Neuheiten" />
             <RichTextEditor label="Text (optional)" value={img.text || ""} onChange={(v) => updateImg(idx, "text", v)} placeholder="Text eingeben…" minHeight="160px" />
+          </BlockStack>
+        </Card>
+      ))}
+      <Button onClick={addImg}>+ Bild hinzufügen</Button>
+    </BlockStack>
+  );
+}
+
+// ── Image Carousel editor ───────────────────────────────────────────────────
+function ImageCarouselEditor({ container, onChange }) {
+  const [pickerIdx, setPickerIdx] = useState(null);
+  const updateImg = (idx, key, val) => {
+    const images = [...(container.images || [])];
+    images[idx] = { ...images[idx], [key]: val };
+    onChange({ ...container, images });
+  };
+  const addImg = () => onChange({ ...container, images: [...(container.images || []), { url: "", link: "", aspect_ratio: "4/5" }] });
+  const removeImg = (idx) => onChange({ ...container, images: (container.images || []).filter((_, i) => i !== idx) });
+
+  return (
+    <BlockStack gap="400">
+      {pickerIdx !== null && (
+        <MediaPickerModal open multiple={false} onClose={() => setPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateImg(pickerIdx, "url", urls[0]); setPickerIdx(null); }} />
+      )}
+      <TextField label="Titel (optional)" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" placeholder="z. B. Unsere Kollektionen" />
+      <InlineStack gap="400" wrap={false}>
+        <div style={{ flex: 1 }}>
+          <TextField label="Bilder pro Zeile (Desktop)" type="number" value={String(container.items_per_row || 4)} onChange={(v) => onChange({ ...container, items_per_row: Number(v) || 4 })} autoComplete="off" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <TextField label="Bilder pro Zeile (Mobil)" type="number" value={String(container.items_per_row_mobile || 2)} onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) || 2 })} autoComplete="off" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <TextField label="Abstand (px)" type="number" value={String(container.gap || 16)} onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })} autoComplete="off" />
+        </div>
+      </InlineStack>
+      <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
+      <ContainerLayoutEditor container={container} onChange={onChange} />
+      {(container.images || []).map((img, idx) => (
+        <Card key={idx}>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingSm">Bild {idx + 1}</Text>
+              {(container.images || []).length > 1 && (
+                <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
+              )}
+            </InlineStack>
+            <ImageField value={img.url} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
+            <InlineStack gap="400" wrap={false}>
+              <div style={{ flex: 1 }}>
+                <TextField label="Link-URL (optional)" value={img.link || ""} onChange={(v) => updateImg(idx, "link", v)} placeholder="https://…" autoComplete="off" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Select label="Seitenverhältnis" options={ASPECT_RATIO_OPTIONS} value={img.aspect_ratio || "4/5"} onChange={(v) => updateImg(idx, "aspect_ratio", v)} />
+              </div>
+            </InlineStack>
           </BlockStack>
         </Card>
       ))}
@@ -1644,6 +1704,7 @@ function ContainerEditor({ container, onChange }) {
     case "text_block":           editor = <TextBlockEditor container={container} onChange={onChange} />; break;
     case "image_text":           editor = <ImageTextEditor container={container} onChange={onChange} />; break;
     case "image_grid":           editor = <ImageGridEditor container={container} onChange={onChange} />; break;
+    case "image_carousel":       editor = <ImageCarouselEditor container={container} onChange={onChange} />; break;
     case "banner_cta":           editor = <BannerCtaEditor container={container} onChange={onChange} />; break;
     case "collection_carousel":  editor = <CollectionCarouselEditor container={container} onChange={onChange} />; break;
     case "collections_carousel": editor = <CollectionsCarouselEditor container={container} onChange={onChange} />; break;
@@ -1857,7 +1918,7 @@ export default function LandingPageEditor() {
   const matchContainerSeitenTab = (c, tab) => {
     const v = c.visible_on || "both";
     if (tab === 0) return v === "both" || v === "desktop";
-    return v === "both" || v === "mobile";
+    return v === "mobile";
   };
 
   const filteredSeitenContainers = useMemo(() => {
@@ -1881,7 +1942,7 @@ export default function LandingPageEditor() {
     setIsDirty(true);
   };
 
-  /** Duplicate a container to the Mobile tab with mobile-friendly overrides. */
+  /** Duplicate a container to the Mobile tab. Original becomes desktop-only; copy becomes mobile-only. */
   const duplicateToMobile = (srcId) => {
     const src = containers.find((c) => c.id === srcId);
     if (!src) return;
@@ -1889,13 +1950,34 @@ export default function LandingPageEditor() {
       ...src,
       id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       visible_on: "mobile",
-      ...(["collection_carousel", "collections_carousel", "blog_carousel"].includes(src.type)
+      ...(["collection_carousel", "collections_carousel", "blog_carousel", "image_carousel"].includes(src.type)
         ? { items_per_row: 2, items_per_row_mobile: 2 }
         : {}),
     };
-    setContainers((prev) => [...prev, copy]);
+    setContainers((prev) => [
+      ...prev.map((c) => c.id === srcId ? { ...c, visible_on: "desktop" } : c),
+      copy,
+    ]);
     setExpandedId(copy.id);
     setSeitenDeviceTab(1);
+    setIsDirty(true);
+  };
+
+  /** Duplicate a container to the Desktop tab. Original becomes mobile-only; copy becomes desktop-only. */
+  const duplicateToDesktop = (srcId) => {
+    const src = containers.find((c) => c.id === srcId);
+    if (!src) return;
+    const copy = {
+      ...src,
+      id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      visible_on: "desktop",
+    };
+    setContainers((prev) => [
+      ...prev.map((c) => c.id === srcId ? { ...c, visible_on: "mobile" } : c),
+      copy,
+    ]);
+    setExpandedId(copy.id);
+    setSeitenDeviceTab(0);
     setIsDirty(true);
   };
 
@@ -2029,6 +2111,17 @@ export default function LandingPageEditor() {
                           setIsDirty(true);
                         }}
                       />
+                      <TextField
+                        label="Abstand Header → erste Sektion (page_padding_top)"
+                        helpText="Steuert den oberen Abstand des Landing-Page-Bereichs direkt unter der Navigation. z. B. '0px', '8px', '24px'. Leer lassen für Standard."
+                        value={categorySettings.page_padding_top || ""}
+                        onChange={(v) => {
+                          setCategorySettings((prev) => ({ ...prev, page_padding_top: v }));
+                          setIsDirty(true);
+                        }}
+                        autoComplete="off"
+                        placeholder="0px"
+                      />
                     </BlockStack>
                   )}
 
@@ -2047,11 +2140,11 @@ export default function LandingPageEditor() {
                               selected={seitenDeviceTab}
                               onSelect={setSeitenDeviceTab}
                             />
-                            <Box paddingBlockStart="300">
-                              <Text as="p" variant="bodySm" tone="subdued">
+                            <Box paddingBlockStart=”300”>
+                              <Text as=”p” variant=”bodySm” tone=”subdued”>
                                 {seitenDeviceTab === 0
-                                  ? "Hier: Container nur für den Desktop-Viewport (ab ca. 1024px) und Blöcke mit „alle Viewports“. „Container hinzufügen“ legt standardmäßig einen Desktop-Block an."
-                                  : "Hier: Container nur für den schmalen Viewport (max. 1023px) und Blöcke mit „alle Viewports“. Neu angelegt = nur Mobil. „Alle Viewports“ erscheinen in beiden Reitern."}
+                                  ? “Desktop-Container (ab ca. 1024px). Änderungen hier betreffen nur den Desktop. Klicke „📱 Mobil”, um eine unabhängige Mobilversion zu erstellen.”
+                                  : “Mobil-Container (max. 1023px). Änderungen hier betreffen nur Mobilgeräte. Klicke „🖥 Desktop”, um eine unabhängige Desktop-Version zu erstellen.”}
                               </Text>
                             </Box>
                           </Card>
@@ -2072,10 +2165,10 @@ export default function LandingPageEditor() {
                           )}
 
                           {containers.length > 0 && filteredSeitenContainers.length === 0 && (
-                            <Banner tone="info">
+                            <Banner tone=”info”>
                               {seitenDeviceTab === 0
-                                ? "Für den Desktop-Reiter sind keine passenden Container vorhanden. Wechsel zu „Mobil“, lege mit „+ Container“ einen an, oder stelle in einem Block unter Abstände die Sichtbarkeit auf „Überall“ / „Nur Desktop“."
-                                : "Für den Mobil-Reiter sind keine passenden Container vorhanden. Wechsel zu „Desktop“, füge einen an, oder nutze in den Abständen die Sichtbarkeit „Nur Mobil“ bzw. „Überall“."}
+                                ? “Keine Desktop-Container vorhanden. Lege einen an oder wechsle zu „Mobil” und nutze „🖥 Desktop” um einen aus einer Mobilversion zu erstellen.”
+                                : “Keine Mobil-Container vorhanden. Wechsle zu „Desktop” und klicke „📱 Mobil” bei einem Container, um eine unabhängige Mobilversion zu erstellen.”}
                             </Banner>
                           )}
 
@@ -2106,6 +2199,9 @@ export default function LandingPageEditor() {
                                         <Button size="slim" disabled={last} onClick={() => moveContainerInSeitenTab(c.id, 1)}>↓</Button>
                                         {seitenDeviceTab === 0 && (
                                           <Button size="slim" onClick={() => duplicateToMobile(c.id)} accessibilityLabel="Für Mobil duplizieren">📱 Mobil</Button>
+                                        )}
+                                        {seitenDeviceTab === 1 && (
+                                          <Button size="slim" onClick={() => duplicateToDesktop(c.id)} accessibilityLabel="Für Desktop duplizieren">🖥 Desktop</Button>
                                         )}
                                         <Button size="slim" tone="critical" onClick={() => { if (confirm("Container entfernen?")) removeContainer(c.id); }}>Entfernen</Button>
                                         <Button size="slim" variant={isExpanded ? "primary" : "secondary"} onClick={() => setExpandedId(isExpanded ? null : c.id)}>

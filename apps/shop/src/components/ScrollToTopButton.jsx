@@ -3,6 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 
+/** align with `HEADER_NARROW_MQ` in ShopHeader — no floating chrome on phone/tablet */
+const HIDE_BELOW_PX = 1023;
+
 const Button = styled.button`
   position: fixed;
   right: 24px;
@@ -23,6 +26,10 @@ const Button = styled.button`
   &:focus-visible {
     outline: 2px solid var(--shop-primary, #ff971c);
     outline-offset: 3px;
+  }
+
+  @media (max-width: ${HIDE_BELOW_PX}px) {
+    display: none;
   }
 `;
 

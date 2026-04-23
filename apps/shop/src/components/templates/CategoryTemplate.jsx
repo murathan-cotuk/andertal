@@ -632,6 +632,16 @@ export default function CategoryTemplate() {
     setPage(1);
   }, [slug]);
 
+  // Mobile: auto-open sidebar when navigating from a category link
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(max-width: 767px)").matches) return;
+    if (sessionStorage.getItem("cat_nav_open") === "1") {
+      sessionStorage.removeItem("cat_nav_open");
+      setPanelOpen(true);
+    }
+  }, []);
+
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
@@ -965,7 +975,7 @@ export default function CategoryTemplate() {
                               key={sub.id}
                               href={subSlug ? `/${subSlug}` : "#"}
                               $active={false}
-                              onClick={() => { setFilters({}); setPage(1); }}
+                              onClick={() => { setFilters({}); setPage(1); sessionStorage.setItem("cat_nav_open", "1"); }}
                             >
                               {sub.name || sub.slug}
                             </SubcategoryLink>
@@ -1000,7 +1010,7 @@ export default function CategoryTemplate() {
                               key={sibling.id}
                               href={sibSlug ? `/${sibSlug}` : "#"}
                               $active={isCurrent}
-                              onClick={() => { setFilters({}); setPage(1); }}
+                              onClick={() => { setFilters({}); setPage(1); if (!isCurrent) sessionStorage.setItem("cat_nav_open", "1"); }}
                             >
                               {sibling.name || sibling.slug}
                             </SubcategoryLink>

@@ -1347,6 +1347,44 @@ function Testimonials({ container }) {
   );
 }
 
+// ── Image Carousel ────────────────────────────────────────────────────────────
+function ImageCarousel({ container }) {
+  const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
+  const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
+  const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
+  const images = (container.images || []).filter((i) => i.url);
+  if (!images.length) return null;
+  const gap = container.gap || 16;
+  const bg = container.bg_color || "#fff";
+  return (
+    <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
+      <div style={getContentInnerStyle(container, 1280)}>
+        <Carousel
+          contained={false}
+          title={container.title?.trim() ? container.title : undefined}
+          visibleCount={itemsPerRow}
+          navOnSides
+          gap={gap}
+          ariaLabel={container.title?.trim() || "Bild-Karussell"}
+        >
+          {images.map((img, i) => {
+            const src = resolveUrl(img.url);
+            const ratio = img.aspect_ratio || "4/5";
+            const card = (
+              <div style={{ width: "100%", aspectRatio: ratio, overflow: "hidden", borderRadius: 12, background: "#f3f4f6" }}>
+                <img src={src} alt={img.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              </div>
+            );
+            return img.link
+              ? <a key={i} href={img.link} style={{ display: "block", textDecoration: "none" }}>{card}</a>
+              : <div key={i}>{card}</div>;
+          })}
+        </Carousel>
+      </div>
+    </div>
+  );
+}
+
 // ── Renderer ──────────────────────────────────────────────────────────────────
 function renderContainer(c, preload = {}, ctx = {}) {
   if (!c.visible) return null;
@@ -1361,6 +1399,7 @@ function renderContainer(c, preload = {}, ctx = {}) {
     case "text_block":           inner = <TextBlock container={c} />; break;
     case "image_text":           inner = <ImageText container={c} />; break;
     case "image_grid":           inner = <ImageGrid container={c} />; break;
+    case "image_carousel":       inner = <ImageCarousel container={c} />; break;
     case "banner_cta":           inner = <BannerCta container={c} />; break;
     case "collection_carousel":  inner = <CollectionCarousel container={c} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
     case "collections_carousel": inner = <CollectionsCarousel container={c} />; break;
@@ -1388,6 +1427,7 @@ function renderContainer(c, preload = {}, ctx = {}) {
 export default function LandingContainers({ pageId, categoryId }) {
   const [containers, setContainers] = useState(null);
   const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
+  const [pagePaddingTop, setPagePaddingTop] = useState("");
   const { setLandingHeaderFilterBar } = useLandingChrome();
   const isNarrow = useIsNarrow(1023);
 
@@ -1404,11 +1444,13 @@ export default function LandingContainers({ pageId, categoryId }) {
       .then((data) => {
         const showBar = data?.settings?.show_filter_bar !== false;
         setLandingHeaderFilterBar(showBar);
+        setPagePaddingTop(data?.settings?.page_padding_top || "");
         if (Array.isArray(data?.containers)) setContainers(data.containers);
         else setContainers([]);
       })
       .catch(() => {
         setLandingHeaderFilterBar(true);
+        setPagePaddingTop("");
         setContainers([]);
       });
   }, [pageId, categoryId, setLandingHeaderFilterBar]);
@@ -1473,7 +1515,7 @@ export default function LandingContainers({ pageId, categoryId }) {
   if (containers.length === 0) return null;
 
   return (
-    <div>
+    <div style={pagePaddingTop ? { paddingTop: pagePaddingTop } : undefined}>
       {containers.map((c) => renderContainer(c, preload, { isNarrow }))}
     </div>
   );

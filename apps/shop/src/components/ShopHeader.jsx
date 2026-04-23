@@ -545,6 +545,46 @@ const CategoryMegaBtnLink = styled.button`
   }
 `;
 
+const CategoryMegaSidebarCol = styled.div`
+  flex-shrink: 0;
+  width: 200px;
+  border-right: 1px solid #e8e8e6;
+  padding-right: 12px;
+  margin-right: 12px;
+  display: flex;
+  flex-direction: column;
+`;
+
+const CategoryMegaRootLink = styled(Link)`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-family: ${tokens.fontFamily.sans};
+  color: ${(p) => (p.$active ? "var(--shop-primary, " + tokens.primary.DEFAULT + ")" : tokens.dark[700])};
+  font-weight: ${(p) => (p.$active ? 600 : 400)};
+  background: ${(p) => (p.$active ? tokens.background.soft : "transparent")};
+  text-decoration: none;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: background 0.13s ease, color 0.13s ease;
+  cursor: pointer;
+
+  &:hover {
+    background: ${tokens.background.soft};
+    color: var(--shop-primary, ${tokens.primary.DEFAULT});
+  }
+`;
+
+const CategoryMegaSubCols = styled.div`
+  flex: 1;
+  display: flex;
+  gap: 0 8px;
+  overflow-x: auto;
+  align-content: flex-start;
+`;
+
 
 /* Keep for minimal bar & dropdowns */
 const Right = styled.div`
@@ -625,8 +665,6 @@ const SubNavWrap = styled.div`
   width: 100%;
   max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 50px)")};
   background: var(--second-nav-bg, #f0f0f0);
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   overflow: hidden;
   opacity: ${(p) => (p.$hide ? 0 : 1)};
   transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
@@ -638,11 +676,14 @@ const SubNavWrap = styled.div`
   position: relative;
   z-index: 0;
 
+  @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
   @media (max-width: 767px) {
     font-size: 13px;
     max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 40px)")};
-    border-top: none;
-    border-bottom: none;
   }
 `;
 
@@ -684,6 +725,13 @@ const SecondLink = styled(Link)`
   &:hover {
     color: var(--second-nav-active, ${tokens.primary.DEFAULT});
     text-decoration: underline;
+  }
+
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    &:hover,
+    &:active {
+      text-decoration: none;
+    }
   }
 `;
 
@@ -1016,7 +1064,7 @@ export default function ShopHeader() {
         id: String(n.id),
         label: n.name || n.slug || "",
         slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
-        hasChildren: false,
+        hasChildren: Array.isArray(n.children) && n.children.some((c) => c && c.has_products !== false),
         node: n,
       }))
       .filter((r) => r.slug)

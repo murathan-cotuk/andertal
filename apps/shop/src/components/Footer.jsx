@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 
@@ -61,12 +61,19 @@ const Grid = styled.div`
   grid-template-columns: repeat(${(p) => p.$columns || 4}, 1fr);
   gap: 32px;
   margin-bottom: 32px;
+  @media (max-width: 767px) {
+    display: block;
+    margin-bottom: 0;
+  }
 `;
 
 const Column = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
+  @media (max-width: 767px) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  }
 `;
 
 const Title = styled.h3`
@@ -74,6 +81,54 @@ const Title = styled.h3`
   font-weight: 600;
   margin-bottom: 4px;
   color: var(--footer-text, #ffffff);
+`;
+
+const AccordionHeader = styled.button`
+  display: none;
+  @media (max-width: 767px) {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    background: none;
+    border: none;
+    padding: 16px 0;
+    color: var(--footer-text, #ffffff);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+`;
+
+const AccordionChevron = styled.span`
+  display: inline-block;
+  transition: transform 0.25s ease;
+  transform: ${(p) => (p.$open ? "rotate(180deg)" : "rotate(0deg)")};
+  font-style: normal;
+  font-size: 12px;
+  flex-shrink: 0;
+`;
+
+const AccordionLinks = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  @media (max-width: 767px) {
+    display: block;
+    overflow: hidden;
+    max-height: ${(p) => (p.$open ? "400px" : "0")};
+    transition: max-height 0.3s ease;
+    padding-bottom: ${(p) => (p.$open ? "12px" : "0")};
+  }
+`;
+
+const DesktopTitle = styled(Title)`
+  @media (max-width: 767px) {
+    display: none;
+  }
 `;
 
 const FooterLink = styled(Link)`
@@ -124,6 +179,7 @@ const FOOTER_LOCATIONS = ["footer1", "footer2", "footer3", "footer4"];
 
 export default function Footer() {
   const [footerColumns, setFooterColumns] = useState([]);
+  const [openSections, setOpenSections] = useState({});
 
   useEffect(() => {
     fetch("/api/store-menus")
@@ -141,26 +197,48 @@ export default function Footer() {
       .catch(() => setFooterColumns([]));
   }, []);
 
+  const toggle = useCallback((loc) => {
+    setOpenSections((prev) => ({ ...prev, [loc]: !prev[loc] }));
+  }, []);
+
   return (
     <FooterContainer className="site-footer">
       <Container>
         {footerColumns.length > 0 && (
           <Grid $columns={4}>
-            {footerColumns.map(({ location, menu, items }) => (
-              <Column key={location}>
-                <Title>{menu?.name || " "}</Title>
-                {items.length > 0 ? (
-                  items.map((item) => (
-                    <FooterLink key={item.id} href={menuItemHref(item)}>{item.label}</FooterLink>
-                  ))
-                ) : (
-                  menu ? <Placeholder>Keine Einträge</Placeholder> : null
-                )}
-              </Column>
-            ))}
+            {footerColumns.map(({ location, menu, items }) => {
+              const isOpen = !!openSections[location];
+              const name = menu?.name || " ";
+              return (
+                <Column key={location}>
+                  {/* Desktop: plain title */}
+                  <DesktopTitle>{name}</DesktopTitle>
+
+                  {/* Mobile: accordion toggle */}
+                  <AccordionHeader
+                    type="button"
+                    onClick={() => toggle(location)}
+                    aria-expanded={isOpen}
+                  >
+                    <span>{name}</span>
+                    <AccordionChevron $open={isOpen} aria-hidden>▾</AccordionChevron>
+                  </AccordionHeader>
+
+                  <AccordionLinks $open={isOpen}>
+                    {items.length > 0 ? (
+                      items.map((item) => (
+                        <FooterLink key={item.id} href={menuItemHref(item)}>{item.label}</FooterLink>
+                      ))
+                    ) : (
+                      menu ? <Placeholder>Keine Einträge</Placeholder> : null
+                    )}
+                  </AccordionLinks>
+                </Column>
+              );
+            })}
           </Grid>
         )}
-        <Bottom>
+        <Bottom style={{ marginTop: 24 }}>
           <Copyright>© {new Date().getFullYear()} Belucha. All rights reserved.</Copyright>
         </Bottom>
       </Container>

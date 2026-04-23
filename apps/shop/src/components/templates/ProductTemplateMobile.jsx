@@ -59,10 +59,8 @@ const ThreeCol = styled.div`
   @media (max-width: 1024px) {
     grid-template-columns: 1fr 1fr;
   }
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-    gap: 16px;
-    margin-bottom: 24px;
+  @media (max-width: 767px) {
+    display: none;
   }
 `;
 
@@ -166,12 +164,6 @@ const DesktopOnly = styled.div`
 
 const MobileHeaderBlock = styled.div`
   display: none;
-  @media (max-width: 768px) {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
 `;
 
 const MobileBrandReviewRow = styled.div`
