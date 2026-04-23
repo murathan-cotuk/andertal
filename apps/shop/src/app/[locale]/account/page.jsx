@@ -6,7 +6,7 @@ import NewtonsCradle from "@/components/NewtonsCradle";
 import { Link, useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
-import AccountSidebar from "@/components/account/AccountSidebar";
+import AccountPageLayout from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 const ORANGE = "#ff971c";
@@ -134,15 +134,6 @@ export default function AccountPage() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const apply = () => setIsMobile(window.innerWidth <= 1023);
-    apply();
-    window.addEventListener("resize", apply);
-    return () => window.removeEventListener("resize", apply);
-  }, []);
 
   useEffect(() => {
     const fetchCustomer = async () => {
@@ -251,9 +242,7 @@ export default function AccountPage() {
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "220px 1fr", gap: 24, alignItems: "start" }}>
-            {!isMobile && <AccountSidebar onLogout={handleLogout} />}
-
+          <AccountPageLayout onLogout={handleLogout}>
             {/* Main content */}
             <div>
               <Section title="Bonuspunkte">
@@ -380,7 +369,7 @@ export default function AccountPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </AccountPageLayout>
         </div>
       </main>
 

@@ -6,18 +6,15 @@ import Footer from "@/components/Footer";
 import LandingContainers from "@/components/landing/LandingContainers";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
-import { HomeMobileSubnavRails } from "@/components/HomeMobileSubnavRails";
 
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <ShopHeader />
       <main className="flex-grow bg-white">
-        <HomeMobileSubnavRails>
-          <SectionErrorBoundary>
-            <LandingContainers />
-          </SectionErrorBoundary>
-        </HomeMobileSubnavRails>
+        <SectionErrorBoundary>
+          <LandingContainers />
+        </SectionErrorBoundary>
         <div className="container mx-auto px-4 py-8">
           <Breadcrumbs />
         </div>

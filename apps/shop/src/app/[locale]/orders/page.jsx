@@ -7,7 +7,7 @@ import { useAuthGuard, getToken, useCustomerAuth as useAuth } from "@belucha/lib
 import { Link, useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
-import AccountSidebar from "@/components/account/AccountSidebar";
+import AccountPageLayout from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 function MessageModal({ order, onClose }) {
@@ -419,8 +419,7 @@ export default function OrdersPage() {
       <main style={{ flex: 1 }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 20px 64px" }}>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#111827", margin: "0 0 28px" }}>Meine Bestellungen</h1>
-          <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 24, alignItems: "start" }}>
-            <AccountSidebar onLogout={() => { logout(); router.push("/"); }} />
+          <AccountPageLayout>
             <div>
               {successMsg && (
                 <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#15803d", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
@@ -696,7 +695,7 @@ export default function OrdersPage() {
                 </div>
               )}
             </div>
-          </div>
+          </AccountPageLayout>
         </div>
       </main>
       <Footer />

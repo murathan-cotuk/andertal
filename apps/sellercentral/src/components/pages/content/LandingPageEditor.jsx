@@ -1866,13 +1866,36 @@ export default function LandingPageEditor() {
   }, [containers, seitenDeviceTab]);
 
   const addContainer = (type) => {
-    const c = {
-      ...newContainer(type),
-      visible_on: seitenDeviceTab === 0 ? "desktop" : "mobile",
-    };
+    const base = newContainer(type);
+    const isMobileTab = seitenDeviceTab === 1;
+    const mobileOverrides = isMobileTab ? {
+      /* Carousel containers: show 2 per row when created in Mobile tab */
+      ...(["collection_carousel", "collections_carousel", "blog_carousel"].includes(type)
+        ? { items_per_row: 2, items_per_row_mobile: 2 }
+        : {}),
+    } : {};
+    const c = { ...base, ...mobileOverrides, visible_on: isMobileTab ? "mobile" : "desktop" };
     setContainers((prev) => [...prev, c]);
     setExpandedId(c.id);
     setAddModalOpen(false);
+    setIsDirty(true);
+  };
+
+  /** Duplicate a container to the Mobile tab with mobile-friendly overrides. */
+  const duplicateToMobile = (srcId) => {
+    const src = containers.find((c) => c.id === srcId);
+    if (!src) return;
+    const copy = {
+      ...src,
+      id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      visible_on: "mobile",
+      ...(["collection_carousel", "collections_carousel", "blog_carousel"].includes(src.type)
+        ? { items_per_row: 2, items_per_row_mobile: 2 }
+        : {}),
+    };
+    setContainers((prev) => [...prev, copy]);
+    setExpandedId(copy.id);
+    setSeitenDeviceTab(1);
     setIsDirty(true);
   };
 
@@ -2081,6 +2104,9 @@ export default function LandingPageEditor() {
                                         <Button size="slim" onClick={() => { updateContainer(c.id, { ...c, visible: !c.visible }); }}>{c.visible ? "Verstecken" : "Einblenden"}</Button>
                                         <Button size="slim" disabled={idx === 0} onClick={() => moveContainerInSeitenTab(c.id, -1)}>↑</Button>
                                         <Button size="slim" disabled={last} onClick={() => moveContainerInSeitenTab(c.id, 1)}>↓</Button>
+                                        {seitenDeviceTab === 0 && (
+                                          <Button size="slim" onClick={() => duplicateToMobile(c.id)} accessibilityLabel="Für Mobil duplizieren">📱 Mobil</Button>
+                                        )}
                                         <Button size="slim" tone="critical" onClick={() => { if (confirm("Container entfernen?")) removeContainer(c.id); }}>Entfernen</Button>
                                         <Button size="slim" variant={isExpanded ? "primary" : "secondary"} onClick={() => setExpandedId(isExpanded ? null : c.id)}>
                                           {isExpanded ? "Einklappen" : "Bearbeiten"}

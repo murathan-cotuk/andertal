@@ -8,7 +8,7 @@ import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-
 import ShopHeader from "@/components/ShopHeader";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import Footer from "@/components/Footer";
-import AccountSidebar from "@/components/account/AccountSidebar";
+import AccountPageLayout from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
@@ -193,8 +193,7 @@ export default function PaymentMethodsPage() {
       <main style={{ flex: 1 }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 20px 64px" }}>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#111827", margin: "0 0 28px" }}>Zahlungsmethoden</h1>
-          <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 24, alignItems: "start" }}>
-            <AccountSidebar onLogout={() => { logout(); router.push("/"); }} />
+          <AccountPageLayout>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {loading && <NewtonsCradle />}
               {err && (
@@ -227,7 +226,7 @@ export default function PaymentMethodsPage() {
                 </Elements>
               )}
             </div>
-          </div>
+          </AccountPageLayout>
         </div>
       </main>
       <Footer />

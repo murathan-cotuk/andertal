@@ -49,6 +49,10 @@ const Drawer = styled.aside`
   @media (prefers-reduced-motion: reduce) {
     transition: none;
   }
+
+  @media (max-width: 767px) {
+    height: calc(100vh - 58px - env(safe-area-inset-bottom, 0px));
+  }
 `;
 
 const Header = styled.div`
@@ -68,21 +72,23 @@ const Title = styled.h2`
 `;
 
 const CloseBtn = styled.button`
-  background: none;
+  background: #111827;
   border: none;
-  padding: 10px;
+  padding: 0;
+  width: 32px;
+  height: 32px;
   min-width: 44px;
   min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #111827;
-  border-radius: 8px;
+  color: #fff;
+  border-radius: 50%;
   -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
   &:hover {
-    background: #f3f4f6;
-    color: #000;
+    background: #000;
   }
 `;
 
@@ -358,7 +364,9 @@ export default function CartSidebar() {
         <Header>
           <Title>Warenkorb</Title>
           <CloseBtn type="button" onClick={closeCartSidebar} aria-label="Schließen">
-            <i className="fas fa-times" style={{ fontSize: 18 }} />
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+            </svg>
           </CloseBtn>
         </Header>
         <Scroll>

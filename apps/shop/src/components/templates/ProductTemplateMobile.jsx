@@ -857,7 +857,7 @@ function findAncestors(nodes, slug, path = []) {
   return null;
 }
 
-export default function ProductTemplate() {
+export default function ProductTemplateMobile() {
   const params = useParams();
   const locale = useLocale();
   const marketPrefixVal = useMarketPrefix();
@@ -1875,7 +1875,7 @@ export default function ProductTemplate() {
           <Carousel
             contained={false}
             title="Kunden, die diesen Artikel gekauft haben, kauften auch"
-            visibleCount={5}
+            visibleCount={2}
             gap={16}
             showFade={false}
             navOnSides

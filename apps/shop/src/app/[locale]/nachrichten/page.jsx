@@ -6,7 +6,7 @@ import NewtonsCradle from "@/components/NewtonsCradle";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
-import AccountSidebar from "@/components/account/AccountSidebar";
+import AccountPageLayout from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 const ORANGE = "#ff971c";
@@ -160,9 +160,7 @@ export default function NachrichtenPage() {
     <div style={{ minHeight: "100vh", background: "#f3f4f6", display: "flex", flexDirection: "column" }}>
       <ShopHeader />
       <div style={{ flex: 1, maxWidth: 1100, margin: "0 auto", width: "100%", padding: "40px 24px 64px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 24, alignItems: "start" }}>
-        <AccountSidebar />
-
+        <AccountPageLayout>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", margin: "0 0 16px" }}>Nachrichten</h1>
 
@@ -311,7 +309,7 @@ export default function NachrichtenPage() {
             </div>
           )}
         </div>
-        </div>
+        </AccountPageLayout>
       </div>
       <Footer />
     </div>

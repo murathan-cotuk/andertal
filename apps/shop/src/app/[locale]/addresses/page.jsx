@@ -6,7 +6,7 @@ import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import Footer from "@/components/Footer";
-import AccountSidebar from "@/components/account/AccountSidebar";
+import AccountPageLayout from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useCustomerAuth as useAuth } from "@belucha/lib";
 import { useCart } from "@/context/CartContext";
@@ -145,8 +145,7 @@ export default function AddressesPage() {
       <main style={{ flex: 1 }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px" }}>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: DARK, margin: "0 0 24px" }}>Adressen</h1>
-          <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 24, alignItems: "start" }}>
-            <AccountSidebar onLogout={() => { logout(); router.push("/"); }} />
+          <AccountPageLayout>
             <div>
               {loading ? (
                 <NewtonsCradle />
@@ -278,7 +277,7 @@ export default function AddressesPage() {
                 </div>
               )}
             </div>
-          </div>
+          </AccountPageLayout>
         </div>
       </main>
       <Footer />

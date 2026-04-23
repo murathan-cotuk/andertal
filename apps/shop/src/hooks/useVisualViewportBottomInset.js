@@ -17,12 +17,18 @@ export function useVisualViewportBottomInset() {
     if (typeof window === "undefined" || !window.visualViewport) return;
     const vv = window.visualViewport;
 
+    /* Use rAF so both window.resize and vv.resize have fired before we read
+       final values — avoids a 1-frame "float" when the browser toolbar hides. */
+    let rafId = null;
     const update = () => {
-      if (!window.matchMedia(`(max-width: ${MOBILE_MAX}px)`).matches) {
-        setInset(0);
-        return;
-      }
-      setInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (!window.matchMedia(`(max-width: ${MOBILE_MAX}px)`).matches) {
+          setInset(0);
+          return;
+        }
+        setInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+      });
     };
 
     update();
@@ -33,6 +39,7 @@ export function useVisualViewportBottomInset() {
     mq.addEventListener("change", update);
 
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       vv.removeEventListener("resize", update);
       vv.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
