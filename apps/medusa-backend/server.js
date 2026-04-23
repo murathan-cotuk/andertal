@@ -14097,7 +14097,18 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (product_id) { params.push(product_id); conditions.push(`cr.product_id = $${params.length}::uuid`) }
         const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
         const r = await c.query(
-          `SELECT cr.*, p.title AS product_title FROM admin_hub_product_change_requests cr LEFT JOIN admin_hub_products p ON p.id = cr.product_id ${where} ORDER BY cr.created_at DESC`,
+          `SELECT
+             cr.*,
+             p.title AS product_title,
+             su.store_name AS seller_store_name,
+             su.company_name AS seller_company_name,
+             su.email AS seller_email,
+             COALESCE(NULLIF(su.store_name, ''), NULLIF(su.company_name, ''), NULLIF(su.email, ''), cr.seller_id) AS seller_label
+           FROM admin_hub_product_change_requests cr
+           LEFT JOIN admin_hub_products p ON p.id = cr.product_id
+           LEFT JOIN seller_users su ON su.seller_id = cr.seller_id AND su.sub_of_seller_id IS NULL
+           ${where}
+           ORDER BY cr.created_at DESC`,
           params
         )
         await c.end()

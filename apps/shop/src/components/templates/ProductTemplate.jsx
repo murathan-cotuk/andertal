@@ -95,6 +95,29 @@ const MainImageWrap = styled.div`
   cursor: pointer;
 `;
 
+const GalleryActionRow = styled.div`
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+`;
+
+const GalleryActionBtn = styled.button`
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.94);
+  color: #374151;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+`;
+
 const MainImage = styled.img`
   width: 100%;
   height: 100%;
@@ -134,6 +157,53 @@ const CenterCol = styled.div`
 
 const Title = styled.h1.attrs({ className: "shop-typo-product-title" })``;
 
+const DesktopOnly = styled.div`
+  display: block;
+  @media (max-width: 768px) {
+    display: none;
+  }
+`;
+
+const MobileHeaderBlock = styled.div`
+  display: none;
+  @media (max-width: 768px) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+`;
+
+const MobileBrandReviewRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+`;
+
+const MobileBadgeCategoryRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+`;
+
+const CategoryPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 62%;
+`;
+
 const Brand = styled.span`
   font-size: 0.9rem;
   color: #6b7280;
@@ -151,6 +221,14 @@ const VariantSection = styled.div`
   flex-direction: column;
   gap: 10px;
   margin-top: 2px;
+`;
+
+const MobileVariantsWrap = styled.div`
+  display: none;
+  @media (max-width: 768px) {
+    display: block;
+    margin-top: 10px;
+  }
 `;
 
 const VarGroup = styled.div``;
@@ -1115,6 +1193,29 @@ export default function ProductTemplate() {
 
   const goPrev = () => setSelectedImage((i) => (i <= 0 ? displayImages.length - 1 : i - 1));
   const goNext = () => setSelectedImage((i) => (i >= displayImages.length - 1 ? 0 : i + 1));
+  const shareProduct = async () => {
+    if (typeof window === "undefined") return;
+    const url = window.location.href;
+    const shareData = { title: titleDisplay || displayTitle || "Produkt", url };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+    } catch (_) {}
+    try {
+      await navigator.clipboard.writeText(url);
+      setCartNotice({ text: locale === "de" ? "Link kopiert" : "Link copied", visible: true });
+      if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);
+      if (cartNoticeTimersRef.current.clear) window.clearTimeout(cartNoticeTimersRef.current.clear);
+      cartNoticeTimersRef.current.hide = window.setTimeout(() => {
+        setCartNotice((s) => ({ ...s, visible: false }));
+      }, 1600);
+      cartNoticeTimersRef.current.clear = window.setTimeout(() => {
+        setCartNotice({ text: "", visible: false });
+      }, 2000);
+    } catch (_) {}
+  };
 
   const handleAddToCart = async () => {
     const variantId = variant?.id;
@@ -1211,6 +1312,111 @@ export default function ProductTemplate() {
       : {}),
   } : null;
 
+  const variantSelectorContent = useLinkedVariations && variationGroups?.length ? (
+    <VariantSection>
+      {variationGroups.map((group, gIdx) => {
+        const groupName = group.name || "";
+        const selected = selectedOptions[groupName] ?? "";
+        const groupTitle = variationGroupDisplayName(group, gIdx, meta, locale);
+        const selectedOpt = (group.options || []).find(
+          (o) => optionCanonicalValue(o).toLowerCase() === selected.trim().toLowerCase()
+        );
+        const selectedLabel = selected
+          ? (selectedOpt ? optionDisplayLabel(selectedOpt, locale) : selected)
+          : "";
+        const isSwatch = (group.options || []).some(
+          (o) => (typeof o === "object" && o.swatch_image)
+        );
+        return (
+          <VarGroup key={groupName}>
+            <VarLabel>
+              {groupTitle || groupName}
+              {selectedLabel && <VarLabelSelected>: {selectedLabel}</VarLabelSelected>}
+            </VarLabel>
+            <VarRow>
+              {(group.options || []).map((opt, oIdx) => {
+                const valueStr = optionCanonicalValue(opt);
+                const displayStr = optionDisplayLabel(opt, locale) || `Option ${oIdx + 1}`;
+                const swatchUrl = typeof opt === "object" && opt.swatch_image
+                  ? resolveImageUrl(opt.swatch_image)
+                  : null;
+                const isSelected = selected.trim().toLowerCase() === valueStr.toLowerCase();
+                const inStockOpt = hasStockForOption(variants, variationGroups, groupName, valueStr, selectedOptions);
+                const handleClick = () => {
+                  if (isSelected || !inStockOpt) return;
+                  setSelectedOptions((prev) => ({ ...prev, [groupName]: valueStr }));
+                  setSelectedImage(0);
+                };
+                if (isSwatch || swatchUrl) {
+                  return (
+                    <VarSwatch
+                      key={oIdx}
+                      type="button"
+                      title={displayStr}
+                      $selected={isSelected}
+                      $oos={!inStockOpt}
+                      onClick={handleClick}
+                      aria-label={displayStr}
+                      aria-pressed={isSelected}
+                    >
+                      {swatchUrl ? (
+                        <img src={swatchUrl} alt={displayStr} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }} />
+                      ) : (
+                        <span style={{ display: "block", width: "100%", height: "100%", borderRadius: "50%", background: valueStr.toLowerCase() }} />
+                      )}
+                    </VarSwatch>
+                  );
+                }
+                return (
+                  <VarChip
+                    key={oIdx}
+                    type="button"
+                    $selected={isSelected}
+                    $oos={!inStockOpt}
+                    onClick={handleClick}
+                    aria-pressed={isSelected}
+                  >
+                    {displayStr}
+                  </VarChip>
+                );
+              })}
+            </VarRow>
+          </VarGroup>
+        );
+      })}
+    </VariantSection>
+  ) : (() => {
+    const legacyGroups = groupVariantsByTitle(variants);
+    if (legacyGroups.length === 0) return null;
+    return (
+      <VariantSection>
+        {legacyGroups.map((group) => (
+          <VarGroup key={group.title}>
+            <VarLabel>{group.title}</VarLabel>
+            <VarRow>
+              {group.options.map(({ variant: v, index: idx }) => {
+                const qty = v.inventory_quantity ?? v.inventory ?? 0;
+                const oos = Number(qty) <= 0;
+                return (
+                  <VarChip
+                    key={idx}
+                    type="button"
+                    $selected={selectedVariantIndex === idx}
+                    $oos={oos}
+                    onClick={() => !oos && setSelectedVariantIndex(idx)}
+                    aria-pressed={selectedVariantIndex === idx}
+                  >
+                    {v.value || v.title || `Option ${idx + 1}`}
+                  </VarChip>
+                );
+              })}
+            </VarRow>
+          </VarGroup>
+        ))}
+      </VariantSection>
+    );
+  })();
+
   return (
     <Container>
       {jsonLd && (
@@ -1221,6 +1427,37 @@ export default function ProductTemplate() {
       )}
       <Breadcrumbs items={breadcrumbItems} />
 
+      <MobileHeaderBlock>
+        <MobileBrandReviewRow>
+          {(meta.brand_name || meta.brand) ? (
+            <BrandRow
+              brandName={meta.brand_name || meta.brand || ""}
+              brandHandle={meta.brand_handle || null}
+              brandLogo={meta.brand_logo ? resolveImageUrl(meta.brand_logo) : null}
+              reviewCount={0}
+            />
+          ) : <span />}
+          <a
+            href="#reviews"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "inherit", whiteSpace: "nowrap" }}
+          >
+            <StarRating average={reviewAvg} count={reviewCount} />
+            <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+              {reviewCount > 0 ? `${reviewCount}` : "0"}
+            </span>
+          </a>
+        </MobileBrandReviewRow>
+
+        <Title>{titleDisplay}</Title>
+
+        <MobileBadgeCategoryRow>
+          <span>{isBestseller && <BestsellerBadge style={{ alignSelf: "flex-start" }} />}</span>
+          {categoryCurrentLabel ? (
+            <CategoryPill title={categoryCurrentLabel}>{categoryCurrentLabel}</CategoryPill>
+          ) : <span />}
+        </MobileBadgeCategoryRow>
+      </MobileHeaderBlock>
+
       <ThreeCol>
         {/* Left: Gallery — sticky until Kunden section */}
         <GalleryCol>
@@ -1229,14 +1466,7 @@ export default function ProductTemplate() {
               <MainImage src={mainImage} alt={displayTitle} />
             </MainImageWrap>
             {product?.id && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: 8,
-                  right: 8,
-                  zIndex: 40,
-                  pointerEvents: "auto",
-                }}
+              <GalleryActionRow
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
@@ -1245,7 +1475,16 @@ export default function ProductTemplate() {
                 <div style={{ position: "relative" }}>
                   <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
                 </div>
-              </div>
+                <GalleryActionBtn type="button" aria-label="Share product" title="Share product" onClick={shareProduct}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="18" cy="5" r="3"></circle>
+                    <circle cx="6" cy="12" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.6" y1="13.5" x2="15.4" y2="17.5"></line>
+                    <line x1="15.4" y1="6.5" x2="8.6" y2="10.5"></line>
+                  </svg>
+                </GalleryActionBtn>
+              </GalleryActionRow>
             )}
           </div>
           {displayImages.length > 1 && (
@@ -1267,148 +1506,44 @@ export default function ProductTemplate() {
               <button type="button" onClick={goNext} className="px-3 py-1 border rounded hover:bg-gray-100">›</button>
             </div>
           )}
+          <MobileVariantsWrap>{variantSelectorContent}</MobileVariantsWrap>
         </GalleryCol>
 
         {/* Center: Title, brand, reviews, price, variants, bullets, meta */}
         <CenterCol>
-          {isBestseller && <BestsellerBadge style={{ alignSelf: "flex-start", marginBottom: 2 }} />}
-          <Title>{titleDisplay}</Title>
-          {/* ── Review row — always visible ── */}
-          <a
-            href="#reviews"
-            style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit" }}
-          >
-            <StarRating average={reviewAvg} count={reviewCount} />
-            {reviewAvg > 0 ? (
-              <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#374151" }}>
-                {reviewAvg.toFixed(1).replace(".", ",")}
+          <DesktopOnly>
+            {isBestseller && <BestsellerBadge style={{ alignSelf: "flex-start", marginBottom: 2 }} />}
+            <Title>{titleDisplay}</Title>
+            <a
+              href="#reviews"
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit" }}
+            >
+              <StarRating average={reviewAvg} count={reviewCount} />
+              {reviewAvg > 0 ? (
+                <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#374151" }}>
+                  {reviewAvg.toFixed(1).replace(".", ",")}
+                </span>
+              ) : null}
+              <span style={{ fontSize: "0.8125rem", color: "#6b7280" }}>
+                {reviewCount > 0 ? `(${reviewCount} Bewertungen)` : "Noch keine Bewertungen"}
               </span>
-            ) : null}
-            <span style={{ fontSize: "0.8125rem", color: "#6b7280" }}>
-              {reviewCount > 0 ? `(${reviewCount} Bewertungen)` : "Noch keine Bewertungen"}
-            </span>
-          </a>
-
-          {/* ── Seller / Brand row ── */}
-          {(meta.brand_name || meta.brand) && (
-            <BrandRow
-              brandName={meta.brand_name || meta.brand || ""}
-              brandHandle={meta.brand_handle || null}
-              brandLogo={meta.brand_logo ? resolveImageUrl(meta.brand_logo) : null}
-              reviewCount={reviewCount}
-            />
-          )}
+            </a>
+            {(meta.brand_name || meta.brand) && (
+              <BrandRow
+                brandName={meta.brand_name || meta.brand || ""}
+                brandHandle={meta.brand_handle || null}
+                brandLogo={meta.brand_logo ? resolveImageUrl(meta.brand_logo) : null}
+                reviewCount={reviewCount}
+              />
+            )}
+          </DesktopOnly>
           {soldLastMonth != null && soldLastMonth > 0 && (
             <p className="text-gray-500 text-sm">
               {soldLastMonth} im letzten Monat verkauft
             </p>
           )}
 
-          {/* ── Variant selector ── */}
-          {useLinkedVariations && variationGroups?.length ? (
-            <VariantSection>
-              {variationGroups.map((group, gIdx) => {
-                const groupName = group.name || "";
-                const selected = selectedOptions[groupName] ?? "";
-                const groupTitle = variationGroupDisplayName(group, gIdx, meta, locale);
-                const selectedOpt = (group.options || []).find(
-                  (o) => optionCanonicalValue(o).toLowerCase() === selected.trim().toLowerCase()
-                );
-                const selectedLabel = selected
-                  ? (selectedOpt ? optionDisplayLabel(selectedOpt, locale) : selected)
-                  : "";
-                const isSwatch = (group.options || []).some(
-                  (o) => (typeof o === "object" && o.swatch_image)
-                );
-                return (
-                  <VarGroup key={groupName}>
-                    <VarLabel>
-                      {groupTitle || groupName}
-                      {selectedLabel && <VarLabelSelected>: {selectedLabel}</VarLabelSelected>}
-                    </VarLabel>
-                    <VarRow>
-                      {(group.options || []).map((opt, oIdx) => {
-                        const valueStr = optionCanonicalValue(opt);
-                        const displayStr = optionDisplayLabel(opt, locale) || `Option ${oIdx + 1}`;
-                        const swatchUrl = typeof opt === "object" && opt.swatch_image
-                          ? resolveImageUrl(opt.swatch_image)
-                          : null;
-                        const isSelected = selected.trim().toLowerCase() === valueStr.toLowerCase();
-                        const inStock = hasStockForOption(variants, variationGroups, groupName, valueStr, selectedOptions);
-                        const handleClick = () => {
-                          if (isSelected || !inStock) return;
-                          setSelectedOptions((prev) => ({ ...prev, [groupName]: valueStr }));
-                          setSelectedImage(0);
-                        };
-                        if (isSwatch || swatchUrl) {
-                          return (
-                            <VarSwatch
-                              key={oIdx}
-                              type="button"
-                              title={displayStr}
-                              $selected={isSelected}
-                              $oos={!inStock}
-                              onClick={handleClick}
-                              aria-label={displayStr}
-                              aria-pressed={isSelected}
-                            >
-                              {swatchUrl ? (
-                                <img src={swatchUrl} alt={displayStr} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }} />
-                              ) : (
-                                <span style={{ display: "block", width: "100%", height: "100%", borderRadius: "50%", background: valueStr.toLowerCase() }} />
-                              )}
-                            </VarSwatch>
-                          );
-                        }
-                        return (
-                          <VarChip
-                            key={oIdx}
-                            type="button"
-                            $selected={isSelected}
-                            $oos={!inStock}
-                            onClick={handleClick}
-                            aria-pressed={isSelected}
-                          >
-                            {displayStr}
-                          </VarChip>
-                        );
-                      })}
-                    </VarRow>
-                  </VarGroup>
-                );
-              })}
-            </VariantSection>
-          ) : (() => {
-            const legacyGroups = groupVariantsByTitle(variants);
-            if (legacyGroups.length === 0) return null;
-            return (
-              <VariantSection>
-                {legacyGroups.map((group) => (
-                  <VarGroup key={group.title}>
-                    <VarLabel>{group.title}</VarLabel>
-                    <VarRow>
-                      {group.options.map(({ variant: v, index: idx }) => {
-                        const qty = v.inventory_quantity ?? v.inventory ?? 0;
-                        const oos = Number(qty) <= 0;
-                        return (
-                          <VarChip
-                            key={idx}
-                            type="button"
-                            $selected={selectedVariantIndex === idx}
-                            $oos={oos}
-                            onClick={() => !oos && setSelectedVariantIndex(idx)}
-                            aria-pressed={selectedVariantIndex === idx}
-                          >
-                            {v.value || v.title || `Option ${idx + 1}`}
-                          </VarChip>
-                        );
-                      })}
-                    </VarRow>
-                  </VarGroup>
-                ))}
-              </VariantSection>
-            );
-          })()}
+          <DesktopOnly>{variantSelectorContent}</DesktopOnly>
 
           {bulletPoints.length > 0 && (
             <BulletList>

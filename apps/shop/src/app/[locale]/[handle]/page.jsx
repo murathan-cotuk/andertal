@@ -1022,7 +1022,7 @@ export default function CollectionPage() {
             {recommendedProducts.length > 0 && (
               <section style={{ marginTop: 48, marginBottom: 24 }}>
                 <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 16, color: "#111" }}>Önerilen ürünler</h2>
-                <ProductGrid products={recommendedProducts} maxColumns={4} maxColumnsMobile={1} />
+                <ProductGrid products={recommendedProducts} maxColumns={4} maxColumnsMobile={2} />
               </section>
             )}
 

@@ -70,10 +70,16 @@ const Title = styled.h2`
 const CloseBtn = styled.button`
   background: none;
   border: none;
-  padding: 8px;
+  padding: 10px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   color: #6b7280;
   border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
   &:hover {
     background: #f3f4f6;
     color: #374151;

@@ -3,12 +3,22 @@
 import { ProductCard } from "@/components/ProductCard";
 import styled from "styled-components";
 
-/* Mobil şerit: kartlar arası + biraz daha geniş his için dar gap */
 const STRIP_GAP = 8;
+const MOBILE_GRID_GAP = 8;
 
 const CatalogWrap = styled.div`
   width: 100%;
-  @media (max-width: 1023px) {
+
+  /* ── Mobile (≤767px): 2-column grid ──────────────────────────────────── */
+  @media (max-width: 767px) {
+    display: grid;
+    grid-template-columns: repeat(${(p) => p.$mobileCols}, minmax(0, 1fr));
+    gap: ${MOBILE_GRID_GAP}px;
+    align-content: start;
+  }
+
+  /* ── Tablet (768–1023px): horizontal scroll strip ────────────────────── */
+  @media (min-width: 768px) and (max-width: 1023px) {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
@@ -24,26 +34,33 @@ const CatalogWrap = styled.div`
       scroll-behavior: auto;
     }
   }
+
+  /* ── Desktop (≥1024px): grid ─────────────────────────────────────────── */
   @media (min-width: 1024px) {
     display: grid;
     grid-template-columns: ${(p) =>
-      p.$cols
-        ? `repeat(${p.$cols}, minmax(0, 1fr))`
-        : "repeat(4, minmax(0, 1fr))"};
+      p.$cols ? `repeat(${p.$cols}, minmax(0, 1fr))` : "repeat(4, minmax(0, 1fr))"};
     gap: 16px;
     align-content: start;
   }
 `;
 
 const CardSlot = styled.div`
-  @media (max-width: 1023px) {
-    flex: 0 0
-      ${(p) => `calc((100% - ${(p.$m - 1) * STRIP_GAP}px) / ${p.$m})`};
+  /* Mobile: grid handles layout, no extra styles needed */
+  @media (max-width: 767px) {
+    min-width: 0;
+  }
+
+  /* Tablet strip: fixed-width cards */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    flex: 0 0 ${(p) => `calc((100% - ${(p.$m - 1) * STRIP_GAP}px) / ${p.$m})`};
     min-width: ${(p) => `calc((100% - ${(p.$m - 1) * STRIP_GAP}px) / ${p.$m})`};
     max-width: ${(p) => `calc((100% - ${(p.$m - 1) * STRIP_GAP}px) / ${p.$m})`};
     scroll-snap-align: start;
     box-sizing: border-box;
   }
+
+  /* Desktop: grid handles layout */
   @media (min-width: 1024px) {
     min-width: 0;
   }
@@ -65,25 +82,28 @@ function clampCols(n) {
 }
 
 /**
- * @param {number} [maxColumns=4] — desktop grid (≥1024px)
- * @param {number} [maxColumnsMobile=1] — yatay şerit, düşük viewport (≤1023px); 1 = tam geniş kart
+ * @param {number} [maxColumns=4]       — desktop grid (≥1024px)
+ * @param {number} [maxColumnsMobile=2] — mobile grid (≤767px); default 2
  */
 export function ProductGrid({
   products = [],
   maxColumns = 4,
-  maxColumnsMobile = 1,
+  maxColumnsMobile = 2,
   activeFilters = {},
 }) {
   if (!products.length) return <Empty>No products found</Empty>;
 
   const cols = clampCols(maxColumns);
   const m = clampCols(maxColumnsMobile);
+  // Mobile grid columns: use maxColumnsMobile, default 2
+  const mobileCols = Math.max(1, Math.min(m, 3));
 
   return (
     <CatalogWrap
       className="product-grid-strip"
       data-product-strip
       $cols={cols}
+      $mobileCols={mobileCols}
     >
       {products.map((p) => (
         <CardSlot key={p.id} $m={m}>

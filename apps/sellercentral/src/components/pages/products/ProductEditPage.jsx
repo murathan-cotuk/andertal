@@ -34,6 +34,10 @@ import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect
 import { routing } from "@/i18n/routing";
 import { encodeVariantPathKey } from "@/lib/variant-path-key";
 import { ChangeRequestFieldBadge } from "@/components/ChangeRequestFieldBadge";
+import {
+  fieldNameDisplayLabel,
+  formatChangeRequestValuePreview,
+} from "@/lib/product-change-request-format";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -252,6 +256,18 @@ function descriptionVisualToHtml(html) {
   return "<p>" + s + "</p>";
 }
 
+function changeRequestSellerLabel(cr) {
+  if (!cr || typeof cr !== "object") return "—";
+  return String(
+    cr.seller_label ||
+      cr.seller_store_name ||
+      cr.seller_company_name ||
+      cr.seller_email ||
+      cr.seller_id ||
+      "—"
+  );
+}
+
 export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload }) {
   const router = useRouter();
   const locale = useLocale();
@@ -321,6 +337,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [newCatalogMetaSaving, setNewCatalogMetaSaving] = useState(false);
   const [newCatalogMetaErr, setNewCatalogMetaErr] = useState("");
   const [pendingChangeRequests, setPendingChangeRequests] = useState([]);
+  const [changeRequestActionId, setChangeRequestActionId] = useState("");
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -334,24 +351,85 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
   }, []);
 
+  const refetchPendingChangeRequests = useCallback(async (productId) => {
+    if (!productId) {
+      setPendingChangeRequests([]);
+      return [];
+    }
+    try {
+      const d = await client.request(`/admin-hub/v1/product-change-requests?status=pending&product_id=${encodeURIComponent(productId)}`);
+      const list = Array.isArray(d?.change_requests) ? d.change_requests : [];
+      setPendingChangeRequests(list);
+      return list;
+    } catch (_) {
+      setPendingChangeRequests([]);
+      return [];
+    }
+  }, [client]);
+
+  const mergeLocaleFields = useCallback((p) => {
+    if (!p) return p;
+    const tr = p.metadata?.translations?.[locale];
+    return tr
+      ? { ...p, title: tr.title ?? p.title, description: tr.description ?? p.description }
+      : p;
+  }, [locale]);
+
   useEffect(() => {
     if (isNew || !product?.id) {
       setPendingChangeRequests([]);
       return;
     }
-    let cancelled = false;
-    client
-      .request(`/admin-hub/v1/product-change-requests?status=pending&product_id=${encodeURIComponent(product.id)}`)
-      .then((d) => {
-        if (!cancelled) setPendingChangeRequests(Array.isArray(d?.change_requests) ? d.change_requests : []);
-      })
-      .catch(() => {
-        if (!cancelled) setPendingChangeRequests([]);
+    refetchPendingChangeRequests(product.id);
+  }, [isNew, product?.id, refetchPendingChangeRequests]);
+
+  const approveChangeRequest = useCallback(async (requestId) => {
+    if (!requestId || !product?.id) return;
+    try {
+      setChangeRequestActionId(String(requestId));
+      await client.request(`/admin-hub/v1/product-change-requests/${encodeURIComponent(requestId)}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ reviewer_note: "Approved via product page" }),
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [isNew, product?.id, client]);
+      const fresh = await client.getAdminHubProduct(product.id);
+      const localized = mergeLocaleFields(fresh);
+      if (localized) {
+        setProduct(localized);
+        initialSnapshotRef.current = JSON.stringify(normalizeForCompare(localized));
+        unsavedRef.current?.setDirty(false);
+      }
+      await refetchPendingChangeRequests(product.id);
+      setMessage({ type: "success", text: locale === "tr" ? "Değişiklik onaylandı ve ürün güncellendi." : locale === "de" ? "Änderung genehmigt und Produkt aktualisiert." : "Change approved and product updated." });
+      onReload?.();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("belucha-notifications-refresh"));
+      }
+    } catch (err) {
+      setMessage({ type: "error", text: err?.message || (locale === "tr" ? "Onaylama başarısız." : locale === "de" ? "Freigabe fehlgeschlagen." : "Approval failed.") });
+    } finally {
+      setChangeRequestActionId("");
+    }
+  }, [client, product?.id, locale, onReload, refetchPendingChangeRequests, mergeLocaleFields]);
+
+  const rejectChangeRequest = useCallback(async (requestId) => {
+    if (!requestId || !product?.id) return;
+    try {
+      setChangeRequestActionId(String(requestId));
+      await client.request(`/admin-hub/v1/product-change-requests/${encodeURIComponent(requestId)}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reviewer_note: "Rejected via product page" }),
+      });
+      await refetchPendingChangeRequests(product.id);
+      setMessage({ type: "success", text: locale === "tr" ? "Değişiklik reddedildi, ürün değerleri korunuyor." : locale === "de" ? "Änderung abgelehnt, Produktwerte bleiben unverändert." : "Change rejected, product values stay unchanged." });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("belucha-notifications-refresh"));
+      }
+    } catch (err) {
+      setMessage({ type: "error", text: err?.message || (locale === "tr" ? "Reddetme başarısız." : locale === "de" ? "Ablehnung fehlgeschlagen." : "Rejection failed.") });
+    } finally {
+      setChangeRequestActionId("");
+    }
+  }, [client, product?.id, locale, refetchPendingChangeRequests]);
 
   // Sync from server when we switch product (id/handle) or locale. Merge translations[locale] into title/description.
   const initialProductId = initialProduct?.id ?? initialProduct?.handle ?? "";
@@ -841,10 +919,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("belucha-notifications-refresh"));
         }
-        try {
-          const d = await client.request(`/admin-hub/v1/product-change-requests?status=pending&product_id=${encodeURIComponent(product.id)}`);
-          setPendingChangeRequests(Array.isArray(d?.change_requests) ? d.change_requests : []);
-        } catch (_) { /* ignore */ }
+        await refetchPendingChangeRequests(product.id);
         setSaving(false);
         return;
       }
@@ -870,10 +945,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       initialSnapshotRef.current = JSON.stringify(normalizeForCompare(savedProduct));
       unsavedRef.current?.setDirty(false);
       setMessage({ type: "success", text: updatedRaw?.listing_saved ? "Preis, Bestand und eigene Daten gespeichert." : "Saved" });
-      try {
-        const d = await client.request(`/admin-hub/v1/product-change-requests?status=pending&product_id=${encodeURIComponent(savedProduct.id)}`);
-        setPendingChangeRequests(Array.isArray(d?.change_requests) ? d.change_requests : []);
-      } catch (_) { /* ignore */ }
+      await refetchPendingChangeRequests(savedProduct.id);
       onReload?.();
     } catch (err) {
       setMessage({ type: "error", text: err?.message || "Save failed" });
@@ -1481,11 +1553,47 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       {!isNew && pendingChangeRequests.length > 0 && (
         <Box paddingBlockEnd="200">
           <Banner tone="warning">
-            {locale === "tr"
-              ? "Onay bekleyen alan değişiklikleri var. İlgili alanların yanındaki kırmızı işarete tıklayarak mevcut ve önerilen değerleri görebilirsiniz."
-              : locale === "de"
-                ? "Ausstehende Feldänderungen: Klicken Sie auf das rote Symbol neben dem Feld für aktuelle und vorgeschlagene Werte."
-                : "Pending field changes: click the red marker beside a field to see current and proposed values."}
+            <BlockStack gap="300">
+              <Text as="p" variant="bodySm">
+                {locale === "tr"
+                  ? "Onay bekleyen alan değişiklikleri var. İlgili alanların yanındaki kırmızı işarete tıklayarak mevcut ve önerilen değerleri görebilirsiniz."
+                  : locale === "de"
+                    ? "Ausstehende Feldänderungen: Klicken Sie auf das rote Symbol neben dem Feld für aktuelle und vorgeschlagene Werte."
+                    : "Pending field changes: click the red marker beside a field to see current and proposed values."}
+              </Text>
+              {isSuperuser && (
+                <BlockStack gap="200">
+                  {pendingChangeRequests.map((cr) => {
+                    const busy = changeRequestActionId === String(cr.id);
+                    return (
+                      <InlineStack key={cr.id} gap="300" align="space-between" blockAlign="center" wrap>
+                        <BlockStack gap="050">
+                          <Text as="p" variant="bodySm">
+                            <strong>{fieldNameDisplayLabel(cr.field_name, locale)}:</strong>{" "}
+                            {formatChangeRequestValuePreview(cr.new_value, 80)}
+                          </Text>
+                          <Text as="p" variant="bodyXs" tone="subdued">
+                            {locale === "tr"
+                              ? `Satıcı: ${changeRequestSellerLabel(cr)}`
+                              : locale === "de"
+                                ? `Verkäufer: ${changeRequestSellerLabel(cr)}`
+                                : `Seller: ${changeRequestSellerLabel(cr)}`}
+                          </Text>
+                        </BlockStack>
+                        <InlineStack gap="200">
+                          <Button size="slim" tone="success" onClick={() => approveChangeRequest(cr.id)} loading={busy} disabled={busy}>
+                            {locale === "tr" ? "Onayla" : locale === "de" ? "Freigeben" : "Approve"}
+                          </Button>
+                          <Button size="slim" tone="critical" variant="secondary" onClick={() => rejectChangeRequest(cr.id)} loading={busy} disabled={busy}>
+                            {locale === "tr" ? "Reddet" : locale === "de" ? "Ablehnen" : "Reject"}
+                          </Button>
+                        </InlineStack>
+                      </InlineStack>
+                    );
+                  })}
+                </BlockStack>
+              )}
+            </BlockStack>
           </Banner>
         </Box>
       )}

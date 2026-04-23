@@ -634,6 +634,7 @@ const SubNavWrap = styled.div`
   @media (max-width: 767px) {
     font-size: 13px;
     max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 40px)")};
+    border-bottom: none;
   }
 `;
 

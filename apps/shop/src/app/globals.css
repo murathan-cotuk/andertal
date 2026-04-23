@@ -201,19 +201,29 @@ a {
     gap: 0 !important;
   }
 
-  /* Locale dropdown: stack columns on mobile */
+  /* Locale dropdown: Land full-width top, Sprache + Währung side-by-side below */
   [data-locale-dropdown] > div {
-    flex-direction: column !important;
+    flex-wrap: wrap !important;
+    flex-direction: row !important;
     max-width: 98vw !important;
     max-height: 80vh !important;
     overflow-y: auto !important;
   }
-  [data-locale-dropdown] > div > div {
+  /* Land: full-width top row */
+  [data-locale-dropdown] > div > div:first-child {
+    flex: 0 0 100% !important;
     border-right: none !important;
     border-bottom: 1px solid #e5e7eb !important;
   }
-  [data-locale-dropdown] > div > div:last-child {
+  /* Sprache + Währung: side by side */
+  [data-locale-dropdown] > div > div:not(:first-child) {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    border-right: none !important;
     border-bottom: none !important;
+  }
+  [data-locale-dropdown] > div > div:nth-child(2) {
+    border-right: 1px solid #e5e7eb !important;
   }
 }
 

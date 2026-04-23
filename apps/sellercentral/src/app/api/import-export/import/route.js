@@ -71,6 +71,60 @@ async function fetchJson(url, init = {}) {
   return res.json();
 }
 
+async function registerImportedMediaUrls(backendUrl, authHeaders, urls) {
+  const cleaned = [...new Set((urls || []).map((u) => String(u || "").trim()).filter((u) => /^https?:\/\//i.test(u)))];
+  if (!cleaned.length) return null;
+
+  const CHUNK_SIZE = 150;
+  let registered = 0;
+  let skipped = 0;
+  let folder = null;
+  const errors = [];
+
+  for (let i = 0; i < cleaned.length; i += CHUNK_SIZE) {
+    const chunk = cleaned.slice(i, i + CHUNK_SIZE);
+    let chunkDone = false;
+    try {
+      const mr = await fetch(`${backendUrl}/admin-hub/v1/media/import-urls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({ urls: chunk }),
+      });
+      if (mr.ok) {
+        const data = await mr.json().catch(() => ({}));
+        registered += Number(data?.registered || 0);
+        skipped += Number(data?.skipped || 0);
+        if (!folder && data?.folder) folder = data.folder;
+        chunkDone = true;
+      } else {
+        const t = await mr.text().catch(() => "");
+        errors.push(`import-urls failed (${mr.status})${t ? `: ${t}` : ""}`);
+      }
+    } catch (e) {
+      errors.push(`import-urls error: ${e?.message || "request failed"}`);
+    }
+
+    // Fallback for older/backward deployments: try one-by-one URL registration endpoint.
+    if (!chunkDone) {
+      for (const url of chunk) {
+        try {
+          const ar = await fetch(`${backendUrl}/admin-hub/v1/media/add-url`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeaders },
+            body: JSON.stringify({ url }),
+          });
+          if (ar.ok) registered++;
+          else skipped++;
+        } catch (_) {
+          skipped++;
+        }
+      }
+    }
+  }
+
+  return { registered, skipped, folder, errors };
+}
+
 async function loadImportLookups(backendUrl, sellerToken) {
   const authHeaders = sellerToken ? { Authorization: `Bearer ${sellerToken}` } : {};
 
@@ -1180,17 +1234,11 @@ export async function POST(request) {
       }
     }
 
-    // Register collected image URLs in the seller's media library
+    // Register collected image URLs in the seller's media library.
+    // Robust mode: chunked batch endpoint + fallback to add-url (older backend deployments).
     let mediaResult = null;
     if (collectedImageUrls.size > 0 && sellerToken) {
-      try {
-        const mr = await fetch(`${backendUrl}/admin-hub/v1/media/import-urls`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders },
-          body: JSON.stringify({ urls: [...collectedImageUrls] }),
-        });
-        if (mr.ok) mediaResult = await mr.json();
-      } catch (_) {}
+      mediaResult = await registerImportedMediaUrls(backendUrl, authHeaders, [...collectedImageUrls]);
     }
 
     return Response.json({
@@ -1200,7 +1248,14 @@ export async function POST(request) {
       updated: results.updated,
       failed: results.failed,
       errors: results.errors,
-      media: mediaResult ? { registered: mediaResult.registered, skipped: mediaResult.skipped, folder: mediaResult.folder } : null,
+      media: mediaResult
+        ? {
+            registered: mediaResult.registered,
+            skipped: mediaResult.skipped,
+            folder: mediaResult.folder || null,
+            errors: Array.isArray(mediaResult.errors) ? mediaResult.errors : [],
+          }
+        : null,
     });
   } catch (e) {
     console.error("Import error:", e);

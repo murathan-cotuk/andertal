@@ -61,6 +61,33 @@ const GroupedDropdownSearch = dynamic(
   { ssr: false, loading: () => <div style={{ width: "100%", maxWidth: 400, height: 36 }} /> }
 );
 
+const SUPERUSER_ACCENT_COLOR = "#812727";
+
+const styleSuperuserOnlyNavItems = (items, isSuperuser) => {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => {
+    const subNavigationItems = Array.isArray(item.subNavigationItems)
+      ? item.subNavigationItems.map((sub) => {
+          const isSuperOnlySub = !!sub.superuserOnly;
+          return {
+            ...sub,
+            label: isSuperuser && isSuperOnlySub
+              ? <span style={{ color: SUPERUSER_ACCENT_COLOR, fontWeight: 700 }}>{sub.label}</span>
+              : sub.label,
+          };
+        })
+      : item.subNavigationItems;
+    const isSuperOnlyItem = !!item.superuserOnly;
+    return {
+      ...item,
+      label: isSuperuser && isSuperOnlyItem
+        ? <span style={{ color: SUPERUSER_ACCENT_COLOR, fontWeight: 700 }}>{item.label}</span>
+        : item.label,
+      subNavigationItems,
+    };
+  });
+};
+
 function getMenuItemsMain(t, isSuperuser = false) {
   const tx = (key, fallback) => {
     try {
@@ -79,7 +106,11 @@ function getMenuItemsMain(t, isSuperuser = false) {
       subNavigationItems: [
         { url: "/orders", label: tx("view", "View") },
         { url: "/orders/returns", label: tx("returns", "Returns") },
-        { url: "/orders/abandoned-checkouts", label: tx("abandonedCheckouts", "Abandoned checkouts") },
+        {
+          url: "/orders/abandoned-checkouts",
+          label: tx("abandonedCheckouts", "Abandoned checkouts"),
+          superuserOnly: true,
+        },
       ],
     },
     {
@@ -88,7 +119,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       icon: ProductIcon,
       subNavigationItems: [
         { url: "/products/inventory", label: tx("inventory", "Inventory") },
-        { url: "/products/collections", label: tx("collections", "Collections") },
+        { url: "/products/collections", label: tx("collections", "Collections"), superuserOnly: true },
         { url: "/products/product-groups", label: "Produktgruppen" },
       ],
     },
@@ -107,9 +138,10 @@ function getMenuItemsMain(t, isSuperuser = false) {
     items.push({
       url: "/sellers-menu",
       label: tx("sellers", "Sellers"),
+      superuserOnly: true,
       icon: StoreIcon,
       subNavigationItems: [
-        { url: "/sellers", label: tx("view", "View") },
+        { url: "/sellers", label: tx("view", "View"), superuserOnly: true },
       ],
     });
   }
@@ -140,14 +172,14 @@ function getMenuItemsMain(t, isSuperuser = false) {
       icon: ListBulletedIcon,
       subNavigationItems: [
         { url: "/content/media", label: tx("media", "Media") },
-        { url: "/content/menus", label: tx("menus", "Menus") },
-        { url: "/content/categories", label: tx("categories", "Categories") },
+        { url: "/content/menus", label: tx("menus", "Menus"), superuserOnly: true },
+        { url: "/content/categories", label: tx("categories", "Categories"), superuserOnly: true },
         { url: "/content/brands", label: tx("brands", "Brands") },
         { url: "/content/metaobjects", label: tx("metaobjects", "Metaobjects") },
-        { url: "/content/landing-page", label: tx("landingPage", "Landing Page") },
-        { url: "/content/styles", label: tx("styles", "Styles") },
-        { url: "/content/pages", label: tx("pages", "Pages") },
-        { url: "/content/blog-posts", label: tx("blogPosts", "Blog Posts") },
+        { url: "/content/landing-page", label: tx("landingPage", "Landing Page"), superuserOnly: true },
+        { url: "/content/styles", label: tx("styles", "Styles"), superuserOnly: true },
+        { url: "/content/pages", label: tx("pages", "Pages"), superuserOnly: true },
+        { url: "/content/blog-posts", label: tx("blogPosts", "Blog Posts"), superuserOnly: true },
       ],
     },
     {
@@ -157,7 +189,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       subNavigationItems: [
         { url: "/analytics/reports", label: tx("reports", "Reports") },
         { url: "/analytics/transactions", label: "Transactions" },
-        { url: "/analytics/live-view", label: tx("liveView", "Live View") },
+        { url: "/analytics/live-view", label: tx("liveView", "Live View"), superuserOnly: true },
         { url: "/analytics/ranking", label: tx("reports", "Reports") },
       ],
     },
@@ -799,7 +831,10 @@ export default function PolarisLayout({ children }) {
       });
   };
 
-  const menuMain = filterNavForRole(getMenuItemsMain(t, isSuperuser));
+  const menuMain = styleSuperuserOnlyNavItems(
+    filterNavForRole(getMenuItemsMain(t, isSuperuser)),
+    isSuperuser
+  );
   const menuSettings = getMenuItemsSettings(t, isSuperuser);
   const navLocation = pathname && pathname !== "" ? pathname : "/";
 

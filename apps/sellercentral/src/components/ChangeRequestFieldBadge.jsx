@@ -8,6 +8,18 @@ import {
   fieldNameDisplayLabel,
 } from "@/lib/product-change-request-format";
 
+function changeRequestSellerLabel(cr) {
+  if (!cr || typeof cr !== "object") return "—";
+  return String(
+    cr.seller_label ||
+      cr.seller_store_name ||
+      cr.seller_company_name ||
+      cr.seller_email ||
+      cr.seller_id ||
+      "—"
+  );
+}
+
 export function ChangeRequestFieldBadge({ requests, fieldName }) {
   const locale = useLocale();
   const list = useMemo(
@@ -25,17 +37,20 @@ export function ChangeRequestFieldBadge({ requests, fieldName }) {
           cur: "Mevcut değer",
           prop: "Önerilen değer",
           hint: "Onay bekleyen değişiklik",
+          seller: "Öneren satıcı",
         }
       : locale === "de"
         ? {
             cur: "Aktueller Wert",
             prop: "Vorgeschlagener Wert",
             hint: "Änderung ausstehend",
+            seller: "Vorschlag von",
           }
         : {
             cur: "Current value",
             prop: "Proposed value",
             hint: "Change pending approval",
+            seller: "Suggested by",
           };
 
   return (
@@ -78,6 +93,9 @@ export function ChangeRequestFieldBadge({ requests, fieldName }) {
           </Text>
           <Text as="p" variant="bodyXs" tone="subdued">
             {l.hint}
+          </Text>
+          <Text as="p" variant="bodyXs" tone="subdued">
+            {l.seller}: {changeRequestSellerLabel(cr)}
           </Text>
           <BlockStack gap="100">
             <Text as="p" variant="bodyXs" tone="subdued">

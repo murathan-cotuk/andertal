@@ -480,7 +480,7 @@ export default function SearchTemplate() {
   const showSidebarTmpl = tmpl.show_sidebar !== false;
   const contentPadX = tmpl.content_padding_x || "32px";
   const productsPerRow = Number(tmpl.products_per_row) || 4;
-  const productsPerRowMobile = Number(tmpl.products_per_row_mobile) || 1;
+  const productsPerRowMobile = Number(tmpl.products_per_row_mobile) || 2;
 
   const q = (searchParams?.get("q") || "").trim();
   const catParam = (searchParams?.get("cat") || "").trim();

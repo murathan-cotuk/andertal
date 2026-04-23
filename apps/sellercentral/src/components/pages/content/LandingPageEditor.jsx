@@ -411,6 +411,12 @@ function HeroBannerEditor({ container, onChange }) {
                       />
                     </div>
                   </InlineStack>
+                  <PaddingEditor
+                    label="Außenabstand (Mobil)"
+                    value={container.mobile_padding || "0px 0px 0px 0px"}
+                    onChange={(v) => onChange({ ...container, mobile_padding: v })}
+                    defaultValue="0px 0px 0px 0px"
+                  />
                 </BlockStack>
               )}
             </div>

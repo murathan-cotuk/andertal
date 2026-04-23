@@ -239,16 +239,18 @@ const Sidebar = styled.aside`
   @media (max-width: 767px) {
     position: fixed;
     top: 0;
-    left: ${(p) => (p.$open ? "0" : "-260px")};
-    width: 250px;
-    height: 100vh;
-    max-height: 100vh;
-    z-index: 100;
+    left: 0;
+    width: min(82vw, 320px);
+    height: 100dvh;
+    max-height: 100dvh;
+    z-index: 2147483620;
     background: #fff;
-    box-shadow: 4px 0 16px rgba(0,0,0,0.12);
-    transition: left var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+    transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
+    transition: transform var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
     padding: 16px;
     box-sizing: border-box;
+    overflow-y: auto;
 
     @media (prefers-reduced-motion: reduce) {
       transition: none;
@@ -277,8 +279,8 @@ const SidebarOverlay = styled.div`
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.35);
-    z-index: 99;
+    background: rgba(0,0,0,0.45);
+    z-index: 2147483619;
     opacity: ${(p) => (p.$open ? 1 : 0)};
     pointer-events: ${(p) => (p.$open ? "auto" : "none")};
     transition: opacity var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
@@ -702,7 +704,7 @@ export default function CategoryTemplate() {
   const showSidebar     = tmpl.show_sidebar !== false;
   const sidebarWidth    = tmpl.sidebar_width || "280px";
   const colsPerRow      = Number(tmpl.products_per_row) || 4;
-  const colsPerRowMobile = Number(tmpl.products_per_row_mobile) || 1;
+  const colsPerRowMobile = Number(tmpl.products_per_row_mobile) || 2;
   const richtextAlign   = tmpl.richtext_align || "left";
   const richtextMaxW    = tmpl.richtext_max_width || "700px";
   const contentPadX     = tmpl.content_padding_x || "32px";
@@ -766,14 +768,7 @@ export default function CategoryTemplate() {
   const hasSubcategories = subcategories.length > 0;
   const showCatalogSidebar = hasFacets || hasSubcategories || !!parentCategory;
 
-  /* Mobile: keep category / subcategory nav drawer open on load & when navigating (subcategories visible) */
-  useEffect(() => {
-    if (loading || !category) return;
-    if (!showSidebar || !showCatalogSidebar) return;
-    if (typeof window === "undefined" || !window.matchMedia("(max-width: 767px)").matches) return;
-    if (!hasSubcategories && !parentCategory) return;
-    setPanelOpen(true);
-  }, [loading, slug, category?.id, hasSubcategories, parentCategory?.id, showSidebar, showCatalogSidebar]);
+  /* Mobile: sidebar stays closed on load — user opens manually via filter button */
 
   useEffect(() => {
     const facetKeys = Object.keys(facets);
