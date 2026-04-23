@@ -1,6 +1,7 @@
 "use client";
 
-import { ProductCard } from "@/components/ProductCard";
+import { ProductCard, ProductListItem } from "@/components/ProductCard";
+import { useIsNarrow } from "@/hooks/useIsNarrow";
 import styled from "styled-components";
 
 const STRIP_GAP = 8;
@@ -9,12 +10,18 @@ const MOBILE_GRID_GAP = 8;
 const CatalogWrap = styled.div`
   width: 100%;
 
-  /* ── Mobile (≤767px): 2-column grid ──────────────────────────────────── */
+  /* ── Mobile (≤767px): list (1-col) or grid ───────────────────────────── */
   @media (max-width: 767px) {
-    display: grid;
-    grid-template-columns: repeat(${(p) => p.$mobileCols}, minmax(0, 1fr));
-    gap: ${MOBILE_GRID_GAP}px;
-    align-content: start;
+    ${(p) => p.$mobileCols === 1 ? `
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    ` : `
+      display: grid;
+      grid-template-columns: repeat(${p.$mobileCols}, minmax(0, 1fr));
+      gap: ${MOBILE_GRID_GAP}px;
+      align-content: start;
+    `}
   }
 
   /* ── Tablet (768–1023px): horizontal scroll strip ────────────────────── */
@@ -91,12 +98,13 @@ export function ProductGrid({
   maxColumnsMobile = 2,
   activeFilters = {},
 }) {
+  const isMobile = useIsNarrow(767);
   if (!products.length) return <Empty>No products found</Empty>;
 
   const cols = clampCols(maxColumns);
   const m = clampCols(maxColumnsMobile);
-  // Mobile grid columns: use maxColumnsMobile, default 2
   const mobileCols = Math.max(1, Math.min(m, 3));
+  const useMobileList = isMobile && mobileCols === 1;
 
   return (
     <CatalogWrap
@@ -107,7 +115,10 @@ export function ProductGrid({
     >
       {products.map((p) => (
         <CardSlot key={p.id} $m={m}>
-          <ProductCard product={p} activeFilters={activeFilters} plainImage />
+          {useMobileList
+            ? <ProductListItem product={p} activeFilters={activeFilters} />
+            : <ProductCard product={p} activeFilters={activeFilters} plainImage />
+          }
         </CardSlot>
       ))}
     </CatalogWrap>

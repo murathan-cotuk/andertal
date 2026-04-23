@@ -244,8 +244,15 @@ const VarLabelSelected = styled.span`
 
 const VarRow = styled.div`
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: ${(p) => p.$scroll ? "nowrap" : "wrap"};
   gap: 8px;
+  ${(p) => p.$scroll ? `
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  ` : ""}
+  &::-webkit-scrollbar { display: ${(p) => p.$scroll ? "none" : "auto"}; }
 `;
 
 /* Compact text chip — sizes, materials, etc */
@@ -664,6 +671,49 @@ const ReviewsSection = styled.section`
   margin-bottom: 48px;
 `;
 
+/* ── Mobile-only flat layout ── */
+const MobileStack = styled.div`
+  display: none;
+  @media (max-width: 767px) {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 24px;
+  }
+`;
+
+const MobileSection = styled.div`
+  border-top: 1px solid #f3f4f6;
+  padding: 14px 0;
+`;
+
+const MobileGalleryOuter = styled.div`
+  margin: 10px -12px 0;
+  background: #fff;
+  position: relative;
+`;
+
+const MobileGalleryTrack = styled.div`
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+`;
+
+const MobileGallerySlide = styled.div`
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #fff;
+  cursor: zoom-in;
+`;
+
 function sanitizeHtml(html) {
   if (!html || typeof html !== "string") return "";
   return html
@@ -876,6 +926,8 @@ export default function ProductTemplateMobile() {
   const [categoryAncestors, setCategoryAncestors] = useState([]);
   const [categoryCurrentNode, setCategoryCurrentNode] = useState(null);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
+  const [mobileGalleryIdx, setMobileGalleryIdx] = useState(0);
+  const galleryTrackRef = useRef(null);
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
   const openCartSidebar = cartState?.openCartSidebar ?? (() => {});
@@ -928,6 +980,25 @@ export default function ProductTemplateMobile() {
     };
     fetchProduct();
   }, [slug]);
+
+  useEffect(() => {
+    if (!product) return;
+    const handle = storefrontProductHandle(product, locale) || product.handle || slug;
+    if (!handle) return;
+    const locP = getLocalizedProduct(product, locale) || product;
+    const entry = {
+      handle,
+      title: locP.title || product.title || "",
+      thumbnail: product.thumbnail || product.images?.[0]?.url || null,
+      price_cents: product.variants?.[0]?.prices?.[0]?.amount ?? null,
+    };
+    try {
+      const raw = localStorage.getItem("belucha_recently_viewed") || "[]";
+      const list = JSON.parse(raw).filter((p) => p.handle !== handle);
+      list.unshift(entry);
+      localStorage.setItem("belucha_recently_viewed", JSON.stringify(list.slice(0, 20)));
+    } catch (_) {}
+  }, [product?.id]);
 
   useEffect(() => {
     if (typeof document === "undefined" || !product) return;
@@ -1027,6 +1098,15 @@ export default function ProductTemplateMobile() {
       })
       .catch(() => {});
   }, [product?.id, multiOffer?.review_product_ids]);
+
+  useEffect(() => {
+    if (!galleryTrackRef.current) return;
+    const track = galleryTrackRef.current;
+    const targetLeft = track.clientWidth * selectedImage;
+    if (Math.abs(track.scrollLeft - targetLeft) > 5) {
+      track.scrollLeft = targetLeft;
+    }
+  }, [selectedImage]);
 
   if (loading) return <Container><NewtonsCradle /></Container>;
   if (error) return <Container>Fehler: {error}</Container>;
@@ -1209,6 +1289,15 @@ export default function ProductTemplateMobile() {
     } catch (_) {}
   };
 
+  const handleMobileGalleryScroll = (e) => {
+    const track = e.currentTarget;
+    const idx = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+    if (idx !== mobileGalleryIdx) {
+      setMobileGalleryIdx(idx);
+      setSelectedImage(idx);
+    }
+  };
+
   const handleAddToCart = async () => {
     const variantId = variant?.id;
     if (!variantId) return;
@@ -1304,80 +1393,83 @@ export default function ProductTemplateMobile() {
       : {}),
   } : null;
 
-  const variantSelectorContent = useLinkedVariations && variationGroups?.length ? (
-    <VariantSection>
-      {variationGroups.map((group, gIdx) => {
-        const groupName = group.name || "";
-        const selected = selectedOptions[groupName] ?? "";
-        const groupTitle = variationGroupDisplayName(group, gIdx, meta, locale);
-        const selectedOpt = (group.options || []).find(
-          (o) => optionCanonicalValue(o).toLowerCase() === selected.trim().toLowerCase()
-        );
-        const selectedLabel = selected
-          ? (selectedOpt ? optionDisplayLabel(selectedOpt, locale) : selected)
-          : "";
-        const isSwatch = (group.options || []).some(
-          (o) => (typeof o === "object" && o.swatch_image)
-        );
-        return (
-          <VarGroup key={groupName}>
-            <VarLabel>
-              {groupTitle || groupName}
-              {selectedLabel && <VarLabelSelected>: {selectedLabel}</VarLabelSelected>}
-            </VarLabel>
-            <VarRow>
-              {(group.options || []).map((opt, oIdx) => {
-                const valueStr = optionCanonicalValue(opt);
-                const displayStr = optionDisplayLabel(opt, locale) || `Option ${oIdx + 1}`;
-                const swatchUrl = typeof opt === "object" && opt.swatch_image
-                  ? resolveImageUrl(opt.swatch_image)
-                  : null;
-                const isSelected = selected.trim().toLowerCase() === valueStr.toLowerCase();
-                const inStockOpt = hasStockForOption(variants, variationGroups, groupName, valueStr, selectedOptions);
-                const handleClick = () => {
-                  if (isSelected || !inStockOpt) return;
-                  setSelectedOptions((prev) => ({ ...prev, [groupName]: valueStr }));
-                  setSelectedImage(0);
-                };
-                if (isSwatch || swatchUrl) {
-                  return (
-                    <VarSwatch
-                      key={oIdx}
-                      type="button"
-                      title={displayStr}
-                      $selected={isSelected}
-                      $oos={!inStockOpt}
-                      onClick={handleClick}
-                      aria-label={displayStr}
-                      aria-pressed={isSelected}
-                    >
-                      {swatchUrl ? (
-                        <img src={swatchUrl} alt={displayStr} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }} />
-                      ) : (
-                        <span style={{ display: "block", width: "100%", height: "100%", borderRadius: "50%", background: valueStr.toLowerCase() }} />
-                      )}
-                    </VarSwatch>
-                  );
-                }
-                return (
-                  <VarChip
-                    key={oIdx}
-                    type="button"
-                    $selected={isSelected}
-                    $oos={!inStockOpt}
-                    onClick={handleClick}
-                    aria-pressed={isSelected}
-                  >
-                    {displayStr}
-                  </VarChip>
-                );
-              })}
-            </VarRow>
-          </VarGroup>
-        );
-      })}
-    </VariantSection>
-  ) : (() => {
+  const buildVariantSelector = (scrollable = false) => {
+    if (useLinkedVariations && variationGroups?.length) {
+      return (
+        <VariantSection>
+          {variationGroups.map((group, gIdx) => {
+            const groupName = group.name || "";
+            const selected = selectedOptions[groupName] ?? "";
+            const groupTitle = variationGroupDisplayName(group, gIdx, meta, locale);
+            const selectedOpt = (group.options || []).find(
+              (o) => optionCanonicalValue(o).toLowerCase() === selected.trim().toLowerCase()
+            );
+            const selectedLabel = selected
+              ? (selectedOpt ? optionDisplayLabel(selectedOpt, locale) : selected)
+              : "";
+            const isSwatch = (group.options || []).some(
+              (o) => (typeof o === "object" && o.swatch_image)
+            );
+            return (
+              <VarGroup key={groupName}>
+                <VarLabel>
+                  {groupTitle || groupName}
+                  {selectedLabel && <VarLabelSelected>: {selectedLabel}</VarLabelSelected>}
+                </VarLabel>
+                <VarRow $scroll={scrollable}>
+                  {(group.options || []).map((opt, oIdx) => {
+                    const valueStr = optionCanonicalValue(opt);
+                    const displayStr = optionDisplayLabel(opt, locale) || `Option ${oIdx + 1}`;
+                    const swatchUrl = typeof opt === "object" && opt.swatch_image
+                      ? resolveImageUrl(opt.swatch_image)
+                      : null;
+                    const isSelected = selected.trim().toLowerCase() === valueStr.toLowerCase();
+                    const inStockOpt = hasStockForOption(variants, variationGroups, groupName, valueStr, selectedOptions);
+                    const handleClick = () => {
+                      if (isSelected || !inStockOpt) return;
+                      setSelectedOptions((prev) => ({ ...prev, [groupName]: valueStr }));
+                      setSelectedImage(0);
+                    };
+                    if (isSwatch || swatchUrl) {
+                      return (
+                        <VarSwatch
+                          key={oIdx}
+                          type="button"
+                          title={displayStr}
+                          $selected={isSelected}
+                          $oos={!inStockOpt}
+                          onClick={handleClick}
+                          aria-label={displayStr}
+                          aria-pressed={isSelected}
+                        >
+                          {swatchUrl ? (
+                            <img src={swatchUrl} alt={displayStr} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }} />
+                          ) : (
+                            <span style={{ display: "block", width: "100%", height: "100%", borderRadius: "50%", background: valueStr.toLowerCase() }} />
+                          )}
+                        </VarSwatch>
+                      );
+                    }
+                    return (
+                      <VarChip
+                        key={oIdx}
+                        type="button"
+                        $selected={isSelected}
+                        $oos={!inStockOpt}
+                        onClick={handleClick}
+                        aria-pressed={isSelected}
+                      >
+                        {displayStr}
+                      </VarChip>
+                    );
+                  })}
+                </VarRow>
+              </VarGroup>
+            );
+          })}
+        </VariantSection>
+      );
+    }
     const legacyGroups = groupVariantsByTitle(variants);
     if (legacyGroups.length === 0) return null;
     return (
@@ -1385,7 +1477,7 @@ export default function ProductTemplateMobile() {
         {legacyGroups.map((group) => (
           <VarGroup key={group.title}>
             <VarLabel>{group.title}</VarLabel>
-            <VarRow>
+            <VarRow $scroll={scrollable}>
               {group.options.map(({ variant: v, index: idx }) => {
                 const qty = v.inventory_quantity ?? v.inventory ?? 0;
                 const oos = Number(qty) <= 0;
@@ -1407,7 +1499,9 @@ export default function ProductTemplateMobile() {
         ))}
       </VariantSection>
     );
-  })();
+  };
+  const variantSelectorContent = buildVariantSelector();
+  const mobileVariantSelector = buildVariantSelector(true);
 
   return (
     <Container>
@@ -1419,8 +1513,10 @@ export default function ProductTemplateMobile() {
       )}
       <Breadcrumbs items={breadcrumbItems} />
 
-      <MobileHeaderBlock>
-        <MobileBrandReviewRow>
+      {/* ── Mobile-only flat layout ── */}
+      <MobileStack>
+        {/* 1. Brand + Reviews */}
+        <MobileBrandReviewRow style={{ paddingBottom: 8 }}>
           {(meta.brand_name || meta.brand) ? (
             <BrandRow
               brandName={meta.brand_name || meta.brand || ""}
@@ -1434,22 +1530,188 @@ export default function ProductTemplateMobile() {
             style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "inherit", whiteSpace: "nowrap" }}
           >
             <StarRating average={reviewAvg} count={reviewCount} />
-            <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-              {reviewCount > 0 ? `${reviewCount}` : "0"}
-            </span>
+            <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>{reviewCount > 0 ? reviewCount : 0}</span>
           </a>
         </MobileBrandReviewRow>
 
-        <Title>{titleDisplay}</Title>
+        {/* 2. Title */}
+        <Title style={{ fontSize: "1.05rem", lineHeight: 1.35, margin: "2px 0 6px" }}>{titleDisplay}</Title>
 
+        {/* 3. Badge + Category */}
         <MobileBadgeCategoryRow>
-          <span>{isBestseller && <BestsellerBadge style={{ alignSelf: "flex-start" }} />}</span>
+          <span>{isBestseller && <BestsellerBadge />}</span>
           {categoryCurrentLabel ? (
             <CategoryPill title={categoryCurrentLabel}>{categoryCurrentLabel}</CategoryPill>
           ) : <span />}
         </MobileBadgeCategoryRow>
-      </MobileHeaderBlock>
 
+        {/* 4. Full-bleed swipeable gallery */}
+        <MobileGalleryOuter>
+          <MobileGalleryTrack ref={galleryTrackRef} onScroll={handleMobileGalleryScroll}>
+            {(displayImages.length > 0 ? displayImages : [{ url: mainImage, alt: displayTitle }]).map((img, i) => (
+              <MobileGallerySlide key={i} onClick={() => { setSelectedImage(i); setLightboxOpen(true); }}>
+                <img
+                  src={img.url || mainImage}
+                  alt={img.alt || displayTitle}
+                  style={{ width: "100%", height: "100%", objectFit: "contain", background: "#fff" }}
+                />
+              </MobileGallerySlide>
+            ))}
+          </MobileGalleryTrack>
+          {/* Wishlist + Share — bottom-right */}
+          {product?.id && (
+            <GalleryActionRow
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              role="presentation"
+            >
+              <div style={{ position: "relative" }}>
+                <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
+              </div>
+              <GalleryActionBtn type="button" aria-label="Share product" title="Share product" onClick={shareProduct}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="18" cy="5" r="3" />
+                  <circle cx="6" cy="12" r="3" />
+                  <circle cx="18" cy="19" r="3" />
+                  <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" />
+                  <line x1="15.4" y1="6.5" x2="8.6" y2="10.5" />
+                </svg>
+              </GalleryActionBtn>
+            </GalleryActionRow>
+          )}
+          {/* Slide dots */}
+          {displayImages.length > 1 && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 4, padding: "6px 0 8px" }}>
+              {displayImages.map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: mobileGalleryIdx === i ? 16 : 6,
+                    height: 6,
+                    borderRadius: 3,
+                    background: mobileGalleryIdx === i ? "#374151" : "#d1d5db",
+                    transition: "width 0.2s, background 0.2s",
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </MobileGalleryOuter>
+
+        {/* 5. Variants — single scrollable row */}
+        {mobileVariantSelector && (
+          <MobileSection>{mobileVariantSelector}</MobileSection>
+        )}
+
+        {/* 6. Price */}
+        <MobileSection>
+          <PriceMainRow style={{ marginBottom: 4 }}>
+            <PriceMain>{formatPriceCents(effectiveDisplayCents)} €</PriceMain>
+            {discountPercent != null && discountPercent > 0 && (
+              <DiscountPill>-{discountPercent}%</DiscountPill>
+            )}
+          </PriceMainRow>
+          {(hasSale || (uvpCents != null && uvpCents > 0)) && (
+            <PriceSubRow>
+              {hasSale && <Strike>{formatPriceCents(priceCents)} €</Strike>}
+              {uvpCents != null && uvpCents > 0 && <MSRP>UVP {formatPriceCents(uvpCents)} €</MSRP>}
+            </PriceSubRow>
+          )}
+          <TaxLine>inkl. MwSt. · zzgl. Versandkosten</TaxLine>
+          {grundpreis && (
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+              {grundpreis.contentLabel && <span>{grundpreis.contentLabel} · </span>}
+              <span>{grundpreis.display}</span>
+            </div>
+          )}
+        </MobileSection>
+
+        {/* 7. Qty + CTA */}
+        <MobileSection>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <QtyLabel>Menge</QtyLabel>
+            <QtySelect
+              as="input"
+              type="number"
+              min={1}
+              value={quantity}
+              onChange={(e) => { const v = Math.max(1, Math.floor(Number(e.target.value)) || 1); setQuantity(v); }}
+              onBlur={(e) => { const v = Math.max(1, Math.floor(Number(e.target.value)) || 1); setQuantity(v); }}
+              disabled={!inStock || isComingSoon || shippingUnavailable}
+            />
+          </div>
+          {cartNotice.text ? <CartNotice $visible={cartNotice.visible}>{cartNotice.text}</CartNotice> : null}
+          <ToCartButton
+            onClick={handleAddToCart}
+            disabled={!inStock || isComingSoon || shippingUnavailable}
+          >
+            {shippingUnavailable
+              ? ({ de: "Nicht in diese Region lieferbar", tr: "Bu bölgeye teslimat yok", fr: "Pas de livraison dans cette région", it: "Nessuna consegna in questa regione", es: "Sin envío a esta región" }[locale] ?? "Not available in this region")
+              : isComingSoon
+                ? ({ de: "Bald verfügbar", tr: "Yakında", fr: "Bientôt disponible", it: "Disponibile presto", es: "Próximamente" }[locale] ?? "Coming Soon")
+                : !inStock
+                  ? ({ de: "Ausverkauft", tr: "Stokta Yok", fr: "Épuisé", it: "Esaurito", es: "Agotado" }[locale] ?? "Out of Stock")
+                  : ({ de: "In den Einkaufswagen", tr: "Sepete Ekle", fr: "Ajouter au panier", it: "Aggiungi al carrello", es: "Añadir al carrito" }[locale] ?? "Add to Cart")
+            }
+          </ToCartButton>
+          {isComingSoon && publishDate && (
+            <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "8px 0 0", fontWeight: 400 }}>
+              {({ de: "Bald verfügbar", tr: "Pek yakında", fr: "Bientôt disponible", it: "Disponibile presto", es: "Próximamente" }[locale] ?? "Coming Soon")}
+              {publishDate && !isNaN(publishDate.getTime()) && (
+                <span style={{ marginLeft: 6 }}>
+                  ({publishDate.toLocaleDateString(locale === "tr" ? "tr-TR" : "de-DE", { day: "numeric", month: "long", year: "numeric" })})
+                </span>
+              )}
+            </p>
+          )}
+        </MobileSection>
+
+        {/* 8. Info rows: Versand / Rückgabe / Verkäufer / EAN */}
+        <MobileSection>
+          <InfoList style={{ borderTop: "none", paddingTop: 0 }}>
+            {[
+              { label: "Versand", value: shippingDisplay },
+              { label: "Rückgabe", value: `${returnDays} Tage, ${returnCost}` },
+              { label: "Verkäufer", value: effectiveStoreName },
+              ...((variant?.ean || meta.ean) ? [{ label: "EAN", value: variant?.ean || meta.ean }] : []),
+            ].map(({ label, value }) => (
+              <InfoRow key={label}>
+                <InfoLabel>{label}</InfoLabel>
+                <InfoValue title={String(value ?? "")}>{value}</InfoValue>
+              </InfoRow>
+            ))}
+          </InfoList>
+        </MobileSection>
+
+        {/* 9. Bullet points */}
+        {bulletPoints.length > 0 && (
+          <MobileSection>
+            <BulletList>
+              {bulletPoints.map((text, i) => <li key={i}>{text}</li>)}
+            </BulletList>
+          </MobileSection>
+        )}
+
+        {/* 10. Eigenschaften */}
+        {(metaRows.length > 0 || dimensionsDisplay || (Array.isArray(meta.metafields) && meta.metafields.some((f) => f?.key && f?.value)) || variantMetafields.length > 0) && (
+          <MobileSection>
+            <MetaTable>
+              <tbody>
+                {metaRows.map(({ key, value }) => <tr key={key}><th>{key}</th><td>{value}</td></tr>)}
+                {dimensionsDisplay && <tr><th>Abmessungen</th><td>{dimensionsDisplay}</td></tr>}
+                {Array.isArray(meta.metafields) && meta.metafields.filter((f) => f?.key && f?.value).map((f, i) => (
+                  <tr key={`mf-${i}`}><th>{f.key}</th><td>{f.value}</td></tr>
+                ))}
+                {variantMetafields.map((f, i) => (
+                  <tr key={`vmf-${i}`}><th>{f.key}</th><td>{f.value}</td></tr>
+                ))}
+              </tbody>
+            </MetaTable>
+          </MobileSection>
+        )}
+      </MobileStack>
+
+      {/* ── Desktop ThreeCol (hidden on mobile) ── */}
       <ThreeCol>
         {/* Left: Gallery — sticky until Kunden section */}
         <GalleryCol>

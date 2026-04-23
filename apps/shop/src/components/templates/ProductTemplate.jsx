@@ -938,6 +938,25 @@ export default function ProductTemplate() {
   }, [slug]);
 
   useEffect(() => {
+    if (!product) return;
+    const handle = storefrontProductHandle(product, locale) || product.handle || slug;
+    if (!handle) return;
+    const locP = getLocalizedProduct(product, locale) || product;
+    const entry = {
+      handle,
+      title: locP.title || product.title || "",
+      thumbnail: product.thumbnail || product.images?.[0]?.url || null,
+      price_cents: product.variants?.[0]?.prices?.[0]?.amount ?? null,
+    };
+    try {
+      const raw = localStorage.getItem("belucha_recently_viewed") || "[]";
+      const list = JSON.parse(raw).filter((p) => p.handle !== handle);
+      list.unshift(entry);
+      localStorage.setItem("belucha_recently_viewed", JSON.stringify(list.slice(0, 20)));
+    } catch (_) {}
+  }, [product?.id]);
+
+  useEffect(() => {
     if (typeof document === "undefined" || !product) return;
     const pathSlug = storefrontProductHandle(product, locale);
     if (!pathSlug) return;

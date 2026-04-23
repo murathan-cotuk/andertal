@@ -103,7 +103,8 @@
       "Bash(sed -n '1345,1360p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/app/[locale]/checkout/page.jsx\")",
       "Bash(sed -n '1388,1400p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/app/[locale]/checkout/page.jsx\")",
       "Bash(sed -n '993,998p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/components/ShopHeader.jsx\")",
-      "Bash(sed -n '1145,1150p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/components/ShopHeader.jsx\")"
+      "Bash(sed -n '1145,1150p' \"C:/Users/murat/Desktop/MC/MC/EC/EC/ECProjeleri/belucha/apps/shop/src/components/ShopHeader.jsx\")",
+      "Bash(npx tsc *)"
     ]
   }
 }

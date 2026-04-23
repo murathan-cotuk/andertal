@@ -40,16 +40,22 @@ const Card = styled.article`
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
+  @media (max-width: 767px) {
+    border-radius: 8px;
+  }
 `;
 
 /* Image block: keep full image visible (no crop). */
 const ImgBlock = styled.div`
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   background: #fff;
   isolation: isolate;
+  @media (max-width: 767px) {
+    aspect-ratio: 1 / 1;
+  }
 
   img {
     position: absolute;
@@ -61,30 +67,15 @@ const ImgBlock = styled.div`
     padding: 2px;
     box-sizing: border-box;
     display: block;
-    transition: transform 0.45s ease, opacity 0.35s ease;
+    transition: none;
   }
 
   img.img-primary {
     z-index: 1;
   }
   img.img-secondary {
-    z-index: 2;
-    opacity: 0;
+    display: none !important;
   }
-  &:hover img.img-primary {
-    opacity: 0;
-    transform: scale(1.01);
-  }
-  &:hover img.img-secondary {
-    opacity: 1;
-    transform: scale(1.01);
-  }
-  ${(p) => p.$plain
-    && css`
-    img { transition: none; }
-    img.img-secondary { display: none !important; }
-    &:hover img.img-primary { opacity: 1 !important; transform: none !important; }
-  `}
 `;
 
 const ImgPlaceholder = styled.div`
@@ -245,6 +236,9 @@ const Info = styled.div`
   max-width: 100%;
   width: 100%;
   box-sizing: border-box;
+  @media (max-width: 767px) {
+    padding: 5px 5px 3px;
+  }
 `;
 
 const Name = styled.h3`
@@ -326,6 +320,14 @@ const Pills = styled.div`
   max-width: 100%;
   width: 100%;
   box-sizing: border-box;
+  @media (max-width: 767px) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    &::-webkit-scrollbar { display: none; }
+  }
 `;
 
 const Pill = styled.button`
@@ -797,5 +799,231 @@ export function StarRating({ average = 0, count = 0 }) {
       </span>
       <span style={{ fontSize: 12, color: "#9ca3af" }}>({count})</span>
     </div>
+  );
+}
+
+/* ─── Mobile list-view item (horizontal) ───────────────────── */
+
+const ListCard = styled.article`
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+  min-width: 0;
+  background: #fff;
+`;
+
+const ListImgWrap = styled.div`
+  flex-shrink: 0;
+  width: 110px;
+  height: 110px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8f8f8;
+  position: relative;
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    padding: 2px;
+    box-sizing: border-box;
+  }
+`;
+
+const ListBody = styled.div`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+`;
+
+const ListName = styled.h3`
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #111;
+  line-height: 1.35;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+`;
+
+const ListPriceRow = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 1px;
+`;
+
+const ListPriceMain = styled.span`
+  font-size: 15px;
+  font-weight: 700;
+  color: ${(p) => (p.$sale ? "#e53e3e" : "#111")};
+`;
+
+const ListPriceOld = styled.span`
+  font-size: 12px;
+  color: #aaa;
+  text-decoration: line-through;
+`;
+
+const ListShippingLine = styled.div`
+  font-size: 11.5px;
+  color: #6b7280;
+`;
+
+const ListCartBtn = styled.button`
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: #111;
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: 6px;
+  cursor: pointer;
+  align-self: flex-start;
+  white-space: nowrap;
+  &:hover:not(:disabled) { background: #333; }
+  &:disabled { opacity: 0.45; cursor: not-allowed; background: #888; }
+`;
+
+const ListBadge = styled.span`
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  color: #fff;
+  background: ${(p) => p.$sale ? "#e53e3e" : p.$gray ? "#9ca3af" : p.$orange ? "#c2410c" : "#15803d"};
+`;
+
+export function ProductListItem({ product, activeFilters = {} }) {
+  const locale = useLocale();
+  const marketPrefixVal = useMarketPrefix();
+  const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
+  const countryCode = useShippingCountryForQuotes(marketCountry);
+  const { title: displayTitle } = getLocalizedProduct(product, locale);
+  const cartCtx = useContext(CartContext);
+  const addToCart = cartCtx?.addToCart ?? (async () => null);
+  const openCartSidebar = cartCtx?.openCartSidebar ?? (() => {});
+  const cartLoading = cartCtx?.loading ?? false;
+  const shippingGroups = cartCtx?.shippingGroups ?? [];
+
+  const variants = product.variants || [];
+  const variant = variants[0] ?? null;
+
+  const [adding, setAdding] = useState(false);
+  const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
+  const cartTimers = useRef({ hide: null, clear: null });
+
+  const localeMedia = localizedProductMediaList(product, locale);
+  const rawImg = variantImageUrlForLocale(variant, locale) || product.images?.[0]?.url || product.thumbnail || localeMedia[0] || null;
+  const imgSrc = resolveImg(rawImg);
+
+  const variantCountryPrice = (() => {
+    const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
+    const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
+    const direct = prices[countryCode] || prices[marketCountry];
+    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+  })();
+  const parentCountryPrice = (() => {
+    const pm = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
+    const prices = pm.prices && typeof pm.prices === "object" ? pm.prices : {};
+    const direct = prices[countryCode] || prices[marketCountry];
+    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+  })();
+  const priceCents = variantCountryPrice != null ? variantCountryPrice
+    : (variant?.prices?.[0]?.amount != null ? Number(variant.prices[0].amount)
+    : (parentCountryPrice != null ? parentCountryPrice
+    : (product.price != null ? Math.round(Number(product.price) * 100) : 0)));
+  const saleCents = product.metadata?.rabattpreis_cents != null ? Number(product.metadata.rabattpreis_cents) : null;
+  const hasSale = saleCents != null && saleCents > 0 && saleCents < priceCents;
+
+  const meta = product.metadata || {};
+  const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
+  const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
+  const isBestseller = isBestsellerMetadata(meta);
+  const inventoryQty = variant?.inventory_quantity ?? null;
+  const outOfStock = variant?.manage_inventory === true && typeof inventoryQty === "number" && inventoryQty <= 0;
+  const shippingGroupIdRaw = meta.shipping_group_id;
+  const shippingGroup = shippingGroupIdRaw != null && String(shippingGroupIdRaw).trim() !== "" ? findShippingGroup(shippingGroups, shippingGroupIdRaw) : null;
+  const shippingPriceCents = shippingGroup ? resolveShippingQuoteStrict(shippingGroup.prices, countryCode || marketCountry) : null;
+  const hasShippingGroup = shippingGroupIdRaw != null && String(shippingGroupIdRaw).trim() !== "" && shippingGroup != null;
+  const shippingUnavailable = hasShippingGroup && shippingPriceCents === null;
+  const reviewAvg = meta.review_avg != null ? Number(meta.review_avg) : 0;
+  const reviewCount = meta.review_count != null ? Number(meta.review_count) : 0;
+  const productHandle = storefrontProductHandle(product, locale);
+  const productUrl = productHandle ? `/produkt/${productHandle}` : "#";
+
+  const handleQuickAdd = async (e) => {
+    e.preventDefault();
+    const vid = variant?.id;
+    if (!vid || outOfStock || shippingUnavailable) return;
+    setAdding(true);
+    if (cartTimers.current.hide) clearTimeout(cartTimers.current.hide);
+    if (cartTimers.current.clear) clearTimeout(cartTimers.current.clear);
+    const successText = locale === "de" ? "Zum Warenkorb hinzugefügt" : locale === "tr" ? "Sepete eklendi" : "Added to cart";
+    const errorText = locale === "de" ? "Hinzufügen fehlgeschlagen" : locale === "tr" ? "Sepete eklenemedi" : "Add to cart failed";
+    try {
+      const ok = await addToCart(vid, 1);
+      if (ok) openCartSidebar();
+      setCartNotice({ text: ok ? successText : errorText, visible: true });
+      cartTimers.current.hide = setTimeout(() => setCartNotice((s) => ({ ...s, visible: false })), 2200);
+      cartTimers.current.clear = setTimeout(() => setCartNotice({ text: "", visible: false }), 2700);
+    } catch {
+      setCartNotice({ text: errorText, visible: true });
+    }
+    setAdding(false);
+  };
+
+  const btnLabel = adding ? "…" : isComingSoon ? (locale === "de" ? "Bald verfügbar" : "Coming soon")
+    : shippingUnavailable ? (locale === "de" ? "Nicht lieferbar" : "Not available")
+    : outOfStock ? (locale === "de" ? "Ausverkauft" : "Sold out")
+    : (locale === "de" ? "In den Warenkorb" : locale === "tr" ? "Sepete Ekle" : "Add to cart");
+
+  return (
+    <ListCard>
+      <Link href={productUrl} style={{ flexShrink: 0, textDecoration: "none" }}>
+        <ListImgWrap>
+          {imgSrc ? <img src={imgSrc} alt={displayTitle} loading="lazy" /> : null}
+        </ListImgWrap>
+      </Link>
+      <ListBody>
+        <Link href={productUrl} style={{ textDecoration: "none" }}>
+          <ListName>{displayTitle}</ListName>
+        </Link>
+        {reviewCount > 0 && <StarRating average={reviewAvg} count={reviewCount} />}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 1 }}>
+          {isBestseller && !isComingSoon && <ListBadge>★ Bestseller</ListBadge>}
+          {isComingSoon && <ListBadge $orange>Pek yakında</ListBadge>}
+          {hasSale && !isComingSoon && <ListBadge $sale>Sale</ListBadge>}
+          {outOfStock && !isComingSoon && <ListBadge $gray>Ausverkauft</ListBadge>}
+        </div>
+        <ListPriceRow>
+          {hasSale && <ListPriceOld>{formatPriceCents(priceCents)} €</ListPriceOld>}
+          <ListPriceMain $sale={hasSale}>{formatPriceCents(hasSale ? saleCents : priceCents)} €</ListPriceMain>
+        </ListPriceRow>
+        {hasShippingGroup && shippingPriceCents != null && (
+          <ListShippingLine>
+            {shippingPriceCents === 0 ? (locale === "de" ? "Kostenloser Versand" : "Free shipping") : `${locale === "de" ? "Versand" : "Shipping"}: ${formatPriceCents(shippingPriceCents)} €`}
+          </ListShippingLine>
+        )}
+        <ListCartBtn
+          type="button"
+          onClick={handleQuickAdd}
+          disabled={cartLoading || adding || outOfStock || isComingSoon || shippingUnavailable}
+        >
+          {btnLabel}
+        </ListCartBtn>
+        {cartNotice.text && (
+          <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice>
+        )}
+      </ListBody>
+    </ListCard>
   );
 }
