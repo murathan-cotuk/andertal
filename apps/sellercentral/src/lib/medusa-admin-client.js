@@ -960,6 +960,18 @@ class MedusaAdminClient {
     if (subject_thread !== undefined) payload.subject_thread = subject_thread;
     return this.request('/admin-hub/v1/messages/support/mark-read', { method: 'PATCH', body: JSON.stringify(payload) })
   }
+  async getMessageTemplates() {
+    return this.request('/admin-hub/v1/message-templates')
+  }
+  async createMessageTemplate(data) {
+    return this.request('/admin-hub/v1/message-templates', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    })
+  }
+  async deleteMessageTemplate(id) {
+    return this.request(`/admin-hub/v1/message-templates/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  }
   // ── Ranking ──────────────────────────────────────────────────────────────
   async getRankingConfig() {
     return this.request('/admin-hub/v1/ranking/config')

@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, Link } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useMedusaAuth } from "@/hooks/useMedusaAuth";
 import { useCustomerAuth as useAuth, useAuthGuard } from "@belucha/lib";
 import { tokens } from "@/design-system/tokens";
+import { resolveImageUrl } from "@/lib/image-url";
 
 /* ── Monkey SVG (password‑blind feature) ─────────────────── */
 function MonkeyAvatar({ isBlind }) {
@@ -58,12 +59,41 @@ export default function LoginPage() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [branding, setBranding] = useState({ logo: "", favicon: "", logoHeight: 34 });
   const { login } = useAuth();
   const router = useRouter();
   const { login: loginMedusa, loading } = useMedusaAuth();
   const searchParams = useSearchParams();
 
   const isBlind = !showPassword;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/store-seller-settings?seller_id=default", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        setBranding({
+          logo: resolveImageUrl(d?.shop_logo_url || ""),
+          favicon: resolveImageUrl(d?.shop_favicon_url || ""),
+          logoHeight: d?.shop_logo_height != null ? Number(d.shop_logo_height) : 34,
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const fav = (branding.favicon || "").trim();
+    if (!fav || typeof document === "undefined") return;
+    let link = document.querySelector("link[rel='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.setAttribute("rel", "icon");
+      document.head.appendChild(link);
+    }
+    link.setAttribute("href", fav);
+  }, [branding.favicon]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -103,8 +133,16 @@ export default function LoginPage() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa", fontFamily: tokens.fontFamily.sans }}>
       {/* Top bar */}
       <div style={{ padding: "16px 24px" }}>
-        <Link href="/" style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", textDecoration: "none", letterSpacing: "-0.03em" }}>
-          Belucha
+        <Link href="/" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
+          {branding.logo ? (
+            <img
+              src={branding.logo}
+              alt="Belucha"
+              style={{ height: Math.min(Math.max(branding.logoHeight || 34, 20), 56), width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
+            />
+          ) : (
+            <span style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", letterSpacing: "-0.03em" }}>Belucha</span>
+          )}
         </Link>
       </div>
 

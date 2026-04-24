@@ -22,6 +22,7 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
+  const [branding, setBranding] = useState({ logo: "", favicon: "", logoHeight: 30 });
 
   useEffect(() => {
     const inviteEmail = searchParams?.get("email");
@@ -29,6 +30,36 @@ function RegisterForm() {
     if (inviteEmail) { setEmail(inviteEmail); setIsInvited(true); }
     if (token) setInviteToken(token);
   }, [searchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const base = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "");
+    if (!base) return;
+    fetch(`${base}/admin-hub/seller-settings?seller_id=default`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        setBranding({
+          logo: (d?.sellercentral_logo_url || "").trim(),
+          favicon: (d?.sellercentral_favicon_url || "").trim(),
+          logoHeight: d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 30,
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const fav = (branding.favicon || "").trim();
+    if (!fav || typeof document === "undefined") return;
+    let link = document.querySelector("link[rel='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.setAttribute("rel", "icon");
+      document.head.appendChild(link);
+    }
+    link.setAttribute("href", fav);
+  }, [branding.favicon]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -70,7 +101,15 @@ function RegisterForm() {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6" }}>
       <div style={{ width: "100%", maxWidth: 440 }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: "0.18em", color: "#111827" }}>BELUCHA</span>
+          {branding.logo ? (
+            <img
+              src={branding.logo}
+              alt="Belucha"
+              style={{ height: Math.min(Math.max(branding.logoHeight || 30, 18), 52), width: "auto", maxWidth: 260, objectFit: "contain", display: "inline-block" }}
+            />
+          ) : (
+            <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: "0.18em", color: "#111827" }}>BELUCHA</span>
+          )}
         </div>
         <div style={{ background: "#fff", borderRadius: 12, padding: "40px 36px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
           <div style={{ textAlign: "center", marginBottom: 24 }}>

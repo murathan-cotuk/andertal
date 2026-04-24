@@ -7,6 +7,7 @@ import { useCustomerAuth as useAuth, useAuthGuard } from "@belucha/lib";
 import { tokens } from "@/design-system/tokens";
 import { useCart } from "@/context/CartContext";
 import { getShippableCountries } from "@/lib/countries";
+import { resolveImageUrl } from "@/lib/image-url";
 
 /* ── Monkey SVG ─────────────────────────────────────────────────────────── */
 function MonkeyAvatar({ isBlind }) {
@@ -88,9 +89,11 @@ export default function RegisterPage() {
     billingSameAsShipping: true,
     billingAddress: "", billingZipCode: "", billingCity: "", billingCountry: "DE",
     password: "",
+    legalConsent: false,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [branding, setBranding] = useState({ logo: "", favicon: "", logoHeight: 34 });
   const { login } = useAuth();
   const router = useRouter();
   const { register: registerMedusa, login: loginMedusa, loading } = useMedusaAuth();
@@ -109,6 +112,34 @@ export default function RegisterPage() {
     });
   }, [shippableCountries]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/store-seller-settings?seller_id=default", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        setBranding({
+          logo: resolveImageUrl(d?.shop_logo_url || ""),
+          favicon: resolveImageUrl(d?.shop_favicon_url || ""),
+          logoHeight: d?.shop_logo_height != null ? Number(d.shop_logo_height) : 34,
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const fav = (branding.favicon || "").trim();
+    if (!fav || typeof document === "undefined") return;
+    let link = document.querySelector("link[rel='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.setAttribute("rel", "icon");
+      document.head.appendChild(link);
+    }
+    link.setAttribute("href", fav);
+  }, [branding.favicon]);
+
   const set = (key) => (e) => setFormData(f => ({ ...f, [key]: e.target.value }));
 
   const focusStyle = (e) => e.target.style.boxShadow = `0 0 0 3px ${tokens.primary.light}`;
@@ -120,6 +151,7 @@ export default function RegisterPage() {
     if (!formData.email || !formData.password) { setError("E-Mail und Passwort sind erforderlich."); return; }
     if (formData.password.length < 6) { setError("Das Passwort muss mindestens 6 Zeichen lang sein."); return; }
     if (accountType === "gewerbe" && !formData.companyName.trim()) { setError("Firmenname ist erforderlich."); return; }
+    if (!formData.legalConsent) { setError("Bitte akzeptieren Sie die rechtlichen Hinweise."); return; }
 
     try {
       const extra = {
@@ -144,6 +176,14 @@ export default function RegisterPage() {
 
       const loginResult = await loginMedusa(formData.email, formData.password);
       if (loginResult?.customer?.id) {
+        if (formData.legalConsent && formData.email) {
+          const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
+          fetch(`${backendUrl}/store/newsletter-subscribe`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: formData.email.trim().toLowerCase() }),
+          }).catch(() => {});
+        }
         const token = loginResult.access_token || loginResult.token;
         if (token) {
           login(token, loginResult.customer.id);
@@ -165,15 +205,23 @@ export default function RegisterPage() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa", fontFamily: tokens.fontFamily.sans }}>
       {/* Top bar */}
       <div style={{ padding: "16px 24px" }}>
-        <Link href="/" style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", textDecoration: "none", letterSpacing: "-0.03em" }}>
-          Belucha
+        <Link href="/" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
+          {branding.logo ? (
+            <img
+              src={branding.logo}
+              alt="Belucha"
+              style={{ height: Math.min(Math.max(branding.logoHeight || 34, 20), 56), width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
+            />
+          ) : (
+            <span style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", letterSpacing: "-0.03em" }}>Belucha</span>
+          )}
         </Link>
       </div>
 
       {/* Center card */}
       <div style={{ flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px" }}>
         <div style={{
-          width: "100%", maxWidth: 480,
+          width: "100%", maxWidth: 980,
           background: "#fff",
           border: "2px solid #1A1A1A",
           borderRadius: 16,
@@ -205,8 +253,10 @@ export default function RegisterPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
 
+            <div className="register-grid">
+
             {/* Account type toggle */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
               <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Kontotyp</label>
               <div style={{ display: "flex", border: "2px solid #1A1A1A", borderRadius: 8, overflow: "hidden" }}>
                 {[{ val: "privat", label: "👤 Privatkunde" }, { val: "gewerbe", label: "🏢 Geschäftskunde" }].map(({ val, label }) => (
@@ -233,7 +283,7 @@ export default function RegisterPage() {
             {/* Business fields */}
             {accountType === "gewerbe" && (
               <>
-                <div style={sectionLabel}>Unternehmensdaten</div>
+                <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>Unternehmensdaten</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label htmlFor="companyName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Firmenname *</label>
                   <input id="companyName" value={formData.companyName} onChange={set("companyName")} placeholder="Muster GmbH" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
@@ -242,37 +292,33 @@ export default function RegisterPage() {
                   <label htmlFor="vatNumber" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>USt-IdNr. (optional)</label>
                   <input id="vatNumber" value={formData.vatNumber} onChange={set("vatNumber")} placeholder="DE123456789" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
-                <div style={sectionLabel}>Ansprechpartner</div>
+                <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>Ansprechpartner</div>
               </>
             )}
 
             {/* Name row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label htmlFor="firstName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Vorname *</label>
-                <input id="firstName" value={formData.firstName} onChange={set("firstName")} placeholder="Max" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label htmlFor="lastName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Nachname *</label>
-                <input id="lastName" value={formData.lastName} onChange={set("lastName")} placeholder="Mustermann" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
-              </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label htmlFor="firstName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Vorname *</label>
+              <input id="firstName" value={formData.firstName} onChange={set("firstName")} placeholder="Max" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label htmlFor="lastName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Nachname *</label>
+              <input id="lastName" value={formData.lastName} onChange={set("lastName")} placeholder="Mustermann" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
 
             {/* Gender + Birthdate */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label htmlFor="gender" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Geschlecht</label>
-                <select id="gender" value={formData.gender} onChange={set("gender")} style={selStyle} onFocus={focusStyle} onBlur={blurStyle}>
-                  <option value="">Bitte wählen</option>
-                  <option value="male">Männlich</option>
-                  <option value="female">Weiblich</option>
-                  <option value="diverse">Divers</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label htmlFor="birthDate" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Geburtsdatum</label>
-                <input type="date" id="birthDate" value={formData.birthDate} onChange={set("birthDate")} style={inp} onFocus={focusStyle} onBlur={blurStyle} />
-              </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label htmlFor="gender" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Geschlecht</label>
+              <select id="gender" value={formData.gender} onChange={set("gender")} style={selStyle} onFocus={focusStyle} onBlur={blurStyle}>
+                <option value="">Bitte wählen</option>
+                <option value="male">Männlich</option>
+                <option value="female">Weiblich</option>
+                <option value="diverse">Divers</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label htmlFor="birthDate" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Geburtsdatum</label>
+              <input type="date" id="birthDate" value={formData.birthDate} onChange={set("birthDate")} style={inp} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
 
             {/* Email */}
@@ -288,21 +334,19 @@ export default function RegisterPage() {
             </div>
 
             {/* Delivery address */}
-            <div style={sectionLabel}>Lieferadresse</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>Lieferadresse</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
               <label htmlFor="address" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Straße und Hausnummer</label>
               <input id="address" value={formData.address} onChange={set("address")} placeholder="Musterstraße 1" autoComplete="street-address" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label htmlFor="zipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>PLZ</label>
-                <input id="zipCode" value={formData.zipCode} onChange={set("zipCode")} placeholder="12345" autoComplete="postal-code" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label htmlFor="city" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Stadt</label>
-                <input id="city" value={formData.city} onChange={set("city")} placeholder="Berlin" autoComplete="address-level2" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
-              </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label htmlFor="zipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>PLZ</label>
+              <input id="zipCode" value={formData.zipCode} onChange={set("zipCode")} placeholder="12345" autoComplete="postal-code" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label htmlFor="city" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Stadt</label>
+              <input id="city" value={formData.city} onChange={set("city")} placeholder="Berlin" autoComplete="address-level2" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -315,7 +359,7 @@ export default function RegisterPage() {
             </div>
 
             {/* Billing address checkbox */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, gridColumn: "1 / -1" }}>
               <input
                 type="checkbox"
                 id="billingSame"
@@ -330,20 +374,18 @@ export default function RegisterPage() {
 
             {formData.billingSameAsShipping === false && (
               <>
-                <div style={sectionLabel}>Rechnungsadresse</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>Rechnungsadresse</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
                   <label htmlFor="billingAddress" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Straße und Hausnummer</label>
                   <input id="billingAddress" value={formData.billingAddress || ""} onChange={set("billingAddress")} placeholder="Musterstraße 1" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label htmlFor="billingZipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>PLZ</label>
-                    <input id="billingZipCode" value={formData.billingZipCode || ""} onChange={set("billingZipCode")} placeholder="12345" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label htmlFor="billingCity" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Stadt</label>
-                    <input id="billingCity" value={formData.billingCity || ""} onChange={set("billingCity")} placeholder="Berlin" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
-                  </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label htmlFor="billingZipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>PLZ</label>
+                  <input id="billingZipCode" value={formData.billingZipCode || ""} onChange={set("billingZipCode")} placeholder="12345" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label htmlFor="billingCity" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Stadt</label>
+                  <input id="billingCity" value={formData.billingCity || ""} onChange={set("billingCity")} placeholder="Berlin" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label htmlFor="billingCountry" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Land</label>
@@ -357,7 +399,7 @@ export default function RegisterPage() {
             )}
 
             {/* Password */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
               <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Passwort * (min. 6 Zeichen)</label>
               <div style={{ position: "relative" }}>
                 <input
@@ -388,6 +430,25 @@ export default function RegisterPage() {
             </div>
 
             {/* Submit */}
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, gridColumn: "1 / -1" }}>
+              <input
+                type="checkbox"
+                id="legalConsent"
+                checked={!!formData.legalConsent}
+                onChange={(e) => setFormData((f) => ({ ...f, legalConsent: e.target.checked }))}
+                style={{ width: 16, height: 16, marginTop: 2, cursor: "pointer", accentColor: tokens.primary.DEFAULT }}
+              />
+              <label htmlFor="legalConsent" style={{ fontSize: 13, lineHeight: 1.45, color: "#374151", cursor: "pointer" }}>
+                Ich habe die{" "}
+                <Link href="/agb" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>AGB</Link>,{" "}
+                <Link href="/datenschutz" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>Datenschutzhinweise</Link>{" "}
+                und{" "}
+                <Link href="/widerrufsrecht" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>Widerrufsbelehrung</Link>{" "}
+                gelesen und akzeptiere sie. Bei Zustimmung werde ich zum Newsletter angemeldet.
+              </label>
+            </div>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
@@ -403,6 +464,8 @@ export default function RegisterPage() {
                 transition: "transform 0.1s, box-shadow 0.1s",
                 letterSpacing: 0.2,
                 fontFamily: tokens.fontFamily.sans,
+                maxWidth: 420,
+                alignSelf: "center",
               }}
               onMouseEnter={e => { if (!loading) { e.currentTarget.style.transform = "translateY(1px)"; e.currentTarget.style.boxShadow = "0 2px 0 2px #1A1A1A"; } }}
               onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = loading ? "none" : "0 3px 0 2px #1A1A1A"; }}
@@ -410,6 +473,19 @@ export default function RegisterPage() {
               {loading ? "Wird registriert…" : "Konto erstellen"}
             </button>
           </form>
+
+          <style jsx>{`
+            .register-grid {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 12px;
+            }
+            @media (max-width: 767px) {
+              .register-grid {
+                grid-template-columns: 1fr;
+              }
+            }
+          `}</style>
 
           {/* Login link */}
           <p style={{ fontSize: 13, color: "#6b7280", margin: 0, textAlign: "center" }}>

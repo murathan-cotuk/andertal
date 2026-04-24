@@ -442,7 +442,14 @@ export default function MobileNav() {
       ["/orders", "/addresses", "/payment-methods", "/nachrichten", "/reviews", "/bonus", "/invoices"].some(
         (h) => appPath === h || appPath.startsWith(`${h}/`),
       ));
+  const hideOnAuthPages =
+    appPath === "/login" ||
+    appPath.startsWith("/login/") ||
+    appPath === "/register" ||
+    appPath.startsWith("/register/");
   const wishlistCount = wishlistIds?.size ?? 0;
+
+  if (hideOnAuthPages) return null;
 
   return (
     /* Only rendered/visible on mobile — display:none injected via globals.css on desktop */

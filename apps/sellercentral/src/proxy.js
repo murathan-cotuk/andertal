@@ -6,6 +6,9 @@ const intlMiddleware = createMiddleware(routing);
 
 /** Routes that don't require authentication */
 const PUBLIC_PATH_PATTERNS = [
+  /^\/login(\/|$)/,
+  /^\/register(\/|$)/,
+  /^\/forgot-password(\/|$)/,
   /^\/[^/]+\/login(\/|$)/,
   /^\/[^/]+\/register(\/|$)/,
   /^\/[^/]+\/forgot-password(\/|$)/,
@@ -28,7 +31,8 @@ export default function middleware(request) {
     if (!token) {
       // Determine locale prefix from path (e.g. /de/dashboard → /de/login)
       const localeMatch = pathname.match(/^\/([^/]+)/);
-      const locale = localeMatch ? localeMatch[1] : "en";
+      const rawLocale = localeMatch ? localeMatch[1] : "";
+      const locale = (routing.locales || []).includes(rawLocale) ? rawLocale : routing.defaultLocale || "en";
       const loginUrl = new URL(`/${locale}/login`, request.url);
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);

@@ -332,6 +332,9 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
 
   useEffect(() => {
     if (!open) return;
+    if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
+      return;
+    }
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -437,7 +440,11 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
           "border-b border-gray-200/90 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.12)]",
           "motion-reduce:transition-none",
         )}
-        style={{ top: topPx }}
+        style={{
+          top: topPx,
+          overscrollBehaviorY: "contain",
+          WebkitOverflowScrolling: "touch",
+        }}
       >
         <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-5 sm:py-4">
           {isAuthenticated ? (

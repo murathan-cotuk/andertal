@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Page, Text, Button, Badge, BlockStack, InlineStack,
-  Box, Divider, Spinner, TextField, Tabs,
+  Box, Divider, Spinner, TextField, Tabs, Select, Modal,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
@@ -144,6 +144,36 @@ function groupBySupportSubject(messages) {
     });
 }
 
+function useMessageTemplates(client) {
+  const [templates, setTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesErr, setTemplatesErr] = useState("");
+
+  const loadTemplates = useCallback(async () => {
+    setTemplatesLoading(true);
+    setTemplatesErr("");
+    try {
+      const data = await client.getMessageTemplates();
+      setTemplates(data?.templates || []);
+    } catch (e) {
+      setTemplatesErr(e?.message || "Vorlagen konnten nicht geladen werden");
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, [client]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
+
+  return {
+    templates,
+    templatesLoading,
+    templatesErr,
+    loadTemplates,
+  };
+}
+
 // ── Customer tab (original inbox) ──────────────────────────────────────────
 
 function CustomerInbox({ client, isSuperuser, sellerNames }) {
@@ -154,9 +184,15 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateName, setTemplateName] = useState("");
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateDeletingId, setTemplateDeletingId] = useState(null);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [searchQ, setSearchQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const bottomRef = useRef(null);
+  const { templates, templatesLoading, templatesErr, loadTemplates } = useMessageTemplates(client);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(searchQ.trim()), 320);
@@ -230,6 +266,56 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
       setErr(e?.message || "Fehler beim Senden");
     }
     setSending(false);
+  };
+
+  const templateOptions = useMemo(
+    () => [
+      { label: "Vorlage wählen…", value: "" },
+      ...templates.map((t) => ({ label: t.name || `Vorlage #${t.id}`, value: String(t.id) })),
+    ],
+    [templates],
+  );
+
+  const applySelectedTemplate = () => {
+    if (!selectedTemplateId) return;
+    const t = templates.find((it) => String(it.id) === String(selectedTemplateId));
+    if (!t?.body) return;
+    setReply(t.body);
+  };
+
+  const saveCurrentReplyAsTemplate = async () => {
+    const name = templateName.trim();
+    const body = reply.trim();
+    if (!name || !body) {
+      setErr("Vorlagenname und Nachricht sind erforderlich");
+      return;
+    }
+    setTemplateSaving(true);
+    setErr("");
+    try {
+      await client.createMessageTemplate({ name, body });
+      setTemplateName("");
+      await loadTemplates();
+    } catch (e) {
+      setErr(e?.message || "Vorlage konnte nicht gespeichert werden");
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
+
+  const deleteTemplate = async (id) => {
+    if (!id) return;
+    setTemplateDeletingId(id);
+    setErr("");
+    try {
+      await client.deleteMessageTemplate(id);
+      if (String(selectedTemplateId) === String(id)) setSelectedTemplateId("");
+      await loadTemplates();
+    } catch (e) {
+      setErr(e?.message || "Vorlage konnte nicht gelöscht werden");
+    } finally {
+      setTemplateDeletingId(null);
+    }
   };
 
   const unreadCount = (thread) =>
@@ -387,6 +473,40 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
             <Box padding="300" borderBlockStartWidth="025" borderColor="border">
               <BlockStack gap="200">
                 {err && <Text as="p" variant="bodySm" tone="critical">{err}</Text>}
+                {templatesErr && <Text as="p" variant="bodySm" tone="critical">{templatesErr}</Text>}
+                <InlineStack gap="200" blockAlign="end" wrap>
+                  <div style={{ minWidth: 240, flex: 1 }}>
+                    <Select
+                      label="Antwortvorlage"
+                      labelHidden
+                      options={templateOptions}
+                      value={selectedTemplateId}
+                      onChange={setSelectedTemplateId}
+                      disabled={templatesLoading || templates.length === 0}
+                    />
+                  </div>
+                  <Button onClick={applySelectedTemplate} disabled={!selectedTemplateId}>
+                    Vorlage anwenden
+                  </Button>
+                  <Button variant="plain" onClick={() => setShowTemplateManager(true)}>
+                    Vorlagen verwalten
+                  </Button>
+                </InlineStack>
+                <InlineStack gap="200" blockAlign="end" wrap>
+                  <div style={{ minWidth: 240, flex: 1 }}>
+                    <TextField
+                      label="Als Vorlage speichern"
+                      labelHidden
+                      placeholder="Vorlagenname…"
+                      value={templateName}
+                      onChange={setTemplateName}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <Button onClick={saveCurrentReplyAsTemplate} loading={templateSaving} disabled={templateSaving || !reply.trim() || !templateName.trim()}>
+                    Speichern
+                  </Button>
+                </InlineStack>
                 <InlineStack gap="200" blockAlign="end">
                   <div style={{ flex: 1 }}>
                     <TextField
@@ -404,6 +524,37 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
                 </InlineStack>
               </BlockStack>
             </Box>
+            <Modal
+              open={showTemplateManager}
+              onClose={() => setShowTemplateManager(false)}
+              title="Nachrichtenvorlagen"
+            >
+              <Modal.Section>
+                <BlockStack gap="200">
+                  {templates.length === 0 && (
+                    <Text as="p" variant="bodySm" tone="subdued">Noch keine Vorlagen gespeichert.</Text>
+                  )}
+                  {templates.map((t) => (
+                    <Box key={t.id} padding="200" borderWidth="025" borderColor="border" borderRadius="200">
+                      <BlockStack gap="100">
+                        <InlineStack align="space-between" blockAlign="center">
+                          <Text as="p" variant="bodySm" fontWeight="semibold">{t.name}</Text>
+                          <Button
+                            tone="critical"
+                            variant="plain"
+                            onClick={() => deleteTemplate(t.id)}
+                            loading={templateDeletingId === t.id}
+                          >
+                            Löschen
+                          </Button>
+                        </InlineStack>
+                        <Text as="p" variant="bodySm" tone="subdued">{t.body}</Text>
+                      </BlockStack>
+                    </Box>
+                  ))}
+                </BlockStack>
+              </Modal.Section>
+            </Modal>
           </>
         )}
       </div>
@@ -508,7 +659,13 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateName, setTemplateName] = useState("");
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateDeletingId, setTemplateDeletingId] = useState(null);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
   const bottomRef = useRef(null);
+  const { templates, templatesLoading, templatesErr, loadTemplates } = useMessageTemplates(client);
 
   const sellerThreads = isSuperuser ? groupBySeller(rawMessages) : [];
   const selectedSellerThread = selectedSellerId
@@ -643,6 +800,56 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
     if (isNewSubject) return !!newSubject.trim();
     if (!selectedSubjectThread) return false;
     return true;
+  };
+
+  const templateOptions = useMemo(
+    () => [
+      { label: "Vorlage wählen…", value: "" },
+      ...templates.map((t) => ({ label: t.name || `Vorlage #${t.id}`, value: String(t.id) })),
+    ],
+    [templates],
+  );
+
+  const applySelectedTemplate = () => {
+    if (!selectedTemplateId) return;
+    const t = templates.find((it) => String(it.id) === String(selectedTemplateId));
+    if (!t?.body) return;
+    setReply(t.body);
+  };
+
+  const saveCurrentReplyAsTemplate = async () => {
+    const name = templateName.trim();
+    const body = reply.trim();
+    if (!name || !body) {
+      setErr("Vorlagenname und Nachricht sind erforderlich");
+      return;
+    }
+    setTemplateSaving(true);
+    setErr("");
+    try {
+      await client.createMessageTemplate({ name, body });
+      setTemplateName("");
+      await loadTemplates();
+    } catch (e) {
+      setErr(e?.message || "Vorlage konnte nicht gespeichert werden");
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
+
+  const deleteTemplate = async (id) => {
+    if (!id) return;
+    setTemplateDeletingId(id);
+    setErr("");
+    try {
+      await client.deleteMessageTemplate(id);
+      if (String(selectedTemplateId) === String(id)) setSelectedTemplateId("");
+      await loadTemplates();
+    } catch (e) {
+      setErr(e?.message || "Vorlage konnte nicht gelöscht werden");
+    } finally {
+      setTemplateDeletingId(null);
+    }
   };
 
   const handleSend = async () => {
@@ -915,9 +1122,43 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
             <Box padding="300" borderBlockStartWidth="025" borderColor="border">
               <BlockStack gap="200">
                 {err && <Text as="p" variant="bodySm" tone="critical">{err}</Text>}
+                {templatesErr && <Text as="p" variant="bodySm" tone="critical">{templatesErr}</Text>}
                 {isNewSubject && (
                   <TextField label="Betreff" value={newSubject} onChange={setNewSubject} autoComplete="off" placeholder="z. B. Frage zu Auszahlung" />
                 )}
+                <InlineStack gap="200" blockAlign="end" wrap>
+                  <div style={{ minWidth: 240, flex: 1 }}>
+                    <Select
+                      label="Antwortvorlage"
+                      labelHidden
+                      options={templateOptions}
+                      value={selectedTemplateId}
+                      onChange={setSelectedTemplateId}
+                      disabled={templatesLoading || templates.length === 0}
+                    />
+                  </div>
+                  <Button onClick={applySelectedTemplate} disabled={!selectedTemplateId}>
+                    Vorlage anwenden
+                  </Button>
+                  <Button variant="plain" onClick={() => setShowTemplateManager(true)}>
+                    Vorlagen verwalten
+                  </Button>
+                </InlineStack>
+                <InlineStack gap="200" blockAlign="end" wrap>
+                  <div style={{ minWidth: 240, flex: 1 }}>
+                    <TextField
+                      label="Als Vorlage speichern"
+                      labelHidden
+                      placeholder="Vorlagenname…"
+                      value={templateName}
+                      onChange={setTemplateName}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <Button onClick={saveCurrentReplyAsTemplate} loading={templateSaving} disabled={templateSaving || !reply.trim() || !templateName.trim()}>
+                    Speichern
+                  </Button>
+                </InlineStack>
                 <InlineStack gap="200" blockAlign="end">
                   <div style={{ flex: 1 }}>
                     <TextField
@@ -935,6 +1176,37 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                 </InlineStack>
               </BlockStack>
             </Box>
+            <Modal
+              open={showTemplateManager}
+              onClose={() => setShowTemplateManager(false)}
+              title="Nachrichtenvorlagen"
+            >
+              <Modal.Section>
+                <BlockStack gap="200">
+                  {templates.length === 0 && (
+                    <Text as="p" variant="bodySm" tone="subdued">Noch keine Vorlagen gespeichert.</Text>
+                  )}
+                  {templates.map((t) => (
+                    <Box key={t.id} padding="200" borderWidth="025" borderColor="border" borderRadius="200">
+                      <BlockStack gap="100">
+                        <InlineStack align="space-between" blockAlign="center">
+                          <Text as="p" variant="bodySm" fontWeight="semibold">{t.name}</Text>
+                          <Button
+                            tone="critical"
+                            variant="plain"
+                            onClick={() => deleteTemplate(t.id)}
+                            loading={templateDeletingId === t.id}
+                          >
+                            Löschen
+                          </Button>
+                        </InlineStack>
+                        <Text as="p" variant="bodySm" tone="subdued">{t.body}</Text>
+                      </BlockStack>
+                    </Box>
+                  ))}
+                </BlockStack>
+              </Modal.Section>
+            </Modal>
           </>
         )}
       </div>

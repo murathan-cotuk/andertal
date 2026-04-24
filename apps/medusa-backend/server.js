@@ -12528,6 +12528,120 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    const ensureMessageTemplatesTable = async (client) => {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS admin_hub_message_templates (
+          id bigserial PRIMARY KEY,
+          seller_id text NOT NULL,
+          name text NOT NULL,
+          body text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `)
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_admin_hub_message_templates_seller_id
+        ON admin_hub_message_templates (seller_id, updated_at DESC)
+      `)
+    }
+
+    const adminHubMessageTemplatesGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        await ensureMessageTemplatesTable(client)
+        const sellerId = String(req.sellerUser?.seller_id || '').trim()
+        if (!sellerId) {
+          await client.end()
+          return res.status(400).json({ message: 'seller_id missing in token' })
+        }
+        const r = await client.query(
+          `SELECT id, seller_id, name, body, created_at, updated_at
+           FROM admin_hub_message_templates
+           WHERE seller_id = $1
+           ORDER BY updated_at DESC, id DESC`,
+          [sellerId],
+        )
+        await client.end()
+        res.json({ templates: r.rows || [], count: r.rows?.length || 0 })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubMessageTemplatesPOST = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        await ensureMessageTemplatesTable(client)
+        const sellerId = String(req.sellerUser?.seller_id || '').trim()
+        if (!sellerId) {
+          await client.end()
+          return res.status(400).json({ message: 'seller_id missing in token' })
+        }
+        const name = String(req.body?.name || '').trim()
+        const body = String(req.body?.body || '').trim()
+        if (!name) {
+          await client.end()
+          return res.status(400).json({ message: 'name required' })
+        }
+        if (!body) {
+          await client.end()
+          return res.status(400).json({ message: 'body required' })
+        }
+        if (name.length > 120) {
+          await client.end()
+          return res.status(400).json({ message: 'name too long' })
+        }
+        if (body.length > 5000) {
+          await client.end()
+          return res.status(400).json({ message: 'body too long' })
+        }
+        const r = await client.query(
+          `INSERT INTO admin_hub_message_templates (seller_id, name, body)
+           VALUES ($1, $2, $3)
+           RETURNING id, seller_id, name, body, created_at, updated_at`,
+          [sellerId, name, body],
+        )
+        await client.end()
+        res.status(201).json({ template: r.rows?.[0] || null })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubMessageTemplatesDELETE = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        await ensureMessageTemplatesTable(client)
+        const sellerId = String(req.sellerUser?.seller_id || '').trim()
+        const id = Number(req.params.id)
+        if (!sellerId) {
+          await client.end()
+          return res.status(400).json({ message: 'seller_id missing in token' })
+        }
+        if (!Number.isFinite(id) || id <= 0) {
+          await client.end()
+          return res.status(400).json({ message: 'invalid id' })
+        }
+        await client.query(
+          `DELETE FROM admin_hub_message_templates WHERE id = $1 AND seller_id = $2`,
+          [id, sellerId],
+        )
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     const storeMessagesGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const token = (req.headers.authorization || '').replace('Bearer ', '').trim()
@@ -12669,6 +12783,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.post('/admin-hub/v1/messages', adminHubMessagesPOST)
     httpApp.patch('/admin-hub/v1/messages/support/mark-read', adminHubSupportMessagesMarkReadPATCH)
     httpApp.patch('/admin-hub/v1/messages/:id/read', adminHubMessageMarkReadPATCH)
+    httpApp.get('/admin-hub/v1/message-templates', requireSellerAuth, adminHubMessageTemplatesGET)
+    httpApp.post('/admin-hub/v1/message-templates', requireSellerAuth, adminHubMessageTemplatesPOST)
+    httpApp.delete('/admin-hub/v1/message-templates/:id', requireSellerAuth, adminHubMessageTemplatesDELETE)
     httpApp.get('/store/messages', storeMessagesGET)
     httpApp.post('/store/messages', storeMessagesPOST)
 

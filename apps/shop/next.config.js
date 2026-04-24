@@ -12,10 +12,27 @@ const withBundleAnalyzer = process.env.ANALYZE === 'true'
 
 /** Monorepo kökü — aksi halde Next, üst dizindeki başka package-lock.json'ı seçip yanlış root kullanıyor (Windows'ta 500 / tracing hataları). */
 const monorepoRoot = path.join(__dirname, "../..");
+const devHost = process.env.NEXT_PUBLIC_SITE_URL
+  ? (() => {
+      try {
+        return new URL(process.env.NEXT_PUBLIC_SITE_URL).origin;
+      } catch {
+        return null;
+      }
+    })()
+  : null;
+
+const allowedDevOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://192.168.1.240:3000",
+  devHost,
+].filter(Boolean);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: monorepoRoot,
+  allowedDevOrigins,
   reactStrictMode: true,
   transpilePackages: ["@belucha/ui", "@belucha/lib", "@belucha/shop-theme"],
   compiler: {
