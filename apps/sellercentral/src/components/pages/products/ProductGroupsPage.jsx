@@ -52,6 +52,28 @@ function GroupCard({ group, products, onEdit, onDelete }) {
   );
 }
 
+function SellerSection({ sellerLabel, groups, products, onEdit, onDelete }) {
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{
+        background: "#f6f6f7",
+        borderRadius: 8,
+        padding: "8px 14px",
+        marginBottom: 4,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}>
+        <Text as="span" variant="headingSm" fontWeight="semibold">{sellerLabel}</Text>
+        <Badge tone="info">{groups.length} Gruppen</Badge>
+      </div>
+      {groups.map((g) => (
+        <GroupCard key={g.id} group={g} products={products} onEdit={onEdit} onDelete={onDelete} />
+      ))}
+    </div>
+  );
+}
+
 export default function ProductGroupsPage() {
   const [groups, setGroups] = useState([]);
   const [products, setProducts] = useState([]);
@@ -62,8 +84,15 @@ export default function ProductGroupsPage() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [productSearch, setProductSearch] = useState("");
+  const [isSuperuser, setIsSuperuser] = useState(false);
 
   const client = getMedusaAdminClient();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -156,10 +185,21 @@ export default function ProductGroupsPage() {
     (p.ean || "").includes(productSearch)
   );
 
+  // For superuser: group by seller
+  const groupsBySeller = isSuperuser
+    ? groups.reduce((acc, g) => {
+        const key = g.seller_id || "unknown";
+        const label = g.seller_store_name || g.seller_email || g.seller_id || "Unbekannter Seller";
+        if (!acc[key]) acc[key] = { label, items: [] };
+        acc[key].items.push(g);
+        return acc;
+      }, {})
+    : null;
+
   return (
     <Page
       title="Produktgruppen"
-      primaryAction={{ content: "Neue Gruppe", onAction: openCreate }}
+      primaryAction={!isSuperuser ? { content: "Neue Gruppe", onAction: openCreate } : undefined}
     >
       <BlockStack gap="400">
         {msg && (
@@ -172,13 +212,31 @@ export default function ProductGroupsPage() {
           {loading ? (
             <div style={{ padding: 32, textAlign: "center" }}><Spinner size="small" /></div>
           ) : groups.length === 0 ? (
-            <EmptyState
-              heading="Keine Produktgruppen"
-              image=""
-            >
+            <EmptyState heading="Keine Produktgruppen" image="">
               <p>Erstelle Produktgruppen um Kampagnen gezielt auf mehrere Produkte anzuwenden.</p>
             </EmptyState>
+          ) : isSuperuser ? (
+            // Superuser: grouped by seller
+            <BlockStack gap="0">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">Alle Gruppen ({groups.length})</Text>
+                <Button size="slim" onClick={load} loading={loading}>Aktualisieren</Button>
+              </InlineStack>
+              <div style={{ marginTop: 16 }}>
+                {Object.entries(groupsBySeller).map(([sellerId, { label, items }]) => (
+                  <SellerSection
+                    key={sellerId}
+                    sellerLabel={label}
+                    groups={items}
+                    products={products}
+                    onEdit={openEdit}
+                    onDelete={remove}
+                  />
+                ))}
+              </div>
+            </BlockStack>
           ) : (
+            // Normal seller: own groups only
             <BlockStack gap="0">
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h2" variant="headingMd">Gruppen ({groups.length})</Text>

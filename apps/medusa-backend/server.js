@@ -13823,7 +13823,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const c = pgDbClient(); try {
         await c.connect()
         const r = isSuperuser
-          ? await c.query(`SELECT * FROM seller_product_groups ORDER BY created_at DESC`)
+          ? await c.query(`
+              SELECT spg.*, su.store_name AS seller_store_name, su.email AS seller_email
+              FROM seller_product_groups spg
+              LEFT JOIN seller_users su ON su.seller_id = spg.seller_id
+              ORDER BY COALESCE(su.store_name, su.email, spg.seller_id), spg.created_at DESC
+            `)
           : await c.query(`SELECT * FROM seller_product_groups WHERE seller_id = $1 ORDER BY created_at DESC`, [sellerId])
         await c.end(); res.json({ groups: r.rows })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }

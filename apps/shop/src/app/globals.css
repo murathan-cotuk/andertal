@@ -360,3 +360,13 @@ a {
     padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px) + var(--belucha-vv-bottom-inset, 0px)) !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════
+   BREADCRUMBS — always hidden on mobile
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  nav[aria-label="Breadcrumb"],
+  nav[aria-label="breadcrumb"] {
+    display: none !important;
+  }
+}
