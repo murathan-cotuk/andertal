@@ -26,18 +26,23 @@ const defaultMarketPath = () => {
   return `/${m}/${lang}/${DEFAULT_CURRENCY}`;
 };
 
-/** Map geo country → preferred language (not market code). */
+/** Map geo country → preferred language */
 const COUNTRY_TO_LOCALE = {
-  DE: "de",
-  AT: "de",
-  CH: "de",
+  DE: "de", AT: "de", CH: "de", LU: "de", LI: "de",
   TR: "tr",
-  FR: "fr",
-  ES: "es",
-  IT: "it",
-  GB: "en",
-  US: "en",
-  EN: "en",
+  FR: "fr", BE: "fr", MC: "fr", SN: "fr", CI: "fr", CM: "fr",
+  ES: "es", MX: "es", AR: "es", CO: "es", CL: "es", PE: "es",
+    VE: "es", EC: "es", BO: "es", PY: "es", UY: "es", CR: "es",
+    GT: "es", HN: "es", SV: "es", NI: "es", PA: "es", DO: "es", CU: "es",
+  IT: "it", SM: "it", VA: "it",
+  GB: "en", US: "en", CA: "en", AU: "en", NZ: "en", IE: "en",
+  ZA: "en", SG: "en", IN: "en", PH: "en", NG: "en",
+};
+
+/** Map geo country → market (URL segment) — uses own 2-letter code, else special cases */
+const COUNTRY_TO_MARKET = {
+  AT: "at", CH: "ch", GB: "gb", US: "us", TR: "tr",
+  FR: "fr", ES: "es", IT: "it", DE: "de",
 };
 
 function getLocaleFromGeo(request) {
@@ -186,7 +191,53 @@ export default function middleware(request) {
   }
 
   if (pathname === "/" || pathname === "") {
-    return NextResponse.redirect(new URL(defaultMarketPath(), request.url));
+    // 1. Returning visitor: use saved cookie
+    const cookieT = marketTripleFromCookie(request);
+    if (cookieT?.country && cookieT?.lang && cookieT?.currency) {
+      const mp = marketPrefix(cookieT.country, cookieT.lang, cookieT.currency);
+      return NextResponse.redirect(new URL(mp + "/", request.url));
+    }
+
+    // 2. New visitor: detect from geo header
+    const countryCode = (
+      request.headers.get("cf-ipcountry") ||
+      request.headers.get("x-vercel-ip-country") ||
+      ""
+    ).toUpperCase();
+
+    const geoLocale = (countryCode && COUNTRY_TO_LOCALE[countryCode] && LOCALES.includes(COUNTRY_TO_LOCALE[countryCode]))
+      ? COUNTRY_TO_LOCALE[countryCode]
+      : null;
+
+    // 3. Fall back to Accept-Language
+    let locale = geoLocale;
+    if (!locale) {
+      const acceptLanguage = request.headers.get("accept-language") || "";
+      const acc = acceptLanguage.split(",").map((s) => (s.split(";")[0] || "").trim());
+      for (const part of acc) {
+        const lang = (part.split("-")[0] || "").toLowerCase();
+        if (LOCALES.includes(lang)) { locale = lang; break; }
+      }
+    }
+    if (!locale) locale = DEFAULT_LOCALE;
+
+    // Determine market: use country-specific market if known, else derive from locale
+    const market = (countryCode && COUNTRY_TO_MARKET[countryCode] && isValidMarket(COUNTRY_TO_MARKET[countryCode]))
+      ? COUNTRY_TO_MARKET[countryCode]
+      : defaultMarketForLocale(locale);
+    const cur = defaultCurrencyForMarket(market);
+
+    const mp = marketPrefix(market, locale, cur);
+    const redirectRes = NextResponse.redirect(new URL(mp + "/", request.url));
+    try {
+      redirectRes.cookies.set("belucha_market_prefix", mp, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+    } catch (_) {}
+    return redirectRes;
   }
 
   const requestToUse = requestWithPreferredLocale(request);

@@ -31,6 +31,7 @@ import {
   filterProductsByCategorySubtree,
 } from "@/lib/search-listing-helpers";
 import { normCatId } from "@/lib/category-product-ids";
+import CustomCheckbox from "../ui/CustomCheckbox";
 
 const HEADER_H = 112;
 const NARROW = "(max-width: 767px)";
@@ -455,14 +456,68 @@ const PBtn = styled.button`
   }
 `;
 
+function normalizeSearchText(v) {
+  return String(v || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isSubsequence(needle, haystack) {
+  if (!needle || !haystack) return false;
+  let i = 0;
+  let j = 0;
+  while (i < needle.length && j < haystack.length) {
+    if (needle[i] === haystack[j]) i += 1;
+    j += 1;
+  }
+  return i === needle.length;
+}
+
+function scoreProductForQuery(product, needle, tokens) {
+  const title = normalizeSearchText(product?.title || "");
+  const desc = normalizeSearchText(product?.description || "");
+  const brand = normalizeSearchText(product?.brand || product?.brand_name || "");
+  const category = normalizeSearchText(product?.category || product?.category_name || "");
+  const merged = `${title} ${brand} ${category} ${desc}`.trim();
+  if (!merged) return 0;
+
+  let score = 0;
+  if (title.includes(needle)) score += 120;
+  else if (brand.includes(needle) || category.includes(needle)) score += 90;
+  else if (desc.includes(needle)) score += 60;
+
+  for (const t of tokens) {
+    if (!t) continue;
+    if (title.includes(t)) score += 24;
+    else if (brand.includes(t) || category.includes(t)) score += 16;
+    else if (desc.includes(t)) score += 10;
+    else if (isSubsequence(t, title) || isSubsequence(t, brand) || isSubsequence(t, category)) score += 7;
+    else if (isSubsequence(t, merged)) score += 3;
+  }
+
+  if (score === 0 && isSubsequence(needle, merged)) score += 5;
+  return score;
+}
+
 function textMatchProducts(q, products) {
   if (!q || !Array.isArray(products)) return [];
-  const needle = q.toLowerCase();
-  return products.filter(
-    (p) =>
-      (p?.title || "").toLowerCase().includes(needle) ||
-      (p?.description || "").toLowerCase().includes(needle),
-  );
+  const needle = normalizeSearchText(q);
+  if (!needle) return [];
+  const tokens = needle.split(" ").filter(Boolean);
+
+  const scored = products
+    .map((p) => ({ p, s: scoreProductForQuery(p, needle, tokens) }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s)
+    .map((x) => x.p);
+
+  // Never return empty search results: if nothing matches strongly,
+  // fall back to the full catalog so the user always sees products.
+  if (scored.length > 0) return scored;
+  return [...products];
 }
 
 function buildSearchUrl(pathname, q, cat) {
@@ -961,10 +1016,10 @@ export default function SearchTemplate() {
                             const on = (filters[key] || []).includes(val);
                             return (
                               <CheckRow key={val} $on={on}>
-                                <input
-                                  type="checkbox"
+                                <CustomCheckbox
                                   checked={on}
                                   onChange={() => toggle(key, val)}
+                                  size={18}
                                 />
                                 {formatFacetOptionLabel(key, val, categorySlugToName)}
                               </CheckRow>
@@ -1151,10 +1206,10 @@ export default function SearchTemplate() {
                             const on = (filters[key] || []).includes(val);
                             return (
                               <CheckRow key={val} $on={on}>
-                                <input
-                                  type="checkbox"
+                                <CustomCheckbox
                                   checked={on}
                                   onChange={() => toggle(key, val)}
+                                  size={18}
                                 />
                                 {formatFacetOptionLabel(key, val, categorySlugToName)}
                               </CheckRow>
@@ -1202,18 +1257,26 @@ export default function SearchTemplate() {
             ) : null}
 
             {q && paginated.length === 0 ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "80px 0",
-                  color: "#bbb",
-                  fontSize: 12,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                }}
-              >
-                No products match.
-              </div>
+              <>
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "24px 0 14px",
+                    color: "#6b7280",
+                    fontSize: 12,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Keine direkten Treffer - wir zeigen ähnliche Produkte.
+                </div>
+                <ProductGrid
+                  products={applyCatalogSort(products || [], sort, { bestsellerOnly: false }).slice(0, PER_PAGE)}
+                  activeFilters={{}}
+                  maxColumns={productsPerRow}
+                  maxColumnsMobile={productsPerRowMobile}
+                />
+              </>
             ) : null}
 
             {q && paginated.length > 0 ? (

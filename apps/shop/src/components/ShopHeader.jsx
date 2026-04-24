@@ -98,6 +98,20 @@ const HeaderWrap = styled.header`
       -webkit-backdrop-filter: none;
     }
   }
+
+  /* Mobile notch / status-bar safe area should match header color */
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    &::before {
+      content: "";
+      position: absolute;
+      top: calc(env(safe-area-inset-top) * -1);
+      left: 0;
+      right: 0;
+      height: env(safe-area-inset-top);
+      background: var(--header-bg, ${MIDDLE_BAR_BG});
+      pointer-events: none;
+    }
+  }
 `;
 
 /* TopBar wrapper — always in DOM, slides up smoothly when not at top */
@@ -305,6 +319,7 @@ const MegaPanel = styled.div`
 
   @media (max-width: 1023px) {
     display: none;
+    border-top: none;
   }
 `;
 
@@ -488,6 +503,10 @@ const CategoryMegaPanel = styled.div`
   max-height: ${(p) => (p.$open ? "600px" : "0")};
   transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: ${(p) => (p.$open ? "auto" : "none")};
+
+  @media (max-width: 767px) {
+    border-top: none;
+  }
 `;
 
 const CategoryMegaInner = styled.div`
@@ -815,8 +834,8 @@ const LocaleOption = styled.button`
 // SHOP_COUNTRIES is now computed dynamically from shippingGroups in the component
 
 const SHOP_LOCALES = [
-  { code: "de", label: "Deutsch",    flag: "🇩🇪" },
   { code: "en", label: "English",    flag: "🇬🇧" },
+  { code: "de", label: "Deutsch",    flag: "🇩🇪" },
   { code: "fr", label: "Français",   flag: "🇫🇷" },
   { code: "it", label: "Italiano",   flag: "🇮🇹" },
   { code: "es", label: "Español",    flag: "🇪🇸" },
@@ -862,9 +881,12 @@ export default function ShopHeader() {
   const [drillCategoryId, setDrillCategoryId] = useState(null); // null = root level
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
+  const tLocale = useTranslations("locale");
+  const tNav = useTranslations("nav");
+  const locale = useLocale();
 
   // Dynamically computed from shipping groups — only countries with configured prices
-  const shopCountries = getShippableCountries(shippingGroups);
+  const shopCountries = getShippableCountries(shippingGroups, locale);
 
   const selectedCountry = (() => {
     const t = marketParsed || (ctxPrefix ? parseMarketPath(ctxPrefix) : null);
@@ -885,9 +907,6 @@ export default function ShopHeader() {
     navigateTriple(m, lang, cur);
     setLocaleDropdownOpen(false);
   };
-  const tLocale = useTranslations("locale");
-  const tNav = useTranslations("nav");
-  const locale = useLocale();
 
   useEffect(() => {
     let cancelled = false;
@@ -916,6 +935,48 @@ export default function ShopHeader() {
     }
     link.setAttribute("href", fav);
   }, [shopBranding.shop_favicon_url]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || typeof window === "undefined") return;
+    const mq = window.matchMedia(`(max-width: ${HEADER_NARROW_MQ}px)`);
+    const root = document.documentElement;
+    const body = document.body;
+    const prevRootBg = root.style.backgroundColor;
+    const prevBodyBg = body.style.backgroundColor;
+
+    const ensureThemeMeta = () => {
+      let meta = document.querySelector("meta[name='theme-color']");
+      if (!meta) {
+        meta = document.createElement("meta");
+        meta.setAttribute("name", "theme-color");
+        document.head.appendChild(meta);
+      }
+      return meta;
+    };
+
+    const apply = () => {
+      const headerBg = getComputedStyle(root).getPropertyValue("--header-bg").trim() || MIDDLE_BAR_BG;
+      const themeMeta = ensureThemeMeta();
+      themeMeta.setAttribute("content", headerBg);
+
+      // Ensure iOS safe-area/notch backdrop is never white on mobile.
+      if (mq.matches) {
+        root.style.backgroundColor = headerBg;
+        body.style.backgroundColor = headerBg;
+      } else {
+        root.style.backgroundColor = prevRootBg;
+        body.style.backgroundColor = prevBodyBg;
+      }
+    };
+
+    apply();
+    mq.addEventListener?.("change", apply);
+    return () => {
+      mq.removeEventListener?.("change", apply);
+      root.style.backgroundColor = prevRootBg;
+      body.style.backgroundColor = prevBodyBg;
+    };
+  }, []);
 
   useEffect(() => {
     const norm = (s) => String(s || "").toLowerCase().trim();

@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { resolveImageUrl } from "@/lib/image-url";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 function RegisterForm() {
   const router = useRouter();
@@ -33,15 +35,12 @@ function RegisterForm() {
 
   useEffect(() => {
     let cancelled = false;
-    const base = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "");
-    if (!base) return;
-    fetch(`${base}/admin-hub/seller-settings?seller_id=default`, { cache: "no-store" })
-      .then((r) => r.json())
+    getMedusaAdminClient().getSellerSettings("default")
       .then((d) => {
         if (cancelled) return;
         setBranding({
-          logo: (d?.sellercentral_logo_url || "").trim(),
-          favicon: (d?.sellercentral_favicon_url || "").trim(),
+          logo: resolveImageUrl(d?.sellercentral_logo_url || ""),
+          favicon: resolveImageUrl(d?.sellercentral_favicon_url || ""),
           logoHeight: d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 30,
         });
       })
@@ -52,14 +51,38 @@ function RegisterForm() {
   useEffect(() => {
     const fav = (branding.favicon || "").trim();
     if (!fav || typeof document === "undefined") return;
-    let link = document.querySelector("link[rel='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      link.setAttribute("rel", "icon");
-      document.head.appendChild(link);
-    }
-    link.setAttribute("href", fav);
+    const upsert = (rel) => {
+      let link = document.querySelector(`link[rel='${rel}']`);
+      if (!link) {
+        link = document.createElement("link");
+        link.setAttribute("rel", rel);
+        document.head.appendChild(link);
+      }
+      link.setAttribute("href", fav);
+      link.setAttribute("type", "image/x-icon");
+    };
+    upsert("icon");
+    upsert("shortcut icon");
   }, [branding.favicon]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    let viewport = document.querySelector('meta[name="viewport"]');
+    const previous = viewport?.getAttribute("content") || "";
+    if (!viewport) {
+      viewport = document.createElement("meta");
+      viewport.setAttribute("name", "viewport");
+      document.head.appendChild(viewport);
+    }
+    viewport.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+    );
+    return () => {
+      if (!viewport) return;
+      if (previous) viewport.setAttribute("content", previous);
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -98,8 +121,8 @@ function RegisterForm() {
   const inputStyle = { width: "100%", padding: "10px 14px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6" }}>
-      <div style={{ width: "100%", maxWidth: 440 }}>
+    <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6", overflowX: "hidden", overflowY: "auto", touchAction: "pan-y", overscrollBehaviorX: "none", WebkitOverflowScrolling: "touch", padding: "16px", boxSizing: "border-box" }}>
+      <div style={{ width: "100%", maxWidth: 440, boxSizing: "border-box" }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
           {branding.logo ? (
             <img
@@ -111,14 +134,14 @@ function RegisterForm() {
             <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: "0.18em", color: "#111827" }}>BELUCHA</span>
           )}
         </div>
-        <div style={{ background: "#fff", borderRadius: 12, padding: "40px 36px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+        <div style={{ background: "#fff", borderRadius: 12, padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 36px)", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111827", margin: "0 0 6px" }}>{isInvited ? t("titleInvited") : t("title")}</h1>
             <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>{isInvited ? t("subtitleInvited") : t("subtitle")}</p>
           </div>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {isInvited ? (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("firstName")} *</label>
                   <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required style={inputStyle} placeholder={t("firstNamePlaceholder")} />
@@ -153,8 +176,11 @@ function RegisterForm() {
                   style={{ ...inputStyle, padding: "10px 44px 10px 14px" }}
                   placeholder={t("passwordPlaceholder")}
                 />
-                <button type="button" onClick={() => setShowPassword((v) => !v)}
-                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 0, display: "flex", alignItems: "center" }}
+                <button type="button" onPointerDown={(e) => {
+                  e.preventDefault();
+                  setShowPassword((v) => !v);
+                }}
+                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 0, display: "flex", alignItems: "center", zIndex: 2, touchAction: "manipulation" }}
                   tabIndex={-1}>
                   {showPassword ? (
                     <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0 1 12 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 0 1 1.563-3.029m5.858.908a3 3 0 1 1 4.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88 6.59 6.59m7.532 7.532 3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0 1 12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 0 1-4.132 5.411m0 0L21 21" /></svg>
@@ -165,11 +191,11 @@ function RegisterForm() {
               </div>
             </div>
             <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 14, color: "#374151" }}>
-              <input
-                type="checkbox"
+              <CustomCheckbox
                 checked={agreementAccepted}
                 onChange={(e) => setAgreementAccepted(e.target.checked)}
-                style={{ marginTop: 2, width: 16, height: 16, cursor: "pointer", accentColor: "#ff971c", flexShrink: 0 }}
+                size={18}
+                style={{ marginTop: 2, flexShrink: 0 }}
               />
               <span>
                 {t.rich("agreeText", {

@@ -17,6 +17,7 @@ import {
   EmptyState,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 const EMPTY_FORM = { name: "", description: "", product_ids: [] };
 
@@ -309,11 +310,10 @@ export default function ProductGroupsPage() {
                         borderBottom: "1px solid #f4f5f7",
                       }}
                     >
-                      <input
-                        type="checkbox"
+                      <CustomCheckbox
                         checked={checked}
                         onChange={() => toggleProduct(p.id)}
-                        style={{ width: 16, height: 16, cursor: "pointer" }}
+                        size={18}
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#202223", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

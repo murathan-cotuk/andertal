@@ -5,14 +5,66 @@
  * REST API kullanarak products, cart, orders yönetimi
  */
 
-// Get Medusa backend URL from environment variable
-// In production, this should be set to your deployed Medusa backend URL (e.g., Railway, Render)
-const MEDUSA_BACKEND_URL =
-  (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'http://localhost:9000').replace(/\/$/, '')
+function resolveMedusaBaseUrl() {
+  const envUrl = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").trim();
+  const forceEnvInDev = String(process.env.NEXT_PUBLIC_MEDUSA_USE_ENV_IN_DEV || "").trim() === "true";
+  if (typeof window !== "undefined") {
+    const host = String(window.location?.hostname || "").trim().toLowerCase();
+    const isLocalHost = host === "localhost" || host === "127.0.0.1";
+    // In local browser development, default to local backend for login/signup consistency.
+    // Set NEXT_PUBLIC_MEDUSA_USE_ENV_IN_DEV=true if you explicitly want to use env URL.
+    if (isLocalHost && !forceEnvInDev) {
+      return "http://localhost:9000";
+    }
+  }
+  if (envUrl) return envUrl.replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    const host = String(window.location?.hostname || "").trim();
+    if (host && host !== "localhost" && host !== "127.0.0.1") {
+      return `http://${host}:9000`;
+    }
+  }
+  return "http://localhost:9000";
+}
 
 class MedusaClient {
-  constructor(baseURL = MEDUSA_BACKEND_URL) {
-    this.baseURL = baseURL
+  constructor(baseURL = null) {
+    this.baseURL = (baseURL || "").replace(/\/$/, "")
+  }
+
+  async requestShopApi(endpoint, options = {}) {
+    const url = endpoint;
+    const { headers: optHeaders, ...restOptions } = options;
+    const config = {
+      ...restOptions,
+      headers: {
+        "Content-Type": "application/json",
+        ...optHeaders,
+      },
+    };
+    try {
+      const response = await fetch(url, config);
+      if (!response.ok) {
+        let message = response.statusText || `HTTP ${response.status}`;
+        try {
+          const text = await response.text();
+          if (text && text.trim().startsWith("{")) {
+            const body = JSON.parse(text);
+            message = body.message || body.error || body.msg || message;
+          }
+        } catch (_) {}
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[MedusaClient] ${response.status} ${endpoint}:`, message);
+        }
+        return { __error: true, status: response.status, message };
+      }
+      return await response.json();
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`[MedusaClient] ${endpoint}:`, error?.message || error);
+      }
+      return { __error: true, status: 0, message: error?.message || "Network error" };
+    }
   }
 
   inferMarketCountry() {
@@ -30,16 +82,8 @@ class MedusaClient {
    * Generic API request helper
    */
   async request(endpoint, options = {}) {
-    // Check if backend URL is available
-    if (!this.baseURL || this.baseURL === 'http://localhost:9000') {
-      // In production, if backend URL is not set, return empty response
-      if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-        console.warn('Medusa backend URL not configured. Please set NEXT_PUBLIC_MEDUSA_BACKEND_URL environment variable.')
-        throw new Error('Medusa backend not configured')
-      }
-    }
-
-    const url = `${this.baseURL}${endpoint}`
+    const base = this.baseURL || resolveMedusaBaseUrl();
+    const url = `${base}${endpoint}`
     const { headers: optHeaders, ...restOptions } = options
     const config = {
       ...restOptions,
@@ -103,7 +147,7 @@ class MedusaClient {
    * Cart
    */
   async createCart() {
-    const res = await this.request('/store/carts', {
+    const res = await this.requestShopApi('/api/store-carts', {
       method: 'POST',
       body: JSON.stringify({}),
     })
@@ -113,7 +157,7 @@ class MedusaClient {
 
   async getCart(cartId) {
     if (!cartId) return { cart: null }
-    const res = await this.request(`/store/carts/${cartId}?expand=items.variant.product`)
+    const res = await this.requestShopApi(`/api/store-carts/${encodeURIComponent(cartId)}?expand=items.variant.product`)
     if (res?.__error) return { cart: null }
     return res
   }
@@ -121,7 +165,7 @@ class MedusaClient {
   async addToCart(cartId, variantId, quantity = 1, sellerId = null) {
     const body = { variant_id: variantId, quantity }
     if (sellerId) body.seller_id = sellerId
-    const res = await this.request(`/store/carts/${cartId}/line-items`, {
+    const res = await this.requestShopApi(`/api/store-carts/${encodeURIComponent(cartId)}/line-items`, {
       method: 'POST',
       body: JSON.stringify(body),
     })
@@ -130,7 +174,7 @@ class MedusaClient {
   }
 
   async updateLineItem(cartId, lineId, quantity) {
-    const res = await this.request(`/store/carts/${cartId}/line-items/${lineId}`, {
+    const res = await this.requestShopApi(`/api/store-carts/${encodeURIComponent(cartId)}/line-items/${encodeURIComponent(lineId)}`, {
       method: 'PATCH',
       body: JSON.stringify({ quantity }),
     })
@@ -139,7 +183,7 @@ class MedusaClient {
   }
 
   async removeLineItem(cartId, lineId) {
-    const res = await this.request(`/store/carts/${cartId}/line-items/${lineId}`, {
+    const res = await this.requestShopApi(`/api/store-carts/${encodeURIComponent(cartId)}/line-items/${encodeURIComponent(lineId)}`, {
       method: 'DELETE',
     })
     if (res?.__error) return { cart: null }
@@ -147,7 +191,7 @@ class MedusaClient {
   }
 
   async clearCart(cartId) {
-    const res = await this.request(`/store/carts/${cartId}/line-items`, {
+    const res = await this.requestShopApi(`/api/store-carts/${encodeURIComponent(cartId)}/line-items`, {
       method: 'DELETE',
     })
     if (res?.__error) return { cart: null }
@@ -158,7 +202,7 @@ class MedusaClient {
   async patchStoreCart(cartId, body, authToken) {
     const headers = {}
     if (authToken) headers.Authorization = `Bearer ${authToken}`
-    const res = await this.request(`/store/carts/${cartId}`, {
+    const res = await this.requestShopApi(`/api/store-carts/${encodeURIComponent(cartId)}`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify(body || {}),
@@ -168,7 +212,7 @@ class MedusaClient {
   }
 
   async updateCart(cartId, data) {
-    const res = await this.request(`/store/carts/${cartId}`, {
+    const res = await this.requestShopApi(`/api/store-carts/${encodeURIComponent(cartId)}`, {
       method: 'POST',
       body: JSON.stringify(data),
     })
@@ -180,7 +224,7 @@ class MedusaClient {
    * Orders
    */
   async createOrder(cartId, email) {
-    const res = await this.request(`/store/carts/${cartId}/complete`, {
+    const res = await this.requestShopApi(`/api/store-carts/${encodeURIComponent(cartId)}/complete`, {
       method: 'POST',
       body: JSON.stringify({ email }),
     })
@@ -406,7 +450,8 @@ class MedusaClient {
    */
   async health() {
     try {
-      const response = await fetch(`${this.baseURL}/health`)
+      const base = this.baseURL || resolveMedusaBaseUrl();
+      const response = await fetch(`${base}/health`)
       return response.ok
     } catch {
       return false

@@ -218,7 +218,7 @@ const Empty = styled.div`
   text-align: center;
 `;
 
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 120;
 const MAX_HITS = 8;
 const RECENT_SEARCHES_KEY = "belucha-recent-searches";
 const MAX_RECENT = 10;
@@ -288,6 +288,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
   const isMobile = useMatchMediaOnce(MOBILE_MQ);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState([]);
+  const [fallbackHits, setFallbackHits] = useState([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -299,8 +300,9 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
   const debounceRef = useRef(null);
 
   const fetchProducts = useCallback(async (query) => {
-    if (!(query && query.trim().length >= 2)) {
+    if (!(query && query.trim().length >= 1)) {
       setHits([]);
+      setFallbackHits([]);
       setOpen(!!(query && query.trim()));
       return;
     }
@@ -309,9 +311,22 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
       const client = getMedusaClient();
       const { products = [] } = await client.getProducts({ q: query.trim(), limit: MAX_HITS });
       setHits(products);
+      if (!products.length) {
+        const { products: fb = [] } = await client.getProducts({ limit: MAX_HITS });
+        setFallbackHits(fb || []);
+      } else {
+        setFallbackHits([]);
+      }
       setOpen(true);
     } catch (_) {
       setHits([]);
+      try {
+        const client = getMedusaClient();
+        const { products: fb = [] } = await client.getProducts({ limit: MAX_HITS });
+        setFallbackHits(fb || []);
+      } catch {
+        setFallbackHits([]);
+      }
       setOpen(true);
     } finally {
       setLoading(false);
@@ -333,6 +348,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
     const query = (q || "").trim();
     if (!query) {
       setHits([]);
+      setFallbackHits([]);
       setOpen(false);
       return;
     }
@@ -395,7 +411,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
     else router.push("/search");
   };
 
-  const showDropdown = open && (q || "").trim().length >= 2;
+  const showDropdown = open && (q || "").trim().length >= 1;
 
   const productHitList = (onPick) =>
     hits.map((product, i) => {
@@ -478,8 +494,31 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
           ) : (
             <>
               {loading && hits.length === 0 && <div style={{ marginTop: 16 }}><Empty>Suche…</Empty></div>}
-              {!loading && (q || "").trim().length >= 2 && hits.length === 0 && <Empty>Keine Ergebnisse für &quot;{q.trim()}&quot;</Empty>}
+              {!loading && hits.length === 0 && fallbackHits.length === 0 && <Empty>Keine direkten Treffer — wir zeigen trotzdem Produkte.</Empty>}
               {hits.length > 0 && <div style={{ padding: "8px 0" }}>{productHitList(() => { saveRecentSearch(q); setMobileOpen(false); setQ(""); })}</div>}
+              {!loading && hits.length === 0 && fallbackHits.length > 0 && (
+                <div style={{ padding: "8px 0" }}>
+                  {fallbackHits.map((product, i) => {
+                    const { title: hitTitle, description: hitDesc } = getLocalizedProduct(product, locale);
+                    const priceCents = product.variants?.[0]?.prices?.[0]?.amount ?? product.metadata?.price_cents ?? null;
+                    const pathHandle = storefrontProductHandle(product, locale);
+                    return (
+                      <HitLink
+                        key={product.id || product.handle || i}
+                        href={pathHandle ? `/produkt/${pathHandle}` : "#"}
+                        onClick={() => { saveRecentSearch(q); setMobileOpen(false); setQ(""); }}
+                      >
+                        {product.thumbnail && <HitImage src={product.thumbnail} alt="" />}
+                        <HitText>
+                          <Primary>{hitTitle || "(No title)"}</Primary>
+                          {hitDesc && <Secondary>{stripHtmlForSearch(hitDesc, 100)}</Secondary>}
+                          {priceCents != null && <Tertiary>{formatPriceCents(priceCents)}</Tertiary>}
+                        </HitText>
+                      </HitLink>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -521,8 +560,28 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
       {showDropdown && (
         <Dropdown $maxHeight={maxHeight} role="listbox">
           {loading && hits.length === 0 && <Empty>Suche...</Empty>}
-          {!loading && hits.length === 0 && <Empty>Keine Ergebnisse für &quot;{q.trim()}&quot;</Empty>}
+          {!loading && hits.length === 0 && fallbackHits.length === 0 && <Empty>Keine direkten Treffer — wir zeigen trotzdem Produkte.</Empty>}
           {productHitList(() => setOpen(false))}
+          {!loading && hits.length === 0 && fallbackHits.length > 0 &&
+            fallbackHits.map((product, i) => {
+              const { title: hitTitle, description: hitDesc } = getLocalizedProduct(product, locale);
+              const priceCents = product.variants?.[0]?.prices?.[0]?.amount ?? product.metadata?.price_cents ?? null;
+              const pathHandle = storefrontProductHandle(product, locale);
+              return (
+                <HitLink
+                  key={product.id || product.handle || `fb-${i}`}
+                  href={pathHandle ? `/produkt/${pathHandle}` : "#"}
+                  onClick={() => setOpen(false)}
+                >
+                  {product.thumbnail && <HitImage src={product.thumbnail} alt="" />}
+                  <HitText>
+                    <Primary>{hitTitle || "(No title)"}</Primary>
+                    {hitDesc && <Secondary>{stripHtmlForSearch(hitDesc, 120)}</Secondary>}
+                    {priceCents != null && <Tertiary>{formatPriceCents(priceCents)}</Tertiary>}
+                  </HitText>
+                </HitLink>
+              );
+            })}
         </Dropdown>
       )}
     </Wrap>

@@ -15,8 +15,10 @@ import { useWishlist } from "@/context/WishlistContext";
 import { restPathFromPathname } from "@/lib/shop-market";
 import { useVisualViewportBottomInset } from "@/hooks/useVisualViewportBottomInset";
 import { resolveImageUrl } from "@/lib/image-url";
+import ModernMobileBottomNav from "@/components/ModernMobileBottomNav";
 
 const TEAL = "#1b8880";
+const USE_MODERN_MOBILE_BOTTOM_NAV = true;
 
 /* ─── inline styles (no styled-components dependency) ─────── */
 
@@ -336,7 +338,7 @@ export default function MobileNav() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTarget, setDrawerTarget] = useState("menu"); // "menu" | "account"
   const [categories, setCategories] = useState([]);
-  const [expandedCategoryId, setExpandedCategoryId] = useState(null);
+  const [activeMobileCategory, setActiveMobileCategory] = useState(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   const drawerRef = useRef(null);
   const drawerBodyRef = useRef(null);
@@ -387,7 +389,7 @@ export default function MobileNav() {
   /* Close drawer on route change */
   useEffect(() => {
     setDrawerOpen(false);
-    setExpandedCategoryId(null);
+    setActiveMobileCategory(null);
     setDrawerTarget("menu");
   }, [pathname]);
 
@@ -419,6 +421,10 @@ export default function MobileNav() {
   }, []);
 
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+
+  const activeCategoryNode = activeMobileCategory
+    ? categories.find((c) => String(c.id) === String(activeMobileCategory))
+    : null;
 
   useEffect(() => {
     if (!drawerOpen || drawerTarget !== "account") return;
@@ -487,47 +493,63 @@ export default function MobileNav() {
           {categories.length > 0 && (
             <>
               <div style={css.sectionLabel}>Kategorien</div>
-              {categories.slice(0, 18).map((cat) => (
-                <div key={cat.id}>
-                  {cat.imageUrl ? (
+              <div style={{ overflow: "hidden" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    width: "200%",
+                    transform: activeCategoryNode ? "translateX(-50%)" : "translateX(0)",
+                    transition: reducedMotion ? "none" : "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
+                  }}
+                >
+                  <div style={{ width: "50%" }}>
+                    {categories.slice(0, 18).map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          if (cat.children?.length) setActiveMobileCategory(cat.id);
+                          else closeDrawer();
+                        }}
+                        style={css.categoryRowBtn}
+                      >
+                        {cat.imageUrl ? <img src={cat.imageUrl} alt="" style={css.categoryThumb} /> : <div style={css.categoryThumbPlaceholder} aria-hidden />}
+                        <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
+                        <IcoChevron />
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ width: "50%" }}>
                     <button
                       type="button"
-                      onClick={() => setExpandedCategoryId((prev) => (prev === cat.id ? null : cat.id))}
-                      style={{ ...css.categoryRowBtn, background: expandedCategoryId === cat.id ? "#f9fafb" : "transparent" }}
+                      onClick={() => setActiveMobileCategory(null)}
+                      style={{
+                        ...css.drawerBtn,
+                        fontWeight: 700,
+                        color: TEAL,
+                        borderBottom: "1px solid #e5e7eb",
+                      }}
                     >
-                      <img src={cat.imageUrl} alt="" style={css.categoryThumb} />
-                      <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
-                      <span style={{ transform: expandedCategoryId === cat.id ? "rotate(90deg)" : "none", transition: "transform 0.15s ease" }}>
-                        <IcoChevron />
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ transform: "rotate(180deg)", display: "inline-flex" }}><IcoChevron /></span>
+                        Zurück
                       </span>
                     </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setExpandedCategoryId((prev) => (prev === cat.id ? null : cat.id))}
-                      style={{ ...css.categoryRowBtn, background: expandedCategoryId === cat.id ? "#f9fafb" : "transparent" }}
-                    >
-                      <div style={css.categoryThumbPlaceholder} aria-hidden />
-                      <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
-                      <span style={{ transform: expandedCategoryId === cat.id ? "rotate(90deg)" : "none", transition: "transform 0.15s ease" }}>
-                        <IcoChevron />
-                      </span>
-                    </button>
-                  )}
-                  {expandedCategoryId === cat.id && (
-                    <>
-                      <HoverLink href={cat.href} onClick={closeDrawer} style={{ ...css.subCategoryLink, fontWeight: 700, color: TEAL }}>
-                        Alle anzeigen
-                      </HoverLink>
-                      {(cat.children || []).map((sub) => (
-                        <HoverLink key={sub.id} href={sub.href} onClick={closeDrawer} style={css.subCategoryLink}>
-                          {sub.label}
+                    {activeCategoryNode && (
+                      <>
+                        <HoverLink href={activeCategoryNode.href} onClick={closeDrawer} style={{ ...css.subCategoryLink, fontWeight: 700, color: TEAL, paddingLeft: 16 }}>
+                          Alle anzeigen
                         </HoverLink>
-                      ))}
-                    </>
-                  )}
+                        {(activeCategoryNode.children || []).map((sub) => (
+                          <HoverLink key={sub.id} href={sub.href} onClick={closeDrawer} style={{ ...css.subCategoryLink, paddingLeft: 16 }}>
+                            {sub.label}
+                          </HoverLink>
+                        ))}
+                      </>
+                    )}
+                  </div>
                 </div>
-              ))}
+              </div>
             </>
           )}
 
@@ -574,6 +596,59 @@ export default function MobileNav() {
       </div>
 
       {/* ── Bottom Navigation Bar ── */}
+      {USE_MODERN_MOBILE_BOTTOM_NAV ? (
+        <ModernMobileBottomNav
+          bottomInsetPx={vvBottomInset}
+          accentColor={TEAL}
+          items={[
+            { key: "home", label: "Start", icon: <IcoHome />, href: "/", active: isHome },
+            {
+              key: "menu",
+              label: "Menü",
+              icon: <IcoMenu />,
+              active: drawerOpen && drawerTarget === "menu",
+              onClick: () => {
+                setDrawerTarget("menu");
+                setDrawerOpen((v) => !v);
+              },
+            },
+            {
+              key: "cart",
+              label: "Warenkorb",
+              icon: <IcoCart />,
+              active: isCart,
+              badge: itemCount || 0,
+              onClick: openCartSidebar,
+            },
+            {
+              key: "wishlist",
+              label: "Merkzettel",
+              icon: <IcoHeart />,
+              href: "/merkzettel",
+              active: isMerkzettel,
+              badge: wishlistCount || 0,
+            },
+            isAuthenticated
+              ? {
+                  key: "profile",
+                  label: "Profil",
+                  icon: <IcoUser />,
+                  active: drawerOpen && drawerTarget === "account",
+                  onClick: () => {
+                    setDrawerTarget("account");
+                    setDrawerOpen(true);
+                  },
+                }
+              : {
+                  key: "profile",
+                  label: "Profil",
+                  icon: <IcoUser />,
+                  href: "/login",
+                  active: isProfile,
+                },
+          ]}
+        />
+      ) : (
       <nav style={css.bar(vvBottomInset)} aria-label="Mobile Navigation">
         {/* Home */}
         <Link href="/" style={css.barBtn(isHome)} aria-label="Startseite">
@@ -647,6 +722,7 @@ export default function MobileNav() {
           </Link>
         )}
       </nav>
+      )}
 
       {/* Spacer so content isn't hidden under bottom bar */}
       <div className="belucha-mobile-nav-pad" style={css.bodyPad(vvBottomInset)} aria-hidden="true" />

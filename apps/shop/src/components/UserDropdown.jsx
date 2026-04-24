@@ -294,6 +294,7 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
   const [open, setOpen] = useState(false);
   const [topPx, setTopPx] = useState(0);
   const triggerRef = useRef(null);
+  const panelRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [fromOrders, setFromOrders] = useState([]);
   const [buyAgain, setBuyAgain] = useState([]);
@@ -349,6 +350,18 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
+  }, [open, close]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e) => {
+      const target = e.target;
+      if (triggerRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      close();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [open, close]);
 
   useEffect(() => {
@@ -432,6 +445,7 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
         tabIndex={-1}
       />
       <div
+        ref={panelRef}
         id={panelId}
         role="region"
         aria-label={isAuthenticated ? t("triggerTitleAuth") : t("triggerTitleGuest")}
@@ -444,6 +458,15 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
           top: topPx,
           overscrollBehaviorY: "contain",
           WebkitOverflowScrolling: "touch",
+        }}
+        onWheel={(e) => {
+          const el = e.currentTarget;
+          const atTop = el.scrollTop <= 0;
+          const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+          if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+            e.preventDefault();
+          }
+          e.stopPropagation();
         }}
       >
         <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-5 sm:py-4">

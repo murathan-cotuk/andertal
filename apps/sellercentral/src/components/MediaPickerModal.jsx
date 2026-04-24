@@ -39,6 +39,59 @@ function resolveUrl(url) {
   return `${BACKEND_URL}${u.startsWith("/") ? "" : "/"}${u}`;
 }
 
+async function readImageBitmap(file) {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = objectUrl;
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
+    return img;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function inspectProductImageFile(file) {
+  const img = await readImageBitmap(file);
+  const width = Number(img.naturalWidth || img.width || 0);
+  const height = Number(img.naturalHeight || img.height || 0);
+  const minSizeOk = width >= 1000 && height >= 1000;
+  const squareOk = width === height;
+
+  // Simple white-background heuristic from corners.
+  let whiteCornersOk = false;
+  try {
+    const canvas = document.createElement("canvas");
+    const w = Math.max(1, Math.min(64, width));
+    const h = Math.max(1, Math.min(64, height));
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (ctx) {
+      ctx.drawImage(img, 0, 0, w, h);
+      const points = [
+        [0, 0],
+        [w - 1, 0],
+        [0, h - 1],
+        [w - 1, h - 1],
+      ];
+      const threshold = 246;
+      whiteCornersOk = points.every(([x, y]) => {
+        const p = ctx.getImageData(x, y, 1, 1).data;
+        return p[3] >= 245 && p[0] >= threshold && p[1] >= threshold && p[2] >= threshold;
+      });
+    }
+  } catch {
+    whiteCornersOk = false;
+  }
+
+  return { width, height, minSizeOk, squareOk, whiteCornersOk };
+}
+
 export default function MediaPickerModal({
   open,
   onClose,
@@ -54,6 +107,7 @@ export default function MediaPickerModal({
   const [loadingLib, setLoadingLib] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [uploadWarnings, setUploadWarnings] = useState([]);
   const [selected, setSelected] = useState(new Set()); // Set of resolved URLs
   const [urlInput, setUrlInput] = useState("");
 
@@ -63,6 +117,7 @@ export default function MediaPickerModal({
     setSelected(new Set());
     setUrlInput("");
     setUploadError("");
+    setUploadWarnings([]);
     setLoadingLib(true);
     client
       .getMedia({ limit: 1000 })
@@ -93,11 +148,27 @@ export default function MediaPickerModal({
       const list = Array.isArray(files) ? files : [files];
       if (!list.length) return;
       setUploadError("");
+      setUploadWarnings([]);
       setUploading(true);
       onUploadingChange?.(true);
       const uploadOpts = uploadPurpose === "product" ? { purpose: "product" } : {};
       Promise.all(
-        list.map((file) => {
+        list.map(async (file) => {
+          if (uploadPurpose === "product") {
+            const analysis = await inspectProductImageFile(file).catch(() => null);
+            if (analysis) {
+              const warns = [];
+              if (!analysis.squareOk) warns.push("not square");
+              if (!analysis.minSizeOk) warns.push("below 1000x1000");
+              if (!analysis.whiteCornersOk) warns.push("background may not be pure white (#ffffff)");
+              if (warns.length) {
+                setUploadWarnings((prev) => [
+                  ...prev,
+                  `${file.name}: ${warns.join(", ")}.`,
+                ]);
+              }
+            }
+          }
           const fd = new FormData();
           fd.append("file", file);
           return client.uploadMedia(fd, uploadOpts).then((r) => r.url || null);
@@ -205,6 +276,23 @@ export default function MediaPickerModal({
         {uploadError && (
           <Box paddingBlockEnd="300">
             <Text as="p" variant="bodySm" tone="critical">{uploadError}</Text>
+          </Box>
+        )}
+        {uploadWarnings.length > 0 && (
+          <Box paddingBlockEnd="300">
+            <Text as="p" variant="bodySm" tone="critical">
+              Image criteria warning:
+            </Text>
+            <div style={{ marginTop: 6 }}>
+              {uploadWarnings.map((w, i) => (
+                <Text key={`${w}-${i}`} as="p" variant="bodySm" tone="subdued">
+                  - {w}
+                </Text>
+              ))}
+            </div>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Main image should be square, at least 1000x1000, and white background (#ffffff).
+            </Text>
           </Box>
         )}
         {uploading && (

@@ -22,6 +22,7 @@ import {
   productSalesScore,
 } from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 /* ─────────────────────────────────────────────────────────── */
 const HEADER_H = 112; /* TopBar 40px + Navbar 72px            */
@@ -975,7 +976,7 @@ export default function CollectionPage() {
                       const on = (filters[key] || []).includes(val);
                       return (
                         <CheckRow key={val} $on={on}>
-                          <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
+                          <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
                           {val}
                         </CheckRow>
                       );

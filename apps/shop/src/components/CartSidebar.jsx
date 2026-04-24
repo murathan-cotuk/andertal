@@ -96,6 +96,11 @@ const Scroll = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 16px 20px;
+
+  @media (max-width: 767px) {
+    overflow-y: hidden;
+    overscroll-behavior: contain;
+  }
 `;
 
 const Item = styled.div`
@@ -246,6 +251,12 @@ const Footer = styled.div`
   border-top: 1px solid #e5e7eb;
   flex-shrink: 0;
   background: #fff;
+
+  @media (max-width: 767px) {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+  }
 `;
 
 const Row = styled.div`
@@ -299,6 +310,89 @@ const Empty = styled.p`
   margin: 0;
 `;
 
+const RecommendedWrap = styled.div`
+  margin-top: 8px;
+`;
+
+const RecommendedTitle = styled.h3`
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1f2937;
+`;
+
+const RecommendedList = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+`;
+
+const RecommendedItem = styled(Link)`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #eceff3;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  background: #fff;
+`;
+
+const RecommendedThumb = styled.div`
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f3f4f6;
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`;
+
+const RecommendedMeta = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+`;
+
+const RecommendedName = styled.div`
+  font-size: 0.82rem;
+  color: #111827;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const RecommendedPrice = styled.div`
+  font-size: 0.78rem;
+  color: #6b7280;
+`;
+
+const QuickAddBtn = styled.button`
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: none;
+  background: #ff971c;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 6px;
+`;
+
 const ENV_THRESHOLD_CENTS = typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
   ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS)
   : null;
@@ -341,7 +435,7 @@ function calcShipping(items, shippingGroups, country = "DE") {
 export default function CartSidebar() {
   const locale = useLocale();
   const tCart = useTranslations("cart");
-  const { cart, sidebarOpen, closeCartSidebar, updateLineItem, removeLineItem, loading, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
+  const { cart, sidebarOpen, closeCartSidebar, updateLineItem, removeLineItem, addToCart, loading, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
   const allThresholds = useShippingThresholds();
   const prefix = useMarketPrefix();
@@ -356,6 +450,54 @@ export default function CartSidebar() {
     : shippingCents != null
       ? `${formatPriceCents(shippingCents)} €`
       : tCart("shipping");
+  const [recommended, setRecommended] = useState([]);
+  const [recommendedLoading, setRecommendedLoading] = useState(false);
+
+  useEffect(() => {
+    if (!sidebarOpen || items.length > 0) return;
+    let cancelled = false;
+    setRecommendedLoading(true);
+    fetch("/api/store-products?limit=4")
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        const list = Array.isArray(d?.products) ? d.products : [];
+        const mapped = list
+          .map((p) => {
+            const price =
+              Number(p?.variants?.[0]?.calculated_price?.calculated_amount ?? p?.variants?.[0]?.prices?.[0]?.amount ?? 0);
+            const v0 = p?.variants?.[0] || {};
+            return {
+              id: p.id,
+              handle: String(p.handle || p.id || "").replace(/^\//, ""),
+              title: p.title || "Produkt",
+              thumbnail: p.thumbnail || p.images?.[0]?.url || "",
+              price,
+              variantId: p?.variants?.[0]?.id || "",
+              sellerId:
+                p?.seller_id ||
+                p?.metadata?.seller_id ||
+                v0?.seller_id ||
+                v0?.metadata?.seller_id ||
+                v0?.product?.seller_id ||
+                v0?.product?.metadata?.seller_id ||
+                null,
+            };
+          })
+          .filter((p) => p.handle && p.variantId)
+          .slice(0, 3);
+        setRecommended(mapped);
+      })
+      .catch(() => {
+        if (!cancelled) setRecommended([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRecommendedLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sidebarOpen, items.length]);
 
   return (
     <>
@@ -370,7 +512,47 @@ export default function CartSidebar() {
           </CloseBtn>
         </Header>
         <Scroll>
-          {items.length === 0 && !loading && <Empty>Ihr Warenkorb ist leer.</Empty>}
+          {items.length === 0 && !loading && (
+            <>
+              <Empty>Ihr Warenkorb ist leer.</Empty>
+              <RecommendedWrap>
+                <RecommendedTitle>Empfohlene Produkte</RecommendedTitle>
+                <RecommendedList>
+                  {recommendedLoading && <div style={{ color: "#9ca3af", fontSize: 13 }}>Wird geladen...</div>}
+                  {!recommendedLoading && recommended.length === 0 && (
+                    <div style={{ color: "#9ca3af", fontSize: 13 }}>Keine Empfehlungen verfügbar.</div>
+                  )}
+                  {!recommendedLoading &&
+                    recommended.map((p) => (
+                      <RecommendedItem key={p.id} href={`/produkt/${p.handle}`} onClick={closeCartSidebar}>
+                        <RecommendedThumb>
+                          {p.thumbnail ? <img src={p.thumbnail} alt={p.title} /> : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />}
+                        </RecommendedThumb>
+                        <RecommendedMeta>
+                          <RecommendedName>{p.title}</RecommendedName>
+                          <RecommendedPrice>{formatPriceCents(p.price)}</RecommendedPrice>
+                        </RecommendedMeta>
+                        <QuickAddBtn
+                          type="button"
+                          title="Schnell hinzufügen"
+                          aria-label="Schnell hinzufügen"
+                          disabled={loading}
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            let out = await addToCart(p.variantId, 1, p.sellerId || null);
+                            // Fallback retry if seller-aware add fails in edge responses.
+                            if (!out && p.sellerId) out = await addToCart(p.variantId, 1, null);
+                          }}
+                        >
+                          +
+                        </QuickAddBtn>
+                      </RecommendedItem>
+                    ))}
+                </RecommendedList>
+              </RecommendedWrap>
+            </>
+          )}
           {items.map((item) => (
             <Item key={item.id}>
               <ItemImage>

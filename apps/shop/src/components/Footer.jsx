@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
 
 function slugify(s) {
   return (s || "")
@@ -48,6 +49,11 @@ const FooterContainer = styled.footer`
   color: var(--footer-text, #ffffff);
   padding: 48px 0 24px;
   margin-top: auto;
+
+  @media (max-width: 767px) {
+    /* On short mobile pages, avoid bottom-anchoring so accordion expands downward */
+    margin-top: 0;
+  }
 `;
 
 const Container = styled.div`
@@ -72,7 +78,7 @@ const Column = styled.div`
   flex-direction: column;
   gap: 12px;
   @media (max-width: 767px) {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: ${(p) => (p.$isLast ? "none" : "1px solid rgba(255, 255, 255, 0.15)")};
   }
 `;
 
@@ -83,45 +89,12 @@ const Title = styled.h3`
   color: var(--footer-text, #ffffff);
 `;
 
-const AccordionHeader = styled.button`
-  display: none;
-  @media (max-width: 767px) {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    justify-content: space-between;
-    background: none;
-    border: none;
-    padding: 16px 0;
-    color: var(--footer-text, #ffffff);
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    text-align: left;
-    font-family: inherit;
-    -webkit-tap-highlight-color: transparent;
-  }
-`;
-
-const AccordionChevron = styled.span`
-  display: inline-block;
-  transition: transform 0.25s ease;
-  transform: ${(p) => (p.$open ? "rotate(180deg)" : "rotate(0deg)")};
-  font-style: normal;
-  font-size: 12px;
-  flex-shrink: 0;
-`;
-
 const AccordionLinks = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
   @media (max-width: 767px) {
-    display: block;
-    overflow: hidden;
-    max-height: ${(p) => (p.$open ? "400px" : "0")};
-    transition: max-height 0.3s ease;
-    padding-bottom: ${(p) => (p.$open ? "12px" : "0")};
+    display: none;
   }
 `;
 
@@ -129,6 +102,73 @@ const DesktopTitle = styled(Title)`
   @media (max-width: 767px) {
     display: none;
   }
+`;
+
+const MobileAccordion = styled(AccordionPrimitive.Root)`
+  display: none;
+  @media (max-width: 767px) {
+    display: block;
+  }
+`;
+
+const MobileAccordionItem = styled(AccordionPrimitive.Item)`
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const MobileAccordionTrigger = styled(AccordionPrimitive.Trigger)`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.03);
+  border: none;
+  padding: 14px 12px;
+  border-radius: 10px;
+  color: var(--footer-text, #ffffff);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.22s ease, transform 0.2s ease;
+
+  &:active {
+    transform: scale(0.995);
+  }
+
+  &[data-state="open"] .footer-chevron {
+    transform: rotate(180deg);
+  }
+`;
+
+const MobileAccordionContent = styled(AccordionPrimitive.Content)`
+  overflow: hidden;
+  &[data-state="open"] {
+    animation: footerAccordionDown 0.24s ease-out;
+  }
+  &[data-state="closed"] {
+    animation: footerAccordionUp 0.2s ease-out;
+  }
+
+  @keyframes footerAccordionDown {
+    from { height: 0; opacity: 0; }
+    to { height: var(--radix-accordion-content-height); opacity: 1; }
+  }
+  @keyframes footerAccordionUp {
+    from { height: var(--radix-accordion-content-height); opacity: 1; }
+    to { height: 0; opacity: 0; }
+  }
+`;
+
+const MobileAccordionContentInner = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 12px 14px;
 `;
 
 const FooterLink = styled(Link)`
@@ -179,7 +219,6 @@ const FOOTER_LOCATIONS = ["footer1", "footer2", "footer3", "footer4"];
 
 export default function Footer() {
   const [footerColumns, setFooterColumns] = useState([]);
-  const [openSections, setOpenSections] = useState({});
 
   useEffect(() => {
     fetch("/api/store-menus")
@@ -197,34 +236,18 @@ export default function Footer() {
       .catch(() => setFooterColumns([]));
   }, []);
 
-  const toggle = useCallback((loc) => {
-    setOpenSections((prev) => ({ ...prev, [loc]: !prev[loc] }));
-  }, []);
-
   return (
     <FooterContainer className="site-footer">
       <Container>
         {footerColumns.length > 0 && (
           <Grid $columns={4}>
             {footerColumns.map(({ location, menu, items }) => {
-              const isOpen = !!openSections[location];
               const name = menu?.name || " ";
               return (
-                <Column key={location}>
+                <Column key={location} $isLast={location === footerColumns[footerColumns.length - 1]?.location}>
                   {/* Desktop: plain title */}
                   <DesktopTitle>{name}</DesktopTitle>
-
-                  {/* Mobile: accordion toggle */}
-                  <AccordionHeader
-                    type="button"
-                    onClick={() => toggle(location)}
-                    aria-expanded={isOpen}
-                  >
-                    <span>{name}</span>
-                    <AccordionChevron $open={isOpen} aria-hidden>▾</AccordionChevron>
-                  </AccordionHeader>
-
-                  <AccordionLinks $open={isOpen}>
+                  <AccordionLinks>
                     {items.length > 0 ? (
                       items.map((item) => (
                         <FooterLink key={item.id} href={menuItemHref(item)}>{item.label}</FooterLink>
@@ -237,6 +260,36 @@ export default function Footer() {
               );
             })}
           </Grid>
+        )}
+        {footerColumns.length > 0 && (
+          <MobileAccordion type="multiple">
+            {footerColumns.map(({ location, menu, items }) => {
+              const name = menu?.name || " ";
+              return (
+                <MobileAccordionItem key={`mobile-${location}`} value={location}>
+                  <AccordionPrimitive.Header>
+                    <MobileAccordionTrigger>
+                      <span>{name}</span>
+                      <svg className="footer-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transition: "transform 0.2s ease", opacity: 0.8 }}>
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </MobileAccordionTrigger>
+                  </AccordionPrimitive.Header>
+                  <MobileAccordionContent>
+                    <MobileAccordionContentInner>
+                      {items.length > 0 ? (
+                        items.map((item) => (
+                          <FooterLink key={`mobile-${item.id}`} href={menuItemHref(item)}>{item.label}</FooterLink>
+                        ))
+                      ) : (
+                        menu ? <Placeholder>Keine Einträge</Placeholder> : null
+                      )}
+                    </MobileAccordionContentInner>
+                  </MobileAccordionContent>
+                </MobileAccordionItem>
+              );
+            })}
+          </MobileAccordion>
         )}
         <Bottom style={{ marginTop: 24 }}>
           <Copyright>© {new Date().getFullYear()} Belucha. All rights reserved.</Copyright>

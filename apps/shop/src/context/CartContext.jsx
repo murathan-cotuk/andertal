@@ -93,15 +93,24 @@ export function CartProvider({ children }) {
       }
       const res = await client.addToCart(c.id, variantId, quantity, sellerId);
       const updated = res?.cart;
-      if (updated) setCart(updated);
-      return updated;
+      if (updated) {
+        setCart(updated);
+        return updated;
+      }
+      // Some backends return eventual cart state slowly; force a refetch for instant UI sync.
+      const refreshed = await fetchCart(c.id);
+      if (refreshed) {
+        setCart(refreshed);
+        return refreshed;
+      }
+      return null;
     } catch (err) {
       console.error("Add to cart failed:", err);
       return null;
     } finally {
       setLoading(false);
     }
-  }, [cart, createCart]);
+  }, [cart, createCart, fetchCart]);
 
   const updateLineItem = useCallback(async (lineId, quantity) => {
     if (!cart?.id) return null;

@@ -205,11 +205,24 @@ export const ALL_COUNTRIES = [
 export const COUNTRY_MAP = Object.fromEntries(ALL_COUNTRIES.map((c) => [c.code, c]));
 
 /**
+ * Returns the localized display name for a country code using Intl.DisplayNames.
+ * Falls back to the German label from ALL_COUNTRIES, then to the code itself.
+ */
+export function getLocalizedCountryName(code, locale = "de") {
+  try {
+    const dn = new Intl.DisplayNames([locale], { type: "region" });
+    const name = dn.of(code);
+    if (name && name !== code) return name;
+  } catch (_) {}
+  return COUNTRY_MAP[code]?.label || code;
+}
+
+/**
  * Given shippingGroups from /store/shipping-groups,
  * returns countries that have at least one finite, non-negative price (incl. 0 = free).
- * Sorted alphabetically by label. Unknown ISO codes still appear with code as label.
+ * Sorted alphabetically by label in the requested locale. Unknown ISO codes still appear with code as label.
  */
-export function getShippableCountries(shippingGroups) {
+export function getShippableCountries(shippingGroups, locale = "de") {
   const codes = new Set();
   for (const g of (shippingGroups || [])) {
     const prices = g.prices || {};
@@ -224,8 +237,9 @@ export function getShippableCountries(shippingGroups) {
   const out = [];
   for (const code of codes) {
     const meta = COUNTRY_MAP[code];
-    if (meta) out.push(meta);
-    else out.push({ code, label: code, flag: "", currency: "eur", locale: "en" });
+    const localizedLabel = getLocalizedCountryName(code, locale);
+    if (meta) out.push({ ...meta, label: localizedLabel });
+    else out.push({ code, label: localizedLabel, flag: "", currency: "eur", locale: "en" });
   }
-  return out.sort((a, b) => a.label.localeCompare(b.label, "de"));
+  return out.sort((a, b) => a.label.localeCompare(b.label, locale));
 }

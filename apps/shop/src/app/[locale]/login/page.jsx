@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter, Link } from "@/i18n/navigation";
+import { useRouter, Link, usePathname } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useMedusaAuth } from "@/hooks/useMedusaAuth";
 import { useCustomerAuth as useAuth, useAuthGuard } from "@belucha/lib";
 import { tokens } from "@/design-system/tokens";
 import { resolveImageUrl } from "@/lib/image-url";
+import { DEFAULT_CURRENCY, marketPrefix, parseMarketPath } from "@/lib/shop-market";
 
 /* ── Monkey SVG (password‑blind feature) ─────────────────── */
 function MonkeyAvatar({ isBlind }) {
@@ -56,16 +58,34 @@ function MonkeyAvatar({ isBlind }) {
 export default function LoginPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/", redirectIfAuthenticated: true });
 
+  const t = useTranslations("auth");
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [branding, setBranding] = useState({ logo: "", favicon: "", logoHeight: 34 });
+  const [isDesktop, setIsDesktop] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = useLocale();
   const { login: loginMedusa, loading } = useMedusaAuth();
   const searchParams = useSearchParams();
+  const localeItems = [
+    { code: "en", label: "English" },
+    { code: "de", label: "Deutsch" },
+    { code: "fr", label: "Français" },
+    { code: "it", label: "Italiano" },
+    { code: "es", label: "Español" },
+    { code: "tr", label: "Türkçe" },
+  ];
 
   const isBlind = !showPassword;
+  const localeHref = (nextLocale) => {
+    const parsed = parseMarketPath(pathname || "");
+    const country = parsed?.country || "de";
+    const currency = parsed?.currency || DEFAULT_CURRENCY;
+    return `${marketPrefix(country, nextLocale, currency)}/login`;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -74,9 +94,12 @@ export default function LoginPage() {
       .then((d) => {
         if (cancelled) return;
         setBranding({
-          logo: resolveImageUrl(d?.shop_logo_url || ""),
-          favicon: resolveImageUrl(d?.shop_favicon_url || ""),
-          logoHeight: d?.shop_logo_height != null ? Number(d.shop_logo_height) : 34,
+          logo: resolveImageUrl(d?.shop_logo_url || d?.sellercentral_logo_url || ""),
+          favicon: resolveImageUrl(d?.shop_favicon_url || d?.sellercentral_favicon_url || ""),
+          logoHeight:
+            d?.shop_logo_height != null
+              ? Number(d.shop_logo_height)
+              : (d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 34),
         });
       })
       .catch(() => {});
@@ -86,14 +109,47 @@ export default function LoginPage() {
   useEffect(() => {
     const fav = (branding.favicon || "").trim();
     if (!fav || typeof document === "undefined") return;
-    let link = document.querySelector("link[rel='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      link.setAttribute("rel", "icon");
-      document.head.appendChild(link);
-    }
-    link.setAttribute("href", fav);
+    const upsert = (rel) => {
+      let link = document.querySelector(`link[rel='${rel}']`);
+      if (!link) {
+        link = document.createElement("link");
+        link.setAttribute("rel", rel);
+        document.head.appendChild(link);
+      }
+      link.setAttribute("href", fav);
+      link.setAttribute("type", "image/x-icon");
+    };
+    upsert("icon");
+    upsert("shortcut icon");
   }, [branding.favicon]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    let viewport = document.querySelector('meta[name="viewport"]');
+    const previous = viewport?.getAttribute("content") || "";
+    if (!viewport) {
+      viewport = document.createElement("meta");
+      viewport.setAttribute("name", "viewport");
+      document.head.appendChild(viewport);
+    }
+    viewport.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+    );
+    return () => {
+      if (!viewport) return;
+      if (previous) viewport.setAttribute("content", previous);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const mq = window.matchMedia("(min-width: 768px)");
+    const apply = () => setIsDesktop(mq.matches);
+    apply();
+    mq.addEventListener?.("change", apply);
+    return () => mq.removeEventListener?.("change", apply);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -110,13 +166,13 @@ export default function LoginPage() {
           router.push(redirectTo);
           router.refresh();
         } else {
-          setError("Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.");
+          setError(t("loginFailed"));
         }
       } else {
-        setError("Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.");
+        setError(t("loginFailed"));
       }
     } catch (err) {
-      setError(err.message || "Ein unerwarteter Fehler ist aufgetreten.");
+      setError(err.message || t("unexpectedError"));
     }
   };
 
@@ -130,9 +186,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa", fontFamily: tokens.fontFamily.sans }}>
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "#fafafa", fontFamily: tokens.fontFamily.sans, overflowX: "hidden", overflowY: "auto", touchAction: "pan-y", overscrollBehaviorX: "none", WebkitOverflowScrolling: "touch" }}>
       {/* Top bar */}
-      <div style={{ padding: "16px 24px" }}>
+      <div style={{ padding: "16px max(16px, env(safe-area-inset-left)) 16px max(16px, env(safe-area-inset-right))", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <Link href="/" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
           {branding.logo ? (
             <img
@@ -144,31 +200,40 @@ export default function LoginPage() {
             <span style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", letterSpacing: "-0.03em" }}>Belucha</span>
           )}
         </Link>
+        <details style={{ position: "relative" }}>
+          <summary style={{ listStyle: "none", cursor: "pointer", border: "2px solid #1A1A1A", borderRadius: 10, padding: "7px 10px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#fff", lineHeight: 0, boxShadow: isDesktop ? "0 3px 0 0 #1A1A1A" : "none", minWidth: isDesktop ? 42 : "auto" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="#1A1A1A" strokeWidth="2" />
+              <path d="M3 12h18M12 3c2.5 2.5 2.5 15.5 0 18M12 3c-2.5 2.5-2.5 15.5 0 18" stroke="#1A1A1A" strokeWidth="1.6" />
+            </svg>
+          </summary>
+          <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: "#fff", border: "2px solid #1A1A1A", borderRadius: isDesktop ? 14 : 10, minWidth: isDesktop ? 180 : 150, boxShadow: isDesktop ? "0 12px 30px rgba(0,0,0,0.18)" : "0 6px 20px rgba(0,0,0,0.14)", overflow: "hidden", zIndex: 20, padding: isDesktop ? 6 : 0 }}>
+            {localeItems.map((l) => (
+              <a
+                key={l.code}
+                href={localeHref(l.code)}
+                style={{ display: "block", padding: isDesktop ? "10px 12px" : "10px 12px", borderRadius: isDesktop ? 10 : 0, marginBottom: isDesktop ? 4 : 0, fontSize: 14, fontWeight: l.code === locale ? 800 : 600, textDecoration: "none", color: "#1A1A1A", background: l.code === locale ? "#fff4e8" : "#fff" }}
+              >
+                {l.label}
+              </a>
+            ))}
+          </div>
+        </details>
       </div>
 
       {/* Center card */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", boxSizing: "border-box" }}>
         <div style={{
           width: "100%", maxWidth: 420,
           background: "#fff",
           border: "2px solid #1A1A1A",
           borderRadius: 16,
           boxShadow: "4px 4px 0 0 #1A1A1A",
-          padding: "40px 36px 36px",
+          padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 36px) clamp(16px, 4vw, 36px)",
           display: "flex", flexDirection: "column", alignItems: "center", gap: 28,
         }}>
           {/* Monkey */}
           <MonkeyAvatar isBlind={isBlind} />
-
-          {/* Heading */}
-          <div style={{ textAlign: "center" }}>
-            <h1 style={{ fontSize: 26, fontWeight: 800, color: "#1A1A1A", margin: "0 0 6px", letterSpacing: "-0.03em" }}>
-              Willkommen zurück
-            </h1>
-            <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>
-              Melde dich an, um dein Konto zu nutzen
-            </p>
-          </div>
 
           {/* Error */}
           {error && (
@@ -185,7 +250,7 @@ export default function LoginPage() {
               <input
                 id="login-email"
                 type="email"
-                placeholder="deine@email.de"
+                placeholder={t("emailPlaceholder")}
                 value={formData.email}
                 onChange={e => setFormData(f => ({ ...f, email: e.target.value }))}
                 required
@@ -198,16 +263,16 @@ export default function LoginPage() {
             {/* Password */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <label htmlFor="login-password" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Passwort</label>
+                <label htmlFor="login-password" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("passwordLabel")}</label>
                 <Link href="/forgot-password" style={{ fontSize: 12, color: tokens.primary.DEFAULT, textDecoration: "none", fontWeight: 600 }}>
-                  Vergessen?
+                  {t("forgotPassword")}
                 </Link>
               </div>
               <div style={{ position: "relative" }}>
                 <input
                   id="login-password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Dein Passwort"
+                  placeholder={t("passwordPlaceholder")}
                   value={formData.password}
                   onChange={e => setFormData(f => ({ ...f, password: e.target.value }))}
                   required
@@ -217,15 +282,20 @@ export default function LoginPage() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(v => !v)}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    setShowPassword((v) => !v);
+                  }}
                   style={{
                     position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
                     background: "none", border: "none", cursor: "pointer",
                     fontSize: 12, fontWeight: 700, color: tokens.primary.DEFAULT,
                     padding: "3px 6px",
+                    zIndex: 2,
+                    touchAction: "manipulation",
                   }}
                 >
-                  {showPassword ? "Verbergen" : "Anzeigen"}
+                  {showPassword ? t("hide") : t("show")}
                 </button>
               </div>
             </div>
@@ -249,15 +319,15 @@ export default function LoginPage() {
               onMouseEnter={e => { if (!loading) { e.currentTarget.style.transform = "translateY(1px)"; e.currentTarget.style.boxShadow = "0 2px 0 2px #1A1A1A"; } }}
               onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = loading ? "none" : "0 3px 0 2px #1A1A1A"; }}
             >
-              {loading ? "Wird angemeldet…" : "Anmelden"}
+              {loading ? t("signingIn") : t("signIn")}
             </button>
           </form>
 
           {/* Register link */}
           <p style={{ fontSize: 13, color: "#6b7280", margin: 0, textAlign: "center" }}>
-            Noch kein Konto?{" "}
+            {t("noAccount")}{" "}
             <Link href="/register" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>
-              Jetzt registrieren
+              {t("registerNow")}
             </Link>
           </p>
         </div>

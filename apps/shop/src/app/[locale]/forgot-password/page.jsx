@@ -2,11 +2,13 @@
 
 import React, { useState } from "react";
 import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { tokens } from "@/design-system/tokens";
 
 const MEDUSA_BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
 export default function ForgotPasswordPage() {
+  const t = useTranslations("auth");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -18,7 +20,7 @@ export default function ForgotPasswordPage() {
     setSuccess("");
     const val = String(email || "").trim().toLowerCase();
     if (!val) {
-      setError("Bitte geben Sie Ihre E-Mail-Adresse ein.");
+      setError(t("enterEmail"));
       return;
     }
     setLoading(true);
@@ -30,12 +32,12 @@ export default function ForgotPasswordPage() {
       });
       // Security best-practice: don't reveal if email exists.
       if (!res.ok) {
-        setSuccess("Wenn ein Konto mit dieser E-Mail existiert, wurde eine E-Mail zum Zurücksetzen gesendet.");
+        setSuccess(t("resetSent"));
       } else {
-        setSuccess("Wenn ein Konto mit dieser E-Mail existiert, wurde eine E-Mail zum Zurücksetzen gesendet.");
+        setSuccess(t("resetSent"));
       }
     } catch {
-      setSuccess("Wenn ein Konto mit dieser E-Mail existiert, wurde eine E-Mail zum Zurücksetzen gesendet.");
+      setSuccess(t("resetSent"));
     } finally {
       setLoading(false);
     }
@@ -61,9 +63,9 @@ export default function ForgotPasswordPage() {
             padding: "36px 30px 30px",
           }}
         >
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", margin: "0 0 8px" }}>Passwort vergessen</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", margin: "0 0 8px" }}>{t("forgotPasswordTitle")}</h1>
           <p style={{ fontSize: 14, color: "#6b7280", margin: "0 0 18px" }}>
-            Geben Sie Ihre E-Mail-Adresse ein. Wir senden Ihnen einen Link zum Zurücksetzen Ihres Passworts.
+            {t("forgotPasswordSubtitle")}
           </p>
 
           {error ? (
@@ -84,7 +86,7 @@ export default function ForgotPasswordPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="deine@email.de"
+              placeholder={t("emailPlaceholder")}
               required
               style={{
                 width: "100%",
@@ -115,13 +117,13 @@ export default function ForgotPasswordPage() {
                 boxShadow: loading ? "none" : "0 3px 0 2px #1A1A1A",
               }}
             >
-              {loading ? "Wird gesendet…" : "Reset-Link senden"}
+              {loading ? t("sending") : t("sendResetLink")}
             </button>
           </form>
 
           <p style={{ fontSize: 13, color: "#6b7280", margin: "14px 0 0", textAlign: "center" }}>
             <Link href="/login" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>
-              Zurück zur Anmeldung
+              {t("backToLogin")}
             </Link>
           </p>
         </div>
@@ -129,4 +131,3 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
-

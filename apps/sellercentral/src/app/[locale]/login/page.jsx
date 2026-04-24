@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { resolveImageUrl } from "@/lib/image-url";
 
 export default function Login() {
   const router = useRouter();
@@ -22,15 +23,12 @@ export default function Login() {
 
   useEffect(() => {
     let cancelled = false;
-    const base = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "");
-    if (!base) return;
-    fetch(`${base}/admin-hub/seller-settings?seller_id=default`, { cache: "no-store" })
-      .then((r) => r.json())
+    getMedusaAdminClient().getSellerSettings("default")
       .then((d) => {
         if (cancelled) return;
         setBranding({
-          logo: (d?.sellercentral_logo_url || "").trim(),
-          favicon: (d?.sellercentral_favicon_url || "").trim(),
+          logo: resolveImageUrl(d?.sellercentral_logo_url || ""),
+          favicon: resolveImageUrl(d?.sellercentral_favicon_url || ""),
           logoHeight: d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 30,
         });
       })
@@ -41,14 +39,38 @@ export default function Login() {
   useEffect(() => {
     const fav = (branding.favicon || "").trim();
     if (!fav || typeof document === "undefined") return;
-    let link = document.querySelector("link[rel='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      link.setAttribute("rel", "icon");
-      document.head.appendChild(link);
-    }
-    link.setAttribute("href", fav);
+    const upsert = (rel) => {
+      let link = document.querySelector(`link[rel='${rel}']`);
+      if (!link) {
+        link = document.createElement("link");
+        link.setAttribute("rel", rel);
+        document.head.appendChild(link);
+      }
+      link.setAttribute("href", fav);
+      link.setAttribute("type", "image/x-icon");
+    };
+    upsert("icon");
+    upsert("shortcut icon");
   }, [branding.favicon]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    let viewport = document.querySelector('meta[name="viewport"]');
+    const previous = viewport?.getAttribute("content") || "";
+    if (!viewport) {
+      viewport = document.createElement("meta");
+      viewport.setAttribute("name", "viewport");
+      document.head.appendChild(viewport);
+    }
+    viewport.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+    );
+    return () => {
+      if (!viewport) return;
+      if (previous) viewport.setAttribute("content", previous);
+    };
+  }, []);
 
   const finishLogin = async (data) => {
     localStorage.setItem("sellerToken", data.token);
@@ -105,8 +127,8 @@ export default function Login() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6" }}>
-      <div style={{ width: "100%", maxWidth: 420 }}>
+    <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6", overflowX: "hidden", overflowY: "auto", touchAction: "pan-y", overscrollBehaviorX: "none", WebkitOverflowScrolling: "touch", padding: "16px", boxSizing: "border-box" }}>
+      <div style={{ width: "100%", maxWidth: 420, boxSizing: "border-box" }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
           {branding.logo ? (
             <img
@@ -118,7 +140,7 @@ export default function Login() {
             <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: "0.18em", color: "#111827" }}>BELUCHA</span>
           )}
         </div>
-        <div style={{ background: "#fff", borderRadius: 12, padding: "40px 36px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+        <div style={{ background: "#fff", borderRadius: 12, padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 36px)", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
           {!totpRequired ? (
             <>
               <div style={{ textAlign: "center", marginBottom: 32 }}>
@@ -150,8 +172,11 @@ export default function Login() {
                     />
                     <button
                       type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 0, display: "flex", alignItems: "center" }}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        setShowPassword((v) => !v);
+                      }}
+                      style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 0, display: "flex", alignItems: "center", zIndex: 2, touchAction: "manipulation" }}
                       tabIndex={-1}
                     >
                       {showPassword ? (

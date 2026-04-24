@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useLocale } from "next-intl";
+import CustomCheckbox from "./ui/CustomCheckbox";
 
 const STORAGE_KEY = "belucha_cookie_consent";
 
@@ -68,6 +69,7 @@ export default function CookieBanner() {
   const [visible, setVisible] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [prefs, setPrefs] = useState({ analytics: false, marketing: false });
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     try {
@@ -82,6 +84,19 @@ export default function CookieBanner() {
     } catch {
       setVisible(true);
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    if (typeof mq.addEventListener === "function") mq.addEventListener("change", update);
+    else mq.addListener(update);
+    return () => {
+      if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", update);
+      else mq.removeListener(update);
+    };
   }, []);
 
   const save = (consent) => {
@@ -109,6 +124,9 @@ export default function CookieBanner() {
         background: "#fff", borderTop: "2px solid #000",
         boxShadow: "0 -4px 24px rgba(0,0,0,0.13)",
         fontFamily: "inherit",
+        maxHeight: isMobile ? "calc(100vh - 12px)" : "none",
+        overflowY: isMobile ? "auto" : "visible",
+        paddingBottom: "max(8px, env(safe-area-inset-bottom))",
       }}
       role="dialog"
       aria-modal="true"
@@ -117,29 +135,30 @@ export default function CookieBanner() {
       {!showManage ? (
         /* ── Compact bar ─────────────────────────────── */
         <div style={{
-          maxWidth: 1200, margin: "0 auto", padding: "18px 24px",
-          display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
+          maxWidth: 1200, margin: "0 auto", padding: isMobile ? "14px 12px" : "18px 24px",
+          display: "flex", alignItems: isMobile ? "stretch" : "center", gap: 12, flexWrap: "wrap",
+          flexDirection: isMobile ? "column" : "row",
         }}>
-          <div style={{ flex: 1, minWidth: 260 }}>
+          <div style={{ flex: 1, minWidth: isMobile ? "100%" : 260 }}>
             <span style={{ fontWeight: 700, fontSize: 15, marginRight: 8 }}>{t.title}</span>
             <span style={{ fontSize: 14, color: "#4b5563", lineHeight: 1.5 }}>{t.body}</span>
           </div>
-          <div style={{ display: "flex", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
             <button
               onClick={() => setShowManage(true)}
-              style={{ ...btnBase, background: "#fff", color: "#374151" }}
+              style={{ ...btnBase, background: "#fff", color: "#374151", flex: isMobile ? "1 1 100%" : "0 0 auto" }}
             >
               {t.manage}
             </button>
             <button
               onClick={acceptNecessary}
-              style={{ ...btnBase, background: "#f3f4f6", color: "#374151" }}
+              style={{ ...btnBase, background: "#f3f4f6", color: "#374151", flex: isMobile ? "1 1 calc(50% - 4px)" : "0 0 auto" }}
             >
               {t.necessary}
             </button>
             <button
               onClick={acceptAll}
-              style={{ ...btnBase, background: "#ff971c", color: "#fff", border: "2px solid #000" }}
+              style={{ ...btnBase, background: "#ff971c", color: "#fff", border: "2px solid #000", flex: isMobile ? "1 1 calc(50% - 4px)" : "0 0 auto" }}
             >
               {t.acceptAll}
             </button>
@@ -147,7 +166,7 @@ export default function CookieBanner() {
         </div>
       ) : (
         /* ── Manage panel ────────────────────────────── */
-        <div style={{ maxWidth: 680, margin: "0 auto", padding: "24px 24px 20px" }}>
+        <div style={{ maxWidth: 680, margin: "0 auto", padding: isMobile ? "16px 12px 8px" : "24px 24px 20px", maxHeight: isMobile ? "calc(100vh - 24px)" : "none", overflowY: isMobile ? "auto" : "visible" }}>
           <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 16 }}>{t.manage}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 20 }}>
             {Object.entries(t.categories).map(([key, cat]) => (
@@ -160,12 +179,12 @@ export default function CookieBanner() {
                   cursor: cat.fixed ? "default" : "pointer",
                 }}
               >
-                <input
-                  type="checkbox"
+                <CustomCheckbox
                   checked={cat.fixed || !!prefs[key]}
                   disabled={!!cat.fixed}
                   onChange={(e) => !cat.fixed && setPrefs((p) => ({ ...p, [key]: e.target.checked }))}
-                  style={{ marginTop: 2, flexShrink: 0, accentColor: "#ff971c", width: 16, height: 16 }}
+                  size={18}
+                  style={{ marginTop: 2, flexShrink: 0 }}
                 />
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>

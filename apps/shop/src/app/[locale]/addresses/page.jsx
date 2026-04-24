@@ -11,6 +11,8 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { useCustomerAuth as useAuth } from "@belucha/lib";
 import { useCart } from "@/context/CartContext";
 import { COUNTRY_MAP, getShippableCountries } from "@/lib/countries";
+import { useLocale } from "next-intl";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 const ORANGE = "#ff971c";
 const DARK = "#1A1A1A";
 const GRAY = "#6b7280";
@@ -30,8 +32,9 @@ const cardStyle = {
 export default function AddressesPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
   const { user, logout } = useAuth();
+  const locale = useLocale();
   const { shippingGroups } = useCart();
-  const shippableCountries = useMemo(() => getShippableCountries(shippingGroups), [shippingGroups]);
+  const shippableCountries = useMemo(() => getShippableCountries(shippingGroups, locale), [shippingGroups, locale]);
   const router = useRouter();
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -252,11 +255,11 @@ export default function AddressesPage() {
                       ))}
                     </select>
                     <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
-                      <input type="checkbox" checked={form.is_default_shipping} onChange={(e) => set("is_default_shipping", e.target.checked)} />
+                      <CustomCheckbox checked={form.is_default_shipping} onChange={(e) => set("is_default_shipping", e.target.checked)} size={18} />
                       Standard-Lieferadresse
                     </label>
                     <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
-                      <input type="checkbox" checked={form.is_default_billing} onChange={(e) => set("is_default_billing", e.target.checked)} />
+                      <CustomCheckbox checked={form.is_default_billing} onChange={(e) => set("is_default_billing", e.target.checked)} size={18} />
                       Standard-Rechnungsadresse
                     </label>
                     {err && <p style={{ color: "#ef4444", fontSize: 13, margin: 0 }}>{err}</p>}

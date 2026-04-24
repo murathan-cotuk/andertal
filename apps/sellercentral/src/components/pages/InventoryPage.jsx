@@ -30,6 +30,7 @@ import {
   formatChangeRequestValueForDisplay,
   fieldNameDisplayLabel,
 } from "@/lib/product-change-request-format";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 const INVENTORY_ROW_GRID = "40px 56px 110px 72px minmax(320px, 2fr) minmax(140px, 0.9fr) minmax(150px, 1fr) minmax(200px, 1.2fr) 108px";
 const EXCEL_BORDER = "1px solid #e5e7eb";
@@ -309,7 +310,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
       {drafts.map((d, idx) => (
         <div key={idx} style={{ display: "grid", gridTemplateColumns: "40px 56px 110px 2fr 140px 150px 1.2fr", gap: 0, alignItems: "center", borderBottom: idx === drafts.length - 1 ? "none" : EXCEL_BORDER, background: idx % 2 === 0 ? "#fff" : "#fcfdff" }}>
           <div style={{ textAlign: "center", color: "#9ca3af", padding: "8px 4px", borderRight: EXCEL_BORDER }}>↳</div>
-          <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER }}><input type="checkbox" /></div>
+          <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER }}><CustomCheckbox checked={false} onChange={() => {}} size={18} /></div>
           <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER }}>
             {(() => {
               const c = statusColors(matrixVariants[idx]?.status || product.status);
@@ -460,8 +461,7 @@ function InventoryProductRow({
           {hasVariants ? (variantsOpen ? "▾" : "▸") : "·"}
         </button>
           <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER, display: "flex", justifyContent: "center" }}>
-          <input
-            type="checkbox"
+          <CustomCheckbox
             checked={selectedIds.includes(product.id)}
             onChange={(e) => {
               e.stopPropagation();
@@ -469,6 +469,7 @@ function InventoryProductRow({
                 e.target.checked ? [...prev, product.id] : prev.filter((id) => id !== product.id)
               );
             }}
+            size={18}
             style={{ margin: 0 }}
           />
           </div>

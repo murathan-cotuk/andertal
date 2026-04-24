@@ -31,6 +31,7 @@ import { CHECKOUT_SHIPPING_COUNTRY_LS, CHECKOUT_SHIPPING_MARKET_COUNTRY_LS } fro
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 const STRIPE_PK_ENV = (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim();
 
@@ -832,12 +833,12 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
 
         {/* Billing address toggle */}
         <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => setBillingSameAsShipping(v => !v)}>
-          <input
-            type="checkbox"
+          <CustomCheckbox
             id="billing-same"
             checked={billingSameAsShipping}
             onChange={e => setBillingSameAsShipping(e.target.checked)}
-            style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#111827" }}
+            size={18}
+            style={{ pointerEvents: "none" }}
           />
           <label htmlFor="billing-same" style={{ fontSize: "0.875rem", color: "#374151", cursor: "pointer", userSelect: "none" }}>
             {t("billingSameAsShipping")}
@@ -919,11 +920,10 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
       {user?.id && !shipAddrId && (
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "#374151", cursor: "pointer" }}>
-            <input
-              type="checkbox"
+            <CustomCheckbox
               checked={saveNewAddress}
               onChange={(e) => setSaveNewAddress(e.target.checked)}
-              style={{ width: 16, height: 16, accentColor: "#111827" }}
+              size={18}
             />
             Diese Lieferadresse in meinem Konto speichern
           </label>
@@ -962,7 +962,7 @@ export default function CheckoutPage() {
   const marketCountryCode = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const [shippingCountry, setShippingCountry] = useState(marketCountryCode);
 
-  const shippableCountries = useMemo(() => getShippableCountries(shippingGroups), [shippingGroups]);
+  const shippableCountries = useMemo(() => getShippableCountries(shippingGroups, locale), [shippingGroups, locale]);
 
   useEffect(() => {
     if (!shippableCountries.length) return;

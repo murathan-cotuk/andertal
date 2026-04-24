@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { Card, Button, Input } from "@belucha/ui";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 const Container = styled.div`
   max-width: 1200px;
@@ -760,10 +761,10 @@ export default function ProductsPage() {
                           <CategoryGroupTitle>{parentName}</CategoryGroupTitle>
                           {cats.map((cat) => (
                             <CategoryOption key={cat.id}>
-                              <input
-                                type="checkbox"
+                              <CustomCheckbox
                                 checked={formData.categories.includes(cat.id)}
                                 onChange={() => toggleCategory(cat.id)}
+                                size={18}
                               />
                               <span>{cat.name}</span>
                             </CategoryOption>

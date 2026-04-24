@@ -17,6 +17,7 @@ import {
 import { normCatId } from "@/lib/category-product-ids";
 import LandingContainers from "@/components/landing/LandingContainers";
 import { useShopStyles } from "@/context/ShopStylesContext";
+import CustomCheckbox from "../ui/CustomCheckbox";
 
 const HEADER_H = 112;
 
@@ -248,15 +249,15 @@ const Sidebar = styled.aside`
     position: fixed;
     top: 0;
     left: 0;
-    width: min(82vw, 320px);
+    width: min(360px, 90vw);
     height: 100dvh;
     max-height: 100dvh;
-    z-index: 2147483620;
+    z-index: 2147483701;
     background: #fff;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+    box-shadow: 4px 0 32px rgba(0,0,0,0.2);
     transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
     transition: transform var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
-    padding: 16px;
+    padding: 14px 16px 16px;
     box-sizing: border-box;
     overflow-y: auto;
 
@@ -288,7 +289,7 @@ const SidebarOverlay = styled.div`
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.45);
-    z-index: 2147483619;
+    z-index: 2147483700;
     opacity: ${(p) => (p.$open ? 1 : 0)};
     pointer-events: ${(p) => (p.$open ? "auto" : "none")};
     transition: opacity var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
@@ -641,6 +642,16 @@ export default function CategoryTemplate() {
       setPanelOpen(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    if (!window.matchMedia("(max-width: 767px)").matches) return undefined;
+    const prev = document.body.style.overflow;
+    if (panelOpen) document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [panelOpen]);
 
   useEffect(() => {
     if (!slug) return;
@@ -1044,7 +1055,7 @@ export default function CategoryTemplate() {
                             const on = (filters[key] || []).includes(val);
                             return (
                               <CheckRow key={val} $on={on}>
-                                <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
+                                <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
                                 {val}
                               </CheckRow>
                             );

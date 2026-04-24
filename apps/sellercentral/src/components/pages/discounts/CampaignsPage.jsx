@@ -19,6 +19,7 @@ import {
   Checkbox,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 const STATUS_OPTIONS = [
   { label: "Entwurf", value: "draft" },
@@ -418,7 +419,7 @@ export default function CampaignsPage() {
                     const checked = form.product_ids.includes(p.id);
                     return (
                       <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer", background: checked ? "#f0f9ff" : "transparent", borderBottom: "1px solid #f4f5f7" }}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleProduct(p.id)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                        <CustomCheckbox checked={checked} onChange={() => toggleProduct(p.id)} size={18} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#202223", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title || p.id}</div>
                           {p.ean && <div style={{ fontSize: 11, color: "#6d7175" }}>EAN: {p.ean}</div>}
@@ -441,7 +442,7 @@ export default function CampaignsPage() {
                       const checked = form.group_ids.includes(g.id);
                       return (
                         <label key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", cursor: "pointer", background: checked ? "#f0f9ff" : "transparent", borderBottom: "1px solid #f4f5f7" }}>
-                          <input type="checkbox" checked={checked} onChange={() => toggleGroup(g.id)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                          <CustomCheckbox checked={checked} onChange={() => toggleGroup(g.id)} size={18} />
                           <div>
                             <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#202223" }}>{g.name}</div>
                             <div style={{ fontSize: 11, color: "#6d7175" }}>{(g.product_ids || []).length} Produkte</div>

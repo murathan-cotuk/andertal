@@ -8,6 +8,7 @@ import { Button, InlineStack } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function fmtCents(c) {
@@ -934,7 +935,7 @@ export default function OrdersPage() {
           onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fff"; }}
         >
           <td style={{ padding: "10px 8px 10px 12px", width: 32 }} onClick={e => e.stopPropagation()}>
-            <input type="checkbox" checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} style={{ cursor: "pointer" }} />
+            <CustomCheckbox checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} size={18} />
           </td>
           <td style={{ padding: "10px 8px 10px 0", width: 32 }}>
             <button onClick={() => toggleExpand(order)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#6b7280", padding: 0 }}>
@@ -1174,7 +1175,7 @@ export default function OrdersPage() {
                     style={{ padding: "10px 10px", textAlign: i >= 5 && i <= 10 ? "center" : "left", fontWeight: 600, fontSize: 11, color: isSortable ? "#374151" : "#6b7280", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", cursor: isSortable ? "pointer" : "default", userSelect: "none", position: "sticky", top: 0, zIndex: 2, background: "#f9fafb" }}
                   >
                     {i === 0 ? (
-                      <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ cursor: "pointer" }} />
+                      <CustomCheckbox checked={allSelected} onChange={toggleAll} size={18} />
                     ) : (
                       <span>
                         {c}

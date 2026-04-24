@@ -1,13 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { useRouter, Link } from "@/i18n/navigation";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter, Link, usePathname } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useMedusaAuth } from "@/hooks/useMedusaAuth";
 import { useCustomerAuth as useAuth, useAuthGuard } from "@belucha/lib";
 import { tokens } from "@/design-system/tokens";
 import { useCart } from "@/context/CartContext";
-import { getShippableCountries } from "@/lib/countries";
+import { ALL_COUNTRIES, getLocalizedCountryName, getShippableCountries } from "@/lib/countries";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { resolveImageUrl } from "@/lib/image-url";
+import { DEFAULT_CURRENCY, marketPrefix, parseMarketPath } from "@/lib/shop-market";
 
 /* ── Monkey SVG ─────────────────────────────────────────────────────────── */
 function MonkeyAvatar({ isBlind }) {
@@ -80,37 +83,91 @@ const sectionLabel = {
 export default function RegisterPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/", redirectIfAuthenticated: true });
 
+  const t = useTranslations("auth");
   const [accountType, setAccountType] = useState("privat");
   const [formData, setFormData] = useState({
     firstName: "", lastName: "", email: "", phone: "",
     gender: "", birthDate: "",
-    address: "", addressLine2: "", zipCode: "", city: "", country: "DE",
+    address: "", addressLine2: "", zipCode: "", city: "", country: "",
     companyName: "", vatNumber: "",
     billingSameAsShipping: true,
-    billingAddress: "", billingZipCode: "", billingCity: "", billingCountry: "DE",
+    billingAddress: "", billingZipCode: "", billingCity: "", billingCountry: "",
     password: "",
+    passwordConfirm: "",
     legalConsent: false,
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordConfirmTouched, setPasswordConfirmTouched] = useState(false);
   const [error, setError] = useState("");
+  const [countrySearch, setCountrySearch] = useState("");
+  const [billingCountrySearch, setBillingCountrySearch] = useState("");
+  const [isCountryOpen, setIsCountryOpen] = useState(false);
+  const [isBillingCountryOpen, setIsBillingCountryOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const countryBoxRef = useRef(null);
+  const billingCountryBoxRef = useRef(null);
   const [branding, setBranding] = useState({ logo: "", favicon: "", logoHeight: 34 });
   const { login } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = useLocale();
   const { register: registerMedusa, login: loginMedusa, loading } = useMedusaAuth();
   const { shippingGroups } = useCart();
-  const shippableCountries = useMemo(() => getShippableCountries(shippingGroups), [shippingGroups]);
+  const shippableCountries = useMemo(() => getShippableCountries(shippingGroups, locale), [shippingGroups, locale]);
+  const localizedAllCountries = useMemo(() => {
+    return ALL_COUNTRIES
+      .map((c) => ({ ...c, label: getLocalizedCountryName(c.code, locale) }))
+      .sort((a, b) => a.label.localeCompare(b.label, locale));
+  }, [locale]);
+  const countriesForSelect = shippableCountries.length ? shippableCountries : localizedAllCountries;
+  const localeItems = [
+    { code: "en", label: "English" },
+    { code: "de", label: "Deutsch" },
+    { code: "fr", label: "Français" },
+    { code: "it", label: "Italiano" },
+    { code: "es", label: "Español" },
+    { code: "tr", label: "Türkçe" },
+  ];
+  const localeHref = (nextLocale) => {
+    const parsed = parseMarketPath(pathname || "");
+    const country = parsed?.country || "de";
+    const currency = parsed?.currency || DEFAULT_CURRENCY;
+    return `${marketPrefix(country, nextLocale, currency)}/register`;
+  };
 
   useEffect(() => {
     if (!shippableCountries.length) return;
     const codes = new Set(shippableCountries.map((c) => c.code));
     setFormData((f) => {
       const next = { ...f };
-      if (!codes.has(next.country)) next.country = shippableCountries[0].code;
-      const bc = next.billingCountry || "DE";
-      if (!codes.has(bc)) next.billingCountry = shippableCountries[0].code;
+      if (next.country && !codes.has(next.country)) next.country = "";
+      if (next.billingCountry && !codes.has(next.billingCountry)) next.billingCountry = "";
       return next;
     });
   }, [shippableCountries]);
+
+  useEffect(() => {
+    const selected = countriesForSelect.find((c) => c.code === formData.country);
+    setCountrySearch(selected ? `${selected.label} (${selected.code})` : "");
+  }, [formData.country, countriesForSelect]);
+
+  useEffect(() => {
+    const selected = countriesForSelect.find((c) => c.code === (formData.billingCountry || ""));
+    setBillingCountrySearch(selected ? `${selected.label} (${selected.code})` : "");
+  }, [formData.billingCountry, countriesForSelect]);
+
+  useEffect(() => {
+    const onPointerDown = (event) => {
+      if (countryBoxRef.current && !countryBoxRef.current.contains(event.target)) {
+        setIsCountryOpen(false);
+      }
+      if (billingCountryBoxRef.current && !billingCountryBoxRef.current.contains(event.target)) {
+        setIsBillingCountryOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,9 +176,12 @@ export default function RegisterPage() {
       .then((d) => {
         if (cancelled) return;
         setBranding({
-          logo: resolveImageUrl(d?.shop_logo_url || ""),
-          favicon: resolveImageUrl(d?.shop_favicon_url || ""),
-          logoHeight: d?.shop_logo_height != null ? Number(d.shop_logo_height) : 34,
+          logo: resolveImageUrl(d?.shop_logo_url || d?.sellercentral_logo_url || ""),
+          favicon: resolveImageUrl(d?.shop_favicon_url || d?.sellercentral_favicon_url || ""),
+          logoHeight:
+            d?.shop_logo_height != null
+              ? Number(d.shop_logo_height)
+              : (d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 34),
         });
       })
       .catch(() => {});
@@ -131,27 +191,95 @@ export default function RegisterPage() {
   useEffect(() => {
     const fav = (branding.favicon || "").trim();
     if (!fav || typeof document === "undefined") return;
-    let link = document.querySelector("link[rel='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      link.setAttribute("rel", "icon");
-      document.head.appendChild(link);
-    }
-    link.setAttribute("href", fav);
+    const upsert = (rel) => {
+      let link = document.querySelector(`link[rel='${rel}']`);
+      if (!link) {
+        link = document.createElement("link");
+        link.setAttribute("rel", rel);
+        document.head.appendChild(link);
+      }
+      link.setAttribute("href", fav);
+      link.setAttribute("type", "image/x-icon");
+    };
+    upsert("icon");
+    upsert("shortcut icon");
   }, [branding.favicon]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    let viewport = document.querySelector('meta[name="viewport"]');
+    const previous = viewport?.getAttribute("content") || "";
+    if (!viewport) {
+      viewport = document.createElement("meta");
+      viewport.setAttribute("name", "viewport");
+      document.head.appendChild(viewport);
+    }
+    viewport.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+    );
+    return () => {
+      if (!viewport) return;
+      if (previous) viewport.setAttribute("content", previous);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const mq = window.matchMedia("(min-width: 768px)");
+    const apply = () => setIsDesktop(mq.matches);
+    apply();
+    mq.addEventListener?.("change", apply);
+    return () => mq.removeEventListener?.("change", apply);
+  }, []);
+
   const set = (key) => (e) => setFormData(f => ({ ...f, [key]: e.target.value }));
+  const parseCountryCode = (value, list) => {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    const byCode = list.find((c) => c.code.toLowerCase() === raw.toLowerCase());
+    if (byCode) return byCode.code;
+    const m = raw.match(/\(([A-Za-z]{2})\)\s*$/);
+    if (m) {
+      const code = m[1].toUpperCase();
+      if (list.some((c) => c.code === code)) return code;
+    }
+    const byLabel = list.find((c) => c.label.toLowerCase() === raw.toLowerCase());
+    return byLabel ? byLabel.code : null;
+  };
 
   const focusStyle = (e) => e.target.style.boxShadow = `0 0 0 3px ${tokens.primary.light}`;
   const blurStyle = (e) => e.target.style.boxShadow = "none";
+  const passwordMismatch =
+    !!formData.passwordConfirm &&
+    formData.password !== formData.passwordConfirm;
+  const filteredCountries = useMemo(() => {
+    const q = countrySearch.trim().toLowerCase();
+    if (!q) return countriesForSelect;
+    return countriesForSelect.filter((c) =>
+      c.label.toLowerCase().includes(q) || c.code.toLowerCase().includes(q),
+    );
+  }, [countrySearch, countriesForSelect]);
+  const filteredBillingCountries = useMemo(() => {
+    const q = billingCountrySearch.trim().toLowerCase();
+    if (!q) return countriesForSelect;
+    return countriesForSelect.filter((c) =>
+      c.label.toLowerCase().includes(q) || c.code.toLowerCase().includes(q),
+    );
+  }, [billingCountrySearch, countriesForSelect]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!formData.email || !formData.password) { setError("E-Mail und Passwort sind erforderlich."); return; }
-    if (formData.password.length < 6) { setError("Das Passwort muss mindestens 6 Zeichen lang sein."); return; }
-    if (accountType === "gewerbe" && !formData.companyName.trim()) { setError("Firmenname ist erforderlich."); return; }
-    if (!formData.legalConsent) { setError("Bitte akzeptieren Sie die rechtlichen Hinweise."); return; }
+    if (!formData.email || !formData.password) { setError(t("emailRequired")); return; }
+    if (formData.password.length < 6) { setError(t("passwordTooShort")); return; }
+    if (formData.password !== formData.passwordConfirm) {
+      setPasswordConfirmTouched(true);
+      setError("Passwörter stimmen nicht überein.");
+      return;
+    }
+    if (accountType === "gewerbe" && !formData.companyName.trim()) { setError(t("companyNameRequired")); return; }
+    if (!formData.legalConsent) { setError(t("legalConsentRequired")); return; }
 
     try {
       const extra = {
@@ -172,7 +300,7 @@ export default function RegisterPage() {
         billing_country: formData.billingSameAsShipping !== false ? undefined : (formData.billingCountry || undefined),
       };
       const registerResult = await registerMedusa(formData.email, formData.password, formData.firstName, formData.lastName, extra);
-      if (!registerResult?.customer) { setError("Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut."); return; }
+      if (!registerResult?.customer) { setError(t("registerFailed")); return; }
 
       const loginResult = await loginMedusa(formData.email, formData.password);
       if (loginResult?.customer?.id) {
@@ -191,20 +319,20 @@ export default function RegisterPage() {
           router.push("/");
           router.refresh();
         } else {
-          setError("Registrierung erfolgreich. Bitte melden Sie sich an.");
+          setError(t("registerFailed"));
         }
       } else {
-        setError("Registrierung erfolgreich. Bitte melden Sie sich an.");
+        setError(t("registerFailed"));
       }
     } catch (err) {
-      setError(err.message || "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.");
+      setError(err.message || t("registerFailed"));
     }
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa", fontFamily: tokens.fontFamily.sans }}>
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "#fafafa", fontFamily: tokens.fontFamily.sans, overflowX: "hidden", overflowY: "auto", touchAction: "pan-y", overscrollBehaviorX: "none", WebkitOverflowScrolling: "touch" }}>
       {/* Top bar */}
-      <div style={{ padding: "16px 24px" }}>
+      <div style={{ padding: "16px max(16px, env(safe-area-inset-left)) 16px max(16px, env(safe-area-inset-right))", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <Link href="/" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
           {branding.logo ? (
             <img
@@ -216,17 +344,36 @@ export default function RegisterPage() {
             <span style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", letterSpacing: "-0.03em" }}>Belucha</span>
           )}
         </Link>
+        <details style={{ position: "relative" }}>
+          <summary style={{ listStyle: "none", cursor: "pointer", border: "2px solid #1A1A1A", borderRadius: 10, padding: "7px 10px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#fff", lineHeight: 0, boxShadow: isDesktop ? "0 3px 0 0 #1A1A1A" : "none", minWidth: isDesktop ? 42 : "auto" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="#1A1A1A" strokeWidth="2" />
+              <path d="M3 12h18M12 3c2.5 2.5 2.5 15.5 0 18M12 3c-2.5 2.5-2.5 15.5 0 18" stroke="#1A1A1A" strokeWidth="1.6" />
+            </svg>
+          </summary>
+          <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: "#fff", border: "2px solid #1A1A1A", borderRadius: isDesktop ? 14 : 10, minWidth: isDesktop ? 180 : 150, boxShadow: isDesktop ? "0 12px 30px rgba(0,0,0,0.18)" : "0 6px 20px rgba(0,0,0,0.14)", overflow: "hidden", zIndex: 20, padding: isDesktop ? 6 : 0 }}>
+            {localeItems.map((l) => (
+              <a
+                key={l.code}
+                href={localeHref(l.code)}
+                style={{ display: "block", padding: "10px 12px", borderRadius: isDesktop ? 10 : 0, marginBottom: isDesktop ? 4 : 0, fontSize: 14, fontWeight: l.code === locale ? 800 : 600, textDecoration: "none", color: "#1A1A1A", background: l.code === locale ? "#fff4e8" : "#fff" }}
+              >
+                {l.label}
+              </a>
+            ))}
+          </div>
+        </details>
       </div>
 
       {/* Center card */}
-      <div style={{ flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px", boxSizing: "border-box" }}>
         <div style={{
           width: "100%", maxWidth: 980,
           background: "#fff",
           border: "2px solid #1A1A1A",
           borderRadius: 16,
           boxShadow: "4px 4px 0 0 #1A1A1A",
-          padding: "40px 36px 36px",
+          padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 36px) clamp(16px, 4vw, 36px)",
           display: "flex", flexDirection: "column", alignItems: "center", gap: 24,
           marginBottom: 40,
         }}>
@@ -236,11 +383,8 @@ export default function RegisterPage() {
           {/* Heading */}
           <div style={{ textAlign: "center" }}>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: "#1A1A1A", margin: "0 0 6px", letterSpacing: "-0.03em" }}>
-              Konto erstellen
+              {t("createAccount")}
             </h1>
-            <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>
-              Werde Teil der Belucha-Community
-            </p>
           </div>
 
           {/* Error */}
@@ -257,9 +401,9 @@ export default function RegisterPage() {
 
             {/* Account type toggle */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Kontotyp</label>
+              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("accountType")}</label>
               <div style={{ display: "flex", border: "2px solid #1A1A1A", borderRadius: 8, overflow: "hidden" }}>
-                {[{ val: "privat", label: "👤 Privatkunde" }, { val: "gewerbe", label: "🏢 Geschäftskunde" }].map(({ val, label }) => (
+                {[{ val: "privat", label: t("private") }, { val: "gewerbe", label: t("business") }].map(({ val, label }) => (
                   <button
                     key={val}
                     type="button"
@@ -283,131 +427,296 @@ export default function RegisterPage() {
             {/* Business fields */}
             {accountType === "gewerbe" && (
               <>
-                <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>Unternehmensdaten</div>
+                <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>{t("companyData")}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label htmlFor="companyName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Firmenname *</label>
-                  <input id="companyName" value={formData.companyName} onChange={set("companyName")} placeholder="Muster GmbH" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+                  <label htmlFor="companyName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("companyName")} *</label>
+                  <input id="companyName" value={formData.companyName} onChange={set("companyName")} placeholder={t("placeholderCompany")} required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label htmlFor="vatNumber" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>USt-IdNr. (optional)</label>
+                  <label htmlFor="vatNumber" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("vatNumber")}</label>
                   <input id="vatNumber" value={formData.vatNumber} onChange={set("vatNumber")} placeholder="DE123456789" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
-                <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>Ansprechpartner</div>
+                <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>{t("contactPerson")}</div>
               </>
             )}
 
             {/* Name row */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="firstName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Vorname *</label>
-              <input id="firstName" value={formData.firstName} onChange={set("firstName")} placeholder="Max" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="lastName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Nachname *</label>
-              <input id="lastName" value={formData.lastName} onChange={set("lastName")} placeholder="Mustermann" required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, gridColumn: "1 / -1" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label htmlFor="firstName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("firstName")} *</label>
+                <input id="firstName" value={formData.firstName} onChange={set("firstName")} placeholder={t("placeholderFirstName")} required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label htmlFor="lastName" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("lastName")} *</label>
+                <input id="lastName" value={formData.lastName} onChange={set("lastName")} placeholder={t("placeholderLastName")} required style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
             </div>
 
             {/* Gender + Birthdate */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="gender" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Geschlecht</label>
+              <label htmlFor="gender" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("gender")}</label>
               <select id="gender" value={formData.gender} onChange={set("gender")} style={selStyle} onFocus={focusStyle} onBlur={blurStyle}>
-                <option value="">Bitte wählen</option>
-                <option value="male">Männlich</option>
-                <option value="female">Weiblich</option>
-                <option value="diverse">Divers</option>
+                <option value="">{t("genderSelect")}</option>
+                <option value="male">{t("genderMale")}</option>
+                <option value="female">{t("genderFemale")}</option>
+                <option value="diverse">{t("genderDiverse")}</option>
               </select>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="birthDate" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Geburtsdatum</label>
-              <input type="date" id="birthDate" value={formData.birthDate} onChange={set("birthDate")} style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+              <label htmlFor="birthDate" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("birthDate")}</label>
+              <input
+                type="date"
+                id="birthDate"
+                value={formData.birthDate}
+                onChange={set("birthDate")}
+                style={{ ...inp, minHeight: 45, appearance: "none", WebkitAppearance: "none" }}
+                onFocus={focusStyle}
+                onBlur={blurStyle}
+              />
             </div>
 
             {/* Email */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label htmlFor="email" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>E-Mail *</label>
-              <input type="email" id="email" value={formData.email} onChange={set("email")} placeholder="ihre@email.de" required autoComplete="email" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+              <input type="email" id="email" value={formData.email} onChange={set("email")} placeholder={t("emailPlaceholder")} required autoComplete="email" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
 
             {/* Phone */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="phone" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Telefonnummer</label>
-              <input type="tel" id="phone" value={formData.phone} onChange={set("phone")} placeholder="+49 123 456789" autoComplete="tel" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+              <label htmlFor="phone" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("phone")}</label>
+              <input type="tel" id="phone" value={formData.phone} onChange={set("phone")} placeholder={t("placeholderPhone")} autoComplete="tel" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
 
             {/* Delivery address */}
-            <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>Lieferadresse</div>
+            <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>{t("deliveryAddress")}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
-              <label htmlFor="address" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Straße und Hausnummer</label>
-              <input id="address" value={formData.address} onChange={set("address")} placeholder="Musterstraße 1" autoComplete="street-address" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+              <label htmlFor="address" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("street")}</label>
+              <input id="address" value={formData.address} onChange={set("address")} placeholder={t("placeholderStreet")} autoComplete="street-address" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, gridColumn: "1 / -1" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label htmlFor="zipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("postalCode")}</label>
+                <input id="zipCode" value={formData.zipCode} onChange={set("zipCode")} placeholder={t("placeholderZip")} autoComplete="postal-code" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label htmlFor="city" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("city")}</label>
+                <input id="city" value={formData.city} onChange={set("city")} placeholder={t("placeholderCity")} autoComplete="address-level2" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="zipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>PLZ</label>
-              <input id="zipCode" value={formData.zipCode} onChange={set("zipCode")} placeholder="12345" autoComplete="postal-code" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="city" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Stadt</label>
-              <input id="city" value={formData.city} onChange={set("city")} placeholder="Berlin" autoComplete="address-level2" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="country" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Land</label>
-              <select id="country" value={shippableCountries.some((c) => c.code === formData.country) ? formData.country : (shippableCountries[0]?.code || "")} onChange={set("country")} autoComplete="country" style={selStyle} onFocus={focusStyle} onBlur={blurStyle} disabled={!shippableCountries.length}>
-                {shippableCountries.map((c) => (
-                  <option key={c.code} value={c.code}>{c.flag ? `${c.flag} ` : ""}{c.label}</option>
-                ))}
-              </select>
+              <label htmlFor="country" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("country")}</label>
+              <div ref={countryBoxRef} style={{ position: "relative" }}>
+                <input
+                  id="country"
+                  type="text"
+                  value={countrySearch}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCountrySearch(v);
+                    setIsCountryOpen(true);
+                    if (!v.trim()) {
+                      setFormData((f) => ({ ...f, country: "" }));
+                    }
+                  }}
+                  autoComplete="off"
+                  placeholder="Land suchen..."
+                  style={inp}
+                  onFocus={(e) => {
+                    focusStyle(e);
+                    setIsCountryOpen(true);
+                  }}
+                  onBlur={(e) => {
+                    blurStyle(e);
+                  }}
+                  disabled={!countriesForSelect.length}
+                />
+                {isCountryOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      left: 0,
+                      right: 0,
+                      background: "#fff",
+                      border: "2px solid #1A1A1A",
+                      borderRadius: 8,
+                      maxHeight: 220,
+                      overflowY: "auto",
+                      overscrollBehavior: "contain",
+                      zIndex: 20,
+                      boxShadow: "0 6px 14px rgba(0,0,0,0.12)",
+                    }}
+                    onWheel={(e) => {
+                      const el = e.currentTarget;
+                      const atTop = el.scrollTop <= 0;
+                      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+                      if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+                        e.preventDefault();
+                      }
+                      e.stopPropagation();
+                    }}
+                  >
+                    {filteredCountries.length ? filteredCountries.map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setFormData((f) => ({ ...f, country: c.code }));
+                          setCountrySearch(`${c.label} (${c.code})`);
+                          setIsCountryOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          border: "none",
+                          borderBottom: "1px solid #f1f1f1",
+                          background: "#fff",
+                          padding: "9px 12px",
+                          cursor: "pointer",
+                          fontSize: 14,
+                        }}
+                      >
+                        {c.label} ({c.code})
+                      </button>
+                    )) : (
+                      <div style={{ padding: "9px 12px", fontSize: 14, color: "#6b7280" }}>
+                        Sonuc bulunamadi
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Billing address checkbox */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, gridColumn: "1 / -1" }}>
-              <input
-                type="checkbox"
+              <CustomCheckbox
                 id="billingSame"
                 checked={formData.billingSameAsShipping !== false}
                 onChange={e => setFormData(f => ({ ...f, billingSameAsShipping: e.target.checked }))}
-                style={{ width: 16, height: 16, cursor: "pointer", accentColor: tokens.primary.DEFAULT }}
+                size={18}
               />
               <label htmlFor="billingSame" style={{ fontSize: 13, color: "#1A1A1A", cursor: "pointer", fontWeight: 600 }}>
-                Rechnungsadresse = Lieferadresse
+                {t("billingSame")}
               </label>
             </div>
 
             {formData.billingSameAsShipping === false && (
               <>
-                <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>Rechnungsadresse</div>
+                <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>{t("billingAddress")}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
-                  <label htmlFor="billingAddress" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Straße und Hausnummer</label>
+                  <label htmlFor="billingAddress" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("street")}</label>
                   <input id="billingAddress" value={formData.billingAddress || ""} onChange={set("billingAddress")} placeholder="Musterstraße 1" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label htmlFor="billingZipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>PLZ</label>
+                  <label htmlFor="billingZipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("postalCode")}</label>
                   <input id="billingZipCode" value={formData.billingZipCode || ""} onChange={set("billingZipCode")} placeholder="12345" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label htmlFor="billingCity" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Stadt</label>
+                  <label htmlFor="billingCity" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("city")}</label>
                   <input id="billingCity" value={formData.billingCity || ""} onChange={set("billingCity")} placeholder="Berlin" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label htmlFor="billingCountry" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Land</label>
-                  <select id="billingCountry" value={(shippableCountries.find((c) => c.code === (formData.billingCountry || "")) || shippableCountries[0])?.code || ""} onChange={set("billingCountry")} style={selStyle} onFocus={focusStyle} onBlur={blurStyle} disabled={!shippableCountries.length}>
-                    {shippableCountries.map((c) => (
-                      <option key={c.code} value={c.code}>{c.flag ? `${c.flag} ` : ""}{c.label}</option>
-                    ))}
-                  </select>
+                  <label htmlFor="billingCountry" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("country")}</label>
+                  <div ref={billingCountryBoxRef} style={{ position: "relative" }}>
+                    <input
+                      id="billingCountry"
+                      type="text"
+                      value={billingCountrySearch}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setBillingCountrySearch(v);
+                        setIsBillingCountryOpen(true);
+                        if (!v.trim()) {
+                          setFormData((f) => ({ ...f, billingCountry: "" }));
+                        }
+                      }}
+                      autoComplete="off"
+                      placeholder="Land suchen..."
+                      style={inp}
+                      onFocus={(e) => {
+                        focusStyle(e);
+                        setIsBillingCountryOpen(true);
+                      }}
+                      onBlur={(e) => {
+                        blurStyle(e);
+                      }}
+                      disabled={!countriesForSelect.length}
+                    />
+                    {isBillingCountryOpen && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 4px)",
+                          left: 0,
+                          right: 0,
+                          background: "#fff",
+                          border: "2px solid #1A1A1A",
+                          borderRadius: 8,
+                          maxHeight: 220,
+                          overflowY: "auto",
+                          overscrollBehavior: "contain",
+                          zIndex: 20,
+                          boxShadow: "0 6px 14px rgba(0,0,0,0.12)",
+                        }}
+                        onWheel={(e) => {
+                          const el = e.currentTarget;
+                          const atTop = el.scrollTop <= 0;
+                          const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+                          if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+                            e.preventDefault();
+                          }
+                          e.stopPropagation();
+                        }}
+                      >
+                        {filteredBillingCountries.length ? filteredBillingCountries.map((c) => (
+                          <button
+                            key={c.code}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setFormData((f) => ({ ...f, billingCountry: c.code }));
+                              setBillingCountrySearch(`${c.label} (${c.code})`);
+                              setIsBillingCountryOpen(false);
+                            }}
+                            style={{
+                              width: "100%",
+                              textAlign: "left",
+                              border: "none",
+                              borderBottom: "1px solid #f1f1f1",
+                              background: "#fff",
+                              padding: "9px 12px",
+                              cursor: "pointer",
+                              fontSize: 14,
+                            }}
+                          >
+                            {c.label} ({c.code})
+                          </button>
+                        )) : (
+                          <div style={{ padding: "9px 12px", fontSize: 14, color: "#6b7280" }}>
+                            Sonuc bulunamadi
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             )}
 
             {/* Password */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Passwort * (min. 6 Zeichen)</label>
+              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("passwordLabel")}</label>
               <div style={{ position: "relative" }}>
                 <input
                   type={showPassword ? "text" : "password"}
                   id="password"
                   value={formData.password}
                   onChange={set("password")}
-                  placeholder="Ihr Passwort"
+                  placeholder={t("passwordPlaceholder")}
                   required
                   autoComplete="new-password"
                   style={{ ...inp, paddingRight: 90 }}
@@ -416,35 +725,67 @@ export default function RegisterPage() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(v => !v)}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    setShowPassword((v) => !v);
+                  }}
                   style={{
                     position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
                     background: "none", border: "none", cursor: "pointer",
                     fontSize: 12, fontWeight: 700, color: tokens.primary.DEFAULT,
                     padding: "3px 6px",
+                    zIndex: 2,
+                    touchAction: "manipulation",
                   }}
                 >
-                  {showPassword ? "Verbergen" : "Anzeigen"}
+                  {showPassword ? t("hide") : t("show")}
                 </button>
               </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
+              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Passwort wiederholen *</label>
+              <input
+                type={showPassword ? "text" : "password"}
+                id="passwordConfirm"
+                value={formData.passwordConfirm}
+                onChange={set("passwordConfirm")}
+                placeholder={t("passwordPlaceholder")}
+                required
+                autoComplete="new-password"
+                style={{
+                  ...inp,
+                  border: passwordConfirmTouched && passwordMismatch ? "2px solid #dc2626" : inp.border,
+                }}
+                onFocus={focusStyle}
+                onBlur={(e) => {
+                  blurStyle(e);
+                  setPasswordConfirmTouched(true);
+                }}
+              />
+              {passwordConfirmTouched && passwordMismatch && (
+                <span style={{ color: "#dc2626", fontSize: 12, fontWeight: 600 }}>
+                  Passwörter stimmen nicht überein.
+                </span>
+              )}
             </div>
 
             {/* Submit */}
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, gridColumn: "1 / -1" }}>
-              <input
-                type="checkbox"
+              <CustomCheckbox
                 id="legalConsent"
                 checked={!!formData.legalConsent}
                 onChange={(e) => setFormData((f) => ({ ...f, legalConsent: e.target.checked }))}
-                style={{ width: 16, height: 16, marginTop: 2, cursor: "pointer", accentColor: tokens.primary.DEFAULT }}
+                size={18}
+                style={{ marginTop: 2 }}
               />
               <label htmlFor="legalConsent" style={{ fontSize: 13, lineHeight: 1.45, color: "#374151", cursor: "pointer" }}>
-                Ich habe die{" "}
-                <Link href="/agb" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>AGB</Link>,{" "}
-                <Link href="/datenschutz" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>Datenschutzhinweise</Link>{" "}
-                und{" "}
-                <Link href="/widerrufsrecht" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>Widerrufsbelehrung</Link>{" "}
-                gelesen und akzeptiere sie. Bei Zustimmung werde ich zum Newsletter angemeldet.
+                {t("legalConsentPart1")}{" "}
+                <Link href="/agb" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>{t("termsLabel")}</Link>
+                {t("legalConsentPart2")}{" "}
+                <Link href="/datenschutz" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>{t("privacyLabel")}</Link>{" "}
+                {t("legalConsentPart3")}{" "}
+                <Link href="/widerrufsrecht" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>{t("withdrawalLabel")}</Link>{" "}
+                {t("legalConsentPart4")}
               </label>
             </div>
             </div>
@@ -470,7 +811,7 @@ export default function RegisterPage() {
               onMouseEnter={e => { if (!loading) { e.currentTarget.style.transform = "translateY(1px)"; e.currentTarget.style.boxShadow = "0 2px 0 2px #1A1A1A"; } }}
               onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = loading ? "none" : "0 3px 0 2px #1A1A1A"; }}
             >
-              {loading ? "Wird registriert…" : "Konto erstellen"}
+              {loading ? t("registering") : t("createAccount")}
             </button>
           </form>
 
@@ -489,9 +830,9 @@ export default function RegisterPage() {
 
           {/* Login link */}
           <p style={{ fontSize: 13, color: "#6b7280", margin: 0, textAlign: "center" }}>
-            Bereits ein Konto?{" "}
+            {t("alreadyHaveAccount")}{" "}
             <Link href="/login" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>
-              Jetzt anmelden
+              {t("signInNow")}
             </Link>
           </p>
         </div>

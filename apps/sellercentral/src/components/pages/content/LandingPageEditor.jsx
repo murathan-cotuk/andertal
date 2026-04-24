@@ -1855,9 +1855,10 @@ export default function LandingPageEditor() {
         setCategorySettings(normalizeLandingPageSettings(data?.settings));
       }
       setContainers(Array.isArray(data?.containers) ? data.containers : []);
-    } catch (_) {
+    } catch (e) {
       setContainers([]);
       setCategorySettings({ show_submenu_left: false, show_filter_bar: true });
+      setErr(e?.message || "Containerlar yüklenemedi");
     }
     setLoading(false);
   }, [client]);

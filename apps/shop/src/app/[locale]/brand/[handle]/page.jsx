@@ -18,6 +18,7 @@ import {
   getFacetGroupTitle,
 } from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 /* ─────────────────────────────────────────────────────────── */
 const HEADER_H = 112;
@@ -714,7 +715,7 @@ export default function BrandPage() {
                         const label = formatFacetOptionLabel(key, val, categorySlugToName);
                         return (
                           <CheckRow key={val} $on={on}>
-                            <input type="checkbox" checked={on} onChange={() => toggle(key, val)} />
+                            <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
                             {label}
                           </CheckRow>
                         );

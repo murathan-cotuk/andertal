@@ -9,6 +9,7 @@ import {
   Box, Banner, Divider, Badge, ProgressBar, Checkbox, Spinner, Tabs,
 } from "@shopify/polaris";
 import { ImportIcon, ExportIcon, NoteIcon } from "@shopify/polaris-icons";
+import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 function sortDeep(nodes) {
   nodes.sort((a, b) => String(a.name || a.slug || "").localeCompare(String(b.name || b.slug || ""), undefined, { sensitivity: "base" }));
@@ -85,13 +86,11 @@ function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree
             <label
               style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", flex: 1, cursor: "pointer", userSelect: "none" }}
             >
-              <input
-                type="checkbox"
+              <CustomCheckbox
                 checked={directSelected}
-                ref={(el) => { if (el) el.indeterminate = partial && !directSelected; }}
                 onChange={() => onToggle(node.slug)}
-                onClick={(e) => e.stopPropagation()}
-                style={{ width: 16, height: 16, accentColor: "#2563eb", flexShrink: 0 }}
+                size={18}
+                style={{ flexShrink: 0 }}
               />
               <div style={{ minWidth: 0 }}>
                 <div
