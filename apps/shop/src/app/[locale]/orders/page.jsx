@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import styled from "styled-components";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import { useAuthGuard, getToken, useCustomerAuth as useAuth } from "@belucha/lib";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -78,6 +79,72 @@ function MessageModal({ order, onClose }) {
     </div>
   );
 }
+
+/* ── Mobile-responsive order row layout ──────────────────────────────────── */
+
+const OrderMainRow = styled.div`
+  padding: 14px 18px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  @media (max-width: 600px) {
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    gap: 0;
+  }
+`;
+
+const OrderLeftMeta = styled.div`
+  min-width: 110px;
+  flex-shrink: 0;
+  @media (max-width: 600px) {
+    flex: 1;
+    min-width: 0;
+  }
+`;
+
+const OrderMiddle = styled.div`
+  flex: 1;
+  min-width: 0;
+  @media (max-width: 600px) {
+    flex: 0 0 100%;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #f3f4f6;
+  }
+`;
+
+const OrderRight = styled.div`
+  flex-shrink: 0;
+  text-align: right;
+  @media (max-width: 600px) {
+    flex-shrink: 0;
+  }
+`;
+
+const OrderActionsRow = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin-top: 8px;
+  @media (max-width: 600px) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px 12px;
+  }
+`;
+
+const OrderItemSpan = styled.span`
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+`;
 
 const STATUS_LABEL_FALLBACK = {
   offen: "Offen",
@@ -466,9 +533,9 @@ export default function OrdersPage() {
                         style={{ borderTop: idx > 0 ? "1px solid #f3f4f6" : "none" }}
                       >
                         {/* Main row */}
-                        <div style={{ padding: "14px 18px", display: "flex", gap: 16, alignItems: "flex-start" }}>
+                        <OrderMainRow>
                           {/* Left meta */}
-                          <div style={{ minWidth: 110, flexShrink: 0 }}>
+                          <OrderLeftMeta>
                             <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
                               #{order.order_number || order.id?.slice(0, 8)}
                             </div>
@@ -476,10 +543,10 @@ export default function OrdersPage() {
                             <div style={{ marginTop: 6 }}>
                               <StatusPill status={displayStatus(order)} label={statusLabel(displayStatus(order))} />
                             </div>
-                          </div>
+                          </OrderLeftMeta>
 
                           {/* Items inline */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                          <OrderMiddle>
                             {items.map((item, i) => (
                               <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < items.length - 1 ? 6 : 0 }}>
                                 {item.thumbnail && (
@@ -489,7 +556,7 @@ export default function OrdersPage() {
                                     style={{ width: 32, height: 32, borderRadius: 5, objectFit: "cover", flexShrink: 0, border: "1px solid #f3f4f6" }}
                                   />
                                 )}
-                                <span style={{ fontSize: 13, color: "#374151", lineHeight: 1.3 }}>
+                                <OrderItemSpan>
                                   {item.product_handle ? (
                                     <Link href={`/produkt/${item.product_handle}`} style={{ color: "#374151", textDecoration: "none" }}>
                                       {shortTitle(item.title)}
@@ -498,7 +565,7 @@ export default function OrdersPage() {
                                   {item.quantity > 1 && (
                                     <span style={{ color: "#9ca3af", marginLeft: 4 }}>×{item.quantity}</span>
                                   )}
-                                </span>
+                                </OrderItemSpan>
                               </div>
                             ))}
                             {order.tracking_number && (
@@ -518,14 +585,14 @@ export default function OrdersPage() {
                                 Zugestellt: {fmtDate(order.delivery_date)}
                               </div>
                             )}
-                          </div>
+                          </OrderMiddle>
 
                           {/* Right: total + actions */}
-                          <div style={{ flexShrink: 0, textAlign: "right" }}>
+                          <OrderRight>
                             <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
                               {fmtEur(total)}
                             </div>
-                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, marginTop: 8 }}>
+                            <OrderActionsRow>
                               <button
                                 onClick={() => setExpanded(e => ({ ...e, [order.id]: !e[order.id] }))}
                                 style={{ fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline", textDecorationColor: "#d1d5db" }}
@@ -592,9 +659,9 @@ export default function OrdersPage() {
                                   </Link>
                                 );
                               })()}
-                            </div>
-                          </div>
-                        </div>
+                            </OrderActionsRow>
+                          </OrderRight>
+                        </OrderMainRow>
 
                         {/* Expanded details */}
                         {isExpanded && (() => {

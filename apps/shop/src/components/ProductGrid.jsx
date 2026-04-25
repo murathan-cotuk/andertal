@@ -5,7 +5,7 @@ import { useIsNarrow } from "@/hooks/useIsNarrow";
 import styled from "styled-components";
 
 const STRIP_GAP = 8;
-const MOBILE_GRID_GAP = 8;
+const MOBILE_GRID_GAP = 4;
 
 const CatalogWrap = styled.div`
   width: 100%;

@@ -120,13 +120,16 @@ export default function CookieBanner() {
   return (
     <div
       style={{
-        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9999,
+        position: "fixed",
+        bottom: isMobile ? "calc(60px + env(safe-area-inset-bottom, 0px))" : 0,
+        left: 0, right: 0,
+        zIndex: 2147483647,
         background: "#fff", borderTop: "2px solid #000",
-        boxShadow: "0 -4px 24px rgba(0,0,0,0.13)",
+        boxShadow: "0 -4px 24px rgba(0,0,0,0.18)",
         fontFamily: "inherit",
-        maxHeight: isMobile ? "calc(100vh - 12px)" : "none",
+        maxHeight: isMobile ? "calc(100vh - 80px)" : "none",
         overflowY: isMobile ? "auto" : "visible",
-        paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+        paddingBottom: isMobile ? "8px" : "max(8px, env(safe-area-inset-bottom))",
       }}
       role="dialog"
       aria-modal="true"

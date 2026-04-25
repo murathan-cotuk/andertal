@@ -327,16 +327,24 @@ const RecommendedList = styled.div`
   gap: 10px;
 `;
 
-const RecommendedItem = styled(Link)`
+const RecommendedItem = styled.div`
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px;
   border: 1px solid #eceff3;
   border-radius: 10px;
+  background: #fff;
+`;
+
+const RecommendedItemLink = styled(Link)`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
   text-decoration: none;
   color: inherit;
-  background: #fff;
 `;
 
 const RecommendedThumb = styled.div`
@@ -524,24 +532,23 @@ export default function CartSidebar() {
                   )}
                   {!recommendedLoading &&
                     recommended.map((p) => (
-                      <RecommendedItem key={p.id} href={`/produkt/${p.handle}`} onClick={closeCartSidebar}>
-                        <RecommendedThumb>
-                          {p.thumbnail ? <img src={p.thumbnail} alt={p.title} /> : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />}
-                        </RecommendedThumb>
-                        <RecommendedMeta>
-                          <RecommendedName>{p.title}</RecommendedName>
-                          <RecommendedPrice>{formatPriceCents(p.price)}</RecommendedPrice>
-                        </RecommendedMeta>
+                      <RecommendedItem key={p.id}>
+                        <RecommendedItemLink href={`/produkt/${p.handle}`} onClick={closeCartSidebar}>
+                          <RecommendedThumb>
+                            {p.thumbnail ? <img src={p.thumbnail} alt={p.title} /> : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />}
+                          </RecommendedThumb>
+                          <RecommendedMeta>
+                            <RecommendedName>{p.title}</RecommendedName>
+                            <RecommendedPrice>{formatPriceCents(p.price)}</RecommendedPrice>
+                          </RecommendedMeta>
+                        </RecommendedItemLink>
                         <QuickAddBtn
                           type="button"
                           title="Schnell hinzufügen"
                           aria-label="Schnell hinzufügen"
                           disabled={loading}
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
+                          onClick={async () => {
                             let out = await addToCart(p.variantId, 1, p.sellerId || null);
-                            // Fallback retry if seller-aware add fails in edge responses.
                             if (!out && p.sellerId) out = await addToCart(p.variantId, 1, null);
                           }}
                         >

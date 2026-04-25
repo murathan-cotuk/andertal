@@ -557,16 +557,10 @@ export default function MobileNav() {
 
           {isAuthenticated ? (
             <>
-              <div ref={accountSectionRef} style={css.sectionLabel}>Mein Konto</div>
-              <HoverLink href="/account"     onClick={closeDrawer} style={css.drawerLink}><span>Übersicht</span><IcoChevron /></HoverLink>
-              <HoverLink href="/orders"      onClick={closeDrawer} style={css.drawerLink}><span>Bestellungen</span><IcoChevron /></HoverLink>
-              <HoverLink href="/merkzettel"   onClick={closeDrawer} style={css.drawerLink}><span>Merkzettel</span><IcoChevron /></HoverLink>
-              <HoverLink href="/addresses"   onClick={closeDrawer} style={css.drawerLink}><span>Adressen</span><IcoChevron /></HoverLink>
-              <HoverLink href="/payment-methods" onClick={closeDrawer} style={css.drawerLink}><span>Zahlungsmethoden</span><IcoChevron /></HoverLink>
-              <HoverLink href="/nachrichten"  onClick={closeDrawer} style={css.drawerLink}><span>Nachrichten</span><IcoChevron /></HoverLink>
-              <HoverLink href="/reviews"      onClick={closeDrawer} style={css.drawerLink}><span>Bewertungen</span><IcoChevron /></HoverLink>
-              <HoverLink href="/bonus"        onClick={closeDrawer} style={css.drawerLink}><span>Bonuspunkte</span><IcoChevron /></HoverLink>
               <div style={css.divider} />
+              <HoverLink href="/account" onClick={closeDrawer} style={{ ...css.drawerLink, fontWeight: 700, color: TEAL }}>
+                <span>Konto Übersicht</span><IcoChevron />
+              </HoverLink>
               <HoverBtn
                 style={{ ...css.drawerBtn, color: "#ef4444" }}
                 onClick={() => {
@@ -633,11 +627,8 @@ export default function MobileNav() {
                   key: "profile",
                   label: "Profil",
                   icon: <IcoUser />,
-                  active: drawerOpen && drawerTarget === "account",
-                  onClick: () => {
-                    setDrawerTarget("account");
-                    setDrawerOpen(true);
-                  },
+                  href: "/account",
+                  active: isProfile,
                 }
               : {
                   key: "profile",

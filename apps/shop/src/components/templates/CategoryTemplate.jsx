@@ -231,8 +231,9 @@ const ContentWrap = styled.div`
   align-items: flex-start;
 
   @media (max-width: 767px) {
-    /* Daha geniş ürün kartları: yatay padding az */
     padding: 6px 6px 80px;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
     gap: 0;
   }
 `;
@@ -257,9 +258,11 @@ const Sidebar = styled.aside`
     box-shadow: 4px 0 32px rgba(0,0,0,0.2);
     transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
     transition: transform var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
-    padding: 14px 16px 16px;
+    padding: ${(p) => (p.$filterMode ? "0" : "14px 16px 16px")};
     box-sizing: border-box;
-    overflow-y: auto;
+    display: ${(p) => (p.$filterMode ? "flex" : "block")};
+    flex-direction: column;
+    overflow: ${(p) => (p.$filterMode ? "hidden" : "auto")};
 
     @media (prefers-reduced-motion: reduce) {
       transition: none;
@@ -271,6 +274,95 @@ const SidebarSplit = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0;
+`;
+
+const DesktopSidebarContent = styled.div`
+  @media (max-width: 767px) {
+    display: none;
+  }
+`;
+
+const MobileFilterSplit = styled.div`
+  display: none;
+  @media (max-width: 767px) {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+`;
+
+const MobileFilterLeft = styled.div`
+  width: 92px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: #f7f7f6;
+  border-right: 1px solid #e8e8e6;
+`;
+
+const MobileFilterLeftBtn = styled.button`
+  display: block;
+  width: 100%;
+  padding: 13px 8px 13px 11px;
+  font-size: 11px;
+  font-weight: ${(p) => (p.$active ? 700 : 400)};
+  text-align: left;
+  background: ${(p) => (p.$active ? "#fff" : "transparent")};
+  border: none;
+  border-left: 3px solid ${(p) => (p.$active ? "#111" : "transparent")};
+  color: ${(p) => (p.$active ? "#111" : "#555")};
+  cursor: pointer;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  font-family: inherit;
+`;
+
+const MobileNavLink = styled(Link)`
+  display: block;
+  width: 100%;
+  padding: 12px 8px 12px 11px;
+  font-size: 11px;
+  font-weight: ${(p) => (p.$active ? 700 : 400)};
+  text-align: left;
+  background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
+  border-left: 3px solid ${(p) => (p.$active ? "#111" : "transparent")};
+  color: ${(p) => (p.$active ? "#111" : "#555")};
+  cursor: pointer;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  box-sizing: border-box;
+`;
+
+const MobileFilterRight = styled.div`
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 12px 10px;
+`;
+
+const MobileFilterPillGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+`;
+
+const MobileFilterPill = styled.button`
+  padding: 9px 6px;
+  font-size: 11.5px;
+  font-weight: ${(p) => (p.$on ? 700 : 400)};
+  background: ${(p) => (p.$on ? "#111" : "#fff")};
+  color: ${(p) => (p.$on ? "#fff" : "#444")};
+  border: 1.5px solid ${(p) => (p.$on ? "#111" : "#d1d5db")};
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  line-height: 1.3;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  &:hover { border-color: #111; }
+  word-break: break-word;
 `;
 
 const SidebarPane = styled.section`
@@ -304,8 +396,9 @@ const SidebarHead = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  flex-shrink: 0;
+  margin-bottom: ${(p) => (p.$filterMode ? "0" : "20px")};
+  padding: ${(p) => (p.$filterMode ? "12px 14px" : "0 0 12px")};
   border-bottom: 1px solid #e8e8e6;
 
   @media (min-width: 768px) { display: none; }
@@ -625,6 +718,7 @@ export default function CategoryTemplate() {
   const [filters, setFilters] = useState({});
   const [panelOpen, setPanelOpen] = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
+  const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
 
   const bodyRef = useRef(null);
 
@@ -814,6 +908,14 @@ export default function CategoryTemplate() {
     });
   }, [facets, filters]);
 
+  useEffect(() => {
+    if (!panelOpen || !hasFacets) return;
+    const keys = Object.keys(facets);
+    if (keys.length > 0 && (!activeMobileFilterGroup || !facets[activeMobileFilterGroup])) {
+      setActiveMobileFilterGroup(keys[0]);
+    }
+  }, [panelOpen, facets, hasFacets, activeMobileFilterGroup]);
+
   const toggle = (key, val) => {
     setFilters((prev) => {
       const cur = prev[key] || [];
@@ -946,18 +1048,27 @@ export default function CategoryTemplate() {
       {showCatalogSidebar && showSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
       <ContentWrap ref={bodyRef} style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
         {showCatalogSidebar && showSidebar && (
-          <Sidebar $open={panelOpen} $width={sidebarWidth}>
-            <SidebarHead>
+          <Sidebar $open={panelOpen} $width={sidebarWidth} $filterMode={hasFacets}>
+            <SidebarHead $filterMode={hasFacets}>
               <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                Navigation
+                Filter{activeCount > 0 ? ` (${activeCount})` : ""}
               </span>
-              <button type="button" aria-label="Filter schließen" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555", lineHeight: 1 }}>×</button>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {activeCount > 0 && (
+                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ padding: "2px 8px", fontSize: 10 }}>
+                    Löschen
+                  </ClearAllBtn>
+                )}
+                <button type="button" aria-label="Filter schließen" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#555", lineHeight: 1, padding: 0 }}>×</button>
+              </div>
             </SidebarHead>
+
+            {/* Desktop: accordion layout — hidden on mobile when two-panel is present */}
+            <DesktopSidebarContent>
             <SidebarSplit>
               {(hasSubcategories || parentCategory) && (
                 <SidebarPane>
                   <SubcategoryGroup style={{ marginTop: 0 }}>
-                    {/* If current category has children → show current as "Alle" + children */}
                     {hasSubcategories ? (
                       <>
                         {parentCategory && (
@@ -972,29 +1083,19 @@ export default function CategoryTemplate() {
                         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
                           {displayTitle}
                         </div>
-                        <SubcategoryLink
-                          href={slug ? `/${slug}` : "#"}
-                          $active={true}
-                          onClick={() => { setFilters({}); setPage(1); }}
-                        >
+                        <SubcategoryLink href={slug ? `/${slug}` : "#"} $active={true} onClick={() => { setFilters({}); setPage(1); }}>
                           Alle
                         </SubcategoryLink>
                         {subcategories.map((sub) => {
                           const subSlug = String(sub.slug || "").replace(/^\//, "");
                           return (
-                            <SubcategoryLink
-                              key={sub.id}
-                              href={subSlug ? `/${subSlug}` : "#"}
-                              $active={false}
-                              onClick={() => { setFilters({}); setPage(1); sessionStorage.setItem("cat_nav_open", "1"); }}
-                            >
+                            <SubcategoryLink key={sub.id} href={subSlug ? `/${subSlug}` : "#"} $active={false} onClick={() => { setFilters({}); setPage(1); sessionStorage.setItem("cat_nav_open", "1"); }}>
                               {sub.name || sub.slug}
                             </SubcategoryLink>
                           );
                         })}
                       </>
                     ) : (
-                      /* Leaf category: show siblings (parent's children) with current highlighted */
                       <>
                         <SubcategoryLink
                           href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
@@ -1017,12 +1118,7 @@ export default function CategoryTemplate() {
                           const sibSlug = String(sibling.slug || "").replace(/^\//, "");
                           const isCurrent = sibSlug === slug;
                           return (
-                            <SubcategoryLink
-                              key={sibling.id}
-                              href={sibSlug ? `/${sibSlug}` : "#"}
-                              $active={isCurrent}
-                              onClick={() => { setFilters({}); setPage(1); if (!isCurrent) sessionStorage.setItem("cat_nav_open", "1"); }}
-                            >
+                            <SubcategoryLink key={sibling.id} href={sibSlug ? `/${sibSlug}` : "#"} $active={isCurrent} onClick={() => { setFilters({}); setPage(1); if (!isCurrent) sessionStorage.setItem("cat_nav_open", "1"); }}>
                               {sibling.name || sibling.slug}
                             </SubcategoryLink>
                           );
@@ -1032,50 +1128,106 @@ export default function CategoryTemplate() {
                   </SubcategoryGroup>
                 </SidebarPane>
               )}
-
               <SidebarPane>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
-                    Filter
-                    {activeCount > 0 && (
-                      <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
-                        Clear
-                      </ClearAllBtn>
-                    )}
-                  </div>
-
-                  {hasFacets ? (
-                    Object.entries(facets).map(([key, vals]) => (
-                      <FilterGroup key={key}>
-                        <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                          <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
-                          <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
-                        </FilterGroupTitle>
-                        <FilterGroupBody $open={!!openFilterGroups[key]}>
-                          {vals.map((val) => {
-                            const on = (filters[key] || []).includes(val);
-                            return (
-                              <CheckRow key={val} $on={on}>
-                                <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
-                                {val}
-                              </CheckRow>
-                            );
-                          })}
-                        </FilterGroupBody>
-                      </FilterGroup>
-                    ))
-                  ) : (
-                    <div style={{ fontSize: 12, color: "#8b8b8b", padding: "6px 2px" }}>
-                      Bu kategoride filtre bulunmuyor.
-                    </div>
-                  )}
-
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
+                  Filter
                   {activeCount > 0 && (
-                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
-                      Clear all filters
-                    </ClearAllBtn>
+                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>Clear</ClearAllBtn>
                   )}
+                </div>
+                {hasFacets ? (
+                  Object.entries(facets).map(([key, vals]) => (
+                    <FilterGroup key={key}>
+                      <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
+                        <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
+                        <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
+                      </FilterGroupTitle>
+                      <FilterGroupBody $open={!!openFilterGroups[key]}>
+                        {vals.map((val) => {
+                          const on = (filters[key] || []).includes(val);
+                          return (
+                            <CheckRow key={val} $on={on}>
+                              <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
+                              {val}
+                            </CheckRow>
+                          );
+                        })}
+                      </FilterGroupBody>
+                    </FilterGroup>
+                  ))
+                ) : (
+                  <div style={{ fontSize: 12, color: "#8b8b8b", padding: "6px 2px" }}>Bu kategoride filtre bulunmuyor.</div>
+                )}
+                {activeCount > 0 && (
+                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>Clear all filters</ClearAllBtn>
+                )}
               </SidebarPane>
             </SidebarSplit>
+            </DesktopSidebarContent>
+
+            {/* Mobile only: two-panel filter layout */}
+            {hasFacets && (
+              <MobileFilterSplit>
+                <MobileFilterLeft>
+                  {(hasSubcategories || parentCategory) && (
+                    <div>
+                      <div style={{ padding: "8px 8px 4px 11px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#999" }}>Kategorien</div>
+                      {hasSubcategories ? (
+                        <>
+                          <MobileNavLink href={slug ? `/${slug}` : "#"} $active={false} onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
+                            Alle
+                          </MobileNavLink>
+                          {subcategories.map((sub) => {
+                            const subSlug = String(sub.slug || "").replace(/^\//, "");
+                            return (
+                              <MobileNavLink key={sub.id} href={subSlug ? `/${subSlug}` : "#"} $active={false} onClick={() => { setFilters({}); setPage(1); sessionStorage.setItem("cat_nav_open", "1"); setPanelOpen(false); }}>
+                                {sub.name || sub.slug}
+                              </MobileNavLink>
+                            );
+                          })}
+                        </>
+                      ) : parentCategory && (
+                        visibleSubcats(parentCategory.children || []).map((sibling) => {
+                          const sibSlug = String(sibling.slug || "").replace(/^\//, "");
+                          const isCurrent = sibSlug === slug;
+                          return (
+                            <MobileNavLink key={sibling.id} href={sibSlug ? `/${sibSlug}` : "#"} $active={isCurrent} onClick={() => { setFilters({}); setPage(1); if (!isCurrent) sessionStorage.setItem("cat_nav_open", "1"); setPanelOpen(false); }}>
+                              {sibling.name || sibling.slug}
+                            </MobileNavLink>
+                          );
+                        })
+                      )}
+                      <div style={{ height: 1, background: "#e8e8e6", margin: "4px 0" }} />
+                    </div>
+                  )}
+                  {Object.entries(facets).map(([key]) => {
+                    const cnt = (filters[key] || []).length;
+                    return (
+                      <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
+                        {getFacetGroupTitle(key)}
+                        {cnt > 0 && <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>{cnt} ausgewählt</span>}
+                      </MobileFilterLeftBtn>
+                    );
+                  })}
+                </MobileFilterLeft>
+                <MobileFilterRight>
+                  {activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
+                    <MobileFilterPillGrid>
+                      {facets[activeMobileFilterGroup].map((val) => {
+                        const on = (filters[activeMobileFilterGroup] || []).includes(val);
+                        return (
+                          <MobileFilterPill key={val} type="button" $on={on} onClick={() => toggle(activeMobileFilterGroup, val)}>
+                            {val}
+                          </MobileFilterPill>
+                        );
+                      })}
+                    </MobileFilterPillGrid>
+                  ) : (
+                    <div style={{ color: "#aaa", fontSize: 12 }}>Wähle einen Filter</div>
+                  )}
+                </MobileFilterRight>
+              </MobileFilterSplit>
+            )}
           </Sidebar>
         )}
 

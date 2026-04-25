@@ -288,6 +288,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [collections, setCollections] = useState([]);
   const [brands, setBrands] = useState([]);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [mediaDragIndex, setMediaDragIndex] = useState(null);
+  const [mediaDragOverIndex, setMediaDragOverIndex] = useState(null);
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionPopoverOpen, setCollectionPopoverOpen] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -1419,6 +1421,35 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     if (locale === "de") updateMeta("media", next);
     else updateLocaleField("media", next);
   };
+
+  const handleMediaDragStart = (e, i) => {
+    setMediaDragIndex(i);
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleMediaDragOver = (e, i) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (mediaDragOverIndex !== i) setMediaDragOverIndex(i);
+  };
+  const handleMediaDrop = (e, i) => {
+    e.preventDefault();
+    if (mediaDragIndex === null || mediaDragIndex === i) {
+      setMediaDragIndex(null);
+      setMediaDragOverIndex(null);
+      return;
+    }
+    const next = [...mediaUrls];
+    const [moved] = next.splice(mediaDragIndex, 1);
+    next.splice(i, 0, moved);
+    if (locale === "de") updateMeta("media", next);
+    else updateLocaleField("media", next);
+    setMediaDragIndex(null);
+    setMediaDragOverIndex(null);
+  };
+  const handleMediaDragEnd = () => {
+    setMediaDragIndex(null);
+    setMediaDragOverIndex(null);
+  };
   const resolveMediaUrl = (url) => {
     if (!url) return "";
     return url.startsWith("http") || url.startsWith("data:") ? url : `${baseUrl.replace(/\/$/, "")}${url.startsWith("/") ? "" : "/"}${url}`;
@@ -1434,8 +1465,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .product-edit-label { font-size: 0.8125rem; font-weight: 400; color: var(--p-color-text-subdued); margin-bottom: 4px; }
         .product-price-strike { text-decoration: line-through; color: var(--p-color-text-subdued); }
         .product-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; max-width: 400px; }
-        .product-media-item { aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--p-color-bg-fill-secondary); position: relative; }
-        .product-media-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .product-media-item { aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--p-color-bg-fill-secondary); position: relative; cursor: grab; border: 2px solid transparent; transition: border-color 0.15s, opacity 0.15s, box-shadow 0.15s; }
+        .product-media-item:active { cursor: grabbing; }
+        .product-media-item.dragging { opacity: 0.35; }
+        .product-media-item.drag-over { border-color: var(--p-color-border-info, #2c6ecb); box-shadow: 0 0 0 2px rgba(44,110,203,0.2); }
+        .product-media-item img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+        .product-media-drag-hint { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); font-size: 11px; color: rgba(255,255,255,0.9); background: rgba(0,0,0,0.45); border-radius: 4px; padding: 1px 5px; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
+        .product-media-item:hover .product-media-drag-hint { opacity: 1; }
         .product-media-remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border: none; border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff; font-size: 14px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; padding: 0; }
         .product-media-item:hover .product-media-remove { opacity: 1; }
         .product-media-remove:hover { background: rgba(0,0,0,0.75); }
@@ -1923,9 +1959,18 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               )}
               <div className="product-media-grid">
                 {mediaUrls.map((url, i) => (
-                  <div key={i} className="product-media-item">
+                  <div
+                    key={url + i}
+                    className={`product-media-item${mediaDragIndex === i ? " dragging" : ""}${mediaDragOverIndex === i && mediaDragIndex !== i ? " drag-over" : ""}`}
+                    draggable={true}
+                    onDragStart={(e) => handleMediaDragStart(e, i)}
+                    onDragOver={(e) => handleMediaDragOver(e, i)}
+                    onDrop={(e) => handleMediaDrop(e, i)}
+                    onDragEnd={handleMediaDragEnd}
+                  >
                     <img src={url.startsWith("http") || url.startsWith("data:") ? url : `${baseUrl}${url}`} alt="" />
                     <button type="button" className="product-media-remove" onClick={() => removeMedia(i)} aria-label="Remove image">×</button>
+                    {mediaUrls.length > 1 && <span className="product-media-drag-hint">⠿ Ziehen</span>}
                   </div>
                 ))}
                 {mediaUrls.length < 6 && (

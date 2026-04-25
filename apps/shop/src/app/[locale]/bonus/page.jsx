@@ -66,8 +66,8 @@ export default function BonusPage() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
       <ShopHeader />
-      <main style={{ flex: 1, padding: "40px 24px", width: "100%", boxSizing: "border-box" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <main style={{ flex: 1, width: "100%", boxSizing: "border-box" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 16px 48px" }}>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: DARK, margin: "0 0 8px" }}>Meine Bonuspunkte</h1>
           <p style={{ fontSize: 14, color: GRAY, margin: "0 0 28px", lineHeight: 1.5 }}>
             Sammeln und einlösen Sie Punkte bei jedem Einkauf — inklusive Übersicht Ihrer letzten Bewegungen.
@@ -79,7 +79,7 @@ export default function BonusPage() {
                   background: "#fff",
                   borderRadius: 12,
                   border: `1px solid ${BORDER}`,
-                  padding: "28px 32px",
+                  padding: "clamp(16px, 4vw, 28px) clamp(14px, 4vw, 32px)",
                   marginBottom: 24,
                   textAlign: "center",
                 }}
@@ -96,7 +96,7 @@ export default function BonusPage() {
                 )}
               </div>
 
-              <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "24px 28px", marginBottom: 24 }}>
+              <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "clamp(14px, 3vw, 24px) clamp(12px, 3vw, 28px)", marginBottom: 24 }}>
                 <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 16px" }}>Verlauf</h2>
                 {loading ? (
                   <NewtonsCradle />

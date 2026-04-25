@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "@/i18n/navigation";
-import { getMedusaClient } from "@/lib/medusa-client";
+import { getMedusaClient, resolveMedusaBaseUrl } from "@/lib/medusa-client";
 import { useLandingChrome } from "@/context/LandingChromeContext";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
@@ -1442,6 +1442,20 @@ export default function LandingContainers({ pageId, categoryId }) {
     getMedusaClient()
       .request(endpoint, { cache: "no-store" })
       .then((data) => {
+        if (data?.__error) {
+          if (process.env.NODE_ENV === "development") {
+            const base = resolveMedusaBaseUrl();
+            console.warn(
+              `[LandingContainers] ${endpoint} failed: HTTP ${data.status} — ${data.message}. Aktif Medusa: ${base}. ` +
+                "Shop ve Seller Central aynı NEXT_PUBLIC_MEDUSA_BACKEND_URL değerine ihtiyaç duyar. " +
+                "Localhost’ta shop, NEXT_PUBLIC_MEDUSA_USE_ENV_IN_DEV=true olmadan yalnızca http://localhost:9000 kullanır; bu yüzden kayıt Render’dayken sayfa boş kalabilir."
+            );
+          }
+          setLandingHeaderFilterBar(true);
+          setPagePaddingTop("");
+          setContainers([]);
+          return;
+        }
         const showBar = data?.settings?.show_filter_bar !== false;
         setLandingHeaderFilterBar(showBar);
         setPagePaddingTop(data?.settings?.page_padding_top || "");

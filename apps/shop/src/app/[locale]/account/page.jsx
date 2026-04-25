@@ -4,40 +4,16 @@ import { useState, useEffect } from "react";
 import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@belucha/lib";
 import styled from "styled-components";
 import NewtonsCradle from "@/components/NewtonsCradle";
-import { Link, useRouter, usePathname } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import AccountPageLayout from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
-import { restPathFromPathname } from "@/lib/shop-market";
 
 const ORANGE = "#ff971c";
 const DARK = "#1A1A1A";
 const GRAY = "#6b7280";
 const BORDER = "#e5e7eb";
-
-const COUNTRIES = [
-  { code: "DE", name: "Deutschland" },
-  { code: "AT", name: "Österreich" },
-  { code: "CH", name: "Schweiz" },
-  { code: "FR", name: "Frankreich" },
-  { code: "IT", name: "Italien" },
-  { code: "ES", name: "Spanien" },
-  { code: "TR", name: "Türkei" },
-  { code: "GB", name: "Vereinigtes Königreich" },
-  { code: "US", name: "USA" },
-];
-
-const NAV = [
-  { label: "Übersicht", href: "/account" },
-  { label: "Bestellungen", href: "/orders" },
-  { label: "Merkzettel", href: "/merkzettel" },
-  { label: "Adressen", href: "/addresses" },
-  { label: "Zahlungsmethoden", href: "/payment-methods" },
-  { label: "Nachrichten", href: "/nachrichten" },
-  { label: "Bewertungen", href: "/reviews" },
-  { label: "Bonuspunkte", href: "/bonus" },
-];
 
 const inp = {
   width: "100%",
@@ -63,114 +39,6 @@ const lbl = {
 };
 
 // ── Styled components ─────────────────────────────────────────────────────────
-
-const GreetingWrap = styled.div`
-  background: linear-gradient(135deg, #136761 0%, #1a8a82 100%);
-  border-radius: 16px;
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-  @media (max-width: 767px) {
-    padding: 18px 16px;
-    border-radius: 12px;
-    margin-bottom: 10px;
-  }
-`;
-
-const GreetingText = styled.div`
-  font-size: 24px;
-  font-weight: 800;
-  color: #fff;
-  line-height: 1.2;
-  @media (max-width: 767px) { font-size: 19px; }
-`;
-
-const GreetingMeta = styled.div`
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
-  margin-top: 4px;
-`;
-
-const GreetingBadge = styled(Link)`
-  flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 12px;
-  padding: 10px 18px;
-  text-align: center;
-  text-decoration: none;
-  transition: background 0.15s;
-  &:hover { background: rgba(255, 255, 255, 0.22); }
-  @media (max-width: 767px) { padding: 8px 14px; }
-`;
-
-const GreetingBadgeNum = styled.div`
-  font-size: 22px;
-  font-weight: 800;
-  color: #fff;
-  line-height: 1;
-  @media (max-width: 767px) { font-size: 18px; }
-`;
-
-const GreetingBadgeLabel = styled.div`
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.8);
-  font-weight: 600;
-  margin-top: 3px;
-`;
-
-const MobileNavWrap = styled.div`
-  display: none;
-  @media (max-width: 1023px) {
-    display: flex;
-    flex-direction: row;
-    gap: 8px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding: 0 0 12px;
-    margin-bottom: 8px;
-    &::-webkit-scrollbar { display: none; }
-  }
-`;
-
-const NavPill = styled(Link)`
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-  display: inline-flex;
-  align-items: center;
-  padding: 7px 15px;
-  background: ${(p) => (p.$active ? ORANGE : "#fff")};
-  color: ${(p) => (p.$active ? "#fff" : DARK)};
-  border: 1.5px solid ${(p) => (p.$active ? ORANGE : BORDER)};
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  text-decoration: none;
-  transition: all 0.12s;
-`;
-
-const NavLogoutPill = styled.button`
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-  display: inline-flex;
-  align-items: center;
-  padding: 7px 15px;
-  background: #fff;
-  color: #ef4444;
-  border: 1.5px solid #fecaca;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  font-family: inherit;
-`;
 
 const CarouselSection = styled.div`
   background: #fff;
@@ -331,6 +199,48 @@ const StatusDot = styled.span`
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+const SectionCard = styled.div`
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid ${BORDER};
+  padding: 24px 28px;
+  margin-bottom: 16px;
+  @media (max-width: 767px) {
+    padding: 16px 14px;
+    border-radius: 10px;
+  }
+`;
+
+const SectionHead = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 8px;
+  @media (max-width: 767px) {
+    margin-bottom: 14px;
+  }
+`;
+
+const InfoGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const EditFormGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
 function InfoRow({ label, value }) {
   return (
     <div style={{ marginBottom: 16 }}>
@@ -342,13 +252,13 @@ function InfoRow({ label, value }) {
 
 function Section({ title, children, action }) {
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "24px 28px", marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+    <SectionCard>
+      <SectionHead>
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: DARK }}>{title}</h2>
         {action}
-      </div>
+      </SectionHead>
       {children}
-    </div>
+    </SectionCard>
   );
 }
 
@@ -435,11 +345,6 @@ function shortTitle(raw) {
   return m ? m[1] : (raw || "");
 }
 
-function normalizePath(pathname) {
-  if (!pathname) return "/";
-  const rest = restPathFromPathname(pathname);
-  return rest === "" ? "/" : rest.startsWith("/") ? rest : `/${rest}`;
-}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -448,8 +353,6 @@ export default function AccountPage() {
 
   const { user, logout } = useAuth();
   const router = useRouter();
-  const pathname = usePathname() || "/";
-  const appPath = normalizePath(pathname);
 
   const [customer, setCustomer] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -603,56 +506,12 @@ export default function AccountPage() {
     );
   }
 
-  const firstName = customer?.first_name || user?.firstName || "";
-  const greeting = firstName ? `Hallo, ${firstName}!` : "Hallo!";
-
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
       <ShopHeader />
 
       <main style={{ flex: 1 }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px 56px" }}>
-
-          {/* Greeting banner */}
-          <GreetingWrap>
-            <div>
-              <GreetingText>{greeting}</GreetingText>
-              <GreetingMeta>
-                {customer?.customer_number ? `#${customer.customer_number} · ` : ""}
-                {customer?.email}
-              </GreetingMeta>
-            </div>
-            {customer?.bonus_points != null && (
-              <GreetingBadge href="/bonus">
-                <GreetingBadgeNum>{customer.bonus_points}</GreetingBadgeNum>
-                <GreetingBadgeLabel>Punkte</GreetingBadgeLabel>
-              </GreetingBadge>
-            )}
-          </GreetingWrap>
-
-          {/* Horizontal nav pills — visible on mobile/tablet only */}
-          <MobileNavWrap>
-            {NAV.map((item) => {
-              const active =
-                item.href === "/account"
-                  ? appPath === "/account"
-                  : appPath === item.href || appPath.startsWith(`${item.href}/`);
-              return (
-                <NavPill key={item.href} href={item.href} $active={active}>
-                  {item.label}
-                </NavPill>
-              );
-            })}
-            <NavLogoutPill
-              type="button"
-              onClick={() => {
-                document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax";
-                handleLogout();
-              }}
-            >
-              Abmelden
-            </NavLogoutPill>
-          </MobileNavWrap>
 
           <AccountPageLayout onLogout={handleLogout}>
             <div>
@@ -664,7 +523,7 @@ export default function AccountPage() {
               >
                 {editSection === "personal" ? (
                   <div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                    <EditFormGrid>
                       <div>
                         <label htmlFor="acc-first_name" style={lbl}>Vorname</label>
                         <input id="acc-first_name" style={inp} value={form.first_name} onChange={(e) => set("first_name", e.target.value)} />
@@ -696,7 +555,7 @@ export default function AccountPage() {
                           </div>
                         </>
                       )}
-                    </div>
+                    </EditFormGrid>
                     {saveErr && <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{saveErr}</p>}
                     <div style={{ display: "flex", gap: 10 }}>
                       <SaveButton onClick={saveEdit} loading={saving} />
@@ -709,7 +568,7 @@ export default function AccountPage() {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                  <InfoGrid>
                     <InfoRow label="Vorname" value={customer?.first_name} />
                     <InfoRow label="Nachname" value={customer?.last_name} />
                     <InfoRow label="E-Mail" value={customer?.email} />
@@ -717,7 +576,7 @@ export default function AccountPage() {
                     <InfoRow label="Kontotyp" value={accountTypeLabel(customer?.account_type)} />
                     {customer?.company_name && <InfoRow label="Firma" value={customer.company_name} />}
                     {customer?.vat_number && <InfoRow label="USt-IdNr." value={customer.vat_number} />}
-                  </div>
+                  </InfoGrid>
                 )}
               </Section>
 

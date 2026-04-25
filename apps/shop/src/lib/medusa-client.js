@@ -5,7 +5,7 @@
  * REST API kullanarak products, cart, orders yönetimi
  */
 
-function resolveMedusaBaseUrl() {
+export function resolveMedusaBaseUrl() {
   const envUrl = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").trim();
   const forceEnvInDev = String(process.env.NEXT_PUBLIC_MEDUSA_USE_ENV_IN_DEV || "").trim() === "true";
   if (typeof window !== "undefined") {
