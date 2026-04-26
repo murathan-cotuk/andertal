@@ -1028,9 +1028,9 @@ export function ProductListItem({ product, activeFilters = {} }) {
         >
           {btnLabel}
         </ListCartBtn>
-        {cartNotice.text && (
-          {cartNotice.text ? <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice> : null}
-        )}
+        {cartNotice.text ? (
+          <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice>
+        ) : null}
       </ListBody>
     </ListCard>
   );
