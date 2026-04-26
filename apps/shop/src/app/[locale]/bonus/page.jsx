@@ -3,10 +3,9 @@
 import { useState, useEffect } from "react";
 import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@belucha/lib";
 import NewtonsCradle from "@/components/NewtonsCradle";
-import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
-import AccountPageLayout from "@/components/account/AccountPageLayout";
+import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 const ORANGE = "#ff971c";
@@ -39,38 +38,47 @@ function sourceLabel(source) {
 
 export default function BonusPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
-  const { user, logout } = useAuth();
-  const router = useRouter();
+  const { user, isLoading: authLoading, isAuthenticated, token: authToken } = useAuth();
   const [points, setPoints] = useState(null);
   const [ledger, setLedger] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+
     const load = async () => {
-      const token = getToken("customer");
-      if (!token) {
+      const token = authToken || getToken("customer");
+      if (!isAuthenticated || !token) {
+        setPoints(0);
+        setLedger([]);
         setLoading(false);
         return;
       }
+      setLoading(true);
       const client = getMedusaClient();
       const r = await client.getCustomer(token);
-      setPoints(r?.customer?.bonus_points ?? 0);
-      setLedger(Array.isArray(r?.customer?.bonus_ledger) ? r.customer.bonus_ledger : []);
+      if (!r?.customer) {
+        setPoints(0);
+        setLedger([]);
+        setLoading(false);
+        return;
+      }
+      setPoints(r.customer.bonus_points ?? 0);
+      setLedger(Array.isArray(r.customer.bonus_ledger) ? r.customer.bonus_ledger : []);
       setLoading(false);
     };
     load();
-  }, [user?.id]);
+  }, [authLoading, isAuthenticated, authToken, user?.id, user?.sub]);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
       <ShopHeader />
       <main style={{ flex: 1, width: "100%", boxSizing: "border-box" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 16px 48px" }}>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: DARK, margin: "0 0 8px" }}>Meine Bonuspunkte</h1>
-          <p style={{ fontSize: 14, color: GRAY, margin: "0 0 28px", lineHeight: 1.5 }}>
-            Sammeln und einlösen Sie Punkte bei jedem Einkauf — inklusive Übersicht Ihrer letzten Bewegungen.
-          </p>
-          <AccountPageLayout>
+        <div style={ACCOUNT_PAGE_MAIN_INNER}>
+          <AccountPageLayout
+            title="Meine Bonuspunkte"
+            description="Sammeln und einlösen Sie Punkte bei jedem Einkauf — inklusive Übersicht Ihrer letzten Bewegungen."
+          >
             <div style={{ minWidth: 0 }}>
               <div
                 style={{

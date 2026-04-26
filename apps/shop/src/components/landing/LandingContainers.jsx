@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link } from "@/i18n/navigation";
 import { getMedusaClient, resolveMedusaBaseUrl } from "@/lib/medusa-client";
 import { useLandingChrome } from "@/context/LandingChromeContext";
@@ -42,6 +42,38 @@ function normalizeContentMaxWidth(val, fallbackPx) {
   return fb;
 }
 
+/** Dünne Überschrift direkt unter einem Bild / einer Karten-Fläche (Landing) */
+function LandingItemHeadingStyle() {
+  return {
+    fontSize: 12,
+    fontWeight: 400,
+    color: "#64748b",
+    lineHeight: 1.35,
+    marginTop: 4,
+    letterSpacing: "0.02em",
+  };
+}
+
+function LandingItemHeading({ children }) {
+  if (children == null || !String(children).trim()) return null;
+  return <div style={LandingItemHeadingStyle()}>{children}</div>;
+}
+
+function LandingItemSubtext({ html, marginTop: mt }) {
+  if (!html || !String(html).trim()) return null;
+  return (
+    <div
+      style={{ fontSize: 14, color: "#374151", marginTop: mt != null ? mt : 8, lineHeight: 1.6 }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+function parseLandingProductCaptions(raw) {
+  if (raw == null || raw === "") return [];
+  return String(raw).split("\n").map((s) => s.trimEnd());
+}
+
 function getContentInnerStyle(container, fallbackMaxPx) {
   if (container.content_layout === "full") {
     return {
@@ -62,6 +94,103 @@ function getContentInnerStyle(container, fallbackMaxPx) {
     marginLeft: "auto",
     marginRight: "auto",
   };
+}
+
+/** @param {unknown[]} arr @param {number} pageSize */
+function chunkArrayForMobilePages(arr, pageSize) {
+  const s = Math.max(1, pageSize);
+  const out = [];
+  for (let i = 0; i < arr.length; i += s) {
+    out.push(arr.slice(i, i + s));
+  }
+  return out;
+}
+
+/**
+ * mobile_layout: "row" = eine Zeile wischen, "grid" = Raster (Zeilen×Spalten) pro „Seite“ wischen
+ * @param {{ mobile_layout?: string, mobile_grid_rows?: unknown, mobile_grid_cols?: unknown }} container
+ */
+function resolveMobilePagedGrid(container) {
+  const isGrid = container?.mobile_layout === "grid";
+  const rows = Math.max(1, Math.min(4, Math.round(Number(container?.mobile_grid_rows)) || 2));
+  const cols = Math.max(1, Math.min(4, Math.round(Number(container?.mobile_grid_cols)) || 2));
+  return { isGrid, rows, cols, pageSize: rows * cols };
+}
+
+/**
+ * Mobil (≤1023px): horizontale Snap-Seiten, jede Seite = CSS-Grid mit rows×cols
+ */
+function MobilePagedGridScroll({ title, gap, rows, cols, items, itemKey, renderItem, ariaLabel }) {
+  const pageSize = Math.max(1, rows * cols);
+  const pages = useMemo(
+    () => chunkArrayForMobilePages(items, pageSize),
+    [items, pageSize]
+  );
+
+  const titleStr = title != null ? String(title).trim() : "";
+  return (
+    <div>
+      {titleStr ? (
+        <h2
+          style={{
+            fontSize: "clamp(1.125rem, 2vw, 1.375rem)",
+            fontWeight: 600,
+            color: "#111827",
+            margin: "0 0 16px 0",
+            lineHeight: 1.3,
+          }}
+        >
+          {titleStr}
+        </h2>
+      ) : null}
+      <div
+        role="region"
+        aria-label={ariaLabel || titleStr || "Karussell"}
+        style={{
+          display: "flex",
+          overflowX: "auto",
+          scrollSnapType: "x mandatory",
+          WebkitOverflowScrolling: "touch",
+          width: "100%",
+          paddingBottom: 4,
+        }}
+      >
+        {pages.map((page, pi) => (
+          <div
+            key={pi}
+            style={{
+              flex: "0 0 100%",
+              minWidth: "100%",
+              width: "100%",
+              maxWidth: "100%",
+              scrollSnapAlign: "start",
+              boxSizing: "border-box",
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                gridAutoRows: "minmax(0, auto)",
+                gap,
+                alignItems: "start",
+                width: "100%",
+              }}
+            >
+              {page.map((item, idx) => {
+                const globalIdx = pi * pageSize + idx;
+                return (
+                  <div key={itemKey(item, globalIdx)} style={{ minWidth: 0, width: "100%" }}>
+                    {renderItem(item, globalIdx)}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function collectionHref(handle) {
@@ -317,6 +446,131 @@ function TextBlock({ container }) {
   );
 }
 
+/** YouTube- / Vimeo-Links in eine sichere embed-URL umwandeln */
+function landingVideoEmbedFromUrl(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  if (/^https:\/\/(www\.)?youtube\.com\/embed\//i.test(raw)) {
+    return raw.includes("?") ? raw : `${raw}?modestbranding=1&rel=0&playsinline=1`;
+  }
+  if (/player\.vimeo\.com\/video\//i.test(raw)) {
+    return raw;
+  }
+  let s = raw;
+  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+  try {
+    const u = new URL(s);
+    const h = u.hostname.replace(/^www\./, "");
+    if (h === "youtu.be") {
+      const id = u.pathname.replace(/^\//, "").split("/")[0];
+      if (id) return `https://www.youtube.com/embed/${id}?modestbranding=1&rel=0&playsinline=1`;
+    }
+    if (h === "youtube.com" || h === "m.youtube.com") {
+      const v = u.searchParams.get("v");
+      if (v) return `https://www.youtube.com/embed/${v}?modestbranding=1&rel=0&playsinline=1`;
+      const sh = u.pathname.match(/\/embed\/([^/?]+)/);
+      if (sh) return `https://www.youtube.com/embed/${sh[1]}?modestbranding=1&rel=0&playsinline=1`;
+    }
+    if (h === "vimeo.com") {
+      const m = u.pathname.match(/(\d{6,})/);
+      if (m) return `https://player.vimeo.com/video/${m[1]}`;
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+// ── Video (Datei-URL oder Einbettung, optional Desktop/Mobil getrennt) ──────
+function VideoBlock({ container }) {
+  const isNarrow = useIsNarrow(1023);
+  const mode = container.video_mode === "embed" ? "embed" : "file";
+  const ar = String(container.aspect_ratio || "16/9").replace(/:/g, "/").replace(/\s+/g, "") || "16/9";
+  const arNorm = ar === "auto" ? "16/9" : ar;
+
+  const embedDesktop = mode === "embed" ? landingVideoEmbedFromUrl(container.embed_url) : "";
+  const embedMobileRaw = mode === "embed" ? landingVideoEmbedFromUrl(container.embed_url_mobile) : "";
+  const embedSrc = isNarrow && embedMobileRaw ? embedMobileRaw : embedDesktop;
+
+  const fileDesktop = String(container.video_url || "").trim() ? resolveUrl(container.video_url) : "";
+  const fileMobileRaw = String(container.video_url_mobile || "").trim() ? resolveUrl(container.video_url_mobile) : "";
+  const fileSrc = isNarrow && fileMobileRaw ? fileMobileRaw : fileDesktop;
+
+  const posterD = String(container.poster_url || "").trim() ? resolveUrl(container.poster_url) : undefined;
+  const posterM = String(container.poster_url_mobile || "").trim() ? resolveUrl(container.poster_url_mobile) : undefined;
+  const poster = isNarrow && posterM ? posterM : posterD;
+
+  const hasEmbed = mode === "embed" && Boolean(embedSrc);
+  const hasFile = mode === "file" && Boolean(fileSrc);
+  if (!hasEmbed && !hasFile) return null;
+
+  const tc = container.text_color || "#111827";
+  const bg = container.bg_color || "#fff";
+  const autoplay = container.autoplay === true;
+  const muted = container.muted !== false;
+  const loop = container.loop === true;
+  const controls = container.controls !== false;
+  const playsInline = container.playsinline !== false;
+  const box = {
+    position: "relative",
+    width: "100%",
+    borderRadius: 12,
+    overflow: "hidden",
+    border: "1px solid #e5e7eb",
+    background: "#000",
+    aspectRatio: arNorm,
+  };
+
+  return (
+    <div style={{ background: bg, ...getContainerPadding(container, "32px 24px") }}>
+      <div style={{ ...getContentInnerStyle(container, 1000) }}>
+        {container.title && (
+          <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: tc, margin: "0 0 8px" }}>
+            {container.title}
+          </h2>
+        )}
+        {container.caption && (
+          <p style={{ fontSize: 15, color: tc, margin: "0 0 16px", lineHeight: 1.5, opacity: 0.92 }}>
+            {container.caption}
+          </p>
+        )}
+        <div style={box}>
+          {mode === "embed" ? (
+            <iframe
+              title={String(container.title || "Video").slice(0, 120)}
+              src={embedSrc}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, display: "block" }}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowFullScreen
+            />
+          ) : (
+            <video
+              key={fileSrc}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: ar === "auto" ? "contain" : "cover",
+                display: "block",
+                background: "#000",
+              }}
+              controls={controls}
+              playsInline={playsInline}
+              muted={autoplay || muted}
+              autoPlay={autoplay}
+              loop={loop}
+              poster={poster}
+            >
+              <source src={fileSrc} />
+            </video>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Image + Text ──────────────────────────────────────────────────────────────
 function ImageText({ container }) {
   const imageLeft = container.image_side !== "right";
@@ -360,6 +614,238 @@ function ImageText({ container }) {
   );
 }
 
+/** "1,2,2" oder "1 2" → [1,2,2], jede Zahl = Spalten in dieser Zeile (wiederholend) */
+function parseMosaicLayoutPattern(input, fallback = [1, 2]) {
+  const s = String(input ?? "").trim();
+  if (!s) return fallback;
+  const parts = s.split(/[,;\s]+/).map((p) => parseInt(p, 10)).filter((n) => !Number.isNaN(n) && n >= 1);
+  if (!parts.length) return fallback;
+  return parts.map((n) => Math.min(8, Math.max(1, n)));
+}
+
+/** Items nacheinander in Zeilen füllen, Zeilengröße folgt wechselndem Muster (z. B. 1 dann 2 dann 1…) */
+function buildMosaicRows(items, pattern) {
+  if (!Array.isArray(items) || !items.length) return [];
+  const p = pattern.length ? pattern : [1];
+  const rows = [];
+  let idx = 0;
+  let pi = 0;
+  while (idx < items.length) {
+    const want = p[pi % p.length];
+    const n = Math.max(1, Math.min(8, want));
+    const rowItems = items.slice(idx, idx + n);
+    if (rowItems.length === 0) break;
+    rows.push(rowItems);
+    idx += rowItems.length;
+    pi += 1;
+  }
+  return rows;
+}
+
+/** 0-basierter Index in der flachen Raster-Reihenfolge (Mosaik) */
+function mosaicGridCellIndex(rows, rowIdx, colIdx) {
+  let o = 0;
+  for (let r = 0; r < rowIdx; r++) o += rows[r].length;
+  return o + colIdx;
+}
+
+// ── Content-Mosaic: Bilder ODER Kollektionsprodukte ODER Kollektionen, Raster frei wählbar ──
+function ContentMosaic({ container, preloadedProducts }) {
+  const isNarrow = useIsNarrow(1023);
+  const source = String(container.source || "images");
+  const baseGap = container.gap != null ? Number(container.gap) : 16;
+  const gapMobile = container.gap_mobile != null ? Number(container.gap_mobile) : null;
+  const gap = isNarrow && gapMobile != null && !Number.isNaN(gapMobile) ? gapMobile : (Number.isNaN(baseGap) ? 16 : baseGap);
+  const patD = parseMosaicLayoutPattern(container.layout_pattern_desktop, [1, 2]);
+  const patM = parseMosaicLayoutPattern(container.layout_pattern_mobile, [1]);
+  const pattern = isNarrow ? patM : patD;
+  const ratio = normalizeCollectionsCarouselAspectRatio(container.card_aspect_ratio);
+  const imgObjectFit = container.card_image_object_fit === "contain" ? "contain" : "cover";
+  const bg = container.bg_color || "#fff";
+
+  const [liveCollections, setLiveCollections] = useState(null);
+  const snapshots = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
+  const [products, setProducts] = useState(
+    source === "collection" ? preloadedProducts : undefined
+  );
+
+  useEffect(() => {
+    if (source !== "collection") return;
+    if (Array.isArray(preloadedProducts)) {
+      setProducts(preloadedProducts);
+      return;
+    }
+    if (!container.collection_id && !container.collection_handle) {
+      setProducts([]);
+      return;
+    }
+    const param = container.collection_id
+      ? `collection_id=${encodeURIComponent(container.collection_id)}`
+      : `collection_handle=${encodeURIComponent(container.collection_handle)}`;
+    fetch(`/api/store-products?${param}&limit=100`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setProducts(Array.isArray(d?.products) ? d.products : []))
+      .catch(() => setProducts([]));
+  }, [source, container.collection_id, container.collection_handle, preloadedProducts]);
+
+  useEffect(() => {
+    if (source !== "collections" || !snapshots.length) return;
+    fetch("/api/store-collections", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        const all = Array.isArray(data?.collections) ? data.collections : [];
+        if (!all.length) return;
+        const byId = new Map(all.map((c) => [c.id, c]));
+        const merged = snapshots.map((snap) => {
+          const live = byId.get(snap.id);
+          if (!live) return snap;
+          const fromMain = collectionCarouselCardImageFromLive(live);
+          return { ...snap, title: live.display_title || live.title || snap.title, handle: live.handle || snap.handle, image: fromMain || "" };
+        });
+        setLiveCollections(merged);
+      })
+      .catch(() => {});
+  }, [source, container.id, snapshots.length]);
+
+  const collectionCards = (liveCollections ?? snapshots);
+
+  let items = [];
+  if (source === "images") {
+    items = (container.images || []).filter((i) => i && i.url);
+  } else if (source === "collection") {
+    items = products === undefined ? null : (products || []);
+  } else {
+    items = collectionCards;
+  }
+
+  if (source === "collection" && products === undefined) {
+    return (
+      <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
+        <div style={getContentInnerStyle(container, 1280)}>
+          <div style={{ display: "flex", flexDirection: "column", gap, width: "100%" }}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: i === 1 ? "1fr" : "1fr 1fr", gap, width: "100%" }}>
+                {Array.from({ length: i === 1 ? 1 : 2 }).map((_, j) => (
+                  <div key={j} style={{ minHeight: 200, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!items || !items.length) return null;
+
+  const rows = buildMosaicRows(items, pattern);
+  const productCaptionLines = source === "collection" ? parseLandingProductCaptions(container.product_captions) : [];
+
+  const renderImage = (img) => {
+    const r = String(img.aspect_ratio || "1/1").replace(/:/g, "/");
+    const src = resolveUrl(img.url);
+    const hasTitle = !!(img.title && String(img.title).trim());
+    const hasBody = !!(img.text && String(img.text).trim());
+    const hasCaption = hasTitle || hasBody;
+    const below = hasCaption ? (
+      <div>
+        {hasTitle ? <LandingItemHeading>{img.title}</LandingItemHeading> : null}
+        <LandingItemSubtext html={img.text} marginTop={hasTitle ? 8 : 4} />
+      </div>
+    ) : null;
+    const card = (
+      <div>
+        <img src={src} alt={img.title || ""} style={{ width: "100%", aspectRatio: r, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />
+        {below}
+      </div>
+    );
+    if (img.link) return <a href={img.link} style={{ display: "block", textDecoration: "none" }}>{card}</a>;
+    return card;
+  };
+
+  const renderProduct = (product, key, listIndex) => {
+    const line = productCaptionLines[listIndex];
+    const cap = line != null && String(line).trim() !== "" ? <LandingItemHeading>{line.trim()}</LandingItemHeading> : null;
+    return (
+      <div key={key} style={{ minWidth: 0 }}>
+        <ProductCard product={product} plainImage />
+        {cap}
+      </div>
+    );
+  };
+
+  const renderCollectionCard = (c, i, key) => {
+    const href = collectionHref(c.handle);
+    const image = resolveUrl(c.image);
+    const el = (
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          aspectRatio: ratio,
+          borderRadius: 18,
+          overflow: "hidden",
+          background: "#f3f4f6",
+          border: "1px solid #ececec",
+        }}
+      >
+        {image ? (
+          <img src={image} alt={c.title || ""} style={{ width: "100%", height: "100%", objectFit: imgObjectFit, display: "block" }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>Keine Vorschau</div>
+        )}
+        <div style={{ position: "absolute", inset: "auto 0 0 0", padding: "12px 14px", background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)", color: "#fff" }}>
+          <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>{c.title || c.handle || `Kollektion ${i + 1}`}</div>
+        </div>
+      </div>
+    );
+    const sub = c.item_heading && String(c.item_heading).trim() ? <LandingItemHeading>{c.item_heading.trim()}</LandingItemHeading> : null;
+    const block = href === "#" ? (
+      <>
+        {el}
+        {sub}
+      </>
+    ) : (
+      <>
+        <a href={href} style={{ display: "block", textDecoration: "none" }}>{el}</a>
+        {sub}
+      </>
+    );
+    return <div key={key} style={{ minWidth: 0 }}>{block}</div>;
+  };
+
+  return (
+    <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
+      <div style={getContentInnerStyle(container, 1280)}>
+        {container.title && (
+          <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{container.title}</h2>
+        )}
+        <div style={{ display: "flex", flexDirection: "column", gap, width: "100%" }}>
+          {rows.map((rowItems, ri) => (
+            <div
+              key={ri}
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${rowItems.length}, minmax(0, 1fr))`,
+                gap,
+                width: "100%",
+                alignItems: "start",
+              }}
+            >
+              {rowItems.map((it, ci) => {
+                const k = `m-${ri}-${ci}`;
+                if (source === "images") return <div key={k} style={{ minWidth: 0 }}>{renderImage(it)}</div>;
+                if (source === "collection") return renderProduct(it, k, mosaicGridCellIndex(rows, ri, ci));
+                return renderCollectionCard(it, ri * 10 + ci, k);
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Image Grid ────────────────────────────────────────────────────────────────
 function ImageGrid({ container }) {
   const cols = container.cols || 2;
@@ -372,15 +858,12 @@ function ImageGrid({ container }) {
         {images.map((img, i) => {
           const ratio = img.aspect_ratio || "1/1";
           const imgEl = <img src={resolveUrl(img.url)} alt={img.title || ""} style={{ width: "100%", aspectRatio: ratio, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />;
-          const caption = (img.title || img.text) ? (
-            <div style={{ paddingTop: 10 }}>
-              {img.title && <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.3 }}>{img.title}</div>}
-              {img.text ? (
-                <div
-                  style={{ fontSize: 14, color: "#374151", marginTop: img.title ? 6 : 0, lineHeight: 1.7 }}
-                  dangerouslySetInnerHTML={{ __html: img.text }}
-                />
-              ) : null}
+          const hasTitle = !!(img.title && String(img.title).trim());
+          const hasBody = !!(img.text && String(img.text).trim());
+          const caption = (hasTitle || hasBody) ? (
+            <div>
+              {hasTitle ? <LandingItemHeading>{img.title}</LandingItemHeading> : null}
+              <LandingItemSubtext html={img.text} marginTop={hasTitle ? 8 : 4} />
             </div>
           ) : null;
           const inner = <>{imgEl}{caption}</>;
@@ -461,6 +944,10 @@ function CollectionCarousel({ container, preloadedProducts }) {
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
   const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
   const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
+  const isNarrow = useIsNarrow(1023);
+  const baseGap = container.gap != null ? Number(container.gap) : 16;
+  const gapMobile = container.gap_mobile != null ? Number(container.gap_mobile) : null;
+  const gap = isNarrow && gapMobile != null && !Number.isNaN(gapMobile) ? gapMobile : (Number.isNaN(baseGap) ? 16 : baseGap);
 
   useEffect(() => {
     if (Array.isArray(preloadedProducts)) {
@@ -481,7 +968,7 @@ function CollectionCarousel({ container, preloadedProducts }) {
   if (products === undefined) {
     return (
       <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
-        <div style={{ display: "flex", gap: 16, overflow: "hidden" }}>
+        <div style={{ display: "flex", gap, overflow: "hidden" }}>
           {Array.from({ length: itemsPerRow }).map((_, i) => (
             <div key={i} style={{ flex: `0 0 calc(${100 / itemsPerRow}% - 12px)`, height: 280, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
           ))}
@@ -492,6 +979,38 @@ function CollectionCarousel({ container, preloadedProducts }) {
 
   if (!products.length) return null;
 
+  const productCaptionLines = parseLandingProductCaptions(container.product_captions);
+  const renderProductWithCaption = (product, i) => {
+    const line = productCaptionLines[i];
+    const cap = line != null && String(line).trim() !== "" ? <LandingItemHeading>{line.trim()}</LandingItemHeading> : null;
+    return (
+      <>
+        <ProductCard product={product} plainImage />
+        {cap}
+      </>
+    );
+  };
+
+  const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
+  if (isNarrow && isGrid) {
+    return (
+      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+        <div style={getContentInnerStyle(container, 1280)}>
+          <MobilePagedGridScroll
+            title={container.title}
+            gap={gap}
+            rows={rows}
+            cols={cols}
+            items={products}
+            itemKey={(p, i) => p.id || i}
+            renderItem={renderProductWithCaption}
+            ariaLabel={container.title?.trim() || "Kollektion: Produkte"}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
       <div style={getContentInnerStyle(container, 1280)}>
@@ -500,12 +1019,14 @@ function CollectionCarousel({ container, preloadedProducts }) {
           title={container.title?.trim() ? container.title : undefined}
           visibleCount={itemsPerRow}
           navOnSides
-          gap={16}
+          gap={gap}
           showFade={false}
           ariaLabel={container.title?.trim() || "Collection carousel"}
         >
           {products.map((product, i) => (
-            <ProductCard key={product.id || i} product={product} plainImage />
+            <div key={product.id || i} style={{ minWidth: 0 }}>
+              {renderProductWithCaption(product, i)}
+            </div>
           ))}
         </Carousel>
       </div>
@@ -518,6 +1039,10 @@ function CollectionsCarousel({ container }) {
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
   const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
   const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
+  const isNarrow = useIsNarrow(1023);
+  const baseGap = container.gap != null ? Number(container.gap) : 16;
+  const gapMobile = container.gap_mobile != null ? Number(container.gap_mobile) : null;
+  const gap = isNarrow && gapMobile != null && !Number.isNaN(gapMobile) ? gapMobile : (Number.isNaN(baseGap) ? 16 : baseGap);
   const ratio = normalizeCollectionsCarouselAspectRatio(container.card_aspect_ratio);
   const imgObjectFit =
     container.card_image_object_fit === "contain" ? "contain" : "cover";
@@ -553,6 +1078,85 @@ function CollectionsCarousel({ container }) {
 
   if (!collections.length) return null;
 
+  const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
+  if (isNarrow && isGrid) {
+    const renderCollectionCell = (collection, i) => {
+      const href = collectionHref(collection.handle);
+      const image = resolveUrl(collection.image);
+      const card = (
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            aspectRatio: ratio,
+            borderRadius: 18,
+            overflow: "hidden",
+            background: "#f3f4f6",
+            border: "1px solid #ececec",
+          }}
+        >
+          {image ? (
+            <img
+              src={image}
+              alt={collection.title || ""}
+              style={{ width: "100%", height: "100%", objectFit: imgObjectFit, display: "block" }}
+            />
+          ) : (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
+              Keine Vorschau
+            </div>
+          )}
+          <div
+            style={{
+              position: "absolute",
+              inset: "auto 0 0 0",
+              padding: "16px 18px",
+              background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)",
+              color: "#fff",
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>
+              {collection.title || collection.handle || `Kollektion ${i + 1}`}
+            </div>
+          </div>
+        </div>
+      );
+      const sub = collection.item_heading && String(collection.item_heading).trim() ? (
+        <LandingItemHeading>{collection.item_heading.trim()}</LandingItemHeading>
+      ) : null;
+      if (href === "#") {
+        return (
+          <>
+            {card}
+            {sub}
+          </>
+        );
+      }
+      return (
+        <>
+          <a href={href} style={{ display: "block", textDecoration: "none" }}>{card}</a>
+          {sub}
+        </>
+      );
+    };
+    return (
+      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+        <div style={getContentInnerStyle(container, 1280)}>
+          <MobilePagedGridScroll
+            title={container.title}
+            gap={gap}
+            rows={rows}
+            cols={cols}
+            items={collections}
+            itemKey={(c, i) => c.id || i}
+            renderItem={renderCollectionCell}
+            ariaLabel={container.title?.trim() || "Kollektionen"}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
       <div style={getContentInnerStyle(container, 1280)}>
@@ -561,59 +1165,60 @@ function CollectionsCarousel({ container }) {
           title={container.title?.trim() ? container.title : undefined}
           visibleCount={itemsPerRow}
           navOnSides
-          gap={16}
+          gap={gap}
           ariaLabel={container.title?.trim() || "Collections carousel"}
         >
           {collections.map((collection, i) => {
-          const href = collectionHref(collection.handle);
-          const image = resolveUrl(collection.image);
-          const card = (
-            <div
-              style={{
-                position: "relative",
-                width: "100%",
-                aspectRatio: ratio,
-                borderRadius: 18,
-                overflow: "hidden",
-                background: "#f3f4f6",
-                border: "1px solid #ececec",
-              }}
-            >
-              {image ? (
-                <img
-                  src={image}
-                  alt={collection.title || ""}
-                  style={{ width: "100%", height: "100%", objectFit: imgObjectFit, display: "block" }}
-                />
-              ) : (
-                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
-                  Keine Vorschau
-                </div>
-              )}
+            const href = collectionHref(collection.handle);
+            const image = resolveUrl(collection.image);
+            const card = (
               <div
                 style={{
-                  position: "absolute",
-                  inset: "auto 0 0 0",
-                  padding: "16px 18px",
-                  background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)",
-                  color: "#fff",
+                  position: "relative",
+                  width: "100%",
+                  aspectRatio: ratio,
+                  borderRadius: 18,
+                  overflow: "hidden",
+                  background: "#f3f4f6",
+                  border: "1px solid #ececec",
                 }}
               >
-                <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>
-                  {collection.title || collection.handle || `Kollektion ${i + 1}`}
+                {image ? (
+                  <img
+                    src={image}
+                    alt={collection.title || ""}
+                    style={{ width: "100%", height: "100%", objectFit: imgObjectFit, display: "block" }}
+                  />
+                ) : (
+                  <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
+                    Keine Vorschau
+                  </div>
+                )}
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: "auto 0 0 0",
+                    padding: "16px 18px",
+                    background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)",
+                    color: "#fff",
+                  }}
+                >
+                  <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>
+                    {collection.title || collection.handle || `Kollektion ${i + 1}`}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-
-          return href === "#" ? (
-            <div key={collection.id || i}>{card}</div>
-          ) : (
-            <a key={collection.id || i} href={href} style={{ display: "block", textDecoration: "none" }}>
-              {card}
-            </a>
-          );
-        })}
+            );
+            const sub = collection.item_heading && String(collection.item_heading).trim() ? (
+              <LandingItemHeading>{collection.item_heading.trim()}</LandingItemHeading>
+            ) : null;
+            return (
+              <div key={collection.id || i} style={{ minWidth: 0 }}>
+                {href === "#" ? card : <a href={href} style={{ display: "block", textDecoration: "none" }}>{card}</a>}
+                {sub}
+              </div>
+            );
+          })}
         </Carousel>
       </div>
     </div>
@@ -1348,14 +1953,93 @@ function Testimonials({ container }) {
 }
 
 // ── Image Carousel ────────────────────────────────────────────────────────────
+function normalizeImageCarouselAspect(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (/^[\d.]+$/.test(s)) return s;
+  return s.replace(/:/g, "/").replace(/\s+/g, "");
+}
+
+/**
+ * Pro Slide: optionale Desktop-/Mobil-Seitenverhältnisse und min. Höhe (Mobil) aus dem Seller-Editor.
+ */
+function pickImageCarouselRatio(img, isNarrow) {
+  const desktop = normalizeImageCarouselAspect(img.aspect_ratio_custom) || normalizeImageCarouselAspect(img.aspect_ratio) || "4/5";
+  if (!isNarrow) return desktop;
+  const mobileCustom = normalizeImageCarouselAspect(img.aspect_ratio_mobile_custom);
+  if (mobileCustom) return mobileCustom;
+  const mobile = normalizeImageCarouselAspect(img.aspect_ratio_mobile);
+  if (mobile) return mobile;
+  return desktop;
+}
+
 function ImageCarousel({ container }) {
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
   const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
   const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
+  const isNarrow = useIsNarrow(1023);
   const images = (container.images || []).filter((i) => i.url);
   if (!images.length) return null;
-  const gap = container.gap || 16;
+  const baseGap = container.gap != null ? Number(container.gap) : 16;
+  const gapMobile = container.gap_mobile != null ? Number(container.gap_mobile) : null;
+  const gap = isNarrow && gapMobile != null && !Number.isNaN(gapMobile) ? gapMobile : (Number.isNaN(baseGap) ? 16 : baseGap);
   const bg = container.bg_color || "#fff";
+  const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
+
+  const renderImageCell = (img) => {
+    const src = resolveUrl(img.url);
+    const ratio = pickImageCarouselRatio(img, isNarrow);
+    const minH = isNarrow && (img.min_height_mobile != null) && String(img.min_height_mobile).trim() !== "";
+    const boxStyle = {
+      width: "100%",
+      aspectRatio: ratio,
+      overflow: "hidden",
+      borderRadius: 12,
+      background: "#f3f4f6",
+      ...(minH ? { minHeight: String(img.min_height_mobile).trim() } : {}),
+    };
+    const hasTitle = !!(img.title && String(img.title).trim());
+    const hasBody = !!(img.text && String(img.text).trim());
+    const cap = (hasTitle || hasBody) ? (
+      <div>
+        {hasTitle ? <LandingItemHeading>{img.title}</LandingItemHeading> : null}
+        <LandingItemSubtext html={img.text} marginTop={hasTitle ? 8 : 4} />
+      </div>
+    ) : null;
+    const block = (
+      <>
+        <div style={boxStyle}>
+          <img src={src} alt={img.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        </div>
+        {cap}
+      </>
+    );
+    if (img.link) {
+      return <a href={img.link} style={{ display: "block", textDecoration: "none" }}>{block}</a>;
+    }
+    return <div>{block}</div>;
+  };
+
+  if (isNarrow && isGrid) {
+    return (
+      <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
+        <div style={getContentInnerStyle(container, 1280)}>
+          <MobilePagedGridScroll
+            title={container.title}
+            gap={gap}
+            rows={rows}
+            cols={cols}
+            items={images}
+            itemKey={(_, i) => `img-${i}`}
+            renderItem={renderImageCell}
+            ariaLabel={container.title?.trim() || "Bild-Karussell"}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
       <div style={getContentInnerStyle(container, 1280)}>
@@ -1367,18 +2051,11 @@ function ImageCarousel({ container }) {
           gap={gap}
           ariaLabel={container.title?.trim() || "Bild-Karussell"}
         >
-          {images.map((img, i) => {
-            const src = resolveUrl(img.url);
-            const ratio = img.aspect_ratio || "4/5";
-            const card = (
-              <div style={{ width: "100%", aspectRatio: ratio, overflow: "hidden", borderRadius: 12, background: "#f3f4f6" }}>
-                <img src={src} alt={img.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              </div>
-            );
-            return img.link
-              ? <a key={i} href={img.link} style={{ display: "block", textDecoration: "none" }}>{card}</a>
-              : <div key={i}>{card}</div>;
-          })}
+          {images.map((img, i) => (
+            <div key={i} style={{ minWidth: 0 }}>
+              {renderImageCell(img)}
+            </div>
+          ))}
         </Carousel>
       </div>
     </div>
@@ -1397,11 +2074,13 @@ function renderContainer(c, preload = {}, ctx = {}) {
   switch (c.type) {
     case "hero_banner":          inner = <HeroBanner container={c} />; break;
     case "text_block":           inner = <TextBlock container={c} />; break;
+    case "video_block":         inner = <VideoBlock container={c} />; break;
     case "image_text":           inner = <ImageText container={c} />; break;
     case "image_grid":           inner = <ImageGrid container={c} />; break;
     case "image_carousel":       inner = <ImageCarousel container={c} />; break;
     case "banner_cta":           inner = <BannerCta container={c} />; break;
     case "collection_carousel":  inner = <CollectionCarousel container={c} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
+    case "content_mosaic":       inner = <ContentMosaic container={c} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
     case "collections_carousel": inner = <CollectionsCarousel container={c} />; break;
     case "accordion":            inner = <Accordion container={c} />; break;
     case "tabs":                 inner = <Tabs container={c} />; break;
@@ -1478,9 +2157,14 @@ export default function LandingContainers({ pageId, categoryId }) {
       const singleTargets = new Set();
       for (const c of containers) {
         if (!c?.visible) continue;
-        if (c.type === "collection_carousel") {
+        if (c.type === "collection_carousel" || (c.type === "content_mosaic" && String(c.source || "images") === "collection")) {
           const key = `${String(c.collection_id || "").trim()}|${String(c.collection_handle || "").trim()}`;
-          if (key !== "|") collectionTargets.set(key, c);
+          if (key === "|") continue;
+          const needLimit = c.type === "content_mosaic" ? 100 : 20;
+          const prev = collectionTargets.get(key);
+          if (!prev || needLimit > (prev.limit || 0)) {
+            collectionTargets.set(key, { c, limit: needLimit });
+          }
         } else if (c.type === "single_product") {
           const idOrHandle = String(c.product_id || c.product_handle || "").trim();
           if (idOrHandle) singleTargets.add(idOrHandle);
@@ -1490,12 +2174,14 @@ export default function LandingContainers({ pageId, categoryId }) {
       // Fetch collections AND single products in parallel
       const [collectionEntries, singleEntries] = await Promise.all([
         Promise.all(
-          [...collectionTargets.entries()].map(async ([key, c]) => {
+          [...collectionTargets.entries()].map(async ([key, entry]) => {
             try {
+              const c = entry.c;
+              const limit = entry.limit || 20;
               const param = c.collection_id
                 ? `collection_id=${encodeURIComponent(c.collection_id)}`
                 : `collection_handle=${encodeURIComponent(c.collection_handle)}`;
-              const d = await fetch(`/api/store-products?${param}&limit=20`, { cache: "no-store" }).then((r) => r.json());
+              const d = await fetch(`/api/store-products?${param}&limit=${limit}`, { cache: "no-store" }).then((r) => r.json());
               return [key, Array.isArray(d?.products) ? d.products : []];
             } catch {
               return [key, []];

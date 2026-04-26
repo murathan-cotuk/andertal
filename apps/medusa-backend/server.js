@@ -6604,7 +6604,14 @@ async function start() {
         const row = r.rows[0]
         if (!row || !row.password_hash) return res.status(401).json({ message: 'Invalid email or password' })
         if (!verifyPassword(password, row.password_hash)) return res.status(401).json({ message: 'Invalid email or password' })
-        const token = signCustomerToken({ id: row.id, email: row.email, role: 'customer', first_name: row.first_name || null, last_name: row.last_name || null })
+        const token = signCustomerToken({
+          id: row.id,
+          email: row.email,
+          role: 'customer',
+          first_name: row.first_name || null,
+          last_name: row.last_name || null,
+          customer_number: row.customer_number != null ? Number(row.customer_number) : null,
+        })
         const customer = { id: row.id, customer_number: row.customer_number ? Number(row.customer_number) : null, email: row.email, first_name: row.first_name, last_name: row.last_name, phone: row.phone, account_type: row.account_type, company_name: row.company_name }
         res.json({ customer, token, access_token: token })
       } catch (e) {

@@ -110,7 +110,13 @@ export default function AccountMobileHeader({ onLogout }) {
   const pathname = usePathname() || "/";
   const appPath = normalizePath(pathname);
   const firstName = user?.firstName || user?.first_name || "";
-  const greeting = firstName ? `Hallo, ${firstName}!` : "Hallo!";
+  const cno = user?.customer_number;
+  const numSuffix = cno != null && cno !== "" ? ` #${cno}` : "";
+  const greeting = firstName
+    ? `Hallo, ${firstName}${numSuffix}!`
+    : numSuffix
+      ? `Hallo!${numSuffix}`
+      : "Hallo!";
   const scrollRef = useRef(null);
   const activeRef = useRef(null);
 

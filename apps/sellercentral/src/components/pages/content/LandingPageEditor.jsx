@@ -71,44 +71,80 @@ function parsePadding(val) {
   return [parts[0], parts[1], parts[2], parts[3]];
 }
 
+/** Kompakte, umbrechende Feldgruppen (statt 4 Felder in einer quetschten Zeile) */
+const EDITOR_FIELD_GRID = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+  gap: 12,
+  width: "100%",
+};
+
+/** Hauptinhalt (links) + Abstand-Panel (rechts) */
+const CONTAINER_EDITOR_ROW = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "flex-start",
+  gap: 24,
+  width: "100%",
+};
+const CONTAINER_EDITOR_MAIN = { flex: "1 1 420px", minWidth: 0, maxWidth: "100%" };
+const CONTAINER_EDITOR_CHROME = { flex: "0 0 300px", minWidth: 260, maxWidth: "100%", position: "sticky", top: 16, alignSelf: "flex-start" };
+
+/** Einheitliche Innenabstand-Defaults pro Container-Typ (Landing Page) */
+const CONTAINER_PADDING_DEFAULTS = {
+  hero_banner: "0px 0px 0px 0px",
+  text_block: "48px 24px 48px 24px",
+  image_text: "48px 24px 48px 24px",
+  image_grid: "32px 24px 32px 24px",
+  image_carousel: "32px 24px 32px 24px",
+  video_block: "32px 24px 32px 24px",
+  banner_cta: "32px 48px 40px 48px",
+  collection_carousel: "32px 24px 32px 24px",
+  collections_carousel: "32px 24px 32px 24px",
+  content_mosaic: "32px 24px 32px 24px",
+  accordion: "48px 24px 48px 24px",
+  tabs: "48px 24px 48px 24px",
+  single_product: "48px 24px 48px 24px",
+  blog_carousel: "40px 24px 40px 24px",
+  newsletter: "48px 24px 48px 24px",
+  feature_grid: "64px 24px 64px 24px",
+  testimonials: "64px 24px 64px 24px",
+};
+
+function getContainerPaddingDefault(type) {
+  return CONTAINER_PADDING_DEFAULTS[type] || "32px 24px 32px 24px";
+}
+
+/** true = nur links/rechts (2 Felder) — schnell; false = 4-Seiten-Padding (z. B. CTA-Banner) */
+function containerPaddingHorizontalOnly(type) {
+  return type !== "banner_cta";
+}
+
 // horizontalOnly=true: only shows Rechts/Links fields (vertical spacing comes from ContainerSpacingEditor)
-function PaddingEditor({ label = "Seitenabstand", value, onChange, defaultValue = "0px 0px 0px 0px", horizontalOnly = false }) {
+function PaddingEditor({ label = "Innenabstand", value, onChange, defaultValue = "0px 0px 0px 0px", horizontalOnly = false }) {
   const [t, r, b, l] = parsePadding(value || defaultValue);
   const emit = (top, right, bottom, left) => onChange(`${top} ${right} ${bottom} ${left}`);
-  const fieldStyle = { flex: 1, minWidth: 0 };
   if (horizontalOnly) {
     return (
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 500, color: "#202223", marginBottom: 6 }}>{label}</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={fieldStyle}>
-            <TextField label="Rechts" value={r} onChange={(v) => emit(t, v, b, l)} autoComplete="off" placeholder="0px" />
-          </div>
-          <div style={fieldStyle}>
-            <TextField label="Links" value={l} onChange={(v) => emit(t, r, b, v)} autoComplete="off" placeholder="0px" />
-          </div>
+      <BlockStack gap="200">
+        <Text as="p" variant="bodyMd" fontWeight="semibold">{label}</Text>
+        <div style={EDITOR_FIELD_GRID}>
+          <TextField label="Rechts" value={r} onChange={(v) => emit(t, v, b, l)} autoComplete="off" placeholder="0px" />
+          <TextField label="Links" value={l} onChange={(v) => emit(t, r, b, v)} autoComplete="off" placeholder="0px" />
         </div>
-      </div>
+      </BlockStack>
     );
   }
   return (
-    <div>
-      <div style={{ fontSize: 13, fontWeight: 500, color: "#202223", marginBottom: 6 }}>{label}</div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <div style={fieldStyle}>
-          <TextField label="Oben" value={t} onChange={(v) => emit(v, r, b, l)} autoComplete="off" placeholder="0px" />
-        </div>
-        <div style={fieldStyle}>
-          <TextField label="Rechts" value={r} onChange={(v) => emit(t, v, b, l)} autoComplete="off" placeholder="0px" />
-        </div>
-        <div style={fieldStyle}>
-          <TextField label="Unten" value={b} onChange={(v) => emit(t, r, v, l)} autoComplete="off" placeholder="0px" />
-        </div>
-        <div style={fieldStyle}>
-          <TextField label="Links" value={l} onChange={(v) => emit(t, r, b, v)} autoComplete="off" placeholder="0px" />
-        </div>
+    <BlockStack gap="200">
+      <Text as="p" variant="bodyMd" fontWeight="semibold">{label}</Text>
+      <div style={EDITOR_FIELD_GRID}>
+        <TextField label="Oben" value={t} onChange={(v) => emit(v, r, b, l)} autoComplete="off" placeholder="0px" />
+        <TextField label="Unten" value={b} onChange={(v) => emit(t, r, v, l)} autoComplete="off" placeholder="0px" />
+        <TextField label="Rechts" value={r} onChange={(v) => emit(t, v, b, l)} autoComplete="off" placeholder="0px" />
+        <TextField label="Links" value={l} onChange={(v) => emit(t, r, b, v)} autoComplete="off" placeholder="0px" />
       </div>
-    </div>
+    </BlockStack>
   );
 }
 
@@ -117,7 +153,9 @@ const CONTAINER_TYPES = [
   { type: "text_block",          label: "Text-Block",            description: "Überschrift, Fließtext (HTML) und optionaler Button" },
   { type: "image_text",          label: "Bild + Text",           description: "Bild links oder rechts, Text (HTML) daneben" },
   { type: "image_grid",          label: "Bild-Raster",           description: "2–4 Bilder nebeneinander mit Seitenverhältnis-Auswahl" },
+  { type: "content_mosaic",      label: "Inhalts-Mosaik",        description: "Bilder, Kollektionsprodukte oder Kollektionskarten — Zeilen/Spalten pro Desktop & Mobil frei (z. B. 1 oben, 2 unten)" },
   { type: "image_carousel",      label: "Bild-Karussell",        description: "Scrollbares Karussell mit eigenen Bildern (wie Produkt-Karussell)" },
+  { type: "video_block",         label: "Video",                 description: "Eingebettetes oder gehostetes Video (Desktop + Mobil, Datei-URL oder YouTube/Vimeo)" },
   { type: "banner_cta",          label: "CTA-Banner",            description: "Farbiger Banner mit Handlungsaufforderung und Positionierung" },
   { type: "collection_carousel", label: "Kollektion-Karussell",  description: "Produkte einer Kollektion als Karussell" },
   { type: "collections_carousel", label: "Kollektionen-Karussell", description: "Mehrere Kollektionen als anklickbare Karten nebeneinander" },
@@ -173,12 +211,44 @@ function newContainer(type) {
       return { ...base, image: "", title: "", body: "", btn_text: "", btn_url: "", image_side: "left", bg_color: "#ffffff", text_color: "#111827", text_align: "left", padding: "48px 24px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "image_grid":
       return { ...base, images: [{ url: "", link: "", aspect_ratio: "1/1" }, { url: "", link: "", aspect_ratio: "1/1" }], cols: 2, gap: 16, padding: "32px 24px", content_layout: "full" };
-    case "image_carousel":
-      return { ...base, title: "", images: [{ url: "", link: "", aspect_ratio: "4/5" }, { url: "", link: "", aspect_ratio: "4/5" }], items_per_row: 4, items_per_row_mobile: 2, gap: 16, padding: "32px 24px", content_layout: "full" };
+    case "content_mosaic":
+      return {
+        ...base,
+        title: "",
+        source: "images",
+        images: [{ url: "", link: "", aspect_ratio: "1/1", title: "", text: "" }],
+        collection_id: "",
+        collection_handle: "",
+        product_captions: "",
+        collections: [],
+        layout_pattern_desktop: "1,2",
+        layout_pattern_mobile: "1",
+        gap: 16,
+        gap_mobile: undefined,
+        card_aspect_ratio: "4/5",
+        card_image_object_fit: "cover",
+        bg_color: "#ffffff",
+        padding: "32px 24px",
+        content_layout: "full",
+      };
+    case "image_carousel": {
+      const emptySlide = {
+        url: "",
+        link: "",
+        title: "",
+        text: "",
+        aspect_ratio: "4/5",
+        aspect_ratio_custom: "",
+        aspect_ratio_mobile: "",
+        aspect_ratio_mobile_custom: "",
+        min_height_mobile: "",
+      };
+      return { ...base, title: "", images: [emptySlide, { ...emptySlide }], items_per_row: 4, items_per_row_mobile: 2, gap: 16, mobile_layout: "row", mobile_grid_rows: 2, mobile_grid_cols: 2, padding: "32px 24px", content_layout: "full" };
+    }
     case "banner_cta":
       return { ...base, title: "", subtitle: "", btn_text: "", btn_url: "", bg_color: "#ff971c", text_color: "#ffffff", text_position: "center", padding: "32px 48px 40px 48px", btn_bg: "#ffffff", btn_color: "#111827", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "collection_carousel":
-      return { ...base, title: "", collection_id: "", collection_handle: "", items_per_row: 4, items_per_row_mobile: 2, padding: "32px 24px", content_layout: "full" };
+      return { ...base, title: "", collection_id: "", collection_handle: "", product_captions: "", items_per_row: 4, items_per_row_mobile: 2, gap: 16, mobile_layout: "row", mobile_grid_rows: 2, mobile_grid_cols: 2, padding: "32px 24px", content_layout: "full" };
     case "collections_carousel":
       return {
         ...base,
@@ -186,6 +256,10 @@ function newContainer(type) {
         collections: [],
         items_per_row: 4,
         items_per_row_mobile: 2,
+        gap: 16,
+        mobile_layout: "row",
+        mobile_grid_rows: 2,
+        mobile_grid_cols: 2,
         padding: "32px 24px",
         card_aspect_ratio: "4/5",
         card_image_object_fit: "cover",
@@ -282,6 +356,29 @@ function newContainer(type) {
           { quote: "Endlich ein Online-Shop, dem man vertrauen kann. Tolle Auswahl und faire Preise.", author: "Julia M.", role: "Neukunde", avatar: "", rating: 4 },
         ],
       };
+    case "video_block":
+      return {
+        ...base,
+        title: "",
+        caption: "",
+        text_color: "#111827",
+        video_mode: "file",
+        video_url: "",
+        video_url_mobile: "",
+        embed_url: "",
+        embed_url_mobile: "",
+        poster_url: "",
+        poster_url_mobile: "",
+        aspect_ratio: "16/9",
+        autoplay: false,
+        muted: true,
+        loop: false,
+        controls: true,
+        playsinline: true,
+        bg_color: "#ffffff",
+        padding: "32px 24px",
+        content_layout: "full",
+      };
     default:
       return base;
   }
@@ -377,8 +474,7 @@ function HeroBannerEditor({ container, onChange }) {
                 <TextField label="Verzögerung (ms)" type="number" value={String(container.delay || 4000)} onChange={(v) => onChange({ ...container, delay: Number(v) || 4000 })} autoComplete="off" />
               </div>
             </InlineStack>
-            <PaddingEditor label="Außenabstand" value={container.padding || "0px 0px 0px 0px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="0px 0px 0px 0px" horizontalOnly />
-            <ContainerLayoutEditor container={container} onChange={onChange} />
+            <Text as="p" variant="bodySm" tone="subdued">Innenabstand der Sektion und Inhaltsbreite: rechte Spalte.</Text>
           </BlockStack>
         </BlockStack>
       </Card>
@@ -498,11 +594,7 @@ function TextBlockEditor({ container, onChange }) {
         <div style={{ flex: 1 }}>
           <ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} />
         </div>
-        <div style={{ flex: 1 }}>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
-        </div>
       </InlineStack>
-      <ContainerLayoutEditor container={container} onChange={onChange} />
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}>
           <ColorField label="Button-Hintergrund" value={container.btn_bg || "#ff971c"} onChange={(v) => onChange({ ...container, btn_bg: v })} />
@@ -551,11 +643,7 @@ function ImageTextEditor({ container, onChange }) {
         <div style={{ flex: 1 }}>
           <ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} />
         </div>
-        <div style={{ flex: 1 }}>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
-        </div>
       </InlineStack>
-      <ContainerLayoutEditor container={container} onChange={onChange} />
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}>
           <ColorField label="Button-Hintergrund" value={container.btn_bg || "#ff971c"} onChange={(v) => onChange({ ...container, btn_bg: v })} />
@@ -604,11 +692,7 @@ function ImageGridEditor({ container, onChange }) {
         <div style={{ flex: 1 }}>
           <TextField label="Abstand (px)" type="number" value={String(container.gap || 16)} onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })} autoComplete="off" />
         </div>
-        <div style={{ flex: 1 }}>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
-        </div>
       </InlineStack>
-      <ContainerLayoutEditor container={container} onChange={onChange} />
 
       {(container.images || []).map((img, idx) => (
         <Card key={idx}>
@@ -628,7 +712,14 @@ function ImageGridEditor({ container, onChange }) {
                 <Select label="Seitenverhältnis" options={ASPECT_RATIO_OPTIONS} value={img.aspect_ratio || "1/1"} onChange={(v) => updateImg(idx, "aspect_ratio", v)} />
               </div>
             </InlineStack>
-            <TextField label="Überschrift (optional)" value={img.title || ""} onChange={(v) => updateImg(idx, "title", v)} autoComplete="off" placeholder="z. B. Neuheiten" />
+            <TextField
+              label="Beschriftung unter dem Bild (optional)"
+              value={img.title || ""}
+              onChange={(v) => updateImg(idx, "title", v)}
+              autoComplete="off"
+              placeholder="z. B. Neuheiten"
+              helpText="Im Shop: klein und grau, direkt unter dem Bild"
+            />
             <RichTextEditor label="Text (optional)" value={img.text || ""} onChange={(v) => updateImg(idx, "text", v)} placeholder="Text eingeben…" minHeight="160px" />
           </BlockStack>
         </Card>
@@ -638,58 +729,514 @@ function ImageGridEditor({ container, onChange }) {
   );
 }
 
-// ── Image Carousel editor ───────────────────────────────────────────────────
-function ImageCarouselEditor({ container, onChange }) {
+const CONTENT_MOSAIC_SOURCE_OPTIONS = [
+  { label: "Eigene Bilder", value: "images" },
+  { label: "Produkte einer Kollektion", value: "collection" },
+  { label: "Kollektions-Karten (mehrere)", value: "collections" },
+];
+
+// ── Content-Mosaik: freies Zeilenmuster, Quelle wählbar ─────────────────────
+function ContentMosaicEditor({ container, onChange }) {
+  const client = getMedusaAdminClient();
   const [pickerIdx, setPickerIdx] = useState(null);
+  const [hubCollections, setHubCollections] = useState([]);
+  const [allCollections, setAllCollections] = useState([]);
+  const [addColId, setAddColId] = useState("");
+
+  const source = String(container.source || "images");
+
+  useEffect(() => {
+    if (source !== "collection") return;
+    client.request("/admin-hub/collections").then((r) => {
+      setHubCollections(Array.isArray(r?.collections) ? r.collections : []);
+    }).catch(() => {});
+  }, [client, source]);
+
+  useEffect(() => {
+    if (source !== "collections") return;
+    client.getMedusaCollections({ adminHub: true })
+      .then((r) => {
+        setAllCollections(Array.isArray(r?.collections) ? r.collections : []);
+      })
+      .catch(() => {});
+  }, [client, source]);
+
+  const colOptions = [
+    { label: "— Kollektion wählen —", value: "" },
+    ...hubCollections.map((c) => ({ label: c.title || c.handle || c.id, value: c.id })),
+  ];
+
+  const chosen = Array.isArray(container.collections) ? container.collections : [];
+  const addCollectionOptions = [
+    { label: "— Kollektion hinzufügen —", value: "" },
+    ...allCollections
+      .filter((c) => !chosen.some((entry) => entry.id === c.id))
+      .map((c) => ({ label: c.title || c.handle || c.id, value: c.id })),
+  ];
+
+  const addCollection = (id) => {
+    if (!id) return;
+    const col = allCollections.find((c) => c.id === id);
+    if (!col) return;
+    onChange({
+      ...container,
+      collections: [
+        ...chosen,
+        {
+          id: col.id,
+          title: col.title || "",
+          handle: col.handle || "",
+          image: col.image_url || col.image || col.thumbnail || "",
+          item_heading: "",
+        },
+      ],
+    });
+    setAddColId("");
+  };
+
+  const removeCollection = (id) => {
+    onChange({ ...container, collections: chosen.filter((entry) => entry.id !== id) });
+  };
+
+  const moveCollection = (idx, direction) => {
+    const nextIdx = idx + direction;
+    if (nextIdx < 0 || nextIdx >= chosen.length) return;
+    const next = [...chosen];
+    [next[idx], next[nextIdx]] = [next[nextIdx], next[idx]];
+    onChange({ ...container, collections: next });
+  };
+
+  const updateMosaicCollectionEntry = (idx, key, val) => {
+    const next = chosen.map((e, i) => (i === idx ? { ...e, [key]: val } : e));
+    onChange({ ...container, collections: next });
+  };
+
   const updateImg = (idx, key, val) => {
     const images = [...(container.images || [])];
     images[idx] = { ...images[idx], [key]: val };
     onChange({ ...container, images });
   };
-  const addImg = () => onChange({ ...container, images: [...(container.images || []), { url: "", link: "", aspect_ratio: "4/5" }] });
+  const addImg = () => onChange({ ...container, images: [...(container.images || []), { url: "", link: "", aspect_ratio: "1/1", title: "", text: "" }] });
   const removeImg = (idx) => onChange({ ...container, images: (container.images || []).filter((_, i) => i !== idx) });
+
+  const aspectValue = (() => {
+    const raw = String(container.card_aspect_ratio || "4/5").trim().replace(/:/g, "/");
+    const ok = COLLECTIONS_CAROUSEL_ASPECT_OPTIONS.some((o) => o.value === raw);
+    return ok ? raw : "4/5";
+  })();
 
   return (
     <BlockStack gap="400">
       {pickerIdx !== null && (
         <MediaPickerModal open multiple={false} onClose={() => setPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateImg(pickerIdx, "url", urls[0]); setPickerIdx(null); }} />
       )}
-      <TextField label="Titel (optional)" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" placeholder="z. B. Unsere Kollektionen" />
-      <InlineStack gap="400" wrap={false}>
-        <div style={{ flex: 1 }}>
-          <TextField label="Bilder pro Zeile (Desktop)" type="number" value={String(container.items_per_row || 4)} onChange={(v) => onChange({ ...container, items_per_row: Number(v) || 4 })} autoComplete="off" />
-        </div>
-        <div style={{ flex: 1 }}>
-          <TextField label="Bilder pro Zeile (Mobil)" type="number" value={String(container.items_per_row_mobile || 2)} onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) || 2 })} autoComplete="off" />
-        </div>
-        <div style={{ flex: 1 }}>
-          <TextField label="Abstand (px)" type="number" value={String(container.gap || 16)} onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })} autoComplete="off" />
-        </div>
-      </InlineStack>
-      <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
-      <ContainerLayoutEditor container={container} onChange={onChange} />
-      {(container.images || []).map((img, idx) => (
-        <Card key={idx}>
+
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">Inhalts-Mosaik</Text>
+          <Text as="p" variant="bodySm" tone="subdued">
+            Zeilenaufbau: Zahlen = Spalten pro Zeile, durch Komma getrennt, wiederholt (z. B. 1,2 = eine volle Zeile, dann zwei nebeneinander). Desktop &amp; Mobil getrennt einstellbar.
+          </Text>
+          <TextField label="Überschrift (optional)" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
+          <ColorField label="Hintergrundfarbe" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} />
+          <Select
+            label="Inhalt"
+            options={CONTENT_MOSAIC_SOURCE_OPTIONS}
+            value={source}
+            onChange={(v) => onChange({ ...container, source: v })}
+          />
+        </BlockStack>
+      </Card>
+
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">Raster (Shop)</Text>
+          <TextField
+            label="Muster Desktop"
+            value={String(container.layout_pattern_desktop || "1,2")}
+            onChange={(v) => onChange({ ...container, layout_pattern_desktop: v })}
+            autoComplete="off"
+            helpText="Z. B. 1,2,2"
+          />
+          <TextField
+            label="Muster Mobil (≤1023px)"
+            value={String(container.layout_pattern_mobile || "1")}
+            onChange={(v) => onChange({ ...container, layout_pattern_mobile: v })}
+            autoComplete="off"
+            helpText="Eigene Werte, z. B. 1 für eine Spalte oder 2,2"
+          />
+          <div style={EDITOR_FIELD_GRID}>
+            <TextField label="Abstand (px)" type="number" value={String(container.gap ?? 16)} onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })} autoComplete="off" />
+            <TextField
+              label="Abstand nur Mobil (px, optional)"
+              type="number"
+              value={String(container.gap_mobile ?? "")}
+              onChange={(v) => {
+                const t = (v || "").trim();
+                if (t === "") onChange({ ...container, gap_mobile: undefined });
+                else onChange({ ...container, gap_mobile: Number(v) || 0 });
+              }}
+              autoComplete="off"
+              helpText="Leer = wie Abstand (Desktop)"
+            />
+          </div>
+        </BlockStack>
+      </Card>
+
+      {source === "images" && (
+        <>
+          {(container.images || []).map((img, idx) => (
+            <Card key={idx}>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h3" variant="headingSm">Bild {idx + 1}</Text>
+                  {(container.images || []).length > 1 && (
+                    <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
+                  )}
+                </InlineStack>
+                <ImageField value={img.url} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
+                <InlineStack gap="400" wrap={false}>
+                  <div style={{ flex: 1 }}>
+                    <TextField label="Link-URL (optional)" value={img.link || ""} onChange={(v) => updateImg(idx, "link", v)} placeholder="https://…" autoComplete="off" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <Select label="Seitenverhältnis" options={ASPECT_RATIO_OPTIONS} value={img.aspect_ratio || "1/1"} onChange={(v) => updateImg(idx, "aspect_ratio", v)} />
+                  </div>
+                </InlineStack>
+                <TextField
+                  label="Beschriftung unter dem Bild (optional)"
+                  value={img.title || ""}
+                  onChange={(v) => updateImg(idx, "title", v)}
+                  autoComplete="off"
+                  helpText="Im Shop: klein und grau, direkt unter dem Bild"
+                />
+                <RichTextEditor label="Text (optional)" value={img.text || ""} onChange={(v) => updateImg(idx, "text", v)} placeholder="Text eingeben…" minHeight="120px" />
+              </BlockStack>
+            </Card>
+          ))}
+          <Button onClick={addImg}>+ Bild hinzufügen</Button>
+        </>
+      )}
+
+      {source === "collection" && (
+        <Card>
           <BlockStack gap="300">
-            <InlineStack align="space-between" blockAlign="center">
-              <Text as="h3" variant="headingSm">Bild {idx + 1}</Text>
-              {(container.images || []).length > 1 && (
-                <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
-              )}
-            </InlineStack>
-            <ImageField value={img.url} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
-            <InlineStack gap="400" wrap={false}>
-              <div style={{ flex: 1 }}>
-                <TextField label="Link-URL (optional)" value={img.link || ""} onChange={(v) => updateImg(idx, "link", v)} placeholder="https://…" autoComplete="off" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <Select label="Seitenverhältnis" options={ASPECT_RATIO_OPTIONS} value={img.aspect_ratio || "4/5"} onChange={(v) => updateImg(idx, "aspect_ratio", v)} />
-              </div>
-            </InlineStack>
+            <Text as="h3" variant="headingSm">Kollektion (Produktkarten)</Text>
+            <Text as="p" variant="bodySm" tone="subdued">Bis zu 100 Produkte, Darstellung richtet sich nach Ihrem Muster.</Text>
+            <Select
+              label="Kollektion"
+              options={colOptions}
+              value={container.collection_id || ""}
+              onChange={(id) => {
+                const col = hubCollections.find((c) => c.id === id);
+                onChange({ ...container, collection_id: id, collection_handle: col?.handle || "" });
+              }}
+            />
+            <TextField
+              label="Produkt-Beschriftungen (optional)"
+              value={String(container.product_captions || "")}
+              onChange={(v) => onChange({ ...container, product_captions: v })}
+              multiline={5}
+              autoComplete="off"
+              helpText="Eine dünne Zeile unter jeder Karte, in der gleichen Reihenfolge wie die Produkte: eine Zeile = erstes Produkt, zweite Zeile = zweites Produkt … Leerzeilen = kein Text."
+            />
           </BlockStack>
         </Card>
-      ))}
-      <Button onClick={addImg}>+ Bild hinzufügen</Button>
+      )}
+
+      {source === "collections" && (
+        <BlockStack gap="400">
+          <BlockStack gap="200">
+            <Text as="h3" variant="headingSm">Kollektions-Karten</Text>
+            <Select
+              label="Kollektion hinzufügen"
+              options={addCollectionOptions}
+              value={addColId}
+              onChange={(id) => {
+                setAddColId(id);
+                addCollection(id);
+              }}
+            />
+            <div style={EDITOR_FIELD_GRID}>
+              <Select
+                label="Seitenverhältnis (Karten)"
+                options={COLLECTIONS_CAROUSEL_ASPECT_OPTIONS}
+                value={aspectValue}
+                onChange={(v) => onChange({ ...container, card_aspect_ratio: v })}
+              />
+              <Select
+                label="Bild im Rahmen"
+                options={COLLECTIONS_CAROUSEL_OBJECT_FIT_OPTIONS}
+                value={container.card_image_object_fit === "contain" ? "contain" : "cover"}
+                onChange={(v) => onChange({ ...container, card_image_object_fit: v })}
+              />
+            </div>
+          </BlockStack>
+          {chosen.length === 0 ? (
+            <Card>
+              <Box padding="400">
+                <Text as="p" tone="subdued">Noch keine Kollektionen.</Text>
+              </Box>
+            </Card>
+          ) : (
+            chosen.map((entry, idx) => (
+              <Card key={entry.id || idx}>
+                <BlockStack gap="300">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <BlockStack gap="100">
+                      <Text as="h3" variant="headingSm">{entry.title || entry.handle || `Kollektion ${idx + 1}`}</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">/{entry.handle || "ohne-handle"}</Text>
+                    </BlockStack>
+                    <InlineStack gap="200">
+                      <Button size="slim" disabled={idx === 0} onClick={() => moveCollection(idx, -1)}>Nach oben</Button>
+                      <Button size="slim" disabled={idx === chosen.length - 1} onClick={() => moveCollection(idx, 1)}>Nach unten</Button>
+                      <Button size="slim" tone="critical" onClick={() => removeCollection(entry.id)}>Entfernen</Button>
+                    </InlineStack>
+                  </InlineStack>
+                  <TextField
+                    label="Beschriftung unter der Karte (optional)"
+                    value={entry.item_heading != null ? String(entry.item_heading) : ""}
+                    onChange={(v) => updateMosaicCollectionEntry(idx, "item_heading", v)}
+                    autoComplete="off"
+                    helpText="Im Shop: klein und grau, unter der Karte (nicht im Banner)"
+                  />
+                </BlockStack>
+              </Card>
+            ))
+          )}
+        </BlockStack>
+      )}
+    </BlockStack>
+  );
+}
+
+// Bild-Karussell — gleiche Seitenverhältnis-Auswahl wie Kollektions-Karussell, plus manuelle Mobile-Werte
+const IMAGE_CAROUSEL_ASPECT_OPTIONS = [
+  { label: "Hoch — 4:5 (Standard)", value: "4/5" },
+  { label: "Hoch — 3:4", value: "3/4" },
+  { label: "Hoch — 2:3", value: "2/3" },
+  { label: "Quadrat — 1:1", value: "1/1" },
+  { label: "Quer — 4:3", value: "4/3" },
+  { label: "Quer — 3:2", value: "3/2" },
+  { label: "Quer — 16:9 (breit)", value: "16/9" },
+  { label: "Quer — 21:9 (Cinematic)", value: "21/9" },
+  { label: "Sehr hoch (9:20)", value: "9/20" },
+  { label: "Sehr hoch (1:2)", value: "1/2" },
+];
+const MOBILE_ASPECT_LIKE_DESKTOP = [{ label: "Wie Desktop", value: "" }, ...IMAGE_CAROUSEL_ASPECT_OPTIONS];
+
+/** Shop ≤1023px: eine Zeile vs. Raster pro „Seite“ (nach rechts wischen) */
+const LANDING_MOBILE_CAROUSEL_LAYOUT = [
+  { label: "Eine Zeile wischen (klassisch)", value: "row" },
+  { label: "Raster: Spalten×Zeilen, seitlich wischen", value: "grid" },
+];
+const MOBILE_GRID_DIM_OPTIONS = [1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }));
+
+// ── Image Carousel editor ───────────────────────────────────────────────────
+function ImageCarouselEditor({ container, onChange }) {
+  const [pickerIdx, setPickerIdx] = useState(null);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const images = container.images || [];
+  const n = images.length;
+  const safeIdx = n ? Math.min(Math.max(0, selectedIdx), n - 1) : 0;
+
+  useEffect(() => {
+    if (n === 0) {
+      if (selectedIdx !== 0) setSelectedIdx(0);
+    } else if (selectedIdx > n - 1) {
+      setSelectedIdx(n - 1);
+    }
+  }, [n, selectedIdx]);
+
+  const updateImg = (idx, key, val) => {
+    const next = [...(container.images || [])];
+    next[idx] = { ...next[idx], [key]: val };
+    onChange({ ...container, images: next });
+  };
+  const newSlide = () => ({
+    url: "",
+    link: "",
+    title: "",
+    text: "",
+    aspect_ratio: "4/5",
+    aspect_ratio_custom: "",
+    aspect_ratio_mobile: "",
+    aspect_ratio_mobile_custom: "",
+    min_height_mobile: "",
+  });
+  const addImg = () => {
+    const list = [...(container.images || []), newSlide()];
+    onChange({ ...container, images: list });
+    setSelectedIdx(list.length - 1);
+  };
+  const removeImg = (idx) => {
+    const next = (container.images || []).filter((_, i) => i !== idx);
+    onChange({ ...container, images: next });
+    setSelectedIdx((cur) => {
+      if (next.length === 0) return 0;
+      if (idx < cur) return cur - 1;
+      if (idx === cur) return Math.min(cur, next.length - 1);
+      return cur;
+    });
+  };
+
+  const img = n ? images[safeIdx] : null;
+  const idx = safeIdx;
+
+  return (
+    <BlockStack gap="400">
+      {pickerIdx !== null && (
+        <MediaPickerModal open multiple={false} onClose={() => setPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateImg(pickerIdx, "url", urls[0]); setPickerIdx(null); }} />
+      )}
+
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 20, width: "100%" }}>
+        <Card>
+          <BlockStack gap="300">
+            <Text as="h3" variant="headingSm">Bilder &amp; Raster</Text>
+            <Text as="p" variant="bodySm" tone="subdued">Links Eintrag wählen, rechts Anzeige. Sektion-Abstand: rechte Spalte (alle Container).</Text>
+            <TextField label="Abschnitt-Titel (optional)" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" placeholder="z. B. Unsere Kollektionen" />
+            <div style={EDITOR_FIELD_GRID}>
+              <TextField label="Bilder pro Zeile (Desktop)" type="number" value={String(container.items_per_row || 4)} onChange={(v) => onChange({ ...container, items_per_row: Number(v) || 4 })} autoComplete="off" />
+              <TextField label="Bilder pro Zeile (Mobil)" type="number" value={String(container.items_per_row_mobile || 2)} onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) || 2 })} autoComplete="off" />
+              <TextField label="Abstand Bilder (px)" type="number" value={String(container.gap || 16)} onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })} autoComplete="off" />
+              <TextField
+                label="Abstand nur Mobil (px, optional)"
+                type="number"
+                value={String(container.gap_mobile ?? "")}
+                onChange={(v) => {
+                  const t = (v || "").trim();
+                  if (t === "") onChange({ ...container, gap_mobile: undefined });
+                  else onChange({ ...container, gap_mobile: Number(v) || 0 });
+                }}
+                autoComplete="off"
+                helpText="Leer = wie „Abstand Bilder“"
+              />
+            </div>
+            <Divider />
+            <Text as="h3" variant="headingSm">Mobil (≤1023px) — Shop</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Raster: sichtbar = Spalten×Zeilen pro Seite, bei mehr Inhalt nach links/rechts wischen. Eine Zeile: wie bisher, „Bilder pro Zeile (Mobil)“ steuert die Breite.
+            </Text>
+            <div style={EDITOR_FIELD_GRID}>
+              <Select
+                label="Darstellung"
+                options={LANDING_MOBILE_CAROUSEL_LAYOUT}
+                value={container.mobile_layout === "grid" ? "grid" : "row"}
+                onChange={(v) => onChange({ ...container, mobile_layout: v === "grid" ? "grid" : "row" })}
+              />
+              <Select
+                label="Raster: Spalten (Mobil)"
+                options={MOBILE_GRID_DIM_OPTIONS}
+                value={String(Math.min(4, Math.max(1, Math.round(Number(container.mobile_grid_cols)) || 2)))}
+                onChange={(v) => onChange({ ...container, mobile_grid_cols: Number(v) })}
+                disabled={container.mobile_layout !== "grid"}
+              />
+              <Select
+                label="Raster: Zeilen (Mobil)"
+                options={MOBILE_GRID_DIM_OPTIONS}
+                value={String(Math.min(4, Math.max(1, Math.round(Number(container.mobile_grid_rows)) || 2)))}
+                onChange={(v) => onChange({ ...container, mobile_grid_rows: Number(v) })}
+                disabled={container.mobile_layout !== "grid"}
+              />
+            </div>
+            <Text as="p" variant="bodyMd" fontWeight="semibold">Bilder</Text>
+            {n === 0 ? (
+              <Text as="p" tone="subdued" variant="bodySm">Noch kein Bild — unten hinzufügen.</Text>
+            ) : (
+              <BlockStack gap="150">
+                {images.map((s, i) => (
+                  <Button
+                    key={i}
+                    fullWidth
+                    size="slim"
+                    variant={i === safeIdx ? "primary" : "secondary"}
+                    onClick={() => setSelectedIdx(i)}
+                  >
+                    {`Bild ${i + 1}${s.url ? " · Medien" : ""}`}
+                  </Button>
+                ))}
+              </BlockStack>
+            )}
+            <Button onClick={addImg}>+ Bild hinzufügen</Button>
+          </BlockStack>
+        </Card>
+
+        <Card>
+          {img == null ? (
+            <Box padding="400">
+              <Text as="p" tone="subdued" variant="bodySm">Bilder links hinzufügen, dann erscheint die Anzeige hier.</Text>
+            </Box>
+          ) : (
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h3" variant="headingSm">Darstellung · Bild {idx + 1}</Text>
+                {n > 1 && (
+                  <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
+                )}
+              </InlineStack>
+              <ImageField value={img.url} onPick={() => { setSelectedIdx(idx); setPickerIdx(idx); }} onClear={() => updateImg(idx, "url", "")} />
+              <TextField
+                label="Link (optional)"
+                value={img.link || ""}
+                onChange={(v) => updateImg(idx, "link", v)}
+                placeholder="https://…"
+                autoComplete="off"
+              />
+              <TextField
+                label="Beschriftung unter dem Bild (optional)"
+                value={img.title || ""}
+                onChange={(v) => updateImg(idx, "title", v)}
+                autoComplete="off"
+                helpText="Im Shop: klein und grau, direkt unter dem Bild"
+              />
+              <RichTextEditor
+                label="Text (optional)"
+                value={img.text || ""}
+                onChange={(v) => updateImg(idx, "text", v)}
+                placeholder="Text eingeben…"
+                minHeight="120px"
+              />
+              <Divider />
+              <Text as="p" variant="bodySm" fontWeight="semibold">Desktop (≥1024px)</Text>
+              <div style={EDITOR_FIELD_GRID}>
+                <Select label="Seitenverhältnis" options={IMAGE_CAROUSEL_ASPECT_OPTIONS} value={img.aspect_ratio || "4/5"} onChange={(v) => updateImg(idx, "aspect_ratio", v)} />
+                <TextField
+                  label="Manuell statt Liste (optional)"
+                  value={img.aspect_ratio_custom != null ? String(img.aspect_ratio_custom) : ""}
+                  onChange={(v) => updateImg(idx, "aspect_ratio_custom", v)}
+                  autoComplete="off"
+                  placeholder="z. B. 9/16"
+                />
+              </div>
+              <Divider />
+              <Text as="p" variant="bodySm" fontWeight="semibold">Mobil (≤1023px)</Text>
+              <div style={EDITOR_FIELD_GRID}>
+                <Select
+                  label="Seitenverhältnis"
+                  options={MOBILE_ASPECT_LIKE_DESKTOP}
+                  value={img.aspect_ratio_mobile != null && img.aspect_ratio_mobile !== "" ? img.aspect_ratio_mobile : ""}
+                  onChange={(v) => updateImg(idx, "aspect_ratio_mobile", v)}
+                />
+                <TextField
+                  label="Manuell (optional)"
+                  value={img.aspect_ratio_mobile_custom != null ? String(img.aspect_ratio_mobile_custom) : ""}
+                  onChange={(v) => updateImg(idx, "aspect_ratio_mobile_custom", v)}
+                  autoComplete="off"
+                  placeholder="z. B. 9/20"
+                />
+                <TextField
+                  label="Mindesthöhe (optional)"
+                  value={img.min_height_mobile != null ? String(img.min_height_mobile) : ""}
+                  onChange={(v) => updateImg(idx, "min_height_mobile", v)}
+                  autoComplete="off"
+                  placeholder="220px"
+                  helpText="Nur Mobil"
+                />
+              </div>
+            </BlockStack>
+          )}
+        </Card>
+      </div>
     </BlockStack>
   );
 }
@@ -719,29 +1266,13 @@ function BannerCtaEditor({ container, onChange }) {
           <ColorField label="Textfarbe" value={container.text_color || "#ffffff"} onChange={(v) => onChange({ ...container, text_color: v })} />
         </div>
       </InlineStack>
-      <Card>
-        <BlockStack gap="300">
-          <Text as="span" variant="bodySm" tone="subdued">
-            Innenabstand: oben/unten = Abstand Text/Button zum Banner-Rand; links/rechts = seitlich. Außenabstand zwischen Containern weiter unter „Außenabstand (Margin)“.
-          </Text>
-          <PaddingEditor label="Innenabstand (Padding)" value={container.padding || "32px 48px 40px 48px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 48px 40px 48px" />
-          <ContainerLayoutEditor container={container} onChange={onChange} />
-        </BlockStack>
-      </Card>
-      <InlineStack gap="400" wrap={false}>
-        <div style={{ flex: 1 }}>
-          <ColorField label="Button-Hintergrund" value={container.btn_bg || "#ffffff"} onChange={(v) => onChange({ ...container, btn_bg: v })} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <ColorField label="Button-Textfarbe" value={container.btn_color || "#111827"} onChange={(v) => onChange({ ...container, btn_color: v })} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <TextField label="Button-Rahmen" value={container.btn_border || "2px solid #000"} onChange={(v) => onChange({ ...container, btn_border: v })} autoComplete="off" />
-        </div>
-        <div style={{ flex: 1 }}>
-          <TextField label="Button-Radius (px)" value={String(container.btn_radius ?? 8)} onChange={(v) => onChange({ ...container, btn_radius: Number(v) || 0 })} autoComplete="off" />
-        </div>
-      </InlineStack>
+      <Text as="p" variant="bodySm" tone="subdued">CTA-Banner: Innenabstand (4 Seiten) und Abstand zu anderen Sektionen in der rechten Spalte.</Text>
+      <div style={EDITOR_FIELD_GRID}>
+        <ColorField label="Button-Hintergrund" value={container.btn_bg || "#ffffff"} onChange={(v) => onChange({ ...container, btn_bg: v })} />
+        <ColorField label="Button-Textfarbe" value={container.btn_color || "#111827"} onChange={(v) => onChange({ ...container, btn_color: v })} />
+        <TextField label="Button-Rahmen (CSS)" value={container.btn_border || "2px solid #000"} onChange={(v) => onChange({ ...container, btn_border: v })} autoComplete="off" />
+        <TextField label="Button-Radius (px)" value={String(container.btn_radius ?? 8)} onChange={(v) => onChange({ ...container, btn_radius: Number(v) || 0 })} autoComplete="off" />
+      </div>
     </BlockStack>
   );
 }
@@ -774,28 +1305,72 @@ function CollectionCarouselEditor({ container, onChange }) {
           onChange({ ...container, collection_id: id, collection_handle: col?.handle || "" });
         }}
       />
-      <InlineStack gap="400" wrap={false}>
-        <div style={{ flex: 1 }}>
-          <Select
-            label="Produkte pro Reihe (Desktop)"
-            options={[2, 3, 4, 5, 6].map((n) => ({ label: String(n), value: String(n) }))}
-            value={String(container.items_per_row || 4)}
-            onChange={(v) => onChange({ ...container, items_per_row: Number(v) })}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <Select
-            label="Produkte sichtbar (Mobil, ≤1023px)"
-            options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
-            value={String(container.items_per_row_mobile ?? 2)}
-            onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) })}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
-        </div>
-      </InlineStack>
-      <ContainerLayoutEditor container={container} onChange={onChange} />
+      <TextField
+        label="Produkt-Beschriftungen (optional)"
+        value={String(container.product_captions || "")}
+        onChange={(v) => onChange({ ...container, product_captions: v })}
+        multiline={5}
+        autoComplete="off"
+        helpText="Eine dünne Zeile pro Produkt in Kollektions-Reihenfolge (eine Zeile = erstes Produkt, …). Leerzeile = kein Text."
+      />
+      <div style={EDITOR_FIELD_GRID}>
+        <Select
+          label="Produkte pro Reihe (Desktop)"
+          options={[2, 3, 4, 5, 6].map((n) => ({ label: String(n), value: String(n) }))}
+          value={String(container.items_per_row || 4)}
+          onChange={(v) => onChange({ ...container, items_per_row: Number(v) })}
+        />
+        <Select
+          label="Produkte sichtbar (Mobil)"
+          options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+          value={String(container.items_per_row_mobile ?? 2)}
+          onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) })}
+        />
+        <TextField
+          label="Abstand Karten (px)"
+          type="number"
+          value={String(container.gap ?? 16)}
+          onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })}
+          autoComplete="off"
+        />
+        <TextField
+          label="Abstand nur Mobil (px, optional)"
+          type="number"
+          value={String(container.gap_mobile ?? "")}
+          onChange={(v) => {
+            const t = (v || "").trim();
+            if (t === "") onChange({ ...container, gap_mobile: undefined });
+            else onChange({ ...container, gap_mobile: Number(v) || 0 });
+          }}
+          autoComplete="off"
+          helpText="Wie Bild-Karussell: leer = gleiche wie „Abstand Karten“"
+        />
+      </div>
+      <Divider />
+      <Text as="h3" variant="headingSm">Mobil (≤1023px)</Text>
+      <Text as="p" variant="bodySm" tone="subdued">Raster: Spalten×Zeilen pro sichtbarer Seite, weiter wischen. Eine Zeile: „Produkte sichtbar (Mobil)“ zählt.</Text>
+      <div style={EDITOR_FIELD_GRID}>
+        <Select
+          label="Darstellung"
+          options={LANDING_MOBILE_CAROUSEL_LAYOUT}
+          value={container.mobile_layout === "grid" ? "grid" : "row"}
+          onChange={(v) => onChange({ ...container, mobile_layout: v === "grid" ? "grid" : "row" })}
+        />
+        <Select
+          label="Raster: Spalten"
+          options={MOBILE_GRID_DIM_OPTIONS}
+          value={String(Math.min(4, Math.max(1, Math.round(Number(container.mobile_grid_cols)) || 2)))}
+          onChange={(v) => onChange({ ...container, mobile_grid_cols: Number(v) })}
+          disabled={container.mobile_layout !== "grid"}
+        />
+        <Select
+          label="Raster: Zeilen"
+          options={MOBILE_GRID_DIM_OPTIONS}
+          value={String(Math.min(4, Math.max(1, Math.round(Number(container.mobile_grid_rows)) || 2)))}
+          onChange={(v) => onChange({ ...container, mobile_grid_rows: Number(v) })}
+          disabled={container.mobile_layout !== "grid"}
+        />
+      </div>
     </BlockStack>
   );
 }
@@ -834,6 +1409,7 @@ function CollectionsCarouselEditor({ container, onChange }) {
           title: col.title || "",
           handle: col.handle || "",
           image: col.image_url || col.image || col.thumbnail || "",
+          item_heading: "",
         },
       ],
     });
@@ -852,6 +1428,11 @@ function CollectionsCarouselEditor({ container, onChange }) {
     if (nextIdx < 0 || nextIdx >= chosen.length) return;
     const next = [...chosen];
     [next[idx], next[nextIdx]] = [next[nextIdx], next[idx]];
+    onChange({ ...container, collections: next });
+  };
+
+  const updateListCollectionEntry = (idx, key, val) => {
+    const next = chosen.map((e, i) => (i === idx ? { ...e, [key]: val } : e));
     onChange({ ...container, collections: next });
   };
 
@@ -890,10 +1471,53 @@ function CollectionsCarouselEditor({ container, onChange }) {
             onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) })}
           />
         </div>
-        <div style={{ flex: "1 1 200px", minWidth: 160 }}>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "32px 24px 32px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="32px 24px 32px 24px" horizontalOnly />
-        </div>
       </InlineStack>
+      <div style={EDITOR_FIELD_GRID}>
+        <TextField
+          label="Abstand Karten (px)"
+          type="number"
+          value={String(container.gap ?? 16)}
+          onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })}
+          autoComplete="off"
+        />
+        <TextField
+          label="Abstand nur Mobil (px, optional)"
+          type="number"
+          value={String(container.gap_mobile ?? "")}
+          onChange={(v) => {
+            const t = (v || "").trim();
+            if (t === "") onChange({ ...container, gap_mobile: undefined });
+            else onChange({ ...container, gap_mobile: Number(v) || 0 });
+          }}
+          autoComplete="off"
+          helpText="Leer = wie „Abstand Karten“ (gleich wie Bild-Karussell)"
+        />
+      </div>
+      <Divider />
+      <Text as="h3" variant="headingSm">Mobil (≤1023px)</Text>
+      <Text as="p" variant="bodySm" tone="subdued">Raster: Spalten×Zeilen sichtbar, bei mehr Inhalt wischen. Eine Zeile: „Karten sichtbar (Mobil)“ zählt.</Text>
+      <div style={EDITOR_FIELD_GRID}>
+        <Select
+          label="Darstellung"
+          options={LANDING_MOBILE_CAROUSEL_LAYOUT}
+          value={container.mobile_layout === "grid" ? "grid" : "row"}
+          onChange={(v) => onChange({ ...container, mobile_layout: v === "grid" ? "grid" : "row" })}
+        />
+        <Select
+          label="Raster: Spalten"
+          options={MOBILE_GRID_DIM_OPTIONS}
+          value={String(Math.min(4, Math.max(1, Math.round(Number(container.mobile_grid_cols)) || 2)))}
+          onChange={(v) => onChange({ ...container, mobile_grid_cols: Number(v) })}
+          disabled={container.mobile_layout !== "grid"}
+        />
+        <Select
+          label="Raster: Zeilen"
+          options={MOBILE_GRID_DIM_OPTIONS}
+          value={String(Math.min(4, Math.max(1, Math.round(Number(container.mobile_grid_rows)) || 2)))}
+          onChange={(v) => onChange({ ...container, mobile_grid_rows: Number(v) })}
+          disabled={container.mobile_layout !== "grid"}
+        />
+      </div>
       <BlockStack gap="200">
         <Text as="h3" variant="headingSm">Darstellung der Kollektions-Karten</Text>
         <Text as="p" variant="bodySm" tone="subdued">
@@ -912,7 +1536,6 @@ function CollectionsCarouselEditor({ container, onChange }) {
           onChange={(v) => onChange({ ...container, card_image_object_fit: v })}
         />
       </BlockStack>
-      <ContainerLayoutEditor container={container} onChange={onChange} />
 
       {chosen.length === 0 ? (
         <Card>
@@ -934,6 +1557,13 @@ function CollectionsCarouselEditor({ container, onChange }) {
                 <Button size="slim" tone="critical" onClick={() => removeCollection(entry.id)}>Entfernen</Button>
               </InlineStack>
             </InlineStack>
+            <TextField
+              label="Beschriftung unter der Karte (optional)"
+              value={entry.item_heading != null ? String(entry.item_heading) : ""}
+              onChange={(v) => updateListCollectionEntry(idx, "item_heading", v)}
+              autoComplete="off"
+              helpText="Im Shop: klein und grau, direkt unter der Karte"
+            />
           </BlockStack>
         </Card>
       ))}
@@ -972,8 +1602,6 @@ function AccordionEditor({ container, onChange }) {
             <div style={{ flex: 1 }}><ColorField label="Rahmenfarbe" value={container.border_color || "#e5e7eb"} onChange={(v) => onChange({ ...container, border_color: v })} /></div>
             <div style={{ flex: 1 }}><ColorField label="Icon-Farbe (+/−)" value={container.icon_color || "#111827"} onChange={(v) => onChange({ ...container, icon_color: v })} /></div>
           </InlineStack>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
-          <ContainerLayoutEditor container={container} onChange={onChange} />
         </BlockStack>
       </Card>
 
@@ -1050,9 +1678,7 @@ function TabsEditor({ container, onChange }) {
           <InlineStack gap="400" wrap={false}>
             <div style={{ flex: 1 }}><ColorField label="Seiten-Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
             <div style={{ flex: 1 }}><ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
-            <div style={{ flex: 1 }}><PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly /></div>
           </InlineStack>
-          <ContainerLayoutEditor container={container} onChange={onChange} />
         </BlockStack>
       </Card>
 
@@ -1123,11 +1749,7 @@ function SingleProductEditor({ container, onChange }) {
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}><ColorField label="Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
         <div style={{ flex: 1 }}><ColorField label="Titelfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
-        <div style={{ flex: 1 }}>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
-        </div>
       </InlineStack>
-      <ContainerLayoutEditor container={container} onChange={onChange} />
     </BlockStack>
   );
 }
@@ -1190,30 +1812,22 @@ function BlogCarouselEditor({ container, onChange }) {
             Beiträge unter „Content → Blog-Beiträge“ anlegen (Typ „Blog“, Bild, Teaser, Text, SEO). Nur veröffentlichte Beiträge erscheinen im Shop.
           </Text>
           <TextField label="Abschnitt-Titel" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
-          <InlineStack gap="400" wrap={false}>
-            <div style={{ flex: 1 }}>
-              <Select
-                label="Karten pro Reihe (Desktop)"
-                options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
-                value={String(container.items_per_row || 3)}
-                onChange={(v) => onChange({ ...container, items_per_row: Number(v) })}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <Select
-                label="Karten sichtbar (Mobil, ≤1023px)"
-                options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
-                value={String(container.items_per_row_mobile ?? 1)}
-                onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) })}
-              />
-            </div>
-            <div style={{ flex: 1 }}><ColorField label="Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
-            <div style={{ flex: 1 }}><ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
-            <div style={{ flex: 1 }}>
-              <PaddingEditor label="Seitenabstand" value={container.padding || "40px 24px 40px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="40px 24px 40px 24px" horizontalOnly />
-            </div>
-          </InlineStack>
-          <ContainerLayoutEditor container={container} onChange={onChange} />
+          <div style={EDITOR_FIELD_GRID}>
+            <Select
+              label="Karten pro Reihe (Desktop)"
+              options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+              value={String(container.items_per_row || 3)}
+              onChange={(v) => onChange({ ...container, items_per_row: Number(v) })}
+            />
+            <Select
+              label="Karten sichtbar (Mobil)"
+              options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+              value={String(container.items_per_row_mobile ?? 1)}
+              onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) })}
+            />
+            <ColorField label="Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} />
+            <ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} />
+          </div>
         </BlockStack>
       </Card>
 
@@ -1321,8 +1935,6 @@ function NewsletterEditor({ container, onChange }) {
         <div style={{ flex: 1 }}><ColorField label="Button-Hintergrund" value={container.btn_bg || "#111827"} onChange={(v) => onChange({ ...container, btn_bg: v })} /></div>
         <div style={{ flex: 1 }}><ColorField label="Button-Text" value={container.btn_color || "#ffffff"} onChange={(v) => onChange({ ...container, btn_color: v })} /></div>
       </InlineStack>
-      <PaddingEditor label="Seitenabstand" value={container.padding || "48px 24px 48px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="48px 24px 48px 24px" horizontalOnly />
-      <ContainerLayoutEditor container={container} onChange={onChange} />
 
       <Text as="h3" variant="headingSm">Versteckte Felder</Text>
       {hidden.map((h, idx) => (
@@ -1362,47 +1974,35 @@ function FeatureGridEditor({ container, onChange }) {
           <Text as="h3" variant="headingSm">Feature-Raster Einstellungen</Text>
           <TextField label="Überschrift" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
           <TextField label="Untertitel (optional)" value={container.subtitle || ""} onChange={(v) => onChange({ ...container, subtitle: v })} multiline={2} autoComplete="off" />
-          <InlineStack gap="400" wrap={false}>
-            <div style={{ flex: 1 }}>
-              <Select
-                label="Ausrichtung Titel"
-                options={[{ label: "Zentriert", value: "center" }, { label: "Links", value: "left" }]}
-                value={container.title_align || "center"}
-                onChange={(v) => onChange({ ...container, title_align: v })}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <Select
-                label="Spalten (Desktop)"
-                options={[2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
-                value={String(container.cols || 3)}
-                onChange={(v) => onChange({ ...container, cols: Number(v) })}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <Select
-                label="Karten-Stil"
-                options={[
-                  { label: "Mit Rahmen", value: "bordered" },
-                  { label: "Mit Schatten", value: "shadow" },
-                  { label: "Flach (kein Rahmen)", value: "flat" },
-                ]}
-                value={container.card_style || "bordered"}
-                onChange={(v) => onChange({ ...container, card_style: v })}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <TextField label="Icon-Größe" value={container.icon_size || "40px"} onChange={(v) => onChange({ ...container, icon_size: v })} autoComplete="off" helpText="z. B. 40px, 2rem" />
-            </div>
-          </InlineStack>
-          <InlineStack gap="400" wrap={false}>
-            <div style={{ flex: 1 }}><ColorField label="Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
-            <div style={{ flex: 1 }}><ColorField label="Karten-Hintergrund" value={container.card_bg || "#f9fafb"} onChange={(v) => onChange({ ...container, card_bg: v })} /></div>
-            <div style={{ flex: 1 }}><ColorField label="Kartenrahmen" value={container.card_border_color || "#e5e7eb"} onChange={(v) => onChange({ ...container, card_border_color: v })} /></div>
-            <div style={{ flex: 1 }}><ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
-          </InlineStack>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "64px 24px 64px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="64px 24px 64px 24px" horizontalOnly />
-          <ContainerLayoutEditor container={container} onChange={onChange} />
+          <div style={EDITOR_FIELD_GRID}>
+            <Select
+              label="Ausrichtung Titel"
+              options={[{ label: "Zentriert", value: "center" }, { label: "Links", value: "left" }]}
+              value={container.title_align || "center"}
+              onChange={(v) => onChange({ ...container, title_align: v })}
+            />
+            <Select
+              label="Spalten (Desktop)"
+              options={[2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+              value={String(container.cols || 3)}
+              onChange={(v) => onChange({ ...container, cols: Number(v) })}
+            />
+            <Select
+              label="Karten-Stil"
+              options={[
+                { label: "Mit Rahmen", value: "bordered" },
+                { label: "Mit Schatten", value: "shadow" },
+                { label: "Flach (kein Rahmen)", value: "flat" },
+              ]}
+              value={container.card_style || "bordered"}
+              onChange={(v) => onChange({ ...container, card_style: v })}
+            />
+            <TextField label="Icon-Größe" value={container.icon_size || "40px"} onChange={(v) => onChange({ ...container, icon_size: v })} autoComplete="off" helpText="z. B. 40px" />
+            <ColorField label="Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} />
+            <ColorField label="Karten-Hintergrund" value={container.card_bg || "#f9fafb"} onChange={(v) => onChange({ ...container, card_bg: v })} />
+            <ColorField label="Kartenrahmen" value={container.card_border_color || "#e5e7eb"} onChange={(v) => onChange({ ...container, card_border_color: v })} />
+            <ColorField label="Textfarbe" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} />
+          </div>
         </BlockStack>
       </Card>
 
@@ -1467,40 +2067,30 @@ function TestimonialsEditor({ container, onChange }) {
           <Text as="h3" variant="headingSm">Kundenstimmen Einstellungen</Text>
           <TextField label="Überschrift" value={container.title || ""} onChange={(v) => onChange({ ...container, title: v })} autoComplete="off" />
           <TextField label="Untertitel (optional)" value={container.subtitle || ""} onChange={(v) => onChange({ ...container, subtitle: v })} multiline={2} autoComplete="off" />
-          <InlineStack gap="400" wrap={false}>
-            <div style={{ flex: 1 }}>
-              <Select
-                label="Ausrichtung Titel"
-                options={[{ label: "Zentriert", value: "center" }, { label: "Links", value: "left" }]}
-                value={container.title_align || "center"}
-                onChange={(v) => onChange({ ...container, title_align: v })}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <Select
-                label="Spalten (Desktop)"
-                options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
-                value={String(container.cols || 3)}
-                onChange={(v) => onChange({ ...container, cols: Number(v) })}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <Select
-                label="Sternebewertung anzeigen"
-                options={[{ label: "Ja", value: "true" }, { label: "Nein", value: "false" }]}
-                value={container.show_stars !== false ? "true" : "false"}
-                onChange={(v) => onChange({ ...container, show_stars: v === "true" })}
-              />
-            </div>
-          </InlineStack>
-          <InlineStack gap="400" wrap={false}>
-            <div style={{ flex: 1 }}><ColorField label="Hintergrund" value={container.bg_color || "#f9fafb"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
-            <div style={{ flex: 1 }}><ColorField label="Karten-Hintergrund" value={container.card_bg || "#ffffff"} onChange={(v) => onChange({ ...container, card_bg: v })} /></div>
-            <div style={{ flex: 1 }}><ColorField label="Kartenrahmen" value={container.card_border_color || "#e5e7eb"} onChange={(v) => onChange({ ...container, card_border_color: v })} /></div>
-            <div style={{ flex: 1 }}><ColorField label="Akzentfarbe (Sterne)" value={container.accent_color || "#ff971c"} onChange={(v) => onChange({ ...container, accent_color: v })} /></div>
-          </InlineStack>
-          <PaddingEditor label="Seitenabstand" value={container.padding || "64px 24px 64px 24px"} onChange={(v) => onChange({ ...container, padding: v })} defaultValue="64px 24px 64px 24px" horizontalOnly />
-          <ContainerLayoutEditor container={container} onChange={onChange} />
+          <div style={EDITOR_FIELD_GRID}>
+            <Select
+              label="Ausrichtung Titel"
+              options={[{ label: "Zentriert", value: "center" }, { label: "Links", value: "left" }]}
+              value={container.title_align || "center"}
+              onChange={(v) => onChange({ ...container, title_align: v })}
+            />
+            <Select
+              label="Spalten (Desktop)"
+              options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+              value={String(container.cols || 3)}
+              onChange={(v) => onChange({ ...container, cols: Number(v) })}
+            />
+            <Select
+              label="Sterne anzeigen"
+              options={[{ label: "Ja", value: "true" }, { label: "Nein", value: "false" }]}
+              value={container.show_stars !== false ? "true" : "false"}
+              onChange={(v) => onChange({ ...container, show_stars: v === "true" })}
+            />
+            <ColorField label="Hintergrund" value={container.bg_color || "#f9fafb"} onChange={(v) => onChange({ ...container, bg_color: v })} />
+            <ColorField label="Kartenfläche" value={container.card_bg || "#ffffff"} onChange={(v) => onChange({ ...container, card_bg: v })} />
+            <ColorField label="Kartenrahmen" value={container.card_border_color || "#e5e7eb"} onChange={(v) => onChange({ ...container, card_border_color: v })} />
+            <ColorField label="Akzent (Sterne)" value={container.accent_color || "#ff971c"} onChange={(v) => onChange({ ...container, accent_color: v })} />
+          </div>
         </BlockStack>
       </Card>
 
@@ -1549,55 +2139,207 @@ function TestimonialsEditor({ container, onChange }) {
   );
 }
 
-function ContainerLayoutEditor({ container, onChange }) {
+const VIDEO_ASPECT_OPTIONS = [
+  { label: "16:9 (Standard)", value: "16/9" },
+  { label: "4:3", value: "4/3" },
+  { label: "1:1 (Quadrat)", value: "1/1" },
+  { label: "9:16 (Hochformat)", value: "9/16" },
+  { label: "21:9 (Cinematic)", value: "21/9" },
+  { label: "Auto (Kasten 16:9, Video füllt)", value: "auto" },
+];
+
+// ── Video block editor ─────────────────────────────────────────────────────
+function VideoBlockEditor({ container, onChange }) {
+  const [posterPicker, setPosterPicker] = useState(null);
+  const mode = container.video_mode === "embed" ? "embed" : "file";
+  return (
+    <BlockStack gap="400">
+      {posterPicker === "desktop" && (
+        <MediaPickerModal
+          open
+          multiple={false}
+          onClose={() => setPosterPicker(null)}
+          onSelect={(urls) => { if (urls[0]) onChange({ ...container, poster_url: urls[0] }); setPosterPicker(null); }}
+        />
+      )}
+      {posterPicker === "mobile" && (
+        <MediaPickerModal
+          open
+          multiple={false}
+          onClose={() => setPosterPicker(null)}
+          onSelect={(urls) => { if (urls[0]) onChange({ ...container, poster_url_mobile: urls[0] }); setPosterPicker(null); }}
+        />
+      )}
+
+      <TextField
+        label="Überschrift (optional)"
+        value={container.title || ""}
+        onChange={(v) => onChange({ ...container, title: v })}
+        autoComplete="off"
+      />
+      <TextField
+        label="Unterzeile (optional)"
+        value={container.caption || ""}
+        onChange={(v) => onChange({ ...container, caption: v })}
+        multiline={2}
+        autoComplete="off"
+      />
+      <ColorField label="Textfarbe (Titel & Unterzeile)" value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} />
+      <ColorField label="Hintergrund" value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} />
+
+      <Select
+        label="Quelle"
+        options={[
+          { label: "Video-Datei (URL / Upload-Pfad MP4, WebM)", value: "file" },
+          { label: "Einbetten (YouTube, Vimeo, …)", value: "embed" },
+        ]}
+        value={mode}
+        onChange={(v) => onChange({ ...container, video_mode: v === "embed" ? "embed" : "file" })}
+      />
+
+      {mode === "file" ? (
+        <BlockStack gap="300">
+          <Text as="p" variant="bodySm" tone="subdued">Desktop- und Mobil-URL: optional leerer Mobil-Wert = gleiche Datei. Poster nur für &lt;video&gt; sichtbar vor Abspiel.</Text>
+          <TextField
+            label="Video-URL (Desktop)"
+            value={container.video_url || ""}
+            onChange={(v) => onChange({ ...container, video_url: v })}
+            autoComplete="off"
+            placeholder="https://…/video.mp4 oder /uploads/…"
+            helpText="Direkter Link zu MP4/WebM"
+          />
+          <TextField
+            label="Video-URL (Mobil, optional)"
+            value={container.video_url_mobile || ""}
+            onChange={(v) => onChange({ ...container, video_url_mobile: v })}
+            autoComplete="off"
+            placeholder="Kleinere Datei für Mobil"
+          />
+          <div style={EDITOR_FIELD_GRID}>
+            <ImageField
+              label="Poster (optional)"
+              value={container.poster_url || ""}
+              onPick={() => setPosterPicker("desktop")}
+              onClear={() => onChange({ ...container, poster_url: "" })}
+            />
+            <ImageField
+              label="Poster Mobil (optional)"
+              value={container.poster_url_mobile || ""}
+              onPick={() => setPosterPicker("mobile")}
+              onClear={() => onChange({ ...container, poster_url_mobile: "" })}
+            />
+          </div>
+        </BlockStack>
+      ) : (
+        <BlockStack gap="300">
+          <Text as="p" variant="bodySm" tone="subdued">YouTube- oder Vimeo-Link einfügen. Leerer Mobil-Wert: gleiche Einbettung auf allen Geräten.</Text>
+          <TextField
+            label="Einbettungs-URL (Desktop)"
+            value={container.embed_url || ""}
+            onChange={(v) => onChange({ ...container, embed_url: v })}
+            autoComplete="off"
+            placeholder="https://www.youtube.com/watch?v=…"
+          />
+          <TextField
+            label="Einbettungs-URL (Mobil, optional)"
+            value={container.embed_url_mobile || ""}
+            onChange={(v) => onChange({ ...container, embed_url_mobile: v })}
+            autoComplete="off"
+            placeholder="Andere Fassung, falls nötig"
+          />
+        </BlockStack>
+      )}
+
+      <Select
+        label="Anzeige-Verhältnis (Rahmen)"
+        options={VIDEO_ASPECT_OPTIONS}
+        value={String(container.aspect_ratio || "16/9").replace(/:/g, "/").trim() || "16/9"}
+        onChange={(v) => onChange({ ...container, aspect_ratio: v })}
+      />
+
+      <Text as="h3" variant="headingSm">Wiedergabe (nur Datei-Modus)</Text>
+      <div style={EDITOR_FIELD_GRID}>
+        <Checkbox
+          label="Autoplay (benötigt meist Stumm)"
+          checked={container.autoplay === true}
+          onChange={(c) => onChange({ ...container, autoplay: c })}
+        />
+        <Checkbox
+          label="Stumm starten"
+          checked={container.muted !== false}
+          onChange={(c) => onChange({ ...container, muted: c })}
+        />
+        <Checkbox
+          label="Endlosschleife"
+          checked={container.loop === true}
+          onChange={(c) => onChange({ ...container, loop: c })}
+        />
+        <Checkbox
+          label="Steuerelemente (Play/Pause)"
+          checked={container.controls !== false}
+          onChange={(c) => onChange({ ...container, controls: c })}
+        />
+        <Checkbox
+          label="Plays inline (iOS, empfohlen)"
+          checked={container.playsinline !== false}
+          onChange={(c) => onChange({ ...container, playsinline: c })}
+        />
+      </div>
+    </BlockStack>
+  );
+}
+
+function ContainerLayoutEditor({ container, onChange, embedded = false }) {
   const layout = container.content_layout === "full" ? "full" : "contained";
   const maxW =
     container.content_max_width !== undefined && container.content_max_width !== null
       ? String(container.content_max_width)
       : "";
+  const inner = (
+    <BlockStack gap="300">
+      <Text variant="headingSm" as="h3">Inhaltsbreite</Text>
+      <Text as="p" variant="bodySm" tone="subdued">
+        Volle Breite im Innenbereich oder zentriert mit Maximalbreite.
+      </Text>
+      <Select
+        label="Inhalt"
+        options={[
+          { label: "Volle Breite (innerhalb des Innenabstands)", value: "full" },
+          { label: "Zentriert, max. Breite", value: "contained" },
+        ]}
+        value={layout}
+        onChange={(v) => onChange({ ...container, content_layout: v })}
+      />
+      {layout === "contained" ? (
+        <TextField
+          label="Max. Breite"
+          value={maxW}
+          onChange={(v) => {
+            const t = v != null ? String(v).trim() : "";
+            onChange({
+              ...container,
+              content_max_width: t === "" ? undefined : t,
+            });
+          }}
+          autoComplete="off"
+          placeholder="z. B. 1200px"
+          helpText="Schmal: immer 100%."
+        />
+      ) : null}
+    </BlockStack>
+  );
+  if (embedded) {
+    return <Box paddingBlockStart="0">{inner}</Box>;
+  }
   return (
     <div>
       <Divider />
-      <Box paddingBlockStart="400">
-        <Text variant="headingSm" as="h3">Inhaltsbreite</Text>
-        <Text as="p" variant="bodySm" tone="subdued">
-          Innenabstand (Padding) begrenzt den Rand zum Viewport. Darunter liegt der Inhalt: volle Breite innerhalb dieses Bereichs oder zentriert mit optionaler Maximalbreite.
-        </Text>
-        <Box paddingBlockStart="300">
-          <BlockStack gap="400">
-            <Select
-              label="Inhalt"
-              options={[
-                { label: "Volle Breite (innerhalb des Innenabstands)", value: "full" },
-                { label: "Zentriert, max. Breite", value: "contained" },
-              ]}
-              value={layout}
-              onChange={(v) => onChange({ ...container, content_layout: v })}
-            />
-            {layout === "contained" ? (
-              <TextField
-                label="Max. Breite"
-                value={maxW}
-                onChange={(v) => {
-                  const t = v != null ? String(v).trim() : "";
-                  onChange({
-                    ...container,
-                    content_max_width: t === "" ? undefined : t,
-                  });
-                }}
-                autoComplete="off"
-                placeholder="z. B. 1200 oder 1200px"
-                helpText="Auf schmalen Screens immer 100% der verfügbaren Breite (responsive)."
-              />
-            ) : null}
-          </BlockStack>
-        </Box>
-      </Box>
+      <Box paddingBlockStart="400">{inner}</Box>
     </div>
   );
 }
 
-function ContainerSpacingEditor({ container, onChange }) {
+function ContainerSpacingEditor({ container, onChange, embedded = false }) {
   const m = container.margin || {};
   const set = (k, v) => {
     const next = { ...m };
@@ -1613,42 +2355,60 @@ function ContainerSpacingEditor({ container, onChange }) {
     { key: "left",   label: "Links" },
     { key: "right",  label: "Rechts" },
   ];
+  const inner = (
+    <BlockStack gap="300">
+      <Text variant="headingSm" as="h3">Abstand zu Nachbar-Sektionen</Text>
+      <Text as="p" variant="bodySm" tone="subdued">Margin – Abstand dieses Blocks zu anderen Sektionen (nicht der Innenabstand des Inhalts).</Text>
+      <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+        <div style={EDITOR_FIELD_GRID}>
+          {fields.map(({ key, label: lbl }) => (
+            <TextField
+              key={key}
+              label={lbl}
+              value={m[key] !== undefined ? String(m[key]) : ""}
+              onChange={(v) => set(key, v)}
+              autoComplete="off"
+              placeholder="0"
+            />
+          ))}
+        </div>
+      </Box>
+    </BlockStack>
+  );
+  if (embedded) {
+    return <Box paddingBlockStart="0">{inner}</Box>;
+  }
   return (
     <div>
       <Divider />
-      <Box paddingBlockStart="400">
-        <Select
-          label="Sichtbarkeit (Viewport)"
-          helpText="Legt fest, in welchem Reiter auf der Seite „Landing Page“ (Desktop/Mobil) der Block erscheint. „Nur Desktop“/„Nur schmal“ nur in einem Reiter. „Überall“: in beiden Reitern sichtbar und bearbeitbar."
-          options={[
-            { label: "Überall (Desktop & Mobil)", value: "both" },
-            { label: "Nur Desktop (≥1024px)", value: "desktop" },
-            { label: "Nur schmal (≤1023px)", value: "mobile" },
-          ]}
-          value={container.visible_on || "desktop"}
-          onChange={(v) => onChange({ ...container, visible_on: v })}
-        />
-      </Box>
-      <Box paddingBlockStart="400">
-        <Text variant="headingSm" as="h3">Außenabstand (Margin)</Text>
-        <Box paddingBlockStart="300">
-          <InlineStack gap="300" wrap={false}>
-            {fields.map(({ key, label }) => (
-              <div key={key} style={{ flex: 1 }}>
-                <TextField
-                  label={label}
-                  value={m[key] !== undefined ? String(m[key]) : ""}
-                  onChange={(v) => set(key, v)}
-                  autoComplete="off"
-                  placeholder="0px"
-                  helpText=" "
-                />
-              </div>
-            ))}
-          </InlineStack>
-        </Box>
-      </Box>
+      <Box paddingBlockStart="400">{inner}</Box>
     </div>
+  );
+}
+
+/** Inhalt + Außen: ein Mal rechts, für alle Containertypen */
+function ContainerChromePanel({ container, onChange }) {
+  const t = container.type;
+  const def = getContainerPaddingDefault(t);
+  const hOnly = containerPaddingHorizontalOnly(t);
+  return (
+    <Card>
+      <BlockStack gap="400">
+        <Text as="h3" variant="headingSm">Abstand &amp; sichtbare Breite</Text>
+        <Text as="p" variant="bodySm" tone="subdued">Gilt für diesen Container. Pro Folie/Teil-Block: weiter links im Formular.</Text>
+        <PaddingEditor
+          label="Innenabstand (zum Sektionsrand)"
+          value={container.padding || def}
+          onChange={(v) => onChange({ ...container, padding: v })}
+          defaultValue={def}
+          horizontalOnly={hOnly}
+        />
+        <Divider />
+        <ContainerLayoutEditor container={container} onChange={onChange} embedded />
+        <Divider />
+        <ContainerSpacingEditor container={container} onChange={onChange} embedded />
+      </BlockStack>
+    </Card>
   );
 }
 
@@ -1659,6 +2419,7 @@ function ContainerEditor({ container, onChange }) {
     case "text_block":           editor = <TextBlockEditor container={container} onChange={onChange} />; break;
     case "image_text":           editor = <ImageTextEditor container={container} onChange={onChange} />; break;
     case "image_grid":           editor = <ImageGridEditor container={container} onChange={onChange} />; break;
+    case "content_mosaic":       editor = <ContentMosaicEditor container={container} onChange={onChange} />; break;
     case "image_carousel":       editor = <ImageCarouselEditor container={container} onChange={onChange} />; break;
     case "banner_cta":           editor = <BannerCtaEditor container={container} onChange={onChange} />; break;
     case "collection_carousel":  editor = <CollectionCarouselEditor container={container} onChange={onChange} />; break;
@@ -1670,13 +2431,18 @@ function ContainerEditor({ container, onChange }) {
     case "newsletter":           editor = <NewsletterEditor container={container} onChange={onChange} />; break;
     case "feature_grid":         editor = <FeatureGridEditor container={container} onChange={onChange} />; break;
     case "testimonials":         editor = <TestimonialsEditor container={container} onChange={onChange} />; break;
+    case "video_block":          editor = <VideoBlockEditor container={container} onChange={onChange} />; break;
     default: return null;
   }
   return (
-    <BlockStack gap="0">
-      {editor}
-      <ContainerSpacingEditor container={container} onChange={onChange} />
-    </BlockStack>
+    <div style={CONTAINER_EDITOR_ROW}>
+      <div style={CONTAINER_EDITOR_MAIN}>
+        <BlockStack gap="500">{editor}</BlockStack>
+      </div>
+      <div style={CONTAINER_EDITOR_CHROME}>
+        <ContainerChromePanel container={container} onChange={onChange} />
+      </div>
+    </div>
   );
 }
 
@@ -1871,10 +2637,14 @@ export default function LandingPageEditor() {
     setSeitenDeviceTab(0);
   }, [selectedPageId]);
 
+  /**
+   * Reiter = Ziel-Viewport: neue Container bekommen visible_on per Tab (addContainer).
+   * Legacy: visible_on "both" (alte Speicher) erscheint in beiden Reitern, Shop zeigt den Block überall.
+   */
   const matchContainerSeitenTab = (c, tab) => {
     const v = c.visible_on || "desktop";
     if (tab === 0) return v === "both" || v === "desktop";
-    return v === "mobile";
+    return v === "both" || v === "mobile";
   };
 
   const filteredSeitenContainers = useMemo(() => {
@@ -1940,7 +2710,7 @@ export default function LandingPageEditor() {
   const updateContainer = (id, updated) => { setContainers((prev) => prev.map((c) => c.id === id ? updated : c)); setIsDirty(true); };
   const removeContainer = (id) => { setContainers((prev) => prev.filter((c) => c.id !== id)); if (expandedId === id) setExpandedId(null); setIsDirty(true); };
 
-  /** Reihenfolge nur unter Containern derselben Sichtbarkeit (wie in der jeweiligen Desktop/Mobil-Liste). */
+  /** Reihenfolge nur innerhalb des aktuellen Desktop- bzw. Mobil-Reiters. */
   const moveContainerInSeitenTab = (id, dir) => {
     setContainers((prev) => {
       const inTab = prev.filter((c) => matchContainerSeitenTab(c, seitenDeviceTab));
@@ -2099,8 +2869,8 @@ export default function LandingPageEditor() {
                             <Box paddingBlockStart="300">
                               <Text as="p" variant="bodySm" tone="subdued">
                                 {seitenDeviceTab === 0
-                                  ? "Desktop-Container (ab ca. 1024px). Änderungen hier betreffen nur den Desktop. Klicke „📱 Mobil“, um eine unabhängige Mobilversion zu erstellen."
-                                  : "Mobil-Container (max. 1023px). Änderungen hier betreffen nur Mobilgeräte. Klicke „🖥 Desktop“, um eine unabhängige Desktop-Version zu erstellen."}
+                                  ? "Diese Blöcke erscheinen im Shop auf breiten Viewports (≥1024px). Neuer Container hier = nur Desktop. „📱 Mobil“: Kopie für die schmale Ansicht anlegen (Original bleibt Desktop, Kopie ist Mobil)."
+                                  : "Diese Blöcke erscheinen im Shop auf schmalen Viewports (≤1023px). Neuer Container hier = nur Mobil. „🖥 Desktop“: Kopie für die breite Ansicht anlegen."}
                               </Text>
                             </Box>
                           </Card>
@@ -2123,8 +2893,8 @@ export default function LandingPageEditor() {
                           {containers.length > 0 && filteredSeitenContainers.length === 0 && (
                             <Banner tone="info">
                               {seitenDeviceTab === 0
-                                ? "Keine Desktop-Container vorhanden. Lege einen an oder wechsle zu „Mobil“ und nutze „🖥 Desktop“ um einen aus einer Mobilversion zu erstellen."
-                                : "Keine Mobil-Container vorhanden. Wechsle zu „Desktop“ und klicke „📱 Mobil“ bei einem Container, um eine unabhängige Mobilversion zu erstellen."}
+                                ? "Noch kein Desktop-Block: „+ Container hinzufügen“ oder unter „Mobil“ einen Block mit „🖥 Desktop“ duplizieren."
+                                : "Noch kein Mobil-Block: „+ Container hinzufügen“ oder unter „Desktop“ mit „📱 Mobil“ duplizieren. (Reine Desktop-Container erscheinen in diesem Reiter nicht.)"}
                             </Banner>
                           )}
 
@@ -2132,11 +2902,7 @@ export default function LandingPageEditor() {
                             const info = typeInfo(c.type);
                             const isExpanded = expandedId === c.id;
                             const vis = c.visible_on || "desktop";
-                            const scopeBadge = vis === "both"
-                              ? { label: "Alle Viewports", tone: "info" }
-                              : vis === "desktop"
-                                ? { label: "Nur Desktop", tone: "attention" }
-                                : { label: "Nur Mobil", tone: "attention" };
+                            const isLegacyBoth = vis === "both";
                             const last = idx === filteredSeitenContainers.length - 1;
                             return (
                               <Card key={c.id}>
@@ -2146,7 +2912,7 @@ export default function LandingPageEditor() {
                                       <InlineStack gap="300" blockAlign="center" wrap>
                                         <Text as="h3" variant="headingSm">{info.label}</Text>
                                         <Badge tone={c.visible ? "success" : undefined}>{c.visible ? "Sichtbar" : "Versteckt"}</Badge>
-                                        <Badge tone={scopeBadge.tone}>{scopeBadge.label}</Badge>
+                                        {isLegacyBoth && <Badge tone="info">Beide (Altbestand)</Badge>}
                                         <Text as="span" variant="bodySm" tone="subdued">#{idx + 1}</Text>
                                       </InlineStack>
                                       <InlineStack gap="200" blockAlign="center">

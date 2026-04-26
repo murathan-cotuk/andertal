@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import styled from "styled-components";
 import { tokens } from "@/design-system/tokens";
 
@@ -88,6 +88,13 @@ const NavBtn = styled.button`
     width: 20px;
     height: 20px;
   }
+  /* Mobil / Touch: oklar yok, yatay kaydırma yeter (SSR + JS aynı davranış) */
+  @media (max-width: 1279px) {
+    display: none !important;
+  }
+  @media (pointer: coarse) {
+    display: none !important;
+  }
 `;
 
 const SIDE_NAV_WIDTH = 52;
@@ -132,6 +139,15 @@ const Scroll = styled.div`
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scroll-behavior: smooth;
+
+  @media (max-width: 1279px) {
+    padding: 12px ${tokens.containerPadding} 20px;
+    scroll-padding-inline: 0;
+  }
+  @media (pointer: coarse) {
+    padding: 12px ${tokens.containerPadding} 20px;
+    scroll-padding-inline: 0;
+  }
 
   @media (prefers-reduced-motion: reduce) {
     scroll-behavior: auto;
@@ -210,6 +226,30 @@ const NavRightSvg = () => (
   </svg>
 );
 
+/** Schmale Viewports + Touch-Geräte: keine Pfeile (Wischen/Scroll) */
+const CAROUSEL_HIDE_ARROWS_MQS = [
+  "(max-width: 1279px)",
+  "(pointer: coarse)",
+];
+
+function getCarouselHideArrows() {
+  if (typeof window === "undefined") return false;
+  return CAROUSEL_HIDE_ARROWS_MQS.some((q) => window.matchMedia(q).matches);
+}
+
+function useHideCarouselArrowsOnMobile() {
+  return useSyncExternalStore(
+    (onChange) => {
+      if (typeof window === "undefined") return () => {};
+      const mqs = CAROUSEL_HIDE_ARROWS_MQS.map((q) => window.matchMedia(q));
+      mqs.forEach((m) => m.addEventListener("change", onChange));
+      return () => mqs.forEach((m) => m.removeEventListener("change", onChange));
+    },
+    getCarouselHideArrows,
+    () => false,
+  );
+}
+
 /**
  * AAA-quality horizontal carousel: smooth scroll, fade edges, progress, reduced motion.
  *
@@ -254,7 +294,9 @@ export default function Carousel({
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [paused, setPaused] = useState(false);
   const items = React.Children.toArray(children);
-  const useSideNav = showNav && navOnSides;
+  const isMobileViewport = useHideCarouselArrowsOnMobile();
+  const showNavControls = showNav && !isMobileViewport;
+  const useSideNav = showNavControls && navOnSides;
   const loopMode = Boolean(autoPlay && items.length > (visibleCount || 1));
   const itemsForRender = loopMode ? [...items, ...items] : items;
 
@@ -352,7 +394,7 @@ export default function Carousel({
 
   const gradientLeft = `linear-gradient(to right, ${fadeBgColor}, transparent)`;
   const gradientRight = `linear-gradient(to left, ${fadeBgColor}, transparent)`;
-  const navInHeader = showNav && !useSideNav;
+  const navInHeader = showNavControls && !useSideNav;
 
   const hasTitle = title != null && String(title).trim() !== "";
   const content = (

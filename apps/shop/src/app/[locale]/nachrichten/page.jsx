@@ -6,7 +6,7 @@ import NewtonsCradle from "@/components/NewtonsCradle";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
-import AccountPageLayout from "@/components/account/AccountPageLayout";
+import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 const ORANGE = "#ff971c";
@@ -157,17 +157,16 @@ export default function NachrichtenPage() {
   const customerName = user ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email : "Du";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f3f4f6", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: "#fafafa", display: "flex", flexDirection: "column" }}>
       <ShopHeader />
-      <div style={{ flex: 1, maxWidth: 1100, margin: "0 auto", width: "100%", padding: "40px 24px 64px" }}>
-        <AccountPageLayout>
+      <main style={{ flex: 1, width: "100%", boxSizing: "border-box" }}>
+        <div style={ACCOUNT_PAGE_MAIN_INNER}>
+          <AccountPageLayout title="Nachrichten">
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", margin: "0 0 16px" }}>Nachrichten</h1>
-
           {loading ? (
             <NewtonsCradle />
           ) : threads.length === 0 ? (
-            <div style={{ background: "#fff", borderRadius: 12, padding: 48, textAlign: "center", color: "#9ca3af", fontSize: 14 }}>Noch keine Nachrichten</div>
+            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 48, textAlign: "center", color: "#9ca3af", fontSize: 14 }}>Noch keine Nachrichten</div>
           ) : selected ? (
             /* ── Thread view ── */
             <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden" }}>
@@ -309,8 +308,9 @@ export default function NachrichtenPage() {
             </div>
           )}
         </div>
-        </AccountPageLayout>
-      </div>
+          </AccountPageLayout>
+        </div>
+      </main>
       <Footer />
     </div>
   );

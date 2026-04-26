@@ -429,9 +429,15 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
     if (!user) return "";
     const first = user.firstName || user.first_name;
     const last = user.lastName || user.last_name;
-    if (first || last) return [first, last].filter(Boolean).join(" ");
-    if (user.email) return String(user.email).split("@")[0];
-    return "";
+    let name = "";
+    if (first || last) name = [first, last].filter(Boolean).join(" ");
+    else if (user.email) name = String(user.email).split("@")[0];
+    const cno = user.customer_number;
+    if (cno != null && cno !== "") {
+      if (name) return `${name} #${cno}`;
+      return `#${cno}`;
+    }
+    return name;
   })();
 
   const panelContent = open && (

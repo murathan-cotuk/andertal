@@ -33,7 +33,18 @@ export default function ModernMobileBottomNav({
     };
     setLineWidth();
     window.addEventListener("resize", setLineWidth);
-    return () => window.removeEventListener("resize", setLineWidth);
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (vv) {
+      vv.addEventListener("resize", setLineWidth);
+      vv.addEventListener("scroll", setLineWidth);
+    }
+    return () => {
+      window.removeEventListener("resize", setLineWidth);
+      if (vv) {
+        vv.removeEventListener("resize", setLineWidth);
+        vv.removeEventListener("scroll", setLineWidth);
+      }
+    };
   }, [activeIndex, finalItems]);
 
   if (!finalItems.length) return null;
@@ -70,79 +81,104 @@ export default function ModernMobileBottomNav({
             "--lineWidth": "0px",
             border: "none",
             background: "transparent",
-            padding: "3px 4px 0",
+            padding: "2px 4px 0",
             width: "100%",
             minWidth: 0,
+            height: "100%",
+            minHeight: 0,
             color: textColor,
             display: "flex",
             flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 1,
-            position: "relative",
+            alignItems: "stretch",
+            justifyContent: "space-between",
             WebkitTapHighlightColor: "transparent",
             textDecoration: "none",
             fontFamily: "inherit",
             cursor: "pointer",
+            boxSizing: "border-box",
           },
         };
 
         const content = (
           <>
-            <div style={{ position: "relative", display: "inline-flex" }}>
-              {item.icon}
-              {item.badge > 0 ? (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -5,
-                    right: -7,
-                    background: isActive ? "var(--component-active-color)" : "#6b7280",
-                    color: "#fff",
-                    borderRadius: "50%",
-                    minWidth: 16,
-                    height: 16,
-                    fontSize: 9,
-                    fontWeight: 800,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    pointerEvents: "none",
-                    padding: "0 3px",
-                  }}
-                >
-                  {item.badge > 99 ? "99+" : item.badge}
-                </span>
-              ) : null}
-            </div>
-            <strong
-              ref={(el) => {
-                textRefs.current[index] = el;
-              }}
+            <div
               style={{
-                fontSize: 10,
-                lineHeight: 1.1,
-                fontWeight: isActive ? 700 : 500,
-                opacity: isActive ? 1 : 0.75,
-                transition: "opacity 0.18s ease, color 0.18s ease",
-                position: "relative",
+                flex: 1,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 1,
               }}
             >
-              {item.label}
-            </strong>
-            {isActive ? (
-              <span
-                style={{
-                  position: "absolute",
-                  bottom: "env(safe-area-inset-bottom, 0px)",
-                  height: 3,
-                  width: "var(--lineWidth)",
-                  borderRadius: 999,
-                  background: "var(--component-active-color)",
-                  transition: "width 0.2s ease",
+              <div style={{ position: "relative", display: "inline-flex" }}>
+                {item.icon}
+                {item.badge > 0 ? (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -5,
+                      right: -7,
+                      background: isActive ? "var(--component-active-color)" : "#6b7280",
+                      color: "#fff",
+                      borderRadius: "50%",
+                      minWidth: 16,
+                      height: 16,
+                      fontSize: 9,
+                      fontWeight: 800,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      pointerEvents: "none",
+                      padding: "0 3px",
+                    }}
+                  >
+                    {item.badge > 99 ? "99+" : item.badge}
+                  </span>
+                ) : null}
+              </div>
+              <strong
+                ref={(el) => {
+                  textRefs.current[index] = el;
                 }}
-              />
-            ) : null}
+                style={{
+                  fontSize: 10,
+                  lineHeight: 1.1,
+                  fontWeight: isActive ? 700 : 500,
+                  opacity: isActive ? 1 : 0.75,
+                  transition: "opacity 0.18s ease, color 0.18s ease",
+                }}
+              >
+                {item.label}
+              </strong>
+            </div>
+            {/* Line in normal flow at bottom of tab — avoids absolute+env() shifting on scroll / viewport changes */}
+            <div
+              style={{
+                height: 5,
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "center",
+                boxSizing: "border-box",
+                paddingBottom: 1,
+              }}
+              aria-hidden
+            >
+              {isActive ? (
+                <span
+                  style={{
+                    height: 3,
+                    width: "var(--lineWidth)",
+                    maxWidth: "100%",
+                    borderRadius: 999,
+                    background: "var(--component-active-color)",
+                    transition: "width 0.2s ease",
+                  }}
+                />
+              ) : null}
+            </div>
           </>
         );
 

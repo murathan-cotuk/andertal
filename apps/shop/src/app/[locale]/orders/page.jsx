@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import styled from "styled-components";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import { useAuthGuard, getToken, useCustomerAuth as useAuth } from "@belucha/lib";
 import { Link, useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
-import AccountPageLayout from "@/components/account/AccountPageLayout";
+import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 function MessageModal({ order, onClose }) {
@@ -80,57 +81,43 @@ function MessageModal({ order, onClose }) {
   );
 }
 
-/* ── Mobile-responsive order row layout ──────────────────────────────────── */
+/* ── Desktop order row (≥601px) — mobile uses separate card + ⋮ menu ─────── */
+
+const ORDERS_MOBILE_MQ = "(max-width: 600px)";
+
+function useOrdersNarrow() {
+  return useSyncExternalStore(
+    (onChange) => {
+      if (typeof window === "undefined") return () => {};
+      const mql = window.matchMedia(ORDERS_MOBILE_MQ);
+      mql.addEventListener("change", onChange);
+      return () => mql.removeEventListener("change", onChange);
+    },
+    () => (typeof window !== "undefined" ? window.matchMedia(ORDERS_MOBILE_MQ).matches : false),
+    () => false,
+  );
+}
 
 const OrderMainRow = styled.div`
   padding: 14px 18px;
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  @media (max-width: 600px) {
-    flex-direction: column;
-    padding: 12px 14px;
-    gap: 10px;
-  }
 `;
 
 const OrderLeftMeta = styled.div`
   min-width: 110px;
   flex-shrink: 0;
-  @media (max-width: 600px) {
-    width: 100%;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
 `;
 
 const OrderMiddle = styled.div`
   flex: 1;
   min-width: 0;
-  @media (max-width: 600px) {
-    width: 100%;
-    padding-top: 8px;
-    border-top: 1px solid #f3f4f6;
-  }
 `;
 
 const OrderRight = styled.div`
   flex-shrink: 0;
   text-align: right;
-  @media (max-width: 600px) {
-    width: 100%;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 8px;
-    border-top: 1px solid #f3f4f6;
-    text-align: left;
-  }
 `;
 
 const OrderActionsRow = styled.div`
@@ -139,14 +126,6 @@ const OrderActionsRow = styled.div`
   align-items: flex-end;
   gap: 4px;
   margin-top: 8px;
-  @media (max-width: 600px) {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 4px 10px;
-    margin-top: 0;
-  }
 `;
 
 const OrderItemSpan = styled.span`
@@ -237,55 +216,94 @@ function fmtEur(cents) {
   return (Number(cents || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
-async function downloadInvoice(order) {
-  const token = getToken("customer");
-  const res = await fetch(`/api/store-invoice/${order.id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) { alert("Rechnung konnte nicht heruntergeladen werden."); return; }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `Rechnung-${order.order_number || order.id?.slice(0, 8)}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+/** Amount and currency split (e.g. mobile: number + € aligned to the right of the figure) */
+function fmtEurParts(cents) {
+  const num = (Number(cents || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return { num, sym: "€" };
 }
 
-async function downloadReturnRetourenschein(order) {
+/**
+ * PDF after async fetch — iOS Safari / many mobile browsers ignore programmatic
+ * <a download> click (no longer a "user gesture"). Open about:blank synchronously
+ * on tap, then assign the blob URL so the PDF opens. Fallback: same-tab navigation.
+ */
+async function openPdfFromAuthedFetch(apiPath, errorMessage) {
   const token = getToken("customer");
-  const res = await fetch(`/api/store-return-retourenschein/${order.id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) { alert("Retourenschein konnte nicht geladen werden."); return; }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `Retourenschein-${order.order_number || order.id?.slice(0, 8)}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  if (!token) {
+    alert("Bitte melden Sie sich erneut an.");
+    return;
+  }
+
+  let popup = null;
+  try {
+    popup = window.open("about:blank", "_blank");
+  } catch (_) {
+    popup = null;
+  }
+
+  try {
+    const res = await fetch(apiPath, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      if (popup && !popup.closed) popup.close();
+      let msg = errorMessage;
+      try {
+        const data = await res.json();
+        if (data?.message) msg = String(data.message);
+      } catch (_) {}
+      alert(msg);
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const revokeLater = () => {
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (_) {}
+      }, 120000);
+    };
+
+    if (popup && !popup.closed) {
+      try {
+        popup.location.href = url;
+      } catch (_) {
+        popup.close();
+        window.location.assign(url);
+      }
+      revokeLater();
+      return;
+    }
+
+    // Popup blockiert (z. B. Instagram) — gleiches Fenster öffnet den PDF-Viewer zuverlässig
+    window.location.assign(url);
+    revokeLater();
+  } catch (e) {
+    if (popup && !popup.closed) popup.close();
+    alert(e?.message || errorMessage);
+  }
 }
 
-async function downloadReturnEtikett(order) {
-  const token = getToken("customer");
-  const res = await fetch(`/api/store-return-etikett/${order.id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) { alert("Rücksende-Etikett konnte nicht geladen werden."); return; }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `Ruecksende-Etikett-${order.order_number || order.id?.slice(0, 8)}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+function downloadInvoice(order) {
+  return openPdfFromAuthedFetch(
+    `/api/store-invoice/${order.id}`,
+    "Rechnung konnte nicht heruntergeladen werden.",
+  );
+}
+
+function downloadReturnRetourenschein(order) {
+  return openPdfFromAuthedFetch(
+    `/api/store-return-retourenschein/${order.id}`,
+    "Retourenschein konnte nicht geladen werden.",
+  );
+}
+
+function downloadReturnEtikett(order) {
+  return openPdfFromAuthedFetch(
+    `/api/store-return-etikett/${order.id}`,
+    "Rücksende-Etikett konnte nicht geladen werden.",
+  );
 }
 
 function RetourModal({ order, onClose, onSubmitted }) {
@@ -362,11 +380,129 @@ function shortTitle(raw) {
   return m ? m[1] : (raw || "");
 }
 
+const MORE_MENU_ITEM = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "10px 12px",
+  fontSize: 14,
+  color: "#111827",
+  borderRadius: 8,
+  cursor: "pointer",
+  outline: "none",
+};
+
+function OrderMobileMoreMenu({
+  tOrd,
+  approvedReturn,
+  canReturn,
+  activeReturn,
+  returnExpired,
+  reviewState,
+  getAvgRating,
+  onInvoice,
+  onRetoureSchein,
+  onEtikett,
+  onRetour,
+  onMessage,
+}) {
+  return (
+    <DropdownMenu.Root modal={false}>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Weitere Aktionen"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            border: "1px solid #e5e7eb",
+            background: "#fafafa",
+            cursor: "pointer",
+            color: "#374151",
+            flexShrink: 0,
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M12 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+          </svg>
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          side="bottom"
+          align="end"
+          sideOffset={6}
+          collisionPadding={12}
+          style={{
+            minWidth: 230,
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            boxShadow: "0 10px 40px rgba(0,0,0,0.12)",
+            padding: 6,
+            zIndex: 10050,
+          }}
+        >
+          <DropdownMenu.Item onSelect={onInvoice} style={MORE_MENU_ITEM}>
+            Rechnung
+          </DropdownMenu.Item>
+          {approvedReturn && (
+            <>
+              <DropdownMenu.Item onSelect={onRetoureSchein} style={{ ...MORE_MENU_ITEM, color: "#9a3412" }}>
+                {tOrd("retourenschein")}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item onSelect={onEtikett} style={{ ...MORE_MENU_ITEM, color: "#9a3412" }}>
+                {tOrd("ruecksendeEtikett")}
+              </DropdownMenu.Item>
+            </>
+          )}
+          {canReturn && !activeReturn && (
+            <DropdownMenu.Item onSelect={onRetour} style={{ ...MORE_MENU_ITEM, color: "#b91c1c" }}>
+              Retoure
+            </DropdownMenu.Item>
+          )}
+          {returnExpired && !activeReturn && (
+            <div style={{ padding: "8px 12px 6px", fontSize: 12, color: "#9ca3af" }}>Frist abgelaufen</div>
+          )}
+          <DropdownMenu.Separator style={{ height: 1, background: "#f3f4f6", margin: "6px 0" }} />
+          <DropdownMenu.Item onSelect={onMessage} style={MORE_MENU_ITEM}>
+            Nachricht
+          </DropdownMenu.Item>
+          {reviewState != null && reviewState === "full" && (
+            <DropdownMenu.Item asChild style={MORE_MENU_ITEM}>
+              <Link href="/reviews" style={{ display: "flex", alignItems: "center", textDecoration: "none", color: "#16a34a" }}>
+                Bewertung ansehen
+                {getAvgRating() > 0 && (
+                  <span style={{ marginLeft: 6 }}>
+                    <StarDisplay rating={getAvgRating()} />
+                  </span>
+                )}
+              </Link>
+            </DropdownMenu.Item>
+          )}
+          {reviewState != null && reviewState !== "full" && (
+            <DropdownMenu.Item asChild style={MORE_MENU_ITEM}>
+              <Link href="/reviews" style={{ textDecoration: "none", color: "#111827" }}>
+                {reviewState === "partial" ? "Weiter bewerten" : "Bewerten"}
+              </Link>
+            </DropdownMenu.Item>
+          )}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
+
 export default function OrdersPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
   const { logout } = useAuth();
   const router = useRouter();
   const tOrd = useTranslations("pages.orders");
+  const isNarrow = useOrdersNarrow();
   const statusLabel = (code) => {
     const k = (code || "").toLowerCase();
     try {
@@ -497,9 +633,8 @@ export default function OrdersPage() {
         <MessageModal order={messageModal} onClose={() => setMessageModal(null)} />
       )}
       <main style={{ flex: 1 }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 20px 64px" }}>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#111827", margin: "0 0 28px" }}>Meine Bestellungen</h1>
-          <AccountPageLayout>
+        <div style={ACCOUNT_PAGE_MAIN_INNER}>
+          <AccountPageLayout title="Meine Bestellungen">
             <div>
               {successMsg && (
                 <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#15803d", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
@@ -540,12 +675,119 @@ export default function OrdersPage() {
                     const reviewState = getOrderReviewState(order);
                     const trackUrl = getTrackingUrl(order.carrier_name, order.tracking_number);
 
+                    const totalParts = fmtEurParts(total);
                     return (
                       <div
                         key={order.id}
                         style={{ borderTop: idx > 0 ? "1px solid #f3f4f6" : "none" }}
                       >
-                        {/* Main row */}
+                        {isNarrow ? (
+                          <div style={{ padding: "14px 16px 12px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 16, fontWeight: 800, color: "#111827", letterSpacing: -0.02 }}>
+                                  #{order.order_number || order.id?.slice(0, 8)}
+                                </div>
+                                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>{fmtDate(order.created_at)}</div>
+                              </div>
+                              <div style={{ flexShrink: 0 }}>
+                                <StatusPill status={displayStatus(order)} label={statusLabel(displayStatus(order))} />
+                              </div>
+                            </div>
+                            <div style={{ marginBottom: 4 }}>
+                              {items.map((item, i) => (
+                                <div
+                                  key={i}
+                                  style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: i < items.length - 1 ? 8 : 0 }}
+                                >
+                                  {item.thumbnail && (
+                                    <img
+                                      src={item.thumbnail}
+                                      alt=""
+                                      style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", flexShrink: 0, border: "1px solid #f3f4f6" }}
+                                    />
+                                  )}
+                                  <div style={{ minWidth: 0, flex: 1, fontSize: 13, color: "#374151", lineHeight: 1.35 }}>
+                                    {item.product_handle ? (
+                                      <Link href={`/produkt/${item.product_handle}`} style={{ color: "#111827", textDecoration: "none", fontWeight: 500 }}>
+                                        {shortTitle(item.title)}
+                                      </Link>
+                                    ) : shortTitle(item.title)}
+                                    {item.quantity > 1 && <span style={{ color: "#9ca3af", marginLeft: 4 }}>×{item.quantity}</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {order.tracking_number && (
+                              <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
+                                {order.carrier_name && <span style={{ marginRight: 4 }}>{order.carrier_name}:</span>}
+                                {trackUrl ? (
+                                  <a href={trackUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", fontFamily: "monospace", textDecoration: "underline" }}>
+                                    {order.tracking_number}
+                                  </a>
+                                ) : (
+                                  <span style={{ fontFamily: "monospace" }}>{order.tracking_number}</span>
+                                )}
+                              </div>
+                            )}
+                            {order.delivery_date && (
+                              <div style={{ marginTop: 4, fontSize: 12, color: "#6b7280" }}>
+                                Zugestellt: {fmtDate(order.delivery_date)}
+                              </div>
+                            )}
+                            <div
+                              style={{
+                                marginTop: 12,
+                                paddingTop: 12,
+                                borderTop: "1px solid #f0f0f0",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 10,
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em" }}>Summe</span>
+                                <div style={{ display: "inline-flex", alignItems: "baseline", gap: 6, flexShrink: 0 }}>
+                                  <span style={{ fontSize: 20, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: "#111827" }}>{totalParts.num}</span>
+                                  <span style={{ fontSize: 15, fontWeight: 700, color: "#6b7280" }}>{totalParts.sym}</span>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpanded((e) => ({ ...e, [order.id]: !e[order.id] }))}
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: "#111827",
+                                    background: "#f3f4f6",
+                                    border: "1px solid #e5e7eb",
+                                    borderRadius: 10,
+                                    padding: "8px 14px",
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                  }}
+                                >
+                                  {isExpanded ? "Weniger" : "Details"}
+                                </button>
+                                <OrderMobileMoreMenu
+                                  tOrd={tOrd}
+                                  approvedReturn={!!approvedReturn}
+                                  canReturn={canReturn(order)}
+                                  activeReturn={!!activeReturn}
+                                  returnExpired={returnExpired(order) && !activeReturn}
+                                  reviewState={reviewState}
+                                  getAvgRating={() => getOrderAvgRating(order)}
+                                  onInvoice={() => { downloadInvoice(order); }}
+                                  onRetoureSchein={() => { downloadReturnRetourenschein(order); }}
+                                  onEtikett={() => { downloadReturnEtikett(order); }}
+                                  onRetour={() => { setRetourModal(order); }}
+                                  onMessage={() => { setMessageModal(order); }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
                         <OrderMainRow>
                           {/* Left meta */}
                           <OrderLeftMeta>
@@ -609,6 +851,7 @@ export default function OrdersPage() {
                             </div>
                             <OrderActionsRow>
                               <button
+                                type="button"
                                 onClick={() => setExpanded(e => ({ ...e, [order.id]: !e[order.id] }))}
                                 style={{ fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline", textDecorationColor: "#d1d5db" }}
                               >
@@ -641,6 +884,7 @@ export default function OrdersPage() {
                               )}
                               {canReturn(order) && !activeReturn && (
                                 <button
+                                  type="button"
                                   onClick={() => setRetourModal(order)}
                                   style={{ fontSize: 11, color: "#dc2626", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline", textDecorationColor: "#fca5a5" }}
                                 >
@@ -651,6 +895,7 @@ export default function OrdersPage() {
                                 <span style={{ fontSize: 10, color: "#d1d5db" }}>Frist abgelaufen</span>
                               )}
                               <button
+                                type="button"
                                 onClick={() => setMessageModal(order)}
                                 style={{ fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 3 }}
                                 title="Nachricht senden"
@@ -677,6 +922,7 @@ export default function OrdersPage() {
                             </OrderActionsRow>
                           </OrderRight>
                         </OrderMainRow>
+                        )}
 
                         {/* Expanded details */}
                         {isExpanded && (() => {

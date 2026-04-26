@@ -6,7 +6,7 @@ import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import Footer from "@/components/Footer";
-import AccountPageLayout from "@/components/account/AccountPageLayout";
+import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useCustomerAuth as useAuth } from "@belucha/lib";
 import { useCart } from "@/context/CartContext";
@@ -146,9 +146,8 @@ export default function AddressesPage() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
       <ShopHeader />
       <main style={{ flex: 1 }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px" }}>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: DARK, margin: "0 0 24px" }}>Adressen</h1>
-          <AccountPageLayout>
+        <div style={ACCOUNT_PAGE_MAIN_INNER}>
+          <AccountPageLayout title="Adressen">
             <div>
               {loading ? (
                 <NewtonsCradle />

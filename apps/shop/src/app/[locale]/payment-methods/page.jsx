@@ -8,7 +8,7 @@ import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-
 import ShopHeader from "@/components/ShopHeader";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import Footer from "@/components/Footer";
-import AccountPageLayout from "@/components/account/AccountPageLayout";
+import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
@@ -191,9 +191,8 @@ export default function PaymentMethodsPage() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
       <ShopHeader />
       <main style={{ flex: 1 }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 20px 64px" }}>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#111827", margin: "0 0 28px" }}>Zahlungsmethoden</h1>
-          <AccountPageLayout>
+        <div style={ACCOUNT_PAGE_MAIN_INNER}>
+          <AccountPageLayout title="Zahlungsmethoden">
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {loading && <NewtonsCradle />}
               {err && (
@@ -204,7 +203,7 @@ export default function PaymentMethodsPage() {
               {!loading && !showAddForm && (
                 <>
                   {paymentMethods.length === 0 && (
-                    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "40px 24px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
+                    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "40px 24px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
                       Keine gespeicherten Zahlungsmethoden.
                     </div>
                   )}
