@@ -217,11 +217,14 @@ const SortSelect = styled.select`
 const SidebarOverlay = styled.div`
   display: none;
   @media (max-width: 767px) {
-    display: ${(p) => (p.$open ? "block" : "none")};
+    display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.35);
-    z-index: 99;
+    background: rgba(0,0,0,0.45);
+    z-index: 2147483700;
+    opacity: ${(p) => (p.$open ? 1 : 0)};
+    pointer-events: ${(p) => (p.$open ? "auto" : "none")};
+    transition: opacity var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
   }
 `;
 
@@ -229,11 +232,84 @@ const SidebarHead = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  flex-shrink: 0;
+  margin-bottom: ${(p) => (p.$filterMode ? "0" : "20px")};
+  padding: ${(p) => (p.$filterMode ? "12px 14px" : "0 0 12px")};
   border-bottom: 1px solid #e8e8e6;
 
   @media (min-width: 768px) { display: none; }
+`;
+
+const DesktopSidebarContent = styled.div`
+  @media (max-width: 767px) {
+    display: none;
+  }
+`;
+
+const MobileFilterSplit = styled.div`
+  display: none;
+  @media (max-width: 767px) {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+`;
+
+const MobileFilterLeft = styled.div`
+  width: 92px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: #f7f7f6;
+  border-right: 1px solid #e8e8e6;
+`;
+
+const MobileFilterLeftBtn = styled.button`
+  display: block;
+  width: 100%;
+  padding: 13px 8px 13px 11px;
+  font-size: 11px;
+  font-weight: ${(p) => (p.$active ? 700 : 400)};
+  text-align: left;
+  background: ${(p) => (p.$active ? "#fff" : "transparent")};
+  border: none;
+  border-left: 3px solid ${(p) => (p.$active ? "#111" : "transparent")};
+  color: ${(p) => (p.$active ? "#111" : "#555")};
+  cursor: pointer;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  font-family: inherit;
+`;
+
+const MobileFilterRight = styled.div`
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 12px 10px;
+`;
+
+const MobileFilterPillGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+`;
+
+const MobileFilterPill = styled.button`
+  padding: 9px 6px;
+  font-size: 11.5px;
+  font-weight: ${(p) => (p.$on ? 700 : 400)};
+  background: ${(p) => (p.$on ? "#111" : "#fff")};
+  color: ${(p) => (p.$on ? "#fff" : "#444")};
+  border: 1.5px solid ${(p) => (p.$on ? "#111" : "#d1d5db")};
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  line-height: 1.3;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  &:hover { border-color: #111; }
+  word-break: break-word;
 `;
 
 const FilterGroup = styled.div`
@@ -329,7 +405,10 @@ const ContentWrap = styled.div`
   align-items: flex-start;
 
   @media (max-width: 767px) {
-    padding: 10px 16px 60px;
+    padding: 6px 6px 80px;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    gap: 0;
   }
 `;
 
@@ -344,16 +423,24 @@ const SidebarCol = styled.aside`
   @media (max-width: 767px) {
     position: fixed;
     top: 0;
-    left: ${(p) => (p.$open ? "0" : "-260px")};
-    width: 250px;
-    height: 100vh;
-    max-height: 100vh;
-    z-index: 100;
+    left: 0;
+    width: min(360px, 90vw);
+    height: 100dvh;
+    max-height: 100dvh;
+    z-index: 2147483701;
     background: #fff;
-    box-shadow: 4px 0 16px rgba(0,0,0,0.12);
-    transition: left 0.3s ease;
-    padding: 16px;
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.2);
+    transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
+    transition: transform var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+    padding: ${(p) => (p.$filterMode ? "0" : "14px 16px 16px")};
     box-sizing: border-box;
+    display: ${(p) => (p.$filterMode ? "flex" : "block")};
+    flex-direction: column;
+    overflow: ${(p) => (p.$filterMode ? "hidden" : "auto")};
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
   }
 `;
 
@@ -460,6 +547,7 @@ export default function BrandPage() {
   const [filters,     setFilters]     = useState({});
   const [panelOpen,   setPanelOpen]   = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
+  const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
   const [categorySlugToName, setCategorySlugToName] = useState(() => new Map());
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
@@ -533,6 +621,21 @@ export default function BrandPage() {
       return changed ? next : prev;
     });
   }, [facets]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const prev = document.body.style.overflow;
+    if (panelOpen) document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [panelOpen]);
+
+  useEffect(() => {
+    if (!panelOpen || !hasFacets) return;
+    const keys = Object.keys(facets);
+    if (keys.length > 0 && (!activeMobileFilterGroup || !facets[activeMobileFilterGroup])) {
+      setActiveMobileFilterGroup(keys[0]);
+    }
+  }, [panelOpen, facets, hasFacets, activeMobileFilterGroup]);
 
   const toggle = (key, val) => {
     setFilters((prev) => {
@@ -683,52 +786,90 @@ export default function BrandPage() {
         {showCatalogSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
         <ContentWrap ref={bodyRef}>
           {showCatalogSidebar && (
-            <SidebarCol $open={panelOpen}>
-              <SidebarHead>
+            <SidebarCol $open={panelOpen} $filterMode={hasFacets}>
+              <SidebarHead $filterMode={hasFacets}>
                 <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                  Filter
+                  Filter{activeCount > 0 ? ` (${activeCount})` : ""}
                 </span>
-                <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555", lineHeight: 1 }} aria-label="Close filters">×</button>
-              </SidebarHead>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
-                  Filter
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {activeCount > 0 && (
-                    <ClearAllBtn
-                      type="button"
-                      onClick={() => { setFilters({}); setPage(1); }}
-                      style={{ float: "right", padding: "2px 8px", fontSize: 10 }}
-                    >
-                      Clear
+                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ padding: "2px 8px", fontSize: 10 }}>
+                      Löschen
+                    </ClearAllBtn>
+                  )}
+                  <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#555", lineHeight: 1, padding: 0 }} aria-label="Schließen">×</button>
+                </div>
+              </SidebarHead>
+
+              {/* Desktop: accordion layout */}
+              <DesktopSidebarContent>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
+                    Filter
+                    {activeCount > 0 && (
+                      <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
+                        Clear
+                      </ClearAllBtn>
+                    )}
+                  </div>
+                  {Object.entries(facets).map(([key, vals]) => (
+                    <FilterGroup key={key}>
+                      <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
+                        <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
+                        <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
+                      </FilterGroupTitle>
+                      <FilterGroupBody $open={!!openFilterGroups[key]}>
+                        {vals.map((val) => {
+                          const on = (filters[key] || []).includes(val);
+                          const label = formatFacetOptionLabel(key, val, categorySlugToName);
+                          return (
+                            <CheckRow key={val} $on={on}>
+                              <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
+                              {label}
+                            </CheckRow>
+                          );
+                        })}
+                      </FilterGroupBody>
+                    </FilterGroup>
+                  ))}
+                  {activeCount > 0 && (
+                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
+                      Clear all filters
                     </ClearAllBtn>
                   )}
                 </div>
-                {Object.entries(facets).map(([key, vals]) => (
-                  <FilterGroup key={key}>
-                    <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                      <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
-                      <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
-                    </FilterGroupTitle>
-                    <FilterGroupBody $open={!!openFilterGroups[key]}>
-                      {vals.map((val) => {
-                        const on = (filters[key] || []).includes(val);
-                        const label = formatFacetOptionLabel(key, val, categorySlugToName);
+              </DesktopSidebarContent>
+
+              {/* Mobile: two-panel layout */}
+              <MobileFilterSplit>
+                <MobileFilterLeft>
+                  {Object.entries(facets).map(([key]) => {
+                    const cnt = (filters[key] || []).length;
+                    return (
+                      <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
+                        {getFacetGroupTitle(key)}
+                        {cnt > 0 && <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>{cnt} ausgewählt</span>}
+                      </MobileFilterLeftBtn>
+                    );
+                  })}
+                </MobileFilterLeft>
+                <MobileFilterRight>
+                  {activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
+                    <MobileFilterPillGrid>
+                      {facets[activeMobileFilterGroup].map((val) => {
+                        const on = (filters[activeMobileFilterGroup] || []).includes(val);
                         return (
-                          <CheckRow key={val} $on={on}>
-                            <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
-                            {label}
-                          </CheckRow>
+                          <MobileFilterPill key={val} type="button" $on={on} onClick={() => toggle(activeMobileFilterGroup, val)}>
+                            {formatFacetOptionLabel(activeMobileFilterGroup, val, categorySlugToName)}
+                          </MobileFilterPill>
                         );
                       })}
-                    </FilterGroupBody>
-                  </FilterGroup>
-                ))}
-                {activeCount > 0 && (
-                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
-                    Clear all filters
-                  </ClearAllBtn>
-                )}
-              </div>
+                    </MobileFilterPillGrid>
+                  ) : (
+                    <div style={{ color: "#aaa", fontSize: 12 }}>Wähle einen Filter</div>
+                  )}
+                </MobileFilterRight>
+              </MobileFilterSplit>
             </SidebarCol>
           )}
 

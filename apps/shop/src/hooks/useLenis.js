@@ -8,6 +8,10 @@ import { useEffect } from "react";
  */
 export function useLenis() {
   useEffect(() => {
+    // Skip Lenis on touch devices — native momentum scroll is smooth and
+    // Lenis's touch interception causes pull-to-refresh jitter on mobile.
+    if (typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches) return;
+
     let lenis;
     let raf;
 
@@ -17,7 +21,6 @@ export function useLenis() {
         easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
         smoothWheel: true,
         wheelMultiplier: 1,
-        touchMultiplier: 2,
       });
 
       function animate(time) {

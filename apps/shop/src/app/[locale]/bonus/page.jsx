@@ -15,17 +15,15 @@ const GRAY = "#6b7280";
 const BORDER = "#e5e7eb";
 
 function fmtLedgerDate(iso) {
-  if (!iso) return "—";
+  if (!iso) return { date: "—", time: "" };
   try {
-    return new Date(iso).toLocaleString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const d = new Date(iso);
+    return {
+      date: d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }),
+      time: d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }),
+    };
   } catch {
-    return String(iso);
+    return { date: String(iso), time: "" };
   }
 }
 
@@ -96,41 +94,51 @@ export default function BonusPage() {
                 )}
               </div>
 
-              <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "clamp(14px, 3vw, 24px) clamp(12px, 3vw, 28px)", marginBottom: 24 }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 16px" }}>Verlauf</h2>
+              <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "14px 10px 14px", marginBottom: 24 }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 12px", paddingLeft: 4 }}>Verlauf</h2>
                 {loading ? (
                   <NewtonsCradle />
                 ) : ledger.length === 0 ? (
                   <p style={{ color: GRAY, margin: 0 }}>Noch keine Einträge.</p>
                 ) : (
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                      <thead>
-                        <tr style={{ color: GRAY, fontSize: 12, textAlign: "left", borderBottom: `1px solid ${BORDER}` }}>
-                          <th style={{ padding: "10px 8px", fontWeight: 600 }}>Datum</th>
-                          <th style={{ padding: "10px 8px", fontWeight: 600 }}>Punkte</th>
-                          <th style={{ padding: "10px 8px", fontWeight: 600 }}>Herkunft</th>
-                          <th style={{ padding: "10px 8px", fontWeight: 600 }}>Beschreibung</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {ledger.map((row) => (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
+                    <colgroup>
+                      <col style={{ width: "22%" }} />
+                      <col style={{ width: "16%" }} />
+                      <col style={{ width: "22%" }} />
+                      <col style={{ width: "40%" }} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{ color: GRAY, fontSize: 11, textAlign: "left", borderBottom: `1px solid ${BORDER}` }}>
+                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>Datum</th>
+                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>Punkte</th>
+                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>Herkunft</th>
+                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>Beschreibung</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ledger.map((row) => {
+                        const { date, time } = fmtLedgerDate(row.occurred_at || row.created_at);
+                        return (
                           <tr key={row.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
-                            <td style={{ padding: "12px 8px", whiteSpace: "nowrap", color: DARK }}>{fmtLedgerDate(row.occurred_at || row.created_at)}</td>
+                            <td style={{ padding: "10px 4px", color: DARK }}>
+                              <div style={{ fontSize: 12 }}>{date}</div>
+                              {time && <div style={{ fontSize: 10, color: GRAY, marginTop: 1 }}>{time}</div>}
+                            </td>
                             <td style={{
-                              padding: "12px 8px",
+                              padding: "10px 4px",
                               fontWeight: 700,
                               color: Number(row.points_delta) >= 0 ? "#059669" : "#dc2626",
                             }}>
                               {Number(row.points_delta) > 0 ? "+" : ""}{row.points_delta}
                             </td>
-                            <td style={{ padding: "12px 8px", color: GRAY }}>{sourceLabel(row.source)}</td>
-                            <td style={{ padding: "12px 8px", color: DARK, lineHeight: 1.4 }}>{row.description || "—"}</td>
+                            <td style={{ padding: "10px 4px", color: GRAY, fontSize: 12 }}>{sourceLabel(row.source)}</td>
+                            <td style={{ padding: "10px 4px", color: DARK, lineHeight: 1.4, fontSize: 12, wordBreak: "break-word" }}>{row.description || "—"}</td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 )}
               </div>
 

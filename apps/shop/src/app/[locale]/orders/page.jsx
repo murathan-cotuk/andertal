@@ -88,9 +88,9 @@ const OrderMainRow = styled.div`
   gap: 16px;
   align-items: flex-start;
   @media (max-width: 600px) {
-    flex-wrap: wrap;
+    flex-direction: column;
     padding: 12px 14px;
-    gap: 0;
+    gap: 10px;
   }
 `;
 
@@ -98,8 +98,13 @@ const OrderLeftMeta = styled.div`
   min-width: 110px;
   flex-shrink: 0;
   @media (max-width: 600px) {
-    flex: 1;
-    min-width: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 `;
 
@@ -107,9 +112,8 @@ const OrderMiddle = styled.div`
   flex: 1;
   min-width: 0;
   @media (max-width: 600px) {
-    flex: 0 0 100%;
-    margin-top: 10px;
-    padding-top: 10px;
+    width: 100%;
+    padding-top: 8px;
     border-top: 1px solid #f3f4f6;
   }
 `;
@@ -118,7 +122,14 @@ const OrderRight = styled.div`
   flex-shrink: 0;
   text-align: right;
   @media (max-width: 600px) {
-    flex-shrink: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 8px;
+    border-top: 1px solid #f3f4f6;
+    text-align: left;
   }
 `;
 
@@ -131,8 +142,10 @@ const OrderActionsRow = styled.div`
   @media (max-width: 600px) {
     flex-direction: row;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: flex-end;
-    gap: 6px 12px;
+    gap: 4px 10px;
+    margin-top: 0;
   }
 `;
 
@@ -536,11 +549,13 @@ export default function OrdersPage() {
                         <OrderMainRow>
                           {/* Left meta */}
                           <OrderLeftMeta>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
-                              #{order.order_number || order.id?.slice(0, 8)}
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
+                                #{order.order_number || order.id?.slice(0, 8)}
+                              </div>
+                              <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{fmtDate(order.created_at)}</div>
                             </div>
-                            <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{fmtDate(order.created_at)}</div>
-                            <div style={{ marginTop: 6 }}>
+                            <div>
                               <StatusPill status={displayStatus(order)} label={statusLabel(displayStatus(order))} />
                             </div>
                           </OrderLeftMeta>

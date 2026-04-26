@@ -37,6 +37,8 @@ import { menuItemHref } from "@/lib/shop-menu-href";
 
 const SCROLL_THRESHOLD = 60;
 const SCROLL_DELTA = 8; /* px; only toggle direction after this much scroll to avoid jitter */
+/** Ignore “scroll up” when near the document bottom (rubber-band / overscroll / addr. bar) to avoid header ↔ spacer feedback jitter */
+const BOTTOM_IGNORE_SCROLL_UP_PX = 28;
 const MIDDLE_BAR_BG = "#1b8880";
 /** @media (max-width) for mobile/tablet header chrome (matches mega menu breakpoint) */
 const HEADER_NARROW_MQ = 1023;
@@ -90,12 +92,10 @@ const HeaderWrap = styled.header`
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: visible;
 
-  /* Thin search row: no white layer above the semi-transparent site-color bar */
+  /* Compact mobile: header itself fades to transparent (MiddleBarWrap has its own bg) */
   &[data-mobile-compact="true"] {
     @media (max-width: ${HEADER_NARROW_MQ}px) {
       background: transparent;
-      backdrop-filter: none;
-      -webkit-backdrop-filter: none;
     }
   }
 
@@ -146,9 +146,8 @@ const MiddleBarWrap = styled.div`
       p.$mobileSearchCompact
         ? `
       min-height: 0;
-      background: color-mix(in srgb, var(--header-bg, ${MIDDLE_BAR_BG}) 78%, transparent);
-      -webkit-backdrop-filter: blur(10px);
-      backdrop-filter: blur(10px);
+      background-color: var(--header-bg, ${MIDDLE_BAR_BG});
+      box-shadow: 0 2px 8px rgba(0,0,0,0.10);
     `
         : ""}
   }
@@ -166,8 +165,8 @@ const MiddleBarInner = styled.div`
     ${(p) =>
       p.$mobileSearchCompact
         ? `
-      min-height: 46px;
-      padding: 6px 12px;
+      min-height: 54px;
+      padding: 9px 16px;
       align-items: center;
     `
         : ""}
@@ -386,7 +385,7 @@ const SearchBarForm = styled.div`
   }
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) => (p.$mobileCompact ? `height: 32px; padding: 0 2px 0 10px;` : "")}
+    ${(p) => (p.$mobileCompact ? `height: 36px;` : "")}
   }
 `;
 
@@ -1048,8 +1047,15 @@ export default function ShopHeader() {
         const current = window.scrollY ?? window.pageYOffset ?? 0;
         const prev = lastScrollYRef.current;
         const delta = current - prev;
-        if (delta > SCROLL_DELTA) setScrollingDown(true);
-        else if (delta < -SCROLL_DELTA) setScrollingDown(false);
+        const el = document.documentElement;
+        const maxScroll = Math.max(0, (el && el.scrollHeight) - window.innerHeight);
+        const nearDocumentBottom =
+          maxScroll > SCROLL_THRESHOLD * 2 && current >= maxScroll - BOTTOM_IGNORE_SCROLL_UP_PX;
+        if (delta > SCROLL_DELTA) {
+          setScrollingDown(true);
+        } else if (delta < -SCROLL_DELTA && !nearDocumentBottom) {
+          setScrollingDown(false);
+        }
         lastScrollYRef.current = current;
         setScrollY(current);
         ticking = false;
@@ -1228,7 +1234,10 @@ export default function ShopHeader() {
       <HeaderWrap
         ref={headerRef}
         data-mobile-compact={isMobileSearchCompact ? "true" : "false"}
-        style={{ transform: hideHeaderCompletely ? "translateY(-100%)" : "translateY(0)" }}
+        style={{
+          transform: hideHeaderCompletely ? "translateY(-100%)" : "translateY(0)",
+          zIndex: localeDropdownOpen ? 2147483650 : undefined,
+        }}
       >
         <TopBarWrap $visible={atTop}>
           <TopBar />

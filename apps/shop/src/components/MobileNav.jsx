@@ -13,7 +13,6 @@ import { useCustomerAuth as useAuth } from "@belucha/lib";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { restPathFromPathname } from "@/lib/shop-market";
-import { useVisualViewportBottomInset } from "@/hooks/useVisualViewportBottomInset";
 import { resolveImageUrl } from "@/lib/image-url";
 import ModernMobileBottomNav from "@/components/ModernMobileBottomNav";
 
@@ -24,10 +23,10 @@ const USE_MODERN_MOBILE_BOTTOM_NAV = true;
 
 const css = {
   /* Bottom bar */
-  bar: (bottomInsetPx = 0) => ({
+  bar: () => ({
     display: "flex",
     position: "fixed",
-    bottom: bottomInsetPx,
+    bottom: 0,
     left: 0,
     right: 0,
     height: "calc(58px + env(safe-area-inset-bottom, 0px))",
@@ -37,7 +36,6 @@ const css = {
     boxShadow: "0 -2px 12px rgba(0,0,0,0.07)",
     zIndex: 2147483640,
     alignItems: "stretch",
-    transition: "bottom 0.12s ease-out",
   }),
   barBtn: (active) => ({
     flex: 1,
@@ -227,10 +225,6 @@ const css = {
   },
 
   /* Body-level bottom padding so content isn't hidden under the bar */
-  bodyPad: (extraBottomPx = 0) => ({
-    height: `calc(58px + env(safe-area-inset-bottom, 0px) + ${extraBottomPx}px)`,
-    flexShrink: 0,
-  }),
 };
 
 /* ─── Icons ──────────────────────────────────────────────── */
@@ -333,8 +327,6 @@ export default function MobileNav() {
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount } = useCart();
   const { ids: wishlistIds } = useWishlist();
-  const vvBottomInset = useVisualViewportBottomInset();
-
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTarget, setDrawerTarget] = useState("menu"); // "menu" | "account"
   const [categories, setCategories] = useState([]);
@@ -408,16 +400,6 @@ export default function MobileNav() {
     const handler = (e) => { if (e.key === "Escape") setDrawerOpen(false); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, []);
-
-  /* Expose extra bottom gap for global CSS (footer) — matches visual viewport */
-  useEffect(() => {
-    document.documentElement.style.setProperty("--belucha-vv-bottom-inset", `${vvBottomInset}px`);
-  }, [vvBottomInset]);
-  useEffect(() => {
-    return () => {
-      document.documentElement.style.removeProperty("--belucha-vv-bottom-inset");
-    };
   }, []);
 
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
@@ -504,19 +486,29 @@ export default function MobileNav() {
                 >
                   <div style={{ width: "50%" }}>
                     {categories.slice(0, 18).map((cat) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          if (cat.children?.length) setActiveMobileCategory(cat.id);
-                          else closeDrawer();
-                        }}
-                        style={css.categoryRowBtn}
-                      >
-                        {cat.imageUrl ? <img src={cat.imageUrl} alt="" style={css.categoryThumb} /> : <div style={css.categoryThumbPlaceholder} aria-hidden />}
-                        <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
-                        <IcoChevron />
-                      </button>
+                      cat.children?.length ? (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setActiveMobileCategory(cat.id)}
+                          style={css.categoryRowBtn}
+                        >
+                          {cat.imageUrl ? <img src={cat.imageUrl} alt="" style={css.categoryThumb} /> : <div style={css.categoryThumbPlaceholder} aria-hidden />}
+                          <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
+                          <IcoChevron />
+                        </button>
+                      ) : (
+                        <Link
+                          key={cat.id}
+                          href={cat.href}
+                          onClick={closeDrawer}
+                          style={{ ...css.categoryRowBtn, textDecoration: "none", display: "flex" }}
+                        >
+                          {cat.imageUrl ? <img src={cat.imageUrl} alt="" style={css.categoryThumb} /> : <div style={css.categoryThumbPlaceholder} aria-hidden />}
+                          <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
+                          <IcoChevron />
+                        </Link>
+                      )
                     ))}
                   </div>
                   <div style={{ width: "50%" }}>
@@ -592,7 +584,6 @@ export default function MobileNav() {
       {/* ── Bottom Navigation Bar ── */}
       {USE_MODERN_MOBILE_BOTTOM_NAV ? (
         <ModernMobileBottomNav
-          bottomInsetPx={vvBottomInset}
           accentColor={TEAL}
           items={[
             { key: "home", label: "Start", icon: <IcoHome />, href: "/", active: isHome },
@@ -640,7 +631,7 @@ export default function MobileNav() {
           ]}
         />
       ) : (
-      <nav style={css.bar(vvBottomInset)} aria-label="Mobile Navigation">
+      <nav style={css.bar()} aria-label="Mobile Navigation">
         {/* Home */}
         <Link href="/" style={css.barBtn(isHome)} aria-label="Startseite">
           <IcoHome />
@@ -715,8 +706,6 @@ export default function MobileNav() {
       </nav>
       )}
 
-      {/* Spacer so content isn't hidden under bottom bar */}
-      <div className="belucha-mobile-nav-pad" style={css.bodyPad(vvBottomInset)} aria-hidden="true" />
     </div>
   );
 }

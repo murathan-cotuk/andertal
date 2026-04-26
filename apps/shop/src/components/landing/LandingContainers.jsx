@@ -1388,7 +1388,7 @@ function ImageCarousel({ container }) {
 // ── Renderer ──────────────────────────────────────────────────────────────────
 function renderContainer(c, preload = {}, ctx = {}) {
   if (!c.visible) return null;
-  const v = c.visible_on || "both";
+  const v = c.visible_on || "desktop";
   if (v === "desktop" && ctx.isNarrow) return null;
   if (v === "mobile" && !ctx.isNarrow) return null;
   let inner = null;

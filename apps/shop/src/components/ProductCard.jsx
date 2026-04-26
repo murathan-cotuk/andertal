@@ -95,6 +95,9 @@ const AddToCartBtn = styled.button`
   width: calc(100% - 12px);
   margin: 5px 6px 0;
   padding: 7px 10px;
+  @media (max-width: 767px) {
+    margin-top: 3px;
+  }
   background: #111;
   color: #fff;
   border: none;
@@ -192,6 +195,11 @@ const DescriptionPreview = styled.p`
 const ReviewRow = styled.div`
   margin-top: 1px;
   height: 20px;
+  font-size: 13px;
+  @media (max-width: 767px) {
+    height: 14px;
+    font-size: 10px;
+  }
 `;
 
 /* Badges */
@@ -640,7 +648,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false })
         {adding ? "…" : isComingSoon ? "Pek yakında" : shippingUnavailable ? "Nicht lieferbar" : outOfStock ? "Sold out" : "Add to cart"}
       </AddToCartBtn>
 
-      <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice>
+      {cartNotice.text ? <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice> : null}
 
       {/* ── Info ── */}
       <Info>
@@ -791,13 +799,13 @@ export function StarRating({ average = 0, count = 0 }) {
   const half = average - full >= 0.5 ? 1 : 0;
   const empty = 5 - full - half;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-      <span aria-hidden style={{ display: "flex" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 3, lineHeight: 1 }}>
+      <span aria-hidden style={{ display: "flex", fontSize: "1em" }}>
         {[...Array(full)].map((_, i) => <span key={`f${i}`} style={{ color: "#f59e0b" }}>★</span>)}
         {half ? <span style={{ color: "#f59e0b" }}>★</span> : null}
         {[...Array(empty)].map((_, i) => <span key={`e${i}`} style={{ color: "#d1d5db" }}>★</span>)}
       </span>
-      <span style={{ fontSize: 12, color: "#9ca3af" }}>({count})</span>
+      <span style={{ fontSize: "0.85em", color: "#9ca3af" }}>({count})</span>
     </div>
   );
 }
@@ -1021,7 +1029,7 @@ export function ProductListItem({ product, activeFilters = {} }) {
           {btnLabel}
         </ListCartBtn>
         {cartNotice.text && (
-          <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice>
+          {cartNotice.text ? <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice> : null}
         )}
       </ListBody>
     </ListCard>

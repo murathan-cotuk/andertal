@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import styled from "styled-components";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useCustomerAuth as useAuth } from "@belucha/lib";
@@ -110,6 +111,18 @@ export default function AccountMobileHeader({ onLogout }) {
   const appPath = normalizePath(pathname);
   const firstName = user?.firstName || user?.first_name || "";
   const greeting = firstName ? `Hallo, ${firstName}!` : "Hallo!";
+  const scrollRef = useRef(null);
+  const activeRef = useRef(null);
+
+  useEffect(() => {
+    if (!scrollRef.current || !activeRef.current) return;
+    const container = scrollRef.current;
+    const active = activeRef.current;
+    const containerLeft = container.getBoundingClientRect().left;
+    const activeLeft = active.getBoundingClientRect().left;
+    const offset = activeLeft - containerLeft - (container.clientWidth / 2) + (active.offsetWidth / 2);
+    container.scrollBy({ left: offset, behavior: "smooth" });
+  }, [appPath]);
 
   return (
     <Wrap>
@@ -117,14 +130,14 @@ export default function AccountMobileHeader({ onLogout }) {
         <GreetingText>{greeting}</GreetingText>
         {user?.email && <GreetingMeta>{user.email}</GreetingMeta>}
       </Greeting>
-      <NavScroll>
+      <NavScroll ref={scrollRef}>
         {NAV.map((item) => {
           const active =
             item.href === "/account"
               ? appPath === "/account"
               : appPath === item.href || appPath.startsWith(`${item.href}/`);
           return (
-            <NavPill key={item.href} href={item.href} $active={active}>
+            <NavPill key={item.href} href={item.href} $active={active} ref={active ? activeRef : null}>
               {item.label}
             </NavPill>
           );

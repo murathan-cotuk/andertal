@@ -357,7 +357,7 @@ a {
 @media (max-width: 767px) {
   /* Ensure footer doesn't overlap with bottom nav */
   footer {
-    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px) + var(--belucha-vv-bottom-inset, 0px)) !important;
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 

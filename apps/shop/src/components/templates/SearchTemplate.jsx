@@ -96,20 +96,17 @@ const BreadcrumbRow = styled.div`
   @media (max-width: 767px) { display: none; }
 `;
 
-const StickyControlStack = styled.div`
-  position: sticky;
-  z-index: 20;
-  top: ${HEADER_H}px;
-  background: #fff;
-  @media ${NARROW} {
-    top: 72px;
-  }
-`;
-
 const SortBar = styled.div`
+  position: sticky;
+  top: ${HEADER_H}px;
+  z-index: 20;
+  background: #fff;
   border-top: 1px solid #e8e8e6;
   border-bottom: 1px solid #e8e8e6;
-  background: #fff;
+
+  @media (max-width: 767px) {
+    top: 72px;
+  }
 `;
 
 const SortBarInner = styled.div`
@@ -129,6 +126,29 @@ const SortBarLeft = styled.div`
   gap: 16px;
   min-width: 0;
   flex: 1;
+`;
+
+const FilterBtn = styled.button`
+  display: none;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: ${(p) => (p.$active ? "#111" : "#666")};
+  cursor: pointer;
+  transition: color 0.12s;
+  border-bottom: 2px solid ${(p) => (p.$active ? "#111" : "transparent")};
+  margin-bottom: -1px;
+
+  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  &:hover { color: #111; }
+
+  @media (max-width: 767px) { display: inline-flex; }
 `;
 
 const SortWrap = styled.div`
@@ -164,44 +184,6 @@ const SortSelect = styled.select`
   background-position: right 4px center;
 `;
 
-const SearchMobileBar = styled.div`
-  display: none;
-  @media ${NARROW} {
-    display: flex;
-    align-items: stretch;
-    gap: 8px;
-    max-width: 1440px;
-    margin: 0 auto;
-    padding: 8px 12px 10px;
-    box-sizing: border-box;
-    background: #fafaf9;
-    border-top: 1px solid #e8e8e6;
-    border-bottom: 1px solid #e8e8e6;
-  }
-`;
-
-const SearchMobileBarBtn = styled.button`
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 12px;
-  background: #fff;
-  border: 1px solid #ddd;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #111;
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-  border-radius: 6px;
-  &:hover { border-color: #111; }
-  ${(p) => p.$active && "border-color: #111; background: #f4f4f2;"}
-`;
-
 const ContentWrap = styled.div`
   max-width: 1440px;
   margin: 0 auto;
@@ -226,22 +208,24 @@ const Sidebar = styled.aside`
   top: ${HEADER_H + 100}px;
   max-height: calc(100vh - ${HEADER_H + 100}px);
   overflow-y: auto;
-  @media ${NARROW} {
+
+  @media (max-width: 767px) {
     position: fixed;
     top: 0;
-    left: ${(p) => (p.$open ? "0" : "-100vw")};
-    width: ${(p) => (p.$mobileFilterMode ? "min(88vw, 340px)" : "280px")};
-    height: 100vh;
-    max-height: 100vh;
-    z-index: 100;
+    left: 0;
+    width: min(360px, 90vw);
+    height: 100dvh;
+    max-height: 100dvh;
+    z-index: 2147483701;
     background: #fff;
-    box-shadow: 4px 0 16px rgba(0, 0, 0, 0.12);
-    transition: left var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
-    padding: ${(p) => (p.$mobileFilterMode ? "0" : "16px")};
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.2);
+    transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
+    transition: transform var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+    padding: ${(p) => (p.$filterMode ? "0" : "14px 16px 16px")};
     box-sizing: border-box;
-    display: ${(p) => (p.$mobileFilterMode ? "flex" : "block")};
+    display: ${(p) => (p.$filterMode ? "flex" : "block")};
     flex-direction: column;
-    overflow: ${(p) => (p.$mobileFilterMode ? "hidden" : "auto")};
+    overflow: ${(p) => (p.$filterMode ? "hidden" : "auto")};
 
     @media (prefers-reduced-motion: reduce) {
       transition: none;
@@ -251,12 +235,12 @@ const Sidebar = styled.aside`
 
 const SidebarOverlay = styled.div`
   display: none;
-  @media ${NARROW} {
+  @media (max-width: 767px) {
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
-    z-index: 99;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 2147483700;
     opacity: ${(p) => (p.$open ? 1 : 0)};
     pointer-events: ${(p) => (p.$open ? "auto" : "none")};
     transition: opacity var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
@@ -278,6 +262,12 @@ const SidebarHead = styled.div`
   @media (min-width: 768px) { display: none; }
 `;
 
+const DesktopSidebarContent = styled.div`
+  @media (max-width: 767px) {
+    display: none;
+  }
+`;
+
 const SidebarSplit = styled.div`
   display: flex;
   flex-direction: column;
@@ -285,11 +275,14 @@ const SidebarSplit = styled.div`
 `;
 
 const MobileFilterSplit = styled.div`
-  display: flex;
-  flex-direction: row;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  display: none;
+  @media (max-width: 767px) {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
 `;
 
 const MobileFilterLeft = styled.div`
@@ -315,6 +308,23 @@ const MobileFilterLeftBtn = styled.button`
   line-height: 1.3;
   letter-spacing: 0.02em;
   font-family: inherit;
+`;
+
+const MobileNavLink = styled(Link)`
+  display: block;
+  width: 100%;
+  padding: 12px 8px 12px 11px;
+  font-size: 11px;
+  font-weight: ${(p) => (p.$active ? 700 : 400)};
+  text-align: left;
+  background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
+  border-left: 3px solid ${(p) => (p.$active ? "#111" : "transparent")};
+  color: ${(p) => (p.$active ? "#111" : "#555")};
+  cursor: pointer;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  box-sizing: border-box;
 `;
 
 const MobileFilterRight = styled.div`
@@ -352,9 +362,6 @@ const SidebarPane = styled.section`
   & + & {
     padding-top: 16px;
     border-top: 1px solid #eceae7;
-  }
-  @media ${NARROW} {
-    display: ${(p) => (p.$hidden ? "none" : "block")};
   }
 `;
 
@@ -529,7 +536,7 @@ function normalizeSearchText(v) {
   return String(v || "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -583,8 +590,6 @@ function textMatchProducts(q, products) {
     .sort((a, b) => b.s - a.s)
     .map((x) => x.p);
 
-  // Never return empty search results: if nothing matches strongly,
-  // fall back to the full catalog so the user always sees products.
   if (scored.length > 0) return scored;
   return [...products];
 }
@@ -622,19 +627,16 @@ export default function SearchTemplate() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({});
   const [panelOpen, setPanelOpen] = useState(false);
-  const [mobilePane, setMobilePane] = useState("subs");
   const [openFilterGroups, setOpenFilterGroups] = useState({});
   const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
-  const [isNarrow, setIsNarrow] = useState(false);
   const bodyRef = useRef(null);
 
   useEffect(() => {
-    const mq = window.matchMedia(NARROW);
-    const apply = () => setIsNarrow(!!mq.matches);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, []);
+    if (typeof document === "undefined") return undefined;
+    const prev = document.body.style.overflow;
+    if (panelOpen) document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [panelOpen]);
 
   useEffect(() => {
     let c = true;
@@ -781,12 +783,12 @@ export default function SearchTemplate() {
   }, [facets, filters]);
 
   useEffect(() => {
-    if (!isNarrow || !panelOpen || mobilePane !== "filters") return;
+    if (!panelOpen || !hasFacets) return;
     const keys = Object.keys(facets);
     if (keys.length > 0 && (!activeMobileFilterGroup || !facets[activeMobileFilterGroup])) {
       setActiveMobileFilterGroup(keys[0]);
     }
-  }, [isNarrow, panelOpen, mobilePane, facets, activeMobileFilterGroup]);
+  }, [panelOpen, facets, hasFacets, activeMobileFilterGroup]);
 
   const toggle = (key, val) => {
     setFilters((prev) => {
@@ -824,10 +826,6 @@ export default function SearchTemplate() {
     && !treeLoading
     && showSidebarTmpl;
 
-  const showMobileBar = isNarrow && showCatalogSidebar;
-  const showSubsInDrawer = hasNavPane;
-  const showFiltersInDrawer = hasFacets;
-
   const searchHrefForSub = (slug) => {
     const sl = String(slug || "").replace(/^\//, "");
     if (!sl) {
@@ -836,7 +834,126 @@ export default function SearchTemplate() {
     return buildSearchUrl(pathname, q, sl);
   };
 
-  const title = q ? `${tCommon("search")}: “${q}”` : tCommon("search");
+  const title = q ? `${tCommon("search")}: "${q}"` : tCommon("search");
+
+  // ── Nav content helpers ──────────────────────────────────────────────────────
+
+  function renderDesktopNavPane() {
+    if (!hasNavPane) return null;
+    return (
+      <SidebarPane>
+        {branchNav && hasSubcategories ? (
+          <SubcategoryGroup style={{ marginTop: 0 }}>
+            {parentCategory && (
+              <SubcategoryLink
+                href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                $active={false}
+                style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+              >
+                ← {parentCategory.name || parentCategory.slug}
+              </SubcategoryLink>
+            )}
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
+              {displayTitle}
+            </div>
+            <SubcategoryLink href={searchHrefForSub("")} $active={!effectiveCat} onClick={() => { setFilters({}); setPage(1); }}>
+              Alle
+            </SubcategoryLink>
+            {subcategories.map((sub) => {
+              const subSlug = String(sub.slug || "").replace(/^\//, "");
+              return (
+                <SubcategoryLink key={sub.id} href={searchHrefForSub(subSlug)} $active={effectiveCat === subSlug} onClick={() => { setFilters({}); setPage(1); }}>
+                  {sub.name || sub.slug}
+                </SubcategoryLink>
+              );
+            })}
+          </SubcategoryGroup>
+        ) : parentCategory && (
+          <SubcategoryGroup style={{ marginTop: 0 }}>
+            <SubcategoryLink
+              href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+              $active={false}
+              style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+            >
+              ← {parentCategory.name || parentCategory.slug}
+            </SubcategoryLink>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: 4 }}>
+              {parentCategory.name || parentCategory.slug}
+            </div>
+            <SubcategoryLink
+              href={searchHrefForSub(String(parentCategory.slug || "").replace(/^\//, ""))}
+              $active={effectiveCat === String(parentCategory.slug || "").replace(/^\//, "")}
+              onClick={() => { setFilters({}); setPage(1); }}
+            >
+              Alle
+            </SubcategoryLink>
+            {subcategories.map((sibling) => {
+              const sibSlug = String(sibling.slug || "").replace(/^\//, "");
+              return (
+                <SubcategoryLink key={sibling.id} href={searchHrefForSub(sibSlug)} $active={effectiveCat === sibSlug} onClick={() => { setFilters({}); setPage(1); }}>
+                  {sibling.name || sibling.slug}
+                </SubcategoryLink>
+              );
+            })}
+          </SubcategoryGroup>
+        )}
+      </SidebarPane>
+    );
+  }
+
+  function renderMobileNavSection(close) {
+    if (!hasNavPane) return null;
+    return (
+      <div>
+        <div style={{ padding: "8px 8px 4px 11px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#999" }}>Kategorien</div>
+        {branchNav && hasSubcategories ? (
+          <>
+            {parentCategory && (
+              <MobileNavLink
+                href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                $active={false}
+                onClick={() => { setFilters({}); setPage(1); close(); }}
+                style={{ fontSize: 10, color: "#9ca3af", borderBottom: "1px solid #e8e8e6" }}
+              >
+                ← {parentCategory.name || parentCategory.slug}
+              </MobileNavLink>
+            )}
+            <MobileNavLink href={searchHrefForSub("")} $active={!effectiveCat} onClick={() => { setFilters({}); setPage(1); close(); }}>
+              Alle
+            </MobileNavLink>
+            {subcategories.map((sub) => {
+              const subSlug = String(sub.slug || "").replace(/^\//, "");
+              return (
+                <MobileNavLink key={sub.id} href={searchHrefForSub(subSlug)} $active={effectiveCat === subSlug} onClick={() => { setFilters({}); setPage(1); close(); }}>
+                  {sub.name || sub.slug}
+                </MobileNavLink>
+              );
+            })}
+          </>
+        ) : parentCategory && (
+          <>
+            <MobileNavLink
+              href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+              $active={false}
+              onClick={() => { setFilters({}); setPage(1); close(); }}
+              style={{ fontSize: 10, color: "#9ca3af", borderBottom: "1px solid #e8e8e6" }}
+            >
+              ← {parentCategory.name || parentCategory.slug}
+            </MobileNavLink>
+            {subcategories.map((sibling) => {
+              const sibSlug = String(sibling.slug || "").replace(/^\//, "");
+              return (
+                <MobileNavLink key={sibling.id} href={searchHrefForSub(sibSlug)} $active={effectiveCat === sibSlug} onClick={() => { setFilters({}); setPage(1); close(); }}>
+                  {sibling.name || sibling.slug}
+                </MobileNavLink>
+              );
+            })}
+          </>
+        )}
+        <div style={{ height: 1, background: "#e8e8e6", margin: "4px 0" }} />
+      </div>
+    );
+  }
 
   if (loading && !textHits.length) {
     return (
@@ -846,14 +963,7 @@ export default function SearchTemplate() {
           <Bone style={{ height: 220 }} />
           <div style={{ maxWidth: 1440, margin: "0 auto", padding: "14px 32px" }}>
             <Bone style={{ height: 13, width: 200, margin: "24px 0 32px" }} />
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, 1fr)",
-                gap: 1,
-                background: "#e8e8e6",
-              }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 1, background: "#e8e8e6" }}>
               {Array.from({ length: 6 }).map((_, i) => (
                 <Bone key={i} style={{ aspectRatio: "3/4" }} />
               ))}
@@ -884,48 +994,42 @@ export default function SearchTemplate() {
           {q ? <TitleSub>{textHits.length} {textHits.length === 1 ? "Ergebnis" : "Ergebnisse"}</TitleSub> : null}
         </ColHeader>
 
-        <StickyControlStack>
-          {showMobileBar ? (
-            <SearchMobileBar>
-              {showSubsInDrawer ? (
-                <SearchMobileBarBtn
+        <SortBar>
+          <SortBarInner>
+            <SortBarLeft>
+              {showCatalogSidebar && (
+                <FilterBtn
                   type="button"
-                  $active={panelOpen && mobilePane === "subs"}
-                  onClick={() => { setMobilePane("subs"); setPanelOpen(true); }}
+                  $active={panelOpen || activeCount > 0}
+                  onClick={() => setPanelOpen((o) => !o)}
+                  aria-expanded={panelOpen}
                 >
-                  Unterkategorien
-                </SearchMobileBarBtn>
-              ) : null}
-              {showFiltersInDrawer ? (
-                <SearchMobileBarBtn
-                  type="button"
-                  $active={panelOpen && mobilePane === "filters"}
-                  onClick={() => { setMobilePane("filters"); setPanelOpen(true); }}
-                >
-                  Filter
-                  {activeCount > 0 ? ` (${activeCount})` : ""}
-                </SearchMobileBarBtn>
-              ) : null}
-            </SearchMobileBar>
-          ) : null}
-          <SortBar>
-            <SortBarInner>
-              <SortBarLeft />
-              <SortWrap>
-                <SortLabel>Sort:</SortLabel>
-                <SortSelect
-                  value={sort}
-                  onChange={(e) => { setSort(e.target.value); setPage(1); }}
-                  aria-label="Sort products"
-                >
-                  {SORT_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </SortSelect>
-              </SortWrap>
-            </SortBarInner>
-          </SortBar>
-        </StickyControlStack>
+                  <svg viewBox="0 0 16 12">
+                    <line x1="0" y1="2" x2="16" y2="2" />
+                    <line x1="0" y1="6" x2="16" y2="6" />
+                    <line x1="0" y1="10" x2="16" y2="10" />
+                    <circle cx="5" cy="2" r="1.5" fill="#111" stroke="none" />
+                    <circle cx="11" cy="6" r="1.5" fill="#111" stroke="none" />
+                    <circle cx="5" cy="10" r="1.5" fill="#111" stroke="none" />
+                  </svg>
+                  Navigation{activeCount > 0 ? ` (${activeCount})` : ""}
+                </FilterBtn>
+              )}
+            </SortBarLeft>
+            <SortWrap>
+              <SortLabel>Sort:</SortLabel>
+              <SortSelect
+                value={sort}
+                onChange={(e) => { setSort(e.target.value); setPage(1); }}
+                aria-label="Sort products"
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </SortSelect>
+            </SortWrap>
+          </SortBarInner>
+        </SortBar>
 
         <BreadcrumbRow style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
           <Breadcrumb aria-label="Breadcrumb">
@@ -935,14 +1039,7 @@ export default function SearchTemplate() {
             {q ? (
               <>
                 <span style={{ color: "#ccc" }}>/</span>
-                <b
-                  style={{
-                    maxWidth: 200,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <b style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {q}
                 </b>
               </>
@@ -950,190 +1047,18 @@ export default function SearchTemplate() {
           </Breadcrumb>
         </BreadcrumbRow>
 
-        <SidebarOverlay $open={isNarrow && panelOpen} onClick={() => setPanelOpen(false)} />
+        {showCatalogSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
 
         <ContentWrap ref={bodyRef} style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
-          {showCatalogSidebar && (!isNarrow) ? (
-            <Sidebar $open={false} $width={sidebarWidth}>
-              <SidebarSplit>
-                {hasNavPane && (
-                  <SidebarPane $hidden={false}>
-                    {branchNav && hasSubcategories ? (
-                      <SubcategoryGroup style={{ marginTop: 0 }}>
-                        {parentCategory && (
-                          <SubcategoryLink
-                            href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
-                            $active={false}
-                            style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
-                          >
-                            ←
-                            {parentCategory.name || parentCategory.slug}
-                          </SubcategoryLink>
-                        )}
-                        <div
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            letterSpacing: "0.1em",
-                            textTransform: "uppercase",
-                            color: "#111",
-                            marginBottom: 4,
-                            marginTop: parentCategory ? 4 : 0,
-                          }}
-                        >
-                          {displayTitle}
-                        </div>
-                        <SubcategoryLink
-                          href={searchHrefForSub("")}
-                          $active={!effectiveCat}
-                          onClick={() => { setFilters({}); setPage(1); }}
-                        >
-                          Alle
-                        </SubcategoryLink>
-                        {subcategories.map((sub) => {
-                          const subSlug = String(sub.slug || "").replace(/^\//, "");
-                          return (
-                            <SubcategoryLink
-                              key={sub.id}
-                              href={searchHrefForSub(subSlug)}
-                              $active={effectiveCat === subSlug}
-                              onClick={() => { setFilters({}); setPage(1); }}
-                            >
-                              {sub.name || sub.slug}
-                            </SubcategoryLink>
-                          );
-                        })}
-                      </SubcategoryGroup>
-                    ) : (
-                      parentCategory
-                      && (
-                        <SubcategoryGroup style={{ marginTop: 0 }}>
-                          <SubcategoryLink
-                            href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
-                            $active={false}
-                            style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
-                          >
-                            ←
-                            {parentCategory.name || parentCategory.slug}
-                          </SubcategoryLink>
-                          <div
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              letterSpacing: "0.1em",
-                              textTransform: "uppercase",
-                              color: "#111",
-                              marginBottom: 4,
-                              marginTop: 4,
-                            }}
-                          >
-                            {parentCategory.name || parentCategory.slug}
-                          </div>
-                          <SubcategoryLink
-                            href={searchHrefForSub(String(parentCategory.slug || "").replace(/^\//, ""))}
-                            $active={effectiveCat === String(parentCategory.slug || "").replace(/^\//, "")}
-                            onClick={() => { setFilters({}); setPage(1); }}
-                          >
-                            Alle
-                          </SubcategoryLink>
-                          {subcategories.map((sibling) => {
-                            const sibSlug = String(sibling.slug || "").replace(/^\//, "");
-                            return (
-                              <SubcategoryLink
-                                key={sibling.id}
-                                href={searchHrefForSub(sibSlug)}
-                                $active={effectiveCat === sibSlug}
-                                onClick={() => { setFilters({}); setPage(1); }}
-                              >
-                                {sibling.name || sibling.slug}
-                              </SubcategoryLink>
-                            );
-                          })}
-                        </SubcategoryGroup>
-                      )
-                    )}
-                  </SidebarPane>
-                )}
-
-                <SidebarPane $hidden={false}>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      color: "#111",
-                      marginBottom: 8,
-                      paddingBottom: 8,
-                      borderBottom: "1px solid #e8e8e6",
-                    }}
-                  >
-                    Filter
-                    {activeCount > 0 && (
-                      <ClearAllBtn
-                        type="button"
-                        onClick={() => { setFilters({}); setPage(1); }}
-                        style={{ float: "right", padding: "2px 8px", fontSize: 10 }}
-                      >
-                        Clear
-                      </ClearAllBtn>
-                    )}
-                  </div>
-                  {hasFacets ? (
-                    Object.entries(facets).map(([key, vals]) => (
-                      <FilterGroup key={key}>
-                        <FilterGroupTitle
-                          type="button"
-                          onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}
-                        >
-                          <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
-                          <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
-                        </FilterGroupTitle>
-                        <FilterGroupBody $open={!!openFilterGroups[key]}>
-                          {vals.map((val) => {
-                            const on = (filters[key] || []).includes(val);
-                            return (
-                              <CheckRow key={val} $on={on}>
-                                <CustomCheckbox
-                                  checked={on}
-                                  onChange={() => toggle(key, val)}
-                                  size={18}
-                                />
-                                {formatFacetOptionLabel(key, val, categorySlugToName)}
-                              </CheckRow>
-                            );
-                          })}
-                        </FilterGroupBody>
-                      </FilterGroup>
-                    ))
-                  ) : (
-                    <div style={{ fontSize: 12, color: "#8b8b8b", padding: "6px 2px" }}>
-                      No filters for this result set.
-                    </div>
-                  )}
-                  {activeCount > 0 && (
-                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }}>
-                      Clear all filters
-                    </ClearAllBtn>
-                  )}
-                </SidebarPane>
-              </SidebarSplit>
-            </Sidebar>
-          ) : null}
-
-          {showCatalogSidebar && isNarrow ? (
-            <Sidebar $open={panelOpen} $width={sidebarWidth} $mobileFilterMode={mobilePane === "filters"}>
-              <SidebarHead $filterMode={mobilePane === "filters"}>
+          {showCatalogSidebar && (
+            <Sidebar $open={panelOpen} $width={sidebarWidth} $filterMode={hasFacets}>
+              <SidebarHead $filterMode={hasFacets}>
                 <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                  {mobilePane === "subs" ? "Unterkategorien" : `Filter${activeCount > 0 ? ` (${activeCount})` : ""}`}
+                  Navigation{activeCount > 0 ? ` (${activeCount})` : ""}
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {mobilePane === "filters" && activeCount > 0 && (
-                    <ClearAllBtn
-                      type="button"
-                      onClick={() => { setFilters({}); setPage(1); }}
-                      style={{ padding: "2px 8px", fontSize: 10 }}
-                    >
+                  {activeCount > 0 && (
+                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ padding: "2px 8px", fontSize: 10 }}>
                       Löschen
                     </ClearAllBtn>
                   )}
@@ -1148,89 +1073,58 @@ export default function SearchTemplate() {
                 </div>
               </SidebarHead>
 
-              {mobilePane === "subs" && hasNavPane && (
+              {/* Desktop: accordion layout */}
+              <DesktopSidebarContent>
                 <SidebarSplit>
+                  {renderDesktopNavPane()}
                   <SidebarPane>
-                    {branchNav && hasSubcategories ? (
-                      <SubcategoryGroup style={{ marginTop: 0 }}>
-                        {parentCategory && (
-                          <SubcategoryLink
-                            href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
-                            $active={false}
-                            onClick={() => setPanelOpen(false)}
-                            style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
-                          >
-                            ← {parentCategory.name || parentCategory.slug}
-                          </SubcategoryLink>
-                        )}
-                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
-                          {displayTitle}
-                        </div>
-                        <SubcategoryLink
-                          href={searchHrefForSub("")}
-                          $active={!effectiveCat}
-                          onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
-                        >
-                          Alle
-                        </SubcategoryLink>
-                        {subcategories.map((sub) => {
-                          const subSlug = String(sub.slug || "").replace(/^\//, "");
-                          return (
-                            <SubcategoryLink
-                              key={sub.id}
-                              href={searchHrefForSub(subSlug)}
-                              $active={effectiveCat === subSlug}
-                              onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
-                            >
-                              {sub.name || sub.slug}
-                            </SubcategoryLink>
-                          );
-                        })}
-                      </SubcategoryGroup>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
+                      Filter
+                      {activeCount > 0 && (
+                        <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
+                          Clear
+                        </ClearAllBtn>
+                      )}
+                    </div>
+                    {hasFacets ? (
+                      Object.entries(facets).map(([key, vals]) => (
+                        <FilterGroup key={key}>
+                          <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
+                            <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
+                            <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
+                          </FilterGroupTitle>
+                          <FilterGroupBody $open={!!openFilterGroups[key]}>
+                            {vals.map((val) => {
+                              const on = (filters[key] || []).includes(val);
+                              return (
+                                <CheckRow key={val} $on={on}>
+                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
+                                  {formatFacetOptionLabel(key, val, categorySlugToName)}
+                                </CheckRow>
+                              );
+                            })}
+                          </FilterGroupBody>
+                        </FilterGroup>
+                      ))
                     ) : (
-                      parentCategory && (
-                        <SubcategoryGroup style={{ marginTop: 0 }}>
-                          <SubcategoryLink
-                            href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
-                            $active={false}
-                            onClick={() => setPanelOpen(false)}
-                            style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
-                          >
-                            ← {parentCategory.name || parentCategory.slug}
-                          </SubcategoryLink>
-                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: 4 }}>
-                            {parentCategory.name || parentCategory.slug}
-                          </div>
-                          <SubcategoryLink
-                            href={searchHrefForSub(String(parentCategory.slug || "").replace(/^\//, ""))}
-                            $active={effectiveCat === String(parentCategory.slug || "").replace(/^\//, "")}
-                            onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
-                          >
-                            Alle
-                          </SubcategoryLink>
-                          {subcategories.map((sibling) => {
-                            const sibSlug = String(sibling.slug || "").replace(/^\//, "");
-                            return (
-                              <SubcategoryLink
-                                key={sibling.id}
-                                href={searchHrefForSub(sibSlug)}
-                                $active={effectiveCat === sibSlug}
-                                onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
-                              >
-                                {sibling.name || sibling.slug}
-                              </SubcategoryLink>
-                            );
-                          })}
-                        </SubcategoryGroup>
-                      )
+                      <div style={{ fontSize: 12, color: "#8b8b8b", padding: "6px 2px" }}>
+                        No filters for this result set.
+                      </div>
+                    )}
+                    {activeCount > 0 && (
+                      <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }}>
+                        Clear all filters
+                      </ClearAllBtn>
                     )}
                   </SidebarPane>
                 </SidebarSplit>
-              )}
+              </DesktopSidebarContent>
 
-              {mobilePane === "filters" && (
+              {/* Mobile: two-panel layout (when facets exist) */}
+              {hasFacets && (
                 <MobileFilterSplit>
                   <MobileFilterLeft>
+                    {renderMobileNavSection(() => setPanelOpen(false))}
                     {Object.entries(facets).map(([key]) => {
                       const cnt = (filters[key] || []).length;
                       return (
@@ -1273,8 +1167,71 @@ export default function SearchTemplate() {
                   </MobileFilterRight>
                 </MobileFilterSplit>
               )}
+
+              {/* Mobile: simple nav (when no facets) */}
+              {!hasFacets && hasNavPane && (
+                <div style={{ overflowY: "auto", flex: 1, padding: "0 16px 16px" }}>
+                  {branchNav && hasSubcategories ? (
+                    <SubcategoryGroup style={{ marginTop: 0 }}>
+                      {parentCategory && (
+                        <SubcategoryLink
+                          href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                          $active={false}
+                          onClick={() => setPanelOpen(false)}
+                          style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+                        >
+                          ← {parentCategory.name || parentCategory.slug}
+                        </SubcategoryLink>
+                      )}
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
+                        {displayTitle}
+                      </div>
+                      <SubcategoryLink href={searchHrefForSub("")} $active={!effectiveCat} onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
+                        Alle
+                      </SubcategoryLink>
+                      {subcategories.map((sub) => {
+                        const subSlug = String(sub.slug || "").replace(/^\//, "");
+                        return (
+                          <SubcategoryLink key={sub.id} href={searchHrefForSub(subSlug)} $active={effectiveCat === subSlug} onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
+                            {sub.name || sub.slug}
+                          </SubcategoryLink>
+                        );
+                      })}
+                    </SubcategoryGroup>
+                  ) : parentCategory && (
+                    <SubcategoryGroup style={{ marginTop: 0 }}>
+                      <SubcategoryLink
+                        href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                        $active={false}
+                        onClick={() => setPanelOpen(false)}
+                        style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+                      >
+                        ← {parentCategory.name || parentCategory.slug}
+                      </SubcategoryLink>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: 4 }}>
+                        {parentCategory.name || parentCategory.slug}
+                      </div>
+                      <SubcategoryLink
+                        href={searchHrefForSub(String(parentCategory.slug || "").replace(/^\//, ""))}
+                        $active={effectiveCat === String(parentCategory.slug || "").replace(/^\//, "")}
+                        onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
+                      >
+                        Alle
+                      </SubcategoryLink>
+                      {subcategories.map((sibling) => {
+                        const sibSlug = String(sibling.slug || "").replace(/^\//, "");
+                        return (
+                          <SubcategoryLink key={sibling.id} href={searchHrefForSub(sibSlug)} $active={effectiveCat === sibSlug} onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
+                            {sibling.name || sibling.slug}
+                          </SubcategoryLink>
+                        );
+                      })}
+                    </SubcategoryGroup>
+                  )}
+                </div>
+              )}
             </Sidebar>
-          ) : null}
+          )}
 
           <Body>
             {activeCount > 0 && (
@@ -1283,8 +1240,7 @@ export default function SearchTemplate() {
                   (vals || []).map((v) => (
                     <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
                       {formatFacetOptionLabel(k, v, categorySlugToName)}
-                      {" "}
-                      ×
+                      {" "}×
                     </Chip>
                   )))}
               </ChipBar>
@@ -1292,9 +1248,7 @@ export default function SearchTemplate() {
 
             {q ? (
               <ResultBar>
-                {total}
-                {" "}
-                {total === 1 ? "product" : "products"}
+                {total} {total === 1 ? "product" : "products"}
               </ResultBar>
             ) : null}
 
@@ -1306,16 +1260,7 @@ export default function SearchTemplate() {
 
             {q && paginated.length === 0 ? (
               <>
-                <div
-                  style={{
-                    textAlign: "center",
-                    padding: "24px 0 14px",
-                    color: "#6b7280",
-                    fontSize: 12,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                  }}
-                >
+                <div style={{ textAlign: "center", padding: "24px 0 14px", color: "#6b7280", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   Keine direkten Treffer - wir zeigen ähnliche Produkte.
                 </div>
                 <ProductGrid
@@ -1354,12 +1299,7 @@ export default function SearchTemplate() {
                   }, [])
                   .map((p, i) =>
                     p === "…" ? (
-                      <span
-                        key={`d${i}`}
-                        style={{ width: 36, textAlign: "center", color: "#bbb", fontSize: 12 }}
-                      >
-                        …
-                      </span>
+                      <span key={`d${i}`} style={{ width: 36, textAlign: "center", color: "#bbb", fontSize: 12 }}>…</span>
                     ) : (
                       <PBtn
                         key={p}

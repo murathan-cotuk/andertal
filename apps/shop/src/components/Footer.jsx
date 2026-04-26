@@ -123,10 +123,9 @@ const MobileAccordionTrigger = styled(AccordionPrimitive.Trigger)`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.03);
+  background: none;
   border: none;
-  padding: 14px 12px;
-  border-radius: 10px;
+  padding: 14px 0;
   color: var(--footer-text, #ffffff);
   font-size: 15px;
   font-weight: 600;
@@ -134,11 +133,6 @@ const MobileAccordionTrigger = styled(AccordionPrimitive.Trigger)`
   text-align: left;
   font-family: inherit;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.22s ease, transform 0.2s ease;
-
-  &:active {
-    transform: scale(0.995);
-  }
 
   &[data-state="open"] .footer-chevron {
     transform: rotate(180deg);

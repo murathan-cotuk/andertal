@@ -886,7 +886,10 @@ export default function CategoryTemplate() {
     el.href = `${window.location.origin}${window.location.pathname}`;
   }, [slug, locale]);
 
-  const facets = buildFacetsFromProducts(products);
+  const rawFacets = buildFacetsFromProducts(products);
+  const facets = Object.fromEntries(
+    Object.entries(rawFacets).filter(([k]) => k !== "category" && k !== "category_slug")
+  );
   const hasFacets = Object.keys(facets).length > 0;
   const hasSubcategories = subcategories.length > 0;
   const showCatalogSidebar = hasFacets || hasSubcategories || !!parentCategory;
@@ -1174,6 +1177,16 @@ export default function CategoryTemplate() {
                       <div style={{ padding: "8px 8px 4px 11px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#999" }}>Kategorien</div>
                       {hasSubcategories ? (
                         <>
+                          {parentCategory && (
+                            <MobileNavLink
+                              href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                              $active={false}
+                              onClick={() => { setFilters({}); setPage(1); sessionStorage.setItem("cat_nav_open", "1"); setPanelOpen(false); }}
+                              style={{ fontSize: 10, color: "#9ca3af", borderBottom: "1px solid #e8e8e6" }}
+                            >
+                              ← {parentCategory.name || parentCategory.slug}
+                            </MobileNavLink>
+                          )}
                           <MobileNavLink href={slug ? `/${slug}` : "#"} $active={false} onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
                             Alle
                           </MobileNavLink>
@@ -1187,15 +1200,25 @@ export default function CategoryTemplate() {
                           })}
                         </>
                       ) : parentCategory && (
-                        visibleSubcats(parentCategory.children || []).map((sibling) => {
-                          const sibSlug = String(sibling.slug || "").replace(/^\//, "");
-                          const isCurrent = sibSlug === slug;
-                          return (
-                            <MobileNavLink key={sibling.id} href={sibSlug ? `/${sibSlug}` : "#"} $active={isCurrent} onClick={() => { setFilters({}); setPage(1); if (!isCurrent) sessionStorage.setItem("cat_nav_open", "1"); setPanelOpen(false); }}>
-                              {sibling.name || sibling.slug}
-                            </MobileNavLink>
-                          );
-                        })
+                        <>
+                          <MobileNavLink
+                            href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                            $active={false}
+                            onClick={() => { setFilters({}); setPage(1); sessionStorage.setItem("cat_nav_open", "1"); setPanelOpen(false); }}
+                            style={{ fontSize: 10, color: "#9ca3af", borderBottom: "1px solid #e8e8e6" }}
+                          >
+                            ← {parentCategory.name || parentCategory.slug}
+                          </MobileNavLink>
+                          {visibleSubcats(parentCategory.children || []).map((sibling) => {
+                            const sibSlug = String(sibling.slug || "").replace(/^\//, "");
+                            const isCurrent = sibSlug === slug;
+                            return (
+                              <MobileNavLink key={sibling.id} href={sibSlug ? `/${sibSlug}` : "#"} $active={isCurrent} onClick={() => { setFilters({}); setPage(1); if (!isCurrent) sessionStorage.setItem("cat_nav_open", "1"); setPanelOpen(false); }}>
+                                {sibling.name || sibling.slug}
+                              </MobileNavLink>
+                            );
+                          })}
+                        </>
                       )}
                       <div style={{ height: 1, background: "#e8e8e6", margin: "4px 0" }} />
                     </div>

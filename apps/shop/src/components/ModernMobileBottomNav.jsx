@@ -8,7 +8,6 @@ const DEFAULT_ACCENT = "#1b8880";
 export default function ModernMobileBottomNav({
   items = [],
   accentColor = DEFAULT_ACCENT,
-  bottomInsetPx = 0,
 }) {
   const finalItems = useMemo(() => {
     const valid = Array.isArray(items) && items.length >= 2 && items.length <= 5;
@@ -47,7 +46,7 @@ export default function ModernMobileBottomNav({
         display: "grid",
         gridTemplateColumns: `repeat(${finalItems.length}, minmax(0, 1fr))`,
         position: "fixed",
-        bottom: bottomInsetPx,
+        bottom: 0,
         left: 0,
         right: 0,
         height: "calc(60px + env(safe-area-inset-bottom, 0px))",
@@ -58,7 +57,6 @@ export default function ModernMobileBottomNav({
         WebkitBackdropFilter: "blur(12px)",
         boxShadow: "0 -2px 12px rgba(0,0,0,0.07)",
         zIndex: 2147483640,
-        transition: "bottom 0.12s ease-out",
       }}
     >
       {finalItems.map((item, index) => {
@@ -136,8 +134,8 @@ export default function ModernMobileBottomNav({
               <span
                 style={{
                   position: "absolute",
-                    bottom: "calc(env(safe-area-inset-bottom, 0px) + 2px)",
-                    height: 3,
+                  bottom: "env(safe-area-inset-bottom, 0px)",
+                  height: 3,
                   width: "var(--lineWidth)",
                   borderRadius: 999,
                   background: "var(--component-active-color)",
