@@ -4,6 +4,8 @@
  * Navbar — Desktop: scroll down → header slides away; scroll up → shows.
  * Mobile/tablet (≤1023px): header stays fixed; scroll down past threshold → only thin
  * search bar (site color + slight transparency). Scroll up / near top → full bar again.
+ * Second nav (SubNav): on narrow viewports the bar is hidden on scroll-down and stays hidden
+ * until a clear scroll-up or until the user returns to the top (avoids flicker from touch decel).
  */
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -18,6 +20,7 @@ import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
 import TopBar from "@/components/TopBar";
 import UserDropdownPanel from "@/components/UserDropdown";
+import { SHOP_THEME_CSS_UPDATED } from "@/components/ShopStylesInjector";
 import { tokens } from "@/design-system/tokens";
 import { routing } from "@/i18n/routing";
 import {
@@ -165,9 +168,10 @@ const MiddleBarInner = styled.div`
     ${(p) =>
       p.$mobileSearchCompact
         ? `
-      min-height: 54px;
-      padding: 9px 16px;
+      min-height: 60px;
+      padding: 11px 18px;
       align-items: center;
+      justify-content: center;
     `
         : ""}
   }
@@ -214,7 +218,10 @@ const MiddleBarCenter = styled.div`
         ? `
       margin-left: 0 !important;
       margin-right: 0 !important;
-      flex: 1 1 100%;
+      flex: 0 1 640px;
+      width: 100%;
+      max-width: 100%;
+      justify-content: center;
     `
         : ""}
   }
@@ -385,7 +392,22 @@ const SearchBarForm = styled.div`
   }
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) => (p.$mobileCompact ? `height: 36px;` : "")}
+    ${(p) =>
+      p.$mobileCompact
+        ? `
+      height: 46px;
+      min-height: 46px;
+      max-width: min(560px, 100%);
+      margin-left: auto;
+      margin-right: auto;
+      padding: 0 6px 0 14px;
+      & > button[aria-label="Suchen"] svg {
+        width: 22px;
+        height: 22px;
+        min-width: 22px;
+      }
+    `
+        : ""}
   }
 `;
 
@@ -422,6 +444,17 @@ const MiddleBarSearch = styled.div`
   min-width: 0;
   display: flex;
   align-items: center;
+
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    ${(p) =>
+      p.$mobileCompact
+        ? `
+      flex: 1 1 auto;
+      width: 100%;
+      justify-content: center;
+    `
+        : ""}
+  }
 `;
 
 const MiddleBarRight = styled.div`
@@ -862,6 +895,9 @@ export default function ShopHeader() {
   const [scrollY, setScrollY] = useState(0);
   const [scrollingDown, setScrollingDown] = useState(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
+  /** Narrow only: second menu row hidden after scroll-down; cleared on scroll-up or at top (see scroll handler). */
+  const [mobileSecondNavHidden, setMobileSecondNavHidden] = useState(false);
+  const mobileSecondNavHiddenRef = useRef(false);
   const lastScrollYRef = useRef(0);
   const headerRef = useRef(null);
   const middleBarRef = useRef(null);
@@ -953,12 +989,14 @@ export default function ShopHeader() {
       return meta;
     };
 
+    /** Hex / rgb / '' — Safari expects a solid color for theme-color */
     const apply = () => {
-      const headerBg = getComputedStyle(root).getPropertyValue("--header-bg").trim() || MIDDLE_BAR_BG;
+      const raw = getComputedStyle(root).getPropertyValue("--header-bg").trim();
+      const headerBg = raw || MIDDLE_BAR_BG;
       const themeMeta = ensureThemeMeta();
       themeMeta.setAttribute("content", headerBg);
 
-      // Ensure iOS safe-area/notch backdrop is never white on mobile.
+      /* iOS: html background behind status bar + overscroll; keep in sync with header */
       if (mq.matches) {
         root.style.backgroundColor = headerBg;
         body.style.backgroundColor = headerBg;
@@ -969,9 +1007,13 @@ export default function ShopHeader() {
     };
 
     apply();
-    mq.addEventListener?.("change", apply);
+    const onMq = () => apply();
+    const onThemeInjected = () => apply();
+    mq.addEventListener?.("change", onMq);
+    window.addEventListener(SHOP_THEME_CSS_UPDATED, onThemeInjected);
     return () => {
-      mq.removeEventListener?.("change", apply);
+      mq.removeEventListener?.("change", onMq);
+      window.removeEventListener(SHOP_THEME_CSS_UPDATED, onThemeInjected);
       root.style.backgroundColor = prevRootBg;
       body.style.backgroundColor = prevBodyBg;
     };
@@ -1058,6 +1100,25 @@ export default function ShopHeader() {
         }
         lastScrollYRef.current = current;
         setScrollY(current);
+
+        const narrow = typeof window !== "undefined" && window.innerWidth <= HEADER_NARROW_MQ;
+        let nextHideSecond = mobileSecondNavHiddenRef.current;
+        if (narrow) {
+          if (current <= SCROLL_THRESHOLD) {
+            nextHideSecond = false;
+          } else if (delta > SCROLL_DELTA) {
+            nextHideSecond = true;
+          } else if (delta < -SCROLL_DELTA && !nearDocumentBottom) {
+            nextHideSecond = false;
+          }
+        } else {
+          nextHideSecond = false;
+        }
+        if (nextHideSecond !== mobileSecondNavHiddenRef.current) {
+          mobileSecondNavHiddenRef.current = nextHideSecond;
+          setMobileSecondNavHidden(nextHideSecond);
+        }
+
         ticking = false;
       });
     };
@@ -1073,6 +1134,12 @@ export default function ShopHeader() {
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
+
+  useEffect(() => {
+    if (isNarrowViewport) return;
+    mobileSecondNavHiddenRef.current = false;
+    setMobileSecondNavHidden(false);
+  }, [isNarrowViewport]);
 
   useEffect(() => {
     setDrillCategoryId(null);
@@ -1104,8 +1171,8 @@ export default function ShopHeader() {
   }, []);
 
   const atTop = scrollY <= SCROLL_THRESHOLD;
-  /* Show sub-nav (categories/collections bar) whenever header is visible, not only at top */
-  const showSubNav = !scrollingDown;
+  /* Second nav: desktop = hide with scroll direction (same as before); mobile = latched so it stays off after scroll-down */
+  const showSubNav = isNarrowViewport ? !mobileSecondNavHidden : !scrollingDown;
   /* Header only visible when scrolling up (or initial load when scrollingDown is false) */
   const showHeader = !scrollingDown;
   /** Mobile/tablet: thin search-only row while scrolling down (not on wide desktop) */
@@ -1321,7 +1388,7 @@ export default function ShopHeader() {
 
               </NarrowHeaderChrome>
 
-              <MiddleBarSearch>
+              <MiddleBarSearch $mobileCompact={isMobileSearchCompact}>
                 <SearchBarForm $mobileCompact={isMobileSearchCompact} role="search">
                   <SearchBarButton
                     type="button"

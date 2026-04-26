@@ -26,6 +26,7 @@ const NAV_ITEMS = [
   { category: "Content", label: "Menus", url: "/content/menus", keywords: "menus" },
   { category: "Content", label: "Brands", url: "/content/brands", keywords: "brands" },
   { category: "Analytics", label: "Reports", url: "/analytics/reports", keywords: "reports analytics" },
+  { category: "Analytics", label: "Ranking", url: "/analytics/ranking", keywords: "ranking produkt product score" },
   { category: "Analytics", label: "Live View", url: "/analytics/live-view", keywords: "live" },
   { category: "Navigation", label: "Import/Export", url: "/import-export", keywords: "import export bulk" },
   { category: "Settings", label: "Settings", url: "/settings", keywords: "settings" },

@@ -107,6 +107,13 @@ html {
   scroll-behavior: smooth;
 }
 
+/* iOS Safari: area above/between fixed header and system status bar uses html background on overscroll; match header */
+@media (max-width: 1023px) {
+  html {
+    background-color: var(--header-bg, #1b8880);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

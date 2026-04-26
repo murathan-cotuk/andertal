@@ -60,6 +60,7 @@ const ALL_PERMISSIONS = [
   ]},
   { group: "Analytics", items: [
     { key: "/analytics/reports", label: "Berichte" },
+    { key: "/analytics/ranking", label: "Ranking" },
     { key: "/analytics/transactions", label: "Transaktionen" },
   ]},
   { group: "Einstellungen", items: [
@@ -73,7 +74,7 @@ const DEFAULT_PERMS = [
   "/dashboard", "/inbox", "/orders", "/orders/returns", "/products", "/products/inventory",
   "/products/gift-cards", "/customers", "/customers/reviews", "/marketing", "/discounts",
   "/content/media", "/content/brands", "/content/metaobjects",
-  "/analytics/reports", "/analytics/transactions", "/settings", "/settings/payments",
+  "/analytics/reports", "/analytics/ranking", "/analytics/transactions", "/settings", "/settings/payments",
 ];
 
 function PermissionsSelector({ value, onChange }) {
@@ -259,6 +260,7 @@ const ALL_PERMISSIONS_SUPER = [
   ]},
   { group: "Analytics", items: [
     { key: "/analytics/reports", label: "Berichte" },
+    { key: "/analytics/ranking", label: "Ranking" },
     { key: "/analytics/transactions", label: "Transaktionen" },
     { key: "/analytics/live-view", label: "Live-Ansicht" },
   ]},
@@ -273,7 +275,7 @@ const DEFAULT_SELLER_PERMS = [
   "/dashboard", "/inbox", "/orders", "/orders/returns", "/products", "/products/inventory",
   "/products/gift-cards", "/customers", "/customers/reviews", "/marketing", "/discounts",
   "/content/media", "/content/brands", "/content/metaobjects",
-  "/analytics/reports", "/analytics/transactions", "/settings", "/settings/payments",
+  "/analytics/reports", "/analytics/ranking", "/analytics/transactions", "/settings", "/settings/payments",
 ];
 
 function PermissionsSelectorFull({ value, onChange, isSuperuserTarget }) {

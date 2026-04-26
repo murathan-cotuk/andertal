@@ -1,6 +1,9 @@
 import "./globals.css";
 import ShopStylesInjector from "@/components/ShopStylesInjector";
 
+/* Safari / iOS status area + first paint: keep in sync with --header-bg fallback in ShopHeader (MIDDLE_BAR_BG) */
+const DEFAULT_STATUS_THEME = "#1b8880";
+
 export const metadata = {
   title: {
     default: "Belucha - Your Marketplace",
@@ -11,6 +14,8 @@ export const metadata = {
     title: "Belucha - Your Marketplace",
     description: "Discover amazing products from independent sellers",
   },
+  /* iOS Safari: tints the status bar / top chrome; client updates this when --header-bg is loaded from store theme */
+  themeColor: DEFAULT_STATUS_THEME,
 };
 
 export const viewport = {

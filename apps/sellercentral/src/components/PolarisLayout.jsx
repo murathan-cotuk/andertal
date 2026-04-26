@@ -190,7 +190,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
         { url: "/analytics/reports", label: tx("reports", "Reports") },
         { url: "/analytics/transactions", label: "Transactions" },
         { url: "/analytics/live-view", label: tx("liveView", "Live View"), superuserOnly: true },
-        { url: "/analytics/ranking", label: tx("reports", "Reports") },
+        { url: "/analytics/ranking", label: tx("ranking", "Ranking") },
       ],
     },
     { url: "/import-export", label: tx("importExport", "Import/Export"), icon: ImportIcon },

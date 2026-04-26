@@ -29,6 +29,9 @@ function loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink) {
 
 const FONT_LINK_ID = "shop-google-font-link";
 
+/** Fired when seller theme CSS is injected so header can sync `theme-color` and safe-area */
+export const SHOP_THEME_CSS_UPDATED = "shop-theme-css-updated";
+
 function injectCss(css) {
   let tag = document.getElementById("shop-theme-styles");
   if (!tag) {
@@ -37,6 +40,9 @@ function injectCss(css) {
     document.head.appendChild(tag);
   }
   tag.textContent = css;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SHOP_THEME_CSS_UPDATED));
+  }
 }
 
 function ensureGoogleFontLink(href) {

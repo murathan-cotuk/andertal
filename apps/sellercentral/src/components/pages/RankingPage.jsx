@@ -1,47 +1,76 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import {
-  Page, Card, Text, Button, Badge, BlockStack, InlineStack,
-  Box, Spinner, Banner, Select, Tabs, TextField, Modal,
-  ProgressBar, Tooltip,
+  Page,
+  Card,
+  Text,
+  Button,
+  Badge,
+  BlockStack,
+  InlineStack,
+  Box,
+  Spinner,
+  Banner,
+  Select,
+  Tabs,
+  TextField,
+  Modal,
+  Tooltip,
+  Layout,
+  DataTable,
+  Divider,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
-const STRATEGIES = [
-  { label: "Standard (Default)", value: "default" },
-  { label: "Neuheiten", value: "neuheiten" },
-  { label: "Bestsellers", value: "bestsellers" },
-  { label: "Sales / Angebote", value: "sales" },
-  { label: "Suche (Search)", value: "search" },
+const STRATEGY_I18N = [
+  { value: "default", labelKey: "strategyDefault", descKey: "strategyDefaultDesc" },
+  { value: "neuheiten", labelKey: "strategyNeuheiten", descKey: "strategyNeuheitenDesc" },
+  { value: "bestsellers", labelKey: "strategyBestsellers", descKey: "strategyBestsellersDesc" },
+  { value: "sales", labelKey: "strategySales", descKey: "strategySalesDesc" },
+  { value: "search", labelKey: "strategySearch", descKey: "strategySearchDesc" },
 ];
 
 const WEIGHT_FIELDS = [
-  { key: "w_popularity",  label: "Popularität",   desc: "Verkäufe, GMV, Klicks" },
-  { key: "w_freshness",   label: "Frische",        desc: "Neu eingestellte Produkte bevorzugen" },
-  { key: "w_content",     label: "Inhalt",         desc: "Titel, Beschreibung, Bild, Preis" },
-  { key: "w_discount",    label: "Rabatt",         desc: "Prozent Preisreduktion" },
-  { key: "w_seller",      label: "Verkäufer",      desc: "Ø Bewertung des Verkäufers" },
-  { key: "w_velocity",    label: "Trendgeschwindigkeit", desc: "7d vs 30d Verhältnis" },
+  { key: "w_popularity", label: "Popularität", desc: "Verkäufe, GMV, Klicks" },
+  { key: "w_freshness", label: "Frische", desc: "Neu eingestellte Produkte bevorzugen" },
+  { key: "w_content", label: "Inhalt", desc: "Titel, Beschreibung, Bild, Preis" },
+  { key: "w_discount", label: "Rabatt", desc: "Prozent Preisreduktion" },
+  { key: "w_seller", label: "Verkäufer", desc: "Ø Bewertung des Verkäufers" },
+  { key: "w_velocity", label: "Trendgeschwindigkeit", desc: "7d vs 30d Verhältnis" },
 ];
 
 const PARAM_FIELDS = [
   { key: "freshness_halflife_days", label: "Frische-Halbwertszeit (Tage)", desc: "In wie vielen Tagen verliert ein neues Produkt 50% seines Frische-Bonus" },
-  { key: "exploration_k",           label: "Entdeckungs-Faktor (k)",       desc: "Wie stark neue Produkte initial hochgestuft werden (0.0–1.0)" },
+  { key: "exploration_k", label: "Entdeckungs-Faktor (k)", desc: "Wie stark neue Produkte initial hochgestuft werden (0.0–1.0)" },
   { key: "diversity_max_consecutive", label: "Max. aufeinanderfolgende Seller", desc: "Ab dieser Anzahl greifen Diversitäts-Strafen" },
-  { key: "urgency_threshold",       label: "Lagerbestand-Dringlichkeit",   desc: "Produkte mit Bestand ≤ diesen Wert erhalten kleinen Urgency-Bonus" },
+  { key: "urgency_threshold", label: "Lagerbestand-Dringlichkeit", desc: "Produkte mit Bestand ≤ diesen Wert erhalten kleinen Urgency-Bonus" },
 ];
 
-function ScoreBar({ value, max = 1, color = "#4f46e5", label }) {
+function strategySelectOptions(t) {
+  return STRATEGY_I18N.map((s) => ({ label: t(s.labelKey), value: s.value }));
+}
+
+function strategyDescription(t, value) {
+  const row = STRATEGY_I18N.find((s) => s.value === value);
+  return row ? t(row.descKey) : "";
+}
+
+function ScoreBar({ value, max = 1, color = "#4f46e5" }) {
   const pct = Math.min(100, ((value || 0) / max) * 100);
   return (
     <Tooltip content={`${(value || 0).toFixed(4)}`}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {label && <span style={{ fontSize: 11, color: "#6b7280", width: 80, flexShrink: 0 }}>{label}</span>}
-        <div style={{ flex: 1, background: "#e5e7eb", borderRadius: 4, height: 8, overflow: "hidden" }}>
-          <div style={{ width: `${pct}%`, background: color, height: "100%", borderRadius: 4, transition: "width .3s" }} />
+      <div style={{ minWidth: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ flex: 1, background: "var(--p-color-border-secondary)", borderRadius: 4, height: 8, overflow: "hidden" }}>
+            <div style={{ width: `${pct}%`, background: color, height: "100%", borderRadius: 4, transition: "width .3s" }} />
+          </div>
+          <span style={{ fontSize: 11, color: "var(--p-color-text-secondary)", width: 36, textAlign: "right", flexShrink: 0 }}>
+            {pct.toFixed(0)}%
+          </span>
         </div>
-        <span style={{ fontSize: 11, color: "#374151", width: 42, textAlign: "right", flexShrink: 0 }}>{(pct).toFixed(0)}%</span>
       </div>
     </Tooltip>
   );
@@ -54,12 +83,13 @@ function WeightSumBadge({ config }) {
   return <Badge tone="critical">Summe: {sum.toFixed(2)} (soll 1.00)</Badge>;
 }
 
-// ── Config Editor ────────────────────────────────────────────────────────────
-
-function ConfigEditor({ configs, onSave, saving }) {
+function ConfigEditor({ configs, onSave, saving, t }) {
   const [strategy, setStrategy] = useState("default");
   const [local, setLocal] = useState(null);
   const [err, setErr] = useState("");
+
+  const options = useMemo(() => strategySelectOptions(t), [t]);
+  const strategyDesc = strategyDescription(t, strategy);
 
   useEffect(() => {
     const cfg = configs.find((c) => c.strategy === strategy)?.config || {};
@@ -72,7 +102,7 @@ function ConfigEditor({ configs, onSave, saving }) {
     setErr("");
     const sum = WEIGHT_FIELDS.reduce((a, f) => a + parseFloat(local[f.key] || 0), 0);
     if (Math.abs(sum - 1.0) > 0.01) {
-      setErr(`Gewichtssumme muss 1.00 sein (aktuell: ${sum.toFixed(3)})`);
+      setErr(t("errWeightSum", { sum: sum.toFixed(3) }));
       return;
     }
     await onSave(strategy, local);
@@ -82,13 +112,17 @@ function ConfigEditor({ configs, onSave, saving }) {
 
   return (
     <BlockStack gap="400">
-      <InlineStack gap="300" blockAlign="center" wrap={false}>
-        <div style={{ minWidth: 220 }}>
+      <Banner tone="info">
+        <p style={{ margin: 0 }}>{t("configBanner")}</p>
+      </Banner>
+      <InlineStack gap="300" blockAlign="center" wrap>
+        <div style={{ minWidth: 240 }}>
           <Select
-            label="Strategie"
-            options={STRATEGIES}
+            label={t("strategyLabel")}
+            options={options}
             value={strategy}
             onChange={setStrategy}
+            helpText={strategyDesc}
           />
         </div>
         <div style={{ paddingTop: 20 }}>
@@ -96,9 +130,11 @@ function ConfigEditor({ configs, onSave, saving }) {
         </div>
       </InlineStack>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         <BlockStack gap="300">
-          <Text as="p" variant="bodyMd" fontWeight="semibold">Gewichtungen (Summe = 1.0)</Text>
+          <Text as="p" variant="bodyMd" fontWeight="semibold">
+            {t("weightsTitle")}
+          </Text>
           {WEIGHT_FIELDS.map((f) => (
             <div key={f.key}>
               <Tooltip content={f.desc}>
@@ -118,7 +154,9 @@ function ConfigEditor({ configs, onSave, saving }) {
         </BlockStack>
 
         <BlockStack gap="300">
-          <Text as="p" variant="bodyMd" fontWeight="semibold">Parameter</Text>
+          <Text as="p" variant="bodyMd" fontWeight="semibold">
+            {t("paramsTitle")}
+          </Text>
           {PARAM_FIELDS.map((f) => (
             <div key={f.key}>
               <Tooltip content={f.desc}>
@@ -140,34 +178,89 @@ function ConfigEditor({ configs, onSave, saving }) {
       {err && <Banner tone="critical">{err}</Banner>}
       <InlineStack gap="300">
         <Button variant="primary" onClick={handleSave} loading={saving}>
-          Speichern
+          {t("save")}
         </Button>
       </InlineStack>
     </BlockStack>
   );
 }
 
-// ── Product Ranking Table ────────────────────────────────────────────────────
-
-function RankingTable({ products, isSuperuser, onBreakdown, strategy }) {
+function RankingTable({ products, onBreakdown, strategy, t, router, maxScore }) {
   const [search, setSearch] = useState("");
 
-  const filtered = products.filter((p) =>
-    !search.trim() ||
-    (p.title || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.handle || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.product_id || "").toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(
+    () =>
+      products.filter(
+        (p) =>
+          !search.trim() ||
+          (p.title || "").toLowerCase().includes(search.toLowerCase()) ||
+          (p.handle || "").toLowerCase().includes(search.toLowerCase()) ||
+          (p.product_id || "").toLowerCase().includes(search.toLowerCase())
+      ),
+    [products, search]
   );
 
-  const maxScore = products.reduce((m, p) => Math.max(m, parseFloat(p.final_score) || 0), 0.001);
+  const rows = useMemo(
+    () =>
+      filtered.map((p) => {
+        const finalScore = parseFloat(p.final_score) || 0;
+        const name = p.title || "—";
+        const sub = p.product_id ? `${p.product_id.slice(0, 8)}…` : "—";
+        const review =
+          parseFloat(p.review_avg) > 0
+            ? `⭐ ${parseFloat(p.review_avg).toFixed(1)} (${p.review_count})`
+            : "—";
+        return [
+          "—",
+          <BlockStack key={`n-${p.product_id}`} gap="100">
+            <Text as="span" variant="bodySm" fontWeight="semibold" truncate>
+              {name}
+            </Text>
+            <Text as="span" variant="bodySm" tone="subdued">
+              {sub}
+            </Text>
+          </BlockStack>,
+          <ScoreBar key={`pop-${p.product_id}`} value={parseFloat(p.popularity_score)} color="#6366f1" />,
+          <ScoreBar key={`fr-${p.product_id}`} value={parseFloat(p.freshness_override || p.freshness_score)} color="#10b981" />,
+          <ScoreBar key={`v-${p.product_id}`} value={parseFloat(p.velocity_score)} color="#f59e0b" />,
+          <ScoreBar key={`c-${p.product_id}`} value={parseFloat(p.content_score)} color="#3b82f6" />,
+          parseFloat(p.discount_pct) > 0 ? (
+            <Badge key={`d-${p.product_id}`} tone="success">
+              {parseFloat(p.discount_pct).toFixed(0)}%
+            </Badge>
+          ) : (
+            "—"
+          ),
+          review,
+          <ScoreBar key={`fs-${p.product_id}`} value={finalScore} max={maxScore} color="#8b5cf6" />,
+          <InlineStack key={`a-${p.product_id}`} gap="200" wrap={false}>
+            <Button size="slim" onClick={() => onBreakdown(p.product_id)}>
+              {t("btnDetails")}
+            </Button>
+            {p.product_id && (
+              <Button size="slim" variant="plain" onClick={() => router.push(`/products/${p.product_id}`)}>
+                {t("btnProduct")}
+              </Button>
+            )}
+          </InlineStack>,
+        ];
+      }),
+    [filtered, maxScore, onBreakdown, router, t]
+  );
+
+  // Rank numbers after filter
+  const rowsNumbered = useMemo(
+    () => rows.map((row, i) => [String(i + 1), ...row.slice(1)]),
+    [rows]
+  );
 
   return (
-    <BlockStack gap="300">
-      <div style={{ maxWidth: 340 }}>
+    <BlockStack gap="400">
+      <div style={{ maxWidth: 400 }}>
         <TextField
-          label=""
+          label={t("searchPlaceholder")}
           labelHidden
-          placeholder="Produkt suchen…"
+          placeholder={t("searchPlaceholder")}
           value={search}
           onChange={setSearch}
           autoComplete="off"
@@ -177,79 +270,45 @@ function RankingTable({ products, isSuperuser, onBreakdown, strategy }) {
       </div>
 
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-          <thead>
-            <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
-              {["#", "Produkt", "Popularität", "Frische", "Velocity", "Inhalt", "Rabatt%", "Bewertung", "Final Score", ""].map((h, i) => (
-                <th key={i} style={{ padding: "8px 10px", textAlign: i >= 2 && i <= 7 ? "center" : "left", fontWeight: 600, color: "#6d7175", whiteSpace: "nowrap" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p, i) => {
-              const finalScore = parseFloat(p.final_score) || 0;
-              return (
-                <tr key={p.product_id} style={{ borderBottom: "1px solid #f1f1f1", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                  <td style={{ padding: "8px 10px", color: "#9ca3af", fontWeight: 700, width: 36 }}>{i + 1}</td>
-                  <td style={{ padding: "8px 10px", maxWidth: 220 }}>
-                    <Text as="p" variant="bodySm" fontWeight="semibold" truncate>{p.title || "—"}</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">{p.product_id?.slice(0, 8)}…</Text>
-                  </td>
-                  <td style={{ padding: "8px 10px", minWidth: 120 }}>
-                    <ScoreBar value={parseFloat(p.popularity_score)} color="#6366f1" />
-                  </td>
-                  <td style={{ padding: "8px 10px", minWidth: 120 }}>
-                    <ScoreBar value={parseFloat(p.freshness_override || p.freshness_score)} color="#10b981" />
-                  </td>
-                  <td style={{ padding: "8px 10px", minWidth: 120 }}>
-                    <ScoreBar value={parseFloat(p.velocity_score)} color="#f59e0b" />
-                  </td>
-                  <td style={{ padding: "8px 10px", minWidth: 80 }}>
-                    <ScoreBar value={parseFloat(p.content_score)} color="#3b82f6" />
-                  </td>
-                  <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                    {parseFloat(p.discount_pct) > 0 ? (
-                      <Badge tone="success">{parseFloat(p.discount_pct).toFixed(0)}%</Badge>
-                    ) : "—"}
-                  </td>
-                  <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                    {parseFloat(p.review_avg) > 0 ? (
-                      <span>⭐ {parseFloat(p.review_avg).toFixed(1)} ({p.review_count})</span>
-                    ) : <span style={{ color: "#9ca3af" }}>—</span>}
-                  </td>
-                  <td style={{ padding: "8px 10px", minWidth: 140 }}>
-                    <ScoreBar value={finalScore} max={maxScore} color="#8b5cf6" />
-                  </td>
-                  <td style={{ padding: "8px 10px" }}>
-                    <Button size="slim" onClick={() => onBreakdown(p.product_id)}>
-                      Details
-                    </Button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {filtered.length === 0 && (
+        {rowsNumbered.length === 0 ? (
           <Box padding="600">
-            <Text as="p" variant="bodySm" tone="subdued" alignment="center">Keine Produkte gefunden.</Text>
+            <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+              {t("emptyTable")}
+            </Text>
           </Box>
+        ) : (
+          <DataTable
+            columnContentTypes={["numeric", "text", "text", "text", "text", "text", "text", "text", "text", "text"]}
+            headings={[
+              t("tableRank"),
+              t("tableProduct"),
+              t("tablePop"),
+              t("tableFresh"),
+              t("tableVelo"),
+              t("tableContent"),
+              t("tableDisc"),
+              t("tableReview"),
+              t("tableScore"),
+              t("tableAction"),
+            ]}
+            rows={rowsNumbered}
+          />
         )}
       </div>
     </BlockStack>
   );
 }
 
-// ── Breakdown Modal ──────────────────────────────────────────────────────────
-
-function BreakdownModal({ productId, strategy, onClose, client }) {
+function BreakdownModal({ productId, strategy, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!productId) return;
     setLoading(true);
-    client.getRankingBreakdown(productId, strategy)
+    const c = getMedusaAdminClient();
+    c
+      .getRankingBreakdown(productId, strategy)
       .then((d) => setData(d))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
@@ -262,31 +321,66 @@ function BreakdownModal({ productId, strategy, onClose, client }) {
     <Modal
       open={!!productId}
       onClose={onClose}
-      title={data?.title ? `Score-Analyse: ${data.title}` : "Score-Analyse"}
+      title={data?.title ? `Score: ${data.title}` : "Score-Details"}
       size="large"
     >
       <Modal.Section>
-        {loading && <Box padding="600"><InlineStack align="center"><Spinner size="small" /></InlineStack></Box>}
+        {loading && (
+          <Box padding="600">
+            <InlineStack align="center">
+              <Spinner size="small" />
+            </InlineStack>
+          </Box>
+        )}
         {!loading && !data && <Banner tone="critical">Produkt nicht gefunden. Zuerst berechnen.</Banner>}
         {!loading && data && (
           <BlockStack gap="400">
             <InlineStack gap="400" blockAlign="center" wrap>
-              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 16px", textAlign: "center" }}>
+              <div
+                style={{
+                  background: "var(--p-color-bg-surface-success)",
+                  border: "1px solid var(--p-color-border-success)",
+                  borderRadius: 8,
+                  padding: "10px 16px",
+                  textAlign: "center",
+                }}
+              >
                 <Text as="p" variant="bodySm" tone="subdued">Rang</Text>
-                <Text as="p" variant="headingLg" fontWeight="bold">#{data.rank_position}</Text>
+                <Text as="p" variant="headingLg" fontWeight="bold">
+                  #{data.rank_position}
+                </Text>
               </div>
-              <div style={{ background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 8, padding: "10px 16px", textAlign: "center" }}>
-                <Text as="p" variant="bodySm" tone="subdued">Final Score</Text>
-                <Text as="p" variant="headingLg" fontWeight="bold">{data.final_score?.toFixed(4)}</Text>
+              <div
+                style={{
+                  background: "var(--p-color-bg-surface-info)",
+                  border: "1px solid var(--p-color-border-info)",
+                  borderRadius: 8,
+                  padding: "10px 16px",
+                  textAlign: "center",
+                }}
+              >
+                <Text as="p" variant="bodySm" tone="subdued">Score</Text>
+                <Text as="p" variant="headingLg" fontWeight="bold">
+                  {data.final_score?.toFixed(4)}
+                </Text>
               </div>
-              <div style={{ background: "#fef9c3", border: "1px solid #fde047", borderRadius: 8, padding: "10px 16px", textAlign: "center" }}>
+              <div
+                style={{
+                  background: "var(--p-color-bg-surface-warning)",
+                  border: "1px solid var(--p-color-border-warning)",
+                  borderRadius: 8,
+                  padding: "10px 16px",
+                  textAlign: "center",
+                }}
+              >
                 <Text as="p" variant="bodySm" tone="subdued">Strategie</Text>
-                <Text as="p" variant="headingMd" fontWeight="bold">{data.strategy}</Text>
+                <Text as="p" variant="headingMd" fontWeight="bold">
+                  {data.strategy}
+                </Text>
               </div>
             </InlineStack>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-              {/* Raw signals */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd" fontWeight="semibold">Rohdaten (Signale)</Text>
                 {[
@@ -304,53 +398,67 @@ function BreakdownModal({ productId, strategy, onClose, client }) {
                   ["Lagerbestand", data.signals.inventory],
                   ["Alter", `${data.signals.days_since_published} Tage`],
                 ].map(([label, val]) => (
-                  <InlineStack key={label} align="space-between">
-                    <Text as="span" variant="bodySm" tone="subdued">{label}</Text>
-                    <Text as="span" variant="bodySm" fontWeight="semibold">{val}</Text>
+                  <InlineStack key={label} align="space-between" blockAlign="center">
+                    <Text as="span" variant="bodySm" tone="subdued">
+                      {label}
+                    </Text>
+                    <Text as="span" variant="bodySm" fontWeight="semibold">
+                      {val}
+                    </Text>
                   </InlineStack>
                 ))}
               </BlockStack>
 
-              {/* Score contributions */}
               <BlockStack gap="200">
-                <Text as="p" variant="bodyMd" fontWeight="semibold">Gewichtete Beiträge zum Finale Score</Text>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">Gewichtete Beiträge</Text>
                 {[
-                  { key: "popularity",        label: "Popularität",    color: "#6366f1" },
-                  { key: "freshness",          label: "Frische",        color: "#10b981" },
-                  { key: "content",            label: "Inhalt",         color: "#3b82f6" },
-                  { key: "discount",           label: "Rabatt",         color: "#f59e0b" },
-                  { key: "seller",             label: "Verkäufer",      color: "#ec4899" },
-                  { key: "velocity",           label: "Trend",          color: "#f97316" },
-                  { key: "exploration_bonus",  label: "+ Entdeckungs-Bonus", color: "#14b8a6" },
-                  { key: "urgency_bonus",      label: "+ Dringlichkeit", color: "#a855f7" },
-                  { key: "return_penalty",     label: "− Rückgabe-Strafe", color: "#ef4444" },
+                  { key: "popularity", label: "Popularität", color: "#6366f1" },
+                  { key: "freshness", label: "Frische", color: "#10b981" },
+                  { key: "content", label: "Inhalt", color: "#3b82f6" },
+                  { key: "discount", label: "Rabatt", color: "#f59e0b" },
+                  { key: "seller", label: "Verkäufer", color: "#ec4899" },
+                  { key: "velocity", label: "Trend", color: "#f97316" },
+                  { key: "exploration_bonus", label: "+ Entdeckung", color: "#14b8a6" },
+                  { key: "urgency_bonus", label: "+ Dringlichkeit", color: "#a855f7" },
+                  { key: "return_penalty", label: "− Rückgabe", color: "#ef4444" },
                 ].map(({ key, label, color }) => {
                   const val = contribs[key] || 0;
                   return (
                     <div key={key}>
                       <InlineStack align="space-between" blockAlign="center">
-                        <Text as="span" variant="bodySm">{label}</Text>
-                        <Text as="span" variant="bodySm" fontWeight="semibold"
-                          tone={val < 0 ? "critical" : val > 0 ? "success" : "subdued"}>
-                          {val >= 0 ? "+" : ""}{val.toFixed(4)}
+                        <Text as="span" variant="bodySm">
+                          {label}
+                        </Text>
+                        <Text
+                          as="span"
+                          variant="bodySm"
+                          fontWeight="semibold"
+                          tone={val < 0 ? "critical" : val > 0 ? "success" : "subdued"}
+                        >
+                          {val >= 0 ? "+" : ""}
+                          {val.toFixed(4)}
                         </Text>
                       </InlineStack>
-                      <div style={{ background: "#e5e7eb", borderRadius: 3, height: 6, marginTop: 2 }}>
-                        <div style={{
-                          width: `${Math.min(100, (Math.abs(val) / maxContrib) * 100)}%`,
-                          background: color,
-                          height: "100%",
-                          borderRadius: 3,
-                          opacity: val < 0 ? 0.6 : 1,
-                        }} />
+                      <div style={{ background: "var(--p-color-border-secondary)", borderRadius: 3, height: 6, marginTop: 2 }}>
+                        <div
+                          style={{
+                            width: `${Math.min(100, (Math.abs(val) / maxContrib) * 100)}%`,
+                            background: color,
+                            height: "100%",
+                            borderRadius: 3,
+                            opacity: val < 0 ? 0.6 : 1,
+                          }}
+                        />
                       </div>
                     </div>
                   );
                 })}
 
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "2px solid #e5e7eb" }}>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--p-color-border)" }}>
                   <InlineStack align="space-between">
-                    <Text as="span" variant="bodyMd" fontWeight="semibold">Final Score</Text>
+                    <Text as="span" variant="bodyMd" fontWeight="semibold">
+                      Finaler Score
+                    </Text>
                     <Text as="span" variant="bodyMd" fontWeight="bold" tone="success">
                       {data.final_score?.toFixed(6)}
                     </Text>
@@ -365,9 +473,9 @@ function BreakdownModal({ productId, strategy, onClose, client }) {
   );
 }
 
-// ── Main RankingPage ─────────────────────────────────────────────────────────
-
 export default function RankingPage() {
+  const t = useTranslations("rankingPage");
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
   const [strategy, setStrategy] = useState("default");
   const [configs, setConfigs] = useState([]);
@@ -380,7 +488,15 @@ export default function RankingPage() {
   const [success, setSuccess] = useState(null);
   const [breakdownId, setBreakdownId] = useState(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
-  const client = getMedusaAdminClient();
+  const closeBreakdown = useCallback(() => setBreakdownId(null), []);
+
+  const strategyOptions = useMemo(() => strategySelectOptions(t), [t]);
+  const currentStrategyDesc = strategyDescription(t, strategy);
+
+  const maxScore = useMemo(
+    () => products.reduce((m, p) => Math.max(m, parseFloat(p.final_score) || 0), 0.001),
+    [products]
+  );
 
   useEffect(() => {
     const su = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
@@ -390,33 +506,49 @@ export default function RankingPage() {
   const loadConfig = useCallback(async () => {
     setLoadingConfig(true);
     try {
-      const data = await client.getRankingConfig();
+      const c = getMedusaAdminClient();
+      const data = await c.getRankingConfig();
       if (data?.configs) setConfigs(data.configs);
-    } catch (_) {}
-    finally { setLoadingConfig(false); }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingConfig(false);
+    }
   }, []);
 
   const loadProducts = useCallback(async () => {
     setLoadingProducts(true);
     try {
-      const data = await client.getRankingProducts({ strategy });
+      const c = getMedusaAdminClient();
+      const data = await c.getRankingProducts({ strategy });
       if (data?.products) setProducts(data.products);
-    } catch (_) {}
-    finally { setLoadingProducts(false); }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingProducts(false);
+    }
   }, [strategy]);
 
-  useEffect(() => { loadConfig(); }, [loadConfig]);
-  useEffect(() => { if (activeTab === 1) loadProducts(); }, [activeTab, loadProducts]);
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  useEffect(() => {
+    if (activeTab === 0) loadProducts();
+  }, [activeTab, loadProducts]);
 
   const handleCompute = async () => {
     setComputing(true);
     setErr(null);
     try {
-      await client.triggerRankingCompute();
-      setSuccess("Berechnung gestartet. Ergebnisse in ~30 Sekunden verfügbar.");
-      setTimeout(() => { setSuccess(null); loadProducts(); }, 6000);
+      await getMedusaAdminClient().triggerRankingCompute();
+      setSuccess(t("successCompute"));
+      setTimeout(() => {
+        setSuccess(null);
+        loadProducts();
+      }, 6000);
     } catch (e) {
-      setErr(e?.message || "Fehler");
+      setErr(e?.message || t("errorGeneric"));
     } finally {
       setComputing(false);
     }
@@ -426,114 +558,165 @@ export default function RankingPage() {
     setSaving(true);
     setErr(null);
     try {
-      await client.updateRankingConfig(strat, cfg);
-      setSuccess("Konfiguration gespeichert.");
+      await getMedusaAdminClient().updateRankingConfig(strat, cfg);
+      setSuccess(t("successSave"));
       loadConfig();
       setTimeout(() => setSuccess(null), 3000);
     } catch (e) {
-      setErr(e?.message || "Fehler beim Speichern");
+      setErr(e?.message || t("errorGeneric"));
     } finally {
       setSaving(false);
     }
   };
 
   const tabs = [
-    { id: "config", content: "Gewichtungen & Konfiguration" },
-    { id: "products", content: "Produktranking" },
+    { id: "placements", content: t("tabPlacements") },
+    { id: "rules", content: t("tabRules") },
   ];
 
   return (
     <Page
-      title="Sıralaması Algoritması"
-      subtitle="Ürün görünürlüğü ve sıralamayı yönet"
+      title={t("title")}
+      subtitle={t("subtitle")}
+      secondaryActions={[
+        { content: t("load"), onAction: () => (activeTab === 0 ? loadProducts() : loadConfig()), disabled: activeTab === 0 ? loadingProducts : loadingConfig },
+      ]}
       primaryAction={
-        isSuperuser ? {
-          content: computing ? "Berechne…" : "Jetzt berechnen",
-          onAction: handleCompute,
-          loading: computing,
-        } : undefined
+        isSuperuser
+          ? {
+            content: computing ? t("computing") : t("compute"),
+            onAction: handleCompute,
+            loading: computing,
+          }
+          : undefined
       }
     >
-      <BlockStack gap="400">
-        {err && <Banner tone="critical" onDismiss={() => setErr(null)}>{err}</Banner>}
-        {success && <Banner tone="success" onDismiss={() => setSuccess(null)}>{success}</Banner>}
+      <Layout>
+        <Layout.Section>
+          <BlockStack gap="500">
+            {err && <Banner tone="critical" onDismiss={() => setErr(null)}>{err}</Banner>}
+            {success && <Banner tone="success" onDismiss={() => setSuccess(null)}>{success}</Banner>}
+            {isSuperuser && (
+              <Text as="p" variant="bodySm" tone="subdued">
+                {t("superuserOnly")}
+              </Text>
+            )}
 
-        {/* Info banner */}
-        <Card>
-          <BlockStack gap="200">
-            <Text as="p" variant="bodyMd" fontWeight="semibold">Nasıl çalışır?</Text>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingMd">
+                  {t("whatIsTitle")}
+                </Text>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  {t("whatIsBody")}
+                </Text>
+              </BlockStack>
+            </Card>
+
+            <Text as="h2" variant="headingLg">
+              {t("flowTitle")}
+            </Text>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: 16,
+              }}
+            >
               {[
-                { icon: "📊", title: "Popülerlik", desc: "Satışlar, GMV, tıklamalar — son 30 gün" },
-                { icon: "✨", title: "Tazelik", desc: "Yeni ürünler keşif bonusu alır (üstel azalma)" },
-                { icon: "⚡", title: "Trend Hızı", desc: "7g/30g satış oranı — ivmelenen ürünler öne çıkar" },
-                { icon: "🏷️", title: "İndirim", desc: "Sales stratejisinde ağırlıklı sinyal" },
-                { icon: "🌟", title: "Satıcı Skoru", desc: "Satıcının genel puan ortalaması" },
-                { icon: "🔀", title: "Çeşitlilik", desc: "Aynı satıcı üst üste çok gelmesin" },
-              ].map(({ icon, title, desc }) => (
-                <div key={title} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  <span style={{ fontSize: 18 }}>{icon}</span>
-                  <div>
-                    <Text as="p" variant="bodySm" fontWeight="semibold">{title}</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">{desc}</Text>
-                  </div>
-                </div>
+                { title: t("flow1Title"), body: t("flow1Text") },
+                { title: t("flow2Title"), body: t("flow2Text") },
+                { title: t("flow3Title"), body: t("flow3Text") },
+              ].map((step) => (
+                <Card key={step.title}>
+                  <BlockStack gap="200">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                      {step.title}
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {step.body}
+                    </Text>
+                  </BlockStack>
+                </Card>
               ))}
             </div>
+
+            <Card>
+              <Tabs tabs={tabs} selected={activeTab} onSelect={setActiveTab} />
+              <Box paddingBlockStart="400">
+                {activeTab === 0 && (
+                  <BlockStack gap="500">
+                    <InlineStack align="space-between" blockAlign="start" wrap gap="400">
+                      <div style={{ flex: "1 1 320px" }}>
+                        <BlockStack gap="200">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {t("strategyHelp")}
+                          </Text>
+                          <Select
+                            label={t("strategyLabel")}
+                            options={strategyOptions}
+                            value={strategy}
+                            onChange={setStrategy}
+                            helpText={currentStrategyDesc}
+                          />
+                        </BlockStack>
+                      </div>
+                      <div style={{ paddingTop: 4 }}>
+                        <BlockStack gap="200">
+                          <Button onClick={loadProducts} loading={loadingProducts}>
+                            {t("load")}
+                          </Button>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {t("productCount", { count: products.length })}
+                          </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {t("refreshNote")}
+                          </Text>
+                        </BlockStack>
+                      </div>
+                    </InlineStack>
+                    <Divider />
+                    {loadingProducts ? (
+                      <Box padding="600">
+                        <InlineStack align="center">
+                          <Spinner size="small" />
+                        </InlineStack>
+                      </Box>
+                    ) : (
+                      <RankingTable
+                        products={products}
+                        strategy={strategy}
+                        onBreakdown={setBreakdownId}
+                        t={t}
+                        router={router}
+                        maxScore={maxScore}
+                      />
+                    )}
+                  </BlockStack>
+                )}
+
+                {activeTab === 1 && (
+                  loadingConfig ? (
+                    <Box padding="600">
+                      <InlineStack align="center">
+                        <Spinner size="small" />
+                      </InlineStack>
+                    </Box>
+                  ) : (
+                    <ConfigEditor configs={configs} onSave={handleSaveConfig} saving={saving} t={t} />
+                  )
+                )}
+              </Box>
+            </Card>
           </BlockStack>
-        </Card>
-
-        <Card>
-          <Tabs tabs={tabs} selected={activeTab} onSelect={setActiveTab} />
-          <Box paddingBlockStart="400">
-            {activeTab === 0 && (
-              loadingConfig
-                ? <Box padding="600"><InlineStack align="center"><Spinner size="small" /></InlineStack></Box>
-                : <ConfigEditor configs={configs} onSave={handleSaveConfig} saving={saving} />
-            )}
-
-            {activeTab === 1 && (
-              <BlockStack gap="300">
-                <InlineStack gap="300" blockAlign="center">
-                  <div style={{ minWidth: 220 }}>
-                    <Select
-                      label="Strategie"
-                      options={STRATEGIES}
-                      value={strategy}
-                      onChange={setStrategy}
-                    />
-                  </div>
-                  <div style={{ paddingTop: 20 }}>
-                    <Button onClick={loadProducts} loading={loadingProducts}>Laden</Button>
-                  </div>
-                  <div style={{ paddingTop: 20 }}>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      {products.length} Produkte · Automatische Neuberechnung alle 2h
-                    </Text>
-                  </div>
-                </InlineStack>
-
-                {loadingProducts
-                  ? <Box padding="600"><InlineStack align="center"><Spinner size="small" /></InlineStack></Box>
-                  : <RankingTable
-                      products={products}
-                      isSuperuser={isSuperuser}
-                      strategy={strategy}
-                      onBreakdown={setBreakdownId}
-                    />
-                }
-              </BlockStack>
-            )}
-          </Box>
-        </Card>
-      </BlockStack>
+        </Layout.Section>
+      </Layout>
 
       {breakdownId && (
         <BreakdownModal
           productId={breakdownId}
           strategy={strategy}
-          onClose={() => setBreakdownId(null)}
-          client={client}
+          onClose={closeBreakdown}
         />
       )}
     </Page>
