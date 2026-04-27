@@ -636,6 +636,7 @@ function ButtonTypeSection({ typeKey, typeData, onChange }) {
 export default function StylesPage() {
   const client = getMedusaAdminClient();
   const unsaved = useUnsavedChanges();
+  const [isSuperuser, setIsSuperuser] = useState(false);
   const [styles, setStyles] = useState(null);
   /** Letzter gespeicherter / geladener Stand für Dirty-Vergleich */
   const [savedSnapshot, setSavedSnapshot] = useState(null);
@@ -654,6 +655,11 @@ export default function StylesPage() {
   });
   const [brandingSnapshot, setBrandingSnapshot] = useState(null);
   const [brandingPickerTarget, setBrandingPickerTarget] = useState(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
 
   const loadStyles = useCallback(async () => {
     setLoading(true);
@@ -806,6 +812,33 @@ export default function StylesPage() {
         {savedMsg && (
           <Layout.Section>
             <Banner tone="success" onDismiss={() => setSavedMsg("")}>{savedMsg}</Banner>
+          </Layout.Section>
+        )}
+        {isSuperuser && (
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingMd">Homepage SEO (Meta)</Text>
+                <Text as="p" tone="subdued">
+                  Hier kannst du den Browser-Titel und die Meta-Beschreibung der Startseite setzen.
+                </Text>
+                <TextField
+                  label="Homepage Meta Title"
+                  value={styles?.seo_home_title || ""}
+                  onChange={(v) => setStyles((prev) => ({ ...prev, seo_home_title: v }))}
+                  autoComplete="off"
+                  placeholder="z. B. Banzano - Your Marketplace"
+                />
+                <TextField
+                  label="Homepage Meta Description"
+                  value={styles?.seo_home_description || ""}
+                  onChange={(v) => setStyles((prev) => ({ ...prev, seo_home_description: v }))}
+                  autoComplete="off"
+                  multiline={3}
+                  placeholder="Kurze Beschreibung fuer Suchergebnisse und Social Preview"
+                />
+              </BlockStack>
+            </Card>
           </Layout.Section>
         )}
         <Layout.Section>
