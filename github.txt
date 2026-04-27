@@ -18,6 +18,8 @@ ps: git checkout main ; git merge dev ; git push origin main
     
 .\git-workflow.ps1
 
-Hotinger eski degerler:
+Hostinger eski degerler:
 A	@	0   2.57.91.91  50	
 CNAME	www	0	banzano.com	300
+
+OK NOW

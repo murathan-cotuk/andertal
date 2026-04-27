@@ -1,4 +1,4 @@
-26.04.
+27.04.
 
 - cms
 - bir sistem ile entegre oldugunda hangi verilere get ve post yapilmasi gerektigi cok asikar. sen de gayet iyi biliyorsun. bildigini uygula.
