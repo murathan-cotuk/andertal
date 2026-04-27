@@ -1177,6 +1177,11 @@ export default function ShopHeader() {
   const atTop = scrollY <= SCROLL_THRESHOLD;
   /* Second nav: desktop = hide with scroll direction (same as before); mobile = latched so it stays off after scroll-down */
   const showSubNav = isNarrowViewport ? !mobileSecondNavHidden : !scrollingDown;
+  const secondNavHidden = !showSubNav || !showHeaderFilterBar;
+  const spacerHeight = Math.max(
+    0,
+    headerHeight - (isNarrowViewport && secondNavHidden ? 40 : 0)
+  );
   /* Header only visible when scrolling up (or initial load when scrollingDown is false) */
   const showHeader = !scrollingDown;
   /** Mobile/tablet: thin search-only row while scrolling down (not on wide desktop) */
@@ -1601,7 +1606,7 @@ export default function ShopHeader() {
         </SubNavWrap>
       </HeaderWrap>
 
-      <HeaderSpacer $height={headerHeight} />
+      <HeaderSpacer $height={spacerHeight} />
     </>
   );
 }

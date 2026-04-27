@@ -1985,6 +1985,21 @@ function normalizeImageCarouselAspect(raw) {
   return s.replace(/:/g, "/").replace(/\s+/g, "");
 }
 
+function aspectRatioToNumber(raw, fallback = 0.8) {
+  const s = normalizeImageCarouselAspect(raw);
+  if (!s) return fallback;
+  if (/^[\d.]+$/.test(s)) {
+    const n = Number(s);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  }
+  const m = s.match(/^([\d.]+)\/([\d.]+)$/);
+  if (!m) return fallback;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= 0) return fallback;
+  return a / b;
+}
+
 /**
  * Pro Slide: optionale Desktop-/Mobil-Seitenverhältnisse und min. Höhe (Mobil) aus dem Seller-Editor.
  */
@@ -2016,6 +2031,9 @@ function ImageCarousel({ container, locale = "de" }) {
   const carouselPadding = { ...rawPad, paddingTop: 0, paddingBottom: 0 };
   const maxHDesktop = container.max_height != null ? String(container.max_height).trim() : "";
   const maxHMobile = container.max_height_mobile != null ? String(container.max_height_mobile).trim() : "";
+  const mobileRatio = pickImageCarouselRatio(container, true);
+  const mobileRatioNum = aspectRatioToNumber(mobileRatio, 0.8);
+  const mobileItemWidth = Math.max(110, Math.min(320, Math.round(260 * mobileRatioNum)));
 
   const renderImageCell = (img) => {
     const src = resolveUrl(img.url);
@@ -2080,7 +2098,8 @@ function ImageCarousel({ container, locale = "de" }) {
         <Carousel
           contained={false}
           title={lt(container, "title", locale) || undefined}
-          visibleCount={itemsPerRow}
+          visibleCount={isNarrow ? undefined : itemsPerRow}
+          itemWidth={isNarrow ? mobileItemWidth : 260}
           navOnSides
           gap={gap}
           ariaLabel={lt(container, "title", locale) || "Bild-Karussell"}
