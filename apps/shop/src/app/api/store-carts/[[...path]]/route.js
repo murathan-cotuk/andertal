@@ -6,7 +6,8 @@ const getBackendUrl = () =>
 async function forward(request, ctx) {
   try {
     const base = getBackendUrl();
-    const parts = Array.isArray(ctx?.params?.path) ? ctx.params.path : [];
+    const params = await ctx?.params;
+    const parts = Array.isArray(params?.path) ? params.path : [];
     const suffix = parts.length ? `/${parts.map(encodeURIComponent).join("/")}` : "";
     const incoming = new URL(request.url);
     const query = incoming.search || "";
