@@ -8,8 +8,15 @@ import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow } from "@/hooks/useIsNarrow";
+import { useLocale } from "next-intl";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
+
+/** Read a translatable text field — falls back to root field (DE default) */
+function lt(obj, field, locale) {
+  if (!locale || locale === "de") return obj?.[field] ?? "";
+  return obj?._i18n?.[locale]?.[field] ?? obj?.[field] ?? "";
+}
 
 function resolveUrl(url) {
   if (!url) return "";
@@ -258,7 +265,7 @@ function btnAlignSelf(justifyContent) {
 }
 
 // ── Hero Banner Slider ────────────────────────────────────────────────────────
-function HeroBanner({ container }) {
+function HeroBanner({ container, locale = "de" }) {
   const isMobile = useIsNarrow(767);
   const [current, setCurrent] = useState(0);
   const timerRef = useRef(null);
@@ -316,13 +323,16 @@ function HeroBanner({ container }) {
 
   // ── Shared slide text overlay ─────────────────────────────────────────────
   function Overlay({ s, mobile }) {
-    if (!s.title && !s.subtitle && !s.btn_text) return null;
+    const title = lt(s, "title", locale);
+    const subtitle = lt(s, "subtitle", locale);
+    const btnText = lt(s, "btn_text", locale);
+    if (!title && !subtitle && !btnText) return null;
     const ps = getPositionStyle(s.text_position || "center");
     return (
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", padding: mobile ? "14px" : (s.content_padding || "32px 48px"), pointerEvents: "none", ...ps }}>
-        {s.title && <h2 style={{ fontSize: mobile ? "clamp(14px,5vw,26px)" : (s.title_size || "clamp(24px,4vw,56px)"), fontWeight: 900, color: s.text_color || "#fff", margin: 0, lineHeight: 1.15, marginBottom: s.subtitle ? 6 : (s.btn_text ? 10 : 0) }}>{s.title}</h2>}
-        {s.subtitle && <p style={{ fontSize: mobile ? "clamp(11px,3vw,15px)" : (s.subtitle_size || "clamp(14px,2vw,22px)"), color: s.subtitle_color || s.text_color || "#fff", margin: s.btn_text ? "0 0 10px" : 0, maxWidth: 600 }}>{s.subtitle}</p>}
-        {s.btn_text && <a href={s.btn_url || "#"} style={{ pointerEvents: "auto", display: "inline-block", padding: mobile ? "7px 16px" : (s.btn_padding || "12px 28px"), background: s.btn_bg || "#ff971c", color: s.btn_color || "#fff", border: s.btn_border || "2px solid #000", borderRadius: s.btn_radius || 8, fontWeight: 800, fontSize: mobile ? 12 : 15, textDecoration: "none", boxShadow: "0 3px 0 2px #000", alignSelf: btnAlignSelf(ps.justifyContent) }}>{s.btn_text}</a>}
+        {title && <h2 style={{ fontSize: mobile ? "clamp(14px,5vw,26px)" : (s.title_size || "clamp(24px,4vw,56px)"), fontWeight: 900, color: s.text_color || "#fff", margin: 0, lineHeight: 1.15, marginBottom: subtitle ? 6 : (btnText ? 10 : 0) }}>{title}</h2>}
+        {subtitle && <p style={{ fontSize: mobile ? "clamp(11px,3vw,15px)" : (s.subtitle_size || "clamp(14px,2vw,22px)"), color: s.subtitle_color || s.text_color || "#fff", margin: btnText ? "0 0 10px" : 0, maxWidth: 600 }}>{subtitle}</p>}
+        {btnText && <a href={s.btn_url || "#"} style={{ pointerEvents: "auto", display: "inline-block", padding: mobile ? "7px 16px" : (s.btn_padding || "12px 28px"), background: s.btn_bg || "#ff971c", color: s.btn_color || "#fff", border: s.btn_border || "2px solid #000", borderRadius: s.btn_radius || 8, fontWeight: 800, fontSize: mobile ? 12 : 15, textDecoration: "none", boxShadow: "0 3px 0 2px #000", alignSelf: btnAlignSelf(ps.justifyContent) }}>{btnText}</a>}
       </div>
     );
   }
@@ -412,21 +422,24 @@ function HeroBanner({ container }) {
 }
 
 // ── Text Block ────────────────────────────────────────────────────────────────
-function TextBlock({ container }) {
+function TextBlock({ container, locale = "de" }) {
   const align = container.align || "center";
   const posStyle = getPositionStyle(container.text_position || `center-${align === "left" ? "left" : align === "right" ? "right" : "center"}`);
+  const title = lt(container, "title", locale);
+  const body = lt(container, "body", locale);
+  const btnText = lt(container, "btn_text", locale);
   return (
     <div style={{ background: container.bg_color || "#fff", ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ ...getContentInnerStyle(container, 800), textAlign: align }}>
-        {container.title && (
+        {title && (
           <h2 style={{ fontSize: "clamp(20px,3vw,36px)", fontWeight: 800, color: container.text_color || "#111827", margin: "0 0 16px" }}>
-            {container.title}
+            {title}
           </h2>
         )}
-        {container.body && (
-          <div style={{ fontSize: 16, color: container.text_color || "#374151", lineHeight: 1.7, margin: "0 0 24px" }} dangerouslySetInnerHTML={{ __html: container.body }} />
+        {body && (
+          <div style={{ fontSize: 16, color: container.text_color || "#374151", lineHeight: 1.7, margin: "0 0 24px" }} dangerouslySetInnerHTML={{ __html: body }} />
         )}
-        {container.btn_text && container.btn_url && (
+        {btnText && container.btn_url && (
           <a
             href={container.btn_url}
             style={{
@@ -438,7 +451,7 @@ function TextBlock({ container }) {
               fontWeight: 800, fontSize: 14, textDecoration: "none", boxShadow: "0 3px 0 2px #000",
             }}
           >
-            {container.btn_text}
+            {btnText}
           </a>
         )}
       </div>
@@ -482,7 +495,7 @@ function landingVideoEmbedFromUrl(input) {
 }
 
 // ── Video (Datei-URL oder Einbettung, optional Desktop/Mobil getrennt) ──────
-function VideoBlock({ container }) {
+function VideoBlock({ container, locale = "de" }) {
   const isNarrow = useIsNarrow(1023);
   const mode = container.video_mode === "embed" ? "embed" : "file";
   const ar = String(container.aspect_ratio || "16/9").replace(/:/g, "/").replace(/\s+/g, "") || "16/9";
@@ -524,20 +537,20 @@ function VideoBlock({ container }) {
   return (
     <div style={{ background: bg, ...getContainerPadding(container, "32px 24px") }}>
       <div style={{ ...getContentInnerStyle(container, 1000) }}>
-        {container.title && (
+        {lt(container, "title", locale) && (
           <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: tc, margin: "0 0 8px" }}>
-            {container.title}
+            {lt(container, "title", locale)}
           </h2>
         )}
-        {container.caption && (
+        {lt(container, "caption", locale) && (
           <p style={{ fontSize: 15, color: tc, margin: "0 0 16px", lineHeight: 1.5, opacity: 0.92 }}>
-            {container.caption}
+            {lt(container, "caption", locale)}
           </p>
         )}
         <div style={box}>
           {mode === "embed" ? (
             <iframe
-              title={String(container.title || "Video").slice(0, 120)}
+              title={String(lt(container, "title", locale) || "Video").slice(0, 120)}
               src={embedSrc}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, display: "block" }}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
@@ -572,28 +585,31 @@ function VideoBlock({ container }) {
 }
 
 // ── Image + Text ──────────────────────────────────────────────────────────────
-function ImageText({ container }) {
+function ImageText({ container, locale = "de" }) {
   const imageLeft = container.image_side !== "right";
   const imgSrc = resolveUrl(container.image);
   const textAlign = container.text_align || "left";
+  const title = lt(container, "title", locale);
+  const body = lt(container, "body", locale);
+  const btnText = lt(container, "btn_text", locale);
   return (
     <div style={{ background: container.bg_color || "#fff", ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ ...getContentInnerStyle(container, 1100), display: "flex", flexDirection: imageLeft ? "row" : "row-reverse", gap: 40, alignItems: "center", flexWrap: "wrap" }}>
         {imgSrc && (
           <div style={{ flex: "0 0 auto", width: "min(45%, 480px)" }}>
-            <img src={imgSrc} alt={container.title || ""} style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} />
+            <img src={imgSrc} alt={title || ""} style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} />
           </div>
         )}
         <div style={{ flex: 1, minWidth: 240, textAlign }}>
-          {container.title && (
+          {title && (
             <h2 style={{ fontSize: "clamp(20px,2.5vw,32px)", fontWeight: 800, color: container.text_color || "#111827", margin: "0 0 12px" }}>
-              {container.title}
+              {title}
             </h2>
           )}
-          {container.body && (
-            <div style={{ fontSize: 16, color: container.text_color || "#374151", lineHeight: 1.7, margin: "0 0 20px" }} dangerouslySetInnerHTML={{ __html: container.body }} />
+          {body && (
+            <div style={{ fontSize: 16, color: container.text_color || "#374151", lineHeight: 1.7, margin: "0 0 20px" }} dangerouslySetInnerHTML={{ __html: body }} />
           )}
-          {container.btn_text && container.btn_url && (
+          {btnText && container.btn_url && (
             <a
               href={container.btn_url}
               style={{
@@ -605,7 +621,7 @@ function ImageText({ container }) {
                 fontWeight: 800, fontSize: 14, textDecoration: "none", boxShadow: "0 3px 0 2px #000",
               }}
             >
-              {container.btn_text}
+              {btnText}
             </a>
           )}
         </div>
@@ -650,7 +666,7 @@ function mosaicGridCellIndex(rows, rowIdx, colIdx) {
 }
 
 // ── Content-Mosaic: Bilder ODER Kollektionsprodukte ODER Kollektionen, Raster frei wählbar ──
-function ContentMosaic({ container, preloadedProducts }) {
+function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
   const isNarrow = useIsNarrow(1023);
   const source = String(container.source || "images");
   const baseGap = container.gap != null ? Number(container.gap) : 16;
@@ -744,18 +760,20 @@ function ContentMosaic({ container, preloadedProducts }) {
   const renderImage = (img) => {
     const r = String(img.aspect_ratio || "1/1").replace(/:/g, "/");
     const src = resolveUrl(img.url);
-    const hasTitle = !!(img.title && String(img.title).trim());
-    const hasBody = !!(img.text && String(img.text).trim());
+    const imgTitle = lt(img, "title", locale);
+    const imgText = lt(img, "text", locale);
+    const hasTitle = !!(imgTitle && String(imgTitle).trim());
+    const hasBody = !!(imgText && String(imgText).trim());
     const hasCaption = hasTitle || hasBody;
     const below = hasCaption ? (
       <div>
-        {hasTitle ? <LandingItemHeading>{img.title}</LandingItemHeading> : null}
-        <LandingItemSubtext html={img.text} marginTop={hasTitle ? 8 : 4} />
+        {hasTitle ? <LandingItemHeading>{imgTitle}</LandingItemHeading> : null}
+        <LandingItemSubtext html={imgText} marginTop={hasTitle ? 8 : 4} />
       </div>
     ) : null;
     const card = (
       <div>
-        <img src={src} alt={img.title || ""} style={{ width: "100%", aspectRatio: r, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />
+        <img src={src} alt={imgTitle || ""} style={{ width: "100%", aspectRatio: r, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />
         {below}
       </div>
     );
@@ -817,8 +835,8 @@ function ContentMosaic({ container, preloadedProducts }) {
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
       <div style={getContentInnerStyle(container, 1280)}>
-        {container.title && (
-          <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{container.title}</h2>
+        {lt(container, "title", locale) && (
+          <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{lt(container, "title", locale)}</h2>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap, width: "100%" }}>
           {rows.map((rowItems, ri) => (
@@ -847,7 +865,7 @@ function ContentMosaic({ container, preloadedProducts }) {
 }
 
 // ── Image Grid ────────────────────────────────────────────────────────────────
-function ImageGrid({ container }) {
+function ImageGrid({ container, locale = "de" }) {
   const cols = container.cols || 2;
   const gap = container.gap || 16;
   const images = (container.images || []).filter((i) => i.url);
@@ -857,13 +875,15 @@ function ImageGrid({ container }) {
       <div style={{ ...getContentInnerStyle(container, 1100), display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap }}>
         {images.map((img, i) => {
           const ratio = img.aspect_ratio || "1/1";
-          const imgEl = <img src={resolveUrl(img.url)} alt={img.title || ""} style={{ width: "100%", aspectRatio: ratio, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />;
-          const hasTitle = !!(img.title && String(img.title).trim());
-          const hasBody = !!(img.text && String(img.text).trim());
+          const imgTitle = lt(img, "title", locale);
+          const imgText = lt(img, "text", locale);
+          const imgEl = <img src={resolveUrl(img.url)} alt={imgTitle || ""} style={{ width: "100%", aspectRatio: ratio, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />;
+          const hasTitle = !!(imgTitle && String(imgTitle).trim());
+          const hasBody = !!(imgText && String(imgText).trim());
           const caption = (hasTitle || hasBody) ? (
             <div>
-              {hasTitle ? <LandingItemHeading>{img.title}</LandingItemHeading> : null}
-              <LandingItemSubtext html={img.text} marginTop={hasTitle ? 8 : 4} />
+              {hasTitle ? <LandingItemHeading>{imgTitle}</LandingItemHeading> : null}
+              <LandingItemSubtext html={imgText} marginTop={hasTitle ? 8 : 4} />
             </div>
           ) : null;
           const inner = <>{imgEl}{caption}</>;
@@ -877,7 +897,7 @@ function ImageGrid({ container }) {
 }
 
 // ── Banner CTA ────────────────────────────────────────────────────────────────
-function BannerCta({ container }) {
+function BannerCta({ container, locale = "de" }) {
   const posStyle = getPositionStyle(container.text_position || "center");
   const padRaw = getContainerPadding(container, "32px 48px 40px 48px");
   // Eski horizontal-only kayıtlar 0 üst/alt veriyordu; buton/gölge taşmasın diye minimum.
@@ -899,17 +919,17 @@ function BannerCta({ container }) {
       }}
     >
       <div style={getContentInnerStyle(container, 960)}>
-        {container.title && (
+        {lt(container, "title", locale) && (
           <h2 style={{ fontSize: "clamp(20px,3vw,36px)", fontWeight: 900, color: container.text_color || "#fff", margin: "0 0 8px", maxWidth: "100%" }}>
-            {container.title}
+            {lt(container, "title", locale)}
           </h2>
         )}
-        {container.subtitle && (
+        {lt(container, "subtitle", locale) && (
           <p style={{ fontSize: 16, color: container.subtitle_color || container.text_color || "#fff", margin: "0 0 20px", opacity: 0.9, maxWidth: "100%" }}>
-            {container.subtitle}
+            {lt(container, "subtitle", locale)}
           </p>
         )}
-        {container.btn_text && container.btn_url && (
+        {lt(container, "btn_text", locale) && container.btn_url && (
           <a
             href={container.btn_url}
             style={{
@@ -929,7 +949,7 @@ function BannerCta({ container }) {
               alignSelf: btnAlignSelf(posStyle.justifyContent),
             }}
           >
-            {container.btn_text}
+            {lt(container, "btn_text", locale)}
           </a>
         )}
       </div>
@@ -938,7 +958,7 @@ function BannerCta({ container }) {
 }
 
 // ── Collection Carousel ───────────────────────────────────────────────────────
-function CollectionCarousel({ container, preloadedProducts }) {
+function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
   // undefined = still loading, [] = loaded but empty, [...] = has products
   const [products, setProducts] = useState(preloadedProducts);
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
@@ -997,14 +1017,14 @@ function CollectionCarousel({ container, preloadedProducts }) {
       <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
         <div style={getContentInnerStyle(container, 1280)}>
           <MobilePagedGridScroll
-            title={container.title}
+            title={lt(container, "title", locale)}
             gap={gap}
             rows={rows}
             cols={cols}
             items={products}
             itemKey={(p, i) => p.id || i}
             renderItem={renderProductWithCaption}
-            ariaLabel={container.title?.trim() || "Kollektion: Produkte"}
+            ariaLabel={lt(container, "title", locale) || "Kollektion: Produkte"}
           />
         </div>
       </div>
@@ -1016,12 +1036,12 @@ function CollectionCarousel({ container, preloadedProducts }) {
       <div style={getContentInnerStyle(container, 1280)}>
         <Carousel
           contained={false}
-          title={container.title?.trim() ? container.title : undefined}
+          title={lt(container, "title", locale) || undefined}
           visibleCount={itemsPerRow}
           navOnSides
           gap={gap}
           showFade={false}
-          ariaLabel={container.title?.trim() || "Collection carousel"}
+          ariaLabel={lt(container, "title", locale) || "Collection carousel"}
         >
           {products.map((product, i) => (
             <div key={product.id || i} style={{ minWidth: 0 }}>
@@ -1034,7 +1054,7 @@ function CollectionCarousel({ container, preloadedProducts }) {
   );
 }
 
-function CollectionsCarousel({ container }) {
+function CollectionsCarousel({ container, locale = "de" }) {
   const snapshots = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
   const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
@@ -1143,14 +1163,14 @@ function CollectionsCarousel({ container }) {
       <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
         <div style={getContentInnerStyle(container, 1280)}>
           <MobilePagedGridScroll
-            title={container.title}
+            title={lt(container, "title", locale)}
             gap={gap}
             rows={rows}
             cols={cols}
             items={collections}
             itemKey={(c, i) => c.id || i}
             renderItem={renderCollectionCell}
-            ariaLabel={container.title?.trim() || "Kollektionen"}
+            ariaLabel={lt(container, "title", locale) || "Kollektionen"}
           />
         </div>
       </div>
@@ -1162,11 +1182,11 @@ function CollectionsCarousel({ container }) {
       <div style={getContentInnerStyle(container, 1280)}>
         <Carousel
           contained={false}
-          title={container.title?.trim() ? container.title : undefined}
+          title={lt(container, "title", locale) || undefined}
           visibleCount={itemsPerRow}
           navOnSides
           gap={gap}
-          ariaLabel={container.title?.trim() || "Collections carousel"}
+          ariaLabel={lt(container, "title", locale) || "Collections carousel"}
         >
           {collections.map((collection, i) => {
             const href = collectionHref(collection.handle);
@@ -1226,7 +1246,7 @@ function CollectionsCarousel({ container }) {
 }
 
 // ── Single featured product ───────────────────────────────────────────────────
-function SingleProduct({ container, preloadedProduct }) {
+function SingleProduct({ container, preloadedProduct, locale = "de" }) {
   // undefined = loading, null = not found/no id, object = loaded
   const [product, setProduct] = useState(preloadedProduct !== undefined ? (preloadedProduct || null) : undefined);
   const idOrHandle = (container.product_id || container.product_handle || "").toString().trim();
@@ -1259,7 +1279,7 @@ function SingleProduct({ container, preloadedProduct }) {
   if (!product) return null;
 
   const wrapBg = container.bg_color || "#fff";
-  const title = container.title;
+  const title = lt(container, "title", locale);
 
   return (
     <div style={{ ...getContainerPadding(container, "48px 24px"), background: wrapBg }}>
@@ -1282,7 +1302,7 @@ function SingleProduct({ container, preloadedProduct }) {
 }
 
 // ── Featured blog posts (carousel: teaser ~3 lines + link to full post) ───────
-function BlogCarousel({ container }) {
+function BlogCarousel({ container, locale = "de" }) {
   const posts = Array.isArray(container.posts)
     ? container.posts.filter((p) => p && (p.title || p.image || p.excerpt || p.body))
     : [];
@@ -1315,12 +1335,12 @@ function BlogCarousel({ container }) {
       <div style={getContentInnerStyle(container, 1280)}>
         <Carousel
           contained={false}
-          title={container.title?.trim() ? container.title : undefined}
+          title={lt(container, "title", locale) || undefined}
           visibleCount={Math.min(itemsPerRow, posts.length)}
           navOnSides
           gap={gap}
           fadeBgColor={bg}
-          ariaLabel={container.title?.trim() || "Blog"}
+          ariaLabel={lt(container, "title", locale) || "Blog"}
         >
           {posts.map((post, i) => {
           const id = post.id || `post-${i}`;
@@ -1416,7 +1436,7 @@ function BlogCarousel({ container }) {
 }
 
 // ── Newsletter (form POST to external URL or internal endpoint) ───────────────
-function NewsletterSignup({ container }) {
+function NewsletterSignup({ container, locale = "de" }) {
   const action = (container.form_action || "").trim();
   const method = (container.form_method || "post").toLowerCase() === "get" ? "get" : "post";
   const emailName = (container.email_field_name || "EMAIL").trim() || "EMAIL";
@@ -1468,14 +1488,14 @@ function NewsletterSignup({ container }) {
   return (
     <div style={{ ...getContainerPadding(container, "48px 24px"), background: bg }}>
       <div style={{ ...getContentInnerStyle(container, 560), textAlign: "center" }}>
-        {container.title ? (
+        {lt(container, "title", locale) ? (
           <h2 style={{ fontSize: "clamp(20px,3vw,28px)", fontWeight: 800, color: textColor, margin: "0 0 8px" }}>
-            {container.title}
+            {lt(container, "title", locale)}
           </h2>
         ) : null}
-        {container.subtitle ? (
+        {lt(container, "subtitle", locale) ? (
           <p style={{ margin: "0 0 20px", fontSize: 15, color: "#4b5563", lineHeight: 1.5 }}>
-            {container.subtitle}
+            {lt(container, "subtitle", locale)}
           </p>
         ) : null}
         {action ? (
@@ -1483,8 +1503,8 @@ function NewsletterSignup({ container }) {
             {hiddenFields.map((f, i) => (
               f && f.name ? <input key={i} type="hidden" name={String(f.name)} value={String(f.value ?? "")} /> : null
             ))}
-            <input type="email" name={emailName} required placeholder={container.email_placeholder || "E-Mail"} autoComplete="email" style={sharedInputStyle} />
-            <button type="submit" style={sharedBtnStyle}>{container.button_text || "Abonnieren"}</button>
+            <input type="email" name={emailName} required placeholder={lt(container, "email_placeholder", locale) || "E-Mail"} autoComplete="email" style={sharedInputStyle} />
+            <button type="submit" style={sharedBtnStyle}>{lt(container, "button_text", locale) || "Abonnieren"}</button>
           </form>
         ) : internalState === "success" ? (
           <p style={{ fontSize: 16, color: "#059669", fontWeight: 600, margin: "12px 0 0" }}>
@@ -1497,12 +1517,12 @@ function NewsletterSignup({ container }) {
               required
               value={internalEmail}
               onChange={(e) => setInternalEmail(e.target.value)}
-              placeholder={container.email_placeholder || "E-Mail"}
+              placeholder={lt(container, "email_placeholder", locale) || "E-Mail"}
               autoComplete="email"
               style={sharedInputStyle}
             />
             <button type="submit" disabled={internalState === "loading"} style={{ ...sharedBtnStyle, opacity: internalState === "loading" ? 0.7 : 1 }}>
-              {internalState === "loading" ? "…" : (container.button_text || "Abonnieren")}
+              {internalState === "loading" ? "…" : (lt(container, "button_text", locale) || "Abonnieren")}
             </button>
             {internalState === "error" && (
               <p style={{ fontSize: 13, color: "#ef4444", margin: 0 }}>Fehler beim Anmelden. Bitte erneut versuchen.</p>
@@ -1540,7 +1560,7 @@ function AccordionChevron({ color, open }) {
   );
 }
 
-function Accordion({ container }) {
+function Accordion({ container, locale = "de" }) {
   const [openIdx, setOpenIdx] = useState(null);
   const items = container.items || [];
   const bg = container.bg_color || "#ffffff";
@@ -1551,7 +1571,7 @@ function Accordion({ container }) {
   return (
     <div style={{ background: bg, ...getContainerPadding(container, "48px 24px") }}>
       <div style={getContentInnerStyle(container, 720)}>
-        {container.title && (
+        {lt(container, "title", locale) && (
           <h2
             style={{
               fontSize: "clamp(22px, 3.2vw, 34px)",
@@ -1563,7 +1583,7 @@ function Accordion({ container }) {
               lineHeight: 1.2,
             }}
           >
-            {container.title}
+            {lt(container, "title", locale)}
           </h2>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -1612,7 +1632,7 @@ function Accordion({ container }) {
                       lineHeight: 1.35,
                     }}
                   >
-                    {item.question}
+                    {lt(item, "question", locale)}
                   </span>
                   <AccordionChevron color={iconColor} open={isOpen} />
                 </button>
@@ -1632,7 +1652,7 @@ function Accordion({ container }) {
                       fontSize: "0.984rem",
                       lineHeight: 1.75,
                     }}
-                    dangerouslySetInnerHTML={{ __html: item.answer || "" }}
+                    dangerouslySetInnerHTML={{ __html: lt(item, "answer", locale) || "" }}
                   />
                 </div>
               </div>
@@ -1645,7 +1665,7 @@ function Accordion({ container }) {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-function Tabs({ container }) {
+function Tabs({ container, locale = "de" }) {
   const [activeIdx, setActiveIdx] = useState(0);
   const tabs = container.tabs || [];
   const bg = container.bg_color || "#ffffff";
@@ -1770,7 +1790,7 @@ function Tabs({ container }) {
                 style={tabStyle(idx)}
                 onClick={() => setActiveIdx(idx)}
               >
-                {tab.label}
+                {lt(tab, "label", locale)}
               </button>
             ))}
           </div>
@@ -1789,7 +1809,7 @@ function Tabs({ container }) {
               boxShadow: "0 4px 28px -8px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.05)",
               minHeight: 48,
             }}
-            dangerouslySetInnerHTML={{ __html: activeTab.content || "" }}
+            dangerouslySetInnerHTML={{ __html: lt(activeTab, "content", locale) || "" }}
           />
         )}
       </div>
@@ -1798,15 +1818,17 @@ function Tabs({ container }) {
 }
 
 // ── Feature Grid ──────────────────────────────────────────────────────────────
-function FeatureGrid({ container }) {
+function FeatureGrid({ container, locale = "de" }) {
   const {
-    title, subtitle, title_align = "center",
+    title_align = "center",
     cols = 3, card_style = "bordered",
     icon_size = "40px",
     bg_color = "#ffffff", card_bg = "#f9fafb",
     card_border_color = "#e5e7eb", text_color = "#111827",
     items = [],
   } = container;
+  const title = lt(container, "title", locale);
+  const subtitle = lt(container, "subtitle", locale);
 
   const cardStyle = (() => {
     const base = {
@@ -1852,11 +1874,11 @@ function FeatureGrid({ container }) {
               {item.icon && (
                 <div style={{ fontSize: icon_size, lineHeight: 1 }}>{item.icon}</div>
               )}
-              {item.title && (
-                <div style={{ fontSize: "1.0625rem", fontWeight: 700, color: text_color, margin: 0 }}>{item.title}</div>
+              {lt(item, "title", locale) && (
+                <div style={{ fontSize: "1.0625rem", fontWeight: 700, color: text_color, margin: 0 }}>{lt(item, "title", locale)}</div>
               )}
-              {item.body && (
-                <div style={{ fontSize: "0.9375rem", color: text_color, opacity: 0.72, lineHeight: 1.6, margin: 0 }}>{item.body}</div>
+              {lt(item, "body", locale) && (
+                <div style={{ fontSize: "0.9375rem", color: text_color, opacity: 0.72, lineHeight: 1.6, margin: 0 }}>{lt(item, "body", locale)}</div>
               )}
             </div>
           ))}
@@ -1868,15 +1890,17 @@ function FeatureGrid({ container }) {
 }
 
 // ── Testimonials ──────────────────────────────────────────────────────────────
-function Testimonials({ container }) {
+function Testimonials({ container, locale = "de" }) {
   const {
-    title, subtitle, title_align = "center",
+    title_align = "center",
     cols = 3, show_stars = true,
     bg_color = "#f9fafb", card_bg = "#ffffff",
     card_border_color = "#e5e7eb", text_color = "#111827",
     accent_color = "#ff971c",
     items = [],
   } = container;
+  const title = lt(container, "title", locale);
+  const subtitle = lt(container, "subtitle", locale);
 
   const stars = (n) => Array.from({ length: 5 }, (_, i) => (
     <span key={i} style={{ color: i < n ? accent_color : "#d1d5db", fontSize: "0.875rem" }}>★</span>
@@ -1920,27 +1944,27 @@ function Testimonials({ container }) {
               {show_stars && item.rating > 0 && (
                 <div style={{ display: "flex", gap: 2 }}>{stars(Number(item.rating) || 5)}</div>
               )}
-              {item.quote && (
+              {lt(item, "quote", locale) && (
                 <p style={{ margin: 0, fontSize: "0.9688rem", lineHeight: 1.7, color: text_color, flex: 1 }}>
-                  "{item.quote}"
+                  "{lt(item, "quote", locale)}"
                 </p>
               )}
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: "auto" }}>
                 {item.avatar && (
                   <img
                     src={resolveUrl(item.avatar)}
-                    alt={item.author || ""}
+                    alt={lt(item, "author", locale) || ""}
                     style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `2px solid ${card_border_color}` }}
                   />
                 )}
                 {!item.avatar && (
                   <div style={{ width: 40, height: 40, borderRadius: "50%", background: accent_color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "1rem", fontWeight: 700, color: "#fff" }}>
-                    {(item.author || "?")[0].toUpperCase()}
+                    {(lt(item, "author", locale) || "?")[0].toUpperCase()}
                   </div>
                 )}
                 <div>
-                  {item.author && <div style={{ fontWeight: 700, fontSize: "0.9375rem", color: text_color }}>{item.author}</div>}
-                  {item.role && <div style={{ fontSize: "0.8125rem", color: text_color, opacity: 0.6 }}>{item.role}</div>}
+                  {lt(item, "author", locale) && <div style={{ fontWeight: 700, fontSize: "0.9375rem", color: text_color }}>{lt(item, "author", locale)}</div>}
+                  {lt(item, "role", locale) && <div style={{ fontSize: "0.8125rem", color: text_color, opacity: 0.6 }}>{lt(item, "role", locale)}</div>}
                 </div>
               </div>
             </div>
@@ -1964,17 +1988,17 @@ function normalizeImageCarouselAspect(raw) {
 /**
  * Pro Slide: optionale Desktop-/Mobil-Seitenverhältnisse und min. Höhe (Mobil) aus dem Seller-Editor.
  */
-function pickImageCarouselRatio(img, isNarrow) {
-  const desktop = normalizeImageCarouselAspect(img.aspect_ratio_custom) || normalizeImageCarouselAspect(img.aspect_ratio) || "4/5";
+function pickImageCarouselRatio(container, isNarrow) {
+  const desktop = normalizeImageCarouselAspect(container?.aspect_ratio_custom) || normalizeImageCarouselAspect(container?.aspect_ratio) || "4/5";
   if (!isNarrow) return desktop;
-  const mobileCustom = normalizeImageCarouselAspect(img.aspect_ratio_mobile_custom);
+  const mobileCustom = normalizeImageCarouselAspect(container?.aspect_ratio_mobile_custom);
   if (mobileCustom) return mobileCustom;
-  const mobile = normalizeImageCarouselAspect(img.aspect_ratio_mobile);
+  const mobile = normalizeImageCarouselAspect(container?.aspect_ratio_mobile);
   if (mobile) return mobile;
   return desktop;
 }
 
-function ImageCarousel({ container }) {
+function ImageCarousel({ container, locale = "de" }) {
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
   const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
   const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
@@ -1986,31 +2010,41 @@ function ImageCarousel({ container }) {
   const gap = isNarrow && gapMobile != null && !Number.isNaN(gapMobile) ? gapMobile : (Number.isNaN(baseGap) ? 16 : baseGap);
   const bg = container.bg_color || "#fff";
   const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
+  // Image carousel editor only exposes horizontal padding controls.
+  // Force vertical padding to 0 so "top spacing" is controlled by margin only.
+  const rawPad = getContainerPadding(container, "0px 24px 0px 24px");
+  const carouselPadding = { ...rawPad, paddingTop: 0, paddingBottom: 0 };
+  const maxHDesktop = container.max_height != null ? String(container.max_height).trim() : "";
+  const maxHMobile = container.max_height_mobile != null ? String(container.max_height_mobile).trim() : "";
 
   const renderImageCell = (img) => {
     const src = resolveUrl(img.url);
-    const ratio = pickImageCarouselRatio(img, isNarrow);
-    const minH = isNarrow && (img.min_height_mobile != null) && String(img.min_height_mobile).trim() !== "";
+    const ratio = pickImageCarouselRatio(container, isNarrow);
+    const minH = isNarrow && (container.min_height_mobile != null) && String(container.min_height_mobile).trim() !== "";
+    const maxH = isNarrow ? (maxHMobile || maxHDesktop) : maxHDesktop;
     const boxStyle = {
       width: "100%",
       aspectRatio: ratio,
       overflow: "hidden",
       borderRadius: 12,
       background: "#f3f4f6",
-      ...(minH ? { minHeight: String(img.min_height_mobile).trim() } : {}),
+      ...(minH ? { minHeight: String(container.min_height_mobile).trim() } : {}),
+      ...(maxH ? { maxHeight: maxH } : {}),
     };
-    const hasTitle = !!(img.title && String(img.title).trim());
-    const hasBody = !!(img.text && String(img.text).trim());
+    const imgTitle = lt(img, "title", locale);
+    const imgText = lt(img, "text", locale);
+    const hasTitle = !!(imgTitle && String(imgTitle).trim());
+    const hasBody = !!(imgText && String(imgText).trim());
     const cap = (hasTitle || hasBody) ? (
       <div>
-        {hasTitle ? <LandingItemHeading>{img.title}</LandingItemHeading> : null}
-        <LandingItemSubtext html={img.text} marginTop={hasTitle ? 8 : 4} />
+        {hasTitle ? <LandingItemHeading>{imgTitle}</LandingItemHeading> : null}
+        <LandingItemSubtext html={imgText} marginTop={hasTitle ? 8 : 4} />
       </div>
     ) : null;
     const block = (
       <>
         <div style={boxStyle}>
-          <img src={src} alt={img.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <img src={src} alt={imgTitle || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         </div>
         {cap}
       </>
@@ -2023,17 +2057,17 @@ function ImageCarousel({ container }) {
 
   if (isNarrow && isGrid) {
     return (
-      <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
+      <div style={{ ...carouselPadding, background: bg }}>
         <div style={getContentInnerStyle(container, 1280)}>
           <MobilePagedGridScroll
-            title={container.title}
+            title={lt(container, "title", locale)}
             gap={gap}
             rows={rows}
             cols={cols}
             items={images}
             itemKey={(_, i) => `img-${i}`}
             renderItem={renderImageCell}
-            ariaLabel={container.title?.trim() || "Bild-Karussell"}
+            ariaLabel={lt(container, "title", locale) || "Bild-Karussell"}
           />
         </div>
       </div>
@@ -2041,15 +2075,15 @@ function ImageCarousel({ container }) {
   }
 
   return (
-    <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
+    <div style={{ ...carouselPadding, background: bg }}>
       <div style={getContentInnerStyle(container, 1280)}>
         <Carousel
           contained={false}
-          title={container.title?.trim() ? container.title : undefined}
+          title={lt(container, "title", locale) || undefined}
           visibleCount={itemsPerRow}
           navOnSides
           gap={gap}
-          ariaLabel={container.title?.trim() || "Bild-Karussell"}
+          ariaLabel={lt(container, "title", locale) || "Bild-Karussell"}
         >
           {images.map((img, i) => (
             <div key={i} style={{ minWidth: 0 }}>
@@ -2068,27 +2102,28 @@ function renderContainer(c, preload = {}, ctx = {}) {
   const v = c.visible_on || "desktop";
   if (v === "desktop" && ctx.isNarrow) return null;
   if (v === "mobile" && !ctx.isNarrow) return null;
+  const locale = ctx.locale || "de";
   let inner = null;
   const collectionKey = `${String(c.collection_id || "").trim()}|${String(c.collection_handle || "").trim()}`;
   const singleKey = String(c.product_id || c.product_handle || "").trim();
   switch (c.type) {
-    case "hero_banner":          inner = <HeroBanner container={c} />; break;
-    case "text_block":           inner = <TextBlock container={c} />; break;
-    case "video_block":         inner = <VideoBlock container={c} />; break;
-    case "image_text":           inner = <ImageText container={c} />; break;
-    case "image_grid":           inner = <ImageGrid container={c} />; break;
-    case "image_carousel":       inner = <ImageCarousel container={c} />; break;
-    case "banner_cta":           inner = <BannerCta container={c} />; break;
-    case "collection_carousel":  inner = <CollectionCarousel container={c} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
-    case "content_mosaic":       inner = <ContentMosaic container={c} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
-    case "collections_carousel": inner = <CollectionsCarousel container={c} />; break;
-    case "accordion":            inner = <Accordion container={c} />; break;
-    case "tabs":                 inner = <Tabs container={c} />; break;
-    case "single_product":       inner = <SingleProduct container={c} preloadedProduct={preload.singleProducts?.[singleKey]} />; break;
-    case "blog_carousel":        inner = <BlogCarousel container={c} />; break;
-    case "newsletter":           inner = <NewsletterSignup container={c} />; break;
-    case "feature_grid":         inner = <FeatureGrid container={c} />; break;
-    case "testimonials":         inner = <Testimonials container={c} />; break;
+    case "hero_banner":          inner = <HeroBanner container={c} locale={locale} />; break;
+    case "text_block":           inner = <TextBlock container={c} locale={locale} />; break;
+    case "video_block":         inner = <VideoBlock container={c} locale={locale} />; break;
+    case "image_text":           inner = <ImageText container={c} locale={locale} />; break;
+    case "image_grid":           inner = <ImageGrid container={c} locale={locale} />; break;
+    case "image_carousel":       inner = <ImageCarousel container={c} locale={locale} />; break;
+    case "banner_cta":           inner = <BannerCta container={c} locale={locale} />; break;
+    case "collection_carousel":  inner = <CollectionCarousel container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
+    case "content_mosaic":       inner = <ContentMosaic container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
+    case "collections_carousel": inner = <CollectionsCarousel container={c} locale={locale} />; break;
+    case "accordion":            inner = <Accordion container={c} locale={locale} />; break;
+    case "tabs":                 inner = <Tabs container={c} locale={locale} />; break;
+    case "single_product":       inner = <SingleProduct container={c} locale={locale} preloadedProduct={preload.singleProducts?.[singleKey]} />; break;
+    case "blog_carousel":        inner = <BlogCarousel container={c} locale={locale} />; break;
+    case "newsletter":           inner = <NewsletterSignup container={c} locale={locale} />; break;
+    case "feature_grid":         inner = <FeatureGrid container={c} locale={locale} />; break;
+    case "testimonials":         inner = <Testimonials container={c} locale={locale} />; break;
     default: return null;
   }
   const m = c.margin || {};
@@ -2106,9 +2141,9 @@ function renderContainer(c, preload = {}, ctx = {}) {
 export default function LandingContainers({ pageId, categoryId }) {
   const [containers, setContainers] = useState(null);
   const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
-  const [pagePaddingTop, setPagePaddingTop] = useState("");
   const { setLandingHeaderFilterBar } = useLandingChrome();
   const isNarrow = useIsNarrow(1023);
+  const locale = useLocale();
 
   useEffect(() => {
     let endpoint = "/store/landing-page";
@@ -2131,19 +2166,16 @@ export default function LandingContainers({ pageId, categoryId }) {
             );
           }
           setLandingHeaderFilterBar(true);
-          setPagePaddingTop("");
           setContainers([]);
           return;
         }
         const showBar = data?.settings?.show_filter_bar !== false;
         setLandingHeaderFilterBar(showBar);
-        setPagePaddingTop(data?.settings?.page_padding_top || "");
         if (Array.isArray(data?.containers)) setContainers(data.containers);
         else setContainers([]);
       })
       .catch(() => {
         setLandingHeaderFilterBar(true);
-        setPagePaddingTop("");
         setContainers([]);
       });
   }, [pageId, categoryId, setLandingHeaderFilterBar]);
@@ -2215,8 +2247,8 @@ export default function LandingContainers({ pageId, categoryId }) {
   if (containers.length === 0) return null;
 
   return (
-    <div style={pagePaddingTop ? { paddingTop: pagePaddingTop } : undefined}>
-      {containers.map((c) => renderContainer(c, preload, { isNarrow }))}
+    <div>
+      {containers.map((c) => renderContainer(c, preload, { isNarrow, locale }))}
     </div>
   );
 }

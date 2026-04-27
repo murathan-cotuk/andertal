@@ -275,7 +275,7 @@ export default function RegisterPage() {
     if (formData.password.length < 6) { setError(t("passwordTooShort")); return; }
     if (formData.password !== formData.passwordConfirm) {
       setPasswordConfirmTouched(true);
-      setError("Passwörter stimmen nicht überein.");
+      setError(t("passwordMismatch"));
       return;
     }
     if (accountType === "gewerbe" && !formData.companyName.trim()) { setError(t("companyNameRequired")); return; }
@@ -743,13 +743,13 @@ export default function RegisterPage() {
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>Passwort wiederholen *</label>
+              <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("passwordConfirmLabel")} *</label>
               <input
                 type={showPassword ? "text" : "password"}
                 id="passwordConfirm"
                 value={formData.passwordConfirm}
                 onChange={set("passwordConfirm")}
-                placeholder={t("passwordPlaceholder")}
+                placeholder={t("passwordConfirmPlaceholder")}
                 required
                 autoComplete="new-password"
                 style={{
@@ -764,7 +764,7 @@ export default function RegisterPage() {
               />
               {passwordConfirmTouched && passwordMismatch && (
                 <span style={{ color: "#dc2626", fontSize: 12, fontWeight: 600 }}>
-                  Passwörter stimmen nicht überein.
+                  {t("passwordMismatch")}
                 </span>
               )}
             </div>

@@ -104,6 +104,10 @@ const HeaderWrap = styled.header`
 
   /* Mobile notch / status-bar safe area should match header color */
   @media (max-width: ${HEADER_NARROW_MQ}px) {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--header-bg, ${MIDDLE_BAR_BG});
+
     &::before {
       content: "";
       position: absolute;

@@ -65,24 +65,24 @@ const SUPERUSER_ACCENT_COLOR = "#812727";
 
 const styleSuperuserOnlyNavItems = (items, isSuperuser) => {
   if (!Array.isArray(items)) return [];
+  const emphasizeLabel = (label, isSuperOnly) => {
+    if (!isSuperuser || !isSuperOnly) return label;
+    return `${String(label)} *`;
+  };
   return items.map((item) => {
     const subNavigationItems = Array.isArray(item.subNavigationItems)
       ? item.subNavigationItems.map((sub) => {
           const isSuperOnlySub = !!sub.superuserOnly;
           return {
             ...sub,
-            label: isSuperuser && isSuperOnlySub
-              ? <span style={{ color: SUPERUSER_ACCENT_COLOR, fontWeight: 700 }}>{sub.label}</span>
-              : sub.label,
+            label: emphasizeLabel(sub.label, isSuperOnlySub),
           };
         })
       : item.subNavigationItems;
     const isSuperOnlyItem = !!item.superuserOnly;
     return {
       ...item,
-      label: isSuperuser && isSuperOnlyItem
-        ? <span style={{ color: SUPERUSER_ACCENT_COLOR, fontWeight: 700 }}>{item.label}</span>
-        : item.label,
+      label: emphasizeLabel(item.label, isSuperOnlyItem),
       subNavigationItems,
     };
   });
@@ -215,6 +215,23 @@ const NAV_VIRTUAL_URL_FALLBACK = {
   "/sellers-menu": "/sellers",
 };
 
+function withStableNavIds(items = [], sectionPrefix = "main") {
+  return items.map((item, index) => {
+    const baseId = `${sectionPrefix}:${item?.url || "item"}:${index}`;
+    const subNavigationItems = Array.isArray(item?.subNavigationItems)
+      ? item.subNavigationItems.map((sub, subIndex) => ({
+          ...sub,
+          id: `${baseId}:sub:${sub?.url || "item"}:${subIndex}`,
+        }))
+      : item?.subNavigationItems;
+    return {
+      ...item,
+      id: baseId,
+      subNavigationItems,
+    };
+  });
+}
+
 const isModifiedOrNewTabClick = (e) => {
   if (!e) return false;
   return (
@@ -319,7 +336,7 @@ export default function PolarisLayout({ children }) {
   const [msgUnread, setMsgUnread] = useState(0);
   const notifRef = useRef(null);
   // Track which parent nav item has its sub-menu expanded
-  const [expandedLabel, setExpandedLabel] = useState(null);
+  const [expandedNavKey, setExpandedNavKey] = useState(null);
   const [storeName, setStoreName] = useState(
     typeof window !== "undefined"
       ? localStorage.getItem("storeName") || "Seller Account"
@@ -845,7 +862,7 @@ export default function PolarisLayout({ children }) {
       contextControl={polarisLogoContextControl}
     >
       <Navigation.Section
-        items={menuMain.map((item) => {
+        items={withStableNavIds(menuMain, "main").map((item) => {
           const hasSub = item.subNavigationItems?.length > 0;
           const shouldToggleOnly = hasSub && PARENT_NAV_URLS.has(item.url);
           // A parent is "selected" (expanded) if we manually toggled it OR a child matches current path
@@ -853,16 +870,17 @@ export default function PolarisLayout({ children }) {
           const parentIsActive = !!parentTargetUrl && (navLocation === parentTargetUrl || navLocation.startsWith(`${parentTargetUrl}/`));
           const childIsActive = hasSub && item.subNavigationItems.some((s) => s.url !== item.url && navLocation.startsWith(s.url));
           const isSelected = hasSub
-            ? ((shouldToggleOnly && expandedLabel === item.label) || parentIsActive || childIsActive)
+            ? ((shouldToggleOnly && expandedNavKey === item.url) || parentIsActive || childIsActive)
             : undefined;
           return {
+            id: item.id,
             url: item.url,
             label: item.label,
             icon: item.icon,
             subNavigationItems: item.subNavigationItems,
             selected: isSelected,
             onClick: shouldToggleOnly
-              ? () => setExpandedLabel((prev) => prev === item.label ? null : item.label)
+              ? () => setExpandedNavKey((prev) => prev === item.url ? null : item.url)
               : undefined,
           };
         })}
@@ -870,20 +888,21 @@ export default function PolarisLayout({ children }) {
       <Navigation.Section
         fill
         separator
-        items={menuSettings.map((item) => {
+        items={withStableNavIds(menuSettings, "settings").map((item) => {
           const hasSub = item.subNavigationItems?.length > 0;
           const shouldToggleOnly = hasSub && PARENT_NAV_URLS.has(item.url);
           const parentIsActive = navLocation === item.url || navLocation.startsWith(item.url + "/");
           const childIsActive = hasSub && item.subNavigationItems.some((s) => navLocation.startsWith(s.url));
-          const isSelected = hasSub ? (shouldToggleOnly && expandedLabel === item.label) || parentIsActive || childIsActive : undefined;
+          const isSelected = hasSub ? (shouldToggleOnly && expandedNavKey === item.url) || parentIsActive || childIsActive : undefined;
           return {
+            id: item.id,
             url: item.url,
             label: item.label,
             icon: item.icon,
             subNavigationItems: item.subNavigationItems,
             selected: isSelected,
             onClick: shouldToggleOnly
-              ? () => setExpandedLabel((prev) => prev === item.label ? null : item.label)
+              ? () => setExpandedNavKey((prev) => prev === item.url ? null : item.url)
               : undefined,
           };
         })}
