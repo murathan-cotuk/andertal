@@ -61,28 +61,20 @@ const GroupedDropdownSearch = dynamic(
   { ssr: false, loading: () => <div style={{ width: "100%", maxWidth: 400, height: 36 }} /> }
 );
 
-const SUPERUSER_ACCENT_COLOR = "#812727";
-
 const styleSuperuserOnlyNavItems = (items, isSuperuser) => {
   if (!Array.isArray(items)) return [];
-  const emphasizeLabel = (label, isSuperOnly) => {
-    if (!isSuperuser || !isSuperOnly) return label;
-    return `${String(label)} *`;
-  };
   return items.map((item) => {
     const subNavigationItems = Array.isArray(item.subNavigationItems)
       ? item.subNavigationItems.map((sub) => {
-          const isSuperOnlySub = !!sub.superuserOnly;
           return {
             ...sub,
-            label: emphasizeLabel(sub.label, isSuperOnlySub),
+            label: sub.label,
           };
         })
       : item.subNavigationItems;
-    const isSuperOnlyItem = !!item.superuserOnly;
     return {
       ...item,
-      label: emphasizeLabel(item.label, isSuperOnlyItem),
+      label: item.label,
       subNavigationItems,
     };
   });
