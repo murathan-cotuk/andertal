@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { getToken } from "@belucha/lib";
+import { getToken } from "@andertal/lib";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { getMedusaClient } from "@/lib/medusa-client";

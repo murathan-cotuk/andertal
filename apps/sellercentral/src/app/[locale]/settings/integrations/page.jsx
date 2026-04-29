@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -282,7 +282,7 @@ export default function IntegrationsSettingsPage() {
         <Card>
           <BlockStack gap="200">
             <Text as="p" variant="bodySm" tone="subdued">
-              Lege eine Integration mit <strong>freiem Namen</strong> an. Belucha erzeugt automatisch eine{" "}
+              Lege eine Integration mit <strong>freiem Namen</strong> an. Andertal erzeugt automatisch eine{" "}
               <strong>Zugangs-ID</strong> und einen <strong>Sicherheitsschlüssel</strong> — keine vorgefertigte App-Liste.
             </Text>
           </BlockStack>
@@ -414,7 +414,7 @@ export default function IntegrationsSettingsPage() {
                 onChange={setFormName}
                 autoComplete="off"
                 placeholder="z. B. Warenwirtschaft XY, Eigenes Tool…"
-                helpText="Belucha erzeugt Zugangs-ID und Sicherheitsschlüssel automatisch nach dem Speichern."
+                helpText="Andertal erzeugt Zugangs-ID und Sicherheitsschlüssel automatisch nach dem Speichern."
               />
               {editingId && (
                 <Text as="p" tone="subdued" variant="bodySm">

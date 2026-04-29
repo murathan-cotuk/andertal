@@ -1,12 +1,12 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { normalizeIsoCountryCode } from "@/lib/iso-country";
 
 /** Last delivery country from checkout — used for Versand quotes until shop header country changes. */
-export const CHECKOUT_SHIPPING_COUNTRY_LS = "belucha_checkout_shipping_country";
+export const CHECKOUT_SHIPPING_COUNTRY_LS = "andertal_checkout_shipping_country";
 /** ISO2 of the market storefront (URL prefix) when {@link CHECKOUT_SHIPPING_COUNTRY_LS} was written — avoids DE checkout leaking into /gb/ threshold & Versand. */
-export const CHECKOUT_SHIPPING_MARKET_COUNTRY_LS = "belucha_checkout_shipping_market_country";
+export const CHECKOUT_SHIPPING_MARKET_COUNTRY_LS = "andertal_checkout_shipping_market_country";
 
 /**
  * @param {string} marketCountryUpper - from URL market prefix (e.g. ES)

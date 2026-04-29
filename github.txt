@@ -1,4 +1,4 @@
-git clone https://github.com/murathan-cotuk/banzano
+git clone https://github.com/murathan-cotuk/andertal
 
 cmd: git checkout dev && git add . && git commit -m "update" && git push origin dev
 ps: git checkout dev ; git add . ; git commit -m "update" ; git push origin dev
@@ -19,7 +19,7 @@ ps: git checkout main ; git merge dev ; git push origin main
 .\git-workflow.ps1
 
 Hostinger eski degerler:
-A	@	0   2.57.91.91  50	
-CNAME	www	0	banzano.com	300
+CNAME   www	0	andertal.com	300	
+A	@	0	2.57.91.91	50	
 
 OK NOW

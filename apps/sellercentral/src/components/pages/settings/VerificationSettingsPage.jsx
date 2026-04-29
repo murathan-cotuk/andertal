@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Modal, Spinner, Text, TextField } from "@shopify/polaris";
@@ -218,7 +218,7 @@ const CONTRACT_SECTIONS = {
   de: [
     {
       heading: "Präambel",
-      body: `Diese Vereinbarung regelt die Rechtsbeziehung zwischen dem Betreiber der Plattform Belucha (nachfolgend „Plattform") und dem registrierten Verkäufer (nachfolgend „Verkäufer"). Mit Abschluss der Verifizierung erklärt sich der Verkäufer mit allen nachfolgenden Bedingungen einverstanden. Die Vereinbarung entspricht den Anforderungen der Verordnung (EU) 2022/2065 (Digital Services Act), der Verordnung (EU) 2019/1150 (P2B-Verordnung), der DSGVO sowie dem deutschen Bürgerlichen Gesetzbuch (BGB).`,
+      body: `Diese Vereinbarung regelt die Rechtsbeziehung zwischen dem Betreiber der Plattform Andertal (nachfolgend „Plattform") und dem registrierten Verkäufer (nachfolgend „Verkäufer"). Mit Abschluss der Verifizierung erklärt sich der Verkäufer mit allen nachfolgenden Bedingungen einverstanden. Die Vereinbarung entspricht den Anforderungen der Verordnung (EU) 2022/2065 (Digital Services Act), der Verordnung (EU) 2019/1150 (P2B-Verordnung), der DSGVO sowie dem deutschen Bürgerlichen Gesetzbuch (BGB).`,
     },
     {
       heading: "§ 1 – Vertragsgegenstand",
@@ -250,7 +250,7 @@ const CONTRACT_SECTIONS = {
     },
     {
       heading: "§ 8 – Streitbeilegung",
-      body: `Streitigkeiten zwischen Plattform und Verkäufer werden zunächst intern über den Support-Kanal behandelt. Die Plattform benennt gemäß Art. 11 P2B-VO als interne Beschwerdeführer: support@belucha.com. Als externe Streitbeilegungsstelle steht das Online-Streitbeilegungsportal der EU (https://ec.europa.eu/consumers/odr/) zur Verfügung. Es gilt deutsches Recht, Gerichtsstand ist Berlin.`,
+      body: `Streitigkeiten zwischen Plattform und Verkäufer werden zunächst intern über den Support-Kanal behandelt. Die Plattform benennt gemäß Art. 11 P2B-VO als interne Beschwerdeführer: support@andertal.com. Als externe Streitbeilegungsstelle steht das Online-Streitbeilegungsportal der EU (https://ec.europa.eu/consumers/odr/) zur Verfügung. Es gilt deutsches Recht, Gerichtsstand ist Berlin.`,
     },
     {
       heading: "§ 9 – Schlussbestimmungen",
@@ -260,7 +260,7 @@ const CONTRACT_SECTIONS = {
   tr: [
     {
       heading: "Önsöz",
-      body: `Bu sözleşme, Belucha platformunun işletmecisi (bundan böyle "Platform") ile kayıtlı satıcı (bundan böyle "Satıcı") arasındaki hukuki ilişkiyi düzenler. AB Dijital Hizmetler Yasası (DSA - (EU) 2022/2065), P2B Tüzüğü ((EU) 2019/1150), GDPR ve Türk Ticaret Kanunu çerçevesinde hazırlanmıştır.`,
+      body: `Bu sözleşme, Andertal platformunun işletmecisi (bundan böyle "Platform") ile kayıtlı satıcı (bundan böyle "Satıcı") arasındaki hukuki ilişkiyi düzenler. AB Dijital Hizmetler Yasası (DSA - (EU) 2022/2065), P2B Tüzüğü ((EU) 2019/1150), GDPR ve Türk Ticaret Kanunu çerçevesinde hazırlanmıştır.`,
     },
     {
       heading: "Madde 1 – Sözleşmenin Konusu",
@@ -292,7 +292,7 @@ const CONTRACT_SECTIONS = {
     },
     {
       heading: "Madde 8 – Uyuşmazlık Çözümü",
-      body: `Uyuşmazlıklar önce support@belucha.com üzerinden dahili destek kanalıyla çözülmeye çalışılır. Çözüme kavuşturulamazsa AB Çevrimiçi Uyuşmazlık Çözüm Platformu (https://ec.europa.eu/consumers/odr/) başvuru için kullanılabilir. Türk mevzuatı ve Almanya hukuku birlikte uygulanır; yetki mahkemesi Berlin'dir.`,
+      body: `Uyuşmazlıklar önce support@andertal.com üzerinden dahili destek kanalıyla çözülmeye çalışılır. Çözüme kavuşturulamazsa AB Çevrimiçi Uyuşmazlık Çözüm Platformu (https://ec.europa.eu/consumers/odr/) başvuru için kullanılabilir. Türk mevzuatı ve Almanya hukuku birlikte uygulanır; yetki mahkemesi Berlin'dir.`,
     },
     {
       heading: "Madde 9 – Son Hükümler",
@@ -302,7 +302,7 @@ const CONTRACT_SECTIONS = {
   en: [
     {
       heading: "Preamble",
-      body: `This Agreement governs the legal relationship between the operator of the Belucha platform (hereinafter "Platform") and the registered seller (hereinafter "Seller"). It is prepared in compliance with Regulation (EU) 2022/2065 (Digital Services Act), Regulation (EU) 2019/1150 (P2B Regulation), the GDPR, and applicable national law.`,
+      body: `This Agreement governs the legal relationship between the operator of the Andertal platform (hereinafter "Platform") and the registered seller (hereinafter "Seller"). It is prepared in compliance with Regulation (EU) 2022/2065 (Digital Services Act), Regulation (EU) 2019/1150 (P2B Regulation), the GDPR, and applicable national law.`,
     },
     {
       heading: "Article 1 – Subject Matter",
@@ -334,7 +334,7 @@ const CONTRACT_SECTIONS = {
     },
     {
       heading: "Article 8 – Dispute Resolution",
-      body: `Disputes between the Platform and the Seller are first addressed via the internal support channel at support@belucha.com. The EU Online Dispute Resolution platform (https://ec.europa.eu/consumers/odr/) is available for unresolved disputes. German law applies; the place of jurisdiction is Berlin.`,
+      body: `Disputes between the Platform and the Seller are first addressed via the internal support channel at support@andertal.com. The EU Online Dispute Resolution platform (https://ec.europa.eu/consumers/odr/) is available for unresolved disputes. German law applies; the place of jurisdiction is Berlin.`,
     },
     {
       heading: "Article 9 – Final Provisions",

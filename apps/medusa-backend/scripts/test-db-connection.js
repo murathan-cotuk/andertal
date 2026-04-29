@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PostgreSQL bağlantı testi
  * Kullanım: node scripts/test-db-connection.js
  * .env.local içindeki DATABASE_URL kullanılır (Render External URL olmalı).
@@ -9,7 +9,7 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../.env.loc
 const url = process.env.DATABASE_URL
 if (!url || !url.startsWith('postgres')) {
   console.error('Hata: DATABASE_URL .env.local içinde postgres:// veya postgresql:// ile başlamalı.')
-  console.error('Yerel geliştirme için Render → belucha-medusa-db → External Database URL kopyalayıp .env.local\'e yapıştırın.')
+  console.error('Yerel geliştirme için Render → andertal-medusa-db → External Database URL kopyalayıp .env.local\'e yapıştırın.')
   process.exit(1)
 }
 

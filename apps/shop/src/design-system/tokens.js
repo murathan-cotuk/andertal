@@ -1,5 +1,5 @@
-/**
- * Belucha Design System — Premium Marketplace
+﻿/**
+ * Andertal Design System — Premium Marketplace
  * Single source of truth for colors, spacing, typography, shadows, radius.
  * Use via: import { tokens } from '@/design-system/tokens'
  * Tailwind theme is synced from these values in tailwind.config.js

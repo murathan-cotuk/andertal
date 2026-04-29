@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
 import {
@@ -27,7 +27,7 @@ import {
   HEADER_PRESET_LABELS,
   SECOND_NAV_PRESET_LABELS,
   SCROLL_UP_PRESET_LABELS,
-} from "@belucha/shop-theme";
+} from "@andertal/shop-theme";
 
 /** Deutsche Beschriftungen für Button-Farbfelder (Keys wie in DEFAULT_BUTTON_COLORS). */
 const BUTTON_COLOR_LABELS = {

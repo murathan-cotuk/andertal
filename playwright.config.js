@@ -1,8 +1,8 @@
-// @ts-check
+﻿// @ts-check
 const { defineConfig, devices } = require("@playwright/test");
 
 /**
- * Belucha E2E test config.
+ * Andertal E2E test config.
  * Run: npx playwright test
  * UI mode: npx playwright test --ui
  */

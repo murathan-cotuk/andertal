@@ -1,6 +1,6 @@
-# Cloudflare kurulum rehberi
+﻿# Cloudflare kurulum rehberi
 
-Bu rehber, Belucha projesinde Cloudflare’ı nasıl kullanacağını adım adım anlatır. İki ana kullanım var: **R2** (görsel depolama) ve **Pages** (shop/sellercentral deploy).
+Bu rehber, Andertal projesinde Cloudflare’ı nasıl kullanacağını adım adım anlatır. İki ana kullanım var: **R2** (görsel depolama) ve **Pages** (shop/sellercentral deploy).
 
 ---
 
@@ -39,7 +39,7 @@ Sellercentral’dan eklenen görsellerin kaybolmaması ve her cihazdan açılmas
 ## A.2 Bucket oluşturma
 
 1. R2 sayfasında **Create bucket**’a tıkla.
-2. **Bucket name:** Örn. `belucha-uploads` (küçük harf, tire; boşluk kullanma).
+2. **Bucket name:** Örn. `andertal-uploads` (küçük harf, tire; boşluk kullanma).
 3. **Location:** Automatic bırak.
 4. **Create bucket** de.
 5. Bu ismi not et → Render’da `S3_UPLOAD_BUCKET` olacak.
@@ -50,8 +50,8 @@ Sellercentral’dan eklenen görsellerin kaybolmaması ve her cihazdan açılmas
 
 1. R2 sayfasında **Manage R2 API Tokens**’a tıkla.
 2. **Create API token** de.
-3. **Token name:** Örn. `belucha-render-uploads`.
-4. **Permissions:** **Object Read & Write**. İstersen “Apply to specific buckets only” deyip sadece `belucha-uploads` seç.
+3. **Token name:** Örn. `andertal-render-uploads`.
+4. **Permissions:** **Object Read & Write**. İstersen “Apply to specific buckets only” deyip sadece `andertal-uploads` seç.
 5. **Create API Token** de.
 6. Açılan ekranda **Access Key ID** ve **Secret Access Key** bir kez gösterilir. İkisini de kopyalayıp güvenli yere kaydet (Secret’ı sonra tekrar göremezsin).
    - Bunlar → Render’da `S3_UPLOAD_ACCESS_KEY_ID` ve `S3_UPLOAD_SECRET_ACCESS_KEY`.
@@ -69,7 +69,7 @@ Sellercentral’dan eklenen görsellerin kaybolmaması ve her cihazdan açılmas
 
 ## A.5 Bucket’a public erişim verme
 
-1. R2 → kendi bucket’ına tıkla (örn. `belucha-uploads`) → **Settings**.
+1. R2 → kendi bucket’ına tıkla (örn. `andertal-uploads`) → **Settings**.
 2. **Public access** bölümünde erişimi aç (Allow Access / Enable public access).
 3. Cloudflare bir **public URL** verir: `https://pub-xxxxxxxxxxxxx.r2.dev` (sondaki `/` olmasın).
    - Bu → Render’da `S3_UPLOAD_PUBLIC_BASE_URL`.
@@ -83,7 +83,7 @@ Sellercentral’dan eklenen görsellerin kaybolmaması ve her cihazdan açılmas
 
 | Key | Value |
 |-----|--------|
-| `S3_UPLOAD_BUCKET` | Bucket adı (örn. `belucha-uploads`) |
+| `S3_UPLOAD_BUCKET` | Bucket adı (örn. `andertal-uploads`) |
 | `S3_UPLOAD_REGION` | `auto` |
 | `S3_UPLOAD_ENDPOINT` | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` |
 | `S3_UPLOAD_ACCESS_KEY_ID` | A.3’teki Access Key ID |
@@ -113,8 +113,8 @@ Shop (müşteri mağazası) veya Sellercentral (satıcı paneli) uygulamasını 
 1. **Workers & Pages** → **Create** → **Pages**.
 2. **Connect to Git**’i seç.
 3. GitHub hesabını bağla (izin ver).
-4. **Repository** olarak `belucha` repo’sunu seç.
-5. **Project name:** Shop için örn. `belucha-shop`, Sellercentral için `belucha-sellercentral`.
+4. **Repository** olarak `andertal` repo’sunu seç.
+5. **Project name:** Shop için örn. `andertal-shop`, Sellercentral için `andertal-sellercentral`.
 6. **Production branch:** `main` (veya kullandığın ana branch).
 
 ---
@@ -127,19 +127,19 @@ Monorepo kökünde `npx wrangler deploy` çalıştırmak **“workspace root”*
 
 | Alan | Değer |
 |------|--------|
-| **Build command** | `npm ci && npx turbo run build --filter=@belucha/shop` |
-| **Deploy command** | `cd apps/shop && npx wrangler pages deploy .next --project-name=belucha-shop` |
+| **Build command** | `npm ci && npx turbo run build --filter=@andertal/shop` |
+| **Deploy command** | `cd apps/shop && npx wrangler pages deploy .next --project-name=andertal-shop` |
 | **Non-production branch deploy command** | `cd apps/shop && npx wrangler versions upload` (veya boş bırak) |
 | **Path** | Boş bırak |
 
-`belucha-shop` yerine B.1’de verdiğin **proje adını** yaz.
+`andertal-shop` yerine B.1’de verdiğin **proje adını** yaz.
 
 ### Sellercentral (satıcı paneli) için
 
 | Alan | Değer |
 |------|--------|
-| **Build command** | `npm ci && npx turbo run build --filter=@belucha/sellercentral` |
-| **Deploy command** | `cd apps/sellercentral && npx wrangler pages deploy .next --project-name=belucha-sellercentral` |
+| **Build command** | `npm ci && npx turbo run build --filter=@andertal/sellercentral` |
+| **Deploy command** | `cd apps/sellercentral && npx wrangler pages deploy .next --project-name=andertal-sellercentral` |
 | **Non-production branch deploy command** | `cd apps/sellercentral && npx wrangler versions upload` (veya boş) |
 | **Path** | Boş bırak |
 
@@ -162,7 +162,7 @@ Cloudflare Pages → projen → **Settings** → **Environment variables** kısm
 
 1. Build configuration ve (gerekirse) env’leri kaydettikten sonra **Save** de.
 2. **Deploy** tetiklenir (veya **Retry deployment** ile yeniden çalıştır).
-3. Build ve deploy tamamlandığında Cloudflare bir URL verir (örn. `https://belucha-shop.pages.dev`). Bu adresi kullanarak shop veya sellercentral’a erişirsin.
+3. Build ve deploy tamamlandığında Cloudflare bir URL verir (örn. `https://andertal-shop.pages.dev`). Bu adresi kullanarak shop veya sellercentral’a erişirsin.
 
 ---
 
@@ -175,11 +175,11 @@ Cloudflare Pages → projen → **Settings** → **Environment variables** kısm
 **Çözüm (tercih edilen):** Build’in **repo kökünden** çalışmasını sağla:
 
 - **Root directory / Path:** Boş bırak (proje kökü = repo kökü).
-- **Build command:** `npm ci && npx turbo run build --filter=@belucha/shop`
+- **Build command:** `npm ci && npx turbo run build --filter=@andertal/shop`
 
 Böylece `npm ci` repo kökünde çalışır, tüm workspace ve `@sentry/nextjs` yüklenir; sadece shop build edilir.
 
-**Alternatif:** Root directory’yi `apps/shop` bırakmak istiyorsan, shop’un `package.json`’ında `@sentry/nextjs` tanımlı olmalı (projede eklendi). Yine de `@belucha/lib` ve `@belucha/ui` workspace paketleri için repo kökünden build almak daha güvenilir.
+**Alternatif:** Root directory’yi `apps/shop` bırakmak istiyorsan, shop’un `package.json`’ında `@sentry/nextjs` tanımlı olmalı (projede eklendi). Yine de `@andertal/lib` ve `@andertal/ui` workspace paketleri için repo kökünden build almak daha güvenilir.
 
 ## “Wrangler has been run in the root of a workspace...”
 

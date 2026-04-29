@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /**
  * MobileNav — Bottom navigation bar + slide-in drawer for mobile (≤767px).
@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
-import { useCustomerAuth as useAuth } from "@belucha/lib";
+import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { restPathFromPathname } from "@/lib/shop-market";
@@ -441,7 +441,7 @@ export default function MobileNav() {
 
   return (
     /* Only rendered/visible on mobile — display:none injected via globals.css on desktop */
-    <div className="belucha-mobile-nav-root">
+    <div className="andertal-mobile-nav-root">
       {/* ── Drawer Overlay ── */}
       <div
         style={css.overlay(drawerOpen, reducedMotion)}
@@ -557,7 +557,7 @@ export default function MobileNav() {
                 style={{ ...css.drawerBtn, color: "#ef4444" }}
                 onClick={() => {
                   closeDrawer();
-                  document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax";
+                  document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
                   logout();
                 }}
               >

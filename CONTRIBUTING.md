@@ -1,6 +1,6 @@
-# Contributing to Belucha
+﻿# Contributing to Andertal
 
-Thank you for your interest in contributing to Belucha! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to Andertal! This document provides guidelines and instructions for contributing.
 
 ## Development Setup
 

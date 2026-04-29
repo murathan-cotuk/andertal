@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Veritabanındaki Admin Hub kategorilerini listeler.
  * Kullanım: node scripts/list-categories-in-db.js
  * .env / .env.local içindeki DATABASE_URL kullanılır.
@@ -11,7 +11,7 @@ const url = process.env.DATABASE_URL
 if (!url || !url.startsWith('postgres')) {
   console.error('Hata: DATABASE_URL gerekli.')
   console.error('Kullanım: DATABASE_URL="postgresql://user:pass@host:port/db?sslmode=require" node scripts/list-categories-in-db.js')
-  console.error('Render: Dashboard → belucha-medusa-db → "External Database URL" kopyalayın.')
+  console.error('Render: Dashboard → andertal-medusa-db → "External Database URL" kopyalayın.')
   process.exit(1)
 }
 

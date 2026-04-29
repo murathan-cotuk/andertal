@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import styled from "styled-components";
@@ -20,7 +20,7 @@ import { resolveImageUrl } from "@/lib/image-url";
 import { Link } from "@/i18n/navigation";
 import { tokens } from "@/design-system/tokens";
 import PayNowButton from "@/components/ui/PayNowButton";
-import { getToken, useCustomerAuth as useCustomerAuthHook } from "@belucha/lib";
+import { getToken, useCustomerAuth as useCustomerAuthHook } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { getShippableCountries } from "@/lib/countries";
@@ -35,7 +35,7 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 const STRIPE_PK_ENV = (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim();
 
-const CHECKOUT_SNAPSHOT_KEY = "belucha_checkout_snapshot";
+const CHECKOUT_SNAPSHOT_KEY = "andertal_checkout_snapshot";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -431,7 +431,7 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
     const secret = sp.get("payment_intent_client_secret");
     const piId = sp.get("payment_intent");
     if (!secret || !piId) return;
-    if (sessionStorage.getItem(`belucha_pi_done_${piId}`) === "1") {
+    if (sessionStorage.getItem(`andertal_pi_done_${piId}`) === "1") {
       router.replace(checkoutPath);
       return;
     }
@@ -515,12 +515,12 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
               });
             } catch (_) {}
           }
-          sessionStorage.setItem(`belucha_pi_done_${piId}`, "1");
+          sessionStorage.setItem(`andertal_pi_done_${piId}`, "1");
           try {
             sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY);
           } catch (_) {}
           try {
-            window.localStorage.removeItem("belucha_cart_id");
+            window.localStorage.removeItem("andertal_cart_id");
           } catch (_) {}
           setCart(null);
           router.replace(`/${locale}/order/${orderId}`);
@@ -684,7 +684,7 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
             sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY);
           } catch (_) {}
           if (typeof window !== "undefined") {
-            try { window.localStorage.removeItem("belucha_cart_id"); } catch (_) {}
+            try { window.localStorage.removeItem("andertal_cart_id"); } catch (_) {}
           }
           setCart(null);
           router.push(`/${locale}/order/${orderId}`);

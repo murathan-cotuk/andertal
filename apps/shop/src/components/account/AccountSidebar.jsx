@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { Link, usePathname } from "@/i18n/navigation";
-import { useCustomerAuth as useAuth } from "@belucha/lib";
+import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { restPathFromPathname } from "@/lib/shop-market";
 import { useState, useEffect } from "react";
 
@@ -86,7 +86,7 @@ export default function AccountSidebar({ onLogout, onNavigate }) {
       <button
         type="button"
         onClick={() => {
-          document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax";
+          document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
           onNavigate?.();
           onLogout?.();
         }}

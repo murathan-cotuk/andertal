@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import styled from "styled-components";
-import { Card } from "@belucha/ui";
+import { Card } from "@andertal/ui";
 import Link from "next/link";
 
 const Container = styled.div`

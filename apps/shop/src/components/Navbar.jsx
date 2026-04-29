@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
-import { useCustomerAuth as useAuth } from "@belucha/lib";
+import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
@@ -262,7 +262,7 @@ export default function Navbar() {
   return (
     <Nav>
       <NavContainer>
-        <Logo href="/">Belucha</Logo>
+        <Logo href="/">Andertal</Logo>
         <SearchBar>
           <DropdownSearch
             placeholder="Search products..."

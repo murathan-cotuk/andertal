@@ -1,10 +1,10 @@
-/**
+﻿/**
  * AuthContext Test Component
  * 
  * Manual test component for AuthContext functionality
  * 
  * Usage:
- * import { AuthContextTest } from '@belucha/lib/auth/__tests__/AuthContext.test.jsx';
+ * import { AuthContextTest } from '@andertal/lib/auth/__tests__/AuthContext.test.jsx';
  * 
  * <AuthContextTest />
  */

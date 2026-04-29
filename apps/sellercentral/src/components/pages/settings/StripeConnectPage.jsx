@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import { Banner, BlockStack, Box, Button, Card, InlineStack, Text } from "@shopify/polaris";
@@ -84,7 +84,7 @@ export default function StripeConnectPage() {
           <Text as="p" tone="subdued">
             Verbinde dein Stripe-Konto, um Auszahlungen direkt zu erhalten.
             Nach Lieferung +14 Tagen werden automatisch {sellerPct}% an dich überwiesen —
-            {commissionPct}% Plattformgebühr behält Belucha.
+            {commissionPct}% Plattformgebühr behält Andertal.
           </Text>
         </BlockStack>
       </Card>
@@ -146,7 +146,7 @@ export default function StripeConnectPage() {
                     <Text as="p" variant="bodySm" tone="subdued">
                       Wenn ein Kunde bezahlt, wird die Auszahlung nach Lieferung +14 Tagen automatisch freigegeben und Stripe überweist{" "}
                       <strong>{sellerPct}%</strong> des Produktwerts direkt auf dein verbundenes Konto.
-                      Die {commissionPct}% Plattformgebühr verbleibt bei Belucha.
+                      Die {commissionPct}% Plattformgebühr verbleibt bei Andertal.
                       Auszahlungen erscheinen in deinem Stripe Express Dashboard.
                     </Text>
                   </BlockStack>

@@ -1,5 +1,5 @@
-/**
- * Belucha Typography System
+﻿/**
+ * Andertal Typography System
  * Inter, line-height 1.4–1.6, premium marketplace scale.
  * Use via: import { typography } from '@/design-system/typography'
  * Or use Tailwind: text-h1, text-body, etc. (see tailwind.config.js)

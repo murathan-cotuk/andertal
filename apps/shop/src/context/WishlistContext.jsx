@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { useCustomerAuth as useAuth, getToken } from "@belucha/lib";
+import { useCustomerAuth as useAuth, getToken } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 const WishlistContext = createContext(null);

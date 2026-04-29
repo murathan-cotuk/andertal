@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
-import { Card, Button, Input } from "@belucha/ui";
+import { Card, Button, Input } from "@andertal/ui";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 

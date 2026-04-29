@@ -1,5 +1,5 @@
-{
-  "name": "@belucha/sellercentral",
+﻿{
+  "name": "@andertal/sellercentral",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -9,9 +9,9 @@
     "lint": "eslint . --max-warnings 0"
   },
   "dependencies": {
-    "@belucha/lib": "*",
-    "@belucha/shop-theme": "file:../../packages/shop-theme",
-    "@belucha/ui": "*",
+    "@andertal/lib": "*",
+    "@andertal/shop-theme": "file:../../packages/shop-theme",
+    "@andertal/ui": "*",
     "@shopify/polaris": "^13.0.0",
     "@shopify/polaris-icons": "^9.0.0",
     "autoprefixer": "^10.4.16",
@@ -28,7 +28,7 @@
     "tailwindcss": "^3.4.0"
   },
   "devDependencies": {
-    "@belucha/config": "*",
+    "@andertal/config": "*",
     "eslint": "^9.0.0",
     "eslint-config-next": "16.0.10",
     "typescript": "^5.9.3"

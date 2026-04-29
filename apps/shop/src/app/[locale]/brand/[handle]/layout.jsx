@@ -1,13 +1,13 @@
-const BASE =
+﻿const BASE =
   typeof process !== "undefined"
     ? (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "")
     : "";
 
-/** Site adı: NEXT_PUBLIC_SITE_NAME varsa o; yoksa NEXT_PUBLIC_SITE_URL hostundan; yoksa Belucha */
+/** Site adı: NEXT_PUBLIC_SITE_NAME varsa o; yoksa NEXT_PUBLIC_SITE_URL hostundan; yoksa Andertal */
 function siteDisplayName() {
   const explicit = (process.env.NEXT_PUBLIC_SITE_NAME || "").trim();
   if (explicit) return explicit;
-  const raw = (process.env.NEXT_PUBLIC_SITE_URL || "https://belucha.de").trim();
+  const raw = (process.env.NEXT_PUBLIC_SITE_URL || "https://andertal.de").trim();
   try {
     const host = new URL(raw).hostname.replace(/^www\./i, "");
     const seg = host.split(".")[0] || "";
@@ -15,7 +15,7 @@ function siteDisplayName() {
   } catch {
     /* ignore */
   }
-  return "Belucha";
+  return "Andertal";
 }
 
 export async function generateMetadata({ params }) {

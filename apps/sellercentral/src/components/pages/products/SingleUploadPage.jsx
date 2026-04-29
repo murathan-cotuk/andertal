@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -221,7 +221,7 @@ export default function SingleUploadPage() {
       console.error("Error creating product:", error);
       const msg = error?.message || "An error occurred while creating the product.";
       const hint = msg.includes("Backend unreachable") || msg.includes("NEXT_PUBLIC_MEDUSA_BACKEND_URL")
-        ? " Set NEXT_PUBLIC_MEDUSA_BACKEND_URL in .env.local (e.g. https://belucha-medusa-backend.onrender.com) and restart the dev server."
+        ? " Set NEXT_PUBLIC_MEDUSA_BACKEND_URL in .env.local (e.g. https://andertal-medusa-backend.onrender.com) and restart the dev server."
         : "";
       setMessage({ type: "error", text: msg + hint });
     } finally {
@@ -262,7 +262,7 @@ export default function SingleUploadPage() {
           <Layout.Section>
             <Banner tone="warning">
               Categories could not be loaded from the backend (check NEXT_PUBLIC_MEDUSA_BACKEND_URL on Vercel, e.g.
-              https://belucha-medusa-backend.onrender.com). Using default category for now.
+              https://andertal-medusa-backend.onrender.com). Using default category for now.
             </Banner>
           </Layout.Section>
         )}

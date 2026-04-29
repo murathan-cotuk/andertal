@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import { Page } from "@shopify/polaris";
@@ -7,7 +7,7 @@ import { Page } from "@shopify/polaris";
  * Shopify admin tarzı sayfa başlığı ve aksiyonlar için ortak wrapper.
  * İçeriği Polaris Layout + Card + Button vb. ile kullanın.
  */
-export function BeluchaPage({
+export function AndertalPage({
   title,
   subtitle,
   primaryAction,
