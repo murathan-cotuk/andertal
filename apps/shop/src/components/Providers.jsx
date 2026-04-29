@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import dynamic from "next/dynamic";
-import { CustomerAuthProvider } from "@belucha/lib";
+import { CustomerAuthProvider } from "@andertal/lib";
 import { CartProvider } from "@/context/CartContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import { LandingChromeProvider } from "@/context/LandingChromeContext";

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, Link } from "@/i18n/navigation";
@@ -343,9 +343,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    if (collectionPopoverOpen) document.body.classList.add("belucha-collections-dropdown-open");
-    else document.body.classList.remove("belucha-collections-dropdown-open");
-    return () => document.body.classList.remove("belucha-collections-dropdown-open");
+    if (collectionPopoverOpen) document.body.classList.add("andertal-collections-dropdown-open");
+    else document.body.classList.remove("andertal-collections-dropdown-open");
+    return () => document.body.classList.remove("andertal-collections-dropdown-open");
   }, [collectionPopoverOpen]);
 
   useEffect(() => {
@@ -404,7 +404,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setMessage({ type: "success", text: locale === "tr" ? "Değişiklik onaylandı ve ürün güncellendi." : locale === "de" ? "Änderung genehmigt und Produkt aktualisiert." : "Change approved and product updated." });
       onReload?.();
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("belucha-notifications-refresh"));
+        window.dispatchEvent(new Event("andertal-notifications-refresh"));
       }
     } catch (err) {
       setMessage({ type: "error", text: err?.message || (locale === "tr" ? "Onaylama başarısız." : locale === "de" ? "Freigabe fehlgeschlagen." : "Approval failed.") });
@@ -424,7 +424,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       await refetchPendingChangeRequests(product.id);
       setMessage({ type: "success", text: locale === "tr" ? "Değişiklik reddedildi, ürün değerleri korunuyor." : locale === "de" ? "Änderung abgelehnt, Produktwerte bleiben unverändert." : "Change rejected, product values stay unchanged." });
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("belucha-notifications-refresh"));
+        window.dispatchEvent(new Event("andertal-notifications-refresh"));
       }
     } catch (err) {
       setMessage({ type: "error", text: err?.message || (locale === "tr" ? "Reddetme başarısız." : locale === "de" ? "Ablehnung fehlgeschlagen." : "Rejection failed.") });
@@ -919,7 +919,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       if (updatedRaw?.suggestion_submitted) {
         setMessage({ type: "success", text: "Dein Änderungsvorschlag wurde eingereicht. Ein Superuser wird ihn prüfen." });
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event("belucha-notifications-refresh"));
+          window.dispatchEvent(new Event("andertal-notifications-refresh"));
         }
         await refetchPendingChangeRequests(product.id);
         setSaving(false);

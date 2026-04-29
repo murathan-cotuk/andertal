@@ -1,4 +1,4 @@
-{
+﻿{
   "common": {
     "search": "Cerca prodotti...",
     "categories": "Categorie",
@@ -18,7 +18,7 @@
     "categoryPendingHint": "{label} — Tocca l’icona di ricerca per aprire questa categoria."
   },
   "home": {
-    "title": "Belucha - Il tuo marketplace",
+    "title": "Andertal - Il tuo marketplace",
     "description": "Scopri prodotti da venditori indipendenti",
     "loading": "Caricamento…",
     "error": "Prodotti temporaneamente non disponibili.",

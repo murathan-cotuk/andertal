@@ -1,7 +1,7 @@
-export const revalidate = 3600; // ISR: regenerate every hour
+﻿export const revalidate = 3600; // ISR: regenerate every hour
 
 const BACKEND = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://belucha.de").replace(/\/$/, "");
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://andertal.de").replace(/\/$/, "");
 const LOCALES = ["de", "en", "fr", "it", "es", "tr"];
 const DEFAULT_LOCALE = "de";
 

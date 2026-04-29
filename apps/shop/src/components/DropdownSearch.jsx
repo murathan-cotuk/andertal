@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
@@ -220,7 +220,7 @@ const Empty = styled.div`
 
 const DEBOUNCE_MS = 120;
 const MAX_HITS = 8;
-const RECENT_SEARCHES_KEY = "belucha-recent-searches";
+const RECENT_SEARCHES_KEY = "andertal-recent-searches";
 const MAX_RECENT = 10;
 const MOBILE_MQ = "(max-width: 767px)";
 

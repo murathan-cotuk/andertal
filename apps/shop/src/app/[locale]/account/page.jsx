@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
-import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@belucha/lib";
+import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@andertal/lib";
 import styled from "styled-components";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -401,7 +401,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem("belucha_recently_viewed");
+      const raw = localStorage.getItem("andertal_recently_viewed");
       if (raw) setRecentlyViewed(JSON.parse(raw).slice(0, 12));
     } catch (_) {}
   }, []);

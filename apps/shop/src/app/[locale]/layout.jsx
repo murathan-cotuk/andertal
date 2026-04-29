@@ -1,4 +1,4 @@
-import { NextIntlClientProvider } from "next-intl";
+﻿import { NextIntlClientProvider } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { cookies, headers } from "next/headers";
@@ -30,8 +30,8 @@ export default async function LocaleLayout({ children, params }) {
 
   const h = await headers();
   const c = await cookies();
-  const fromHeader = h.get("x-belucha-market-prefix");
-  const fromCookie = c.get("belucha_market_prefix")?.value?.trim() || "";
+  const fromHeader = h.get("x-andertal-market-prefix");
+  const fromCookie = c.get("andertal_market_prefix")?.value?.trim() || "";
   const headerTriple = fromHeader?.startsWith("/") ? parseMarketPath(fromHeader) : null;
   const cookieTriple = fromCookie.startsWith("/") ? parseMarketPath(fromCookie) : null;
 

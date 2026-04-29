@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import { Link } from "@/i18n/navigation";
@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa", fontFamily: tokens.fontFamily.sans }}>
       <div style={{ padding: "16px 24px" }}>
         <Link href="/" style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", textDecoration: "none", letterSpacing: "-0.03em" }}>
-          Belucha
+          Andertal
         </Link>
       </div>
 

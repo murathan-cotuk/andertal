@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { useCustomerAuth as useAuth } from "@belucha/lib";
+import { useCustomerAuth as useAuth } from "@andertal/lib";
 import AccountSidebar from "./AccountSidebar";
 import AccountMobileHeader from "./AccountMobileHeader";
 

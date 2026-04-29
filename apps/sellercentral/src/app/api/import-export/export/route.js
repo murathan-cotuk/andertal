@@ -1,6 +1,6 @@
-import ExcelJS from "exceljs";
+﻿import ExcelJS from "exceljs";
 
-const DEFAULT_BACKEND = "https://belucha-medusa-backend.onrender.com";
+const DEFAULT_BACKEND = "https://andertal-medusa-backend.onrender.com";
 
 function getBackendBase() {
   return (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || DEFAULT_BACKEND).replace(/\/$/, "");
@@ -258,7 +258,7 @@ function toCsv(columns, rows) {
 
 async function toXlsx(columns, rows, groupBySeller = false, meta = {}) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Belucha Sellercentral";
+  wb.creator = "Andertal Sellercentral";
   wb.created = new Date();
 
   // Summary sheet
@@ -359,7 +359,7 @@ export async function POST(request) {
     }
 
     const format = str(body.format || "xlsx").toLowerCase();
-    const fileBase = `belucha-inventar-${new Date().toISOString().slice(0, 10)}`;
+    const fileBase = `andertal-inventar-${new Date().toISOString().slice(0, 10)}`;
 
     if (format === "csv") {
       const text = toCsv(columns, rows);

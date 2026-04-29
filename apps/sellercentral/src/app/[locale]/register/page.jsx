@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -127,11 +127,11 @@ function RegisterForm() {
           {branding.logo ? (
             <img
               src={branding.logo}
-              alt="Belucha"
+              alt="Andertal"
               style={{ height: Math.min(Math.max(branding.logoHeight || 30, 18), 52), width: "auto", maxWidth: 260, objectFit: "contain", display: "inline-block" }}
             />
           ) : (
-            <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: "0.18em", color: "#111827" }}>BELUCHA</span>
+            <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: "0.18em", color: "#111827" }}>ANDERTAL</span>
           )}
         </div>
         <div style={{ background: "#fff", borderRadius: 12, padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 36px)", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>

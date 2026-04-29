@@ -1,4 +1,4 @@
-{
+﻿{
   "common": {
     "search": "Search products...",
     "categories": "Categories",
@@ -18,7 +18,7 @@
     "categoryPendingHint": "{label} — Tap the search icon to open this category."
   },
   "home": {
-    "title": "Belucha - Your Marketplace",
+    "title": "Andertal - Your Marketplace",
     "description": "Discover amazing products from independent sellers",
     "loading": "Loading…",
     "error": "Products temporarily unavailable.",

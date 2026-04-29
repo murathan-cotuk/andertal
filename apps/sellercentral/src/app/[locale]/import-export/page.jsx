@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
@@ -453,7 +453,7 @@ export default function ImportExportPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "belucha-produkte-template.xlsx";
+      a.download = "andertal-produkte-template.xlsx";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -531,7 +531,7 @@ export default function ImportExportPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `belucha-export.${exportFormat}`;
+      a.download = `andertal-export.${exportFormat}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

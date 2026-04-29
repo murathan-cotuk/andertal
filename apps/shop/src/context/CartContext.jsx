@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useLocale } from "next-intl";
 import { getMedusaClient } from "@/lib/medusa-client";
 
-const CART_ID_KEY = "belucha_cart_id";
+const CART_ID_KEY = "andertal_cart_id";
 
 const CartContext = createContext(null);
 

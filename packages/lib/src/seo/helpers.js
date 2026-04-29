@@ -1,5 +1,5 @@
-export const generateSEOMeta = ({
-  title = "Belucha - Your Marketplace",
+﻿export const generateSEOMeta = ({
+  title = "Andertal - Your Marketplace",
   description = "Discover amazing products from independent sellers",
   image = "/og-image.jpg",
   url = "",
@@ -12,7 +12,7 @@ export const generateSEOMeta = ({
       title,
       description,
       url,
-      siteName: "Belucha",
+      siteName: "Andertal",
       images: [{ url: image }],
       type,
     },

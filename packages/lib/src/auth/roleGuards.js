@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Role Guards - Route protection and role-based access control
  * 
  * Provides:
@@ -58,7 +58,7 @@ export function serverSideAuthGuard(context, options = {}) {
 
   // Get token from cookies (Next.js req.cookies)
   const cookies = context.req?.cookies || {};
-  const tokenKey = `belucha_${requiredRole}_token`;
+  const tokenKey = `andertal_${requiredRole}_token`;
   const token = cookies[tokenKey];
 
   // Check if user is authenticated

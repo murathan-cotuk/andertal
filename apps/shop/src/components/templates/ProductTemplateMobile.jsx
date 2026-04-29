@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
-import { Button } from "@belucha/ui";
+import { Button } from "@andertal/ui";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedProduct } from "@/lib/format";
@@ -993,10 +993,10 @@ export default function ProductTemplateMobile() {
       price_cents: product.variants?.[0]?.prices?.[0]?.amount ?? null,
     };
     try {
-      const raw = localStorage.getItem("belucha_recently_viewed") || "[]";
+      const raw = localStorage.getItem("andertal_recently_viewed") || "[]";
       const list = JSON.parse(raw).filter((p) => p.handle !== handle);
       list.unshift(entry);
-      localStorage.setItem("belucha_recently_viewed", JSON.stringify(list.slice(0, 20)));
+      localStorage.setItem("andertal_recently_viewed", JSON.stringify(list.slice(0, 20)));
     } catch (_) {}
   }, [product?.id]);
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 
@@ -23,13 +23,13 @@ export default function GlobalPageLoader({ label = "Loading..." }) {
             borderRadius: "999px",
             border: "3px solid #d1d5db",
             borderTopColor: "#1b8880",
-            animation: "belucha-spin 0.9s linear infinite",
+            animation: "andertal-spin 0.9s linear infinite",
           }}
         />
         <div style={{ fontSize: 14, color: "#6b7280", fontWeight: 500 }}>{label}</div>
       </div>
       <style jsx>{`
-        @keyframes belucha-spin {
+        @keyframes andertal-spin {
           from {
             transform: rotate(0deg);
           }

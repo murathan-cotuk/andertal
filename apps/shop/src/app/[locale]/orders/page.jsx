@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import styled from "styled-components";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import NewtonsCradle from "@/components/NewtonsCradle";
-import { useAuthGuard, getToken, useCustomerAuth as useAuth } from "@belucha/lib";
+import { useAuthGuard, getToken, useCustomerAuth as useAuth } from "@andertal/lib";
 import { Link, useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";

@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef } from "react";
 import styled from "styled-components";
 import { Link, usePathname } from "@/i18n/navigation";
-import { useCustomerAuth as useAuth } from "@belucha/lib";
+import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { restPathFromPathname } from "@/lib/shop-market";
 
 const ORANGE = "#ff971c";
@@ -152,7 +152,7 @@ export default function AccountMobileHeader({ onLogout }) {
           <NavLogout
             type="button"
             onClick={() => {
-              document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax";
+              document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
               onLogout();
             }}
           >

@@ -1,4 +1,4 @@
-const BACKEND = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
+﻿const BACKEND = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
 function plainFromHtml(html, max) {
   const t = String(html || "")
@@ -11,14 +11,14 @@ function plainFromHtml(html, max) {
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  if (!slug) return { title: "Belucha" };
+  if (!slug) return { title: "Andertal" };
   try {
     const r = await fetch(`${BACKEND}/store/pages/${encodeURIComponent(String(slug))}`, {
       next: { revalidate: 120 },
     });
-    if (!r.ok) return { title: "Belucha" };
+    if (!r.ok) return { title: "Andertal" };
     const page = await r.json();
-    const title = (page.meta_title || page.title || "Belucha").trim();
+    const title = (page.meta_title || page.title || "Andertal").trim();
     const description =
       (page.meta_description && String(page.meta_description).trim()) || plainFromHtml(page.body, 160) || undefined;
     const kwRaw = (page.meta_keywords && String(page.meta_keywords).trim()) || "";
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }) {
       ...(keywords && keywords.length ? { keywords } : {}),
     };
   } catch {
-    return { title: "Belucha" };
+    return { title: "Andertal" };
   }
 }
 

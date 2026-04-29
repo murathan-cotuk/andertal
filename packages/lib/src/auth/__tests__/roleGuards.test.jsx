@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Role Guards Test Components
  * 
  * Manual test components for roleGuards functionality
  * 
  * Usage:
- * import { TestHookComponent, TestHOCComponent, TestComponentPattern } from '@belucha/lib/auth/__tests__/roleGuards.test.jsx';
+ * import { TestHookComponent, TestHOCComponent, TestComponentPattern } from '@andertal/lib/auth/__tests__/roleGuards.test.jsx';
  */
 
 import React from 'react';

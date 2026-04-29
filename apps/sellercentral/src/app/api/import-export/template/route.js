@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+﻿import ExcelJS from "exceljs";
 
 const LANGS = ["de", "en", "tr", "fr", "it", "es"];
 const COUNTRIES = ["DE", "FR", "IT", "ES", "TR"];
@@ -8,7 +8,7 @@ const COUNTRY_LABELS = {
   DE: "Germany (EUR)", FR: "France (EUR)", IT: "Italy (EUR)", ES: "Spain (EUR)", TR: "Turkey (TRY)",
 };
 
-const DEFAULT_BACKEND = "https://belucha-medusa-backend.onrender.com";
+const DEFAULT_BACKEND = "https://andertal-medusa-backend.onrender.com";
 
 const METAFIELD_PAIRS = 15; // template shows 15; import accepts any metafield_N_key/value columns
 
@@ -203,7 +203,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
   const loc = "en";
   const L = {
     de: {
-      title: "BELUCHA — Produkte per Excel importieren",
+      title: "ANDERTAL — Produkte per Excel importieren",
       intro: "Diese Arbeitsmappe hat zwei Blätter: „Products“ (Ihre Daten) und „Anleitung“ (Spaltenhilfe). Die URL-Handles (SEO-Pfade) werden vom System automatisch aus dem Titel erzeugt — keine handle_*-Spalten.",
       categoriesTitle: "Für dieses Template gewählte Kategorien (category_slug exakt so eintragen):",
       noCats: "(Keine Kategorieauswahl — alle aktiven Kategorien stehen in den Dropdowns.)",
@@ -222,7 +222,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
         "Bestehende Produkte: Stimmt die Parent-SKU mit einer SKU im System überein, wird das Produkt aktualisiert — es wird nur überschrieben, was in der Excel-Zelle gefüllt ist; leere Zellen lassen die bisherigen Werte unverändert.",
     },
     en: {
-      title: "BELUCHA — Import products via Excel",
+      title: "ANDERTAL — Import products via Excel",
       intro: 'This workbook has two sheets: "Products" (your data) and "Guide" (column help). URL handles are generated automatically from the title — there are no handle_* columns.',
       categoriesTitle: "Categories selected for this template (use these category_slug values exactly):",
       noCats: "(No category filter — dropdowns list all active categories.)",
@@ -241,7 +241,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
         "Existing products: If the parent row SKU matches a product SKU in the system, that product is updated — only cells you fill in Excel overwrite data; empty cells keep the previous values.",
     },
     tr: {
-      title: "BELUCHA — Excel ile ürün içe aktarma",
+      title: "ANDERTAL — Excel ile ürün içe aktarma",
       intro: "Bu çalışma kitabı iki sayfa içerir: “Products” (verileriniz) ve “Kılavuz”. URL adresleri başlıktan otomatik oluşur; handle_* sütunları yoktur.",
       categoriesTitle: "Bu şablon için seçilen kategoriler (category_slug tam olarak):",
       noCats: "(Kategori seçilmedi — aşağı açılır listeler tüm aktif kategorileri gösterir.)",
@@ -342,7 +342,7 @@ async function buildWorkbook({
   shippingGroups,
 }) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Belucha Sellercentral";
+  wb.creator = "Andertal Sellercentral";
   wb.created = new Date();
 
   const categorySlugs = [...new Set(categoriesForList.map((c) => c.slug))].sort();
@@ -532,7 +532,7 @@ async function buildWorkbook({
     cell.value = rowPair[1];
     const t = String(rowPair[1] || "");
     if (
-      t.startsWith("BELUCHA") ||
+      t.startsWith("ANDERTAL") ||
       t.includes("Categories selected") ||
       t.includes("Kategorien") ||
       t.includes("gewählte") ||
@@ -618,7 +618,7 @@ export async function POST(request) {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": 'attachment; filename="belucha-produkte-template.xlsx"',
+        "Content-Disposition": 'attachment; filename="andertal-produkte-template.xlsx"',
         "Cache-Control": "no-cache",
       },
     });

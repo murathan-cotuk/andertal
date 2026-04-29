@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useRef } from "react";
 
@@ -6,8 +6,8 @@ const BOOTSTRAP_SRC = "https://widget.trustpilot.com/bootstrap/v5/tp.widget.boot
 
 function loadTrustpilotBootstrap() {
   if (typeof window === "undefined") return;
-  if (window.__beluchaTrustpilotScript) return;
-  window.__beluchaTrustpilotScript = true;
+  if (window.__andertalTrustpilotScript) return;
+  window.__andertalTrustpilotScript = true;
   const s = document.createElement("script");
   s.src = BOOTSTRAP_SRC;
   s.async = true;

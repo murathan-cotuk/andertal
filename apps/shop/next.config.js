@@ -1,4 +1,4 @@
-const path = require('path');
+﻿const path = require('path');
 const createNextIntlPlugin = require("next-intl/plugin");
 const { withSentryConfig } = require("@sentry/nextjs");
 
@@ -34,7 +34,7 @@ const nextConfig = {
   outputFileTracingRoot: monorepoRoot,
   allowedDevOrigins,
   reactStrictMode: true,
-  transpilePackages: ["@belucha/ui", "@belucha/lib", "@belucha/shop-theme"],
+  transpilePackages: ["@andertal/ui", "@andertal/lib", "@andertal/shop-theme"],
   compiler: {
     styledComponents: true,
   },
@@ -125,7 +125,7 @@ const sentryWrapped = withSentryConfig(withNextIntl(nextConfig), {
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
   org: "murathan-cotuk",
-  project: "belucha-shop",
+  project: "andertal-shop",
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,

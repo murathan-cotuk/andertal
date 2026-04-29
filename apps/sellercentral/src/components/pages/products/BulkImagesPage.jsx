@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import styled from "styled-components";
-import { Card, Button } from "@belucha/ui";
+import { Card, Button } from "@andertal/ui";
 import Link from "next/link";
 
 const Container = styled.div`

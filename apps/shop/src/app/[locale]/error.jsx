@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import Link from "next/link";
@@ -27,7 +27,7 @@ export default function LocaleError({ error, reset }) {
       }}
     >
       <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: "0.12em", color: "#ff971c", marginBottom: 8 }}>
-        BELUCHA
+        ANDERTAL
       </div>
 
       <h1 style={{ fontSize: 22, fontWeight: 700, margin: "16px 0 8px" }}>

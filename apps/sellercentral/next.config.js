@@ -1,4 +1,4 @@
-const path = require('path');
+﻿const path = require('path');
 const createNextIntlPlugin = require("next-intl/plugin");
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.js");
@@ -17,7 +17,7 @@ const nextConfig = {
       bodySizeLimit: "50mb",
     },
   },
-  transpilePackages: ["@belucha/ui", "@belucha/lib"],
+  transpilePackages: ["@andertal/ui", "@andertal/lib"],
   compiler: {
     styledComponents: true,
   },

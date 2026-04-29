@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -41,8 +41,8 @@ jobs:
         run: npm ci
       
       - name: Build shop app
-        run: npm run build -- --filter=@belucha/shop
+        run: npm run build -- --filter=@andertal/shop
       
       - name: Build sellercentral app
-        run: npm run build -- --filter=@belucha/sellercentral
+        run: npm run build -- --filter=@andertal/sellercentral
 

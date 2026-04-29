@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useAuthGuard } from "@belucha/lib";
+import { useAuthGuard } from "@andertal/lib";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";

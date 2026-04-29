@@ -1,11 +1,11 @@
-# Belucha - E-commerce Marketplace Monorepo
+﻿# Andertal - E-commerce Marketplace Monorepo
 
 A complete e-commerce marketplace platform built with Turborepo, featuring a customer-facing shop, seller dashboard with integrated platform admin, and Medusa v2 backend.
 
 ## 🏗️ Project Structure
 
 ```
-belucha/
+andertal/
 ├── apps/
 │   ├── shop/              # Customer-facing Next.js 14 store
 │   ├── sellercentral/     # Seller dashboard + Platform Admin (Next.js 14)
@@ -29,8 +29,8 @@ belucha/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/murathan-cotuk/belucha.git
-   cd belucha
+   git clone https://github.com/murathan-cotuk/andertal.git
+   cd andertal
    ```
 
 2. **Install dependencies**
@@ -319,7 +319,7 @@ Medusa v2 uses TypeORM for database management. Key entities:
 
 1. Connect your GitHub repository
 2. Set root directory: `apps/shop` (or `apps/sellercentral`)
-3. Set build command: `cd ../.. && npm install && npm run build --filter=@belucha/shop` (adjust filter)
+3. Set build command: `cd ../.. && npm install && npm run build --filter=@andertal/shop` (adjust filter)
 4. Add environment variables (see above)
 
 ## 📚 Documentation
@@ -337,4 +337,4 @@ Medusa v2 uses TypeORM for database management. Key entities:
 
 ## 📄 License
 
-Copyright (c) 2026 Belucha. All rights reserved.
+Copyright (c) 2026 Andertal. All rights reserved.

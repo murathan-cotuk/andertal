@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
-import { useAuthGuard, getToken } from "@belucha/lib";
+import { useAuthGuard, getToken } from "@andertal/lib";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import { Link, useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
@@ -9,7 +9,7 @@ import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { ProductCard } from "@/components/ProductCard";
 import { getMedusaClient } from "@/lib/medusa-client";
-import { useCustomerAuth as useAuth } from "@belucha/lib";
+import { useCustomerAuth as useAuth } from "@andertal/lib";
 import styled from "styled-components";
 
 const ORANGE = "#ff971c";

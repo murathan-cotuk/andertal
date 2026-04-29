@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -296,7 +296,7 @@ export default function SellerDetailPage({ sellerId }) {
     const s = seller;
     const today = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
     const text = `PROVISIONSNOTE\n${"=".repeat(50)}\n
-Aussteller: Belucha GmbH
+Aussteller: Andertal GmbH
 Datum: ${today}
 
 Empfänger:

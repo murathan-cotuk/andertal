@@ -1,4 +1,4 @@
-import createMiddleware from "next-intl/middleware";
+﻿import createMiddleware from "next-intl/middleware";
 import { NextRequest, NextResponse } from "next/server";
 import { routing } from "./i18n/routing";
 import {
@@ -13,7 +13,7 @@ import {
 } from "./lib/shop-market";
 
 function marketTripleFromCookie(request) {
-  const raw = (request.cookies.get("belucha_market_prefix")?.value || "").trim();
+  const raw = (request.cookies.get("andertal_market_prefix")?.value || "").trim();
   if (!raw.startsWith("/")) return null;
   return parseMarketPath(raw);
 }
@@ -106,7 +106,7 @@ export default function middleware(request) {
 
   // Server-level auth guard: redirect to login if cookie missing for protected routes
   if (isProtectedPath(pathname)) {
-    const authCookie = request.cookies.get("belucha_cauth");
+    const authCookie = request.cookies.get("andertal_cauth");
     if (!authCookie?.value) {
       // Determine locale from path segments
       const parts = pathname.split("/").filter(Boolean);
@@ -143,7 +143,7 @@ export default function middleware(request) {
     u.pathname = internal;
     const h = new Headers(request.headers);
     h.set(
-      "x-belucha-market-prefix",
+      "x-andertal-market-prefix",
       marketPrefix(triple.country, triple.lang, triple.currency)
     );
     const forwarded = new NextRequest(u, {
@@ -153,7 +153,7 @@ export default function middleware(request) {
     const intlRes = intlMiddleware(forwarded);
     const mp = marketPrefix(triple.country, triple.lang, triple.currency);
     try {
-      intlRes.cookies.set("belucha_market_prefix", mp, {
+      intlRes.cookies.set("andertal_market_prefix", mp, {
         path: "/",
         maxAge: 60 * 60 * 24 * 365,
         sameSite: "lax",
@@ -180,7 +180,7 @@ export default function middleware(request) {
     const redirectRes = NextResponse.redirect(dest);
     const mp = marketPrefix(market, loc, cur);
     try {
-      redirectRes.cookies.set("belucha_market_prefix", mp, {
+      redirectRes.cookies.set("andertal_market_prefix", mp, {
         path: "/",
         maxAge: 60 * 60 * 24 * 365,
         sameSite: "lax",
@@ -230,7 +230,7 @@ export default function middleware(request) {
     const mp = marketPrefix(market, locale, cur);
     const redirectRes = NextResponse.redirect(new URL(mp + "/", request.url));
     try {
-      redirectRes.cookies.set("belucha_market_prefix", mp, {
+      redirectRes.cookies.set("andertal_market_prefix", mp, {
         path: "/",
         maxAge: 60 * 60 * 24 * 365,
         sameSite: "lax",

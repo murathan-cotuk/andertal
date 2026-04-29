@@ -1,12 +1,12 @@
-/**
- * Belucha Public Marketplace API
+﻿/**
+ * Andertal Public Marketplace API
  *
  * Genel endpoint: /api/v1/
  * Billbee alias:  /api/billbee/  (aynı handler'lar)
  *
  * Auth: HTTP Basic
- *   username = belucha_zug_...  (api_key)   → store_integrations lookup
- *   password = belucha_ssk_...  (api_secret)
+ *   username = andertal_zug_...  (api_key)   → store_integrations lookup
+ *   password = andertal_ssk_...  (api_secret)
  *
  *   Fallback: username = seller email veya seller_id → seller_users lookup
  */
@@ -73,9 +73,9 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
 
     // Collect api_key from all possible sources Billbee might use
     const apiKey = String(
-      (basic?.username?.startsWith('belucha_zug_') ? basic.username : '') ||
+      (basic?.username?.startsWith('andertal_zug_') ? basic.username : '') ||
       req.headers['x-api-key'] || req.headers['x-billbee-api-key'] ||
-      req.headers['x-belucha-api-key'] ||
+      req.headers['x-andertal-api-key'] ||
       req.query.api_key || req.query.apiKey || req.query.billbee_api_key || req.query.key || '',
     ).trim()
 
@@ -85,7 +85,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
     ).trim()
 
     // ── Path A: api_key lookup (any source) ───────────────────────────────────
-    if (apiKey.startsWith('belucha_zug_') && dbUrl) {
+    if (apiKey.startsWith('andertal_zug_') && dbUrl) {
       let c
       try {
         c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
@@ -99,13 +99,13 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         const row = r.rows[0]
         if (!row) {
           logEvent('api.auth.failed', { reason: 'api_key_not_found', apiKey: apiKey.slice(0, 20) })
-          res.setHeader('WWW-Authenticate', 'Basic realm="Belucha API"')
+          res.setHeader('WWW-Authenticate', 'Basic realm="Andertal API"')
           return res.status(401).json({ error: 'Unauthorized', message: 'Invalid API key' })
         }
         // If a secret was provided it must match; if no secret provided, api_key alone is sufficient
         if (apiSecret && row.api_secret && !safeEqual(apiSecret, row.api_secret)) {
           logEvent('api.auth.failed', { reason: 'bad_api_secret' })
-          res.setHeader('WWW-Authenticate', 'Basic realm="Belucha API"')
+          res.setHeader('WWW-Authenticate', 'Basic realm="Andertal API"')
           return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials' })
         }
         const sellerId = String(row.seller_scope_key || '').trim()
@@ -123,7 +123,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
 
     // ── Path B: Basic Auth with email or seller_id ────────────────────────────
     if (!basic || !basic.username) {
-      res.setHeader('WWW-Authenticate', 'Basic realm="Belucha API"')
+      res.setHeader('WWW-Authenticate', 'Basic realm="Andertal API"')
       return res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' })
     }
 
@@ -133,7 +133,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       if (!client) return res.status(503).json({ error: 'Service unavailable' })
       await client.connect()
       const r = await client.query(
-        `SELECT id, email, seller_id, sub_of_seller_id, approval_status, belucha_billbee_api_key, belucha_billbee_api_secret
+        `SELECT id, email, seller_id, sub_of_seller_id, approval_status, andertal_billbee_api_key, andertal_billbee_api_secret
          FROM seller_users
          WHERE (LOWER(TRIM(email)) = LOWER(TRIM($1)) OR TRIM(seller_id) = TRIM($1)) LIMIT 2`,
         [basic.username],
@@ -141,15 +141,15 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       await client.end(); client = null
 
       if (!r.rows || r.rows.length !== 1) {
-        res.setHeader('WWW-Authenticate', 'Basic realm="Belucha API"')
+        res.setHeader('WWW-Authenticate', 'Basic realm="Andertal API"')
         return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials' })
       }
       const row = r.rows[0]
       const st = String(row.approval_status || '').toLowerCase()
       if (st === 'rejected' || st === 'suspended') return res.status(403).json({ error: 'Forbidden', message: 'Account inactive' })
 
-      const primaryOk = row.belucha_billbee_api_key && row.belucha_billbee_api_secret &&
-        safeEqual(basic.password, row.belucha_billbee_api_secret)
+      const primaryOk = row.andertal_billbee_api_key && row.andertal_billbee_api_secret &&
+        safeEqual(basic.password, row.andertal_billbee_api_secret)
 
       if (!primaryOk) {
         const scopeKey = row.sub_of_seller_id
@@ -170,7 +170,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
           } catch (_) { if (c) try { await c.end() } catch (__) {} }
         }
         if (!integOk) {
-          res.setHeader('WWW-Authenticate', 'Basic realm="Belucha API"')
+          res.setHeader('WWW-Authenticate', 'Basic realm="Andertal API"')
           return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials' })
         }
       }
@@ -335,7 +335,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
     }
   }
 
-  const ping = (_req, res) => res.json({ ok: true, name: 'Belucha Marketplace API', version: '1.0' })
+  const ping = (_req, res) => res.json({ ok: true, name: 'Andertal Marketplace API', version: '1.0' })
 
   // ── /api/v1/ — genel endpoint ─────────────────────────────────────────────
   httpApp.get('/api/v1', ping)

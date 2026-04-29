@@ -1,4 +1,4 @@
-# Render deployment configuration
+﻿# Render deployment configuration
 # Manuel ayar: Dashboard → Service → Build & Deploy
 #
 # Build Command (Root Directory: apps/medusa-backend):
@@ -12,7 +12,7 @@
 
 # services:
 #   - type: web
-#     name: belucha-medusa-backend
+#     name: andertal-medusa-backend
 #     env: node
 #     region: frankfurt
 #     rootDir: apps/medusa-backend
@@ -21,7 +21,7 @@
 #     healthCheckPath: /health
 #
 # databases:
-#   - name: belucha-medusa-db
+#   - name: andertal-medusa-db
 #     databaseName: medusa
 #     user: medusa_user
 #     plan: free

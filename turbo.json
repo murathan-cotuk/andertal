@@ -1,4 +1,4 @@
-{
+﻿{
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
   "globalEnv": [
@@ -16,7 +16,7 @@
         "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"
       ]
     },
-    "@belucha/shop#build": {
+    "@andertal/shop#build": {
       "dependsOn": [],
       "outputs": [".next/**", "!.next/cache/**"],
       "env": [
@@ -25,7 +25,7 @@
         "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"
       ]
     },
-    "@belucha/sellercentral#build": {
+    "@andertal/sellercentral#build": {
       "dependsOn": [],
       "outputs": [".next/**", "!.next/cache/**"],
       "env": [

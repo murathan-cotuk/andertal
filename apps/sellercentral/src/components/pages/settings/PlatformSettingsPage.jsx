@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -127,7 +127,7 @@ export default function PlatformSettingsPage() {
                   label="Plattformname"
                   value={platformName}
                   onChange={setPlatformName}
-                  placeholder="z. B. Belucha Marketplace"
+                  placeholder="z. B. Andertal Marketplace"
                   autoComplete="off"
                   helpText="Anzeigename der Plattform (in E-Mails und im Shop sichtbar)"
                 />
@@ -135,7 +135,7 @@ export default function PlatformSettingsPage() {
                   label="Shop-/Anzeigename (intern)"
                   value={storeName}
                   onChange={setStoreName}
-                  placeholder="z. B. Belucha"
+                  placeholder="z. B. Andertal"
                   autoComplete="off"
                   helpText="Kurzname – wird im Sellercentral-Header angezeigt"
                 />
@@ -144,7 +144,7 @@ export default function PlatformSettingsPage() {
                   value={supportEmail}
                   onChange={setSupportEmail}
                   type="email"
-                  placeholder="support@belucha.de"
+                  placeholder="support@andertal.de"
                   autoComplete="off"
                   helpText="Kontakt-E-Mail für Käufer und automatische E-Mails"
                 />
