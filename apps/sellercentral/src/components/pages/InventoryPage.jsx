@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -867,7 +867,7 @@ export default function InventoryPage() {
       }
       setPendingChangeRequestsByProductId(map);
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("belucha-notifications-refresh"));
+        window.dispatchEvent(new Event("andertal-notifications-refresh"));
       }
       return map;
     } catch (e) {

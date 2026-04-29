@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -193,8 +193,8 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
   const hasAny = navHits.length > 0 || productHits.length > 0 || orderHits.length > 0 || customerHits.length > 0;
 
   return (
-    <div ref={wrapRef} className="belucha-search-wrap">
-      <span className="belucha-search-icon" aria-hidden>🔍</span>
+    <div ref={wrapRef} className="andertal-search-wrap">
+      <span className="andertal-search-icon" aria-hidden>🔍</span>
       <input
         type="search"
         autoComplete="off"
@@ -203,23 +203,23 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
         onChange={handleChange}
         onFocus={() => q && setIsOpen(true)}
         aria-expanded={isOpen}
-        className="belucha-search-input"
+        className="andertal-search-input"
       />
       {isOpen && q && (
-        <div className="belucha-search-dropdown" role="listbox">
+        <div className="andertal-search-dropdown" role="listbox">
           {loading && (
-            <div className="belucha-search-empty" style={{ fontStyle: "italic" }}>Searching…</div>
+            <div className="andertal-search-empty" style={{ fontStyle: "italic" }}>Searching…</div>
           )}
 
           {!loading && !hasAny && (
-            <div className="belucha-search-empty">No results for &quot;{query}&quot;</div>
+            <div className="andertal-search-empty">No results for &quot;{query}&quot;</div>
           )}
 
           {/* Products */}
           {productHits.length > 0 && (
             <div>
-              <div className="belucha-search-category">
-                Products <span className="belucha-search-category-count">{productHits.length}</span>
+              <div className="andertal-search-category">
+                Products <span className="andertal-search-category-count">{productHits.length}</span>
               </div>
               {productHits.map((p) => {
                 const meta = p.metadata || {};
@@ -227,7 +227,7 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
                 const ean = meta.ean || p.variants?.[0]?.ean;
                 const sub = [sku && `SKU: ${sku}`, ean && `EAN: ${ean}`].filter(Boolean).join(" · ");
                 return (
-                  <Link key={p.id} href={`/products/${p.id}`} className="belucha-search-hit" onClick={close}>
+                  <Link key={p.id} href={`/products/${p.id}`} className="andertal-search-hit" onClick={close}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                       <span>{p.title || p.handle}</span>
                       {sub && <span style={{ fontSize: 11, opacity: 0.65 }}>{sub}</span>}
@@ -241,15 +241,15 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
           {/* Orders */}
           {orderHits.length > 0 && (
             <div>
-              <div className="belucha-search-category">
-                Orders <span className="belucha-search-category-count">{orderHits.length}</span>
+              <div className="andertal-search-category">
+                Orders <span className="andertal-search-category-count">{orderHits.length}</span>
               </div>
               {orderHits.map((o) => {
                 const num = o.display_id != null ? `#${o.display_id}` : (o.order_number != null ? `#${o.order_number}` : o.id?.slice(0, 8));
                 const addr = o.billing_address || o.shipping_address || {};
                 const customerName = [addr.first_name, addr.last_name].filter(Boolean).join(" ") || o.customer_name || o.email || "";
                 return (
-                  <Link key={o.id} href={`/orders/${o.id}`} className="belucha-search-hit" onClick={close}>
+                  <Link key={o.id} href={`/orders/${o.id}`} className="andertal-search-hit" onClick={close}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                       <span>{num} {customerName && `· ${customerName}`}</span>
                       {o.email && <span style={{ fontSize: 11, opacity: 0.65 }}>{o.email}</span>}
@@ -263,13 +263,13 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
           {/* Customers */}
           {customerHits.length > 0 && (
             <div>
-              <div className="belucha-search-category">
-                Customers <span className="belucha-search-category-count">{customerHits.length}</span>
+              <div className="andertal-search-category">
+                Customers <span className="andertal-search-category-count">{customerHits.length}</span>
               </div>
               {customerHits.map((c) => {
                 const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || c.email;
                 return (
-                  <Link key={c.id} href={`/customers/${c.id}`} className="belucha-search-hit" onClick={close}>
+                  <Link key={c.id} href={`/customers/${c.id}`} className="andertal-search-hit" onClick={close}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                       <span>{name}</span>
                       {c.email && name !== c.email && <span style={{ fontSize: 11, opacity: 0.65 }}>{c.email}</span>}
@@ -283,11 +283,11 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
           {/* Navigation */}
           {navHits.length > 0 && (
             <div>
-              <div className="belucha-search-category">
-                Navigation <span className="belucha-search-category-count">{navHits.length}</span>
+              <div className="andertal-search-category">
+                Navigation <span className="andertal-search-category-count">{navHits.length}</span>
               </div>
               {navHits.map((item) => (
-                <Link key={item.url} href={item.url} className="belucha-search-hit" onClick={close}>
+                <Link key={item.url} href={item.url} className="andertal-search-hit" onClick={close}>
                   {item.label}
                 </Link>
               ))}

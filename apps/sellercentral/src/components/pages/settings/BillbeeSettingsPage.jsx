@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -59,7 +59,7 @@ export default function BillbeeSettingsPage() {
     setErr("");
     try {
       const data = await client.getBillbeeMarketplaceConnection();
-      setName(data?.name || "Belucha Marketplace");
+      setName(data?.name || "Andertal Marketplace");
       setApiBaseUrl(data?.api_base_url || "");
       setApiKey(data?.api_key || "");
       setBasicUser(data?.basic_auth_username || "");
@@ -94,10 +94,10 @@ export default function BillbeeSettingsPage() {
     <BlockStack gap="400">
       <BlockStack gap="100">
         <Text as="h1" variant="headingLg">
-          Billbee ↔ Belucha
+          Billbee ↔ Andertal
         </Text>
         <Text as="p" variant="bodyMd" tone="subdued">
-          Belucha stellt die API unter <Text as="span" fontWeight="semibold">/api/billbee</Text> bereit. Billbee ruft{" "}
+          Andertal stellt die API unter <Text as="span" fontWeight="semibold">/api/billbee</Text> bereit. Billbee ruft{" "}
           <strong>deinen Shop</strong> mit den unten angezeigten Zugangsdaten ab — getrennt pro Verkäuferkonto.
         </Text>
       </BlockStack>
@@ -120,7 +120,7 @@ export default function BillbeeSettingsPage() {
               In Billbee (<strong>Einstellungen → Kanäle → Shopverbindung</strong>):{" "}
               <strong>Name</strong> z. B. „{name}“, <strong>URL</strong> = Basis-URL unten (oder einzelne Endpunkte wie …/orders).{" "}
               <strong>Schlüssel</strong> = API-Schlüssel. <strong>Basic Auth</strong> = E-Mail + Passwort. Optional Header{" "}
-              <code>X-Belucha-Api-Key</code> mit demselben Schlüssel mitsenden.
+              <code>X-Andertal-Api-Key</code> mit demselben Schlüssel mitsenden.
             </Text>
           </Banner>
 
@@ -136,7 +136,7 @@ export default function BillbeeSettingsPage() {
           <CopyField
             label="Schlüssel (API-Key)"
             value={loading ? "" : apiKey}
-            helpText="Format belucha_seller_… — zusätzlich optional als X-Belucha-Api-Key Header"
+            helpText="Format andertal_seller_… — zusätzlich optional als X-Andertal-Api-Key Header"
             multiline={false}
           />
 

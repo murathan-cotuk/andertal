@@ -1,11 +1,11 @@
 {
-  "name": "belucha",
+  "name": "andertal",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --continue=always",
-    "dev:web": "turbo run dev --filter=@belucha/sellercentral --filter=@belucha/shop",
+    "dev:web": "turbo run dev --filter=@andertal/sellercentral --filter=@andertal/shop",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{js,jsx,md}\"",
     "clean": "turbo run clean && rm -rf node_modules",
@@ -34,7 +34,7 @@
     "turbo": "^2.9.4",
     "wrangler": "^3.94.0"
   },
-  "packageManager": "npm@9.5.0",
+  "packageManager": "npm@10.9.2",
   "workspaces": [
     "apps/*",
     "packages/*",

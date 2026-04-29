@@ -1,5 +1,5 @@
-/**
- * Token Service - Centralized token management for Belucha E-Commerce
+﻿/**
+ * Token Service - Centralized token management for Andertal E-Commerce
  * 
  * Provides localStorage abstraction for JWT token management with:
  * - Token storage and retrieval
@@ -39,14 +39,14 @@ import { jwtDecode } from 'jwt-decode';
  */
 const STORAGE_KEYS = {
   customer: {
-    token: "belucha_customer_token",
-    id: "belucha_customer_id",
-    loggedIn: "belucha_customer_logged_in",
+    token: "andertal_customer_token",
+    id: "andertal_customer_id",
+    loggedIn: "andertal_customer_logged_in",
   },
   seller: {
-    token: "belucha_seller_token",
-    id: "belucha_seller_id",
-    loggedIn: "belucha_seller_logged_in",
+    token: "andertal_seller_token",
+    id: "andertal_seller_id",
+    loggedIn: "andertal_seller_logged_in",
   },
 };
 

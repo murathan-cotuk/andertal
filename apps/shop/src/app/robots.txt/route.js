@@ -1,7 +1,7 @@
-export const dynamic = "force-static";
+﻿export const dynamic = "force-static";
 
 export async function GET() {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://belucha.de";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://andertal.de";
   const body = `User-agent: *
 Allow: /
 

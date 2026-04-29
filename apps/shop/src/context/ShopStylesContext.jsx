@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { createContext, useContext, useState } from "react";
-import { DEFAULT_SHOP_STYLES } from "@belucha/shop-theme";
+import { DEFAULT_SHOP_STYLES } from "@andertal/shop-theme";
 
 export const ShopStylesContext = createContext(DEFAULT_SHOP_STYLES);
 

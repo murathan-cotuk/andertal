@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useLayoutEffect, useContext } from "react";
 import {
@@ -7,7 +7,7 @@ import {
   mergeLoadedShopStyles,
   collectTypographyGoogleFamilies,
   buildGoogleFontsLinkHrefForFamilies,
-} from "@belucha/shop-theme";
+} from "@andertal/shop-theme";
 import { ShopStylesContext } from "@/context/ShopStylesContext";
 
 // Fetch styles through the internal API route (handles backend URL; route is no-store)

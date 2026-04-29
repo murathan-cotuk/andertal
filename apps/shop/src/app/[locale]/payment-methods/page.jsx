@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useAuthGuard, getToken, useCustomerAuth as useAuth } from "@belucha/lib";
+import { useAuthGuard, getToken, useCustomerAuth as useAuth } from "@andertal/lib";
 import { useRouter } from "@/i18n/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";

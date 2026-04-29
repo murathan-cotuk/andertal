@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "@/i18n/navigation";
@@ -286,7 +286,7 @@ export default function Footer() {
           </MobileAccordion>
         )}
         <Bottom style={{ marginTop: 24 }}>
-          <Copyright>© {new Date().getFullYear()} Belucha. All rights reserved.</Copyright>
+          <Copyright>© {new Date().getFullYear()} Andertal. All rights reserved.</Copyright>
         </Bottom>
       </Container>
     </FooterContainer>

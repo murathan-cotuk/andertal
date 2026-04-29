@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Page, Card, Button, Checkbox, BlockStack, InlineStack, Text, Box } from "@shopify/polaris";
@@ -36,7 +36,7 @@ export default function NotificationsPage() {
       try {
         await getMedusaAdminClient().markNotificationsSeen();
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event("belucha-notifications-refresh"));
+          window.dispatchEvent(new Event("andertal-notifications-refresh"));
         }
       } catch {
         /* ignore */
@@ -78,7 +78,7 @@ export default function NotificationsPage() {
       setSelected(new Set());
       await load();
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("belucha-notifications-refresh"));
+        window.dispatchEvent(new Event("andertal-notifications-refresh"));
       }
     } catch {
       /* ignore */
@@ -96,7 +96,7 @@ export default function NotificationsPage() {
       setSelected(new Set());
       await load();
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("belucha-notifications-refresh"));
+        window.dispatchEvent(new Event("andertal-notifications-refresh"));
       }
     } catch {
       /* ignore */
@@ -117,7 +117,7 @@ export default function NotificationsPage() {
       });
       await load();
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("belucha-notifications-refresh"));
+        window.dispatchEvent(new Event("andertal-notifications-refresh"));
       }
     } catch {
       /* ignore */

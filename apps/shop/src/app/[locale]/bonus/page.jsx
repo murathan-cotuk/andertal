@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
-import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@belucha/lib";
+import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@andertal/lib";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";

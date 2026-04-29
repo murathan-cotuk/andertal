@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
@@ -238,7 +238,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
     if (toMark.length) {
       await Promise.all(toMark.map((m) => client.markMessageRead(m.id).catch(() => {})));
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("belucha-msg-unread-refresh"));
+        window.dispatchEvent(new Event("andertal-msg-unread-refresh"));
       }
     }
   };
@@ -749,7 +749,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
         client.markSupportMessagesRead(selectedSellerId, "support", subThread.subject_key),
       ).then(() => {
         if (typeof window !== "undefined" && marked.length) {
-          window.dispatchEvent(new Event("belucha-msg-unread-refresh"));
+          window.dispatchEvent(new Event("andertal-msg-unread-refresh"));
         }
       }).catch(() => {});
       setRawMessages((prev) => prev.map((m) => {
@@ -761,7 +761,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
       const toMark = subThread.messages.filter((m) => m.sender_type === "seller" && !m.is_read_by_seller);
       Promise.all(toMark.map((m) => client.markMessageRead(m.id).catch(() => {}))).then(() => {
         if (typeof window !== "undefined" && toMark.length) {
-          window.dispatchEvent(new Event("belucha-msg-unread-refresh"));
+          window.dispatchEvent(new Event("andertal-msg-unread-refresh"));
         }
       });
       setRawMessages((prev) => prev.map((m) => {

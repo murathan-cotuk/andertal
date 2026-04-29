@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -24,7 +24,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
-import { mergeLoadedShopStyles } from "@belucha/shop-theme";
+import { mergeLoadedShopStyles } from "@andertal/shop-theme";
 
 const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 

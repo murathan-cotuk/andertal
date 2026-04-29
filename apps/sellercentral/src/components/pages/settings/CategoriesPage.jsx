@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
-import { Card, Button, Input } from "@belucha/ui";
+import { Card, Button, Input } from "@andertal/ui";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 /** Build nested tree from flat array using parent_id */

@@ -1,4 +1,4 @@
-/* Belucha Design System — Global CSS
+﻿/* Andertal Design System — Global CSS
  * Premium Marketplace: güvenilir, modern, sade.
  * Inter font, design token variables.
  */
@@ -178,11 +178,11 @@ a {
    ══════════════════════════════════════════════════════ */
 
 /* Mobile nav root: visible only on ≤767px */
-.belucha-mobile-nav-root {
+.andertal-mobile-nav-root {
   display: none;
 }
 @media (max-width: 767px) {
-  .belucha-mobile-nav-root {
+  .andertal-mobile-nav-root {
     display: block;
   }
 }

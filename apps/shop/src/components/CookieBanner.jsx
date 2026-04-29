@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useLocale } from "next-intl";
 import CustomCheckbox from "./ui/CustomCheckbox";
 
-const STORAGE_KEY = "belucha_cookie_consent";
+const STORAGE_KEY = "andertal_cookie_consent";
 
 const TEXTS = {
   de: {

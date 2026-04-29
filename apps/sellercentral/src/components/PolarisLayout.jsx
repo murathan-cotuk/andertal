@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
@@ -38,9 +38,9 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { fieldNameDisplayLabel } from "@/lib/product-change-request-format";
 
 const discardBtnStyles = `
-  .belucha-discard-topbar-btn,
-  .belucha-discard-topbar-btn *,
-  .belucha-discard-topbar-btn span { color: #ffffff !important; }
+  .andertal-discard-topbar-btn,
+  .andertal-discard-topbar-btn *,
+  .andertal-discard-topbar-btn span { color: #ffffff !important; }
 `;
 
 /** Polaris Frame logo img: never pass empty/invalid src (React 19 + browser warning). */
@@ -61,6 +61,10 @@ const GroupedDropdownSearch = dynamic(
   { ssr: false, loading: () => <div style={{ width: "100%", maxWidth: 400, height: 36 }} /> }
 );
 
+const buildSuperuserLabel = (label) => (
+  <span style={{ color: "#601b1b", fontWeight: 600 }}>{label}</span>
+);
+
 const styleSuperuserOnlyNavItems = (items, isSuperuser) => {
   if (!Array.isArray(items)) return [];
   return items.map((item) => {
@@ -68,13 +72,13 @@ const styleSuperuserOnlyNavItems = (items, isSuperuser) => {
       ? item.subNavigationItems.map((sub) => {
           return {
             ...sub,
-            label: sub.label,
+            label: isSuperuser && sub.superuserOnly ? buildSuperuserLabel(sub.label) : sub.label,
           };
         })
       : item.subNavigationItems;
     return {
       ...item,
-      label: item.label,
+      label: isSuperuser && item.superuserOnly ? buildSuperuserLabel(item.label) : item.label,
       subNavigationItems,
     };
   });
@@ -378,7 +382,7 @@ export default function PolarisLayout({ children }) {
   useEffect(() => {
     if (typeof document === "undefined") return;
     const h = Math.min(Math.max(platformBranding.sellercentral_logo_height || 30, 16), 44);
-    const id = "belucha-sc-logo-height";
+    const id = "andertal-sc-logo-height";
     let el = document.getElementById(id);
     if (!el) {
       el = document.createElement("style");
@@ -414,11 +418,11 @@ export default function PolarisLayout({ children }) {
     const onRefresh = () => {
       refreshNotifications();
     };
-    window.addEventListener("belucha-msg-unread-refresh", onRefresh);
-    window.addEventListener("belucha-notifications-refresh", onRefresh);
+    window.addEventListener("andertal-msg-unread-refresh", onRefresh);
+    window.addEventListener("andertal-notifications-refresh", onRefresh);
     return () => {
-      window.removeEventListener("belucha-msg-unread-refresh", onRefresh);
-      window.removeEventListener("belucha-notifications-refresh", onRefresh);
+      window.removeEventListener("andertal-msg-unread-refresh", onRefresh);
+      window.removeEventListener("andertal-notifications-refresh", onRefresh);
     };
   }, [isAuthenticated, refreshNotifications]);
 
@@ -777,7 +781,7 @@ export default function PolarisLayout({ children }) {
           {unsaved?.isDirty && (
             <>
               <style>{discardBtnStyles}</style>
-              <div className="belucha-discard-topbar-btn">
+              <div className="andertal-discard-topbar-btn">
                 <Button
                   size="slim"
                   variant="tertiary"
@@ -1038,8 +1042,8 @@ export default function PolarisLayout({ children }) {
             </Modal.Section>
           </Modal>
         )}
-        <div className="belucha-scroll-wrapper">
-          <div className="belucha-page-content belucha-page-content-transition">
+        <div className="andertal-scroll-wrapper">
+          <div className="andertal-page-content andertal-page-content-transition">
             {children}
           </div>
         </div>

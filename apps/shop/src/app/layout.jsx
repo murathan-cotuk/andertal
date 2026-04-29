@@ -1,10 +1,10 @@
-import "./globals.css";
+﻿import "./globals.css";
 import ShopStylesInjector from "@/components/ShopStylesInjector";
 
 /* Safari / iOS status area + first paint: keep in sync with --header-bg fallback in ShopHeader (MIDDLE_BAR_BG) */
 const DEFAULT_STATUS_THEME = "#1b8880";
 
-const DEFAULT_HOME_TITLE = "Belucha - Your Marketplace";
+const DEFAULT_HOME_TITLE = "Andertal - Your Marketplace";
 const DEFAULT_HOME_DESCRIPTION = "Discover amazing products from independent sellers";
 
 const getBackendUrl = () =>
@@ -28,7 +28,7 @@ async function getHomepageMetaFromStyles() {
 
 export async function generateMetadata() {
   const { title, description } = await getHomepageMetaFromStyles();
-  const brand = String(title).split(" - ")[0]?.trim() || "Belucha";
+  const brand = String(title).split(" - ")[0]?.trim() || "Andertal";
   return {
     title: {
       default: title,
@@ -69,4 +69,3 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
-

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -518,7 +518,7 @@ const PRESET_CARRIERS = [
   { name: "USPS", tracking_url_template: "https://tools.usps.com/go/TrackConfirmAction?tLabels={tracking}" },
 ];
 
-const LS_THRESHOLDS_KEY = "belucha_free_shipping_thresholds";
+const LS_THRESHOLDS_KEY = "andertal_free_shipping_thresholds";
 
 export default function ShippingSettingsPage() {
   const [isSuperuser, setIsSuperuser] = useState(false);

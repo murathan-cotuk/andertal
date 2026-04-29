@@ -1,14 +1,14 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useAuthGuard, getToken } from "@belucha/lib";
+import { useAuthGuard, getToken } from "@andertal/lib";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
-import { useCustomerAuth as useAuth } from "@belucha/lib";
+import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { useCart } from "@/context/CartContext";
 import { COUNTRY_MAP, getShippableCountries } from "@/lib/countries";
 import { useLocale } from "next-intl";

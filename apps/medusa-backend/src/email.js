@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Email service — uses Resend when RESEND_API_KEY is set,
  * falls back to nodemailer (SMTP_*) or console log in dev.
  */
@@ -13,7 +13,7 @@ async function sendEmail({ to, from, subject, html, text }) {
       const { Resend } = require("resend");
       const resend = new Resend(resendKey);
       const { data, error } = await resend.emails.send({
-        from: from || process.env.EMAIL_FROM || "noreply@belucha.de",
+        from: from || process.env.EMAIL_FROM || "noreply@andertal.de",
         to: Array.isArray(to) ? to : [to],
         subject,
         html,
@@ -41,7 +41,7 @@ async function sendEmail({ to, from, subject, html, text }) {
         : undefined,
     });
     const info = await transport.sendMail({
-      from: from || process.env.EMAIL_FROM || "noreply@belucha.de",
+      from: from || process.env.EMAIL_FROM || "noreply@andertal.de",
       to: Array.isArray(to) ? to.join(", ") : to,
       subject,
       html,

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 
@@ -30,7 +30,7 @@ export default function GlobalError({ error, reset }) {
         }}
       >
         <div style={{ fontSize: 48, fontWeight: 900, letterSpacing: "0.12em", color: "#ff971c", marginBottom: 8 }}>
-          BELUCHA
+          ANDERTAL
         </div>
 
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: "16px 0 8px" }}>

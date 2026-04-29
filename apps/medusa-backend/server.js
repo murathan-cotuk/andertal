@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Medusa v2 Backend Server
  * dotenv + MedusaAppLoader + app.load() + listen + graceful shutdown.
  * Render: Start Command = node server.js
@@ -245,7 +245,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // CORS: Vercel/Render'da frontend origin'leri env ile verin (virgülle ayrılmış).
-// Örnek: CORS_ORIGINS=https://belucha-sellercentral.vercel.app,https://belucha-shop.vercel.app
+// Örnek: CORS_ORIGINS=https://andertal-sellercentral.vercel.app,https://andertal-shop.vercel.app
 // Production'da CORS_ORIGINS ayarlanmazsa yalnızca localhost'a izin verilir — "herkese aç" bırakılmaz.
 function getAllowedOrigins() {
   const isProduction = process.env.NODE_ENV === 'production'
@@ -401,12 +401,12 @@ async function start() {
         secure: process.env.SMTP_SECURE === 'true',
         auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
       })
-      const sellerCentralUrl = process.env.SELLER_CENTRAL_URL || 'https://belucha-sellercentral.vercel.app'
+      const sellerCentralUrl = process.env.SELLER_CENTRAL_URL || 'https://andertal-sellercentral.vercel.app'
       const displayName = [first_name, last_name].filter(Boolean).join(' ') || email
       const subject = `Neuer Seller registriert: ${store_name || email}`
       const html = `
 <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#1f2937">
-  <div style="font-size:22px;font-weight:900;letter-spacing:0.14em;color:#111;margin-bottom:24px">BELUCHA</div>
+  <div style="font-size:22px;font-weight:900;letter-spacing:0.14em;color:#111;margin-bottom:24px">ANDERTAL</div>
   <h2 style="font-size:17px;font-weight:700;margin:0 0 16px">Neuer Seller registriert</h2>
   <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
     <tr><td style="padding:7px 0;color:#6b7280;width:120px">Name</td><td style="padding:7px 0;font-weight:500">${displayName}</td></tr>
@@ -422,7 +422,7 @@ async function start() {
   <p style="margin-top:24px;font-size:12px;color:#9ca3af">Diese E-Mail wurde automatisch generiert.</p>
 </div>`
       await transport.sendMail({
-        from: process.env.SMTP_FROM || '"Belucha Sellercentral" <noreply@belucha.de>',
+        from: process.env.SMTP_FROM || '"Andertal Sellercentral" <noreply@andertal.de>',
         to: superuserEmails.join(', '),
         subject,
         html,
@@ -1022,11 +1022,11 @@ async function start() {
         // 2FA / TOTP columns
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS totp_secret text DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS totp_enabled boolean NOT NULL DEFAULT false;`).catch(() => {})
-        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS belucha_billbee_api_key text`).catch(() => {})
-        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS belucha_billbee_api_secret text`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS andertal_billbee_api_key text`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS andertal_billbee_api_secret text`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS billbee_integration_enabled boolean NOT NULL DEFAULT true`).catch(() => {})
         await client.query(
-          `CREATE UNIQUE INDEX IF NOT EXISTS idx_seller_users_belucha_billbee_api_key ON seller_users(belucha_billbee_api_key) WHERE belucha_billbee_api_key IS NOT NULL`,
+          `CREATE UNIQUE INDEX IF NOT EXISTS idx_seller_users_andertal_billbee_api_key ON seller_users(andertal_billbee_api_key) WHERE andertal_billbee_api_key IS NOT NULL`,
         ).catch(() => {})
 
         // ── Ranking infrastructure ──────────────────────────────────────────────
@@ -4464,8 +4464,8 @@ async function start() {
         const speakeasy = require('speakeasy')
         const QRCode = require('qrcode')
         const secret = speakeasy.generateSecret({
-          name: `Belucha Sellercentral (${sellerUser.email})`,
-          issuer: 'Belucha',
+          name: `Andertal Sellercentral (${sellerUser.email})`,
+          issuer: 'Andertal',
           length: 32,
         })
         // Store secret temporarily — it's confirmed/activated in the verify step
@@ -6276,7 +6276,7 @@ async function start() {
                 const sc = await stripe.customers.create({
                   email: c.email || payload.email || undefined,
                   name: [c.first_name, c.last_name].filter(Boolean).join(' ').trim() || undefined,
-                  metadata: { belucha_customer_id: c.id },
+                  metadata: { andertal_customer_id: c.id },
                 })
                 stripeCustomerId = sc.id
                 await client.query('UPDATE store_customers SET stripe_customer_id = $1 WHERE id = $2::uuid', [stripeCustomerId, c.id])
@@ -7025,7 +7025,7 @@ async function start() {
         const itemRows = iRes.rows || []
         await client.end(); client = null
         const on = row.order_number != null ? String(row.order_number) : String(orderId).slice(0, 8)
-        const shopName = process.env.SHOP_INVOICE_NAME || 'Belucha'
+        const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="Rechnung-${on}.pdf"`)
         const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
@@ -9075,7 +9075,7 @@ async function start() {
       }
 
       doc.rect(left, 34, contentWidth, 44).fill('#111827')
-      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16).text(pdfDeLatin(shopName || 'Belucha'), left + 14, 49, { width: contentWidth - 28, align: 'left' })
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16).text(pdfDeLatin(shopName || 'Andertal'), left + 14, 49, { width: contentWidth - 28, align: 'left' })
 
       doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(25).text('RECHNUNG', left, 94)
       doc.font('Helvetica').fontSize(10).fillColor('#4b5563').text(`Rechnungs-Nr.: ${invoiceNumber}`, right - invoiceMetaWidth, 96, { width: invoiceMetaWidth, align: 'right' })
@@ -9208,7 +9208,7 @@ async function start() {
         await client.end()
         client = null
         const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
-        const shopName = process.env.SHOP_INVOICE_NAME || 'Belucha'
+        const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="Rechnung-${on}.pdf"`)
         const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
@@ -9249,7 +9249,7 @@ async function start() {
         await client.end()
         client = null
         const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
-        const shopName = process.env.SHOP_INVOICE_NAME || 'Belucha'
+        const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="Lieferschein-${on}.pdf"`)
         const doc = new PDFDocument({ margin: 48, size: 'A4' })
@@ -10372,8 +10372,8 @@ async function start() {
         const { name, logo_url, webhook_url, config, is_active = true, category = 'custom' } = req.body || {}
         if (!name || !String(name).trim()) return res.status(400).json({ message: 'name required' })
         const genSlug = `int_${_c.randomBytes(16).toString('hex')}`
-        const genKey = `belucha_zug_${_c.randomBytes(12).toString('hex')}`
-        const genSec = `belucha_ssk_${_c.randomBytes(18).toString('hex')}`
+        const genKey = `andertal_zug_${_c.randomBytes(12).toString('hex')}`
+        const genSec = `andertal_ssk_${_c.randomBytes(18).toString('hex')}`
         const r = await client.query(
           `INSERT INTO store_integrations (name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active, category, seller_scope_key)
            VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)
@@ -10425,7 +10425,7 @@ async function start() {
         }
         const body = { ...(req.body || {}) }
         if (body.regenerate_secret === true || body.regenerate_secret === 'true') {
-          const newSec = `belucha_ssk_${_c.randomBytes(18).toString('hex')}`
+          const newSec = `andertal_ssk_${_c.randomBytes(18).toString('hex')}`
           const ur = await client.query(
             `UPDATE store_integrations SET api_secret = $2, updated_at = NOW() WHERE id = $1::uuid RETURNING id, name, slug, logo_url, api_key, api_secret, is_active, category, created_at, updated_at`,
             [id, newSec],
@@ -10572,7 +10572,7 @@ async function start() {
     }
 
     const getBillbeePublicBaseUrl = () =>
-      (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '').replace(/\/$/, '') || 'https://belucha-medusa-backend.onrender.com'
+      (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '').replace(/\/$/, '') || 'https://andertal-medusa-backend.onrender.com'
 
     const adminHubBillbeeCredentialsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -10600,7 +10600,7 @@ async function start() {
             : { api_key: '', basic_auth_username: '', basic_auth_password: '' }
         const store_name = row && row.store_name != null ? String(row.store_name).trim() : ''
         const connection_name = row && row.billbee_connection_name != null ? String(row.billbee_connection_name).trim() : ''
-        const name_for_billbee = connection_name || store_name || 'Belucha'
+        const name_for_billbee = connection_name || store_name || 'Andertal'
         const base = getBillbeePublicBaseUrl()
         const webhook_url = `${base}/admin-hub/v1/integrations/billbee/webhook`
         const has_credentials = !!(creds.api_key && creds.basic_auth_username && creds.basic_auth_password)
@@ -10682,7 +10682,7 @@ async function start() {
         const base = getBillbeePublicBaseUrl()
         const webhook_url = `${base}/admin-hub/v1/integrations/billbee/webhook`
         const store_name = row.store_name != null ? String(row.store_name).trim() : ''
-        const name_for_billbee = conn || store_name || 'Belucha'
+        const name_for_billbee = conn || store_name || 'Andertal'
         const has_credentials = !!(api && user && pass)
         return res.json({
           credentials: {
@@ -11019,7 +11019,7 @@ async function start() {
       const row = await client.query('SELECT stripe_customer_id FROM store_customers WHERE id = $1::uuid', [customerId])
       let stripeCustomerId = row.rows[0]?.stripe_customer_id
       if (!stripeCustomerId) {
-        const sc = await stripe.customers.create({ email, metadata: { belucha_customer_id: customerId } })
+        const sc = await stripe.customers.create({ email, metadata: { andertal_customer_id: customerId } })
         stripeCustomerId = sc.id
         await client.query('UPDATE store_customers SET stripe_customer_id = $1 WHERE id = $2::uuid', [stripeCustomerId, customerId])
       }
@@ -11165,34 +11165,34 @@ async function start() {
     httpApp.get('/admin-hub/v1/integrations/billbee/webhook', adminHubBillbeeWebhookGET)
     httpApp.post('/admin-hub/v1/integrations/billbee/webhook', adminHubBillbeeWebhookPOST)
 
-    const ensureBeluchaBillbeeApiKeys = async (client, userId) => {
+    const ensureAndertalBillbeeApiKeys = async (client, userId) => {
       const _c = require('crypto')
       const r = await client.query(
-        `SELECT id, email, seller_id, belucha_billbee_api_key, belucha_billbee_api_secret FROM seller_users WHERE id = $1`,
+        `SELECT id, email, seller_id, andertal_billbee_api_key, andertal_billbee_api_secret FROM seller_users WHERE id = $1`,
         [userId],
       )
       const row = r.rows && r.rows[0]
       if (!row) return null
-      if (row.belucha_billbee_api_key && row.belucha_billbee_api_secret) return row
-      const k = `belucha_seller_${_c.randomBytes(12).toString('hex')}`
+      if (row.andertal_billbee_api_key && row.andertal_billbee_api_secret) return row
+      const k = `andertal_seller_${_c.randomBytes(12).toString('hex')}`
       const sec = _c.randomBytes(24).toString('hex')
       const u = await client.query(
-        `UPDATE seller_users SET belucha_billbee_api_key = $2, belucha_billbee_api_secret = $3, updated_at = now()
-         WHERE id = $1 AND (belucha_billbee_api_key IS NULL OR belucha_billbee_api_secret IS NULL)
-         RETURNING id, email, seller_id, belucha_billbee_api_key, belucha_billbee_api_secret`,
+        `UPDATE seller_users SET andertal_billbee_api_key = $2, andertal_billbee_api_secret = $3, updated_at = now()
+         WHERE id = $1 AND (andertal_billbee_api_key IS NULL OR andertal_billbee_api_secret IS NULL)
+         RETURNING id, email, seller_id, andertal_billbee_api_key, andertal_billbee_api_secret`,
         [userId, k, sec],
       )
       if (u.rows[0]) return u.rows[0]
       const again = await client.query(
-        `SELECT id, email, seller_id, belucha_billbee_api_key, belucha_billbee_api_secret FROM seller_users WHERE id = $1`,
+        `SELECT id, email, seller_id, andertal_billbee_api_key, andertal_billbee_api_secret FROM seller_users WHERE id = $1`,
         [userId],
       )
       return again.rows[0]
     }
 
-    const publicBeluchaBillbeeApiBase = () =>
+    const publicAndertalBillbeeApiBase = () =>
       (process.env.PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '').replace(/\/$/, '') ||
-      'https://belucha-medusa-backend.onrender.com'
+      'https://andertal-medusa-backend.onrender.com'
 
     const adminHubBillbeeMarketplaceConnectionGET = async (req, res) => {
       const userId = req.sellerUser?.id
@@ -11202,25 +11202,25 @@ async function start() {
         client = getSellerDbClient()
         if (!client) return res.status(503).json({ message: 'Database unavailable' })
         await client.connect()
-        const row = await ensureBeluchaBillbeeApiKeys(client, userId)
+        const row = await ensureAndertalBillbeeApiKeys(client, userId)
         await client.end()
         client = null
         if (!row) return res.status(404).json({ message: 'User not found' })
-        const base = publicBeluchaBillbeeApiBase()
+        const base = publicAndertalBillbeeApiBase()
         const apiBase = `${base}/api/billbee`
         res.json({
-          name: 'Belucha Marketplace',
+          name: 'Andertal Marketplace',
           api_base_url: apiBase,
           orders_url: `${base}/api/billbee/orders`,
           products_url: `${base}/api/billbee/products`,
           stock_url: `${base}/api/billbee/stock`,
           webhook_url: `${base}/api/billbee/webhook/order-update`,
-          api_key: row.belucha_billbee_api_key,
+          api_key: row.andertal_billbee_api_key,
           basic_auth_username: row.email,
-          basic_auth_password: row.belucha_billbee_api_secret,
+          basic_auth_password: row.andertal_billbee_api_secret,
           billbee_integration_enabled: true,
           hint:
-            'Billbee Shopverbindung: URL oft die Basis-URL (api_base_url). Schlüssel = api_key. Basic Auth Benutzername = E-Mail, Passwort = gespeichertes Secret. Empfohlen: zusätzlich HTTP-Header X-Belucha-Api-Key mit demselben api_key.',
+            'Billbee Shopverbindung: URL oft die Basis-URL (api_base_url). Schlüssel = api_key. Basic Auth Benutzername = E-Mail, Passwort = gespeichertes Secret. Empfohlen: zusätzlich HTTP-Header X-Andertal-Api-Key mit demselben api_key.',
         })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -11239,13 +11239,13 @@ async function start() {
         await client.connect()
         const sec = _c.randomBytes(24).toString('hex')
         const r = await client.query(
-          `UPDATE seller_users SET belucha_billbee_api_secret = $2, updated_at = now() WHERE id = $1 RETURNING belucha_billbee_api_secret`,
+          `UPDATE seller_users SET andertal_billbee_api_secret = $2, updated_at = now() WHERE id = $1 RETURNING andertal_billbee_api_secret`,
           [userId, sec],
         )
         await client.end()
         client = null
         if (!r.rows[0]) return res.status(404).json({ message: 'Not found' })
-        res.json({ ok: true, basic_auth_password: r.rows[0].belucha_billbee_api_secret })
+        res.json({ ok: true, basic_auth_password: r.rows[0].andertal_billbee_api_secret })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -11301,7 +11301,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 </p>
 </body></html>`
             await transport.sendMail({
-              from: process.env.SMTP_FROM || '"Belucha Shop" <noreply@belucha.de>',
+              from: process.env.SMTP_FROM || '"Andertal Shop" <noreply@andertal.de>',
               to: row.email,
               subject: `Ihr Retoureschein R-${row.return_number} – Bestellung #${row.order_number}`,
               html: `<p>Hallo ${customerName},</p><p>Ihre Retouranfrage wurde genehmigt. Anbei finden Sie Ihren Retoureschein.</p><p>Bitte legen Sie den Retoureschein dem Paket bei und senden Sie es an uns zurück.</p>${labelHtml}`,
@@ -13788,9 +13788,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
               const displayName = [first_name, last_name].filter(Boolean).join(' ')
               await transport.sendMail({
                 to: normalEmail,
-                subject: 'Einladung zur Belucha Seller Platform',
-                text: `${displayName ? `Hallo ${displayName},\n\n` : ''}Sie wurden eingeladen, der Belucha Seller Platform beizutreten.\n\nRegistrierungslink: ${inviteUrl}\n\nDieser Link ist 7 Tage gültig.`,
-                html: `<p>${displayName ? `Hallo <strong>${displayName}</strong>,` : ''}</p><p>Sie wurden eingeladen, der <strong>Belucha Seller Platform</strong> beizutreten.</p><p><a href="${inviteUrl}">Jetzt registrieren</a></p><p>Dieser Link ist 7 Tage gültig.</p>`
+                subject: 'Einladung zur Andertal Seller Platform',
+                text: `${displayName ? `Hallo ${displayName},\n\n` : ''}Sie wurden eingeladen, der Andertal Seller Platform beizutreten.\n\nRegistrierungslink: ${inviteUrl}\n\nDieser Link ist 7 Tage gültig.`,
+                html: `<p>${displayName ? `Hallo <strong>${displayName}</strong>,` : ''}</p><p>Sie wurden eingeladen, der <strong>Andertal Seller Platform</strong> beizutreten.</p><p><a href="${inviteUrl}">Jetzt registrieren</a></p><p>Dieser Link ist 7 Tage gültig.</p>`
               })
             }
           }

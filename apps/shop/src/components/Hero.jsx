@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import styled from "styled-components";
@@ -34,7 +34,7 @@ export default function Hero() {
   return (
     <HeroSection>
       <Container>
-        <Title>Welcome to Belucha</Title>
+        <Title>Welcome to Andertal</Title>
         <Subtitle>Discover amazing products from independent sellers</Subtitle>
       </Container>
     </HeroSection>

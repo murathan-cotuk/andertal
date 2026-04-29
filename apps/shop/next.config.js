@@ -1,4 +1,4 @@
-const path = require('path');
+﻿const path = require('path');
 const createNextIntlPlugin = require("next-intl/plugin");
 const { withSentryConfig } = require("@sentry/nextjs");
 
@@ -34,7 +34,7 @@ const nextConfig = {
   outputFileTracingRoot: monorepoRoot,
   allowedDevOrigins,
   reactStrictMode: true,
-  transpilePackages: ["@belucha/ui", "@belucha/lib", "@belucha/shop-theme"],
+  transpilePackages: ["@andertal/ui", "@andertal/lib", "@andertal/shop-theme"],
   compiler: {
     styledComponents: true,
   },
@@ -57,6 +57,9 @@ const nextConfig = {
   turbopack: {
     resolveAlias: {
       'next-intl/config': './src/i18n/request.js',
+      // Monorepo workspace symlink eksikse (npm install kökten çalışmazsa) yine çözülsün
+      '@andertal/lib': '../../packages/lib',
+      '@andertal/ui': '../../packages/ui',
     },
   },
   async headers() {
@@ -125,7 +128,7 @@ const sentryWrapped = withSentryConfig(withNextIntl(nextConfig), {
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
   org: "murathan-cotuk",
-  project: "belucha-shop",
+  project: "andertal-shop",
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
@@ -148,6 +151,8 @@ const sentryWrapped = withSentryConfig(withNextIntl(nextConfig), {
       ...config.resolve.alias,
       '@': path.resolve(__dirname, './src'),
       'next-intl/config': path.resolve(__dirname, 'src/i18n/request.js'),
+      '@andertal/lib': path.resolve(monorepoRoot, 'packages/lib'),
+      '@andertal/ui': path.resolve(monorepoRoot, 'packages/ui'),
     };
     
     // Node.js modüllerini client-side'da exclude et

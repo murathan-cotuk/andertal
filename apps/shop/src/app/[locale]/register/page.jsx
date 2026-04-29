@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, Link, usePathname } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useMedusaAuth } from "@/hooks/useMedusaAuth";
-import { useCustomerAuth as useAuth, useAuthGuard } from "@belucha/lib";
+import { useCustomerAuth as useAuth, useAuthGuard } from "@andertal/lib";
 import { tokens } from "@/design-system/tokens";
 import { useCart } from "@/context/CartContext";
 import { ALL_COUNTRIES, getLocalizedCountryName, getShippableCountries } from "@/lib/countries";
@@ -315,7 +315,7 @@ export default function RegisterPage() {
         const token = loginResult.access_token || loginResult.token;
         if (token) {
           login(token, loginResult.customer.id);
-          document.cookie = `belucha_cauth=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+          document.cookie = `andertal_cauth=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
           router.push("/");
           router.refresh();
         } else {
@@ -337,11 +337,11 @@ export default function RegisterPage() {
           {branding.logo ? (
             <img
               src={branding.logo}
-              alt="Belucha"
+              alt="Andertal"
               style={{ height: Math.min(Math.max(branding.logoHeight || 34, 20), 56), width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
             />
           ) : (
-            <span style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", letterSpacing: "-0.03em" }}>Belucha</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", letterSpacing: "-0.03em" }}>Andertal</span>
           )}
         </Link>
         <details style={{ position: "relative" }}>
@@ -840,7 +840,7 @@ export default function RegisterPage() {
 
       {/* Footer hint */}
       <div style={{ padding: "16px 24px", textAlign: "center", fontSize: 12, color: "#9ca3af" }}>
-        © {new Date().getFullYear()} Belucha
+        © {new Date().getFullYear()} Andertal
       </div>
     </div>
   );

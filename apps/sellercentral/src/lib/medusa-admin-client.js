@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Medusa Admin API Client for Sellercentral
  * 
  * Sellercentral'dan Medusa backend'e product eklemek için REST API client
  */
 
-/** Belucha production backend — used when NEXT_PUBLIC_MEDUSA_BACKEND_URL is unset. Local: set .env to http://localhost:9000 */
-const DEFAULT_PUBLIC_MEDUSA_URL = 'https://belucha-medusa-backend.onrender.com';
+/** Andertal production backend — used when NEXT_PUBLIC_MEDUSA_BACKEND_URL is unset. Local: set .env to http://localhost:9000 */
+const DEFAULT_PUBLIC_MEDUSA_URL = 'https://andertal-medusa-backend.onrender.com';
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '';
@@ -29,7 +29,7 @@ class MedusaAdminClient {
     const url = `${base}${endpoint}`;
 
     if (!url || url.startsWith('undefined')) {
-      const err = new Error('Backend URL is not set. Set NEXT_PUBLIC_MEDUSA_BACKEND_URL (e.g. https://belucha-medusa-backend.onrender.com).');
+      const err = new Error('Backend URL is not set. Set NEXT_PUBLIC_MEDUSA_BACKEND_URL (e.g. https://andertal-medusa-backend.onrender.com).');
       console.error('Medusa Admin API Error:', err.message);
       throw err;
     }
@@ -61,7 +61,7 @@ class MedusaAdminClient {
       const isNetworkError = error?.message === 'Failed to fetch' || error?.name === 'TypeError' || error?.code === 'ECONNREFUSED';
       const method = (options?.method || 'GET').toUpperCase();
       const friendlyMessage = isNetworkError
-        ? `Backend unreachable (${method} ${endpoint}). Set NEXT_PUBLIC_MEDUSA_BACKEND_URL to your backend URL (e.g. https://belucha-medusa-backend.onrender.com) and ensure the backend is running.`
+        ? `Backend unreachable (${method} ${endpoint}). Set NEXT_PUBLIC_MEDUSA_BACKEND_URL to your backend URL (e.g. https://andertal-medusa-backend.onrender.com) and ensure the backend is running.`
         : (error?.message || 'Request failed');
       const out = new Error(friendlyMessage);
       out.statusCode = error?.statusCode;
@@ -325,7 +325,7 @@ class MedusaAdminClient {
   /**
    * Admin Hub Categories (Platform owner managed)
    * Backend: GET /admin-hub/categories veya GET /admin-hub/v1/categories
-   * Vercel'da NEXT_PUBLIC_MEDUSA_BACKEND_URL = https://belucha-medusa-backend.onrender.com olmalı.
+   * Vercel'da NEXT_PUBLIC_MEDUSA_BACKEND_URL = https://andertal-medusa-backend.onrender.com olmalı.
    */
   async getAdminHubCategories(filters = {}) {
     const { all, ...rest } = filters
@@ -871,7 +871,7 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/integrations/billbee/webhook-url')
   }
 
-  /** Belucha-issued Billbee marketplace API (GET /api/billbee/*) connection strings */
+  /** Andertal-issued Billbee marketplace API (GET /api/billbee/*) connection strings */
   async getBillbeeMarketplaceConnection() {
     return this.request('/admin-hub/v1/billbee/connection')
   }

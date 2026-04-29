@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import styled from "styled-components";
-import { Card, Button } from "@belucha/ui";
+import { Card, Button } from "@andertal/ui";
 
 const Container = styled.div`
   max-width: 1200px;

@@ -1,6 +1,6 @@
-# Auth System Usage Guide
+﻿# Auth System Usage Guide
 
-Bu dokümantasyon, Belucha Auth System'in nasıl kullanılacağını açıklar.
+Bu dokümantasyon, Andertal Auth System'in nasıl kullanılacağını açıklar.
 
 ## 📚 İçindekiler
 
@@ -19,7 +19,7 @@ Route'ları korumak için 3 farklı pattern kullanabilirsiniz:
 ### Option A: Hook Pattern
 
 ```jsx
-import { useAuthGuard } from '@belucha/lib';
+import { useAuthGuard } from '@andertal/lib';
 
 function AccountPage() {
   useAuthGuard({ requiredRole: 'customer', redirectTo: '/login' });
@@ -36,7 +36,7 @@ function AccountPage() {
 ### Option B: HOC Pattern
 
 ```jsx
-import { withAuthGuard } from '@belucha/lib';
+import { withAuthGuard } from '@andertal/lib';
 
 const AccountPage = withAuthGuard(
   function Account() {
@@ -54,7 +54,7 @@ const AccountPage = withAuthGuard(
 ### Option C: Component Pattern
 
 ```jsx
-import { ProtectedRoute } from '@belucha/lib';
+import { ProtectedRoute } from '@andertal/lib';
 
 function AccountPage() {
   return (
@@ -77,7 +77,7 @@ function AccountPage() {
 Next.js `getServerSideProps` içinde kullanın:
 
 ```jsx
-import { serverSideAuthGuard } from '@belucha/lib';
+import { serverSideAuthGuard } from '@andertal/lib';
 
 export async function getServerSideProps(context) {
   const guardResult = serverSideAuthGuard(context, {
@@ -110,7 +110,7 @@ export async function getServerSideProps(context) {
 Belirli bir role sahip olup olmadığını kontrol eder:
 
 ```jsx
-import { hasRole } from '@belucha/lib';
+import { hasRole } from '@andertal/lib';
 
 function SellerDashboard() {
   if (hasRole('seller')) {
@@ -126,7 +126,7 @@ function SellerDashboard() {
 Mevcut kullanıcının role'ünü döner:
 
 ```jsx
-import { getCurrentRole } from '@belucha/lib';
+import { getCurrentRole } from '@andertal/lib';
 
 function UserProfile() {
   const role = getCurrentRole();
@@ -146,7 +146,7 @@ function UserProfile() {
 Herhangi bir kullanıcı giriş yapmış mı kontrol eder:
 
 ```jsx
-import { isAnyUserAuthenticated } from '@belucha/lib';
+import { isAnyUserAuthenticated } from '@andertal/lib';
 
 function Header() {
   const isLoggedIn = isAnyUserAuthenticated();
@@ -170,7 +170,7 @@ function Header() {
 Login sayfalarında, zaten giriş yapmış kullanıcıları ana sayfaya yönlendirin:
 
 ```jsx
-import { useAuthGuard } from '@belucha/lib';
+import { useAuthGuard } from '@andertal/lib';
 
 function LoginPage() {
   useAuthGuard({
@@ -194,7 +194,7 @@ function LoginPage() {
 ### Customer Auth
 
 ```jsx
-import { CustomerAuthProvider, useCustomerAuth } from '@belucha/lib';
+import { CustomerAuthProvider, useCustomerAuth } from '@andertal/lib';
 
 function App() {
   return (
@@ -223,7 +223,7 @@ function AccountPage() {
 ### Seller Auth
 
 ```jsx
-import { SellerAuthProvider, useSellerAuth } from '@belucha/lib';
+import { SellerAuthProvider, useSellerAuth } from '@andertal/lib';
 
 function SellerApp() {
   return (
@@ -243,7 +243,7 @@ function SellerDashboard() {
 ### Login İşlemi
 
 ```jsx
-import { useCustomerAuth } from '@belucha/lib';
+import { useCustomerAuth } from '@andertal/lib';
 
 function LoginForm() {
   const { login } = useCustomerAuth();
@@ -317,7 +317,7 @@ function LoginForm() {
 ### Tam Örnek: Protected Account Page
 
 ```jsx
-import { useAuthGuard, useCustomerAuth } from '@belucha/lib';
+import { useAuthGuard, useCustomerAuth } from '@andertal/lib';
 
 export default function AccountPage() {
   // Route protection
@@ -339,7 +339,7 @@ export default function AccountPage() {
 ### Tam Örnek: Server-Side Protected Page
 
 ```jsx
-import { serverSideAuthGuard } from '@belucha/lib';
+import { serverSideAuthGuard } from '@andertal/lib';
 
 export async function getServerSideProps(context) {
   // Route protection

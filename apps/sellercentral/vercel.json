@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && npm install && turbo run build --filter=@belucha/sellercentral",
+  "buildCommand": "cd ../.. && npm install && turbo run build --filter=@andertal/sellercentral",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "cd ../.. && npm install"

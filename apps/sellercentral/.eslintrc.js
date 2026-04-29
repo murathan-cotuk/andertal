@@ -1,4 +1,4 @@
-module.exports = {
-  extends: ["@belucha/config/eslint/next.js"],
+﻿module.exports = {
+  extends: ["@andertal/config/eslint/next.js"],
 };
 

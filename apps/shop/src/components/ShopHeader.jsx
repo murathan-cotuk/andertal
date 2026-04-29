@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /**
  * Navbar — Desktop: scroll down → header slides away; scroll up → shows.
@@ -14,7 +14,7 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import styled from "styled-components";
 import { motion } from "framer-motion";
-import { useCustomerAuth as useAuth } from "@belucha/lib";
+import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
@@ -1330,7 +1330,7 @@ export default function ShopHeader() {
                       style={{ height: Math.min(shopBranding.shop_logo_height || 34, 56), maxHeight: 56, width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
                     />
                   ) : (
-                    "Belucha"
+                    "Andertal"
                   )}
                 </MiddleBarLogo>
               </MiddleBarLeft>
@@ -1505,7 +1505,7 @@ export default function ShopHeader() {
                   isAuthenticated={isAuthenticated}
                   user={user}
                   onLogout={() => {
-                    document.cookie = "belucha_cauth=; path=/; max-age=0; SameSite=Lax";
+                    document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
                     logout();
                   }}
                   onOpen={() => { setLocaleDropdownOpen(false); setMainMenuOpen(false); }}
