@@ -34,7 +34,7 @@
     "turbo": "^2.9.4",
     "wrangler": "^3.94.0"
   },
-  "packageManager": "npm@9.5.0",
+  "packageManager": "npm@10.9.2",
   "workspaces": [
     "apps/*",
     "packages/*",
