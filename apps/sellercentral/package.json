@@ -9,9 +9,9 @@
     "lint": "eslint . --max-warnings 0"
   },
   "dependencies": {
-    "@andertal/lib": "*",
+    "@andertal/lib": "file:../../packages/lib",
     "@andertal/shop-theme": "file:../../packages/shop-theme",
-    "@andertal/ui": "*",
+    "@andertal/ui": "file:../../packages/ui",
     "@shopify/polaris": "^13.0.0",
     "@shopify/polaris-icons": "^9.0.0",
     "autoprefixer": "^10.4.16",

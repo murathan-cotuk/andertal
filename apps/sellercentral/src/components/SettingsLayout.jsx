@@ -74,9 +74,17 @@ export default function SettingsLayout({ children }) {
                       transition: "background-color .15s ease, border-left-color .15s ease",
                     }}
                   >
-                    <Text as="span" variant="bodyMd" fontWeight={active ? "semibold" : "regular"} tone={active ? "base" : "subdued"}>
-                      {item.label}
-                    </Text>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <Text
+                        as="span"
+                        variant="bodyMd"
+                        fontWeight={active ? "semibold" : "regular"}
+                        tone={active ? "base" : "subdued"}
+                        style={item.superuserOnly ? { color: "#601b1b" } : undefined}
+                      >
+                        {item.label}
+                      </Text>
+                    </span>
                   </div>
                     );
                   })()}

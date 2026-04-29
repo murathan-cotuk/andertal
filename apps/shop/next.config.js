@@ -57,6 +57,9 @@ const nextConfig = {
   turbopack: {
     resolveAlias: {
       'next-intl/config': './src/i18n/request.js',
+      // Monorepo workspace symlink eksikse (npm install kökten çalışmazsa) yine çözülsün
+      '@andertal/lib': '../../packages/lib',
+      '@andertal/ui': '../../packages/ui',
     },
   },
   async headers() {
@@ -148,6 +151,8 @@ const sentryWrapped = withSentryConfig(withNextIntl(nextConfig), {
       ...config.resolve.alias,
       '@': path.resolve(__dirname, './src'),
       'next-intl/config': path.resolve(__dirname, 'src/i18n/request.js'),
+      '@andertal/lib': path.resolve(monorepoRoot, 'packages/lib'),
+      '@andertal/ui': path.resolve(monorepoRoot, 'packages/ui'),
     };
     
     // Node.js modüllerini client-side'da exclude et

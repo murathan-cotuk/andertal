@@ -61,6 +61,10 @@ const GroupedDropdownSearch = dynamic(
   { ssr: false, loading: () => <div style={{ width: "100%", maxWidth: 400, height: 36 }} /> }
 );
 
+const buildSuperuserLabel = (label) => (
+  <span style={{ color: "#601b1b", fontWeight: 600 }}>{label}</span>
+);
+
 const styleSuperuserOnlyNavItems = (items, isSuperuser) => {
   if (!Array.isArray(items)) return [];
   return items.map((item) => {
@@ -68,13 +72,13 @@ const styleSuperuserOnlyNavItems = (items, isSuperuser) => {
       ? item.subNavigationItems.map((sub) => {
           return {
             ...sub,
-            label: sub.label,
+            label: isSuperuser && sub.superuserOnly ? buildSuperuserLabel(sub.label) : sub.label,
           };
         })
       : item.subNavigationItems;
     return {
       ...item,
-      label: item.label,
+      label: isSuperuser && item.superuserOnly ? buildSuperuserLabel(item.label) : item.label,
       subNavigationItems,
     };
   });

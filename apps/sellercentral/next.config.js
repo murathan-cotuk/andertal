@@ -37,6 +37,8 @@ const nextConfig = {
   turbopack: {
     resolveAlias: {
       'next-intl/config': './src/i18n/request.js',
+      '@andertal/lib': '../../packages/lib',
+      '@andertal/ui': '../../packages/ui',
     },
   },
   async headers() {
