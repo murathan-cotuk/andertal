@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
   "globalEnv": [
@@ -16,33 +16,9 @@
         "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"
       ]
     },
-    "@andertal/shop#build": {
-      "dependsOn": [],
-      "outputs": [".next/**", "!.next/cache/**"],
-      "env": [
-        "NODE_ENV",
-        "NEXT_PUBLIC_MEDUSA_BACKEND_URL",
-        "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"
-      ]
-    },
-    "@andertal/sellercentral#build": {
-      "dependsOn": [],
-      "outputs": [".next/**", "!.next/cache/**"],
-      "env": [
-        "NODE_ENV",
-        "NEXT_PUBLIC_MEDUSA_BACKEND_URL",
-        "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"
-      ]
-    },
     "dev": {
       "cache": false,
       "persistent": true
-    },
-    "medusa-backend#dev": {
-      "cache": false,
-      "persistent": false,
-      "dependsOn": [],
-      "outputs": []
     },
     "lint": {
       "dependsOn": ["^lint"]
