@@ -1,12 +1,52 @@
 ﻿"use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
+
+const LOCALES = [
+  { code: "en", label: "EN" }, { code: "de", label: "DE" }, { code: "tr", label: "TR" },
+  { code: "fr", label: "FR" }, { code: "it", label: "IT" }, { code: "es", label: "ES" },
+];
+
+function LocaleSwitcher() {
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const current = LOCALES.find((l) => l.code === locale) ?? LOCALES[0];
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "#374151", fontSize: 13, fontWeight: 600 }}
+      >
+        {current.label}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 50, minWidth: 80 }}>
+          {LOCALES.map((l) => (
+            <button
+              key={l.code}
+              type="button"
+              onClick={() => { router.replace(pathname, { locale: l.code }); setOpen(false); }}
+              style={{ display: "block", width: "100%", padding: "8px 14px", background: l.code === locale ? "#f3f4f6" : "transparent", border: "none", cursor: "pointer", fontSize: 13, fontWeight: l.code === locale ? 700 : 400, textAlign: "left", color: "#111827" }}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function RegisterForm() {
   const router = useRouter();
@@ -122,6 +162,7 @@ function RegisterForm() {
 
   return (
     <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6", overflowX: "hidden", overflowY: "auto", touchAction: "pan-y", overscrollBehaviorX: "none", WebkitOverflowScrolling: "touch", padding: "16px", boxSizing: "border-box" }}>
+      <div style={{ position: "fixed", top: 16, right: 16, zIndex: 100 }}><LocaleSwitcher /></div>
       <div style={{ width: "100%", maxWidth: 440, boxSizing: "border-box" }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
           {branding.logo ? (

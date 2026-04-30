@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useLocale } from "next-intl";
 import {
   Page, Layout, Card, Text, Button, Badge, BlockStack, InlineStack,
   Box, Spinner, Banner, Modal, TextField, Select, EmptyState, Divider,
@@ -9,35 +10,244 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const client = getMedusaAdminClient();
 
-const TRIGGER_OPTIONS = [
-  { label: "Yeni abone / New subscriber", value: "new_subscriber" },
-  { label: "Terk edilen sepet / Abandoned cart", value: "abandoned_cart" },
-  { label: "Sipariş oluşturuldu / Order placed", value: "order_placed" },
-  { label: "Sipariş teslim edildi / Order delivered", value: "order_delivered" },
-  { label: "Yorum isteği / Review request", value: "review_request" },
-  { label: "Pasif müşteri / Win-back", value: "win_back" },
-];
+// ─── Translations ─────────────────────────────────────────────────────────────
 
-const TRIGGER_LABELS = Object.fromEntries(TRIGGER_OPTIONS.map((o) => [o.value, o.label]));
-
-const STATUS_BADGE = {
-  active: { tone: "success", label: "Aktif" },
-  draft: { tone: "info", label: "Taslak" },
-  paused: { tone: "warning", label: "Duraklatıldı" },
+const T = {
+  en: {
+    title: "Flows",
+    subtitle: "Automated email campaigns triggered by customer events",
+    createBtn: "Create flow",
+    smtpWarningTitle: "Email server not configured",
+    smtpWarningBody: "To send flow emails, you need to configure SMTP / Gmail settings first.",
+    smtpWarningAction: "Go to SMTP settings",
+    emptyHeading: "No flows yet",
+    emptyAction: "Create first flow",
+    emptyBody: "Create automated email sequences triggered by customer events (abandoned cart, new order, new subscriber, etc.). Each flow can include delay steps and personalised email templates.",
+    trigger: "Trigger",
+    steps: "steps",
+    sent: "sent",
+    pause: "Pause",
+    activate: "Activate",
+    delete: "Delete",
+    modalTitle: "New Flow",
+    flowName: "Flow name",
+    flowNamePlaceholder: "e.g. Abandoned Cart Series",
+    triggerLabel: "Trigger",
+    createConfirm: "Create",
+    cancel: "Cancel",
+    howTitle: "How do flows work?",
+    howTrigger: "Trigger → Event that starts the flow.",
+    howSteps: "Steps → Send email, wait (e.g. 2 days), check condition.",
+    howEmail: "Email sending is configured via Settings > Apps & Integrations (SMTP).",
+    triggers: {
+      new_subscriber: "New subscriber",
+      abandoned_cart: "Abandoned cart",
+      order_placed: "Order placed",
+      order_delivered: "Order delivered",
+      review_request: "Review request",
+      win_back: "Win-back (inactive customer)",
+    },
+    statuses: { active: "Active", draft: "Draft", paused: "Paused" },
+  },
+  de: {
+    title: "Flows",
+    subtitle: "Automatische E-Mail-Kampagnen ausgelöst durch Kundenereignisse",
+    createBtn: "Flow erstellen",
+    smtpWarningTitle: "E-Mail-Server nicht konfiguriert",
+    smtpWarningBody: "Um Flow-E-Mails zu senden, müssen zuerst die SMTP / Gmail-Einstellungen konfiguriert werden.",
+    smtpWarningAction: "Zu den SMTP-Einstellungen",
+    emptyHeading: "Noch keine Flows",
+    emptyAction: "Ersten Flow erstellen",
+    emptyBody: "Erstelle automatische E-Mail-Sequenzen, die durch Kundenereignisse ausgelöst werden (verlassener Warenkorb, neue Bestellung, neuer Abonnent usw.). Jeder Flow kann Verzögerungsschritte und personalisierte E-Mail-Vorlagen enthalten.",
+    trigger: "Auslöser",
+    steps: "Schritte",
+    sent: "versendet",
+    pause: "Pausieren",
+    activate: "Aktivieren",
+    delete: "Löschen",
+    modalTitle: "Neuer Flow",
+    flowName: "Flow-Name",
+    flowNamePlaceholder: "z. B. Verlassener-Warenkorb-Serie",
+    triggerLabel: "Auslöser",
+    createConfirm: "Erstellen",
+    cancel: "Abbrechen",
+    howTitle: "Wie funktionieren Flows?",
+    howTrigger: "Auslöser → Ereignis, das den Flow startet.",
+    howSteps: "Schritte → E-Mail senden, warten (z. B. 2 Tage), Bedingung prüfen.",
+    howEmail: "E-Mail-Versand wird über Einstellungen > Apps & Integrationen (SMTP) konfiguriert.",
+    triggers: {
+      new_subscriber: "Neuer Abonnent",
+      abandoned_cart: "Verlassener Warenkorb",
+      order_placed: "Bestellung aufgegeben",
+      order_delivered: "Bestellung geliefert",
+      review_request: "Bewertungsanfrage",
+      win_back: "Rückgewinnung (inaktiver Kunde)",
+    },
+    statuses: { active: "Aktiv", draft: "Entwurf", paused: "Pausiert" },
+  },
+  tr: {
+    title: "Flows",
+    subtitle: "Tetikleyici olaylara göre otomatik e-posta kampanyaları",
+    createBtn: "Flow oluştur",
+    smtpWarningTitle: "E-posta sunucusu yapılandırılmamış",
+    smtpWarningBody: "Flow e-postalarının gönderilebilmesi için önce SMTP / Gmail ayarlarını yapmanız gerekiyor.",
+    smtpWarningAction: "SMTP ayarlarına git",
+    emptyHeading: "Henüz hiç flow yok",
+    emptyAction: "İlk flow'u oluştur",
+    emptyBody: "Müşteri olayları (terk edilen sepet, yeni sipariş, yeni abone vb.) ile tetiklenen otomatik e-posta dizileri oluşturun. Her flow; gecikme adımları ve kişiselleştirilmiş e-posta şablonları içerebilir.",
+    trigger: "Tetikleyici",
+    steps: "adım",
+    sent: "gönderim",
+    pause: "Duraklat",
+    activate: "Etkinleştir",
+    delete: "Sil",
+    modalTitle: "Yeni Flow",
+    flowName: "Flow adı",
+    flowNamePlaceholder: "ör. Terk Edilen Sepet Serisi",
+    triggerLabel: "Tetikleyici",
+    createConfirm: "Oluştur",
+    cancel: "İptal",
+    howTitle: "Flows nasıl çalışır?",
+    howTrigger: "Tetikleyici → Flow'u başlatan olay.",
+    howSteps: "Adımlar → E-posta gönder, bekle (ör. 2 gün), koşul kontrol et.",
+    howEmail: "E-posta gönderimi Ayarlar > Apps & Entegrasyonlar (SMTP) üzerinden yapılandırılır.",
+    triggers: {
+      new_subscriber: "Yeni abone",
+      abandoned_cart: "Terk edilen sepet",
+      order_placed: "Sipariş oluşturuldu",
+      order_delivered: "Sipariş teslim edildi",
+      review_request: "Yorum isteği",
+      win_back: "Pasif müşteri (win-back)",
+    },
+    statuses: { active: "Aktif", draft: "Taslak", paused: "Duraklatıldı" },
+  },
+  fr: {
+    title: "Flux",
+    subtitle: "Campagnes e-mail automatiques déclenchées par des événements clients",
+    createBtn: "Créer un flux",
+    smtpWarningTitle: "Serveur e-mail non configuré",
+    smtpWarningBody: "Pour envoyer des e-mails de flux, vous devez d'abord configurer les paramètres SMTP / Gmail.",
+    smtpWarningAction: "Aller aux paramètres SMTP",
+    emptyHeading: "Aucun flux pour l'instant",
+    emptyAction: "Créer le premier flux",
+    emptyBody: "Créez des séquences d'e-mails automatiques déclenchées par des événements clients (panier abandonné, nouvelle commande, nouvel abonné, etc.).",
+    trigger: "Déclencheur",
+    steps: "étapes",
+    sent: "envoyés",
+    pause: "Mettre en pause",
+    activate: "Activer",
+    delete: "Supprimer",
+    modalTitle: "Nouveau Flux",
+    flowName: "Nom du flux",
+    flowNamePlaceholder: "ex. Série Panier Abandonné",
+    triggerLabel: "Déclencheur",
+    createConfirm: "Créer",
+    cancel: "Annuler",
+    howTitle: "Comment fonctionnent les flux?",
+    howTrigger: "Déclencheur → Événement qui démarre le flux.",
+    howSteps: "Étapes → Envoyer e-mail, attendre (ex. 2 jours), vérifier condition.",
+    howEmail: "L'envoi d'e-mails est configuré via Paramètres > Apps & Intégrations (SMTP).",
+    triggers: {
+      new_subscriber: "Nouvel abonné",
+      abandoned_cart: "Panier abandonné",
+      order_placed: "Commande passée",
+      order_delivered: "Commande livrée",
+      review_request: "Demande d'avis",
+      win_back: "Réactivation (client inactif)",
+    },
+    statuses: { active: "Actif", draft: "Brouillon", paused: "En pause" },
+  },
+  it: {
+    title: "Flussi",
+    subtitle: "Campagne e-mail automatiche attivate da eventi dei clienti",
+    createBtn: "Crea flusso",
+    smtpWarningTitle: "Server e-mail non configurato",
+    smtpWarningBody: "Per inviare e-mail di flusso, è necessario prima configurare le impostazioni SMTP / Gmail.",
+    smtpWarningAction: "Vai alle impostazioni SMTP",
+    emptyHeading: "Nessun flusso ancora",
+    emptyAction: "Crea il primo flusso",
+    emptyBody: "Crea sequenze di e-mail automatiche attivate da eventi dei clienti (carrello abbandonato, nuovo ordine, nuovo iscritto, ecc.).",
+    trigger: "Trigger",
+    steps: "passi",
+    sent: "inviati",
+    pause: "Metti in pausa",
+    activate: "Attiva",
+    delete: "Elimina",
+    modalTitle: "Nuovo Flusso",
+    flowName: "Nome del flusso",
+    flowNamePlaceholder: "es. Serie Carrello Abbandonato",
+    triggerLabel: "Trigger",
+    createConfirm: "Crea",
+    cancel: "Annulla",
+    howTitle: "Come funzionano i flussi?",
+    howTrigger: "Trigger → Evento che avvia il flusso.",
+    howSteps: "Passi → Invia e-mail, aspetta (es. 2 giorni), controlla condizione.",
+    howEmail: "L'invio di e-mail è configurato tramite Impostazioni > App e Integrazioni (SMTP).",
+    triggers: {
+      new_subscriber: "Nuovo iscritto",
+      abandoned_cart: "Carrello abbandonato",
+      order_placed: "Ordine effettuato",
+      order_delivered: "Ordine consegnato",
+      review_request: "Richiesta recensione",
+      win_back: "Riattivazione (cliente inattivo)",
+    },
+    statuses: { active: "Attivo", draft: "Bozza", paused: "In pausa" },
+  },
+  es: {
+    title: "Flujos",
+    subtitle: "Campañas de correo automáticas activadas por eventos de clientes",
+    createBtn: "Crear flujo",
+    smtpWarningTitle: "Servidor de correo no configurado",
+    smtpWarningBody: "Para enviar correos de flujo, primero debes configurar los ajustes SMTP / Gmail.",
+    smtpWarningAction: "Ir a ajustes SMTP",
+    emptyHeading: "Aún no hay flujos",
+    emptyAction: "Crear primer flujo",
+    emptyBody: "Crea secuencias de correo automáticas activadas por eventos de clientes (carrito abandonado, nuevo pedido, nuevo suscriptor, etc.).",
+    trigger: "Disparador",
+    steps: "pasos",
+    sent: "enviados",
+    pause: "Pausar",
+    activate: "Activar",
+    delete: "Eliminar",
+    modalTitle: "Nuevo Flujo",
+    flowName: "Nombre del flujo",
+    flowNamePlaceholder: "ej. Serie Carrito Abandonado",
+    triggerLabel: "Disparador",
+    createConfirm: "Crear",
+    cancel: "Cancelar",
+    howTitle: "¿Cómo funcionan los flujos?",
+    howTrigger: "Disparador → Evento que inicia el flujo.",
+    howSteps: "Pasos → Enviar correo, esperar (ej. 2 días), verificar condición.",
+    howEmail: "El envío de correos se configura en Ajustes > Apps e Integraciones (SMTP).",
+    triggers: {
+      new_subscriber: "Nuevo suscriptor",
+      abandoned_cart: "Carrito abandonado",
+      order_placed: "Pedido realizado",
+      order_delivered: "Pedido entregado",
+      review_request: "Solicitud de reseña",
+      win_back: "Reactivación (cliente inactivo)",
+    },
+    statuses: { active: "Activo", draft: "Borrador", paused: "En pausa" },
+  },
 };
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function FlowsPage() {
-  const [flows, setFlows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [togglingId, setTogglingId] = useState("");
+  const locale = useLocale();
+  const t = T[locale] || T.en;
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newTrigger, setNewTrigger] = useState("abandoned_cart");
-  const [newNameErr, setNewNameErr] = useState("");
+  const triggerOptions = Object.entries(t.triggers).map(([value, label]) => ({ label, value }));
 
+  const [flows, setFlows]               = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState("");
+  const [saving, setSaving]             = useState(false);
+  const [togglingId, setTogglingId]     = useState("");
+  const [createOpen, setCreateOpen]     = useState(false);
+  const [newName, setNewName]           = useState("");
+  const [newTrigger, setNewTrigger]     = useState("abandoned_cart");
+  const [newNameErr, setNewNameErr]     = useState("");
   const [smtpConfigured, setSmtpConfigured] = useState(null);
 
   const load = useCallback(async () => {
@@ -50,10 +260,10 @@ export default function FlowsPage() {
       ]);
       setFlows(flowsRes.status === "fulfilled" ? (flowsRes.value?.flows ?? []) : []);
       if (smtpRes.status === "fulfilled" && smtpRes.value) {
-        setSmtpConfigured(!!(smtpRes.value.host || smtpRes.value.smtp_host));
+        setSmtpConfigured(!!(smtpRes.value?.smtp?.host || smtpRes.value?.smtp?.smtp_host));
       }
     } catch (e) {
-      setError(e?.message || "Yükleme hatası");
+      setError(e?.message || "Error");
     } finally {
       setLoading(false);
     }
@@ -63,17 +273,15 @@ export default function FlowsPage() {
 
   const handleCreate = async () => {
     const name = newName.trim();
-    if (!name) { setNewNameErr("Flow adı gerekli"); return; }
+    if (!name) { setNewNameErr(t.flowName + " " + t.cancel.toLowerCase()); return; }
     setSaving(true);
     try {
       const res = await client.createFlow?.({ name, trigger: newTrigger, status: "draft" });
       setFlows((prev) => [...prev, res?.flow ?? { id: Date.now(), name, trigger: newTrigger, status: "draft", step_count: 0 }]);
       setCreateOpen(false);
-      setNewName("");
-      setNewTrigger("abandoned_cart");
-      setNewNameErr("");
+      setNewName(""); setNewTrigger("abandoned_cart"); setNewNameErr("");
     } catch (e) {
-      setNewNameErr(e?.message || "Oluşturma hatası");
+      setNewNameErr(e?.message || "Error");
     } finally {
       setSaving(false);
     }
@@ -86,7 +294,7 @@ export default function FlowsPage() {
       await client.updateFlow?.(flow.id, { status: nextStatus });
       setFlows((prev) => prev.map((f) => f.id === flow.id ? { ...f, status: nextStatus } : f));
     } catch (e) {
-      setError(e?.message || "Durum değiştirilemedi");
+      setError(e?.message || "Error");
     } finally {
       setTogglingId("");
     }
@@ -98,20 +306,19 @@ export default function FlowsPage() {
       await client.deleteFlow?.(id);
       setFlows((prev) => prev.filter((f) => f.id !== id));
     } catch (e) {
-      setError(e?.message || "Silinemedi");
+      setError(e?.message || "Error");
     } finally {
       setTogglingId("");
     }
   };
 
+  const statusBadgeTone = { active: "success", draft: "info", paused: "warning" };
+
   return (
     <Page
-      title="Flows"
-      subtitle="Tetikleyici olaylara göre otomatik e-posta kampanyaları"
-      primaryAction={{
-        content: "Flow oluştur",
-        onAction: () => { setNewName(""); setNewTrigger("abandoned_cart"); setNewNameErr(""); setCreateOpen(true); },
-      }}
+      title={t.title}
+      subtitle={t.subtitle}
+      primaryAction={{ content: t.createBtn, onAction: () => { setNewName(""); setNewTrigger("abandoned_cart"); setNewNameErr(""); setCreateOpen(true); } }}
     >
       <Layout>
         {error && (
@@ -124,10 +331,10 @@ export default function FlowsPage() {
           <Layout.Section>
             <Banner
               tone="warning"
-              title="E-posta sunucusu yapılandırılmamış"
-              action={{ content: "SMTP ayarlarına git", url: "/apps/smtp" }}
+              title={t.smtpWarningTitle}
+              action={{ content: t.smtpWarningAction, url: "/settings/integrations" }}
             >
-              Flow e-postalarının gönderilebilmesi için önce SMTP / Gmail ayarlarını yapmanız gerekiyor.
+              {t.smtpWarningBody}
             </Banner>
           </Layout.Section>
         )}
@@ -138,38 +345,31 @@ export default function FlowsPage() {
           ) : flows.length === 0 ? (
             <Card>
               <EmptyState
-                heading="Henüz hiç flow yok"
-                action={{ content: "İlk flow'u oluştur", onAction: () => setCreateOpen(true) }}
+                heading={t.emptyHeading}
+                action={{ content: t.emptyAction, onAction: () => setCreateOpen(true) }}
                 image=""
               >
-                <p>
-                  Tetikleyici olaylar (terk edilen sepet, yeni sipariş, yeni abone vb.) bazında
-                  otomatik e-posta dizileri oluşturun. Her flow; gecikme adımları ve kişiselleştirilmiş
-                  e-posta şablonları içerebilir.
-                </p>
+                <p>{t.emptyBody}</p>
               </EmptyState>
             </Card>
           ) : (
             <BlockStack gap="300">
               {flows.map((flow) => {
-                const badge = STATUS_BADGE[flow.status] ?? { tone: "default", label: flow.status };
-                const isToggling = togglingId === flow.id;
+                const statusLabel = t.statuses[flow.status] ?? flow.status;
+                const badgeTone   = statusBadgeTone[flow.status] ?? "default";
+                const isToggling  = togglingId === flow.id;
                 return (
                   <Card key={flow.id}>
                     <InlineStack align="space-between" blockAlign="center" wrap={false}>
                       <BlockStack gap="100">
                         <InlineStack gap="200" blockAlign="center">
                           <Text as="h2" variant="headingSm">{flow.name}</Text>
-                          <Badge tone={badge.tone}>{badge.label}</Badge>
+                          <Badge tone={badgeTone}>{statusLabel}</Badge>
                         </InlineStack>
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Tetikleyici: {TRIGGER_LABELS[flow.trigger] ?? flow.trigger}
-                          {flow.step_count != null && (
-                            <> · {flow.step_count} adım</>
-                          )}
-                          {flow.sent_count != null && (
-                            <> · {flow.sent_count.toLocaleString()} gönderim</>
-                          )}
+                          {t.trigger}: {t.triggers[flow.trigger] ?? flow.trigger}
+                          {flow.step_count != null && <> · {flow.step_count} {t.steps}</>}
+                          {flow.sent_count != null && <> · {flow.sent_count.toLocaleString()} {t.sent}</>}
                         </Text>
                       </BlockStack>
                       <InlineStack gap="200" wrap={false}>
@@ -179,16 +379,10 @@ export default function FlowsPage() {
                           loading={isToggling}
                           onClick={() => toggleStatus(flow)}
                         >
-                          {flow.status === "active" ? "Duraklat" : "Etkinleştir"}
+                          {flow.status === "active" ? t.pause : t.activate}
                         </Button>
-                        <Button
-                          size="slim"
-                          tone="critical"
-                          variant="plain"
-                          disabled={isToggling}
-                          onClick={() => deleteFlow(flow.id)}
-                        >
-                          Sil
+                        <Button size="slim" tone="critical" variant="plain" disabled={isToggling} onClick={() => deleteFlow(flow.id)}>
+                          {t.delete}
                         </Button>
                       </InlineStack>
                     </InlineStack>
@@ -202,22 +396,11 @@ export default function FlowsPage() {
         <Layout.Section variant="oneThird">
           <Card>
             <BlockStack gap="300">
-              <Text as="h2" variant="headingSm">Flows nasıl çalışır?</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Bir flow; belirli bir müşteri eylemi (sipariş, sepet terki vb.) gerçekleştiğinde
-                otomatik olarak başlar ve sıradaki adımları çalıştırır.
-              </Text>
+              <Text as="h2" variant="headingSm">{t.howTitle}</Text>
               <Divider />
-              <Text as="p" variant="bodySm" tone="subdued">
-                <strong>Tetikleyici →</strong> Flow'u başlatan olay.
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                <strong>Adımlar →</strong> E-posta gönder, bekle (ör. 2 gün), koşul kontrol et.
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                <strong>E-posta gönderimi</strong> için Apps &gt; SMTP sayfasından Gmail / Google
-                Workspace hesabınızı bağlayın.
-              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">{t.howTrigger}</Text>
+              <Text as="p" variant="bodySm" tone="subdued">{t.howSteps}</Text>
+              <Text as="p" variant="bodySm" tone="subdued">{t.howEmail}</Text>
             </BlockStack>
           </Card>
         </Layout.Section>
@@ -226,23 +409,23 @@ export default function FlowsPage() {
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Yeni Flow"
-        primaryAction={{ content: "Oluştur", onAction: handleCreate, loading: saving }}
-        secondaryActions={[{ content: "İptal", onAction: () => setCreateOpen(false) }]}
+        title={t.modalTitle}
+        primaryAction={{ content: t.createConfirm, onAction: handleCreate, loading: saving }}
+        secondaryActions={[{ content: t.cancel, onAction: () => setCreateOpen(false) }]}
       >
         <Modal.Section>
           <BlockStack gap="400">
             <TextField
-              label="Flow adı"
+              label={t.flowName}
               value={newName}
               onChange={(v) => { setNewName(v); setNewNameErr(""); }}
-              placeholder="ör. Terk Edilen Sepet Serisi"
+              placeholder={t.flowNamePlaceholder}
               error={newNameErr}
               autoComplete="off"
             />
             <Select
-              label="Tetikleyici"
-              options={TRIGGER_OPTIONS}
+              label={t.triggerLabel}
+              options={triggerOptions}
               value={newTrigger}
               onChange={setNewTrigger}
             />
