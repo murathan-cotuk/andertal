@@ -691,6 +691,11 @@ export default function PolarisLayout({ children }) {
                     <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Keine neuen Benachrichtigungen</div>
                   ) : (
                     <>
+                      {(notifData?.recent_verifications || []).length > 0 && (
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          Verifizierungen
+                        </div>
+                      )}
                       {(notifData?.recent_verifications || []).map((v) => (
                         <Link key={v.id} href={v.seller_id ? `/sellers/${v.seller_id}` : "/sellers"} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📋</span>
@@ -700,6 +705,11 @@ export default function PolarisLayout({ children }) {
                           </div>
                         </Link>
                       ))}
+                      {(notifData?.recent_product_change_requests || []).length > 0 && (
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          Produktänderungen
+                        </div>
+                      )}
                       {(notifData?.recent_product_change_requests || []).map((cr) => (
                         <Link
                           key={cr.id}
@@ -734,6 +744,11 @@ export default function PolarisLayout({ children }) {
                           </div>
                         </Link>
                       ))}
+                      {(notifData?.recent_orders || []).length > 0 && (
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          Bestellungen
+                        </div>
+                      )}
                       {(notifData?.recent_orders || []).map((o) => (
                         <Link key={o.id} href={`/orders/${o.id}`} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📦</span>
@@ -743,6 +758,11 @@ export default function PolarisLayout({ children }) {
                           </div>
                         </Link>
                       ))}
+                      {(notifData?.recent_returns || []).length > 0 && (
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          Rückgaben
+                        </div>
+                      )}
                       {(notifData?.recent_returns || []).map((r) => (
                         <Link key={r.id} href="/orders/returns" onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>↩️</span>

@@ -33,8 +33,6 @@ import { isBestsellerMetadata } from "@/lib/bestseller";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
-const STRIPE_PK_ENV = (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim();
-
 const CHECKOUT_SNAPSHOT_KEY = "andertal_checkout_snapshot";
 
 const PageWrap = styled.div`
@@ -1035,17 +1033,11 @@ export default function CheckoutPage() {
   const [piRefreshKey, setPiRefreshKey] = useState(0);
   const [customerToken, setCustomerToken] = useState(null);
 
-  const [stripePromiseState, setStripePromiseState] = useState(() =>
-    STRIPE_PK_ENV ? loadStripe(STRIPE_PK_ENV) : null,
-  );
-  const [stripePkLoading, setStripePkLoading] = useState(!STRIPE_PK_ENV);
+  const [stripePromiseState, setStripePromiseState] = useState(null);
+  const [stripePkLoading, setStripePkLoading] = useState(true);
   const [paymentMethodTypes, setPaymentMethodTypes] = useState(["card"]);
 
   useEffect(() => {
-    if (STRIPE_PK_ENV) {
-      setStripePkLoading(false);
-      return;
-    }
     let cancelled = false;
     fetch("/api/store-public-payment-config")
       .then((r) => r.json())

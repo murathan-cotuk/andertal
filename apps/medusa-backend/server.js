@@ -4730,11 +4730,8 @@ async function start() {
       return r.rows?.[0] || null
     }
 
-    const resolveStripeSecretKeyFromPlatform = (row) => {
-      const envKey = (process.env.STRIPE_SECRET_KEY || '').toString().trim()
-      if (envKey) return envKey
-      return row ? (row.stripe_secret_key || '').toString().trim() : ''
-    }
+    const resolveStripeSecretKeyFromPlatform = (row) =>
+      row ? (row.stripe_secret_key || '').toString().trim() : ''
 
     const paymentMethodTypesFromPlatformRow = (row) => {
       const payCard = !row || row.pay_card !== false
@@ -4769,9 +4766,8 @@ async function start() {
           paypal_client_id: (row?.paypal_client_id || '').toString(),
           paypal_client_secret_set: psec.length > 0,
           paypal_client_secret_hint: psec.length >= 4 ? `…${psec.slice(-4)}` : '',
-          env_stripe_secret: !!(process.env.STRIPE_SECRET_KEY || '').toString().trim(),
-          env_stripe_publishable:
-            !!(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || '').toString().trim(),
+          env_stripe_secret: false,
+          env_stripe_publishable: false,
         })
       } catch (err) {
         try { await client.end() } catch (_) {}
@@ -7974,10 +7970,9 @@ async function start() {
     }
 
     const storePublicPaymentConfigGET = async (_req, res) => {
-      const envPk = (process.env.STRIPE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').toString().trim()
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       if (!dbUrl || !dbUrl.startsWith('postgres')) {
-        return res.json({ stripe_publishable_key: envPk || null, payment_method_types: paymentMethodTypesFromPlatformRow(null) })
+        return res.json({ stripe_publishable_key: null, payment_method_types: paymentMethodTypesFromPlatformRow(null) })
       }
       let client
       try {
@@ -7988,13 +7983,13 @@ async function start() {
         await client.end()
         const dbPk = (row?.stripe_publishable_key || '').toString().trim()
         res.json({
-          stripe_publishable_key: envPk || dbPk || null,
+          stripe_publishable_key: dbPk || null,
           payment_method_types: paymentMethodTypesFromPlatformRow(row),
         })
       } catch (err) {
         if (client) try { await client.end() } catch (_) {}
         console.error('storePublicPaymentConfigGET:', err)
-        res.json({ stripe_publishable_key: envPk || null, payment_method_types: ['card'] })
+        res.json({ stripe_publishable_key: null, payment_method_types: ['card'] })
       }
     }
 
@@ -11013,8 +11008,9 @@ async function start() {
 
     // ── Saved payment methods ────────────────────────────────────────────
     const getOrCreateStripeCustomer = async (client, customerId, email) => {
-      const secretKey = (process.env.STRIPE_SECRET_KEY || '').trim()
-      if (!secretKey) throw new Error('STRIPE_SECRET_KEY not configured')
+      const platformRow = await loadPlatformCheckoutRow(client)
+      const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+      if (!secretKey) throw new Error('Stripe secret key not configured in Sellercentral settings')
       const stripe = new (require('stripe'))(secretKey)
       const row = await client.query('SELECT stripe_customer_id FROM store_customers WHERE id = $1::uuid', [customerId])
       let stripeCustomerId = row.rows[0]?.stripe_customer_id

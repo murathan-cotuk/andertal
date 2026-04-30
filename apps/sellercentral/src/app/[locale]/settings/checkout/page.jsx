@@ -155,22 +155,13 @@ export default function SettingsCheckoutPage() {
               </Banner>
             ) : null}
 
-            {(meta?.env_stripe_secret || meta?.env_stripe_publishable) ? (
-              <Banner tone="info">
-                <Text variant="bodySm">
-                  Server-/Shop-Umgebungsvariablen sind gesetzt und überschreiben die Publishable-Keys bzw. den Secret aus der Datenbank: STRIPE_SECRET_KEY{" "}
-                  {meta.env_stripe_secret ? "✓" : "—"}, Publishable {meta.env_stripe_publishable ? "✓" : "—"}.
-                </Text>
-              </Banner>
-            ) : null}
-
             <Card>
               <BlockStack gap="400">
                 <Text variant="headingMd" as="h2">
                   Stripe
                 </Text>
                 <Text tone="subdued" variant="bodySm">
-                  Publishable Key (pk_…) kann hier oder als NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY im Shop gesetzt werden. Secret (sk_…): leeres Feld lässt den gespeicherten Wert unverändert.
+                  Publishable Key (pk_…) und Secret (sk_…) werden ausschließlich aus diesen Sellercentral-Einstellungen gelesen. Leeres Secret-Feld lässt den gespeicherten Wert unverändert.
                 </Text>
                 <TextField label="Stripe Publishable Key" value={stripePk} onChange={setStripePk} autoComplete="off" />
                 <TextField

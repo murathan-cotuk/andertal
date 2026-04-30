@@ -321,9 +321,11 @@ function ExpandedRow({ order, locale = "de", onSaveFields }) {
                   fontSize: 13,
                 }}
               />
-              <button
-                type="button"
+              <Button
+                size="medium"
+                variant="secondary"
                 disabled={savingTrack || !onSaveFields}
+                loading={savingTrack}
                 onClick={async () => {
                   if (!onSaveFields) return;
                   setSavingTrack(true);
@@ -334,20 +336,9 @@ function ExpandedRow({ order, locale = "de", onSaveFields }) {
                   }
                   setSavingTrack(false);
                 }}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "#0ea5e9",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: savingTrack ? "wait" : "pointer",
-                  opacity: savingTrack ? 0.7 : 1,
-                }}
               >
-                {savingTrack ? "…" : "Speichern"}
-              </button>
+                Speichern
+              </Button>
             </div>
             {order.tracking_number ? (
               <div style={{ marginTop: 10, fontSize: 12 }}>
@@ -357,7 +348,7 @@ function ExpandedRow({ order, locale = "de", onSaveFields }) {
                     href={trackingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "#1d4ed8", textDecoration: "underline" }}
+                    style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "#111827", textDecoration: "underline", textDecorationColor: "#9ca3af" }}
                   >
                     {order.tracking_number}
                   </a>
