@@ -62,7 +62,7 @@ const GroupedDropdownSearch = dynamic(
 );
 
 const buildSuperuserLabel = (label) => (
-  <span style={{ color: "#601b1b", fontWeight: 600 }}>{label}</span>
+  <span style={{ color: "#831c1c", fontWeight: 600 }}>{label}</span>
 );
 
 const styleSuperuserOnlyNavItems = (items, isSuperuser) => {

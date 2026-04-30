@@ -7,7 +7,7 @@ import { useLandingChrome } from "@/context/LandingChromeContext";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
-import { useIsNarrow } from "@/hooks/useIsNarrow";
+import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale } from "next-intl";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
@@ -2119,8 +2119,21 @@ function ImageCarousel({ container, locale = "de" }) {
 function renderContainer(c, preload = {}, ctx = {}) {
   if (!c.visible) return null;
   const v = c.visible_on || "desktop";
-  if (v === "desktop" && ctx.isNarrow) return null;
-  if (v === "mobile" && !ctx.isNarrow) return null;
+  // Tablet-specific containers: only show in tablet range (600–1199px)
+  if (v === "tablet") {
+    if (!ctx.isTablet) return null;
+  } else if (v === "desktop") {
+    // Hide desktop on narrow (mobile) AND tablet — tablet has its own containers
+    if (ctx.isNarrow || ctx.isTablet) return null;
+  } else if (v === "mobile") {
+    // Hide on wide desktop
+    if (!ctx.isNarrow && !ctx.isTablet) return null;
+    // On tablet: hide mobile if tablet-specific containers exist (otherwise fall back to mobile)
+    if (ctx.isTablet && ctx.hasTabletContainers) return null;
+  } else if (v === "both") {
+    // Legacy: shown on desktop + mobile; on tablet fall back to this if no tablet containers
+    if (ctx.isTablet && ctx.hasTabletContainers) return null;
+  }
   const locale = ctx.locale || "de";
   let inner = null;
   const collectionKey = `${String(c.collection_id || "").trim()}|${String(c.collection_handle || "").trim()}`;
@@ -2162,6 +2175,7 @@ export default function LandingContainers({ pageId, categoryId }) {
   const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
   const { setLandingHeaderFilterBar } = useLandingChrome();
   const isNarrow = useIsNarrow(1023);
+  const isTablet = useIsTablet();
   const locale = useLocale();
 
   useEffect(() => {
@@ -2265,9 +2279,11 @@ export default function LandingContainers({ pageId, categoryId }) {
   if (!containers) return null;
   if (containers.length === 0) return null;
 
+  const hasTabletContainers = containers.some((c) => c.visible_on === "tablet");
+
   return (
     <div>
-      {containers.map((c) => renderContainer(c, preload, { isNarrow, locale }))}
+      {containers.map((c) => renderContainer(c, preload, { isNarrow, isTablet, hasTabletContainers, locale }))}
     </div>
   );
 }

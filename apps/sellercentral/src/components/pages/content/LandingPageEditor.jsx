@@ -805,7 +805,7 @@ const CONTENT_MOSAIC_SOURCE_OPTIONS = [
 
 // ── Content-Mosaik: freies Zeilenmuster, Quelle wählbar ─────────────────────
 function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
-  const isMobileView = deviceTab === 1;
+  const isMobileView = deviceTab >= 1;
   const client = getMedusaAdminClient();
   const [pickerIdx, setPickerIdx] = useState(null);
   const [hubCollections, setHubCollections] = useState([]);
@@ -1107,7 +1107,7 @@ const MOBILE_GRID_DIM_OPTIONS = [1, 2, 3, 4].map((n) => ({ label: String(n), val
 
 // ── Image Carousel editor ───────────────────────────────────────────────────
 function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
-  const isMobileView = deviceTab === 1;
+  const isMobileView = deviceTab >= 1;
   const [pickerIdx, setPickerIdx] = useState(null);
   const images = container.images || [];
   const n = images.length;
@@ -1303,7 +1303,7 @@ function BannerCtaEditor({ container, onChange, editLang = "de" }) {
 
 // ── Collection Carousel editor ──────────────────────────────────────────────
 function CollectionCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
-  const isMobileView = deviceTab === 1;
+  const isMobileView = deviceTab >= 1;
   const client = getMedusaAdminClient();
   const [collections, setCollections] = useState([]);
 
@@ -1389,7 +1389,7 @@ function CollectionCarouselEditor({ container, onChange, deviceTab = 0, editLang
 }
 
 function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
-  const isMobileView = deviceTab === 1;
+  const isMobileView = deviceTab >= 1;
   const client = getMedusaAdminClient();
   const [collections, setCollections] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -1765,7 +1765,7 @@ function SingleProductEditor({ container, onChange, editLang = "de" }) {
 }
 
 function BlogCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
-  const isMobileView = deviceTab === 1;
+  const isMobileView = deviceTab >= 1;
   const client = getMedusaAdminClient();
   const posts = Array.isArray(container.posts) ? container.posts : [];
   const [blogPages, setBlogPages] = useState([]);
@@ -2168,7 +2168,7 @@ const VIDEO_ASPECT_OPTIONS = [
 
 // ── Video block editor ─────────────────────────────────────────────────────
 function VideoBlockEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
-  const isMobileView = deviceTab === 1;
+  const isMobileView = deviceTab >= 1;
   const [posterPicker, setPosterPicker] = useState(null);
   const mode = container.video_mode === "embed" ? "embed" : "file";
   return (
@@ -2396,7 +2396,7 @@ function ContainerChromePanel({ container, onChange, deviceTab = 0 }) {
   const t = container.type;
   const def = getContainerPaddingDefault(t);
   const hOnly = containerPaddingHorizontalOnly(t);
-  const isMobileView = deviceTab === 1;
+  const isMobileView = deviceTab >= 1;
   const isImageCarousel = t === "image_carousel";
   return (
     <Card>
@@ -2575,7 +2575,7 @@ export default function LandingPageEditor() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
-  /** Seiten → Container: 0 = Desktop, 1 = Mobil (siehe sichtbarkeit im Shop ≤1023px) */
+  /** Seiten → Container: 0 = Desktop, 1 = Tablet (600–1199px), 2 = Mobil (≤599px) */
   const [seitenDeviceTab, setSeitenDeviceTab] = useState(0);
   const [categoryRows, setCategoryRows] = useState([]);
   const [categorySettings, setCategorySettings] = useState({ show_submenu_left: false });
@@ -2677,11 +2677,13 @@ export default function LandingPageEditor() {
 
   /**
    * Reiter = Ziel-Viewport: neue Container bekommen visible_on per Tab (addContainer).
-   * Legacy: visible_on "both" (alte Speicher) erscheint in beiden Reitern, Shop zeigt den Block überall.
+   * Tab 0 = Desktop, Tab 1 = Tablet, Tab 2 = Mobil.
+   * Legacy: visible_on "both" erscheint in Desktop- und Mobil-Reitern (kein Tablet).
    */
   const matchContainerSeitenTab = (c, tab) => {
     const v = c.visible_on || "desktop";
     if (tab === 0) return v === "both" || v === "desktop";
+    if (tab === 1) return v === "tablet";
     return v === "both" || v === "mobile";
   };
 
@@ -2692,21 +2694,21 @@ export default function LandingPageEditor() {
 
   const addContainer = (type) => {
     const base = newContainer(type);
-    const isMobileTab = seitenDeviceTab === 1;
-    const mobileOverrides = isMobileTab ? {
-      /* Carousel containers: show 2 per row when created in Mobile tab */
-      ...(["collection_carousel", "collections_carousel", "blog_carousel"].includes(type)
-        ? { items_per_row: 2, items_per_row_mobile: 2 }
-        : {}),
-    } : {};
-    const c = { ...base, ...mobileOverrides, visible_on: isMobileTab ? "mobile" : "desktop" };
+    const isTabletTab = seitenDeviceTab === 1;
+    const isMobileTab = seitenDeviceTab === 2;
+    const carouselTypes = ["collection_carousel", "collections_carousel", "blog_carousel"];
+    const narrowOverrides = (isTabletTab || isMobileTab) && carouselTypes.includes(type)
+      ? { items_per_row: 2, items_per_row_mobile: 2 }
+      : {};
+    const visible_on = isMobileTab ? "mobile" : isTabletTab ? "tablet" : "desktop";
+    const c = { ...base, ...narrowOverrides, visible_on };
     setContainers((prev) => [...prev, c]);
     setExpandedId(c.id);
     setAddModalOpen(false);
     setIsDirty(true);
   };
 
-  /** Duplicate a container to the Mobile tab. Original becomes desktop-only; copy becomes mobile-only. */
+  /** Duplicate a container to the Mobile tab (tab 2). Original becomes desktop-only; copy becomes mobile-only. */
   const duplicateToMobile = (srcId) => {
     const src = containers.find((c) => c.id === srcId);
     if (!src) return;
@@ -2722,6 +2724,24 @@ export default function LandingPageEditor() {
       ...prev.map((c) => c.id === srcId ? { ...c, visible_on: "desktop" } : c),
       copy,
     ]);
+    setExpandedId(copy.id);
+    setSeitenDeviceTab(2);
+    setIsDirty(true);
+  };
+
+  /** Duplicate a container to the Tablet tab (tab 1). Original keeps its visible_on; copy becomes tablet-only. */
+  const duplicateToTablet = (srcId) => {
+    const src = containers.find((c) => c.id === srcId);
+    if (!src) return;
+    const copy = {
+      ...src,
+      id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      visible_on: "tablet",
+      ...(["collection_carousel", "collections_carousel", "blog_carousel", "image_carousel"].includes(src.type)
+        ? { items_per_row: 3, items_per_row_mobile: 3 }
+        : {}),
+    };
+    setContainers((prev) => [...prev, copy]);
     setExpandedId(copy.id);
     setSeitenDeviceTab(1);
     setIsDirty(true);
@@ -2899,6 +2919,7 @@ export default function LandingPageEditor() {
                             <PolarisTabs
                               tabs={[
                                 { id: "seiten-d", content: "Desktop" },
+                                { id: "seiten-t", content: "Tablet" },
                                 { id: "seiten-m", content: "Mobil" },
                               ]}
                               selected={seitenDeviceTab}
@@ -2922,10 +2943,12 @@ export default function LandingPageEditor() {
                           )}
 
                           {containers.length > 0 && filteredSeitenContainers.length === 0 && (
-                            <Banner tone="info">
+                            <Banner tone=”info”>
                               {seitenDeviceTab === 0
-                                ? "Noch kein Desktop-Block: „+ Container hinzufügen“ oder unter „Mobil“ einen Block mit „🖥 Desktop“ duplizieren."
-                                : "Noch kein Mobil-Block: „+ Container hinzufügen“ oder unter „Desktop“ mit „📱 Mobil“ duplizieren. (Reine Desktop-Container erscheinen in diesem Reiter nicht.)"}
+                                ? “Henüz Desktop bloğu yok. \”+ Container ekle\” ile yeni bir tane oluştur.”
+                                : seitenDeviceTab === 1
+                                ? “Henüz Tablet bloğu yok. \”+ Container ekle\” ile oluştur. Tablet için genişlik değerlerini px yerine % veya vw olarak ayarla — böylece hem dikey hem yatay tablet yönünde düzgün görünür.”
+                                : “Henüz Mobil bloğu yok. \”+ Container ekle\” ile oluştur.”}
                             </Banner>
                           )}
 
