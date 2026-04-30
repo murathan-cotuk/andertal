@@ -16,7 +16,6 @@ const SETTINGS_ITEMS_ALL = [
   { href: "/settings/checkout", label: "Checkout", superuserOnly: true },
   { href: "/settings/shipping", label: "Shipping and delivery" },
   { href: "/settings/integrations", label: "Apps & Integrations" },
-  { href: "/settings/billbee", label: "Billbee" },
   { href: "/settings/taxes", label: "Taxes and duties" },
   { href: "/settings/locations", label: "Locations" },
   { href: "/settings/notifications", label: "Notifications" },

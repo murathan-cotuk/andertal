@@ -176,6 +176,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
         { url: "/content/styles", label: tx("styles", "Styles"), superuserOnly: true },
         { url: "/content/pages", label: tx("pages", "Pages"), superuserOnly: true },
         { url: "/content/blog-posts", label: tx("blogPosts", "Blog Posts"), superuserOnly: true },
+        { url: "/content/flows", label: tx("flows", "Flows"), superuserOnly: true },
       ],
     },
     {
@@ -452,6 +453,7 @@ export default function PolarisLayout({ children }) {
     "/content/styles",
     "/content/pages",
     "/content/blog-posts",
+    "/content/flows",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
     "/settings/checkout",
@@ -825,6 +827,7 @@ export default function PolarisLayout({ children }) {
     "/content/styles",
     "/content/pages",
     "/content/blog-posts",
+    "/content/flows",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
   ]);
