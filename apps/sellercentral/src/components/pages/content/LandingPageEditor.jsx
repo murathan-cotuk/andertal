@@ -2945,10 +2945,10 @@ export default function LandingPageEditor() {
                           {containers.length > 0 && filteredSeitenContainers.length === 0 && (
                             <Banner tone=”info”>
                               {seitenDeviceTab === 0
-                                ? “Henüz Desktop bloğu yok. \”+ Container ekle\” ile yeni bir tane oluştur.”
+                                ? 'Henüz Desktop bloğu yok. "+ Container ekle" ile yeni bir tane oluştur.'
                                 : seitenDeviceTab === 1
-                                ? “Henüz Tablet bloğu yok. \”+ Container ekle\” ile oluştur. Tablet için genişlik değerlerini px yerine % veya vw olarak ayarla — böylece hem dikey hem yatay tablet yönünde düzgün görünür.”
-                                : “Henüz Mobil bloğu yok. \”+ Container ekle\” ile oluştur.”}
+                                ? 'Henüz Tablet bloğu yok. "+ Container ekle" ile oluştur. Tablet için genişlik değerlerini px yerine % veya vw olarak ayarla.'
+                                : 'Henüz Mobil bloğu yok. "+ Container ekle" ile oluştur.'}
                             </Banner>
                           )}
 
