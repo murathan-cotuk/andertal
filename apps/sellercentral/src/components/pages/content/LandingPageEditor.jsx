@@ -2943,7 +2943,7 @@ export default function LandingPageEditor() {
                           )}
 
                           {containers.length > 0 && filteredSeitenContainers.length === 0 && (
-                            <Banner tone=”info”>
+                            <Banner tone="info">
                               {seitenDeviceTab === 0
                                 ? 'Henüz Desktop bloğu yok. "+ Container ekle" ile yeni bir tane oluştur.'
                                 : seitenDeviceTab === 1
