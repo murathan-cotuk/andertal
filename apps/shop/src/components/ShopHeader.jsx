@@ -513,13 +513,11 @@ const MiddleBarSearch = styled.div`
 `;
 
 const MiddleBarRight = styled.div`
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  min-width: 0;
-  flex-shrink: 0;
   position: relative;
   z-index: 10;
 `;

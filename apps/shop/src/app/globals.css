@@ -177,11 +177,6 @@ a {
   .shop-header-main img[alt="Shop logo"] {
     max-height: 32px !important;
   }
-
-  /* Search bar: full width, no left margin when compact */
-  .shop-header-main [class*="MiddleBarCenter"] {
-    margin-left: 0 !important;
-  }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -208,10 +203,12 @@ a {
     padding-right: 8px !important;
   }
 
-  /* Reduce search bar left margin on mobile */
+  /* Arama orta sütun: kalan genişliği kaplasın; sağda ikonlar için küçük boşluk */
   .shop-header-main [class*="MiddleBarCenter"] {
-    margin-left: 8px !important;
-    margin-right: 2px !important;
+    margin-left: 0 !important;
+    margin-right: 10px !important;
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
   }
 
   /* Shrink icon buttons on mobile for more search space */
