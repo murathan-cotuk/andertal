@@ -8729,31 +8729,28 @@ async function start() {
     }
     httpApp.get('/store/collections', storeCollectionsGET)
 
-    // GET /store/menus – Public menüler (Shop). Her menü SADECE kendi menu_id’sine ait item’ları alır (raw DB).
+    // GET /store/menus – Public menüler (Shop). Her menü SADECE kendi menu_id'sine ait item'ları alır (raw DB).
     let storeCategoriesTreeCache = { at: 0, payload: null }
     const STORE_CATEGORIES_TREE_TTL_MS = 45_000
     const storeCategoriesGET = async (req, res) => {
-      const dbUrl = (process.env.DATABASE_URL || ‘’).replace(/^postgresql:\/\//, ‘postgres://’)
-      if (!dbUrl) return res.status(200).json({ categories: [], tree: [], count: 0 })
-      const { Client } = require(‘pg’)
       try {
-        const slug = (req.query.slug || ‘’).toString().trim()
+        const slug = (req.query.slug || '').toString().trim()
 
         if (slug) {
-          const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes(‘render.com’) ? { rejectUnauthorized: false } : false })
+          const client = getProductsDbClient()
+          if (!client) return res.status(200).json({ categories: [], tree: [], count: 0 })
           await client.connect()
-          const r = await client.query(`SELECT * FROM admin_hub_categories WHERE slug = $1 AND active = true AND is_visible = true LIMIT 1`, [slug])
+          const r = await client.query(
+            `SELECT * FROM admin_hub_categories WHERE slug = $1 AND active = true LIMIT 1`, [slug]
+          )
           await client.end()
-          if (!r.rows[0]) return res.status(404).json({ message: ‘Category not found’ })
+          if (!r.rows[0]) return res.status(404).json({ message: 'Category not found' })
           const category = mapAdminHubCategoryPgRow(r.rows[0])
-          const meta = category.metadata && typeof category.metadata === ‘object’ ? category.metadata : {}
+          const meta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
           const rawBanner = category.banner_image_url != null ? category.banner_image_url : meta.banner_image_url
           const cat = {
-            id: category.id,
-            name: category.name,
-            slug: category.slug,
-            title: category.name,
-            handle: category.slug,
+            id: category.id, name: category.name, slug: category.slug,
+            title: category.name, handle: category.slug,
             description: category.description || null,
             long_content: category.long_content || null,
             banner_image_url: resolveUploadUrl(rawBanner) || null,
@@ -8763,29 +8760,32 @@ async function start() {
           return res.json({ category: cat, categories: [cat], count: 1 })
         }
 
-        // Tree response — use cache
+        // Tree — use in-memory cache
         const now = Date.now()
         if (storeCategoriesTreeCache.payload && now - storeCategoriesTreeCache.at < STORE_CATEGORIES_TREE_TTL_MS) {
           return res.json(storeCategoriesTreeCache.payload)
         }
 
-        const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes(‘render.com’) ? { rejectUnauthorized: false } : false })
+        const client = getProductsDbClient()
+        if (!client) return res.status(200).json({ categories: [], tree: [], count: 0 })
         await client.connect()
         const r = await client.query(
-          `SELECT * FROM admin_hub_categories WHERE active = true AND is_visible = true ORDER BY sort_order ASC, name ASC`
+          `SELECT * FROM admin_hub_categories WHERE active = true ORDER BY sort_order ASC, name ASC`
         )
         await client.end()
 
-        const flat = r.rows.map(mapAdminHubCategoryPgRow)
+        let flat = r.rows.map(mapAdminHubCategoryPgRow)
+        // Filter visible ones for shop
+        flat = flat.filter((c) => c.is_visible !== false)
         const tree = buildAdminHubCategoryTreeFromFlat(flat)
 
-        // Annotate has_products
+        // Annotate has_products — if annotation fails or finds nothing, show all
         let categoryIdsWithProducts = new Set()
         try {
           const allProducts = await listAdminHubProductsDb({ limit: 10000 })
           const approvedIds = await getApprovedSellerIdsSet()
           for (const p of allProducts) {
-            if ((p.status || ‘’).toLowerCase() !== ‘published’) continue
+            if ((p.status || '').toLowerCase() !== 'published') continue
             if (!isStoreVisibleSellerProduct(p, approvedIds)) continue
             for (const cid of storeProductCategoryIds(p)) categoryIdsWithProducts.add(cid)
           }
@@ -8795,15 +8795,14 @@ async function start() {
           for (const n of nodes || []) {
             if (!n) continue
             annotateTree(n.children)
-            n.has_products = categoryIdsWithProducts.has(String(n.id).trim().toLowerCase()) || (n.children || []).some((c) => c?.has_products)
+            n.has_products = categoryIdsWithProducts.has(String(n.id).trim().toLowerCase())
+              || (n.children || []).some((c) => c?.has_products)
           }
         }
         annotateTree(tree)
-
-        // If no product matches found, show all categories anyway
         const hasAny = (nodes) => (nodes || []).some((n) => n?.has_products || hasAny(n?.children))
         if (Array.isArray(tree) && tree.length > 0 && !hasAny(tree)) {
-          const relaxAll = (nodes) => { for (const n of nodes || []) { if (!n) continue; n.has_products = true; relaxAll(n.children) } }
+          const relaxAll = (nodes) => { for (const n of nodes || []) { if (n) { n.has_products = true; relaxAll(n.children) } } }
           relaxAll(tree)
         }
 
@@ -8812,7 +8811,7 @@ async function start() {
         storeCategoriesTreeCache = { at: now, payload }
         res.json(payload)
       } catch (err) {
-        console.error(‘storeCategoriesGET error:’, err?.message || err)
+        console.error('storeCategoriesGET error:', err?.message || err)
         res.status(200).json({ categories: [], tree: [], count: 0 })
       }
     }
@@ -16170,7 +16169,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         let productCounts = {}
         let revenueTotals = {}
         if (sellerIds.length > 0) {
-          // product counts (Sellercentral ürünleri admin_hub_products’ta; eski `product` tablosu bu akışta kullanılmıyor)
+          // product counts (Sellercentral ürünleri admin_hub_products'ta; eski `product` tablosu bu akışta kullanılmıyor)
           try {
             const pc = await client.query(
               `SELECT seller_id, COUNT(*)::int as cnt FROM admin_hub_products WHERE seller_id = ANY($1) GROUP BY seller_id`,
