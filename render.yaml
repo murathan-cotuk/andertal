@@ -5,7 +5,8 @@ services:
     name: medusa-backend
     runtime: node
     # Root Directory: boş (repo kökü)
-    buildCommand: npm install && node apps/medusa-backend/scripts/patch-link-modules.js
+    # Monorepo install is memory-heavy; raise Node heap so npm doesn't OOM on Render builders.
+    buildCommand: NODE_OPTIONS=--max-old-space-size=8192 npm install --omit=dev --no-audit --no-fund && node apps/medusa-backend/scripts/patch-link-modules.js
     startCommand: node apps/medusa-backend/server.js
     envVars:
       - key: PORT
