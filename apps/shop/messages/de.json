@@ -92,6 +92,7 @@
     "shippingPending": "Wird an der Kasse berechnet",
     "total": "Gesamt",
     "billingSameAsShipping": "Rechnungsadresse ist gleich Lieferadresse",
+    "billingSeparateFromShipping": "Rechnungsadresse weicht von der Lieferadresse ab",
     "billingAddress": "Rechnungsadresse",
     "bonusTitle": "Bonuspunkte",
     "bonusBalance": "Ihr Kontostand: {points} Punkte",

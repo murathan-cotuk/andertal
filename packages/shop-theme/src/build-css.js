@@ -2,9 +2,10 @@ import { applyLayoutPresets } from "./layout-presets.js";
 import { mergeLoadedShopStyles } from "./merge-styles.js";
 import { buildButtonColorVarLines } from "./button-type-colors.js";
 import {
-  buildHeaderChromeBackground,
+  buildHeaderChromeBackgroundsByViewport,
   resolveHeaderStringsForCss,
 } from "./header-chrome.js";
+import { buildSecondNavSurfacesByViewport } from "./second-nav-vars.js";
 
 const PRIMARY_TOKEN = "__PRIMARY__";
 
@@ -64,7 +65,8 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   const topbar = resolveSectionStrings(styles.topbar, primary);
   const header = resolveHeaderStringsForCss(styles.header, primary);
   const secondNav = resolveSectionStrings(styles.secondNav, primary);
-  const headerChromeBg = buildHeaderChromeBackground(header, primary);
+  const headerChromeByVp = buildHeaderChromeBackgroundsByViewport(header, primary);
+  const secondNavVp = buildSecondNavSurfacesByViewport(secondNav);
   const footer = styles.footer || {};
   const typo = styles.typography || {};
   const scrollUp = resolveSectionStrings(styles.scrollUpButton, primary);
@@ -97,14 +99,15 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --topbar-shadow:   ${topbar.shadow || "none"};
   --topbar-border-bottom: ${topbar.border_bottom || "none"};
   --header-bg:       ${header.bg_color};
-  --header-chrome-bg: ${headerChromeBg};
+  --header-chrome-bg: ${headerChromeByVp.desktop};
   --header-text:     ${header.text_color};
   --header-h:        ${header.height};
   --header-shadow:   ${header.shadow};
   --header-border:   ${header.border_bottom};
-  --second-nav-bg:   transparent;
-  --second-nav-text: ${secondNav.text_color};
-  --second-nav-active: ${secondNav.active_color};
+  --second-nav-bg:   ${secondNavVp.desktop.bg};
+  --second-nav-border: ${secondNavVp.desktop.border};
+  --second-nav-text: ${secondNavVp.desktop.text};
+  --second-nav-active: ${secondNavVp.desktop.active};
   --second-nav-h:    ${secondNav.height};
   --second-nav-fs:   ${secondNav.font_size};
   --second-nav-fw:   ${secondNav.font_weight};
@@ -186,6 +189,24 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --scroll-up-shadow: ${scrollUp.shadow};
   --scroll-up-border: ${scrollUp.border || "none"};
 ${buttonColorCssVars ? `\n${buttonColorCssVars}` : ""}
+}
+@media (max-width: 1023px) {
+  :root {
+    --header-chrome-bg: ${headerChromeByVp.tablet};
+    --second-nav-bg: ${secondNavVp.tablet.bg};
+    --second-nav-border: ${secondNavVp.tablet.border};
+    --second-nav-text: ${secondNavVp.tablet.text};
+    --second-nav-active: ${secondNavVp.tablet.active};
+  }
+}
+@media (max-width: 767px) {
+  :root {
+    --header-chrome-bg: ${headerChromeByVp.mobile};
+    --second-nav-bg: ${secondNavVp.mobile.bg};
+    --second-nav-border: ${secondNavVp.mobile.border};
+    --second-nav-text: ${secondNavVp.mobile.text};
+    --second-nav-active: ${secondNavVp.mobile.active};
+  }
 }`;
 
   const componentCSS = `
@@ -306,13 +327,12 @@ h5 {
   border-bottom: none !important;
 }
 .second-nav {
-  background: transparent !important;
+  background: var(--second-nav-bg) !important;
   color: var(--second-nav-text) !important;
   min-height: var(--second-nav-h);
   font-size: var(--second-nav-fs);
   font-weight: var(--second-nav-fw);
-  border-top: none !important;
-  border-bottom: none !important;
+  border: var(--second-nav-border) !important;
 }
 .second-nav a,
 nav.second-nav a { color: var(--second-nav-text) !important; }

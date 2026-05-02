@@ -463,7 +463,9 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
     if (!codes.has(billingCountry.value)) applyToField(billingCountry, shipList[0].code);
   }, [shipList]);
 
-  const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
+  /** Unchecked = Rechnung wie Lieferadresse; checked = separate Rechnungsadresse erfassen */
+  const [billingSeparateFromShipping, setBillingSeparateFromShipping] = useState(false);
+  const billingSameAsShipping = !billingSeparateFromShipping;
   const billingAddress = useField("");
   const billingAddress2 = useField("");
   const billingCity = useField("");
@@ -951,33 +953,30 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
           </FieldWrap>
         </FieldGrid>
 
-        {/* Billing address toggle */}
+        {/* Separate billing address — unchecked: bill to shipping */}
         <div
           style={{
             marginTop: 16,
             display: "flex",
             alignItems: "center",
             gap: 10,
-            cursor: "pointer",
             flexWrap: "wrap",
             minWidth: 0,
           }}
-          onClick={() => setBillingSameAsShipping(v => !v)}
         >
           <CustomCheckbox
-            id="billing-same"
-            checked={billingSameAsShipping}
-            onChange={e => setBillingSameAsShipping(e.target.checked)}
+            id="billing-separate"
+            checked={billingSeparateFromShipping}
+            onChange={(e) => setBillingSeparateFromShipping(e.target.checked)}
             size={18}
-            style={{ pointerEvents: "none" }}
           />
-          <label htmlFor="billing-same" style={{ fontSize: "0.875rem", color: "#374151", cursor: "pointer", userSelect: "none" }}>
-            {t("billingSameAsShipping")}
+          <label htmlFor="billing-separate" style={{ fontSize: "0.875rem", color: "#374151", cursor: "pointer", userSelect: "none" }}>
+            {t("billingSeparateFromShipping")}
           </label>
         </div>
       </FormCard>
 
-      {!billingSameAsShipping && (
+      {billingSeparateFromShipping && (
         <FormCard style={{ marginBottom: 24 }}>
           <SectionTitle>{t("billingAddress")}</SectionTitle>
           {savedAddresses.length > 0 && (

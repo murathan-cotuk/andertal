@@ -45,6 +45,39 @@ function isGradientEnabled(header) {
   return v === true || v === "true" || v === 1 || v === "1";
 }
 
+/**
+ * Pro Viewport: eigener Schalter für gemeinsamen Header+Second-Nav-Verlauf.
+ * Ohne Geräte-Feld → Fallback auf globales `bg_gradient_enabled`.
+ * @param {"mobile"|"tablet"|"desktop"} viewport
+ */
+export function effectiveGradientEnabled(header, viewport) {
+  const key =
+    viewport === "mobile"
+      ? "bg_gradient_enabled_mobile"
+      : viewport === "tablet"
+        ? "bg_gradient_enabled_tablet"
+        : "bg_gradient_enabled_desktop";
+  const raw = header?.[key];
+  if (raw !== undefined && raw !== null && raw !== "") {
+    return raw === true || raw === "true" || raw === 1 || raw === "1";
+  }
+  return isGradientEnabled(header);
+}
+
+/** Chrome-Hintergrund wie buildHeaderChromeBackground, aber Verlauf nur wenn für diese Ansicht aktiv */
+export function buildHeaderChromeBackgroundForViewport(header, primary, viewport) {
+  const merged = { ...(header || {}), bg_gradient_enabled: effectiveGradientEnabled(header, viewport) };
+  return buildHeaderChromeBackground(merged, primary);
+}
+
+export function buildHeaderChromeBackgroundsByViewport(header, primary) {
+  return {
+    mobile: buildHeaderChromeBackgroundForViewport(header, primary, "mobile"),
+    tablet: buildHeaderChromeBackgroundForViewport(header, primary, "tablet"),
+    desktop: buildHeaderChromeBackgroundForViewport(header, primary, "desktop"),
+  };
+}
+
 export function escapeCssUrlFragment(url) {
   return String(url || "")
     .trim()
@@ -99,7 +132,8 @@ export function buildHeaderChromeBackground(header, primary) {
  */
 export function buildHeaderSurfaceCssVars(header, primary) {
   const h = resolveHeaderStringsForCss(header, primary);
-  const chromeBg = buildHeaderChromeBackground(h, primary);
+  /** Routen-Overrides: Desktop-Ansicht als Referenz (keine Media Queries in Inline-Styles) */
+  const chromeBg = buildHeaderChromeBackgroundForViewport(h, primary, "desktop");
   const vars = {
     "--header-bg": h.bg_color,
     "--header-chrome-bg": chromeBg,

@@ -393,7 +393,7 @@ const CategoriesButton = styled.button`
   padding: 0;
   border: none;
   background: transparent;
-  color: #fff;
+  color: var(--header-text, #fff);
   cursor: pointer;
 
   &:hover {
@@ -501,17 +501,17 @@ const MiddleBarIconBtn = styled.button`
   height: 46px;
   border: none;
   background: transparent;
-  color: #fff;
+  color: var(--header-text, #fff);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 
   &:hover {
-    background: rgba(255,255,255,0.15);
-    color: #fff;
+    background: color-mix(in srgb, var(--header-text, #fff) 14%, transparent);
+    color: var(--header-text, #fff);
   }
 `;
 
@@ -841,7 +841,7 @@ const UserBtn = styled.button`
 const SubNavWrap = styled.div`
   width: 100%;
   max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 50px)")};
-  background: transparent;
+  background: var(--second-nav-bg, transparent);
   overflow: hidden;
   opacity: ${(p) => (p.$hide ? 0 : 1)};
   transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
@@ -1045,6 +1045,7 @@ export default function ShopHeader() {
   const [mainMenuConfig, setMainMenuConfig] = useState(null);
   const [secondMenuItems, setSecondMenuItems] = useState([]);
   const [categorySlugToId, setCategorySlugToId] = useState(() => new Map());
+  const [categoriesFetchDone, setCategoriesFetchDone] = useState(false);
   const [categoryTree, setCategoryTree] = useState([]);
   const [drillCategoryId, setDrillCategoryId] = useState(null); // null = root level
   const { isAuthenticated, user, logout } = useAuth();
@@ -1225,6 +1226,9 @@ export default function ShopHeader() {
           setCategorySlugToId(new Map());
           setCategoryTree([]);
         }
+      })
+      .finally(() => {
+        if (!cancelled) setCategoriesFetchDone(true);
       });
     return () => { cancelled = true; };
   }, []);
@@ -1431,6 +1435,8 @@ export default function ShopHeader() {
           if (String(i?.link_type || "").toLowerCase() !== "category") return true;
           const ref = categoryRefFromMenuItem(i);
           if (!ref) return false;
+          /* Ağaç yüklenene kadar slug haritası boş — tüm kategori satırlarını silme (yarış) */
+          if (!categoriesFetchDone) return true;
           // Only active/visible categories are present in categorySlugToId map.
           if (categorySlugToId.has(ref)) return true;
           for (const id of categorySlugToId.values()) {
@@ -1438,9 +1444,29 @@ export default function ShopHeader() {
           }
           return false;
         }),
-    [mainMenuAllItems, categorySlugToId],
+    [mainMenuAllItems, categorySlugToId, categoriesFetchDone],
   );
   const showCategoriesMode = Boolean(mainMenuConfig?.categories_with_products);
+  /** categories_with_products modunda ağaç doluysa panel ağacı kullanır; ağaç boşsa menü satırlarına düş */
+  const categoryTreeNavReady = browseRootsFromTree.length > 0;
+  const useCategoryTreeForPanel = showCategoriesMode && categoryTreeNavReady;
+
+  /** Panel tamamen boş kalmasın: kök menü öğeleri (filtre yok) yedek */
+  const looseMenuPanelRows = useMemo(
+    () =>
+      (mainMenuAllItems || [])
+        .filter((i) => !i?.parent_id)
+        .map((item) => ({
+          key: item.id,
+          href: menuItemHref(item),
+          label: item.label,
+          onClick: () => {
+            setMainMenuOpen(false);
+          },
+        }))
+        .filter((r) => r.href && r.href !== "#"),
+    [mainMenuAllItems],
+  );
 
   /* Mega menu — children grouped by parent id */
   const menuChildrenByParent = useMemo(() => {
@@ -1754,8 +1780,8 @@ export default function ShopHeader() {
           ) : null}
           <CategoryMegaInner>
             {(() => {
-              const rows =
-                !showCategoriesMode && menuPanelItems.length > 0
+              const primaryRows =
+                !useCategoryTreeForPanel && menuPanelItems.length > 0
                   ? menuPanelItems.map((item) => ({
                       key: item.id,
                       href: menuItemHref(item),
@@ -1768,6 +1794,8 @@ export default function ShopHeader() {
                       label: row.label,
                       onClick: () => { setMainMenuOpen(false); setDrillCategoryId(null); },
                     })).filter((r) => r.href && r.href !== "#");
+
+              const rows = primaryRows.length > 0 ? primaryRows : looseMenuPanelRows;
 
               if (rows.length === 0) {
                 return (

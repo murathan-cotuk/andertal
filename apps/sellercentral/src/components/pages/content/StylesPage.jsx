@@ -24,6 +24,7 @@ import {
   ensureActiveVariant,
   normalizeButtonType,
   DEFAULT_BUTTON_COLORS,
+  effectiveGradientEnabled,
   TOPBAR_PRESET_LABELS,
   HEADER_PRESET_LABELS,
   SECOND_NAV_PRESET_LABELS,
@@ -846,6 +847,16 @@ export default function StylesPage() {
     return { ...rest, ...patch };
   }, [styles?.header, headerEditScope]);
 
+  /** Verlauf-Farbfelder anzeigen, wenn mindestens eine Ansicht den gemeinsamen Chrome-Verlauf nutzt */
+  const headerGradientAnyViewport = useMemo(() => {
+    if (!headerUi || typeof headerUi !== "object") return false;
+    return (
+      effectiveGradientEnabled(headerUi, "mobile") ||
+      effectiveGradientEnabled(headerUi, "tablet") ||
+      effectiveGradientEnabled(headerUi, "desktop")
+    );
+  }, [headerUi]);
+
   const updateHeaderField = (key, val) => {
     if (headerEditScope === "standard") {
       if (key === "scopes") return;
@@ -1401,13 +1412,37 @@ export default function StylesPage() {
                   onChange={(v) => updateHeaderField("bg_color", v)}
                 />
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <Checkbox
-                    label="Farbverlauf für Header + Second Nav (ein gemeinsamer Hintergrund)"
-                    checked={!!headerUi.bg_gradient_enabled}
-                    onChange={(checked) => updateHeaderField("bg_gradient_enabled", checked)}
-                  />
+                  <BlockStack gap="300">
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      <strong>Gemeinsamer Hintergrund</strong> für Hauptleiste und Second Nav (eine Fläche).
+                      Pro Ansicht einzeln steuerbar. Ohne aktivierten Verlauf nur die Basisfarbe oben.
+                      Ziel-Farbe, Winkel und Stärke gelten für alle Ansichten, in denen der Verlauf eingeschaltet ist.
+                    </Text>
+                    <Checkbox
+                      label="Standard-Verlauf (Fallback, wenn für ein Gerät kein eigener Schalter gesetzt ist)"
+                      checked={!!headerUi.bg_gradient_enabled}
+                      onChange={(checked) => updateHeaderField("bg_gradient_enabled", checked)}
+                    />
+                    <InlineStack gap="400" wrap blockAlign="center">
+                      <Checkbox
+                        label="Desktop ≥1024px"
+                        checked={effectiveGradientEnabled(headerUi, "desktop")}
+                        onChange={(checked) => updateHeaderField("bg_gradient_enabled_desktop", checked)}
+                      />
+                      <Checkbox
+                        label="Tablet 768–1023px"
+                        checked={effectiveGradientEnabled(headerUi, "tablet")}
+                        onChange={(checked) => updateHeaderField("bg_gradient_enabled_tablet", checked)}
+                      />
+                      <Checkbox
+                        label="Mobil ≤767px"
+                        checked={effectiveGradientEnabled(headerUi, "mobile")}
+                        onChange={(checked) => updateHeaderField("bg_gradient_enabled_mobile", checked)}
+                      />
+                    </InlineStack>
+                  </BlockStack>
                 </div>
-                {headerUi.bg_gradient_enabled ? (
+                {headerGradientAnyViewport ? (
                   <>
                     <ColorField
                       label="Verlauf Ziel-Farbe"
@@ -1489,12 +1524,123 @@ export default function StylesPage() {
               <Text as="h2" variant="headingMd">Layout: Second Nav</Text>
               <Banner tone="info">
                 <p>
-                  Die Second Nav nutzt dieselbe Fläche wie der Haupt-Header (kein eigener Streifen).
-                  Farbe oder Verlauf stellen Sie oben unter <strong>Header</strong> ein.
-                  Ob Links wie früher als einfacher Text oder als Frostglas-Kachel erscheinen, legen Sie im nächsten Block
-                  <strong> je nach Gerät</strong> fest — Desktop, Tablet und Mobil können unterschiedlich sein.
+                  Der gemeinsame Header-Chrome (Farbe/Verlauf) steuern Sie unter <strong>Header</strong>.
+                  Die <strong>Second-Nav-Zeile</strong> darunter kann zusätzlich einen eigenen Hintergrund, Rahmen sowie Text-
+                  und Aktivfarbe <strong>je nach Gerät</strong> erhalten — siehe nächster Abschnitt.
+                  Ob Links als klassischer Text oder als Frostglas-Kachel erscheinen, legen Sie darunter
+                  <strong> je nach Gerät</strong> fest.
                 </p>
               </Banner>
+              <Divider />
+              <Text as="h3" variant="headingSm">Second-Nav-Zeile: Hintergrund & Rahmen je Gerät</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Shop-Breakpoints: Mobil bis 767&nbsp;px, Tablet 768–1023&nbsp;px, Desktop ab 1024&nbsp;px.
+                Pro Gerät können Sie Hintergrund und Rahmen setzen oder leer lassen (transparent bzw. kein Rahmen),
+                sofern unten kein Fallback greift. Freie CSS-Werte sind möglich (z.&nbsp;B.{" "}
+                <code style={{ fontSize: 12 }}>rgba(…)</code>,{" "}
+                <code style={{ fontSize: 12 }}>linear-gradient(…)</code>).
+              </Text>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+                <TextField
+                  label="Desktop: Hintergrund (CSS)"
+                  value={styles.secondNav.bg_desktop ?? ""}
+                  onChange={(v) => updateSection("secondNav", "bg_desktop", v)}
+                  placeholder="leer = Fallback bg_color oder transparent"
+                  autoComplete="off"
+                  helpText="z. B. transparent, #f9fafb, rgba(255,255,255,0.85)"
+                />
+                <TextField
+                  label="Desktop: Rahmen (CSS border)"
+                  value={styles.secondNav.border_desktop ?? ""}
+                  onChange={(v) => updateSection("secondNav", "border_desktop", v)}
+                  placeholder="leer = Fallback border"
+                  autoComplete="off"
+                  helpText="z. B. none, 1px solid rgba(0,0,0,0.06)"
+                />
+                <ColorField
+                  label="Desktop: Textfarbe"
+                  value={styles.secondNav.text_color_desktop ?? ""}
+                  onChange={(v) => updateSection("secondNav", "text_color_desktop", v)}
+                  helpText="Leer = globale Textfarbe darunter"
+                />
+                <ColorField
+                  label="Desktop: Aktiv-Farbe"
+                  value={styles.secondNav.active_color_desktop ?? ""}
+                  onChange={(v) => updateSection("secondNav", "active_color_desktop", v)}
+                  helpText="Leer = globale Aktiv-Farbe"
+                />
+                <TextField
+                  label="Tablet: Hintergrund (CSS)"
+                  value={styles.secondNav.bg_tablet ?? ""}
+                  onChange={(v) => updateSection("secondNav", "bg_tablet", v)}
+                  placeholder="leer = Fallback bg_color oder transparent"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Tablet: Rahmen (CSS border)"
+                  value={styles.secondNav.border_tablet ?? ""}
+                  onChange={(v) => updateSection("secondNav", "border_tablet", v)}
+                  placeholder="leer = Fallback border"
+                  autoComplete="off"
+                />
+                <ColorField
+                  label="Tablet: Textfarbe"
+                  value={styles.secondNav.text_color_tablet ?? ""}
+                  onChange={(v) => updateSection("secondNav", "text_color_tablet", v)}
+                  helpText="Leer = globale Textfarbe"
+                />
+                <ColorField
+                  label="Tablet: Aktiv-Farbe"
+                  value={styles.secondNav.active_color_tablet ?? ""}
+                  onChange={(v) => updateSection("secondNav", "active_color_tablet", v)}
+                  helpText="Leer = globale Aktiv-Farbe"
+                />
+                <TextField
+                  label="Mobil: Hintergrund (CSS)"
+                  value={styles.secondNav.bg_mobile ?? ""}
+                  onChange={(v) => updateSection("secondNav", "bg_mobile", v)}
+                  placeholder="leer = Fallback bg_color oder transparent"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Mobil: Rahmen (CSS border)"
+                  value={styles.secondNav.border_mobile ?? ""}
+                  onChange={(v) => updateSection("secondNav", "border_mobile", v)}
+                  placeholder="leer = Fallback border"
+                  autoComplete="off"
+                />
+                <ColorField
+                  label="Mobil: Textfarbe"
+                  value={styles.secondNav.text_color_mobile ?? ""}
+                  onChange={(v) => updateSection("secondNav", "text_color_mobile", v)}
+                  helpText="Leer = globale Textfarbe"
+                />
+                <ColorField
+                  label="Mobil: Aktiv-Farbe"
+                  value={styles.secondNav.active_color_mobile ?? ""}
+                  onChange={(v) => updateSection("secondNav", "active_color_mobile", v)}
+                  helpText="Leer = globale Aktiv-Farbe"
+                />
+              </div>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Fallback für alle Geräte, wenn ein gerätespezifisches Feld leer bleibt (nicht ausgefüllt):
+              </Text>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
+                <TextField
+                  label="Hintergrund-Fallback (bg_color)"
+                  value={styles.secondNav.bg_color ?? ""}
+                  onChange={(v) => updateSection("secondNav", "bg_color", v)}
+                  autoComplete="off"
+                  helpText="Stil-Vorlagen setzen das oft; leer = durchgehend transparent wenn keine bg_* pro Gerät gesetzt sind."
+                />
+                <TextField
+                  label="Rahmen-Fallback (border)"
+                  value={styles.secondNav.border ?? ""}
+                  onChange={(v) => updateSection("secondNav", "border", v)}
+                  autoComplete="off"
+                  helpText="Standard: none"
+                />
+              </div>
               <Divider />
               <Text as="h3" variant="headingSm">Link-Darstellung nach Gerät</Text>
               <Text as="p" variant="bodySm" tone="subdued">

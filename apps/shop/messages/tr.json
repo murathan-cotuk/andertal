@@ -92,6 +92,7 @@
     "shippingPending": "Ödeme sayfasında hesaplanır",
     "total": "Toplam",
     "billingSameAsShipping": "Fatura adresi teslimat adresiyle aynı",
+    "billingSeparateFromShipping": "Fatura adresi teslimat adresinden farklıdır",
     "billingAddress": "Fatura adresi",
     "bonusTitle": "Bonus puanlar",
     "bonusBalance": "Bakiyeniz: {points} puan",

@@ -92,6 +92,7 @@
     "shippingPending": "Calculado en el pago",
     "total": "Total",
     "billingSameAsShipping": "Dirección de facturación igual que la de envío",
+    "billingSeparateFromShipping": "La dirección de facturación es distinta de la de envío",
     "billingAddress": "Dirección de facturación",
     "bonusTitle": "Puntos bonus",
     "bonusBalance": "Tu saldo: {points} puntos",

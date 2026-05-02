@@ -277,8 +277,15 @@ async function start() {
 
     const app = express()
     const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '10mb'
-    app.use(express.json({ limit: jsonBodyLimit }))
-    app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }))
+    // Skip JSON body parsing for Stripe webhook — it needs the raw Buffer for signature verification
+    app.use((req, res, next) => {
+      if (req.path === '/webhook/stripe') return next()
+      express.json({ limit: jsonBodyLimit })(req, res, next)
+    })
+    app.use((req, res, next) => {
+      if (req.path === '/webhook/stripe') return next()
+      express.urlencoded({ extended: true, limit: jsonBodyLimit })(req, res, next)
+    })
     const allowedOrigins = getAllowedOrigins()
     log.info('CORS allowed origins:', allowedOrigins.length ? allowedOrigins.join(', ') : '(localhost only — set CORS_ORIGINS in production)')
     app.use(cors({
@@ -758,6 +765,13 @@ async function start() {
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_transfer_id text;`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_transfer_error text;`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_transfer_at timestamp;`).catch(() => {})
+        // Destination Charges + Manual Payouts fields
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_account_id text;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_application_fee_cents integer;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_payout_status varchar(50);`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_payout_id text;`).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_orders_stripe_payout_id ON store_orders (stripe_payout_id) WHERE stripe_payout_id IS NOT NULL;`).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_orders_stripe_payout_status ON store_orders (stripe_payout_status) WHERE stripe_payout_status IS NOT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS discount_cents integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS shipping_cents integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`
@@ -6443,6 +6457,33 @@ async function start() {
     httpApp.delete('/store/carts/:id/line-items/:lineId', storeCartLineItemDELETE)
     httpApp.delete('/store/carts/:id/line-items', storeCartClearDELETE)
 
+    /** store_name → company_name → first/last — für Stripe-Beschreibungen */
+    async function resolveSellerDisplayNameForStripe(client, sellerId) {
+      const sid = String(sellerId || '').trim()
+      if (!sid || sid === 'default') return ''
+      try {
+        const r = await client.query(
+          `SELECT store_name, company_name, first_name, last_name FROM seller_users WHERE seller_id = $1 LIMIT 1`,
+          [sid],
+        )
+        const row = r.rows?.[0]
+        if (!row) return sid
+        const store = String(row.store_name || '').trim()
+        const company = String(row.company_name || '').trim()
+        const person = [row.first_name, row.last_name].filter(Boolean).join(' ').trim()
+        return store || company || person || sid
+      } catch (_) {
+        return sid
+      }
+    }
+
+    function truncateForStripeDescription(s, maxLen = 120) {
+      let out = String(s || '').replace(/\s+/g, ' ').trim()
+      if (!out) return ''
+      if (out.length > maxLen) out = `${out.slice(0, Math.max(0, maxLen - 1))}…`
+      return out
+    }
+
     // --- Store Payment Intent (Stripe) ---
     const storePaymentIntentPOST = async (req, res) => {
       const body = req.body || {}
@@ -6483,6 +6524,19 @@ async function start() {
               'Der Bestellbetrag ist 0 €. Vollständige Bezahlung nur mit Bonuspunkten ist derzeit nicht möglich — bitte Punkte reduzieren oder Artikel hinzufügen.',
           })
         }
+
+        let cartSellerId = 'default'
+        try {
+          const fi = items[0]
+          if (fi && fi.product_id) {
+            const sr = await client.query('SELECT seller_id FROM admin_hub_products WHERE id = $1', [fi.product_id])
+            if (sr.rows?.[0]?.seller_id) cartSellerId = sr.rows[0].seller_id
+          }
+        } catch (_) {}
+        const cartSellerDisplay = await resolveSellerDisplayNameForStripe(client, cartSellerId)
+        const cartSellerLabel =
+          truncateForStripeDescription(cartSellerDisplay) ||
+          (cartSellerId === 'default' ? 'Marketplace' : String(cartSellerId))
 
         const platformRow = await loadPlatformCheckoutRow(client)
         const secretKeyResolved = resolveStripeSecretKeyFromPlatform(platformRow)
@@ -6526,20 +6580,46 @@ async function start() {
             }
           }
         }
+        // Destination Charge: look up seller's connected Stripe account
+        let _destAccountId = null
+        let _appFeeCents = 0
+        if (cartSellerId && cartSellerId !== 'default') {
+          try {
+            const _sRow = await client.query(
+              `SELECT stripe_account_id, stripe_onboarding_complete, commission_rate FROM seller_users WHERE seller_id = $1`,
+              [cartSellerId]
+            )
+            const _s = _sRow.rows?.[0]
+            if (_s?.stripe_account_id && _s?.stripe_onboarding_complete) {
+              _destAccountId = _s.stripe_account_id
+              _appFeeCents = Math.round(payCents * Number(_s.commission_rate ?? 0.12))
+            }
+          } catch (_) {}
+        }
+
         const piBody = {
           amount: payCents,
           currency: 'eur',
           payment_method_types: paymentMethodTypes,
-          // transfer_group links this charge to seller Transfers created at order completion
-          transfer_group: `cart_${cartId}`,
+          description: `Checkout — ${cartSellerLabel}`,
           metadata: {
             cart_id: cartId,
+            seller_id: String(cartSellerId),
+            seller_name: truncateForStripeDescription(cartSellerDisplay, 500) || cartSellerLabel,
             subtotal_cents: String(subtotalCents),
             discount_cents: String(discountCents),
             coupon_discount_cents: String(couponDiscountCents),
             coupon_code: String(cart.coupon_code || ''),
             bonus_points_redeemed: String(reservedPts),
           },
+        }
+        if (_destAccountId && _appFeeCents > 0) {
+          // Destination Charge: fee stays on platform, seller gets remainder automatically
+          piBody.transfer_data = { destination: _destAccountId }
+          piBody.application_fee_amount = _appFeeCents
+        } else {
+          // Fallback for sellers without Stripe Connect (legacy transfer_group flow)
+          piBody.transfer_group = `cart_${cartId}`
         }
         if (stripeCustomerId) piBody.customer = stripeCustomerId
 
@@ -8071,7 +8151,7 @@ async function start() {
 
         const orderR = await client.query(
           `SELECT id, order_number, customer_id, payment_intent_id, payment_status, order_status, delivery_status,
-                  tracking_number, stripe_transfer_status, total_cents,
+                  tracking_number, stripe_transfer_status, stripe_payout_status, total_cents,
                   COALESCE(bonus_points_redeemed, 0)::int AS bonus_points_redeemed, created_at,
                   (
                     (NOW() <= created_at + interval '15 minutes')
@@ -8119,7 +8199,10 @@ async function start() {
           await client.end()
           return res.status(400).json({ message: 'Sendungsverfolgung aktiv — Stornierung nicht möglich.' })
         }
-        if (String(row.stripe_transfer_status || '').toLowerCase() === 'completed') {
+        if (
+          String(row.stripe_transfer_status || '').toLowerCase() === 'completed' ||
+          String(row.stripe_payout_status || '').toLowerCase() === 'paid'
+        ) {
           await client.end()
           return res.status(400).json({ message: 'Auszahlung bereits erfolgt — bitte den Support kontaktieren.' })
         }
@@ -8155,12 +8238,19 @@ async function start() {
                 await client.end()
                 return res.status(400).json({ message: 'Keine Charge für Erstattung gefunden.' })
               }
-              await stripe.refunds.create({ charge: chargeId })
+              // Destination charge: reverse the transfer and refund the application fee too
+              const isDestinationCharge = !!(pi.transfer_data?.destination)
+              const refundParams = { charge: chargeId }
+              if (isDestinationCharge) {
+                refundParams.reverse_transfer = true
+                refundParams.refund_application_fee = true
+              }
+              await stripe.refunds.create(refundParams)
             } else if (pi.status === 'canceled' || pi.status === 'requires_payment_method') {
               /* bereits storniert / unbezahlt */
             } else {
               await client.end()
-              return res.status(400).json({ message: `Zahlungsstatus „${pi.status}“ — automatische Stornierung nicht möglich.` })
+              return res.status(400).json({ message: `Zahlungsstatus „${pi.status}” — automatische Stornierung nicht möglich.` })
             }
           } catch (se) {
             await client.end()
@@ -8309,6 +8399,11 @@ async function start() {
           }
         } catch (_) {}
 
+        const sellerDisplayForStripe = await resolveSellerDisplayNameForStripe(client, sellerId)
+        const sellerLabelShort =
+          truncateForStripeDescription(sellerDisplayForStripe) ||
+          (sellerId === 'default' ? 'Marketplace' : String(sellerId))
+
         // Customer: angemeldet → immer Konto-E-Mail + customer_id (Bestellungen unter „Meine Bestellungen“)
         let customerId = null
         let isGuest = true
@@ -8355,6 +8450,8 @@ async function start() {
         const secretKey = resolveStripeSecretKeyFromPlatform(platformRowOrders)
         let paymentMethod = 'card'
         let stripeInst = null
+        let piStripeAccountId = null   // connected account from destination charge
+        let piAppFeeCents = null       // application_fee_amount from destination charge
         if (secretKey) {
           try {
             stripeInst = new (require('stripe'))(secretKey)
@@ -8371,6 +8468,9 @@ async function start() {
             } else if (pi.payment_method_types && pi.payment_method_types[0]) {
               paymentMethod = pi.payment_method_types[0]
             }
+            // Extract destination charge fields set during PaymentIntent creation
+            piStripeAccountId = (typeof pi.transfer_data?.destination === 'string' ? pi.transfer_data.destination : pi.transfer_data?.destination?.id) || null
+            piAppFeeCents = pi.application_fee_amount || null
           } catch (e) {
             await client.end()
             return res.status(400).json({ message: e?.message || 'Zahlung konnte nicht verifiziert werden' })
@@ -8395,27 +8495,38 @@ async function start() {
              billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping,
              payment_method, customer_id, is_guest, newsletter_opted_in,
              order_status, payment_status, stripe_transfer_status,
+             stripe_account_id, stripe_application_fee_cents, stripe_payout_status,
              subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency)
-           VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt','pending',$23,$24,$25,$26,$27,$28,$29,'eur')
+           VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt',
+             CASE WHEN $30::text IS NOT NULL THEN 'legacy_skipped' ELSE 'pending' END,
+             $30,$31,
+             CASE WHEN $30::text IS NOT NULL THEN 'pending' ELSE NULL END,
+             $23,$24,$25,$26,$27,$28,$29,'eur')
            RETURNING id, order_number`,
           [cartId, paymentIntentId, sellerId, email, first_name, last_name, phone,
            address_line1, address_line2, city, postal_code, country,
            billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billingSame,
            paymentMethod, customerId, isGuest, newsletter_opted_in,
-           subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents]
+           subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents,
+           piStripeAccountId, piAppFeeCents]
         )
 
         const orderId = ins.rows && ins.rows[0] ? ins.rows[0].id : null
         const orderNumber = ins.rows && ins.rows[0] ? ins.rows[0].order_number : null
         if (!orderId) { await client.end(); return res.status(500).json({ message: 'Order insert failed' }) }
 
-        // Update Stripe payment intent with order number and seller id
+        // Update Stripe payment intent with order number and seller display name
         if (secretKey && orderNumber) {
           try {
             const stripeForUpdate = stripeInst || new (require('stripe'))(secretKey)
             await stripeForUpdate.paymentIntents.update(paymentIntentId, {
-              description: `Order #${orderNumber} - ${sellerId}`,
-              metadata: { order_number: String(orderNumber), order_id: orderId, seller_id: sellerId },
+              description: `Order #${orderNumber} — ${sellerLabelShort}`,
+              metadata: {
+                order_number: String(orderNumber),
+                order_id: orderId,
+                seller_id: sellerId,
+                seller_name: truncateForStripeDescription(sellerDisplayForStripe, 500) || sellerLabelShort,
+              },
             })
           } catch (_) {}
         }
@@ -9890,6 +10001,10 @@ async function start() {
         const prevRes = await client.query('SELECT tracking_number, carrier_name, delivery_status FROM store_orders WHERE id = $1::uuid', [id])
         const prevRow = prevRes.rows[0] || {}
         await client.query(`UPDATE store_orders SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
+        // Auto-set delivery_date when marking as delivered (triggers 14-day Stripe payout window)
+        if (delivery_status === 'zugestellt' && delivery_date === undefined) {
+          await client.query(`UPDATE store_orders SET delivery_date = COALESCE(delivery_date, now()), updated_at = now() WHERE id = $1::uuid`, [id])
+        }
         // Auto-complete: if payment is paid and delivery is delivered, mark order as completed — do not override Retoure / Rückgabe / Erstattung
         await client.query(
           `UPDATE store_orders SET order_status = 'abgeschlossen', updated_at = now()
@@ -10692,7 +10807,7 @@ async function start() {
         )
         const event = evRes.rows[0]
         if (status === 'zugestellt') {
-          await client.query(`UPDATE store_orders SET delivery_status='zugestellt', updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
+          await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
           await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [id])
         } else if (status === 'versendet') {
           await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [id])
@@ -10890,7 +11005,7 @@ async function start() {
         const mostRecentEvent = newEvents[newEvents.length - 1]
         const mostRecentStatus = mostRecentEvent?.status
         if (mostRecentStatus === 'zugestellt') {
-          await client.query(`UPDATE store_orders SET delivery_status='zugestellt', updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
+          await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
           await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [id])
         } else if (mostRecentStatus === 'versendet' || mostRecentStatus === 'in_transit') {
           await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [id])
@@ -14583,6 +14698,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             stripe_transfer_id: row.stripe_transfer_id || null,
             stripe_transfer_error: row.stripe_transfer_error || null,
             stripe_transfer_at: row.stripe_transfer_at || null,
+            stripe_payout_status: row.stripe_payout_status || null,
+            stripe_payout_id: row.stripe_payout_id || null,
+            stripe_account_id: isSuperuser ? (row.stripe_account_id || null) : undefined,
             delivery_date: row.delivery_date,
             created_at: row.created_at,
             first_name: row.first_name,
@@ -15046,14 +15164,24 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
               continue
             }
 
+            const xferSellerDisplay = await resolveSellerDisplayNameForStripe(client, sellerId)
+            const xferSellerLabel =
+              truncateForStripeDescription(xferSellerDisplay) ||
+              sellerId
+
             const tr = await stripe.transfers.create({
               amount: transferAmount,
               currency: 'eur',
               destination: s.stripe_account_id,
               source_transaction: chargeId,
               transfer_group: `cart_${row.cart_id || ''}`,
-              description: `Order #${row.order_number || ''} seller ${sellerId}`,
-              metadata: { order_id: orderId, order_number: String(row.order_number || ''), seller_id: sellerId },
+              description: `Order #${row.order_number || ''} — ${xferSellerLabel}`,
+              metadata: {
+                order_id: orderId,
+                order_number: String(row.order_number || ''),
+                seller_id: sellerId,
+                seller_name: truncateForStripeDescription(xferSellerDisplay, 500) || xferSellerLabel,
+              },
             })
 
             await client.query(
@@ -15084,12 +15212,118 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
-    // Fire once on boot and then hourly: creates payout records automatically on 1st and 15th.
+    // Destination Charges + Manual Payouts: dispatch bank payouts for eligible delivered orders.
+    // Orders using the new model have stripe_account_id set (destination charge) and
+    // stripe_payout_status = 'pending'. After 14 days from delivery we create a Stripe payout
+    // on the seller's connected account to move funds from their Stripe balance to their bank.
+    const runStripePayoutsIfDue = async () => {
+      const client = getDbClient()
+      if (!client) return
+      try {
+        await client.connect()
+        const platformRow = await loadPlatformCheckoutRow(client)
+        const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+        if (!secretKey) { await client.end(); return }
+        const stripe = new (require('stripe'))(secretKey)
+
+        const due = await client.query(
+          `SELECT o.id, o.order_number, o.seller_id, o.stripe_account_id,
+                  o.subtotal_cents, o.total_cents, o.stripe_application_fee_cents
+           FROM store_orders o
+           WHERE o.stripe_payout_status = 'pending'
+             AND o.stripe_account_id IS NOT NULL
+             AND o.payment_status = 'bezahlt'
+             AND o.delivery_date IS NOT NULL
+             AND o.delivery_date <= now() - interval '14 days'
+           ORDER BY o.delivery_date ASC
+           LIMIT 200`
+        )
+
+        for (const row of due.rows || []) {
+          const orderId = row.id
+          const stripeAccountId = row.stripe_account_id
+
+          // Mark as processing to prevent double-payout (idempotency guard)
+          const guard = await client.query(
+            `UPDATE store_orders SET stripe_payout_status = 'processing', updated_at = now()
+             WHERE id = $1::uuid AND stripe_payout_status = 'pending'`,
+            [orderId]
+          )
+          if (!guard.rowCount) continue // Another process already grabbed it
+
+          try {
+            // Payout amount = total paid - platform commission
+            const totalCents = Number(row.total_cents || 0)
+            const feeCents = Number(row.stripe_application_fee_cents || 0)
+            const payoutAmount = totalCents - feeCents
+            if (payoutAmount <= 0) {
+              await client.query(
+                `UPDATE store_orders SET stripe_payout_status = 'skipped', updated_at = now() WHERE id = $1::uuid`,
+                [orderId]
+              )
+              continue
+            }
+
+            // Check available balance on connected account before creating payout
+            const balance = await stripe.balance.retrieve({ stripeAccount: stripeAccountId })
+            const available = balance.available?.find(b => b.currency === 'eur')?.amount || 0
+            if (available < payoutAmount) {
+              // Funds not yet settled — try again next run
+              await client.query(
+                `UPDATE store_orders SET stripe_payout_status = 'pending', updated_at = now() WHERE id = $1::uuid`,
+                [orderId]
+              )
+              continue
+            }
+
+            const payout = await stripe.payouts.create(
+              {
+                amount: payoutAmount,
+                currency: 'eur',
+                description: `Order #${row.order_number || ''} — 14-day release`,
+                metadata: {
+                  order_id: orderId,
+                  order_number: String(row.order_number || ''),
+                  seller_id: row.seller_id || '',
+                },
+              },
+              { stripeAccount: stripeAccountId }
+            )
+
+            await client.query(
+              `UPDATE store_orders
+               SET stripe_payout_status = 'paid',
+                   stripe_payout_id = $2,
+                   updated_at = now()
+               WHERE id = $1::uuid`,
+              [orderId, payout.id]
+            )
+          } catch (e) {
+            await client.query(
+              `UPDATE store_orders
+               SET stripe_payout_status = CASE WHEN $2 ILIKE '%insufficient%funds%' THEN 'pending' ELSE 'failed' END,
+                   updated_at = now()
+               WHERE id = $1::uuid`,
+              [orderId, String(e?.message || '')]
+            )
+            console.error(`[stripePayouts] Order #${row.order_number} payout failed:`, e?.message)
+          }
+        }
+        await client.end()
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        console.error('runStripePayoutsIfDue:', e?.message || e)
+      }
+    }
+
+    // Fire once on boot and then every hour
     runAutomaticPayoutsIfDue().catch(() => {})
     runStripeConnectTransfersIfDue().catch(() => {})
+    runStripePayoutsIfDue().catch(() => {})
     setInterval(() => {
       runAutomaticPayoutsIfDue().catch(() => {})
       runStripeConnectTransfersIfDue().catch(() => {})
+      runStripePayoutsIfDue().catch(() => {})
     }, 60 * 60 * 1000)
 
     // PATCH /admin-hub/v1/seller/iban — set own IBAN
@@ -16491,6 +16725,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             type: 'express',
             email,
             capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+            settings: { payouts: { schedule: { interval: 'manual' } } },
             metadata: { seller_id: sellerId, seller_user_id: userId },
           })
           stripeAccountId = account.id
@@ -16547,6 +16782,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
               const stripe = new (require('stripe'))(secretKey)
               const account = await stripe.accounts.retrieve(stripeAccountId)
               onboardingComplete = account.details_submitted && account.charges_enabled
+              // Ensure manual payout schedule (idempotent — safe to call multiple times)
+              if (onboardingComplete) {
+                try {
+                  await stripe.accounts.update(stripeAccountId, { settings: { payouts: { schedule: { interval: 'manual' } } } })
+                } catch (_) {}
+              }
               try {
                 const ext = await stripe.accounts.listExternalAccounts(stripeAccountId, { object: 'bank_account', limit: 1 })
                 const bank = ext?.data?.[0]
@@ -16658,7 +16899,270 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e.message || 'Error' })
       }
     })
+    /**
+     * POST /admin-hub/v1/stripe-connect/transfer/:orderId
+     * Superuser — manually release funds for a specific order, bypassing the 14-day window.
+     * Handles both models:
+     *  - Destination charge (new): creates a payout from the connected account
+     *  - Legacy transfer: creates a platform→seller transfer via source_transaction
+     */
+    httpApp.post('/admin-hub/v1/stripe-connect/transfer/:orderId', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const orderId = (req.params.orderId || '').trim()
+      if (!orderId) return res.status(400).json({ message: 'orderId required' })
+
+      const platformRow = await loadPlatformCheckoutRowFresh()
+      const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+      if (!secretKey) return res.status(503).json({ message: 'Stripe not configured' })
+
+      const { Client } = require('pg')
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await client.connect()
+        const oRes = await client.query(
+          `SELECT id, order_number, seller_id, payment_intent_id, subtotal_cents, total_cents, cart_id,
+                  stripe_transfer_status, stripe_payout_status, stripe_account_id, stripe_application_fee_cents
+           FROM store_orders WHERE id = $1::uuid`,
+          [orderId]
+        )
+        const order = oRes.rows[0]
+        if (!order) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        if (order.stripe_payout_status === 'paid') { await client.end(); return res.status(400).json({ message: 'Payout already completed' }) }
+        if (order.stripe_transfer_status === 'completed') { await client.end(); return res.status(400).json({ message: 'Transfer already completed' }) }
+
+        const stripe = new (require('stripe'))(secretKey)
+
+        if (order.stripe_account_id) {
+          // ── Destination charge model: create payout on connected account ───
+          const totalCents = Number(order.total_cents || 0)
+          const feeCents = Number(order.stripe_application_fee_cents || Math.round(totalCents * 0.12))
+          const payoutAmount = totalCents - feeCents
+          if (payoutAmount <= 0) { await client.end(); return res.status(400).json({ message: 'Payout amount <= 0' }) }
+
+          const payout = await stripe.payouts.create(
+            {
+              amount: payoutAmount,
+              currency: 'eur',
+              description: `Manual release — Order #${order.order_number || ''}`,
+              metadata: { order_id: orderId, order_number: String(order.order_number || ''), seller_id: order.seller_id, manual: 'true' },
+            },
+            { stripeAccount: order.stripe_account_id }
+          )
+          await client.query(
+            `UPDATE store_orders SET stripe_payout_status='paid', stripe_payout_id=$2, updated_at=now() WHERE id=$1::uuid`,
+            [orderId, payout.id]
+          )
+          await client.end()
+          res.json({ success: true, model: 'payout', payout_id: payout.id, amount: payoutAmount })
+
+        } else {
+          // ── Legacy model: platform → seller transfer ───────────────────────
+          if (!order.payment_intent_id) { await client.end(); return res.status(400).json({ message: 'No payment intent on order' }) }
+
+          const sRes = await client.query(
+            `SELECT stripe_account_id, stripe_onboarding_complete, commission_rate FROM seller_users WHERE seller_id = $1`,
+            [order.seller_id]
+          )
+          const seller = sRes.rows[0]
+          if (!seller?.stripe_account_id || !seller?.stripe_onboarding_complete) {
+            await client.end()
+            return res.status(400).json({ message: 'Seller Stripe onboarding incomplete' })
+          }
+
+          const pi = await stripe.paymentIntents.retrieve(String(order.payment_intent_id), { expand: ['latest_charge'] })
+          const chargeId = typeof pi.latest_charge === 'object' ? pi.latest_charge?.id : pi.latest_charge
+          if (!chargeId) { await client.end(); return res.status(400).json({ message: 'No charge on payment intent' }) }
+
+          const commRate = Number(seller.commission_rate ?? 0.12)
+          const transferAmount = Math.floor(Number(order.subtotal_cents || 0) * (1 - commRate))
+          if (transferAmount <= 0) { await client.end(); return res.status(400).json({ message: 'Transfer amount <= 0' }) }
+
+          const sellerDisplay = await resolveSellerDisplayNameForStripe(client, order.seller_id)
+          const tr = await stripe.transfers.create({
+            amount: transferAmount,
+            currency: 'eur',
+            destination: seller.stripe_account_id,
+            source_transaction: chargeId,
+            transfer_group: `cart_${order.cart_id || ''}`,
+            description: `Manual: Order #${order.order_number || ''} — ${truncateForStripeDescription(sellerDisplay) || order.seller_id}`,
+            metadata: { order_id: orderId, order_number: String(order.order_number || ''), seller_id: order.seller_id, manual: 'true' },
+          })
+          await client.query(
+            `UPDATE store_orders SET stripe_transfer_status='completed', stripe_transfer_id=$2, stripe_transfer_error=NULL, stripe_transfer_at=now(), updated_at=now() WHERE id=$1::uuid`,
+            [orderId, tr.id]
+          )
+          await client.end()
+          res.json({ success: true, model: 'transfer', transfer_id: tr.id, amount: transferAmount })
+        }
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e.message || 'Payout/transfer failed' })
+      }
+    })
     // ── End Stripe Connect Routes ────────────────────────────────────────────
+
+    // ── Stripe Webhook ───────────────────────────────────────────────────────
+    // IMPORTANT: registered with express.raw() so the body is a Buffer — required for
+    // Stripe signature verification. Must come before any JSON body-parser middleware.
+    httpApp.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+      const sig = req.headers['stripe-signature']
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+      if (!webhookSecret) return res.status(400).json({ message: 'STRIPE_WEBHOOK_SECRET not configured' })
+
+      const platformRow = await loadPlatformCheckoutRowFresh()
+      const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+      if (!secretKey) return res.status(400).json({ message: 'Stripe not configured' })
+
+      let event
+      try {
+        const stripe = new (require('stripe'))(secretKey)
+        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret)
+      } catch (err) {
+        console.error('[webhook/stripe] Signature verification failed:', err.message)
+        return res.status(400).json({ message: `Webhook signature invalid: ${err.message}` })
+      }
+
+      // Acknowledge immediately — Stripe retries if it doesn't get 2xx within 30s
+      res.json({ received: true })
+
+      setImmediate(async () => {
+        const stripe = new (require('stripe'))(secretKey)
+        const { Client } = require('pg')
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        const mkClient = () => new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+
+        // ── payment_intent.succeeded ──────────────────────────────────────────
+        if (event.type === 'payment_intent.succeeded') {
+          const pi = event.data.object
+          const client = mkClient()
+          try {
+            await client.connect()
+            // For destination charges: ensure stripe_payout_status = 'pending' (idempotent)
+            await client.query(
+              `UPDATE store_orders
+               SET stripe_payout_status = COALESCE(stripe_payout_status, 'pending'),
+                   updated_at = now()
+               WHERE payment_intent_id = $1
+                 AND stripe_account_id IS NOT NULL
+                 AND stripe_payout_status IS NULL`,
+              [pi.id]
+            )
+            // For legacy transfer orders: ensure stripe_transfer_status is initialised
+            await client.query(
+              `UPDATE store_orders
+               SET stripe_transfer_status = COALESCE(stripe_transfer_status, 'pending'),
+                   updated_at = now()
+               WHERE payment_intent_id = $1
+                 AND stripe_account_id IS NULL
+                 AND (stripe_transfer_status IS NULL OR stripe_transfer_status = 'legacy_skipped')`,
+              [pi.id]
+            )
+            await client.end()
+          } catch (e) {
+            try { await client.end() } catch (_) {}
+            console.error('[webhook/stripe] payment_intent.succeeded error:', e.message)
+          }
+        }
+
+        // ── charge.refunded ───────────────────────────────────────────────────
+        else if (event.type === 'charge.refunded') {
+          const charge = event.data.object
+          const paymentIntentId = charge.payment_intent
+          if (!paymentIntentId) return
+
+          const client = mkClient()
+          try {
+            await client.connect()
+            const oRes = await client.query(
+              `SELECT id, order_number, stripe_account_id, stripe_payout_status,
+                      stripe_transfer_id, stripe_transfer_status
+               FROM store_orders WHERE payment_intent_id = $1 LIMIT 1`,
+              [paymentIntentId]
+            )
+            const order = oRes.rows[0]
+            if (!order) { await client.end(); return }
+
+            if (order.stripe_account_id) {
+              // Destination charge model: mark payout status
+              const newStatus = order.stripe_payout_status === 'paid' ? 'refunded_post_payout' : 'refunded'
+              await client.query(
+                `UPDATE store_orders SET stripe_payout_status = $2, updated_at = now() WHERE id = $1::uuid`,
+                [order.id, newStatus]
+              )
+              if (newStatus === 'refunded_post_payout') {
+                console.warn(`[webhook/stripe] Post-payout refund on order #${order.order_number} — manual recovery may be needed`)
+              }
+            } else if (order.stripe_transfer_id && order.stripe_transfer_status === 'completed') {
+              // Legacy transfer model: reverse the transfer
+              try {
+                const reversal = await stripe.transfers.createReversal(order.stripe_transfer_id, {
+                  description: `Refund — order #${order.order_number || order.id}`,
+                  metadata: { order_id: order.id, order_number: String(order.order_number || '') },
+                })
+                await client.query(
+                  `UPDATE store_orders SET stripe_transfer_status = 'reversed', stripe_transfer_error = $2, updated_at = now() WHERE id = $1::uuid`,
+                  [order.id, `Reversed: ${reversal.id}`]
+                )
+                console.log(`[webhook/stripe] Transfer reversed for order #${order.order_number}: ${reversal.id}`)
+              } catch (re) {
+                console.error('[webhook/stripe] Transfer reversal failed:', re.message)
+              }
+            }
+            await client.end()
+          } catch (e) {
+            try { await client.end() } catch (_) {}
+            console.error('[webhook/stripe] charge.refunded error:', e.message)
+          }
+        }
+
+        // ── payout.paid ───────────────────────────────────────────────────────
+        // Fires on the CONNECTED ACCOUNT (account: acct_xxx in event.account), not the platform.
+        // Stripe delivers it to the platform webhook if you have Connect webhooks enabled.
+        else if (event.type === 'payout.paid') {
+          const payout = event.data.object
+          const payoutId = payout.id
+          const client = mkClient()
+          try {
+            await client.connect()
+            await client.query(
+              `UPDATE store_orders
+               SET stripe_payout_status = 'paid',
+                   stripe_payout_id = $2,
+                   updated_at = now()
+               WHERE stripe_payout_id = $2 AND stripe_payout_status != 'paid'`,
+              [payoutId, payoutId]
+            )
+            await client.end()
+          } catch (e) {
+            try { await client.end() } catch (_) {}
+            console.error('[webhook/stripe] payout.paid error:', e.message)
+          }
+        }
+
+        // ── payout.failed ─────────────────────────────────────────────────────
+        else if (event.type === 'payout.failed') {
+          const payout = event.data.object
+          const payoutId = payout.id
+          const client = mkClient()
+          try {
+            await client.connect()
+            await client.query(
+              `UPDATE store_orders
+               SET stripe_payout_status = 'failed',
+                   updated_at = now()
+               WHERE stripe_payout_id = $1 AND stripe_payout_status NOT IN ('paid', 'refunded')`,
+              [payoutId]
+            )
+            await client.end()
+            console.warn(`[webhook/stripe] Payout failed: ${payoutId}`)
+          } catch (e) {
+            try { await client.end() } catch (_) {}
+            console.error('[webhook/stripe] payout.failed error:', e.message)
+          }
+        }
+      })
+    })
+    // ── End Stripe Webhook ───────────────────────────────────────────────────
 
     // ── Ranking API ─────────────────────────────────────────────────────────
 

@@ -92,6 +92,7 @@
     "shippingPending": "Calculé à la caisse",
     "total": "Total",
     "billingSameAsShipping": "Adresse de facturation identique à la livraison",
+    "billingSeparateFromShipping": "L’adresse de facturation est différente de l’adresse de livraison",
     "billingAddress": "Adresse de facturation",
     "bonusTitle": "Points bonus",
     "bonusBalance": "Votre solde : {points} points",

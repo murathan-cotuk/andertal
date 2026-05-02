@@ -92,6 +92,7 @@
     "shippingPending": "Calculated at checkout",
     "total": "Total",
     "billingSameAsShipping": "Billing address same as shipping",
+    "billingSeparateFromShipping": "Billing address is different from the delivery address",
     "billingAddress": "Billing address",
     "bonusTitle": "Bonus points",
     "bonusBalance": "Your balance: {points} points",

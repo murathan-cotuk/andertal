@@ -69,7 +69,10 @@ export const DEFAULT_SHOP_STYLES = {
   },
   secondNav: {
     variant: "default",
-    bg_color: "#f9fafb",
+    /** Fallback wenn bg_desktop|tablet|mobile nicht gesetzt (Stil-Vorlage kann setzen) */
+    bg_color: "",
+    /** Fallback Rahmen (CSS `border`-Kurzform), wenn border_* nicht gesetzt */
+    border: "none",
     text_color: "#374151",
     active_color: "#ff971c",
     height: "44px",

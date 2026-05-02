@@ -1330,6 +1330,30 @@ class MedusaAdminClient {
       body: JSON.stringify({ platform, ...data }),
     })
   }
+
+  // ── Stripe Connect ───────────────────────────────────────────────────────────
+  async stripeConnectOnboard() {
+    return this.request('/admin-hub/v1/stripe-connect/onboard', { method: 'POST' })
+  }
+
+  async stripeConnectStatus() {
+    return this.request('/admin-hub/v1/stripe-connect/status')
+  }
+
+  async stripeConnectDashboardLink() {
+    return this.request('/admin-hub/v1/stripe-connect/dashboard-link')
+  }
+
+  async stripeConnectDisconnect(sellerId) {
+    return this.request('/admin-hub/v1/stripe-connect/disconnect', {
+      method: 'POST',
+      body: JSON.stringify({ seller_id: sellerId }),
+    })
+  }
+
+  async triggerStripeTransfer(orderId) {
+    return this.request(`/admin-hub/v1/stripe-connect/transfer/${orderId}`, { method: 'POST' })
+  }
 }
 
 // Singleton instance

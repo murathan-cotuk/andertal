@@ -10,6 +10,9 @@ export { mergeLoadedShopStyles } from "./merge-styles.js";
 export { buildShopThemeCSS, buildGoogleFontsLinkHref } from "./build-css.js";
 export {
   buildHeaderChromeBackground,
+  buildHeaderChromeBackgroundForViewport,
+  buildHeaderChromeBackgroundsByViewport,
+  effectiveGradientEnabled,
   resolveHeaderStringsForCss,
   buildHeaderSurfaceCssVars,
 } from "./header-chrome.js";
@@ -19,6 +22,7 @@ export {
   buildGoogleFontsLinkHrefForFamilies,
   firstFontFamilyFromCssStack,
 } from "./typography-fonts.js";
+export { buildSecondNavSurfacesByViewport } from "./second-nav-vars.js";
 export {
   applyLayoutPresets,
   TOPBAR_PRESET_LABELS,

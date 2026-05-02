@@ -92,6 +92,7 @@
     "shippingPending": "Calcolato al checkout",
     "total": "Totale",
     "billingSameAsShipping": "Indirizzo di fatturazione uguale alla spedizione",
+    "billingSeparateFromShipping": "L’indirizzo di fatturazione è diverso dall’indirizzo di consegna",
     "billingAddress": "Indirizzo di fatturazione",
     "bonusTitle": "Punti bonus",
     "bonusBalance": "Il tuo saldo: {points} punti",
