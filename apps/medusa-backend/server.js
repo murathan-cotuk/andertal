@@ -277,15 +277,13 @@ async function start() {
 
     const app = express()
     const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '10mb'
-    // Skip JSON body parsing for Stripe webhook — it needs the raw Buffer for signature verification
-    app.use((req, res, next) => {
-      if (req.path === '/webhook/stripe') return next()
-      express.json({ limit: jsonBodyLimit })(req, res, next)
-    })
-    app.use((req, res, next) => {
-      if (req.path === '/webhook/stripe') return next()
-      express.urlencoded({ extended: true, limit: jsonBodyLimit })(req, res, next)
-    })
+    // Preserve raw Buffer on req.rawBody for Stripe webhook signature verification.
+    // express.json() still parses normally; webhook handler reads req.rawBody instead of req.body.
+    app.use(express.json({
+      limit: jsonBodyLimit,
+      verify: (req, _res, buf) => { req.rawBody = buf },
+    }))
+    app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }))
     const allowedOrigins = getAllowedOrigins()
     log.info('CORS allowed origins:', allowedOrigins.length ? allowedOrigins.join(', ') : '(localhost only — set CORS_ORIGINS in production)')
     app.use(cors({
@@ -17002,12 +17000,15 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     // ── End Stripe Connect Routes ────────────────────────────────────────────
 
     // ── Stripe Webhook ───────────────────────────────────────────────────────
-    // IMPORTANT: registered with express.raw() so the body is a Buffer — required for
-    // Stripe signature verification. Must come before any JSON body-parser middleware.
-    httpApp.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+    // req.rawBody is the raw Buffer preserved by the express.json() verify callback above.
+    // constructEvent MUST receive the raw bytes — parsing to JSON breaks the signature.
+    httpApp.post('/webhook/stripe', async (req, res) => {
       const sig = req.headers['stripe-signature']
       const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
       if (!webhookSecret) return res.status(400).json({ message: 'STRIPE_WEBHOOK_SECRET not configured' })
+
+      const rawBody = req.rawBody
+      if (!rawBody) return res.status(400).json({ message: 'Raw body missing — verify callback not running' })
 
       const platformRow = await loadPlatformCheckoutRowFresh()
       const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
@@ -17016,7 +17017,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       let event
       try {
         const stripe = new (require('stripe'))(secretKey)
-        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret)
+        event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret)
       } catch (err) {
         console.error('[webhook/stripe] Signature verification failed:', err.message)
         return res.status(400).json({ message: `Webhook signature invalid: ${err.message}` })
