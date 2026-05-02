@@ -47,7 +47,7 @@ export function Link({ href, locale, ...props }) {
   const base = marketTripleFromPathname(pathname, ctxPrefix);
   let country = base?.country ?? "de";
   let lang = base?.lang ?? "de";
-  let cur = base?.currency ?? DEFAULT_CURRENCY;
+  const cur = DEFAULT_CURRENCY;
   if (locale && isValidLocale(String(locale))) {
     lang = String(locale).toLowerCase();
   }
@@ -71,7 +71,7 @@ export function useRouter() {
   const ctxPrefix = useMarketPrefix();
   const base = marketTripleFromPathname(pathname, ctxPrefix);
   const prefix = base
-    ? marketPrefix(base.country, base.lang, base.currency)
+    ? marketPrefix(base.country, base.lang, DEFAULT_CURRENCY)
     : `/de/de/${DEFAULT_CURRENCY}`;
 
   const abs = (href) => {

@@ -1022,9 +1022,22 @@ class MedusaAdminClient {
   async deleteFlow(id) {
     return this.request(`/admin-hub/v1/flows/${encodeURIComponent(id)}`, { method: 'DELETE' })
   }
+  /** Merge-field catalog for flow email templates ({FIRST_NAME}, …). Optional trigger filters relevant tokens. */
+  async getFlowEmailMergeFields(locale = 'en', trigger = '') {
+    const qs = new URLSearchParams({ locale: String(locale || 'en').slice(0, 5) })
+    if (trigger) qs.set('trigger', String(trigger))
+    return this.request(`/admin-hub/v1/flows/email-merge-fields?${qs}`)
+  }
   /** Send a test email using flow template (HTML + placeholders); superuser + SMTP required. */
   async sendFlowTestEmail(flowId, data) {
     return this.request(`/admin-hub/v1/flows/${encodeURIComponent(flowId)}/test-email`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+  /** DeepL translation when DEEPL_AUTH_KEY is set on the backend. */
+  async translateFlowEmail(data) {
+    return this.request('/admin-hub/v1/flows/translate', {
       method: 'POST',
       body: JSON.stringify(data),
     })

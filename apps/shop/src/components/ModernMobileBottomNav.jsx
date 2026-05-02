@@ -8,6 +8,8 @@ const DEFAULT_ACCENT = "#1b8880";
 export default function ModernMobileBottomNav({
   items = [],
   accentColor = DEFAULT_ACCENT,
+  /** Aşağı kaydırırken çubuğu ekran dışına kaydır (mobil) */
+  recessed = false,
 }) {
   const finalItems = useMemo(() => {
     const valid = Array.isArray(items) && items.length >= 2 && items.length <= 5;
@@ -52,6 +54,7 @@ export default function ModernMobileBottomNav({
   return (
     <nav
       aria-label="Mobile Navigation"
+      aria-hidden={recessed ? true : undefined}
       style={{
         "--component-active-color": accentColor,
         display: "grid",
@@ -68,6 +71,9 @@ export default function ModernMobileBottomNav({
         WebkitBackdropFilter: "blur(12px)",
         boxShadow: "0 -2px 12px rgba(0,0,0,0.07)",
         zIndex: 2147483640,
+        transition: "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: recessed ? "translateY(calc(100% + env(safe-area-inset-bottom, 0px)))" : "translateY(0)",
+        pointerEvents: recessed ? "none" : "auto",
       }}
     >
       {finalItems.map((item, index) => {

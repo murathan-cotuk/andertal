@@ -10,8 +10,7 @@ import {
   marketPrefix,
   parseMarketPath,
   defaultMarketForLocale,
-  defaultCurrencyForMarket,
-  isValidCurrency,
+  DEFAULT_CURRENCY,
   isValidMarket,
 } from "@/lib/shop-market";
 
@@ -38,26 +37,22 @@ export default async function LocaleLayout({ children, params }) {
   /** Shipping country must not follow UI locale (de ≠ Germany). Derive country from header/cookie; locale is only language. */
   let marketPrefixValue;
   if (fromHeader && fromHeader.startsWith("/") && headerTriple && isValidMarket(headerTriple.country)) {
-    const cur =
-      headerTriple.currency && isValidCurrency(headerTriple.currency)
-        ? headerTriple.currency
-        : defaultCurrencyForMarket(headerTriple.country);
     if (String(headerTriple.lang).toLowerCase() !== String(locale).toLowerCase()) {
-      marketPrefixValue = marketPrefix(headerTriple.country, locale, cur);
+      marketPrefixValue = marketPrefix(headerTriple.country, locale, DEFAULT_CURRENCY);
     } else {
-      marketPrefixValue = fromHeader;
+      marketPrefixValue = marketPrefix(headerTriple.country, headerTriple.lang, DEFAULT_CURRENCY);
     }
   } else if (cookieTriple && isValidMarket(cookieTriple.country)) {
-    const cur =
-      cookieTriple.currency && isValidCurrency(cookieTriple.currency)
-        ? cookieTriple.currency
-        : defaultCurrencyForMarket(cookieTriple.country);
-    marketPrefixValue = marketPrefix(cookieTriple.country, locale, cur);
+    marketPrefixValue = marketPrefix(cookieTriple.country, locale, DEFAULT_CURRENCY);
   } else if (fromCookie.startsWith("/")) {
-    marketPrefixValue = fromCookie;
+    const rawTriple = parseMarketPath(fromCookie);
+    marketPrefixValue =
+      rawTriple && isValidMarket(rawTriple.country)
+        ? marketPrefix(rawTriple.country, locale, DEFAULT_CURRENCY)
+        : fromCookie;
   } else {
     const market = defaultMarketForLocale(locale);
-    marketPrefixValue = marketPrefix(market, locale, defaultCurrencyForMarket(market));
+    marketPrefixValue = marketPrefix(market, locale, DEFAULT_CURRENCY);
   }
 
   return (

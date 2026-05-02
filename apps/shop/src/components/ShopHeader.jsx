@@ -8,7 +8,7 @@
  * until a clear scroll-up or until the user returns to the top (avoids flicker from touch decel).
  */
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { useRouter as useNextRouter } from "next/navigation";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -27,14 +27,15 @@ import {
   parseMarketPath,
   marketPrefix,
   restPathFromPathname,
-  SHOP_CURRENCIES,
   DEFAULT_MARKET,
-  defaultCurrencyForMarket,
-  defaultLocaleForMarket,
-  isValidCurrency,
+  DEFAULT_CURRENCY,
 } from "@/lib/shop-market";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useLandingChrome } from "@/context/LandingChromeContext";
+import {
+  MOBILE_CHROME_SCROLL_THRESHOLD_PX as SCROLL_THRESHOLD,
+  useMobileBottomNavScroll,
+} from "@/context/MobileBottomNavScrollContext";
 import { getShippableCountries } from "@/lib/countries";
 import { menuItemHref } from "@/lib/shop-menu-href";
 import { buildHeaderSurfaceCssVarsFromRoute } from "@andertal/shop-theme";
@@ -42,7 +43,6 @@ import { useShopStyles } from "@/context/ShopStylesContext";
 import { detectShopHeaderRouteScope } from "@/lib/header-route-scope";
 import { extractSolidTintFromChromeCss } from "@/lib/header-status-tint";
 
-const SCROLL_THRESHOLD = 60;
 /** Yukarı kaydırırken titreşimi süzmek için (alt menüyü tekrar göster) */
 const SCROLL_UP_DELTA = 6;
 /** Ignore “scroll up” when near the document bottom (rubber-band / overscroll / addr. bar) to avoid header ↔ spacer feedback jitter */
@@ -50,6 +50,31 @@ const BOTTOM_IGNORE_SCROLL_UP_PX = 28;
 const MIDDLE_BAR_BG = "#1b8880";
 /** @media (max-width) for mobile/tablet header chrome (matches mega menu breakpoint) */
 const HEADER_NARROW_MQ = 1023;
+
+/**
+ * Breakpoints aligned with StylesPage copy: mobile ≤767, tablet 768–1023, desktop ≥1024.
+ * Drives second-nav link_style_* from shop theme JSON.
+ */
+function useSecondNavLinkViewportBand() {
+  const [band, setBand] = useState("desktop");
+  useLayoutEffect(() => {
+    const mqMobile = window.matchMedia("(max-width: 767px)");
+    const mqTablet = window.matchMedia("(min-width: 768px) and (max-width: 1023px)");
+    const apply = () => {
+      if (mqMobile.matches) setBand("mobile");
+      else if (mqTablet.matches) setBand("tablet");
+      else setBand("desktop");
+    };
+    apply();
+    mqMobile.addEventListener("change", apply);
+    mqTablet.addEventListener("change", apply);
+    return () => {
+      mqMobile.removeEventListener("change", apply);
+      mqTablet.removeEventListener("change", apply);
+    };
+  }, []);
+  return band;
+}
 
 function categoryRefFromMenuItem(item) {
   if (!item || String(item.link_type || "").toLowerCase() !== "category") return "";
@@ -69,7 +94,8 @@ function walkCategorySlugMap(nodes, outMap) {
   if (!Array.isArray(nodes)) return;
   for (const n of nodes) {
     if (!n) continue;
-    if (n.slug) outMap.set(String(n.slug).trim().toLowerCase(), String(n.id).trim().toLowerCase());
+    const key = String(n.slug || n.handle || "").trim().toLowerCase();
+    if (key) outMap.set(key, String(n.id).trim().toLowerCase());
     if (n.children && n.children.length) walkCategorySlugMap(n.children, outMap);
   }
 }
@@ -116,7 +142,11 @@ const HeaderWrap = styled.header`
       left: 0;
       right: 0;
       height: env(safe-area-inset-top);
-      background: var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}));
+      /* Landing carousel gradient (inline --narrow-header-safe-fill) ile çentik bandı aynı yüzey */
+      background: var(
+        --narrow-header-safe-fill,
+        var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}))
+      );
       pointer-events: none;
     }
   }
@@ -246,12 +276,6 @@ const CategoriesDropdown = styled.div`
   position: relative;
   flex-shrink: 0;
   margin-right: 4px;
-
-  /* Hide hamburger on desktop when mega nav is shown */
-  ${(p) =>
-    p.$megaActive
-      ? `@media (min-width: 1024px) { display: none; }`
-      : ""}
 
   /* On mobile the bottom nav handles menu; hide header hamburger */
   @media (max-width: 767px) {
@@ -525,23 +549,101 @@ const MiddleBarUserWrap = styled.div`
   }
 `;
 
-/* Full-width category mega panel — positioned absolute on HeaderWrap */
+/* Tablet/mobile: panel unter der Leiste. Desktop: feste linke Sidebar + Backdrop */
+const CategoryMegaBackdrop = styled.div`
+  display: none;
+  @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.38);
+    z-index: 2147483590;
+    opacity: ${(p) => (p.$open ? 1 : 0)};
+    visibility: ${(p) => (p.$open ? "visible" : "hidden")};
+    transition: opacity 0.28s ease, visibility 0.28s ease;
+    pointer-events: ${(p) => (p.$open ? "auto" : "none")};
+  }
+`;
+
 const CategoryMegaPanel = styled.div`
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: #fff;
-  border-top: 3px solid var(--shop-primary, #1b8880);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.13);
-  z-index: 2;
-  overflow: hidden;
-  max-height: ${(p) => (p.$open ? "600px" : "0")};
-  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-  pointer-events: ${(p) => (p.$open ? "auto" : "none")};
+  z-index: 2147483595;
+
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-top: 3px solid var(--shop-primary, #1b8880);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.13);
+    overflow: hidden;
+    max-height: ${(p) => (p.$open ? "600px" : "0")};
+    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: ${(p) => (p.$open ? "auto" : "none")};
+  }
 
   @media (max-width: 767px) {
     border-top: none;
+  }
+
+  @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
+    position: fixed;
+    left: 0;
+    top: ${(p) => `${Math.max(52, Number(p.$topPx) || 0)}px`};
+    bottom: 0;
+    width: min(400px, 38vw);
+    right: auto;
+    background: #fff;
+    border: none;
+    border-right: 1px solid #e5e7eb;
+    box-shadow: 8px 0 44px rgba(0, 0, 0, 0.14);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
+    transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: ${(p) => (p.$open ? "auto" : "none")};
+  }
+`;
+
+const CategoryMegaSidebarHead = styled.div`
+  display: none;
+  @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 15px;
+    font-weight: 700;
+    color: ${tokens.dark[800]};
+    font-family: ${tokens.fontFamily.sans};
+  }
+`;
+
+const CategoryMegaSidebarClose = styled.button`
+  display: none;
+  @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin: -8px -10px -8px 0;
+    padding: 0;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: ${tokens.dark[600]};
+    cursor: pointer;
+    font-size: 22px;
+    line-height: 1;
+    &:hover {
+      background: ${tokens.background.soft};
+      color: ${tokens.dark[800]};
+    }
   }
 `;
 
@@ -552,6 +654,20 @@ const CategoryMegaInner = styled.div`
   display: flex;
   gap: 0 8px;
   overflow-x: auto;
+
+  @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
+    flex: 1;
+    min-height: 0;
+    max-width: none;
+    margin: 0;
+    padding: 10px 12px 28px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 `;
 
 const CategoryMegaCol = styled.div`
@@ -575,6 +691,12 @@ const CategoryMegaLink = styled(Link)`
   &:hover {
     background: ${tokens.background.soft};
     color: var(--shop-primary, ${tokens.primary.DEFAULT});
+  }
+
+  @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
+    white-space: normal;
+    padding: 10px 14px;
+    border-radius: 8px;
   }
 `;
 
@@ -839,7 +961,7 @@ const LocaleDropdown = styled.div`
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 720px;
+  width: 520px;
   max-width: 96vw;
   background: ${tokens.background.card};
   border: 1px solid ${tokens.border.light};
@@ -889,21 +1011,13 @@ const SHOP_LOCALES = [
   { code: "tr", label: "Türkçe",     flag: "🇹🇷" },
 ];
 
-const CCY_FROM_ISO = { EUR: "eur", GBP: "gbp", CHF: "chf", USD: "usd", TRY: "try" };
-
-const SHOP_CCY_LABELS = {
-  eur: { label: "Euro", sub: "EUR" },
-  gbp: { label: "Sterling", sub: "GBP" },
-  chf: { label: "Franken", sub: "CHF" },
-  usd: { label: "US-Dollar", sub: "USD" },
-  try: { label: "Türkische Lira", sub: "TRY" },
-};
-
 export default function ShopHeader() {
-  const { showHeaderFilterBar, landingHeaderBg } = useLandingChrome();
+  const { showHeaderFilterBar, landingHeaderBg, secondNavDesktopClassic } = useLandingChrome();
+  const { publishMobileBottomNavScroll } = useMobileBottomNavScroll();
   const ctxPrefix = useMarketPrefix();
   const pathname = usePathname() || "/";
   const shopStyles = useShopStyles();
+  const secondNavViewportBand = useSecondNavLinkViewportBand();
   const headerRestPath = useMemo(() => restPathFromPathname(pathname), [pathname]);
   const headerRouteScope = useMemo(() => detectShopHeaderRouteScope(headerRestPath), [headerRestPath]);
   const headerScopeCssVars = useMemo(
@@ -937,6 +1051,8 @@ export default function ShopHeader() {
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
   const tLocale = useTranslations("locale");
   const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
+  const tAccountPanel = useTranslations("accountPanel");
   const locale = useLocale();
 
   // Dynamically computed from shipping groups — only countries with configured prices
@@ -956,9 +1072,8 @@ export default function ShopHeader() {
 
   const handleSelectCountry = (countryCode) => {
     const m = countryCode.toLowerCase();
-    const lang = defaultLocaleForMarket(m);
-    const cur = defaultCurrencyForMarket(m);
-    navigateTriple(m, lang, cur);
+    const lang = String(locale || routing.defaultLocale || "de").toLowerCase();
+    navigateTriple(m, lang, DEFAULT_CURRENCY);
     setLocaleDropdownOpen(false);
   };
 
@@ -1022,7 +1137,11 @@ export default function ShopHeader() {
         themeMeta.setAttribute("content", solid);
 
         if (mq.matches) {
-          if (chrome) {
+          if (landingHeaderBg) {
+            root.style.background = landingHeaderBg;
+            root.style.backgroundColor = "";
+            themeMeta.setAttribute("content", extractSolidTintFromChromeCss(landingHeaderBg, headerBg));
+          } else if (chrome) {
             root.style.background = chrome;
             root.style.backgroundColor = "";
           } else {
@@ -1047,7 +1166,7 @@ export default function ShopHeader() {
       root.style.background = prevRootBackground;
       root.style.backgroundColor = prevRootBg;
     };
-  }, [pathname, shopStyles, headerScopeCssVars]);
+  }, [pathname, shopStyles, headerScopeCssVars, landingHeaderBg]);
 
   useEffect(() => {
     const norm = (s) => String(s || "").toLowerCase().trim();
@@ -1138,13 +1257,19 @@ export default function ShopHeader() {
          * her pozitif delta ikinci şeridi gizler (önceki SCROLL_DELTA ile çoğu mobil kaydırmada hiç tetiklenmiyordu).
          * Yukarı: küçük negatif deltalarda da menü gelsin; titreşim için |delta| minimum.
          */
-        if (current <= SCROLL_THRESHOLD) {
-          setScrollingDown(false);
-        } else if (delta > 0 && current > SCROLL_THRESHOLD) {
-          setScrollingDown(true);
-        } else if (delta < -SCROLL_UP_DELTA && !nearDocumentBottom) {
-          setScrollingDown(false);
-        }
+        let nextScrollingDown;
+        setScrollingDown((prevDown) => {
+          let next = prevDown;
+          if (current <= SCROLL_THRESHOLD) next = false;
+          else if (delta > 0 && current > SCROLL_THRESHOLD) next = true;
+          else if (delta < -SCROLL_UP_DELTA && !nearDocumentBottom) next = false;
+          nextScrollingDown = next;
+          return next;
+        });
+        publishMobileBottomNavScroll({
+          scrollY: current,
+          scrollingDown: nextScrollingDown,
+        });
         lastScrollYRef.current = current;
         setScrollY(current);
 
@@ -1160,7 +1285,7 @@ export default function ShopHeader() {
       window.removeEventListener("scroll", handleScroll);
       if (vv) vv.removeEventListener("scroll", handleScroll);
     };
-  }, []);
+  }, [publishMobileBottomNavScroll]);
 
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${HEADER_NARROW_MQ}px)`);
@@ -1174,9 +1299,11 @@ export default function ShopHeader() {
     setDrillCategoryId(null);
     setScrollingDown(false);
     if (typeof window !== "undefined") {
-      lastScrollYRef.current = window.scrollY ?? window.pageYOffset ?? 0;
+      const y = window.scrollY ?? window.pageYOffset ?? 0;
+      lastScrollYRef.current = y;
+      publishMobileBottomNavScroll({ scrollY: y, scrollingDown: false });
     }
-  }, [pathname]);
+  }, [pathname, publishMobileBottomNavScroll]);
 
   // Track actual header height so the spacer is always accurate
   useEffect(() => {
@@ -1215,8 +1342,27 @@ export default function ShopHeader() {
   /** Mobile/tablet: thin search-only row while scrolling down (not on wide desktop) */
   const isMobileSearchCompact =
     isNarrowViewport && scrollingDown && scrollY > SCROLL_THRESHOLD;
+
+  /** Theme JSON link_style_* per breakpoint; Landing kann Desktop auf klassisch erzwingen */
+  const secondNavUsePillClass = useMemo(() => {
+    const sn = shopStyles?.secondNav || {};
+    let mode =
+      secondNavViewportBand === "mobile"
+        ? sn.link_style_mobile
+        : secondNavViewportBand === "tablet"
+          ? sn.link_style_tablet
+          : sn.link_style_desktop;
+    if (mode !== "classic" && mode !== "pill") {
+      mode = secondNavViewportBand === "desktop" ? "classic" : "pill";
+    }
+    if (secondNavDesktopClassic && secondNavViewportBand === "desktop") {
+      mode = "classic";
+    }
+    return mode === "pill";
+  }, [shopStyles?.secondNav, secondNavViewportBand, secondNavDesktopClassic]);
   /** Only desktop hides the whole header on scroll down; narrow keeps a fixed (compact) search bar */
-  const hideHeaderCompletely = !isNarrowViewport && !showHeader;
+  const hideHeaderCompletely =
+    !isNarrowViewport && !showHeader && !mainMenuOpen;
 
   const algoliaAttributes = {
     primaryText: "title",
@@ -1338,11 +1484,17 @@ export default function ShopHeader() {
       <HeaderWrap
         ref={headerRef}
         data-mobile-compact={isMobileSearchCompact ? "true" : "false"}
+        data-landing-header-chrome={isNarrowViewport && landingHeaderBg ? "true" : undefined}
         style={{
           transform: hideHeaderCompletely ? "translateY(-100%)" : "translateY(0)",
           zIndex: localeDropdownOpen ? 2147483650 : undefined,
           ...(headerScopeCssVars || {}),
-          ...(isNarrowViewport && landingHeaderBg ? { background: landingHeaderBg } : {}),
+          ...(isNarrowViewport && landingHeaderBg
+            ? {
+                background: landingHeaderBg,
+                "--narrow-header-safe-fill": landingHeaderBg,
+              }
+            : {}),
         }}
       >
         <ShopTopBar />
@@ -1377,7 +1529,7 @@ export default function ShopHeader() {
                 $hide={isMobileSearchCompact}
                 style={{ gap: 0, minWidth: 0 }}
               >
-                <CategoriesDropdown data-categories-dropdown $megaActive={hasMegaNav}>
+                <CategoriesDropdown data-categories-dropdown>
                   <CategoriesButton
                     type="button"
                     onClick={() => {
@@ -1461,7 +1613,7 @@ export default function ShopHeader() {
             <NarrowHeaderChrome $hide={isMobileSearchCompact}>
             <MiddleBarRight>
               <LocaleCurrencyWrap data-locale-dropdown>
-                <MiddleBarLocaleBtn type="button" onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={`${tLocale("label")} · Währung`} aria-label="Land, Sprache, Währung" aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
+                <MiddleBarLocaleBtn type="button" onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={tLocale("label")} aria-label={tLocale("label")} aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
                   </svg>
@@ -1481,12 +1633,12 @@ export default function ShopHeader() {
                         <span style={{ fontSize: 20 }}>{c.flag}</span>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 600 }}>{c.label}</div>
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{c.currency.toUpperCase()}</div>
+                          <div style={{ fontSize: 11, color: "#9ca3af" }}>EUR</div>
                         </div>
                       </LocaleOption>
                     ))}
                   </div>
-                  <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", padding: "16px 0" }}>
+                  <div style={{ flex: 1, padding: "16px 0" }}>
                     <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Sprache</div>
                     {SHOP_LOCALES.map((l) => (
                       <LocaleOption
@@ -1496,42 +1648,13 @@ export default function ShopHeader() {
                         onClick={() => {
                           setLocaleDropdownOpen(false);
                           const m = marketParsed?.country ?? DEFAULT_MARKET;
-                          const cur =
-                            marketParsed?.currency && isValidCurrency(marketParsed.currency)
-                              ? marketParsed.currency
-                              : defaultCurrencyForMarket(m);
-                          navigateTriple(m, l.code, cur);
+                          navigateTriple(m, l.code, DEFAULT_CURRENCY);
                         }}
                       >
                         <span style={{ fontSize: 20 }}>{l.flag}</span>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{l.label}</div>
                       </LocaleOption>
                     ))}
-                  </div>
-                  <div style={{ flex: 1, padding: "16px 0" }}>
-                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Währung</div>
-                    {SHOP_CURRENCIES.map((code) => {
-                      const active = (marketParsed?.currency || "eur") === code;
-                      const meta = SHOP_CCY_LABELS[code] || { label: code.toUpperCase(), sub: code.toUpperCase() };
-                      return (
-                        <LocaleOption
-                          key={code}
-                          type="button"
-                          data-active={active ? "true" : "false"}
-                          onClick={() => {
-                            setLocaleDropdownOpen(false);
-                            const m = marketParsed?.country ?? DEFAULT_MARKET;
-                            const lang = marketParsed?.lang ?? locale;
-                            navigateTriple(m, lang, code);
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>{meta.label}</div>
-                            <div style={{ fontSize: 11, color: "#9ca3af" }}>{meta.sub}</div>
-                          </div>
-                        </LocaleOption>
-                      );
-                    })}
                   </div>
                 </LocaleDropdown>
               </LocaleCurrencyWrap>
@@ -1568,7 +1691,7 @@ export default function ShopHeader() {
             {secondMenuItems.map((item) => (
               <SecondLink
                 key={item.id}
-                className="shop-second-nav-link"
+                className={secondNavUsePillClass ? "shop-second-nav-link" : undefined}
                 href={menuItemHref(item)}
               >
                 {item.label}
@@ -1600,15 +1723,35 @@ export default function ShopHeader() {
           </MegaPanel>
         )}
 
-        {/* Category mega panel — opens when hamburger is clicked */}
+        {/* Category panel — narrow: unter Header; desktop: linke Sidebar */}
+        {!isNarrowViewport ? (
+          <CategoryMegaBackdrop
+            $open={mainMenuOpen}
+            aria-hidden={!mainMenuOpen}
+            onClick={() => setMainMenuOpen(false)}
+          />
+        ) : null}
         <CategoryMegaPanel
           $open={mainMenuOpen}
+          $topPx={headerHeight}
           data-categories-dropdown
           onClick={(e) => {
-            // close only on direct backdrop click, not on child clicks
+            if (!isNarrowViewport) return;
             if (e.target === e.currentTarget) setMainMenuOpen(false);
           }}
         >
+          {!isNarrowViewport ? (
+            <CategoryMegaSidebarHead>
+              <span>{tCommon("categories")}</span>
+              <CategoryMegaSidebarClose
+                type="button"
+                aria-label={tAccountPanel("close")}
+                onClick={() => setMainMenuOpen(false)}
+              >
+                ×
+              </CategoryMegaSidebarClose>
+            </CategoryMegaSidebarHead>
+          ) : null}
           <CategoryMegaInner>
             {(() => {
               const rows =
@@ -1632,6 +1775,14 @@ export default function ShopHeader() {
                     {tNav("categoryMenuEmpty")}
                   </div>
                 );
+              }
+
+              if (!isNarrowViewport) {
+                return rows.map((row) => (
+                  <CategoryMegaLink key={row.key} href={row.href} onClick={row.onClick}>
+                    {row.label}
+                  </CategoryMegaLink>
+                ));
               }
 
               const COLS_MAX = 8;

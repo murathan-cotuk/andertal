@@ -83,8 +83,7 @@ export default function LoginPage() {
   const localeHref = (nextLocale) => {
     const parsed = parseMarketPath(pathname || "");
     const country = parsed?.country || "de";
-    const currency = parsed?.currency || DEFAULT_CURRENCY;
-    return `${marketPrefix(country, nextLocale, currency)}/login`;
+    return `${marketPrefix(country, nextLocale, DEFAULT_CURRENCY)}/login`;
   };
 
   useEffect(() => {

@@ -37,9 +37,14 @@ const CHECKOUT_SNAPSHOT_KEY = "andertal_checkout_snapshot";
 
 const PageWrap = styled.div`
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: ${tokens.background.main};
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  box-sizing: border-box;
 `;
 
 const Main = styled.main`
@@ -47,7 +52,15 @@ const Main = styled.main`
   max-width: 1100px;
   margin: 0 auto;
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: clip;
   padding: 24px 24px 64px;
+
+  @media (max-width: 768px) {
+    padding: 16px max(12px, env(safe-area-inset-left)) max(56px, calc(48px + env(safe-area-inset-bottom)))
+      max(12px, env(safe-area-inset-right));
+  }
 `;
 
 const Title = styled.h1`
@@ -55,6 +68,11 @@ const Title = styled.h1`
   font-weight: 700;
   color: #111827;
   margin: 0 0 32px;
+
+  @media (max-width: 768px) {
+    font-size: 1.375rem;
+    margin-bottom: 20px;
+  }
 `;
 
 const Layout = styled.div`
@@ -62,9 +80,16 @@ const Layout = styled.div`
   grid-template-columns: 1fr 360px;
   gap: 32px;
   align-items: flex-start;
+  min-width: 0;
+  width: 100%;
+
+  & > * {
+    min-width: 0;
+  }
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
+    gap: 24px;
   }
 `;
 
@@ -73,6 +98,13 @@ const FormCard = styled.div`
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 24px;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: clip;
+
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
 `;
 
 const SectionTitle = styled.h2`
@@ -89,12 +121,18 @@ const FieldGrid = styled.div`
   grid-template-columns: ${(p) => p.$cols || "1fr"};
   gap: 16px;
   margin-bottom: 16px;
+  min-width: 0;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr !important;
+  }
 `;
 
 const FieldWrap = styled.div`
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 `;
 
 const Label = styled.label`
@@ -104,6 +142,9 @@ const Label = styled.label`
 `;
 
 const Input = styled.input`
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 10px 12px;
   border: 1px solid ${(p) => (p.$error ? "#ef4444" : "#d1d5db")};
   border-radius: 8px;
@@ -128,6 +169,16 @@ const SummaryCard = styled.div`
   padding: 24px;
   position: sticky;
   top: 64px;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+
+  @media (max-width: 768px) {
+    position: relative;
+    top: auto;
+    padding: 16px;
+  }
 `;
 
 const SummaryTitle = styled.h2`
@@ -141,6 +192,9 @@ const SummaryItem = styled.div`
   display: flex;
   gap: 12px;
   margin-bottom: 12px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const SummaryThumb = styled.div`
@@ -169,6 +223,13 @@ const SummaryItemTitle = styled.div`
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
+
+  @media (max-width: 768px) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
 `;
 
 const SummaryItemQty = styled.div`
@@ -181,6 +242,7 @@ const SummaryItemPrice = styled.div`
   font-weight: 500;
   color: #111827;
   white-space: nowrap;
+  flex-shrink: 0;
 `;
 
 const SummaryItemLink = styled(Link)`
@@ -191,6 +253,9 @@ const SummaryItemLink = styled(Link)`
   text-decoration: none;
   color: inherit;
   cursor: pointer;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   &:hover ${SummaryItemTitle} {
     color: ${tokens.primary.DEFAULT};
     text-decoration: underline;
@@ -206,9 +271,22 @@ const Divider = styled.hr`
 const SummaryRow = styled.div`
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
   font-size: 0.9375rem;
   color: #4b5563;
   margin-bottom: 8px;
+  min-width: 0;
+
+  & > span:first-child {
+    min-width: 0;
+    flex: 1;
+    padding-right: 4px;
+  }
+  & > span:last-child {
+    flex-shrink: 0;
+    text-align: right;
+  }
 `;
 
 const SummaryTotal = styled(SummaryRow)`
@@ -216,6 +294,46 @@ const SummaryTotal = styled(SummaryRow)`
   font-size: 1.0625rem;
   color: #111827;
   margin-top: 4px;
+`;
+
+/** Stripe iframe + iç grid mobilde taşmasın */
+const StripePaymentWrap = styled.div`
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+`;
+
+const CheckoutSubmitWrap = styled.div`
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-top: 20px;
+
+  button {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: normal !important;
+    flex-wrap: wrap;
+    height: auto !important;
+    min-height: 52px;
+    padding: 12px 14px !important;
+    line-height: 1.25;
+    gap: 8px;
+  }
+
+  /* PayNowButton: BtnText + ikon satırı dar ekranda taşmasın */
+  button > span:first-of-type {
+    min-width: 0;
+    flex: 1 1 auto;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  button > div:last-of-type {
+    flex-shrink: 0;
+  }
 `;
 
 const PayBtn = styled.button`
@@ -775,7 +893,8 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
                 color: "#111827",
                 background: "#fff",
                 width: "100%",
-                maxWidth: 480,
+                maxWidth: "100%",
+                boxSizing: "border-box",
               }}
             >
               <option value="">Neue Adresse eingeben …</option>
@@ -812,6 +931,9 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
                 }}
                 autoComplete="country"
                 style={{
+                  width: "100%",
+                  maxWidth: "100%",
+                  boxSizing: "border-box",
                   padding: "10px 12px",
                   border: "1px solid #d1d5db",
                   borderRadius: 8,
@@ -830,7 +952,18 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
         </FieldGrid>
 
         {/* Billing address toggle */}
-        <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => setBillingSameAsShipping(v => !v)}>
+        <div
+          style={{
+            marginTop: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            cursor: "pointer",
+            flexWrap: "wrap",
+            minWidth: 0,
+          }}
+          onClick={() => setBillingSameAsShipping(v => !v)}
+        >
           <CustomCheckbox
             id="billing-same"
             checked={billingSameAsShipping}
@@ -873,7 +1006,8 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
                   color: "#111827",
                   background: "#fff",
                   width: "100%",
-                  maxWidth: 480,
+                  maxWidth: "100%",
+                  boxSizing: "border-box",
                 }}
               >
                 <option value="">Andere Rechnungsadresse eingeben …</option>
@@ -903,7 +1037,18 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
                   value={shipList.some((c) => c.code === billingCountry.value) ? billingCountry.value : shipList[0].code}
                   onChange={(e) => billingCountry.onChange({ target: { value: e.target.value } })}
                   autoComplete="billing country"
-                  style={{ padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.9375rem", fontFamily: "inherit", color: "#111827", background: "#fff" }}
+                  style={{
+                    width: "100%",
+                    maxWidth: "100%",
+                    boxSizing: "border-box",
+                    padding: "10px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: 8,
+                    fontSize: "0.9375rem",
+                    fontFamily: "inherit",
+                    color: "#111827",
+                    background: "#fff",
+                  }}
                 >
                   {shipList.map((c) => (
                     <option key={c.code} value={c.code}>{c.label}</option>
@@ -917,7 +1062,18 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
 
       {user?.id && !shipAddrId && (
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "#374151", cursor: "pointer" }}>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              fontSize: "0.875rem",
+              color: "#374151",
+              cursor: "pointer",
+              flexWrap: "wrap",
+              minWidth: 0,
+            }}
+          >
             <CustomCheckbox
               checked={saveNewAddress}
               onChange={(e) => setSaveNewAddress(e.target.checked)}
@@ -930,21 +1086,24 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
 
       <FormCard>
         <SectionTitle>{t("payment")}</SectionTitle>
-        <PaymentElement
-          onReady={() => setPaymentElementReady(true)}
-          onLoadError={() => {
-            setPaymentElementReady(false);
-            setError(t("paymentError"));
-          }}
-        />
+        <StripePaymentWrap>
+          <PaymentElement
+            onReady={() => setPaymentElementReady(true)}
+            onLoadError={() => {
+              setPaymentElementReady(false);
+              setError(t("paymentError"));
+            }}
+          />
+        </StripePaymentWrap>
         {error && <ErrorBox>{error}</ErrorBox>}
-        <PayNowButton
-          type="submit"
-          disabled={!stripe || !elements || !paymentElementReady || processing || paymentIntentRefreshing}
-          style={{ width: "100%", marginTop: 20 }}
-        >
-          {processing ? t("processing") : paymentIntentRefreshing ? t("processing") : `${t("placeOrder")} – ${formatPriceCents(payCentsDisplay)} €`}
-        </PayNowButton>
+        <CheckoutSubmitWrap>
+          <PayNowButton
+            type="submit"
+            disabled={!stripe || !elements || !paymentElementReady || processing || paymentIntentRefreshing}
+          >
+            {processing ? t("processing") : paymentIntentRefreshing ? t("processing") : `${t("placeOrder")} – ${formatPriceCents(payCentsDisplay)} €`}
+          </PayNowButton>
+        </CheckoutSubmitWrap>
       </FormCard>
     </form>
   );

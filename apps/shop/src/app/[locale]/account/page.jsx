@@ -363,6 +363,10 @@ export default function AccountPage() {
   const [saveErr, setSaveErr] = useState("");
   const [orders, setOrders] = useState([]);
   const [recentlyViewed, setRecentlyViewed] = useState([]);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteUnderstand, setDeleteUnderstand] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteErr, setDeleteErr] = useState("");
 
   useEffect(() => {
     const fetchCustomer = async () => {
@@ -445,6 +449,39 @@ export default function AccountPage() {
   const handleLogout = () => {
     logout();
     router.push("/");
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteErr("");
+    if (!deleteUnderstand) {
+      setDeleteErr("Bitte bestätigen Sie, dass Sie die Folgen verstanden haben.");
+      return;
+    }
+    const token = getToken("customer");
+    if (!token) {
+      setDeleteErr("Nicht angemeldet.");
+      return;
+    }
+    if (!deletePassword.trim()) {
+      setDeleteErr("Bitte geben Sie Ihr aktuelles Passwort ein.");
+      return;
+    }
+    if (!window.confirm("Konto wirklich unwiderruflich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.")) {
+      return;
+    }
+    setDeleteBusy(true);
+    try {
+      await getMedusaClient().deleteCustomerMe(token, { password: deletePassword });
+      try {
+        document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
+      } catch (_) {}
+      logout();
+      router.push("/");
+    } catch (e) {
+      setDeleteErr(e?.message || "Löschen fehlgeschlagen.");
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const accountTypeLabel = (t) => {
@@ -610,6 +647,53 @@ export default function AccountPage() {
                 >
                   Adressen bearbeiten
                 </Link>
+              </Section>
+
+              <Section title="Konto löschen">
+                <p style={{ fontSize: 14, color: GRAY, margin: "0 0 14px", lineHeight: 1.55 }}>
+                  Wenn Sie Ihr Konto löschen, werden Ihr Profil, gespeicherte Adressen, Merkzettel und Bonuspunkte entfernt.
+                  Bestellhistorien können aus buchhalterischen Gründen weiterhin anonym gespeichert bleiben.
+                </p>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginBottom: 14, fontSize: 14, color: DARK, lineHeight: 1.45 }}>
+                  <input
+                    type="checkbox"
+                    checked={deleteUnderstand}
+                    onChange={(e) => setDeleteUnderstand(e.target.checked)}
+                    style={{ marginTop: 3, flexShrink: 0 }}
+                  />
+                  <span>Ich möchte mein Kundenkonto dauerhaft löschen und habe die Hinweise gelesen.</span>
+                </label>
+                <div style={{ maxWidth: 360, marginBottom: 12 }}>
+                  <label htmlFor="acc-delete-password" style={lbl}>Passwort zur Bestätigung</label>
+                  <input
+                    id="acc-delete-password"
+                    type="password"
+                    autoComplete="current-password"
+                    style={inp}
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    placeholder="Ihr aktuelles Passwort"
+                  />
+                </div>
+                {deleteErr && <p style={{ color: "#b91c1c", fontSize: 13, marginBottom: 12 }}>{deleteErr}</p>}
+                <button
+                  type="button"
+                  disabled={deleteBusy}
+                  onClick={handleDeleteAccount}
+                  style={{
+                    padding: "10px 18px",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#fff",
+                    background: deleteBusy ? "#9ca3af" : "#b91c1c",
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: deleteBusy ? "not-allowed" : "pointer",
+                    boxShadow: "0 2px 0 2px #000",
+                  }}
+                >
+                  {deleteBusy ? "Wird gelöscht…" : "Konto endgültig löschen"}
+                </button>
               </Section>
 
               {/* Meine Bestellungen carousel */}

@@ -25,7 +25,7 @@
     "categoryBrowseHint": "Seules les catégories parentes contenant au moins un produit s’affichent dans le menu. Choisissez une catégorie, puis appuyez sur la loupe pour ouvrir le catalogue. Les sous-catégories apparaissent à gauche, au-dessus des filtres."
   },
   "locale": {
-    "label": "Langue et devise",
+    "label": "Pays et langue",
     "en": "English",
     "de": "Deutsch",
     "tr": "Türkçe",

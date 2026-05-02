@@ -24,6 +24,7 @@ export {
   TOPBAR_PRESET_LABELS,
   HEADER_PRESET_LABELS,
   SECOND_NAV_PRESET_LABELS,
+  SECOND_NAV_LINK_STYLE_OPTIONS,
   SCROLL_UP_PRESET_LABELS,
 } from "./layout-presets.js";
 export { ensureActiveVariant, mergeButtonCatalog, normalizeButtonType } from "./button-merge.js";

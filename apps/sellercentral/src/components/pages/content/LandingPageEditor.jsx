@@ -249,6 +249,7 @@ function normalizeLandingPageSettings(raw) {
     ...s,
     show_submenu_left: s.show_submenu_left === true,
     show_filter_bar: s.show_filter_bar !== false,
+    second_nav_desktop_classic: s.second_nav_desktop_classic === true,
     page_padding_top: s.page_padding_top || "",
   };
 }
@@ -2676,7 +2677,7 @@ export default function LandingPageEditor() {
       setContainers(Array.isArray(data?.containers) ? data.containers : []);
     } catch (e) {
       setContainers([]);
-      setCategorySettings({ show_submenu_left: false, show_filter_bar: true });
+      setCategorySettings(normalizeLandingPageSettings({}));
       setErr(e?.message || "Containerlar yüklenemedi");
     }
     setLoading(false);
@@ -2952,6 +2953,15 @@ export default function LandingPageEditor() {
                         checked={categorySettings.show_filter_bar !== false}
                         onChange={(checked) => {
                           setCategorySettings((prev) => ({ ...prev, show_filter_bar: checked }));
+                          setIsDirty(true);
+                        }}
+                      />
+                      <Checkbox
+                        label="Second-Navigation auf Desktop klassisch (ohne Pillen)"
+                        helpText="Nur Desktop (≥1024px): erzwingt klassische Links auf dieser Landing-Route und überschreibt die Desktop-Einstellung unter Shop-Stilen → Layout Second Nav. Tablet/Mobil folgen weiter den dort gewählten Geräte-Stilen."
+                        checked={categorySettings.second_nav_desktop_classic === true}
+                        onChange={(checked) => {
+                          setCategorySettings((prev) => ({ ...prev, second_nav_desktop_classic: checked }));
                           setIsDirty(true);
                         }}
                       />

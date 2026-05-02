@@ -16,6 +16,7 @@ try {
 
 const path = require('path')
 const fs = require('fs')
+const { runAutomationFlowsForOrder } = require('./src/flow-automation')
 
 let backendLinkModulesPath
 try {
@@ -1006,6 +1007,8 @@ async function start() {
             updated_at timestamptz NOT NULL DEFAULT now()
           )
         `).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_flow_steps ADD COLUMN IF NOT EXISTS email_i18n jsonb DEFAULT NULL`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_flows ADD COLUMN IF NOT EXISTS audience varchar(20) NOT NULL DEFAULT 'customer'`).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_admin_hub_flow_steps_flow ON admin_hub_flow_steps(flow_id, step_order)`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS iban text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT NULL;`).catch(() => {})
@@ -6493,6 +6496,8 @@ async function start() {
         const authHdr = (req.headers.authorization || '').toString()
         const bearerTok = authHdr.startsWith('Bearer ') ? authHdr.slice(7).trim() : ''
         let stripeCustomerId = null
+        /** Set when logged-in store row exists — used to recover stale Stripe customer ids */
+        let stripeCustomerRecovery = null
         if (bearerTok) {
           const payload = verifyCustomerToken(bearerTok)
           if (payload?.id) {
@@ -6502,6 +6507,12 @@ async function start() {
             )
             const c = custR.rows?.[0]
             if (c) {
+              stripeCustomerRecovery = {
+                dbId: c.id,
+                email: c.email || payload.email || null,
+                first_name: c.first_name,
+                last_name: c.last_name,
+              }
               stripeCustomerId = c.stripe_customer_id || null
               if (!stripeCustomerId) {
                 const sc = await stripe.customers.create({
@@ -6531,7 +6542,37 @@ async function start() {
           },
         }
         if (stripeCustomerId) piBody.customer = stripeCustomerId
-        const paymentIntent = await stripe.paymentIntents.create(piBody)
+
+        let paymentIntent
+        try {
+          paymentIntent = await stripe.paymentIntents.create(piBody)
+        } catch (stripeErr) {
+          const code = stripeErr && stripeErr.code
+          const param = stripeErr && stripeErr.param
+          const errMsg = String((stripeErr && stripeErr.message) || '')
+          const noSuchCustomer =
+            (code === 'resource_missing' && param === 'customer') ||
+            /\bno such customer\b/i.test(errMsg)
+          if (noSuchCustomer && stripeCustomerId && stripeCustomerRecovery) {
+            await client.query('UPDATE store_customers SET stripe_customer_id = NULL WHERE id = $1::uuid', [
+              stripeCustomerRecovery.dbId,
+            ])
+            const sc = await stripe.customers.create({
+              email: stripeCustomerRecovery.email || undefined,
+              name: [stripeCustomerRecovery.first_name, stripeCustomerRecovery.last_name].filter(Boolean).join(' ').trim() || undefined,
+              metadata: { andertal_customer_id: stripeCustomerRecovery.dbId },
+            })
+            const newStripeId = sc.id
+            await client.query('UPDATE store_customers SET stripe_customer_id = $1 WHERE id = $2::uuid', [
+              newStripeId,
+              stripeCustomerRecovery.dbId,
+            ])
+            piBody.customer = newStripeId
+            paymentIntent = await stripe.paymentIntents.create(piBody)
+          } else {
+            throw stripeErr
+          }
+        }
 
         await client.end()
         res.json({
@@ -6815,6 +6856,53 @@ async function start() {
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Update failed' })
+      }
+    }
+
+    // DELETE /store/customers/me — self-service account deletion (GDPR); requires password if account has one
+    const storeCustomerMeDELETE = async (req, res) => {
+      const authHeader = req.headers.authorization || ''
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+      const payload = verifyCustomerToken(token)
+      if (!payload) return res.status(401).json({ message: 'Unauthorized' })
+      const body = req.body || {}
+      const password = (body.password ?? '').toString()
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const found = await client.query(
+          'SELECT id, password_hash FROM store_customers WHERE id = $1::uuid',
+          [payload.id],
+        )
+        const row = found.rows[0]
+        if (!row) {
+          await client.end()
+          return res.status(404).json({ message: 'Customer not found' })
+        }
+        if (row.password_hash) {
+          if (!password.trim()) {
+            await client.end()
+            return res.status(400).json({ message: 'Password required to delete your account' })
+          }
+          if (!verifyPassword(password, row.password_hash)) {
+            await client.end()
+            return res.status(401).json({ message: 'Invalid password' })
+          }
+        } else {
+          if (body.confirm !== true) {
+            await client.end()
+            return res.status(400).json({ message: 'Set confirm: true to delete this account' })
+          }
+        }
+        await client.query('DELETE FROM store_customers WHERE id = $1::uuid', [payload.id])
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Could not delete account' })
       }
     }
 
@@ -7795,6 +7883,7 @@ async function start() {
         const custEmail = payload.email ? String(payload.email).trim() : ''
         const ordersR = await client.query(
           `SELECT id, order_number, order_status, payment_status, delivery_status,
+                  stripe_transfer_status,
                   total_cents, subtotal_cents, shipping_cents, discount_cents, currency,
                   first_name, last_name, phone, email,
                   address_line1, address_line2, city, postal_code, country,
@@ -7847,13 +7936,53 @@ async function start() {
             }
           } catch (_) {}
         }
+        const cancelTz = String(process.env.STORE_POLICY_TIMEZONE || 'Europe/Berlin').trim() || 'Europe/Berlin'
+        let cancelWindowMap = {}
+        if (orderIds.length > 0) {
+          try {
+            const cr = await client.query(
+              `SELECT id,
+                (
+                  (NOW() <= created_at + interval '15 minutes')
+                  OR (
+                    (EXTRACT(HOUR FROM (created_at AT TIME ZONE $1::text)) * 60
+                     + EXTRACT(MINUTE FROM (created_at AT TIME ZONE $1::text))) < (7 * 60)
+                    AND NOW() < (
+                      (date_trunc('day', (created_at AT TIME ZONE $1::text)::timestamp) + interval '7 hours')
+                      AT TIME ZONE $1::text
+                    )
+                  )
+                ) AS policy_cancel_ok
+               FROM store_orders WHERE id = ANY($2::uuid[])`,
+              [cancelTz, orderIds],
+            )
+            for (const x of cr.rows || []) cancelWindowMap[x.id] = x.policy_cancel_ok === true
+          } catch (ce) {
+            console.warn('storeOrdersMeGET cancellation window:', ce?.message || ce)
+          }
+        }
+
         await client.end()
-        const orders = (ordersR.rows || []).map(row => ({
-          ...row,
-          order_number: row.order_number ? Number(row.order_number) : null,
-          items: itemsMap[row.id] || [],
-          returns: returnsMap[row.id] || [],
-        }))
+        const blockedOs = new Set(['storniert', 'refunded', 'retoure', 'retoure_anfrage'])
+        const blockedDs = new Set(['versendet', 'zugestellt', 'shipped', 'delivered'])
+        const orders = (ordersR.rows || []).map(row => {
+          let cancellation_allowed = !!cancelWindowMap[row.id]
+          const os = String(row.order_status || '').toLowerCase()
+          const ds = String(row.delivery_status || 'offen').toLowerCase()
+          if (blockedOs.has(os)) cancellation_allowed = false
+          if (blockedDs.has(ds)) cancellation_allowed = false
+          const trk = row.tracking_number != null && String(row.tracking_number).trim() !== ''
+          if (trk) cancellation_allowed = false
+          const tst = String(row.stripe_transfer_status || '').toLowerCase()
+          if (tst === 'completed') cancellation_allowed = false
+          return {
+            ...row,
+            order_number: row.order_number ? Number(row.order_number) : null,
+            items: itemsMap[row.id] || [],
+            returns: returnsMap[row.id] || [],
+            cancellation_allowed,
+          }
+        })
         res.json({ orders })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -7916,6 +8045,192 @@ async function start() {
         await client.end()
         const ret = r.rows[0]
         res.json({ return_request: { ...ret, return_number: ret.return_number ? Number(ret.return_number) : null } })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // POST /store/orders/:id/cancel — customer self-cancel within policy window (15 min or night orders until 07:00 local)
+    const storeOrdersCancelPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const authHeader = req.headers.authorization || ''
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+      if (!token) return res.status(401).json({ message: 'Unauthorized' })
+      const orderId = (req.params.id || '').trim()
+      if (!orderId) return res.status(400).json({ message: 'order id required' })
+      const payload = verifyCustomerToken(token)
+      if (!payload?.email) return res.status(401).json({ message: 'Invalid token' })
+      const cancelTz = String(process.env.STORE_POLICY_TIMEZONE || 'Europe/Berlin').trim() || 'Europe/Berlin'
+
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+
+        const orderR = await client.query(
+          `SELECT id, order_number, customer_id, payment_intent_id, payment_status, order_status, delivery_status,
+                  tracking_number, stripe_transfer_status, total_cents,
+                  COALESCE(bonus_points_redeemed, 0)::int AS bonus_points_redeemed, created_at,
+                  (
+                    (NOW() <= created_at + interval '15 minutes')
+                    OR (
+                      (EXTRACT(HOUR FROM (created_at AT TIME ZONE $2::text)) * 60
+                       + EXTRACT(MINUTE FROM (created_at AT TIME ZONE $2::text))) < (7 * 60)
+                      AND NOW() < (
+                        (date_trunc('day', (created_at AT TIME ZONE $2::text)::timestamp) + interval '7 hours')
+                        AT TIME ZONE $2::text
+                      )
+                    )
+                  ) AS policy_cancel_ok
+           FROM store_orders WHERE id = $1::uuid
+             AND (
+               ($4::uuid IS NOT NULL AND customer_id = $4::uuid)
+               OR (email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(TRIM($3)))
+             )`,
+          [orderId, cancelTz, payload.email, customerIdForPg(payload)],
+        )
+        const row = orderR.rows[0]
+        if (!row) {
+          await client.end()
+          return res.status(404).json({ message: 'Order not found' })
+        }
+
+        const os = String(row.order_status || '').toLowerCase()
+        if (os === 'storniert') {
+          await client.end()
+          return res.json({
+            success: true,
+            already_cancelled: true,
+            order: { id: row.id, order_status: 'storniert', payment_status: row.payment_status },
+          })
+        }
+        if (['refunded', 'retoure', 'retoure_anfrage'].includes(os)) {
+          await client.end()
+          return res.status(400).json({ message: 'Diese Bestellung kann nicht mehr storniert werden.' })
+        }
+        const ds = String(row.delivery_status || 'offen').toLowerCase()
+        if (['versendet', 'zugestellt', 'shipped', 'delivered'].includes(ds)) {
+          await client.end()
+          return res.status(400).json({ message: 'Die Bestellung wurde bereits versendet.' })
+        }
+        if (row.tracking_number != null && String(row.tracking_number).trim() !== '') {
+          await client.end()
+          return res.status(400).json({ message: 'Sendungsverfolgung aktiv — Stornierung nicht möglich.' })
+        }
+        if (String(row.stripe_transfer_status || '').toLowerCase() === 'completed') {
+          await client.end()
+          return res.status(400).json({ message: 'Auszahlung bereits erfolgt — bitte den Support kontaktieren.' })
+        }
+        if (!row.policy_cancel_ok) {
+          await client.end()
+          return res.status(400).json({ message: 'Stornierungsfrist abgelaufen.' })
+        }
+
+        const totalCents = Number(row.total_cents || 0)
+        const piId = row.payment_intent_id ? String(row.payment_intent_id).trim() : ''
+
+        const platformRow = await loadPlatformCheckoutRow(client)
+        const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+
+        if (totalCents > 0) {
+          if (!piId) {
+            await client.end()
+            return res.status(400).json({ message: 'Keine Zahlungsreferenz — bitte den Support kontaktieren.' })
+          }
+          if (!secretKey) {
+            await client.end()
+            return res.status(503).json({ message: 'Zahlungsrückbuchung ist nicht konfiguriert.' })
+          }
+          try {
+            const stripe = new (require('stripe'))(secretKey)
+            const pi = await stripe.paymentIntents.retrieve(piId)
+            if (pi.status === 'requires_capture') {
+              await stripe.paymentIntents.cancel(piId)
+            } else if (pi.status === 'succeeded') {
+              const ch = pi.latest_charge
+              const chargeId = typeof ch === 'string' ? ch : ch?.id
+              if (!chargeId) {
+                await client.end()
+                return res.status(400).json({ message: 'Keine Charge für Erstattung gefunden.' })
+              }
+              await stripe.refunds.create({ charge: chargeId })
+            } else if (pi.status === 'canceled' || pi.status === 'requires_payment_method') {
+              /* bereits storniert / unbezahlt */
+            } else {
+              await client.end()
+              return res.status(400).json({ message: `Zahlungsstatus „${pi.status}“ — automatische Stornierung nicht möglich.` })
+            }
+          } catch (se) {
+            await client.end()
+            return res.status(502).json({ message: se?.message || 'Stripe-Rückbuchung fehlgeschlagen' })
+          }
+        }
+
+        const custId = row.customer_id
+        if (custId) {
+          try {
+            const doneEarn = await client.query(
+              `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_cancel_earn' LIMIT 1`,
+              [orderId],
+            )
+            const doneRedeem = await client.query(
+              `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_cancel_redeem' LIMIT 1`,
+              [orderId],
+            )
+            const earned = await client.query(
+              `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_earn'`,
+              [orderId],
+            )
+            const earnedPts = Number(earned.rows[0]?.total || 0)
+            const redeemed = await client.query(
+              `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_redeem'`,
+              [orderId],
+            )
+            const redeemedPts = Number(redeemed.rows[0]?.total || 0)
+            if (earnedPts > 0 && !doneEarn.rows.length) {
+              await appendBonusLedger(client, {
+                customerId: custId,
+                pointsDelta: -earnedPts,
+                description: `Storno Bestellung #${row.order_number} — Punkte zurückgebucht (−${earnedPts})`,
+                source: 'order_cancel_earn',
+                orderId,
+              })
+            }
+            const redeemedFromOrder = Number(row.bonus_points_redeemed || 0)
+            const pointsToGiveBack = redeemedPts < 0 ? -redeemedPts : redeemedFromOrder
+            if (pointsToGiveBack > 0 && !doneRedeem.rows.length) {
+              await appendBonusLedger(client, {
+                customerId: custId,
+                pointsDelta: pointsToGiveBack,
+                description: `Storno Bestellung #${row.order_number} — eingelöste Punkte zurück (+${pointsToGiveBack})`,
+                source: 'order_cancel_redeem',
+                orderId,
+              })
+            }
+          } catch (be) {
+            console.warn('bonus reversal cancel:', be?.message || be)
+          }
+        }
+
+        await client.query(
+          `UPDATE store_orders SET order_status = 'storniert',
+             payment_status = CASE WHEN $2::bigint > 0 THEN 'refunded' ELSE payment_status END,
+             updated_at = now()
+           WHERE id = $1::uuid`,
+          [orderId, totalCents],
+        )
+
+        await client.end()
+        res.json({
+          success: true,
+          order: {
+            id: row.id,
+            order_status: 'storniert',
+            payment_status: totalCents > 0 ? 'refunded' : row.payment_status,
+          },
+        })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -8175,6 +8490,13 @@ async function start() {
         const order = await getOrderWithItems(client, orderId)
         await client.end()
         res.status(201).json({ order })
+        setImmediate(() => {
+          try {
+            runAutomationFlowsForOrder({ triggerKey: 'order_placed', orderId })
+          } catch (fe) {
+            console.warn('runAutomationFlowsForOrder order_placed:', fe?.message || fe)
+          }
+        })
       } catch (err) {
         if (client) try { await client.end() } catch (_) {}
         console.error('Store orders POST:', err)
@@ -8358,6 +8680,28 @@ async function start() {
           }
         }
         annotateTree(tree)
+        /**
+         * Ürün ↔ kategori ID’leri metadata’da uyumsuzsa tüm düğümler has_products:false kalır ve shop menüsü boşalır.
+         * Hiçbir dalda ürün eşleşmesi yoksa (veya ürün listesi boşsa) navigasyonu kurtar: görünür ağacı listelemeye devam et.
+         */
+        const treeHasAnyProductCategory = (nodes) => {
+          for (const n of nodes || []) {
+            if (!n) continue
+            if (n.has_products === true) return true
+            if (treeHasAnyProductCategory(n.children)) return true
+          }
+          return false
+        }
+        const relaxAllHasProducts = (nodes) => {
+          for (const n of nodes || []) {
+            if (!n) continue
+            n.has_products = true
+            relaxAllHasProducts(n.children)
+          }
+        }
+        if (Array.isArray(tree) && tree.length > 0 && !treeHasAnyProductCategory(tree)) {
+          relaxAllHasProducts(tree)
+        }
         const categories = (tree || []).map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
         const payload = { categories, tree, count: categories.length }
         storeCategoriesTreeCache = { at: now, payload }
@@ -9580,12 +9924,22 @@ async function start() {
             )
           }
         }
+        const fireOrderShipped = trackingChanged || deliveryStatusChangedToVersendet
         const oRes = await client.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
         const row = oRes.rows && oRes.rows[0]
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
         const items = (iRes.rows || []).map(r => ({ id: r.id, variant_id: r.variant_id, product_id: r.product_id, quantity: r.quantity, unit_price_cents: r.unit_price_cents, title: r.title, thumbnail: r.thumbnail, product_handle: r.product_handle }))
         await client.end()
         res.json({ order: { ...row, order_number: row.order_number ? Number(row.order_number) : null, items } })
+        if (fireOrderShipped) {
+          setImmediate(() => {
+            try {
+              runAutomationFlowsForOrder({ triggerKey: 'order_shipped', orderId: id })
+            } catch (fe) {
+              console.warn('runAutomationFlowsForOrder order_shipped:', fe?.message || fe)
+            }
+          })
+        }
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -11249,6 +11603,24 @@ async function start() {
       const stripe = new (require('stripe'))(secretKey)
       const row = await client.query('SELECT stripe_customer_id FROM store_customers WHERE id = $1::uuid', [customerId])
       let stripeCustomerId = row.rows[0]?.stripe_customer_id
+      if (stripeCustomerId) {
+        try {
+          await stripe.customers.retrieve(stripeCustomerId)
+        } catch (stripeErr) {
+          const code = stripeErr && stripeErr.code
+          const param = stripeErr && stripeErr.param
+          const errMsg = String((stripeErr && stripeErr.message) || '')
+          const noSuchCustomer =
+            (code === 'resource_missing' && param === 'customer') ||
+            /\bno such customer\b/i.test(errMsg)
+          if (noSuchCustomer) {
+            await client.query('UPDATE store_customers SET stripe_customer_id = NULL WHERE id = $1::uuid', [customerId])
+            stripeCustomerId = null
+          } else {
+            throw stripeErr
+          }
+        }
+      }
       if (!stripeCustomerId) {
         const sc = await stripe.customers.create({ email, metadata: { andertal_customer_id: customerId } })
         stripeCustomerId = sc.id
@@ -11333,6 +11705,7 @@ async function start() {
     httpApp.post('/store/auth/token', storeAuthTokenPOST)
     httpApp.get('/store/customers/me', storeCustomersMeGET)
     httpApp.patch('/store/customers/me', storeCustomerMePATCH)
+    httpApp.delete('/store/customers/me', storeCustomerMeDELETE)
     httpApp.get('/store/customers/me/addresses', storeCustomerAddressesGET)
     httpApp.post('/store/customers/me/addresses', storeCustomerAddressesPOST)
     httpApp.patch('/store/customers/me/addresses/:addressId', storeCustomerAddressesPATCH)
@@ -11343,6 +11716,7 @@ async function start() {
     httpApp.get('/store/wishlist', storeWishlistGET)
     httpApp.post('/store/wishlist', storeWishlistPOST)
     httpApp.delete('/store/wishlist/:productId', storeWishlistDELETE)
+    httpApp.post('/store/orders/:id/cancel', storeOrdersCancelPOST)
     httpApp.post('/store/orders/:id/return-request', storeReturnRequestPOST)
     httpApp.get('/admin-hub/v1/shipping-groups', requireSellerAuth, adminHubShippingGroupsGET)
     httpApp.post('/admin-hub/v1/shipping-groups', requireSellerAuth, adminHubShippingGroupPOST)
@@ -13070,19 +13444,393 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.post('/admin-hub/v1/smtp-settings/test', requireSellerAuth, requireSuperuser, adminHubSmtpSettingsTestPOST)
 
     // ── Automation flows (Content → Flows; superuser) ───────────────────────────
-    const FLOW_EMAIL_SAMPLE_PLACEHOLDERS = {
-      CUSTOMER: 'Jane Doe',
-      CUSTOMER_NAME: 'Jane Doe',
-      FIRST_NAME: 'Jane',
-      LAST_NAME: 'Doe',
-      EMAIL: 'customer@example.com',
-      PRODUCT: 'Sample Product',
-      PRODUCT_NAME: 'Sample Product',
-      ORDER_NUMBER: '10042',
-      ORDER_ID: '10042',
-      STORE_NAME: 'Your Store',
-      SHOP_NAME: 'Your Store',
+    /** Dokumentation + Testdaten für Flow-E-Mails; Platzhalter {KEY} (Groß/Klein egal) */
+    const FLOW_MERGE_CATEGORY_LABELS = {
+      en: {
+        customer: 'Customer',
+        order: 'Order & amounts',
+        shipping: 'Shipping address',
+        product_cart: 'Product & cart',
+        shop: 'Shop & links',
+        engagement: 'Reviews & loyalty',
+      },
+      de: {
+        customer: 'Kunde',
+        order: 'Bestellung & Beträge',
+        shipping: 'Lieferadresse',
+        product_cart: 'Produkt & Warenkorb',
+        shop: 'Shop & Links',
+        engagement: 'Bewertung & Bonus',
+      },
+      tr: {
+        customer: 'Müşteri',
+        order: 'Sipariş ve tutarlar',
+        shipping: 'Teslimat adresi',
+        product_cart: 'Ürün ve sepet',
+        shop: 'Mağaza ve bağlantılar',
+        engagement: 'Yorum ve sadakat',
+      },
+      fr: {
+        customer: 'Client',
+        order: 'Commande & montants',
+        shipping: 'Adresse de livraison',
+        product_cart: 'Produit & panier',
+        shop: 'Boutique & liens',
+        engagement: 'Avis & fidélité',
+      },
+      it: {
+        customer: 'Cliente',
+        order: 'Ordine & importi',
+        shipping: 'Indirizzo di spedizione',
+        product_cart: 'Prodotto & carrello',
+        shop: 'Negozio & link',
+        engagement: 'Recensioni & punti',
+      },
+      es: {
+        customer: 'Cliente',
+        order: 'Pedido e importes',
+        shipping: 'Dirección de envío',
+        product_cart: 'Producto y carrito',
+        shop: 'Tienda y enlaces',
+        engagement: 'Reseñas y puntos',
+      },
     }
+    const FLOW_MERGE_SYNTAX = {
+      en: 'Use curly braces. Names are not case-sensitive — {FIRST_NAME}, {first_name}, and {Customer_Name} all work.',
+      de: 'Geschweifte Klammern verwenden; Groß-/Kleinschreibung ist egal ({FIRST_NAME} = {first_name}).',
+      tr: 'Süslü parantez kullanın; büyük/küçük harf duyarlı değildir ({FIRST_NAME} = {first_name}).',
+      fr: 'Accolades ; la casse est ignorée ({FIRST_NAME} = {first_name}).',
+      it: 'Parentesi graffe ; maiuscole/minuscole equivalenti ({FIRST_NAME} = {first_name}).',
+      es: 'Llaves ; mayúsculas/minúsculas equivalen ({FIRST_NAME} = {first_name}).',
+    }
+    const FLOW_MERGE_FIELDS = [
+      {
+        key: 'CUSTOMER_NAME',
+        sample: 'Jane Doe',
+        category: 'customer',
+        triggers: ['*'],
+        desc: {
+          en: 'Full name (first + last)',
+          de: 'Vollständiger Name',
+          tr: 'Ad soyad',
+          fr: 'Nom complet',
+          it: 'Nome completo',
+          es: 'Nombre completo',
+        },
+      },
+      {
+        key: 'CUSTOMER',
+        sample: 'Jane Doe',
+        category: 'customer',
+        triggers: ['*'],
+        desc: {
+          en: 'Alias for customer display name',
+          de: 'Alias für Anzeigename',
+          tr: 'Müşteri görünen adı (alias)',
+          fr: 'Alias du nom affiché',
+          it: 'Alias nome visualizzato',
+          es: 'Alias del nombre mostrado',
+        },
+      },
+      {
+        key: 'FIRST_NAME',
+        sample: 'Jane',
+        category: 'customer',
+        triggers: ['*'],
+        desc: { en: 'First name', de: 'Vorname', tr: 'Ad', fr: 'Prénom', it: 'Nome', es: 'Nombre' },
+      },
+      {
+        key: 'LAST_NAME',
+        sample: 'Doe',
+        category: 'customer',
+        triggers: ['*'],
+        desc: { en: 'Last name', de: 'Nachname', tr: 'Soyad', fr: 'Nom', it: 'Cognome', es: 'Apellido' },
+      },
+      {
+        key: 'EMAIL',
+        sample: 'customer@example.com',
+        category: 'customer',
+        triggers: ['*'],
+        desc: { en: 'Email address', de: 'E-Mail-Adresse', tr: 'E-posta', fr: 'E-mail', it: 'Email', es: 'Correo' },
+      },
+      {
+        key: 'PHONE',
+        sample: '+49 30 1234567',
+        category: 'customer',
+        triggers: ['*'],
+        desc: { en: 'Phone if known', de: 'Telefon falls bekannt', tr: 'Telefon (varsa)', fr: 'Téléphone', it: 'Telefono', es: 'Teléfono' },
+      },
+      {
+        key: 'TRACKING_NUMBER',
+        sample: '1Z999AA10123456784',
+        category: 'shipping',
+        triggers: ['order_shipped', 'order_delivered'],
+        desc: {
+          en: 'Carrier tracking number when shipped',
+          de: 'Sendungsnummer (Versand)',
+          tr: 'Kargo takip numarası',
+          fr: 'Numéro de suivi',
+          it: 'Numero di tracking',
+          es: 'Número de seguimiento',
+        },
+      },
+      {
+        key: 'CARRIER_NAME',
+        sample: 'DHL',
+        category: 'shipping',
+        triggers: ['order_shipped', 'order_delivered'],
+        desc: {
+          en: 'Shipping carrier name',
+          de: 'Versanddienst',
+          tr: 'Kargo firması',
+          fr: 'Transporteur',
+          it: 'Corriere',
+          es: 'Transportista',
+        },
+      },
+      {
+        key: 'ORDER_NUMBER',
+        sample: '10042',
+        category: 'order',
+        triggers: ['order_placed', 'order_delivered', 'order_shipped', 'review_request', 'win_back'],
+        desc: {
+          en: 'Human-readable order number',
+          de: 'Bestellnummer (anzeige)',
+          tr: 'Sipariş numarası',
+          fr: 'Numéro de commande',
+          it: 'Numero ordine',
+          es: 'Número de pedido',
+        },
+      },
+      {
+        key: 'ORDER_ID',
+        sample: '10042',
+        category: 'order',
+        triggers: ['order_placed', 'order_shipped', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Same as order number in most cases', de: 'Meist wie Bestellnummer', tr: 'Genelde sipariş no ile aynı', fr: 'Souvent = numéro', it: 'Spesso = numero', es: 'A menudo = número' },
+      },
+      {
+        key: 'ORDER_DATE',
+        sample: '29.04.2026',
+        category: 'order',
+        triggers: ['order_placed', 'order_shipped', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Order date (localized)', de: 'Bestelldatum', tr: 'Sipariş tarihi', fr: 'Date', it: 'Data', es: 'Fecha' },
+      },
+      {
+        key: 'ORDER_TOTAL',
+        sample: '89,99 €',
+        category: 'order',
+        triggers: ['order_placed', 'order_shipped', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Grand total formatted', de: 'Gesamtbetrag formatiert', tr: 'Toplam (biçimli)', fr: 'Total formaté', it: 'Totale formattato', es: 'Total formateado' },
+      },
+      {
+        key: 'ORDER_SUBTOTAL',
+        sample: '79,99 €',
+        category: 'order',
+        triggers: ['order_placed', 'order_shipped', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Subtotal before shipping', de: 'Zwischensumme', tr: 'Ara toplam', fr: 'Sous-total', it: 'Subtotale', es: 'Subtotal' },
+      },
+      {
+        key: 'ORDER_SHIPPING',
+        sample: '5,00 €',
+        category: 'order',
+        triggers: ['order_placed', 'order_shipped', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Shipping cost', de: 'Versandkosten', tr: 'Kargo ücreti', fr: 'Frais de port', it: 'Spedizione', es: 'Envío' },
+      },
+      {
+        key: 'ORDER_DISCOUNT',
+        sample: '10,00 €',
+        category: 'order',
+        triggers: ['order_placed', 'order_shipped', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Discount amount if any', de: 'Rabattbetrag', tr: 'İndirim tutarı', fr: 'Remise', it: 'Sconto', es: 'Descuento' },
+      },
+      {
+        key: 'ORDER_CURRENCY',
+        sample: 'EUR',
+        category: 'order',
+        triggers: ['order_placed', 'order_delivered', 'review_request', 'win_back', 'abandoned_cart'],
+        desc: { en: 'Currency code', de: 'Währungscode', tr: 'Para birimi', fr: 'Devise', it: 'Valuta', es: 'Moneda' },
+      },
+      {
+        key: 'PAYMENT_METHOD',
+        sample: 'Card',
+        category: 'order',
+        triggers: ['order_placed', 'order_delivered'],
+        desc: { en: 'Payment method label', de: 'Zahlungsart', tr: 'Ödeme yöntemi', fr: 'Paiement', it: 'Pagamento', es: 'Pago' },
+      },
+      {
+        key: 'SHIPPING_FULL_NAME',
+        sample: 'Jane Doe',
+        category: 'shipping',
+        triggers: ['order_placed', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Recipient name on shipping', de: 'Empfängername', tr: 'Teslimat adı', fr: 'Destinataire', it: 'Destinatario', es: 'Destinatario' },
+      },
+      {
+        key: 'ADDRESS_LINE1',
+        sample: 'Musterstraße 1',
+        category: 'shipping',
+        triggers: ['order_placed', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Street line 1', de: 'Straße Zeile 1', tr: 'Adres satırı 1', fr: 'Ligne 1', it: 'Riga 1', es: 'Línea 1' },
+      },
+      {
+        key: 'ADDRESS_LINE2',
+        sample: '—',
+        category: 'shipping',
+        triggers: ['order_placed', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Street line 2 / apt', de: 'Adresszusatz', tr: 'Adres 2', fr: 'Ligne 2', it: 'Riga 2', es: 'Línea 2' },
+      },
+      {
+        key: 'CITY',
+        sample: 'Berlin',
+        category: 'shipping',
+        triggers: ['order_placed', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'City', de: 'Stadt', tr: 'Şehir', fr: 'Ville', it: 'Città', es: 'Ciudad' },
+      },
+      {
+        key: 'POSTAL_CODE',
+        sample: '10115',
+        category: 'shipping',
+        triggers: ['order_placed', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'ZIP / postal code', de: 'PLZ', tr: 'Posta kodu', fr: 'Code postal', it: 'CAP', es: 'CP' },
+      },
+      {
+        key: 'ZIP_CODE',
+        sample: '10115',
+        category: 'shipping',
+        triggers: ['order_placed', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Alias for POSTAL_CODE', de: 'Alias für PLZ', tr: 'POSTAL_CODE ile aynı', fr: '= code postal', it: '= CAP', es: '= CP' },
+      },
+      {
+        key: 'COUNTRY',
+        sample: 'DE',
+        category: 'shipping',
+        triggers: ['order_placed', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Country code', de: 'Land', tr: 'Ülke kodu', fr: 'Pays', it: 'Paese', es: 'País' },
+      },
+      {
+        key: 'PRODUCT',
+        sample: 'Sample Product',
+        category: 'product_cart',
+        triggers: ['*'],
+        desc: { en: 'Primary product title', de: 'Produkttitel', tr: 'Ürün adı', fr: 'Produit', it: 'Prodotto', es: 'Producto' },
+      },
+      {
+        key: 'PRODUCT_NAME',
+        sample: 'Sample Product',
+        category: 'product_cart',
+        triggers: ['*'],
+        desc: { en: 'Alias of PRODUCT', de: 'Alias für Produktname', tr: 'PRODUCT ile aynı', fr: '= produit', it: '= nome', es: '= nombre' },
+      },
+      {
+        key: 'PRODUCT_SKU',
+        sample: 'SKU-DEMO-1',
+        category: 'product_cart',
+        triggers: ['abandoned_cart', 'order_placed', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'SKU when available', de: 'SKU falls vorhanden', tr: 'SKU', fr: 'SKU', it: 'SKU', es: 'SKU' },
+      },
+      {
+        key: 'PRODUCT_URL',
+        sample: 'https://shop.example/p/sample-product',
+        category: 'product_cart',
+        triggers: ['abandoned_cart', 'order_placed', 'order_delivered', 'review_request', 'win_back'],
+        desc: { en: 'Link to product page', de: 'Link zur Produktseite', tr: 'Ürün sayfası URL', fr: 'Lien produit', it: 'Link prodotto', es: 'URL producto' },
+      },
+      {
+        key: 'CART_URL',
+        sample: 'https://shop.example/checkout?cart=…',
+        category: 'product_cart',
+        triggers: ['abandoned_cart'],
+        desc: {
+          en: 'Recovery link to cart / checkout',
+          de: 'Link zurück zum Warenkorb',
+          tr: 'Sepete dönüş bağlantısı',
+          fr: 'Lien panier',
+          it: 'Link carrello',
+          es: 'Enlace carrito',
+        },
+      },
+      {
+        key: 'CHECKOUT_URL',
+        sample: 'https://shop.example/checkout',
+        category: 'product_cart',
+        triggers: ['abandoned_cart', 'order_placed'],
+        desc: { en: 'Checkout URL', de: 'Checkout-URL', tr: 'Ödeme URL', fr: 'URL paiement', it: 'Checkout', es: 'Checkout' },
+      },
+      {
+        key: 'LINE_ITEMS_SUMMARY',
+        sample: '2 Artikel · 79,99 €',
+        category: 'product_cart',
+        triggers: ['abandoned_cart', 'order_placed', 'order_shipped', 'order_delivered'],
+        desc: {
+          en: 'Short cart/order lines summary',
+          de: 'Kurze Positionsübersicht',
+          tr: 'Satır özeti',
+          fr: 'Résumé lignes',
+          it: 'Riepilogo righe',
+          es: 'Resumen líneas',
+        },
+      },
+      {
+        key: 'STORE_NAME',
+        sample: 'Your Store',
+        category: 'shop',
+        triggers: ['*'],
+        desc: { en: 'Shop / seller display name', de: 'Shop-Name', tr: 'Mağaza adı', fr: 'Nom boutique', it: 'Nome negozio', es: 'Nombre tienda' },
+      },
+      {
+        key: 'SHOP_NAME',
+        sample: 'Your Store',
+        category: 'shop',
+        triggers: ['*'],
+        desc: { en: 'Alias for STORE_NAME', de: 'Alias Shop-Name', tr: 'STORE_NAME ile aynı', fr: '= boutique', it: '= negozio', es: '= tienda' },
+      },
+      {
+        key: 'SITE_URL',
+        sample: 'https://shop.example',
+        category: 'shop',
+        triggers: ['*'],
+        desc: { en: 'Storefront base URL', de: 'Shop-Basis-URL', tr: 'Mağaza ana URL', fr: 'URL boutique', it: 'URL sito', es: 'URL tienda' },
+      },
+      {
+        key: 'SUPPORT_EMAIL',
+        sample: 'support@example.com',
+        category: 'shop',
+        triggers: ['*'],
+        desc: { en: 'Support / contact email', de: 'Support-E-Mail', tr: 'Destek e-postası', fr: 'E-mail support', it: 'Supporto', es: 'Soporte' },
+      },
+      {
+        key: 'REVIEW_LINK',
+        sample: 'https://shop.example/review?token=…',
+        category: 'engagement',
+        triggers: ['review_request', 'order_delivered'],
+        desc: { en: 'Link to leave a review', de: 'Link zur Bewertung', tr: 'Yorum linki', fr: 'Lien avis', it: 'Link recensione', es: 'Enlace reseña' },
+      },
+      {
+        key: 'BONUS_POINTS_BALANCE',
+        sample: '120',
+        category: 'engagement',
+        triggers: ['*'],
+        desc: {
+          en: 'Bonus points balance if known',
+          de: 'Bonuspunkte-Stand',
+          tr: 'Bonus puan bakiyesi',
+          fr: 'Points fidélité',
+          it: 'Punti bonus',
+          es: 'Puntos bonus',
+        },
+      },
+    ]
+    const FLOW_EMAIL_SAMPLE_PLACEHOLDERS = (() => {
+      const o = {}
+      for (const f of FLOW_MERGE_FIELDS) {
+        const k = String(f.key)
+        const sample = f.sample != null && f.sample !== '' ? String(f.sample) : '—'
+        o[k] = sample
+        o[k.toUpperCase()] = sample
+        o[k.toLowerCase()] = sample
+      }
+      return o
+    })()
     const applyFlowEmailPlaceholders = (template, extra = {}) => {
       if (template == null) return ''
       const vars = { ...FLOW_EMAIL_SAMPLE_PLACEHOLDERS, ...extra }
@@ -13115,6 +13863,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       'new_subscriber',
       'abandoned_cart',
       'order_placed',
+      'order_shipped',
       'order_delivered',
       'review_request',
       'win_back',
@@ -13125,6 +13874,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             id: row.id,
             name: row.name,
             trigger: row.trigger_key,
+            audience: row.audience || 'customer',
             status: row.status,
             sent_count: row.sent_count != null ? Number(row.sent_count) : 0,
             step_count: row.step_count != null ? Number(row.step_count) : undefined,
@@ -13139,6 +13889,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       wait_hours: row.wait_hours != null ? Number(row.wait_hours) : null,
       email_subject: row.email_subject || '',
       email_body: row.email_body || '',
+      email_i18n: row.email_i18n && typeof row.email_i18n === 'object' ? row.email_i18n : null,
     })
 
     const adminHubFlowsListGET = async (req, res) => {
@@ -13172,14 +13923,16 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const status = ['draft', 'active', 'paused'].includes(String(body.status || '').toLowerCase())
         ? String(body.status).toLowerCase()
         : 'draft'
+      const audienceRaw = String(body.audience || 'customer').toLowerCase()
+      const audience = audienceRaw === 'seller' ? 'seller' : 'customer'
       if (!name) return res.status(400).json({ message: 'name is required' })
       if (!FLOW_TRIGGER_KEYS.has(triggerKey)) return res.status(400).json({ message: 'invalid trigger' })
       try {
         await client.connect()
         const ins = await client.query(
-          `INSERT INTO admin_hub_flows (name, trigger_key, status) VALUES ($1, $2, $3)
-           RETURNING id, name, trigger_key, status, sent_count, created_at, updated_at`,
-          [name, triggerKey, status],
+          `INSERT INTO admin_hub_flows (name, trigger_key, status, audience) VALUES ($1, $2, $3, $4)
+           RETURNING id, name, trigger_key, status, audience, sent_count, created_at, updated_at`,
+          [name, triggerKey, status, audience],
         )
         await client.end()
         const flow = mapFlowRow({ ...ins.rows[0], step_count: 0 })
@@ -13263,6 +14016,11 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           sets.push(`status = $${vi++}`)
           vals.push(st)
         }
+        if (body.audience !== undefined) {
+          const au = String(body.audience || 'customer').toLowerCase() === 'seller' ? 'seller' : 'customer'
+          sets.push(`audience = $${vi++}`)
+          vals.push(au)
+        }
 
         if (sets.length) {
           sets.push(`updated_at = now()`)
@@ -13271,6 +14029,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         }
 
         if (Array.isArray(body.steps)) {
+          const FLOW_SAVE_LOCALES = ['de', 'en', 'tr', 'fr', 'it', 'es']
           const normalized = []
           for (let i = 0; i < body.steps.length; i++) {
             const s = body.steps[i] || {}
@@ -13286,13 +14045,44 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 wait_hours: Math.max(0, parseInt(s.wait_hours, 10) || 0),
                 email_subject: null,
                 email_body: null,
+                email_i18n: null,
               })
             } else {
-              const subj = String(s.email_subject || '').trim()
-              const emBody = String(s.email_body || '').trim()
+              let emailI18nObj = null
+              if (s.email_i18n && typeof s.email_i18n === 'object' && !Array.isArray(s.email_i18n)) {
+                emailI18nObj = {}
+                for (const loc of FLOW_SAVE_LOCALES) {
+                  const b = s.email_i18n[loc]
+                  if (!b || typeof b !== 'object') continue
+                  const sj = String(b.subject || '').trim()
+                  const bd = String(b.body || '').trim()
+                  if (sj && bd) emailI18nObj[loc] = { subject: sj, body: bd }
+                }
+                if (!Object.keys(emailI18nObj).length) emailI18nObj = null
+              }
+              let subj = String(s.email_subject || '').trim()
+              let emBody = String(s.email_body || '').trim()
+              if (emailI18nObj) {
+                const pri = ['de', 'en', 'tr', 'fr', 'it', 'es']
+                let picked = null
+                for (const loc of pri) {
+                  if (emailI18nObj[loc]) {
+                    picked = emailI18nObj[loc]
+                    break
+                  }
+                }
+                if (!picked) {
+                  const fk = Object.keys(emailI18nObj)[0]
+                  picked = emailI18nObj[fk]
+                }
+                subj = String(picked.subject || '').trim()
+                emBody = String(picked.body || '').trim()
+              }
               if (!subj || !emBody) {
                 await client.end()
-                return res.status(400).json({ message: `Email step at index ${i} needs subject and body` })
+                return res.status(400).json({
+                  message: `Email step at index ${i} needs subject and body (use locale tabs or legacy fields)`,
+                })
               }
               normalized.push({
                 order: i,
@@ -13300,15 +14090,16 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 wait_hours: null,
                 email_subject: subj,
                 email_body: emBody,
+                email_i18n: emailI18nObj,
               })
             }
           }
           await client.query(`DELETE FROM admin_hub_flow_steps WHERE flow_id = $1`, [id])
           for (const row of normalized) {
             await client.query(
-              `INSERT INTO admin_hub_flow_steps (flow_id, step_order, step_type, wait_hours, email_subject, email_body)
-               VALUES ($1, $2, $3, $4, $5, $6)`,
-              [id, row.order, row.step_type, row.wait_hours, row.email_subject, row.email_body],
+              `INSERT INTO admin_hub_flow_steps (flow_id, step_order, step_type, wait_hours, email_subject, email_body, email_i18n)
+               VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+              [id, row.order, row.step_type, row.wait_hours, row.email_subject, row.email_body, row.email_i18n],
             )
           }
         }
@@ -13376,7 +14167,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             return res.status(400).json({ message: 'invalid step_order' })
           }
           const sr = await client.query(
-            `SELECT email_subject, email_body FROM admin_hub_flow_steps
+            `SELECT email_subject, email_body, email_i18n FROM admin_hub_flow_steps
              WHERE flow_id = $1 AND step_order = $2 AND step_type = 'send_email'`,
             [id, so],
           )
@@ -13384,8 +14175,31 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             await client.end()
             return res.status(404).json({ message: 'send_email step not found for step_order' })
           }
-          subject = sr.rows[0].email_subject
-          htmlBody = sr.rows[0].email_body
+          const tl = String(body.template_locale || body.locale || '')
+            .toLowerCase()
+            .slice(0, 5)
+          const i18n = sr.rows[0].email_i18n
+          let pickedSubj = sr.rows[0].email_subject
+          let pickedBody = sr.rows[0].email_body
+          const tryPick = (loc) => {
+            if (!i18n || typeof i18n !== 'object') return false
+            const b = i18n[loc]
+            const sj = String(b?.subject || '').trim()
+            const bd = String(b?.body || '').trim()
+            if (sj && bd) {
+              pickedSubj = sj
+              pickedBody = bd
+              return true
+            }
+            return false
+          }
+          if (tl && tryPick(tl)) {
+            /* use locale tab */
+          } else if (i18n && typeof i18n === 'object') {
+            for (const loc of ['de', 'en', 'tr', 'fr', 'it', 'es']) tryPick(loc)
+          }
+          subject = pickedSubj
+          htmlBody = pickedBody
         } else {
           subject = String(body.email_subject || '').trim()
           htmlBody = String(body.email_body || '').trim()
@@ -13428,7 +14242,92 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    const adminHubFlowEmailMergeFieldsGET = async (req, res) => {
+      const rawLoc = String(req.query.locale || 'en')
+        .toLowerCase()
+        .replace(/[^a-z]/g, '')
+        .slice(0, 2)
+      const lang = ['de', 'tr', 'fr', 'it', 'es'].includes(rawLoc) ? rawLoc : 'en'
+      const trig = String(req.query.trigger || '').trim()
+      const categoryLabels = FLOW_MERGE_CATEGORY_LABELS[lang] || FLOW_MERGE_CATEGORY_LABELS.en
+      const matchesTrigger = (field, triggerKey) => {
+        if (!triggerKey) return true
+        const tr = field.triggers
+        if (!tr || tr.includes('*')) return true
+        return tr.includes(triggerKey)
+      }
+      const fields = FLOW_MERGE_FIELDS.filter((f) => matchesTrigger(f, trig)).map((f) => ({
+        key: f.key,
+        token: `{${f.key}}`,
+        sample: f.sample != null && f.sample !== '' ? String(f.sample) : null,
+        category: f.category,
+        category_label: categoryLabels[f.category] || f.category,
+        triggers: f.triggers,
+        description: (f.desc && (f.desc[lang] || f.desc.en)) || '',
+      }))
+      res.json({
+        syntax: FLOW_MERGE_SYNTAX[lang] || FLOW_MERGE_SYNTAX.en,
+        locale: lang,
+        categories: categoryLabels,
+        fields,
+      })
+    }
+
+    httpApp.get(
+      '/admin-hub/v1/flows/email-merge-fields',
+      requireSellerAuth,
+      requireSuperuser,
+      adminHubFlowEmailMergeFieldsGET,
+    )
+
+    const adminHubFlowTranslatePOST = async (req, res) => {
+      const body = req.body || {}
+      const sourceLocale = String(body.source_locale || 'de').toLowerCase().slice(0, 2)
+      const targets = Array.isArray(body.target_locales) ? body.target_locales : []
+      const subject = String(body.subject || '').trim()
+      const html = String(body.html || '').trim()
+      const key = String(process.env.DEEPL_AUTH_KEY || '').trim()
+      if (!subject || !html)
+        return res.status(400).json({ message: 'subject and html required' })
+      if (!key) return res.status(400).json({ message: 'Set DEEPL_AUTH_KEY for automatic translation' })
+      const deepLang = (loc) => {
+        const u = String(loc || 'en').toUpperCase()
+        const m = { EN: 'EN', DE: 'DE', TR: 'TR', FR: 'FR', IT: 'IT', ES: 'ES' }
+        return m[u.slice(0, 2)] || 'EN'
+      }
+      const baseUrl =
+        String(process.env.DEEPL_API_URL || '').trim() ||
+        (key.endsWith(':fx') ? 'https://api-free.deepl.com/v2/translate' : 'https://api.deepl.com/v2/translate')
+      const translateChunk = async (text, tgt) => {
+        const params = new URLSearchParams({ auth_key: key, text, target_lang: deepLang(tgt) })
+        if (sourceLocale && sourceLocale.length === 2) params.set('source_lang', deepLang(sourceLocale))
+        const r = await fetch(baseUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params.toString(),
+        })
+        const j = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(j.message || `DeepL HTTP ${r.status}`)
+        return String(j.translations?.[0]?.text || '').trim()
+      }
+      try {
+        const out = {}
+        const allowed = new Set(['en', 'de', 'tr', 'fr', 'it', 'es'])
+        for (const tgt of targets) {
+          const lo = String(tgt).toLowerCase().slice(0, 2)
+          if (!allowed.has(lo) || lo === sourceLocale) continue
+          const sj = await translateChunk(subject, lo)
+          const bd = await translateChunk(html, lo)
+          out[lo] = { subject: sj, body: bd }
+        }
+        res.json({ translations: out })
+      } catch (e) {
+        res.status(400).json({ message: e?.message || 'translate failed' })
+      }
+    }
+
     httpApp.get('/admin-hub/v1/flows', requireSellerAuth, requireSuperuser, adminHubFlowsListGET)
+    httpApp.post('/admin-hub/v1/flows/translate', requireSellerAuth, requireSuperuser, adminHubFlowTranslatePOST)
     httpApp.post('/admin-hub/v1/flows', requireSellerAuth, requireSuperuser, adminHubFlowsPOST)
     httpApp.post('/admin-hub/v1/flows/:id/test-email', requireSellerAuth, requireSuperuser, adminHubFlowTestEmailPOST)
     httpApp.get('/admin-hub/v1/flows/:id', requireSellerAuth, requireSuperuser, adminHubFlowGET)

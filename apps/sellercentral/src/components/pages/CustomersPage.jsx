@@ -110,6 +110,18 @@ function ActionMenu({ customer, onEdit, onDelete, canManage }) {
 
 const COLS = ["Kundennr.", "Name", "Email", "Typ", "Registriert", "Newsletter", "Land", "Bestellungen", "Gesamtumsatz", "Letzter Kauf", ""];
 
+/** Gruppenschlüssel für Kunden ohne main_seller_id / default */
+const PLATFORM_SELLER_KEY = "__platform__";
+const PLATFORM_GROUP_LABEL = "Plattform · direkt / nicht zugeordnet";
+
+function normalizeCustomerSellerKey(c) {
+  const sid = c.main_seller_id;
+  if (sid == null || String(sid).trim() === "" || String(sid) === "default") {
+    return PLATFORM_SELLER_KEY;
+  }
+  return String(sid);
+}
+
 export default function CustomersPage() {
   const router = useRouter();
 
@@ -120,7 +132,6 @@ export default function CustomersPage() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const searchDebounceRef = useRef(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
-  const [mySellerId, setMySellerId] = useState("");
   const [sellerLabelById, setSellerLabelById] = useState({});
   const [sellerSectionOpen, setSellerSectionOpen] = useState({});
   const [sellerSearchFilter, setSellerSearchFilter] = useState("");
@@ -128,11 +139,6 @@ export default function CustomersPage() {
   useEffect(() => {
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
   }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !isSuperuser) return;
-    setMySellerId(localStorage.getItem("sellerId") || "");
-  }, [isSuperuser]);
 
   useEffect(() => {
     if (!isSuperuser) return;
@@ -146,6 +152,14 @@ export default function CustomersPage() {
         setSellerLabelById(m);
       })
       .catch(() => {});
+  }, [isSuperuser]);
+
+  useEffect(() => {
+    if (isSuperuser || typeof window === "undefined") return;
+    const sid = localStorage.getItem("sellerId") || "";
+    if (!sid) return;
+    const sn = (localStorage.getItem("storeName") || "").trim();
+    setSellerLabelById({ [sid]: sn || sid });
   }, [isSuperuser]);
 
   const fetchCustomers = useCallback(async (q) => {
@@ -200,37 +214,33 @@ export default function CustomersPage() {
     setConfirmDelete(null);
   };
 
-  const isOwnCustomer = (c) => {
-    const sid = c.main_seller_id;
-    return !sid || sid === "default" || sid === mySellerId;
-  };
-
-  const { ownCustomersList, sellerCustomerGroups } = useMemo(() => {
-    if (!isSuperuser) return { ownCustomersList: customers, sellerCustomerGroups: [] };
-    const own = [];
+  const customerGroupsBySeller = useMemo(() => {
     const g = new Map();
     for (const c of customers) {
-      if (isOwnCustomer(c)) own.push(c);
-      else {
-        const sid = String(c.main_seller_id || "unknown");
-        if (!g.has(sid)) g.set(sid, []);
-        g.get(sid).push(c);
-      }
+      const k = normalizeCustomerSellerKey(c);
+      if (!g.has(k)) g.set(k, []);
+      g.get(k).push(c);
     }
-    const keys = [...g.keys()].sort((a, b) =>
-      (sellerLabelById[a] || a).localeCompare(sellerLabelById[b] || b, undefined, { sensitivity: "base" })
-    );
-    return { ownCustomersList: own, sellerCustomerGroups: keys.map(k => ({ sellerId: k, items: g.get(k) })) };
-  }, [customers, isSuperuser, mySellerId, sellerLabelById]);
-
-  const filteredSellerCustomerGroups = useMemo(() => {
-    const q = sellerSearchFilter.trim().toLowerCase();
-    if (!q) return sellerCustomerGroups;
-    return sellerCustomerGroups.filter(({ sellerId }) => {
-      const label = (sellerLabelById[sellerId] || sellerId || "").toLowerCase();
-      return label.includes(q) || sellerId.toLowerCase().includes(q);
+    const keys = [...g.keys()];
+    keys.sort((a, b) => {
+      if (a === PLATFORM_SELLER_KEY) return -1;
+      if (b === PLATFORM_SELLER_KEY) return 1;
+      const la = sellerLabelById[a] || a;
+      const lb = sellerLabelById[b] || b;
+      return la.localeCompare(lb, undefined, { sensitivity: "base" });
     });
-  }, [sellerCustomerGroups, sellerSearchFilter, sellerLabelById]);
+    return keys.map((sellerId) => ({ sellerId, items: g.get(sellerId) }));
+  }, [customers, sellerLabelById]);
+
+  const filteredCustomerGroups = useMemo(() => {
+    const q = sellerSearchFilter.trim().toLowerCase();
+    if (!q) return customerGroupsBySeller;
+    return customerGroupsBySeller.filter(({ sellerId }) => {
+      const display =
+        sellerId === PLATFORM_SELLER_KEY ? PLATFORM_GROUP_LABEL : sellerLabelById[sellerId] || sellerId || "";
+      return display.toLowerCase().includes(q) || sellerId.toLowerCase().includes(q);
+    });
+  }, [customerGroupsBySeller, sellerSearchFilter, sellerLabelById]);
 
   const renderCustomerRows = (list) =>
     list.map((c, i) => {
@@ -370,94 +380,56 @@ export default function CustomersPage() {
                         </td>
                       </tr>
                     )}
-                    {!loading && customers.length > 0 && !isSuperuser && renderCustomerRows(ownCustomersList)}
-                    {!loading && customers.length > 0 && isSuperuser && (
-                      <>
+                    {!loading &&
+                      customers.length > 0 &&
+                      (filteredCustomerGroups.length === 0 ? (
                         <tr>
-                          <td
-                            colSpan={11}
-                            style={{
-                              padding: "12px 16px",
-                              background: "#eef2ff",
-                              borderBottom: "1px solid #c7d2fe",
-                              fontWeight: 700,
-                              fontSize: 12,
-                              color: "#3730a3",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.04em",
-                            }}
-                          >
-                            Ihr Superuser-Bereich — direkte & nicht zugeordnete Kunden ({ownCustomersList.length})
+                          <td colSpan={11} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
+                            Keine Kunden in dieser Ansicht{sellerSearchFilter.trim() ? " (Verkäufer-Filter)" : ""}.
                           </td>
                         </tr>
-                        {ownCustomersList.length === 0 ? (
-                          <tr>
-                            <td colSpan={11} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
-                              Keine Kunden in diesem Bereich.
-                            </td>
-                          </tr>
-                        ) : (
-                          renderCustomerRows(ownCustomersList)
-                        )}
-                        <tr>
-                          <td
-                            colSpan={11}
-                            style={{
-                              padding: "12px 16px",
-                              background: "#f3f4f6",
-                              borderBottom: "1px solid #e5e7eb",
-                              fontWeight: 700,
-                              fontSize: 12,
-                              color: "#374151",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.04em",
-                            }}
-                          >
-                            Verkäufer-Kunden
-                          </td>
-                        </tr>
-                        {filteredSellerCustomerGroups.length === 0 ? (
-                          <tr>
-                            <td colSpan={11} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
-                              Keine weiteren Verkäufer-Kunden{sellerSearchFilter.trim() ? " (Filter)" : ""}.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredSellerCustomerGroups.flatMap(({ sellerId, items }) => {
-                            const label = sellerLabelById[sellerId] || sellerId;
-                            const open = sellerSectionOpen[sellerId] !== false;
-                            const headerRow = (
-                              <tr key={`h-${sellerId}`}>
-                                <td colSpan={11} style={{ padding: 0, background: "#fafafa", borderBottom: "1px solid #e5e7eb" }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setSellerSectionOpen((prev) => ({ ...prev, [sellerId]: !open }))}
-                                    style={{
-                                      width: "100%",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "space-between",
-                                      padding: "10px 16px",
-                                      background: "none",
-                                      border: "none",
-                                      cursor: "pointer",
-                                      font: "inherit",
-                                      textAlign: "left",
-                                    }}
-                                  >
-                                    <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{label}</span>
-                                    <span style={{ fontSize: 12, color: "#6b7280" }}>
-                                      {open ? "▾" : "▸"} {items.length} Kunde{items.length !== 1 ? "n" : ""}
-                                    </span>
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                            return open ? [headerRow, ...renderCustomerRows(items)] : [headerRow];
-                          })
-                        )}
-                      </>
-                    )}
+                      ) : (
+                        filteredCustomerGroups.flatMap(({ sellerId, items }) => {
+                          const label =
+                            sellerId === PLATFORM_SELLER_KEY ? PLATFORM_GROUP_LABEL : sellerLabelById[sellerId] || sellerId;
+                          const open = sellerSectionOpen[sellerId] !== false;
+                          const headerBg =
+                            sellerId === PLATFORM_SELLER_KEY ? "#eef2ff" : "#fafafa";
+                          const headerBorder =
+                            sellerId === PLATFORM_SELLER_KEY ? "#c7d2fe" : "#e5e7eb";
+                          const headerRow = (
+                            <tr key={`h-${sellerId}`}>
+                              <td
+                                colSpan={11}
+                                style={{ padding: 0, background: headerBg, borderBottom: `1px solid ${headerBorder}` }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => setSellerSectionOpen((prev) => ({ ...prev, [sellerId]: !open }))}
+                                  style={{
+                                    width: "100%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    padding: "10px 16px",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    font: "inherit",
+                                    textAlign: "left",
+                                  }}
+                                >
+                                  <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{label}</span>
+                                  <span style={{ fontSize: 12, color: "#6b7280" }}>
+                                    {open ? "▾" : "▸"} {items.length} Kunde{items.length !== 1 ? "n" : ""}
+                                  </span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                          return open ? [headerRow, ...renderCustomerRows(items)] : [headerRow];
+                        })
+                      ))}
                   </tbody>
                 </table>
               </div>

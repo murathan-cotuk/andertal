@@ -131,8 +131,7 @@ export default function RegisterPage() {
   const localeHref = (nextLocale) => {
     const parsed = parseMarketPath(pathname || "");
     const country = parsed?.country || "de";
-    const currency = parsed?.currency || DEFAULT_CURRENCY;
-    return `${marketPrefix(country, nextLocale, currency)}/register`;
+    return `${marketPrefix(country, nextLocale, DEFAULT_CURRENCY)}/register`;
   };
 
   useEffect(() => {

@@ -1,6 +1,13 @@
 import { mergeButtonCatalog } from "./button-merge.js";
 import { DEFAULT_SHOP_STYLES } from "./defaults.js";
 
+/** @param {unknown} value */
+function normalizeSecondNavLinkStyle(value, fallback) {
+  const s = String(value ?? "").trim().toLowerCase();
+  if (s === "classic" || s === "pill") return s;
+  return fallback;
+}
+
 function cloneTypo(t) {
   return {
     ...t,
@@ -104,6 +111,10 @@ export function mergeLoadedShopStyles(loaded = {}) {
       const r = String(merged.pill_border_radius ?? "").trim();
       /* Früherer Shop-Default 20% — auf langen Labels wie eine Pille */
       if (r === "20%") merged.pill_border_radius = DEFAULT_SHOP_STYLES.secondNav.pill_border_radius;
+      const def = DEFAULT_SHOP_STYLES.secondNav;
+      merged.link_style_desktop = normalizeSecondNavLinkStyle(merged.link_style_desktop, def.link_style_desktop);
+      merged.link_style_tablet = normalizeSecondNavLinkStyle(merged.link_style_tablet, def.link_style_tablet);
+      merged.link_style_mobile = normalizeSecondNavLinkStyle(merged.link_style_mobile, def.link_style_mobile);
       return merged;
     })(),
     footer: { ...DEFAULT_SHOP_STYLES.footer, ...(loaded.footer || {}) },

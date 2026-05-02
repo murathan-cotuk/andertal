@@ -25,7 +25,7 @@
     "categoryBrowseHint": "En el menú superior solo se muestran las categorías principales con al menos un producto. Elige una categoría y pulsa la lupa para abrir su catálogo. Las subcategorías aparecen a la izquierda, encima de los filtros."
   },
   "locale": {
-    "label": "Idioma y moneda",
+    "label": "País e idioma",
     "en": "English",
     "de": "Deutsch",
     "tr": "Türkçe",

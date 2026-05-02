@@ -663,7 +663,7 @@ export default function CollectionPage() {
     if (!handle) return;
     const h = handle.toLowerCase();
     if (WISHLIST_SLUGS.has(h)) {
-      router.replace("/favorites");
+      router.replace("/wishlist");
     }
   }, [handle, router]);
 

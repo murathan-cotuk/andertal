@@ -25,7 +25,7 @@
     "categoryBrowseHint": "Im Menü oben werden nur übergeordnete Kategorien angezeigt, in denen mindestens ein Produkt verfügbar ist. Wählen Sie eine Kategorie und tippen Sie anschließend auf die Lupe, um die zugehörige Katalogseite zu öffnen. Unterkategorien erscheinen auf der linken Seite über den Filtern."
   },
   "locale": {
-    "label": "Sprache & Währung",
+    "label": "Land & Sprache",
     "en": "English",
     "de": "Deutsch",
     "tr": "Türkçe",

@@ -396,6 +396,8 @@ function OrderMobileMoreMenu({
   tOrd,
   approvedReturn,
   canReturn,
+  canCancel,
+  cancelBusy,
   activeReturn,
   returnExpired,
   reviewState,
@@ -404,6 +406,7 @@ function OrderMobileMoreMenu({
   onRetoureSchein,
   onEtikett,
   onRetour,
+  onCancel,
   onMessage,
 }) {
   return (
@@ -465,6 +468,15 @@ function OrderMobileMoreMenu({
               Retoure
             </DropdownMenu.Item>
           )}
+          {canCancel && (
+            <DropdownMenu.Item
+              disabled={cancelBusy}
+              onSelect={() => { if (!cancelBusy && onCancel) onCancel(); }}
+              style={{ ...MORE_MENU_ITEM, color: cancelBusy ? "#9ca3af" : "#991b1b" }}
+            >
+              {cancelBusy ? "…" : "Bestellung stornieren"}
+            </DropdownMenu.Item>
+          )}
           {returnExpired && !activeReturn && (
             <div style={{ padding: "8px 12px 6px", fontSize: 12, color: "#9ca3af" }}>Frist abgelaufen</div>
           )}
@@ -520,6 +532,7 @@ export default function OrdersPage() {
   const [messageModal, setMessageModal] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
   const [reviewMap, setReviewMap] = useState({});
+  const [cancelBusyId, setCancelBusyId] = useState(null);
 
   const fetchOrders = async () => {
     try {
@@ -551,6 +564,23 @@ export default function OrdersPage() {
   };
 
   useEffect(() => { fetchOrders(); }, []);
+
+  const handleCancelOrder = async (order) => {
+    if (!order?.cancellation_allowed || cancelBusyId) return;
+    if (!window.confirm(`Bestellung #${order.order_number || order.id?.slice(0, 8)} wirklich stornieren? Bei erfolgreicher Zahlung wird der Betrag erstattet.`)) return;
+    const token = getToken("customer");
+    if (!token) return;
+    setCancelBusyId(order.id);
+    try {
+      await getMedusaClient().cancelStoreOrder(token, order.id);
+      setSuccessMsg("Die Bestellung wurde storniert.");
+      await fetchOrders();
+    } catch (e) {
+      alert(e?.message || "Stornierung fehlgeschlagen.");
+    } finally {
+      setCancelBusyId(null);
+    }
+  };
 
   const getOrderReviewState = (order) => {
     const items = (order.items || []).filter(it => it.product_id);
@@ -774,6 +804,8 @@ export default function OrdersPage() {
                                   tOrd={tOrd}
                                   approvedReturn={!!approvedReturn}
                                   canReturn={canReturn(order)}
+                                  canCancel={!!order.cancellation_allowed}
+                                  cancelBusy={cancelBusyId === order.id}
                                   activeReturn={!!activeReturn}
                                   returnExpired={returnExpired(order) && !activeReturn}
                                   reviewState={reviewState}
@@ -782,6 +814,7 @@ export default function OrdersPage() {
                                   onRetoureSchein={() => { downloadReturnRetourenschein(order); }}
                                   onEtikett={() => { downloadReturnEtikett(order); }}
                                   onRetour={() => { setRetourModal(order); }}
+                                  onCancel={() => handleCancelOrder(order)}
                                   onMessage={() => { setMessageModal(order); }}
                                 />
                               </div>
@@ -889,6 +922,16 @@ export default function OrdersPage() {
                                   style={{ fontSize: 11, color: "#dc2626", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline", textDecorationColor: "#fca5a5" }}
                                 >
                                   Retoure
+                                </button>
+                              )}
+                              {order.cancellation_allowed && (
+                                <button
+                                  type="button"
+                                  disabled={cancelBusyId === order.id}
+                                  onClick={() => handleCancelOrder(order)}
+                                  style={{ fontSize: 11, color: cancelBusyId === order.id ? "#9ca3af" : "#991b1b", background: "none", border: "none", cursor: cancelBusyId === order.id ? "default" : "pointer", padding: 0, textDecoration: "underline", textDecorationColor: "#fecaca" }}
+                                >
+                                  {cancelBusyId === order.id ? "Stornieren…" : "Stornieren"}
                                 </button>
                               )}
                               {returnExpired(order) && !activeReturn && (

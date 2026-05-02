@@ -75,6 +75,10 @@ export const DEFAULT_SHOP_STYLES = {
     height: "44px",
     font_size: "14px",
     font_weight: "500",
+    /** Link-Darstellung je Viewport: classic = Text + Hover-Unterstrich, pill = Frostglas-Kachel */
+    link_style_desktop: "classic",
+    link_style_tablet: "pill",
+    link_style_mobile: "pill",
     /** Glasmorphism-Kacheln je Link (Desktop/Mobil/Tablet) */
     pill_background: "rgba(255,255,255,0.30)",
     pill_border: "none",

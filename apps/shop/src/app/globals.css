@@ -114,6 +114,22 @@ html {
   }
 }
 
+/* Mobil/tablet: promo şeridi — theme’deki --topbar-bg bazen beyaz kalıyor; üst yüzey header chrome ile hizala */
+@media (max-width: 1023px) {
+  .topbar.shop-topbar {
+    background: var(--header-chrome-bg, var(--topbar-bg)) !important;
+  }
+}
+
+/* Landing carousel: HeaderWrap inline gradient — topbar şeffaf kalsın ki tek sürekli yüzey olsun */
+@media (max-width: 1023px) {
+  header[data-landing-header-chrome="true"] .topbar {
+    background: transparent !important;
+    box-shadow: none !important;
+    border-bottom: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -208,7 +224,7 @@ a {
     gap: 0 !important;
   }
 
-  /* Locale dropdown: Land full-width top, Sprache + Währung side-by-side below */
+  /* Locale dropdown: Land full-width top, Sprache below (shop prices always EUR) */
   [data-locale-dropdown] > div {
     flex-wrap: wrap !important;
     flex-direction: row !important;
@@ -222,15 +238,12 @@ a {
     border-right: none !important;
     border-bottom: 1px solid #e5e7eb !important;
   }
-  /* Sprache + Währung: side by side */
+  /* Sprache row */
   [data-locale-dropdown] > div > div:not(:first-child) {
     flex: 1 1 0 !important;
     min-width: 0 !important;
     border-right: none !important;
     border-bottom: none !important;
-  }
-  [data-locale-dropdown] > div > div:nth-child(2) {
-    border-right: 1px solid #e5e7eb !important;
   }
 }
 
@@ -362,9 +375,9 @@ a {
    FOOTER — mobile
    ══════════════════════════════════════════════════════ */
 @media (max-width: 767px) {
-  /* Ensure footer doesn't overlap with bottom nav */
-  footer {
-    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
+  /* Shop footer only — alt nav (58px) + home indicator; başka <footer> bileşenlerine dokunma */
+  footer.site-footer {
+    padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 

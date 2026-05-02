@@ -357,6 +357,31 @@ class MedusaClient {
     return res
   }
 
+  /** Cancel own order within server-side policy window (15 min or night rule); Stripe refund when applicable. */
+  async cancelStoreOrder(token, orderId) {
+    const res = await this.request(`/store/orders/${encodeURIComponent(orderId)}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({}),
+    })
+    if (res?.__error) throw new Error(res.message || 'Cancellation failed')
+    return res
+  }
+
+  /** Permanently delete the logged-in customer account (password required when the account has a password). */
+  async deleteCustomerMe(token, { password, confirm } = {}) {
+    const payload = {}
+    if (password != null && String(password).length > 0) payload.password = String(password)
+    if (confirm === true) payload.confirm = true
+    const res = await this.request('/store/customers/me', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    })
+    if (res?.__error) throw new Error(res.message || 'Account deletion failed')
+    return res
+  }
+
   async getWishlist(token) {
     const res = await this.request('/store/wishlist', {
       headers: { Authorization: `Bearer ${token}` },

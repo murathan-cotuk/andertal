@@ -15,6 +15,10 @@ import { useWishlist } from "@/context/WishlistContext";
 import { restPathFromPathname } from "@/lib/shop-market";
 import { resolveImageUrl } from "@/lib/image-url";
 import ModernMobileBottomNav from "@/components/ModernMobileBottomNav";
+import {
+  MOBILE_CHROME_SCROLL_THRESHOLD_PX,
+  useMobileBottomNavScroll,
+} from "@/context/MobileBottomNavScrollContext";
 
 const TEAL = "#1b8880";
 const USE_MODERN_MOBILE_BOTTOM_NAV = true;
@@ -323,6 +327,7 @@ function categoryListImageUrl(node) {
 
 /* ─── Main component ─────────────────────────────────────── */
 export default function MobileNav() {
+  const { mobileBottomNavScroll } = useMobileBottomNavScroll();
   const pathname = usePathname();
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount } = useCart();
@@ -332,6 +337,7 @@ export default function MobileNav() {
   const [categories, setCategories] = useState([]);
   const [activeMobileCategory, setActiveMobileCategory] = useState(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [isMobileNavViewport, setIsMobileNavViewport] = useState(false);
   const drawerRef = useRef(null);
   const drawerBodyRef = useRef(null);
   const accountSectionRef = useRef(null);
@@ -343,6 +349,15 @@ export default function MobileNav() {
     const onChange = () => setReducedMotion(mq.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const go = () => setIsMobileNavViewport(mq.matches);
+    go();
+    mq.addEventListener("change", go);
+    return () => mq.removeEventListener("change", go);
   }, []);
 
   /* Fetch data once */
@@ -430,6 +445,12 @@ export default function MobileNav() {
       ["/orders", "/addresses", "/payment-methods", "/nachrichten", "/reviews", "/bonus", "/invoices"].some(
         (h) => appPath === h || appPath.startsWith(`${h}/`),
       ));
+  const recessBottomBar =
+    isMobileNavViewport &&
+    !drawerOpen &&
+    mobileBottomNavScroll.scrollingDown &&
+    mobileBottomNavScroll.scrollY > MOBILE_CHROME_SCROLL_THRESHOLD_PX;
+
   const hideOnAuthPages =
     appPath === "/login" ||
     appPath.startsWith("/login/") ||
@@ -585,6 +606,7 @@ export default function MobileNav() {
       {USE_MODERN_MOBILE_BOTTOM_NAV ? (
         <ModernMobileBottomNav
           accentColor={TEAL}
+          recessed={recessBottomBar}
           items={[
             { key: "home", label: "Start", icon: <IcoHome />, href: "/", active: isHome },
             {
@@ -631,7 +653,16 @@ export default function MobileNav() {
           ]}
         />
       ) : (
-      <nav style={css.bar()} aria-label="Mobile Navigation">
+      <nav
+        style={{
+          ...css.bar(),
+          transition: reducedMotion ? "none" : "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)",
+          transform: recessBottomBar ? "translateY(calc(100% + env(safe-area-inset-bottom, 0px)))" : "translateY(0)",
+          pointerEvents: recessBottomBar ? "none" : "auto",
+        }}
+        aria-label="Mobile Navigation"
+        aria-hidden={recessBottomBar ? true : undefined}
+      >
         {/* Home */}
         <Link href="/" style={css.barBtn(isHome)} aria-label="Startseite">
           <IcoHome />

@@ -5,6 +5,7 @@ import { CustomerAuthProvider } from "@andertal/lib";
 import { CartProvider } from "@/context/CartContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import { LandingChromeProvider } from "@/context/LandingChromeContext";
+import { MobileBottomNavScrollProvider } from "@/context/MobileBottomNavScrollContext";
 import { ShopStylesProvider } from "@/context/ShopStylesContext";
 import ShopStylesInjector from "@/components/ShopStylesInjector";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -29,17 +30,19 @@ export default function Providers({ children }) {
       <CustomerAuthProvider>
         <WishlistProvider>
           <CartProvider>
-            <ShopStylesProvider>
-              <ShopStylesInjector />
-              <LandingChromeProvider>
-                <LenisInit />
-                {children}
-              </LandingChromeProvider>
-            </ShopStylesProvider>
-            <CartSidebar />
-            <ScrollToTopButton />
-            <CookieBanner />
-            <MobileNav />
+            <MobileBottomNavScrollProvider>
+              <ShopStylesProvider>
+                <ShopStylesInjector />
+                <LandingChromeProvider>
+                  <LenisInit />
+                  {children}
+                </LandingChromeProvider>
+              </ShopStylesProvider>
+              <CartSidebar />
+              <ScrollToTopButton />
+              <CookieBanner />
+              <MobileNav />
+            </MobileBottomNavScrollProvider>
           </CartProvider>
         </WishlistProvider>
       </CustomerAuthProvider>

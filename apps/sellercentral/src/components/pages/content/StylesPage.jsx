@@ -27,6 +27,7 @@ import {
   TOPBAR_PRESET_LABELS,
   HEADER_PRESET_LABELS,
   SECOND_NAV_PRESET_LABELS,
+  SECOND_NAV_LINK_STYLE_OPTIONS,
   SCROLL_UP_PRESET_LABELS,
 } from "@andertal/shop-theme";
 
@@ -1488,11 +1489,40 @@ export default function StylesPage() {
               <Text as="h2" variant="headingMd">Layout: Second Nav</Text>
               <Banner tone="info">
                 <p>
-                  Die Second Nav nutzt dieselbe Fläche wie der Haupt-Header: kein eigener Hintergrund-Streifen mehr.
-                  Farbe oder Verlauf stellen Sie oben unter Header ein. Die Links werden auf horizontalen, abgerundeten Rechtecken
-                  mit Frostglas angezeigt (Desktop, Tablet und Mobil).
+                  Die Second Nav nutzt dieselbe Fläche wie der Haupt-Header (kein eigener Streifen).
+                  Farbe oder Verlauf stellen Sie oben unter <strong>Header</strong> ein.
+                  Ob Links wie früher als einfacher Text oder als Frostglas-Kachel erscheinen, legen Sie im nächsten Block
+                  <strong> je nach Gerät</strong> fest — Desktop, Tablet und Mobil können unterschiedlich sein.
                 </p>
               </Banner>
+              <Divider />
+              <Text as="h3" variant="headingSm">Link-Darstellung nach Gerät</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Shop-Breakpoints: Mobil bis 767&nbsp;px, Tablet 768–1023&nbsp;px, Desktop ab 1024&nbsp;px.
+                Unter „Menü-Kacheln“ steuern Sie nur die Pill-/Kachel-Optik (sichtbar, wenn hier „Kachel / Frostglas“ gewählt ist).
+                In einer Landing-Page kann die Option „Second-Navigation auf Desktop klassisch“ die <strong>Desktop</strong>-Einstellung
+                hier noch überschreiben und immer klassisch erzwingen.
+              </Text>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
+                <Select
+                  label="Desktop (≥1024px)"
+                  options={SECOND_NAV_LINK_STYLE_OPTIONS}
+                  value={styles.secondNav.link_style_desktop || "classic"}
+                  onChange={(v) => updateSection("secondNav", "link_style_desktop", v)}
+                />
+                <Select
+                  label="Tablet (768–1023px)"
+                  options={SECOND_NAV_LINK_STYLE_OPTIONS}
+                  value={styles.secondNav.link_style_tablet || "pill"}
+                  onChange={(v) => updateSection("secondNav", "link_style_tablet", v)}
+                />
+                <Select
+                  label="Mobil (≤767px)"
+                  options={SECOND_NAV_LINK_STYLE_OPTIONS}
+                  value={styles.secondNav.link_style_mobile || "pill"}
+                  onChange={(v) => updateSection("secondNav", "link_style_mobile", v)}
+                />
+              </div>
               <Divider />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 <Select
@@ -1533,9 +1563,9 @@ export default function StylesPage() {
               <Divider />
               <Text as="h3" variant="headingSm">Menü-Kacheln (Second Nav Links)</Text>
               <Text as="p" variant="bodySm" tone="subdued">
-                Jeder Eintrag sitzt auf einem abgerundeten <strong>Rechteck</strong> (nicht Voll-Pille): Eckenradius in{" "}
-                <code style={{ fontSize: 12 }}>px</code> einstellen — keine hohen Prozentwerte, die auf breiten Labels wie
-                Zylinder wirken. Farbe, Rand, Unschärfe frei als CSS.
+                Gilt nur, wenn für das jeweilige Gerät oben „Kachel / Frostglas“ aktiv ist.
+                Jeder Eintrag sitzt auf einem abgerundeten <strong>Rechteck</strong>: Eckenradius in{" "}
+                <code style={{ fontSize: 12 }}>px</code> — keine hohen Prozentwerte, die auf breiten Labels wie Zylinder wirken.
               </Text>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
                 <ColorField

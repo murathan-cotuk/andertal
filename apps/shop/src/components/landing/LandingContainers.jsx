@@ -2268,7 +2268,7 @@ function renderContainer(c, preload = {}, ctx = {}) {
 export default function LandingContainers({ pageId, categoryId }) {
   const [containers, setContainers] = useState(null);
   const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
-  const { setLandingHeaderFilterBar } = useLandingChrome();
+  const { setLandingHeaderFilterBar, setSecondNavDesktopClassic } = useLandingChrome();
   const isNarrow = useIsNarrow(1023);
   const isTablet = useIsTablet();
   const locale = useLocale();
@@ -2294,19 +2294,22 @@ export default function LandingContainers({ pageId, categoryId }) {
             );
           }
           setLandingHeaderFilterBar(true);
+          setSecondNavDesktopClassic(false);
           setContainers([]);
           return;
         }
         const showBar = data?.settings?.show_filter_bar !== false;
         setLandingHeaderFilterBar(showBar);
+        setSecondNavDesktopClassic(data?.settings?.second_nav_desktop_classic === true);
         if (Array.isArray(data?.containers)) setContainers(data.containers);
         else setContainers([]);
       })
       .catch(() => {
         setLandingHeaderFilterBar(true);
+        setSecondNavDesktopClassic(false);
         setContainers([]);
       });
-  }, [pageId, categoryId, setLandingHeaderFilterBar]);
+  }, [pageId, categoryId, setLandingHeaderFilterBar, setSecondNavDesktopClassic]);
 
   useEffect(() => {
     let cancelled = false;

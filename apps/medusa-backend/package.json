@@ -11,6 +11,7 @@
     "db:migrate": "node scripts/write-env-from-process.js && medusa db:migrate --skip-links",
     "run-migrations": "node scripts/run-migrations.js",
     "db:test": "node scripts/test-db-connection.js",
+    "db:reset-stripe-ids": "node scripts/reset-stripe-ids.js",
     "db:categories": "node scripts/list-categories-in-db.js",
     "db:products": "node scripts/list-products-in-db.js",
     "db:menus": "node scripts/list-menus-in-db.js",

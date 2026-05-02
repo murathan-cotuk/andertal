@@ -42,6 +42,12 @@ export const SECOND_NAV_PRESET_LABELS = [
   { value: "contrast", label: "Kontrast-Leiste" },
 ];
 
+/** Second-Nav Link-Stil je Gerät (StylesPage + ShopHeader) */
+export const SECOND_NAV_LINK_STYLE_OPTIONS = [
+  { value: "classic", label: "Klassisch (Textlinks, Hover-Unterstrich)" },
+  { value: "pill", label: "Kachel / Frostglas (Pills)" },
+];
+
 export const SCROLL_UP_PRESET_LABELS = [
   { value: "default", label: "Standard (rund)" },
   { value: "soft", label: "Weich abgerundet" },
@@ -66,7 +72,13 @@ const HEADER_PRESETS = {
 const SECOND_NAV_PRESETS = {
   default: {},
   compact: { height: "38px", font_size: "13px" },
-  pill_bar: { bg_color: "#f1f5f9", font_weight: "600" },
+  pill_bar: {
+    bg_color: "#f1f5f9",
+    font_weight: "600",
+    link_style_desktop: "pill",
+    link_style_tablet: "pill",
+    link_style_mobile: "pill",
+  },
   contrast: {
     bg_color: "#1e293b",
     text_color: "#f8fafc",
