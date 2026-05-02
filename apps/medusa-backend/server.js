@@ -1023,6 +1023,10 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_flows ADD COLUMN IF NOT EXISTS audience varchar(20) NOT NULL DEFAULT 'customer'`).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_admin_hub_flow_steps_flow ON admin_hub_flow_steps(flow_id, step_order)`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS iban text;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS payment_account_holder text;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS payment_bic text;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS payment_bank_name text;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_custom_account_id text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS commission_rate numeric(5,4) NOT NULL DEFAULT 0.12;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ALTER COLUMN commission_rate SET DEFAULT 0.12`).catch(() => {})
@@ -6578,23 +6582,6 @@ async function start() {
             }
           }
         }
-        // Destination Charge: look up seller's connected Stripe account
-        let _destAccountId = null
-        let _appFeeCents = 0
-        if (cartSellerId && cartSellerId !== 'default') {
-          try {
-            const _sRow = await client.query(
-              `SELECT stripe_account_id, stripe_onboarding_complete, commission_rate FROM seller_users WHERE seller_id = $1`,
-              [cartSellerId]
-            )
-            const _s = _sRow.rows?.[0]
-            if (_s?.stripe_account_id && _s?.stripe_onboarding_complete) {
-              _destAccountId = _s.stripe_account_id
-              _appFeeCents = Math.round(payCents * Number(_s.commission_rate ?? 0.12))
-            }
-          } catch (_) {}
-        }
-
         const piBody = {
           amount: payCents,
           currency: 'eur',
@@ -6610,14 +6597,6 @@ async function start() {
             coupon_code: String(cart.coupon_code || ''),
             bonus_points_redeemed: String(reservedPts),
           },
-        }
-        if (_destAccountId && _appFeeCents > 0) {
-          // Destination Charge: fee stays on platform, seller gets remainder automatically
-          piBody.transfer_data = { destination: _destAccountId }
-          piBody.application_fee_amount = _appFeeCents
-        } else {
-          // Fallback for sellers without Stripe Connect (legacy transfer_group flow)
-          piBody.transfer_group = `cart_${cartId}`
         }
         if (stripeCustomerId) piBody.customer = stripeCustomerId
 
@@ -8496,17 +8475,14 @@ async function start() {
              stripe_account_id, stripe_application_fee_cents, stripe_payout_status,
              subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency)
            VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt',
-             CASE WHEN $30::text IS NOT NULL THEN 'legacy_skipped' ELSE 'pending' END,
-             $30,$31,
-             CASE WHEN $30::text IS NOT NULL THEN 'pending' ELSE NULL END,
+             'not_applicable',NULL,NULL,'pending',
              $23,$24,$25,$26,$27,$28,$29,'eur')
            RETURNING id, order_number`,
           [cartId, paymentIntentId, sellerId, email, first_name, last_name, phone,
            address_line1, address_line2, city, postal_code, country,
            billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billingSame,
            paymentMethod, customerId, isGuest, newsletter_opted_in,
-           subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents,
-           piStripeAccountId, piAppFeeCents]
+           subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents]
         )
 
         const orderId = ins.rows && ins.rows[0] ? ins.rows[0].id : null
@@ -15326,26 +15302,190 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    // IBAN payout cron — runs hourly, pays sellers via their IBAN using Stripe Custom accounts
+    // Finds orders: stripe_payout_status='pending', stripe_account_id IS NULL, delivery 14+ days ago
+    // Groups by seller, transfers platform → custom account → IBAN
+    const runSellerIbanPayoutsIfDue = async () => {
+      const client = getDbClient()
+      if (!client) return
+      try {
+        await client.connect()
+        const platformRow = await loadPlatformCheckoutRow(client)
+        const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+        if (!secretKey) { await client.end(); return }
+        const stripeInst = new (require('stripe'))(secretKey)
+
+        // Find eligible orders grouped by seller
+        const due = await client.query(
+          `SELECT o.seller_id, SUM(o.total_cents) AS total_cents,
+                  s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email
+           FROM store_orders o
+           JOIN seller_users s ON s.seller_id = o.seller_id
+           WHERE o.stripe_payout_status = 'pending'
+             AND o.stripe_account_id IS NULL
+             AND o.payment_status = 'bezahlt'
+             AND o.delivery_date IS NOT NULL
+             AND o.delivery_date <= now() - interval '14 days'
+           GROUP BY o.seller_id, s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email`
+        )
+
+        for (const row of due.rows || []) {
+          const { seller_id, total_cents, commission_rate, iban, payment_account_holder, email } = row
+          let customAccountId = row.stripe_custom_account_id
+
+          if (!iban) {
+            console.warn(`runSellerIbanPayoutsIfDue: seller ${seller_id} has no IBAN, skipping`)
+            continue
+          }
+
+          const commissionRate = Number(commission_rate || 0.12)
+          const totalCents = Number(total_cents || 0)
+          const commissionCents = Math.round(totalCents * commissionRate)
+          const payoutCents = totalCents - commissionCents
+          if (payoutCents <= 50) continue // Stripe minimum payout
+
+          // Idempotency: mark all eligible orders as processing first
+          const guard = await client.query(
+            `UPDATE store_orders SET stripe_payout_status = 'processing', updated_at = now()
+             WHERE seller_id = $1 AND stripe_payout_status = 'pending' AND stripe_account_id IS NULL
+               AND payment_status = 'bezahlt' AND delivery_date IS NOT NULL AND delivery_date <= now() - interval '14 days'`,
+            [seller_id]
+          )
+          if (!guard.rowCount) continue
+
+          try {
+            // Create Stripe Custom account if missing
+            if (!customAccountId) {
+              const acct = await stripeInst.accounts.create({
+                type: 'custom',
+                country: 'DE',
+                email,
+                capabilities: { transfers: { requested: true } },
+                tos_acceptance: { service_agreement: 'recipient', date: Math.floor(Date.now() / 1000), ip: '0.0.0.0' },
+              })
+              customAccountId = acct.id
+              const sellerClient = getSellerDbClient()
+              if (sellerClient) {
+                await sellerClient.connect()
+                await sellerClient.query('UPDATE seller_users SET stripe_custom_account_id = $1 WHERE seller_id = $2', [customAccountId, seller_id])
+                await sellerClient.end()
+              }
+              // Add IBAN as external account
+              const cleanIban = iban.replace(/\s/g, '').toUpperCase()
+              await stripeInst.accounts.createExternalAccount(customAccountId, {
+                external_account: {
+                  object: 'bank_account', country: 'DE', currency: 'eur',
+                  account_number: cleanIban,
+                  account_holder_name: payment_account_holder || 'Account Holder',
+                  account_holder_type: 'individual',
+                },
+              })
+            }
+
+            // Transfer from platform to custom account
+            const transfer = await stripeInst.transfers.create({
+              amount: payoutCents,
+              currency: 'eur',
+              destination: customAccountId,
+            })
+
+            // Payout from custom account to IBAN
+            const payout = await stripeInst.payouts.create(
+              { amount: payoutCents, currency: 'eur' },
+              { stripeAccount: customAccountId }
+            )
+
+            await client.query(
+              `UPDATE store_orders SET stripe_payout_status = 'paid', stripe_payout_id = $1, updated_at = now()
+               WHERE seller_id = $2 AND stripe_payout_status = 'processing' AND stripe_account_id IS NULL`,
+              [payout.id, seller_id]
+            )
+            console.log(`runSellerIbanPayoutsIfDue: paid seller ${seller_id} ${payoutCents} EUR → ${customAccountId} (payout ${payout.id})`)
+          } catch (e) {
+            // Reset to pending so next run retries
+            await client.query(
+              `UPDATE store_orders SET stripe_payout_status = 'pending', updated_at = now()
+               WHERE seller_id = $1 AND stripe_payout_status = 'processing' AND stripe_account_id IS NULL`,
+              [seller_id]
+            ).catch(() => {})
+            console.error(`runSellerIbanPayoutsIfDue: seller ${seller_id} failed:`, e?.message)
+          }
+        }
+        await client.end()
+      } catch (e) {
+        console.error('runSellerIbanPayoutsIfDue:', e?.message || e)
+      }
+    }
+
     // Fire once on boot and then every hour
     runAutomaticPayoutsIfDue().catch(() => {})
     runStripeConnectTransfersIfDue().catch(() => {})
     runStripePayoutsIfDue().catch(() => {})
+    runSellerIbanPayoutsIfDue().catch(() => {})
     setInterval(() => {
       runAutomaticPayoutsIfDue().catch(() => {})
       runStripeConnectTransfersIfDue().catch(() => {})
       runStripePayoutsIfDue().catch(() => {})
+      runSellerIbanPayoutsIfDue().catch(() => {})
     }, 60 * 60 * 1000)
 
-    // PATCH /admin-hub/v1/seller/iban — set own IBAN
+    // PATCH /admin-hub/v1/seller/iban — save IBAN + payment info, create Stripe Custom account
     const adminHubSellerIbanPATCH = async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
+      const sellerEmail = req.sellerUser?.email
       if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
       const client = getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const { iban } = req.body || {}
-        await client.query('UPDATE seller_users SET iban = $1, updated_at = now() WHERE seller_id = $2', [iban || null, sellerId])
+        const { iban, payment_account_holder, payment_bic, payment_bank_name } = req.body || {}
+        const cleanIban = (iban || '').replace(/\s/g, '').toUpperCase() || null
+        await client.query(
+          `UPDATE seller_users SET iban = $1, payment_account_holder = $2, payment_bic = $3, payment_bank_name = $4, updated_at = now() WHERE seller_id = $5`,
+          [cleanIban, payment_account_holder || null, payment_bic || null, payment_bank_name || null, sellerId]
+        )
+
+        // Create/update Stripe Custom account for IBAN payouts
+        if (cleanIban) {
+          const platformRow = await loadPlatformCheckoutRow(client)
+          const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+          if (secretKey) {
+            const stripeInst = new (require('stripe'))(secretKey)
+            const sellerRow = (await client.query('SELECT email, stripe_custom_account_id FROM seller_users WHERE seller_id = $1', [sellerId])).rows[0]
+            let customAccountId = sellerRow?.stripe_custom_account_id
+
+            if (!customAccountId) {
+              const acct = await stripeInst.accounts.create({
+                type: 'custom',
+                country: 'DE',
+                email: sellerRow?.email || sellerEmail,
+                capabilities: { transfers: { requested: true } },
+                tos_acceptance: { service_agreement: 'recipient', date: Math.floor(Date.now() / 1000), ip: req.ip || '0.0.0.0' },
+              })
+              customAccountId = acct.id
+              await client.query('UPDATE seller_users SET stripe_custom_account_id = $1 WHERE seller_id = $2', [customAccountId, sellerId])
+            }
+
+            // Replace external bank account with new IBAN
+            try {
+              const existing = await stripeInst.accounts.listExternalAccounts(customAccountId, { object: 'bank_account', limit: 10 })
+              for (const ba of existing.data || []) {
+                await stripeInst.accounts.deleteExternalAccount(customAccountId, ba.id).catch(() => {})
+              }
+            } catch (_) {}
+            await stripeInst.accounts.createExternalAccount(customAccountId, {
+              external_account: {
+                object: 'bank_account',
+                country: 'DE',
+                currency: 'eur',
+                account_number: cleanIban,
+                account_holder_name: payment_account_holder || 'Account Holder',
+                account_holder_type: 'individual',
+              },
+            })
+          }
+        }
+
         await client.end()
         res.json({ success: true })
       } catch (e) {
@@ -15383,7 +15523,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.connect()
         const r = await client.query(
           `SELECT id, email, store_name, seller_id, is_superuser, sub_of_seller_id, first_name, last_name,
-                  approval_status, created_at, iban,
+                  approval_status, created_at, iban, payment_account_holder, payment_bic, payment_bank_name,
                   company_name, authorized_person_name, tax_id, vat_id,
                   business_address, phone, documents, rejection_reason, approved_at
            FROM seller_users WHERE id = $1`,
@@ -15405,6 +15545,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             last_name: row.last_name,
             created_at: row.created_at,
             iban: row.iban,
+            payment_account_holder: row.payment_account_holder,
+            payment_bic: row.payment_bic,
+            payment_bank_name: row.payment_bank_name,
             company_name: row.company_name,
             authorized_person_name: row.authorized_person_name,
             tax_id: row.tax_id,
@@ -16409,7 +16552,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const sellerId = req.sellerUser?.seller_id
       if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
       const body = req.body || {}
-      const allowed = ['company_name', 'authorized_person_name', 'tax_id', 'vat_id', 'business_address', 'warehouse_address', 'phone', 'website']
+      const allowed = ['company_name', 'authorized_person_name', 'tax_id', 'vat_id', 'business_address', 'warehouse_address', 'phone', 'website', 'payment_account_holder', 'payment_bic', 'payment_bank_name']
       const updates = []; const params = []; let n = 1
       const toJsonOrNull = (val) => {
         if (val === undefined) return undefined
