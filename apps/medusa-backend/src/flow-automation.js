@@ -375,11 +375,17 @@ async function sendImmediateStepsForFlow({
 }) {
   const { buildFlowEmailPdfAttachments } = require('./order-pdf-buffers')
   let idx = 0
+  let emailsSent = 0
   while (idx < steps.length) {
     const s = steps[idx]
     if (s.step_type === 'wait_hours') {
       const wh = Number(s.wait_hours || 0)
-      if (wh > 0) break
+      if (wh > 0) {
+        console.warn(
+          `[flow-automation] order ${orderId} flow ${flowId}: wait_hours=${wh} stops immediate sends — delayed steps are not scheduled yet. Put "Send email" as the first step (or 0h wait) for instant mail after checkout.`,
+        )
+        break
+      }
       idx += 1
       continue
     }
@@ -418,11 +424,19 @@ async function sendImmediateStepsForFlow({
       text: plain || subject,
       ...(attachments.length ? { attachments } : {}),
     })
+    emailsSent += 1
     idx += 1
   }
-  await client.query(`UPDATE admin_hub_flows SET sent_count = sent_count + 1, updated_at = now() WHERE id = $1::uuid`, [
-    flowId,
-  ])
+  const hasSendEmailStep = steps.some((x) => x.step_type === 'send_email')
+  if (hasSendEmailStep && emailsSent === 0) {
+    console.warn(
+      `[flow-automation] order ${orderId} flow ${flowId}: send_email step(s) but nothing delivered (empty templates, missing From, or wait > 0 before any email).`,
+    )
+  }
+  if (emailsSent > 0) {
+    await client.query(`UPDATE admin_hub_flows SET sent_count = sent_count + 1, updated_at = now() WHERE id = $1::uuid`, [flowId])
+  }
+  return emailsSent
 }
 
 /**
@@ -430,7 +444,10 @@ async function sendImmediateStepsForFlow({
  */
 async function runAutomationFlowsForOrder(opts) {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return
+  if (!dbUrl || !dbUrl.startsWith('postgres')) {
+    console.warn('[flow-automation] skip: DATABASE_URL missing')
+    return
+  }
 
   const triggerKey = String(opts.triggerKey || '').trim()
   const orderId = String(opts.orderId || '').trim()
@@ -442,13 +459,22 @@ async function runAutomationFlowsForOrder(opts) {
     await client.connect()
 
     const ctx = await loadOrderContext(client, orderId)
-    if (!ctx) return
+    if (!ctx) {
+      console.warn('[flow-automation] skip: order not found', orderId)
+      return
+    }
 
     const transport = await getSmtpTransport(client)
-    if (!transport) return
+    if (!transport) {
+      console.warn('[flow-automation] skip: SMTP not configured (store_smtp_settings needs host + username)')
+      return
+    }
 
     const { fromEmail: connFrom } = await resolveSmtpSenderIdentity(client, null)
-    if (!connFrom) return
+    if (!connFrom) {
+      console.warn('[flow-automation] skip: no From email — set SMTP / gönderen in Seller Central integrations')
+      return
+    }
 
     let customerProfile = null
     if (ctx.order.customer_id) {
@@ -468,7 +494,16 @@ async function runAutomationFlowsForOrder(opts) {
       [triggerKey],
     )
 
-    for (const fr of flowsR.rows || []) {
+    const flowRows = flowsR.rows || []
+    if (!flowRows.length) {
+      console.warn(
+        `[flow-automation] no active flow for trigger "${triggerKey}" — enable the flow (status Active, not Draft) and matching trigger in Content → Flows`,
+      )
+      return
+    }
+
+    let totalEmails = 0
+    for (const fr of flowRows) {
       const flowId = fr.id
       const audience = String(fr.audience || 'customer').toLowerCase() === 'seller' ? 'seller' : 'customer'
 
@@ -487,7 +522,10 @@ async function runAutomationFlowsForOrder(opts) {
       } else {
         templateLocale = 'de'
         const sid = ctx.order.seller_id
-        if (!sid) continue
+        if (!sid) {
+          console.warn(`[flow-automation] skip flow ${flowId}: seller audience but order has no seller_id`)
+          continue
+        }
         const sur = await client.query(
           `SELECT email FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL ORDER BY created_at ASC LIMIT 1`,
           [sid],
@@ -495,9 +533,14 @@ async function runAutomationFlowsForOrder(opts) {
         toEmail = String(sur.rows[0]?.email || '').trim()
       }
 
-      if (!toEmail) continue
+      if (!toEmail) {
+        console.warn(
+          `[flow-automation] skip flow ${flowId} (${audience}): no recipient — customer order needs email; seller flow needs seller account email`,
+        )
+        continue
+      }
 
-      await sendImmediateStepsForFlow({
+      const n = await sendImmediateStepsForFlow({
         client,
         transport,
         flowId,
@@ -509,6 +552,14 @@ async function runAutomationFlowsForOrder(opts) {
         placeholderVars,
         orderId,
       })
+      totalEmails += n
+    }
+    if (totalEmails > 0) {
+      console.log(`[flow-automation] ${triggerKey} order=${orderId}: sent ${totalEmails} email(s)`)
+    } else if (flowRows.length > 0) {
+      console.warn(
+        `[flow-automation] ${triggerKey} order=${orderId}: matched ${flowRows.length} flow(s) but 0 emails — see warnings above (draft→active, wait step first, SMTP, templates).`,
+      )
     }
   } catch (e) {
     console.error('[flow-automation]', opts.triggerKey, opts.orderId, e?.message || e)

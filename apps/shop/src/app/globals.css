@@ -218,15 +218,15 @@ a {
 }
 
 /*
- * Globe / locale: Land | Sprache | Währung her zaman yan yana.
+ * Globe / locale: Land | Sprache yan yana.
  * Dar ekranda panel yatay kayar; sütunlara min-width verilir ki orta sütun sıfıra inmesin.
  */
 @media (max-width: 1023px) {
   [data-locale-dropdown] > div:last-of-type {
     flex-direction: row !important;
     flex-wrap: nowrap !important;
-    width: min(100vw - 24px, 720px) !important;
-    max-width: min(100vw - 24px, 720px) !important;
+    width: min(100vw - 24px, 520px) !important;
+    max-width: min(100vw - 24px, 520px) !important;
     overflow-x: auto !important;
     overflow-y: hidden !important;
     -webkit-overflow-scrolling: touch;

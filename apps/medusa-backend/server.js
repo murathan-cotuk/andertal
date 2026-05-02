@@ -8603,11 +8603,9 @@ async function start() {
         await client.end()
         res.status(201).json({ order })
         setImmediate(() => {
-          try {
-            runAutomationFlowsForOrder({ triggerKey: 'order_placed', orderId })
-          } catch (fe) {
+          runAutomationFlowsForOrder({ triggerKey: 'order_placed', orderId }).catch((fe) => {
             console.warn('runAutomationFlowsForOrder order_placed:', fe?.message || fe)
-          }
+          })
         })
       } catch (err) {
         if (client) try { await client.end() } catch (_) {}
@@ -10061,11 +10059,9 @@ async function start() {
         res.json({ order: { ...row, order_number: row.order_number ? Number(row.order_number) : null, items } })
         if (fireOrderShipped) {
           setImmediate(() => {
-            try {
-              runAutomationFlowsForOrder({ triggerKey: 'order_shipped', orderId: id })
-            } catch (fe) {
+            runAutomationFlowsForOrder({ triggerKey: 'order_shipped', orderId: id }).catch((fe) => {
               console.warn('runAutomationFlowsForOrder order_shipped:', fe?.message || fe)
-            }
+            })
           })
         }
       } catch (e) {
@@ -14739,6 +14735,31 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           const FLOW_ATTACH_KEYS = new Set(['invoice_pdf', 'lieferschein_pdf'])
           const SMTP_SENDER_UUID_RE =
             /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+          /** Clone for PG jsonb — strips undefined / non-JSON types (avoids invalid json syntax). */
+          const flowStepJsonbOrNull = (v) => {
+            if (v === undefined || v === null) return null
+            try {
+              return JSON.parse(JSON.stringify(v))
+            } catch {
+              return null
+            }
+          }
+          /** Client may send email_i18n as double-encoded JSON string. */
+          const coerceFlowEmailI18nInput = (raw) => {
+            if (raw === undefined || raw === null) return null
+            let x = raw
+            if (typeof x === 'string') {
+              const t = String(x).trim()
+              if (!t) return null
+              try {
+                x = JSON.parse(t)
+              } catch {
+                return null
+              }
+            }
+            if (typeof x !== 'object' || x === null || Array.isArray(x)) return null
+            return x
+          }
           const normalized = []
           for (let i = 0; i < body.steps.length; i++) {
             const s = body.steps[i] || {}
@@ -14760,10 +14781,11 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
               })
             } else {
               let emailI18nObj = null
-              if (s.email_i18n && typeof s.email_i18n === 'object' && !Array.isArray(s.email_i18n)) {
+              const i18nSrc = coerceFlowEmailI18nInput(s.email_i18n)
+              if (i18nSrc) {
                 emailI18nObj = {}
                 for (const loc of FLOW_SAVE_LOCALES) {
-                  const b = s.email_i18n[loc]
+                  const b = i18nSrc[loc]
                   if (!b || typeof b !== 'object') continue
                   const sj = String(b.subject || '').trim()
                   const bd = String(b.body || '').trim()
@@ -14831,6 +14853,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           }
           await client.query(`DELETE FROM admin_hub_flow_steps WHERE flow_id = $1`, [id])
           for (const row of normalized) {
+            const jI18n = flowStepJsonbOrNull(row.email_i18n)
+            const jAtt = flowStepJsonbOrNull(row.email_attachments)
+            const uuidSender =
+              row.smtp_sender_id != null && String(row.smtp_sender_id).trim() !== ''
+                ? String(row.smtp_sender_id).trim()
+                : null
             await client.query(
               `INSERT INTO admin_hub_flow_steps (flow_id, step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id)
                VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::uuid)`,
@@ -14841,9 +14869,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 row.wait_hours,
                 row.email_subject,
                 row.email_body,
-                row.email_i18n,
-                row.email_attachments,
-                row.smtp_sender_id,
+                jI18n,
+                jAtt,
+                uuidSender,
               ],
             )
           }

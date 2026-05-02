@@ -31,7 +31,6 @@ import {
   defaultCurrencyForMarket,
   DEFAULT_MARKET,
   DEFAULT_CURRENCY,
-  SHOP_CURRENCIES,
 } from "@/lib/shop-market";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useLandingChrome } from "@/context/LandingChromeContext";
@@ -60,13 +59,6 @@ const BOTTOM_IGNORE_SCROLL_UP_PX = 28;
 const MIDDLE_BAR_BG = "#1b8880";
 /** @media (max-width) for mobile/tablet header chrome (matches mega menu breakpoint) */
 const HEADER_NARROW_MQ = 1023;
-
-function readCurrencyCookie() {
-  if (typeof document === "undefined") return null;
-  const m = document.cookie.match(/(?:^|;\s*)andertal_currency=([^;]*)/);
-  const v = m ? decodeURIComponent(m[1]).trim().toLowerCase() : "";
-  return v && /^[a-z]{3}$/.test(v) ? v : null;
-}
 
 function writeCurrencyCookie(code) {
   if (typeof document === "undefined") return;
@@ -988,7 +980,7 @@ const LocaleDropdown = styled.div`
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 720px;
+  width: 520px;
   max-width: 96vw;
   background: ${tokens.background.card};
   border: 1px solid ${tokens.border.light};
@@ -1093,9 +1085,6 @@ export default function ShopHeader() {
     if (!t?.country) return String(DEFAULT_MARKET).toUpperCase();
     return t.country.toUpperCase();
   })();
-
-  const effectiveCurrency =
-    readCurrencyCookie() || marketParsed?.currency || DEFAULT_CURRENCY;
 
   const navigateTriple = (countryLower, langLower, curLower) => {
     const tail = restPathFromPathname(pathname);
@@ -1719,7 +1708,7 @@ export default function ShopHeader() {
                       </LocaleOption>
                     ))}
                   </div>
-                  <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", padding: "16px 0", minWidth: 0 }}>
+                  <div style={{ flex: 1, padding: "16px 0", minWidth: 0 }}>
                     <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Sprache</div>
                     {SHOP_LOCALES.map((l) => (
                       <LocaleOption
@@ -1729,29 +1718,12 @@ export default function ShopHeader() {
                         onClick={() => {
                           setLocaleDropdownOpen(false);
                           const m = marketParsed?.country ?? DEFAULT_MARKET;
-                          navigateTriple(m, l.code, effectiveCurrency);
+                          const cur = defaultCurrencyForMarket(String(m).toLowerCase());
+                          navigateTriple(m, l.code, cur);
                         }}
                       >
                         <span style={{ fontSize: 20 }}>{l.flag}</span>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{l.label}</div>
-                      </LocaleOption>
-                    ))}
-                  </div>
-                  <div style={{ flex: 1, padding: "16px 0", minWidth: 0 }}>
-                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Währung</div>
-                    {SHOP_CURRENCIES.map((code) => (
-                      <LocaleOption
-                        key={code}
-                        type="button"
-                        data-active={effectiveCurrency === code ? "true" : "false"}
-                        onClick={() => {
-                          setLocaleDropdownOpen(false);
-                          const m = marketParsed?.country ?? DEFAULT_MARKET;
-                          const lang = String(locale || routing.defaultLocale || "de").toLowerCase();
-                          navigateTriple(m, lang, code);
-                        }}
-                      >
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{code.toUpperCase()}</div>
                       </LocaleOption>
                     ))}
                   </div>

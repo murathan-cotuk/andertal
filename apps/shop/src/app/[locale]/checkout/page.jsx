@@ -330,30 +330,12 @@ const checkoutSubmitWrapButtonCss = `
   }
 `;
 
-/** Mobilde (≤767px) form üstünde tekrarlayan CTA — alt satırdaki gizlenir */
-const CheckoutSubmitWrapMobileTop = styled.div`
-  display: none;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  margin: 0 0 20px;
-  ${checkoutSubmitWrapButtonCss}
-
-  @media (max-width: 767px) {
-    display: block;
-  }
-`;
-
 const CheckoutSubmitWrapFooter = styled.div`
   width: 100%;
   max-width: 100%;
   min-width: 0;
   margin-top: 20px;
   ${checkoutSubmitWrapButtonCss}
-
-  @media (max-width: 767px) {
-    display: none;
-  }
 `;
 
 const PayBtn = styled.button`
@@ -836,14 +818,6 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
 
   return (
     <form onSubmit={handleSubmit} noValidate>
-      <CheckoutSubmitWrapMobileTop>
-        <PayNowButton
-          type="submit"
-          disabled={!stripe || !elements || !paymentElementReady || processing || paymentIntentRefreshing}
-        >
-          {processing ? t("processing") : paymentIntentRefreshing ? t("processing") : `${t("placeOrder")} – ${formatPriceCents(payCentsDisplay)} €`}
-        </PayNowButton>
-      </CheckoutSubmitWrapMobileTop>
       <FormCard style={{ marginBottom: 24 }}>
         <SectionTitle>{t("contactInfo")}</SectionTitle>
         <FieldGrid>

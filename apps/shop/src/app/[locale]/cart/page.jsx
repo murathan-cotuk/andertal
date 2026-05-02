@@ -48,7 +48,9 @@ const Layout = styled.div`
   align-items: flex-start;
 
   @media (max-width: 768px) {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
   }
 `;
 
@@ -204,6 +206,12 @@ const SummaryCard = styled.div`
   padding: 24px;
   position: sticky;
   top: 64px;
+
+  @media (max-width: 768px) {
+    order: -1;
+    position: relative;
+    top: auto;
+  }
 `;
 
 const SummaryTitle = styled.h2`
