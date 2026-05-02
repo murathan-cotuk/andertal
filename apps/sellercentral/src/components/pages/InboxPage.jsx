@@ -3,9 +3,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Page, Text, Button, Badge, BlockStack, InlineStack,
-  Box, Divider, Spinner, TextField, Tabs, Select, Modal,
+  Box, Divider, Spinner, TextField, Tabs, Select,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import FlowEmailBodyEditor, { htmlToPlainText } from "@/components/content/FlowEmailBodyEditor";
+import {
+  MESSAGE_TEMPLATE_PLACEHOLDER_OPTIONS,
+  applyMessagePlaceholders,
+  buildCustomerInboxPlaceholderContext,
+  buildSupportInboxPlaceholderContext,
+} from "@/lib/message-template-placeholders";
 
 function fmtDate(d) {
   if (!d) return "";
@@ -15,6 +22,28 @@ function fmtDate(d) {
 function fmtCents(c) {
   if (c == null) return "—";
   return (Number(c) / 100).toFixed(2).replace(".", ",") + " €";
+}
+
+function stripUnsafeMarkup(html) {
+  return String(html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/\s(on\w+|javascript:)\s*=/gi, " data-blocked=");
+}
+
+function MessageBubbleBody({ body }) {
+  const raw = String(body || "");
+  const looksHtml = /<[a-z][\s\S]*>/i.test(raw);
+  if (!looksHtml) {
+    return <Text as="p" variant="bodySm">{raw}</Text>;
+  }
+  return (
+    <div
+      className="inbox-msg-html"
+      style={{ wordBreak: "break-word", fontSize: 13, lineHeight: 1.45, color: "inherit" }}
+      dangerouslySetInnerHTML={{ __html: stripUnsafeMarkup(raw) }}
+    />
+  );
 }
 
 const STATUS_TONE = {
@@ -187,12 +216,18 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
-  const [templateDeletingId, setTemplateDeletingId] = useState(null);
-  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [placeholderInsert, setPlaceholderInsert] = useState("");
   const [searchQ, setSearchQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const bottomRef = useRef(null);
+  const replyEditorRef = useRef(null);
   const { templates, templatesLoading, templatesErr, loadTemplates } = useMessageTemplates(client);
+
+  const placeholderCtx = useMemo(
+    () => buildCustomerInboxPlaceholderContext(selected, sellerNames || {}),
+    [selected, sellerNames],
+  );
+  const replyPlainTrim = useMemo(() => htmlToPlainText(reply).trim(), [reply]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(searchQ.trim()), 320);
@@ -244,13 +279,15 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
   };
 
   const handleSend = async () => {
-    if (!reply.trim() || !selected) return;
+    const html = replyEditorRef.current?.flushEmailBody?.() ?? reply;
+    const bodyOut = applyMessagePlaceholders(String(html || "").trim(), placeholderCtx);
+    if (!htmlToPlainText(bodyOut).trim() || !selected) return;
     setSending(true);
     setErr("");
     try {
       await client.sendMessage({
         order_id: selected.order_id || undefined,
-        body: reply.trim(),
+        body: bodyOut,
         subject: selected.order_number ? `Re: Bestellung #${selected.order_number}` : "Nachricht",
       });
       setReply("");
@@ -280,12 +317,12 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
     if (!selectedTemplateId) return;
     const t = templates.find((it) => String(it.id) === String(selectedTemplateId));
     if (!t?.body) return;
-    setReply(t.body);
+    setReply(applyMessagePlaceholders(t.body, placeholderCtx));
   };
 
   const saveCurrentReplyAsTemplate = async () => {
     const name = templateName.trim();
-    const body = reply.trim();
+    const body = String(replyEditorRef.current?.flushEmailBody?.() ?? reply).trim();
     if (!name || !body) {
       setErr("Vorlagenname und Nachricht sind erforderlich");
       return;
@@ -300,21 +337,6 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
       setErr(e?.message || "Vorlage konnte nicht gespeichert werden");
     } finally {
       setTemplateSaving(false);
-    }
-  };
-
-  const deleteTemplate = async (id) => {
-    if (!id) return;
-    setTemplateDeletingId(id);
-    setErr("");
-    try {
-      await client.deleteMessageTemplate(id);
-      if (String(selectedTemplateId) === String(id)) setSelectedTemplateId("");
-      await loadTemplates();
-    } catch (e) {
-      setErr(e?.message || "Vorlage konnte nicht gelöscht werden");
-    } finally {
-      setTemplateDeletingId(null);
     }
   };
 
@@ -462,8 +484,8 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
                           Kunde
                         </div>
                       )}
-                      <Text as="p" variant="bodySm">{m.body}</Text>
-                      <div style={{ fontSize: 10, marginTop: 4, opacity: 0.65 }}>{fmtDate(m.created_at)}</div>
+                      <MessageBubbleBody body={m.body} />
+                      <div style={{ fontSize: 10, marginTop: 4, opacity: isSeller ? 0.85 : 0.65 }}>{fmtDate(m.created_at)}</div>
                     </div>
                   </div>
                 );
@@ -475,21 +497,31 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
                 {err && <Text as="p" variant="bodySm" tone="critical">{err}</Text>}
                 {templatesErr && <Text as="p" variant="bodySm" tone="critical">{templatesErr}</Text>}
                 <InlineStack gap="200" blockAlign="end" wrap>
-                  <div style={{ minWidth: 240, flex: 1 }}>
+                  <div style={{ minWidth: 200, flex: "1 1 180px" }}>
+                    <Select
+                      label="Platzhalter"
+                      labelHidden
+                      options={MESSAGE_TEMPLATE_PLACEHOLDER_OPTIONS}
+                      value={placeholderInsert}
+                      onChange={(v) => {
+                        setPlaceholderInsert("");
+                        if (!v) return;
+                        setReply((prev) => `${prev || ""}${prev && !/\s$/.test(prev) ? " " : ""}${v}`);
+                      }}
+                    />
+                  </div>
+                  <div style={{ minWidth: 220, flex: "1 1 200px" }}>
                     <Select
                       label="Antwortvorlage"
                       labelHidden
                       options={templateOptions}
                       value={selectedTemplateId}
                       onChange={setSelectedTemplateId}
-                      disabled={templatesLoading || templates.length === 0}
+                      disabled={templatesLoading}
                     />
                   </div>
                   <Button onClick={applySelectedTemplate} disabled={!selectedTemplateId}>
                     Vorlage anwenden
-                  </Button>
-                  <Button variant="plain" onClick={() => setShowTemplateManager(true)}>
-                    Vorlagen verwalten
                   </Button>
                 </InlineStack>
                 <InlineStack gap="200" blockAlign="end" wrap>
@@ -503,58 +535,29 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
                       autoComplete="off"
                     />
                   </div>
-                  <Button onClick={saveCurrentReplyAsTemplate} loading={templateSaving} disabled={templateSaving || !reply.trim() || !templateName.trim()}>
+                  <Button onClick={saveCurrentReplyAsTemplate} loading={templateSaving} disabled={templateSaving || !replyPlainTrim || !templateName.trim()}>
                     Speichern
                   </Button>
                 </InlineStack>
-                <InlineStack gap="200" blockAlign="end">
-                  <div style={{ flex: 1 }}>
-                    <TextField
-                      value={reply}
-                      onChange={setReply}
-                      placeholder="Antwort schreiben… (Enter zum Senden)"
-                      multiline={2}
-                      autoComplete="off"
-                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    />
-                  </div>
-                  <Button variant="primary" onClick={handleSend} disabled={sending || !reply.trim()} loading={sending}>
-                    Senden
-                  </Button>
+                <FlowEmailBodyEditor
+                  ref={replyEditorRef}
+                  key={`cust-${selected?.order_id || "__no_order__"}-${selected?.messages?.length ?? 0}`}
+                  label="Antwort"
+                  value={reply}
+                  onChange={setReply}
+                  minHeight="140px"
+                  placeholder="Antwort (Visuell, HTML oder Text)…"
+                  modes={{ visual: "Visuell", html: "HTML", text: "Text" }}
+                />
+                <InlineStack gap="200" blockAlign="center" wrap={false}>
+                  <Box minWidth="100%">
+                    <Button variant="primary" onClick={handleSend} disabled={sending || !replyPlainTrim} loading={sending}>
+                      Senden
+                    </Button>
+                  </Box>
                 </InlineStack>
               </BlockStack>
             </Box>
-            <Modal
-              open={showTemplateManager}
-              onClose={() => setShowTemplateManager(false)}
-              title="Nachrichtenvorlagen"
-            >
-              <Modal.Section>
-                <BlockStack gap="200">
-                  {templates.length === 0 && (
-                    <Text as="p" variant="bodySm" tone="subdued">Noch keine Vorlagen gespeichert.</Text>
-                  )}
-                  {templates.map((t) => (
-                    <Box key={t.id} padding="200" borderWidth="025" borderColor="border" borderRadius="200">
-                      <BlockStack gap="100">
-                        <InlineStack align="space-between" blockAlign="center">
-                          <Text as="p" variant="bodySm" fontWeight="semibold">{t.name}</Text>
-                          <Button
-                            tone="critical"
-                            variant="plain"
-                            onClick={() => deleteTemplate(t.id)}
-                            loading={templateDeletingId === t.id}
-                          >
-                            Löschen
-                          </Button>
-                        </InlineStack>
-                        <Text as="p" variant="bodySm" tone="subdued">{t.body}</Text>
-                      </BlockStack>
-                    </Box>
-                  ))}
-                </BlockStack>
-              </Modal.Section>
-            </Modal>
           </>
         )}
       </div>
@@ -662,9 +665,9 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
-  const [templateDeletingId, setTemplateDeletingId] = useState(null);
-  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [placeholderInsert, setPlaceholderInsert] = useState("");
   const bottomRef = useRef(null);
+  const replyEditorRef = useRef(null);
   const { templates, templatesLoading, templatesErr, loadTemplates } = useMessageTemplates(client);
 
   const sellerThreads = isSuperuser ? groupBySeller(rawMessages) : [];
@@ -683,6 +686,12 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
     selectedSubjectKey !== null
       ? subjectList.find((t) => t.subject_key === selectedSubjectKey) || null
       : null;
+
+  const placeholderCtx = useMemo(
+    () => buildSupportInboxPlaceholderContext(selectedSellerThread, sellerNames),
+    [selectedSellerThread, sellerNames],
+  );
+  const replyPlainTrim = useMemo(() => htmlToPlainText(reply).trim(), [reply]);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -795,7 +804,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
   };
 
   const canSend = () => {
-    if (!reply.trim()) return false;
+    if (!replyPlainTrim) return false;
     if (isSuperuser && !selectedSellerThread) return false;
     if (isNewSubject) return !!newSubject.trim();
     if (!selectedSubjectThread) return false;
@@ -814,12 +823,12 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
     if (!selectedTemplateId) return;
     const t = templates.find((it) => String(it.id) === String(selectedTemplateId));
     if (!t?.body) return;
-    setReply(t.body);
+    setReply(applyMessagePlaceholders(t.body, placeholderCtx));
   };
 
   const saveCurrentReplyAsTemplate = async () => {
     const name = templateName.trim();
-    const body = reply.trim();
+    const body = String(replyEditorRef.current?.flushEmailBody?.() ?? reply).trim();
     if (!name || !body) {
       setErr("Vorlagenname und Nachricht sind erforderlich");
       return;
@@ -837,23 +846,11 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
     }
   };
 
-  const deleteTemplate = async (id) => {
-    if (!id) return;
-    setTemplateDeletingId(id);
-    setErr("");
-    try {
-      await client.deleteMessageTemplate(id);
-      if (String(selectedTemplateId) === String(id)) setSelectedTemplateId("");
-      await loadTemplates();
-    } catch (e) {
-      setErr(e?.message || "Vorlage konnte nicht gelöscht werden");
-    } finally {
-      setTemplateDeletingId(null);
-    }
-  };
-
   const handleSend = async () => {
     if (!canSend()) return;
+    const html = replyEditorRef.current?.flushEmailBody?.() ?? reply;
+    const bodyOut = applyMessagePlaceholders(String(html || "").trim(), placeholderCtx);
+    if (!htmlToPlainText(bodyOut).trim()) return;
     setSending(true);
     setErr("");
     try {
@@ -868,14 +865,14 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
 
       if (isSuperuser) {
         await client.sendSupportMessage({
-          body: reply.trim(),
+          body: bodyOut,
           target_seller_id: selectedSellerThread.seller_id,
           sender_seller_id: null,
           subject: subjectForApi || undefined,
         });
       } else {
         await client.sendSupportMessage({
-          body: reply.trim(),
+          body: bodyOut,
           sender_seller_id: mySellerID,
           subject: subjectForApi || undefined,
         });
@@ -1109,8 +1106,8 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                             {senderLabel}
                           </div>
                         )}
-                        <Text as="p" variant="bodySm">{m.body}</Text>
-                        <div style={{ fontSize: 10, marginTop: 4, opacity: 0.65 }}>{fmtDate(m.created_at)}</div>
+                        <MessageBubbleBody body={m.body} />
+                        <div style={{ fontSize: 10, marginTop: 4, opacity: isMe ? 0.85 : 0.65 }}>{fmtDate(m.created_at)}</div>
                       </div>
                     </div>
                   );
@@ -1127,21 +1124,31 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                   <TextField label="Betreff" value={newSubject} onChange={setNewSubject} autoComplete="off" placeholder="z. B. Frage zu Auszahlung" />
                 )}
                 <InlineStack gap="200" blockAlign="end" wrap>
-                  <div style={{ minWidth: 240, flex: 1 }}>
+                  <div style={{ minWidth: 200, flex: "1 1 180px" }}>
+                    <Select
+                      label="Platzhalter"
+                      labelHidden
+                      options={MESSAGE_TEMPLATE_PLACEHOLDER_OPTIONS}
+                      value={placeholderInsert}
+                      onChange={(v) => {
+                        setPlaceholderInsert("");
+                        if (!v) return;
+                        setReply((prev) => `${prev || ""}${prev && !/\s$/.test(prev) ? " " : ""}${v}`);
+                      }}
+                    />
+                  </div>
+                  <div style={{ minWidth: 220, flex: "1 1 200px" }}>
                     <Select
                       label="Antwortvorlage"
                       labelHidden
                       options={templateOptions}
                       value={selectedTemplateId}
                       onChange={setSelectedTemplateId}
-                      disabled={templatesLoading || templates.length === 0}
+                      disabled={templatesLoading}
                     />
                   </div>
                   <Button onClick={applySelectedTemplate} disabled={!selectedTemplateId}>
                     Vorlage anwenden
-                  </Button>
-                  <Button variant="plain" onClick={() => setShowTemplateManager(true)}>
-                    Vorlagen verwalten
                   </Button>
                 </InlineStack>
                 <InlineStack gap="200" blockAlign="end" wrap>
@@ -1155,58 +1162,27 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                       autoComplete="off"
                     />
                   </div>
-                  <Button onClick={saveCurrentReplyAsTemplate} loading={templateSaving} disabled={templateSaving || !reply.trim() || !templateName.trim()}>
+                  <Button onClick={saveCurrentReplyAsTemplate} loading={templateSaving} disabled={templateSaving || !replyPlainTrim || !templateName.trim()}>
                     Speichern
                   </Button>
                 </InlineStack>
-                <InlineStack gap="200" blockAlign="end">
-                  <div style={{ flex: 1 }}>
-                    <TextField
-                      value={reply}
-                      onChange={setReply}
-                      placeholder="Nachricht schreiben… (Enter zum Senden)"
-                      multiline={2}
-                      autoComplete="off"
-                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    />
-                  </div>
+                <FlowEmailBodyEditor
+                  ref={replyEditorRef}
+                  key={`sup-${selectedSellerId || ""}-${String(selectedSubjectKey)}-${isNewSubject ? "new" : "t"}`}
+                  label="Nachricht"
+                  value={reply}
+                  onChange={setReply}
+                  minHeight="140px"
+                  placeholder="Nachricht (Visuell, HTML oder Text)…"
+                  modes={{ visual: "Visuell", html: "HTML", text: "Text" }}
+                />
+                <InlineStack gap="200" blockAlign="center">
                   <Button variant="primary" onClick={handleSend} disabled={sending || !canSend()} loading={sending}>
                     Senden
                   </Button>
                 </InlineStack>
               </BlockStack>
             </Box>
-            <Modal
-              open={showTemplateManager}
-              onClose={() => setShowTemplateManager(false)}
-              title="Nachrichtenvorlagen"
-            >
-              <Modal.Section>
-                <BlockStack gap="200">
-                  {templates.length === 0 && (
-                    <Text as="p" variant="bodySm" tone="subdued">Noch keine Vorlagen gespeichert.</Text>
-                  )}
-                  {templates.map((t) => (
-                    <Box key={t.id} padding="200" borderWidth="025" borderColor="border" borderRadius="200">
-                      <BlockStack gap="100">
-                        <InlineStack align="space-between" blockAlign="center">
-                          <Text as="p" variant="bodySm" fontWeight="semibold">{t.name}</Text>
-                          <Button
-                            tone="critical"
-                            variant="plain"
-                            onClick={() => deleteTemplate(t.id)}
-                            loading={templateDeletingId === t.id}
-                          >
-                            Löschen
-                          </Button>
-                        </InlineStack>
-                        <Text as="p" variant="bodySm" tone="subdued">{t.body}</Text>
-                      </BlockStack>
-                    </Box>
-                  ))}
-                </BlockStack>
-              </Modal.Section>
-            </Modal>
           </>
         )}
       </div>
@@ -1259,7 +1235,7 @@ export default function InboxPage() {
   ];
 
   return (
-    <Page title="Nachrichten">
+    <Page title="Nachrichten" secondaryActions={[{ content: "Vorlagen", url: "/inbox/templates" }]}>
       <div style={{ marginBottom: 0 }}>
         <Tabs tabs={tabs} selected={activeTab} onSelect={setActiveTab} fitted={false} />
       </div>

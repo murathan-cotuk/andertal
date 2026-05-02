@@ -848,6 +848,15 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/integrations/${encodeURIComponent(id)}`, { method: 'DELETE' })
   }
 
+  /** Superuser: Trustpilot Business Unit ID for storefront TrustBox (slug trustpilot). */
+  async getTrustpilotIntegration() {
+    return this.request('/admin-hub/v1/integrations/trustpilot')
+  }
+
+  async saveTrustpilotIntegration(data) {
+    return this.request('/admin-hub/v1/integrations/trustpilot', { method: 'PUT', body: JSON.stringify(data) })
+  }
+
   async testBillbeeIntegration(data) {
     return this.request('/admin-hub/v1/integrations/billbee/test', {
       method: 'POST',
@@ -975,6 +984,12 @@ class MedusaAdminClient {
       body: JSON.stringify(data || {}),
     })
   }
+  async updateMessageTemplate(id, data) {
+    return this.request(`/admin-hub/v1/message-templates/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data || {}),
+    })
+  }
   async deleteMessageTemplate(id) {
     return this.request(`/admin-hub/v1/message-templates/${encodeURIComponent(id)}`, { method: 'DELETE' })
   }
@@ -1004,6 +1019,21 @@ class MedusaAdminClient {
   }
   async testSmtpSettings() {
     return this.request('/admin-hub/v1/smtp-settings/test', { method: 'POST' })
+  }
+  async createSmtpSender(data) {
+    return this.request('/admin-hub/v1/smtp-senders', { method: 'POST', body: JSON.stringify(data) })
+  }
+  async updateSmtpSender(id, data) {
+    return this.request(`/admin-hub/v1/smtp-senders/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) })
+  }
+  async deleteSmtpSender(id) {
+    return this.request(`/admin-hub/v1/smtp-senders/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  }
+  async setDefaultSmtpSender(id) {
+    return this.request(`/admin-hub/v1/smtp-senders/${encodeURIComponent(id)}/set-default`, { method: 'POST' })
+  }
+  async testSmtpSender(id, data) {
+    return this.request(`/admin-hub/v1/smtp-senders/${encodeURIComponent(id)}/test`, { method: 'POST', body: JSON.stringify(data) })
   }
 
   /** Automation flows (Content → Flows; superuser). */

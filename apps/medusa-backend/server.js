@@ -17,6 +17,7 @@ try {
 const path = require('path')
 const fs = require('fs')
 const { runAutomationFlowsForOrder } = require('./src/flow-automation')
+const { resolveSmtpSenderIdentity } = require('./src/smtp-sender-resolve')
 
 let backendLinkModulesPath
 try {
@@ -1020,6 +1021,32 @@ async function start() {
           )
         `).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_flow_steps ADD COLUMN IF NOT EXISTS email_i18n jsonb DEFAULT NULL`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_flow_steps ADD COLUMN IF NOT EXISTS email_attachments jsonb DEFAULT NULL`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS store_smtp_sender_profiles (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            seller_id varchar(255) NOT NULL DEFAULT 'default',
+            from_email varchar(512) NOT NULL,
+            from_name text,
+            is_default boolean NOT NULL DEFAULT false,
+            last_test_ok boolean,
+            last_test_at timestamptz,
+            last_test_message text,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            UNIQUE(seller_id, from_email)
+          );
+        `).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_store_smtp_sender_profiles_seller ON store_smtp_sender_profiles(seller_id)`).catch(() => {})
+        await client.query(`
+          INSERT INTO store_smtp_sender_profiles (seller_id, from_email, from_name, is_default)
+          SELECT 'default', TRIM(from_email), NULLIF(TRIM(from_name), ''), true
+          FROM store_smtp_settings WHERE seller_id = 'default'
+            AND from_email IS NOT NULL AND TRIM(from_email) <> ''
+            AND NOT EXISTS (SELECT 1 FROM store_smtp_sender_profiles p WHERE p.seller_id = 'default')
+        `).catch(() => {})
+        await client.query(
+          `ALTER TABLE admin_hub_flow_steps ADD COLUMN IF NOT EXISTS smtp_sender_id uuid REFERENCES store_smtp_sender_profiles(id) ON DELETE SET NULL`,
+        ).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_flows ADD COLUMN IF NOT EXISTS audience varchar(20) NOT NULL DEFAULT 'customer'`).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_admin_hub_flow_steps_flow ON admin_hub_flow_steps(flow_id, step_order)`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS iban text;`).catch(() => {})
@@ -11223,6 +11250,76 @@ async function start() {
       }
     }
 
+    /** Shop TrustBox: slug `trustpilot`, api_key = Business Unit ID (public in embeds). Superuser only. */
+    const TRUSTPILOT_PLATFORM_SCOPE = 'platform'
+
+    const adminHubTrustpilotGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const r = await client.query(
+          `SELECT api_key, config, is_active FROM store_integrations WHERE LOWER(TRIM(slug)) = 'trustpilot' LIMIT 1`,
+        )
+        await client.end()
+        const row = r.rows[0]
+        if (!row) {
+          return res.json({ configured: false, business_unit_id: '', template_id: '', is_active: false })
+        }
+        let cfg = {}
+        try {
+          const c = row.config
+          cfg = typeof c === 'string' ? JSON.parse(c) : (c && typeof c === 'object' ? c : {})
+        } catch (_) {}
+        const tid = (cfg.template_id || cfg.templateId || '').toString().trim()
+        res.json({
+          configured: true,
+          business_unit_id: row.api_key ? String(row.api_key).trim() : '',
+          template_id: tid,
+          is_active: row.is_active !== false,
+        })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubTrustpilotPUT = async (req, res) => {
+      const body = req.body || {}
+      const bu = String(body.business_unit_id ?? body.businessUnitId ?? '').trim()
+      const templateRaw = body.template_id ?? body.templateId
+      const is_active = body.is_active !== false && body.is_active !== 'false'
+      if (!bu) return res.status(400).json({ message: 'business_unit_id required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const cfg = {}
+        if (templateRaw != null && String(templateRaw).trim()) cfg.template_id = String(templateRaw).trim()
+        const configJson = JSON.stringify(cfg)
+        const r = await client.query(
+          `INSERT INTO store_integrations (name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active, category, seller_scope_key)
+           VALUES ('Trustpilot', 'trustpilot', NULL, $1, NULL, NULL, $2::jsonb, $3, 'reviews', $4)
+           ON CONFLICT (slug) DO UPDATE SET
+             api_key = EXCLUDED.api_key,
+             config = EXCLUDED.config,
+             is_active = EXCLUDED.is_active,
+             updated_at = NOW()
+           RETURNING id, name, slug, is_active, updated_at`,
+          [bu, configJson, is_active, TRUSTPILOT_PLATFORM_SCOPE],
+        )
+        await client.end()
+        res.json({ success: true, integration: r.rows[0] })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     const ensureSellerBillbeeCredentials = async (client, sellerId, forceRegenerate = false) => {
       const existing = await client.query(
         'SELECT billbee_api_key, billbee_basic_username, billbee_basic_password FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1',
@@ -11857,6 +11954,8 @@ async function start() {
     httpApp.post('/admin-hub/v1/shipping-carriers', requireSellerAuth, adminHubCarrierPOST)
     httpApp.patch('/admin-hub/v1/shipping-carriers/:id', requireSellerAuth, adminHubCarrierPATCH)
     httpApp.delete('/admin-hub/v1/shipping-carriers/:id', requireSellerAuth, adminHubCarrierDELETE)
+    httpApp.get('/admin-hub/v1/integrations/trustpilot', requireSellerAuth, requireSuperuser, adminHubTrustpilotGET)
+    httpApp.put('/admin-hub/v1/integrations/trustpilot', requireSellerAuth, requireSuperuser, adminHubTrustpilotPUT)
     httpApp.get('/admin-hub/v1/integrations', adminHubIntegrationsGET)
     httpApp.post('/admin-hub/v1/integrations', requireSellerAuth, adminHubIntegrationPOST)
     httpApp.patch('/admin-hub/v1/integrations/:id', requireSellerAuth, adminHubIntegrationPATCH)
@@ -12834,40 +12933,6 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         }
         await client.end()
 
-        const items = []
-        for (const r of ordersQ.rows || []) {
-          items.push({
-            source_type: 'order',
-            source_id: r.id,
-            read: !!r.read,
-            created_at: r.created_at,
-            title: `Neue Bestellung #${r.order_number != null ? r.order_number : '—'}`,
-            subtitle: `${r.first_name || ''} ${r.last_name || ''}`.trim() + (r.total_cents ? ` · ${(Number(r.total_cents) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €` : ''),
-            href: `/orders/${r.id}`,
-          })
-        }
-        for (const r of returnsQ.rows || []) {
-          items.push({
-            source_type: 'return',
-            source_id: r.id,
-            read: !!r.read,
-            created_at: r.created_at,
-            title: `Rückgabeanfrage R-${r.return_number != null ? r.return_number : '—'}`,
-            subtitle: `Bestellung #${r.order_number != null ? r.order_number : '—'} · ${r.status || ''}`,
-            href: '/orders/returns',
-          })
-        }
-        for (const r of verQ.rows || []) {
-          items.push({
-            source_type: 'verification',
-            source_id: r.id,
-            read: !!r.read,
-            created_at: r.created_at,
-            title: r.title || 'Evrak',
-            subtitle: r.body || '',
-            href: r.seller_id ? `/sellers/${r.seller_id}` : '/sellers',
-          })
-        }
         const crShortVal = (val) => {
           if (val == null || val === '') return '—'
           const s = String(val).trim()
@@ -12889,10 +12954,48 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           if (f.startsWith('metadata.')) return `Meta (${f.replace(/^metadata\./, '')})`
           return f || '—'
         }
+
+        const orderFeedItems = []
+        for (const r of ordersQ.rows || []) {
+          orderFeedItems.push({
+            source_type: 'order',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: `Neue Bestellung #${r.order_number != null ? r.order_number : '—'}`,
+            subtitle: `${r.first_name || ''} ${r.last_name || ''}`.trim() + (r.total_cents ? ` · ${(Number(r.total_cents) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €` : ''),
+            href: `/orders/${r.id}`,
+          })
+        }
+        const returnFeedItems = []
+        for (const r of returnsQ.rows || []) {
+          returnFeedItems.push({
+            source_type: 'return',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: `Rückgabeanfrage R-${r.return_number != null ? r.return_number : '—'}`,
+            subtitle: `Bestellung #${r.order_number != null ? r.order_number : '—'} · ${r.status || ''}`,
+            href: '/orders/returns',
+          })
+        }
+        const verificationFeedItems = []
+        for (const r of verQ.rows || []) {
+          verificationFeedItems.push({
+            source_type: 'verification',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: r.title || 'Evrak',
+            subtitle: r.body || '',
+            href: r.seller_id ? `/sellers/${r.seller_id}` : '/sellers',
+          })
+        }
+        const productChangeFeedItems = []
         for (const r of crQ.rows || []) {
           const pid = r.product_id ? String(r.product_id) : ''
           const sub = `${r.product_title || 'Produkt'} · ${crFieldDe(r.field_name)} — Aktuell: ${crShortVal(r.old_value)} → Vorschlag: ${crShortVal(r.new_value)}`
-          items.push({
+          productChangeFeedItems.push({
             source_type: 'product_change_request',
             source_id: r.id,
             read: !!r.read,
@@ -12906,6 +13009,48 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             new_value: r.new_value,
           })
         }
+
+        const groupedMode = req.query.grouped === '1' || req.query.grouped === 'true'
+        if (groupedMode) {
+          const groups = [
+            {
+              key: 'order',
+              label_de: 'Bestellungen',
+              description_de: 'Neue Bestellungen und Bestellübersicht',
+              items: orderFeedItems,
+            },
+            {
+              key: 'return',
+              label_de: 'Rücksendungen',
+              description_de: 'Rückgabeanfragen und Erstattungen',
+              items: returnFeedItems,
+            },
+          ]
+          if (sup) {
+            groups.push(
+              {
+                key: 'verification',
+                label_de: 'Verifizierung & Evrak',
+                description_de: 'Verkäufer-Verifizierung und eingereichte Dokumente',
+                items: verificationFeedItems,
+              },
+              {
+                key: 'product_change_request',
+                label_de: 'Produktänderungen',
+                description_de: 'Ausstehende Freigaben für Verkäufer-Änderungen',
+                items: productChangeFeedItems,
+              },
+            )
+          }
+          const grand_total = groups.reduce((s, g) => s + g.items.length, 0)
+          return res.json({
+            grouped: true,
+            groups: groups.map((g) => ({ ...g, total: g.items.length })),
+            grand_total,
+          })
+        }
+
+        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems]
         items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         const total = items.length
         const paged = items.slice(off, off + lim)
@@ -13116,9 +13261,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.connect()
         const { order_id, body, subject, channel, sender_seller_id } = req.body || {}
         if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
-        // Get seller from_email
-        const smtpR = await client.query(`SELECT from_email, from_name FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
-        const sellerEmail = smtpR.rows[0]?.from_email || ''
+        const { fromEmail: sellerEmail } = await resolveSmtpSenderIdentity(client, null)
 
         if (channel === 'support') {
           // Support channel: seller <-> support team (superusers)
@@ -13157,12 +13300,26 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           const transport = await getSmtpTransport(client)
           if (transport) {
             const fromName = smtpR.rows[0]?.from_name || 'Shop'
+            const rawBody = String(body || '')
+            const looksHtml = /<[a-z][\s\S]*>/i.test(rawBody)
+            const plainFromHtml = (html) =>
+              String(html || '')
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<\/p>/gi, '\n\n')
+                .replace(/<[^>]+>/g, '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim()
+            const mailOpts = looksHtml
+              ? {
+                  text: plainFromHtml(rawBody) || rawBody.replace(/<[^>]+>/g, ''),
+                  html: rawBody,
+                }
+              : { text: rawBody, html: `<p>${rawBody.replace(/\n/g, '<br>')}</p>` }
             transport.sendMail({
               from: `"${fromName}" <${sellerEmail}>`,
               to: recipientEmail,
               subject: subject || 'Nachricht vom Shop',
-              text: body,
-              html: `<p>${body.replace(/\n/g, '<br>')}</p>`,
+              ...mailOpts,
             }).catch((e) => console.error('[SMTP sendMail]', e.message))
           }
         }
@@ -13355,6 +13512,77 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    const adminHubMessageTemplatesPATCH = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        await ensureMessageTemplatesTable(client)
+        const sellerId = String(req.sellerUser?.seller_id || '').trim()
+        const id = Number(req.params.id)
+        if (!sellerId) {
+          await client.end()
+          return res.status(400).json({ message: 'seller_id missing in token' })
+        }
+        if (!Number.isFinite(id) || id <= 0) {
+          await client.end()
+          return res.status(400).json({ message: 'invalid id' })
+        }
+        const nameRaw = req.body?.name
+        const bodyRaw = req.body?.body
+        const updates = []
+        const vals = []
+        let n = 0
+        if (nameRaw !== undefined) {
+          const name = String(nameRaw || '').trim()
+          if (!name) {
+            await client.end()
+            return res.status(400).json({ message: 'name required' })
+          }
+          if (name.length > 120) {
+            await client.end()
+            return res.status(400).json({ message: 'name too long' })
+          }
+          n++
+          updates.push(`name = $${n}`)
+          vals.push(name)
+        }
+        if (bodyRaw !== undefined) {
+          const body = String(bodyRaw || '').trim()
+          if (!body) {
+            await client.end()
+            return res.status(400).json({ message: 'body required' })
+          }
+          if (body.length > 5000) {
+            await client.end()
+            return res.status(400).json({ message: 'body too long' })
+          }
+          n++
+          updates.push(`body = $${n}`)
+          vals.push(body)
+        }
+        if (!updates.length) {
+          await client.end()
+          return res.status(400).json({ message: 'nothing to update' })
+        }
+        const idPh = n + 1
+        const sidPh = n + 2
+        vals.push(id, sellerId)
+        const r = await client.query(
+          `UPDATE admin_hub_message_templates SET ${updates.join(', ')}, updated_at = now()
+           WHERE id = $${idPh} AND seller_id = $${sidPh}
+           RETURNING id, seller_id, name, body, created_at, updated_at`,
+          vals,
+        )
+        await client.end()
+        if (!r.rows?.length) return res.status(404).json({ message: 'template not found' })
+        res.json({ template: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     const storeMessagesGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const token = (req.headers.authorization || '').replace('Bearer ', '').trim()
@@ -13398,8 +13626,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.connect()
         const { order_id, body, subject } = req.body || {}
         if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
-        const smtpR = await client.query(`SELECT from_email, from_name FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
-        const sellerEmail = smtpR.rows[0]?.from_email || ''
+        const { fromEmail: sellerEmail } = await resolveSmtpSenderIdentity(client, null)
         const r = await client.query(
           `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, is_read_by_seller, is_read_by_customer)
            VALUES ($1, 'customer', $2, $3, $4, $5, false, true) RETURNING *`,
@@ -13428,6 +13655,29 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     }
 
     // ── SMTP Settings ─────────────────────────────────────────────────────
+    const syncDefaultSenderFromSmtpForm = async (client, fromEmail, fromName) => {
+      const fe = String(fromEmail || '').trim()
+      const fn = String(fromName || '').trim()
+      if (!fe) return
+      const def = await client.query(
+        `SELECT id FROM store_smtp_sender_profiles WHERE seller_id = 'default' AND is_default = true LIMIT 1`,
+      )
+      if (def.rows[0]) {
+        await client.query(`UPDATE store_smtp_sender_profiles SET from_email = $1, from_name = $2 WHERE id = $3::uuid`, [
+          fe,
+          fn || null,
+          def.rows[0].id,
+        ])
+        return
+      }
+      const cnt = await client.query(`SELECT COUNT(*)::int AS n FROM store_smtp_sender_profiles WHERE seller_id = 'default'`)
+      const first = Number(cnt.rows[0]?.n || 0) === 0
+      await client.query(
+        `INSERT INTO store_smtp_sender_profiles (seller_id, from_email, from_name, is_default) VALUES ('default', $1, $2, $3)`,
+        [fe, fn || null, first],
+      )
+    }
+
     const adminHubSmtpSettingsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       let client
@@ -13436,13 +13686,20 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const r = await client.query(`SELECT seller_id, provider, host, port, secure, username, from_name, from_email, updated_at FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
-        await client.end()
         const row = r.rows[0] || null
         const smtpConfigured = !!(row?.host)
-        if (!req.sellerUser?.is_superuser) {
-          return res.json({ smtp: null, smtp_configured: smtpConfigured })
+        let senders = []
+        if (req.sellerUser?.is_superuser) {
+          const sr = await client.query(
+            `SELECT id, from_email, from_name, is_default, last_test_ok, last_test_at, last_test_message FROM store_smtp_sender_profiles WHERE seller_id = 'default' ORDER BY is_default DESC, created_at ASC`,
+          )
+          senders = sr.rows || []
         }
-        res.json({ smtp: row, smtp_configured: smtpConfigured })
+        await client.end()
+        if (!req.sellerUser?.is_superuser) {
+          return res.json({ smtp: null, smtp_configured: smtpConfigured, senders: [] })
+        }
+        res.json({ smtp: row, smtp_configured: smtpConfigured, senders })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -13467,6 +13724,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
              from_name = EXCLUDED.from_name, from_email = EXCLUDED.from_email, updated_at = now()`,
           [provider || null, host || null, port || 587, !!secure, username || null, password || null, from_name || null, from_email || null]
         )
+        await syncDefaultSenderFromSmtpForm(client, from_email, from_name)
         await client.end()
         res.json({ success: true })
       } catch (e) {
@@ -13493,6 +13751,233 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    const SMTP_PROFILE_UUID_RE =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+    const adminHubSmtpSendersPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const { from_email, from_name } = req.body || {}
+        const fe = String(from_email || '').trim()
+        if (!fe) {
+          await client.end()
+          return res.status(400).json({ message: 'from_email required' })
+        }
+        const cnt = await client.query(`SELECT COUNT(*)::int AS n FROM store_smtp_sender_profiles WHERE seller_id = 'default'`)
+        const isFirst = Number(cnt.rows[0]?.n || 0) === 0
+        const ins = await client.query(
+          `INSERT INTO store_smtp_sender_profiles (seller_id, from_email, from_name, is_default)
+           VALUES ('default', $1, $2, $3)
+           RETURNING id, from_email, from_name, is_default, last_test_ok, last_test_at, last_test_message`,
+          [fe, String(from_name || '').trim() || null, isFirst],
+        )
+        await client.end()
+        res.status(201).json({ sender: ins.rows[0] })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        const msg = e?.code === '23505' ? 'This from_email already exists' : e?.message || 'Error'
+        res.status(400).json({ message: msg })
+      }
+    }
+
+    const adminHubSmtpSendersPATCH = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const id = String(req.params.id || '').trim()
+        if (!SMTP_PROFILE_UUID_RE.test(id)) {
+          await client.end()
+          return res.status(400).json({ message: 'invalid id' })
+        }
+        const ex = await client.query(
+          `SELECT id FROM store_smtp_sender_profiles WHERE id = $1::uuid AND seller_id = 'default'`,
+          [id],
+        )
+        if (!ex.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Sender not found' })
+        }
+        const { from_email, from_name } = req.body || {}
+        const fe = String(from_email || '').trim()
+        if (!fe) {
+          await client.end()
+          return res.status(400).json({ message: 'from_email required' })
+        }
+        const up = await client.query(
+          `UPDATE store_smtp_sender_profiles SET from_email = $1, from_name = $2 WHERE id = $3::uuid AND seller_id = 'default'
+           RETURNING id, from_email, from_name, is_default, last_test_ok, last_test_at, last_test_message`,
+          [fe, String(from_name || '').trim() || null, id],
+        )
+        await client.end()
+        res.json({ sender: up.rows[0] })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        const msg = e?.code === '23505' ? 'This from_email already exists' : e?.message || 'Error'
+        res.status(400).json({ message: msg })
+      }
+    }
+
+    const adminHubSmtpSendersDELETE = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const id = String(req.params.id || '').trim()
+        if (!SMTP_PROFILE_UUID_RE.test(id)) {
+          await client.end()
+          return res.status(400).json({ message: 'invalid id' })
+        }
+        const row = await client.query(
+          `SELECT id, is_default FROM store_smtp_sender_profiles WHERE id = $1::uuid AND seller_id = 'default'`,
+          [id],
+        )
+        if (!row.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Sender not found' })
+        }
+        const total = await client.query(`SELECT COUNT(*)::int AS n FROM store_smtp_sender_profiles WHERE seller_id = 'default'`)
+        if (Number(total.rows[0]?.n || 0) <= 1) {
+          await client.end()
+          return res.status(400).json({ message: 'Cannot delete the only sender profile' })
+        }
+        await client.query(`DELETE FROM store_smtp_sender_profiles WHERE id = $1::uuid AND seller_id = 'default'`, [id])
+        if (row.rows[0].is_default) {
+          const pick = await client.query(
+            `SELECT id FROM store_smtp_sender_profiles WHERE seller_id = 'default' ORDER BY created_at ASC LIMIT 1`,
+          )
+          if (pick.rows[0]?.id) {
+            await client.query(`UPDATE store_smtp_sender_profiles SET is_default = true WHERE id = $1::uuid`, [pick.rows[0].id])
+            const sync = await client.query(
+              `SELECT from_email, from_name FROM store_smtp_sender_profiles WHERE id = $1::uuid`,
+              [pick.rows[0].id],
+            )
+            if (sync.rows[0]?.from_email) {
+              await client.query(
+                `UPDATE store_smtp_settings SET from_email = $1, from_name = $2, updated_at = now() WHERE seller_id = 'default'`,
+                [String(sync.rows[0].from_email).trim(), sync.rows[0].from_name || null],
+              )
+            }
+          }
+        }
+        await client.end()
+        res.json({ deleted: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(400).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubSmtpSendersSetDefaultPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const id = String(req.params.id || '').trim()
+        if (!SMTP_PROFILE_UUID_RE.test(id)) {
+          await client.end()
+          return res.status(400).json({ message: 'invalid id' })
+        }
+        const ex = await client.query(
+          `SELECT id FROM store_smtp_sender_profiles WHERE id = $1::uuid AND seller_id = 'default'`,
+          [id],
+        )
+        if (!ex.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Sender not found' })
+        }
+        await client.query(`UPDATE store_smtp_sender_profiles SET is_default = false WHERE seller_id = 'default'`)
+        await client.query(`UPDATE store_smtp_sender_profiles SET is_default = true WHERE id = $1::uuid AND seller_id = 'default'`, [id])
+        const sync = await client.query(
+          `SELECT from_email, from_name FROM store_smtp_sender_profiles WHERE id = $1::uuid`,
+          [id],
+        )
+        if (sync.rows[0]?.from_email) {
+          await client.query(
+            `UPDATE store_smtp_settings SET from_email = $1, from_name = $2, updated_at = now() WHERE seller_id = 'default'`,
+            [String(sync.rows[0].from_email).trim(), sync.rows[0].from_name || null],
+          )
+        }
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubSmtpSendersTestPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const id = String(req.params.id || '').trim()
+        const body = req.body || {}
+        const toRaw = String(body.to || '').trim()
+        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!SMTP_PROFILE_UUID_RE.test(id)) {
+          await client.end()
+          return res.status(400).json({ message: 'invalid id' })
+        }
+        if (!toRaw || !emailRe.test(toRaw)) {
+          await client.end()
+          return res.status(400).json({ message: 'valid to email required' })
+        }
+        const ex = await client.query(
+          `SELECT id FROM store_smtp_sender_profiles WHERE id = $1::uuid AND seller_id = 'default'`,
+          [id],
+        )
+        if (!ex.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Sender not found' })
+        }
+        const transport = await getSmtpTransport(client)
+        const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, id)
+        const msgOk = 'Test email sent'
+        try {
+          if (!transport) throw new Error('SMTP not configured')
+          const fe = String(fromEmail || '').trim()
+          if (!fe) throw new Error('From email not set for this sender')
+          await transport.sendMail({
+            from: `"${String(fromName).replace(/"/g, '')}" <${fe}>`,
+            to: toRaw,
+            subject: 'SMTP sender test',
+            text: 'Andertal SMTP sender test — OK',
+            html: '<p>Andertal SMTP sender test — OK</p>',
+          })
+          await client.query(
+            `UPDATE store_smtp_sender_profiles SET last_test_ok = true, last_test_at = now(), last_test_message = $2 WHERE id = $1::uuid`,
+            [id, msgOk],
+          )
+          await client.end()
+          return res.json({ success: true, message: msgOk })
+        } catch (sendErr) {
+          const errMsg = String(sendErr?.message || sendErr || 'Send failed').slice(0, 500)
+          await client.query(
+            `UPDATE store_smtp_sender_profiles SET last_test_ok = false, last_test_at = now(), last_test_message = $2 WHERE id = $1::uuid`,
+            [id, errMsg],
+          )
+          await client.end()
+          return res.status(400).json({ message: errMsg })
+        }
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     httpApp.get('/admin-hub/v1/notifications/unread', requireSellerAuth, adminHubNotificationsUnreadGET)
     httpApp.post('/admin-hub/v1/notifications/mark-seen', requireSellerAuth, adminHubNotificationsMarkSeenPOST)
     httpApp.get('/admin-hub/v1/notifications/feed', requireSellerAuth, adminHubNotificationsFeedGET)
@@ -13503,6 +13988,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.patch('/admin-hub/v1/messages/:id/read', adminHubMessageMarkReadPATCH)
     httpApp.get('/admin-hub/v1/message-templates', requireSellerAuth, adminHubMessageTemplatesGET)
     httpApp.post('/admin-hub/v1/message-templates', requireSellerAuth, adminHubMessageTemplatesPOST)
+    httpApp.patch('/admin-hub/v1/message-templates/:id', requireSellerAuth, adminHubMessageTemplatesPATCH)
     httpApp.delete('/admin-hub/v1/message-templates/:id', requireSellerAuth, adminHubMessageTemplatesDELETE)
     httpApp.get('/store/messages', storeMessagesGET)
     httpApp.post('/store/messages', storeMessagesPOST)
@@ -13543,6 +14029,11 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.get('/admin-hub/v1/smtp-settings', requireSellerAuth, adminHubSmtpSettingsGET)
     httpApp.patch('/admin-hub/v1/smtp-settings', requireSellerAuth, requireSuperuser, adminHubSmtpSettingsPATCH)
     httpApp.post('/admin-hub/v1/smtp-settings/test', requireSellerAuth, requireSuperuser, adminHubSmtpSettingsTestPOST)
+    httpApp.post('/admin-hub/v1/smtp-senders', requireSellerAuth, requireSuperuser, adminHubSmtpSendersPOST)
+    httpApp.patch('/admin-hub/v1/smtp-senders/:id', requireSellerAuth, requireSuperuser, adminHubSmtpSendersPATCH)
+    httpApp.delete('/admin-hub/v1/smtp-senders/:id', requireSellerAuth, requireSuperuser, adminHubSmtpSendersDELETE)
+    httpApp.post('/admin-hub/v1/smtp-senders/:id/set-default', requireSellerAuth, requireSuperuser, adminHubSmtpSendersSetDefaultPOST)
+    httpApp.post('/admin-hub/v1/smtp-senders/:id/test', requireSellerAuth, requireSuperuser, adminHubSmtpSendersTestPOST)
 
     // ── Automation flows (Content → Flows; superuser) ───────────────────────────
     /** Dokumentation + Testdaten für Flow-E-Mails; Platzhalter {KEY} (Groß/Klein egal) */
@@ -13662,6 +14153,76 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         desc: { en: 'Phone if known', de: 'Telefon falls bekannt', tr: 'Telefon (varsa)', fr: 'Téléphone', it: 'Telefono', es: 'Teléfono' },
       },
       {
+        key: 'GENDER',
+        sample: 'female',
+        category: 'customer',
+        triggers: ['*'],
+        desc: {
+          en: 'Raw gender from profile (if set)',
+          de: 'Geschlecht aus dem Profil (falls gesetzt)',
+          tr: 'Profildeki cinsiyet (varsa)',
+          fr: 'Genre du profil',
+          it: 'Genere dal profilo',
+          es: 'Género del perfil',
+        },
+      },
+      {
+        key: 'GREETING_DE',
+        sample: 'Sehr geehrte Frau',
+        category: 'customer',
+        triggers: ['*'],
+        desc: {
+          en: 'Formal German greeting line (from gender when set)',
+          de: 'Deutsche Anrede nach Geschlecht',
+          tr: 'Almanca hitap satırı (cinsiyete göre)',
+          fr: 'Formule allemande selon le genre',
+          it: 'Formula tedesca in base al genere',
+          es: 'Saludo formal DE según género',
+        },
+      },
+      {
+        key: 'GREETING_EN',
+        sample: 'Dear Ms.',
+        category: 'customer',
+        triggers: ['*'],
+        desc: {
+          en: 'English greeting prefix from gender',
+          de: 'Englische Anrede nach Geschlecht',
+          tr: 'İngilizce hitap (cinsiyete göre)',
+          fr: 'Formule anglaise selon le genre',
+          it: 'Formula inglese',
+          es: 'Saludo EN según género',
+        },
+      },
+      {
+        key: 'GREETING_TR',
+        sample: 'Sayın Bayan',
+        category: 'customer',
+        triggers: ['*'],
+        desc: {
+          en: 'Turkish greeting from gender',
+          de: 'Türkische Anrede nach Geschlecht',
+          tr: 'Türkçe hitap (cinsiyete göre)',
+          fr: 'Formule turque selon le genre',
+          it: 'Formula turca',
+          es: 'Saludo TR según género',
+        },
+      },
+      {
+        key: 'SALUTATION_DE',
+        sample: 'Frau',
+        category: 'customer',
+        triggers: ['*'],
+        desc: {
+          en: 'German title only (Herr/Frau)',
+          de: 'Anrede Kurzform',
+          tr: 'Almanca unvan (Bay/Bayan)',
+          fr: 'Civilité courte DE',
+          it: 'Titolo DE',
+          es: 'Tratamiento DE',
+        },
+      },
+      {
         key: 'TRACKING_NUMBER',
         sample: '1Z999AA10123456784',
         category: 'shipping',
@@ -13687,6 +14248,48 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           fr: 'Transporteur',
           it: 'Corriere',
           es: 'Transportista',
+        },
+      },
+      {
+        key: 'TRACKING_URL',
+        sample: 'https://www.dhl.de/…',
+        category: 'shipping',
+        triggers: ['order_shipped', 'order_delivered'],
+        desc: {
+          en: 'Carrier tracking web URL when number + carrier are known',
+          de: 'Tracking-Link (bekannte Carrier)',
+          tr: 'Kargo takip linki',
+          fr: 'Lien de suivi transporteur',
+          it: 'URL tracking corriere',
+          es: 'URL seguimiento del transportista',
+        },
+      },
+      {
+        key: 'MY_ORDERS_URL',
+        sample: 'https://shop.example.com/orders',
+        category: 'shop',
+        triggers: ['order_placed', 'order_shipped', 'order_delivered', 'review_request', 'win_back'],
+        desc: {
+          en: 'Account orders page on the storefront (customer must be logged in)',
+          de: 'Shop-Bestellübersicht (Login nötig)',
+          tr: 'Mağaza siparişler sayfası',
+          fr: 'Page commandes du site',
+          it: 'Pagina ordini del negozio',
+          es: 'Página de pedidos de la tienda',
+        },
+      },
+      {
+        key: 'ORDER_UUID',
+        sample: '550e8400-e29b-41d4-a716-446655440000',
+        category: 'order',
+        triggers: ['order_placed', 'order_shipped', 'order_delivered', 'review_request', 'win_back'],
+        desc: {
+          en: 'Internal order UUID (not the display order number)',
+          de: 'Interne Bestell-UUID',
+          tr: 'Sipariş UUID',
+          fr: 'UUID commande interne',
+          it: 'UUID ordine',
+          es: 'UUID interno del pedido',
         },
       },
       {
@@ -13991,6 +14594,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       email_subject: row.email_subject || '',
       email_body: row.email_body || '',
       email_i18n: row.email_i18n && typeof row.email_i18n === 'object' ? row.email_i18n : null,
+      email_attachments: Array.isArray(row.email_attachments) ? row.email_attachments : [],
+      smtp_sender_id: row.smtp_sender_id || null,
     })
 
     const adminHubFlowsListGET = async (req, res) => {
@@ -14131,6 +14736,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
         if (Array.isArray(body.steps)) {
           const FLOW_SAVE_LOCALES = ['de', 'en', 'tr', 'fr', 'it', 'es']
+          const FLOW_ATTACH_KEYS = new Set(['invoice_pdf', 'lieferschein_pdf'])
+          const SMTP_SENDER_UUID_RE =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
           const normalized = []
           for (let i = 0; i < body.steps.length; i++) {
             const s = body.steps[i] || {}
@@ -14147,6 +14755,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 email_subject: null,
                 email_body: null,
                 email_i18n: null,
+                email_attachments: null,
+                smtp_sender_id: null,
               })
             } else {
               let emailI18nObj = null
@@ -14185,6 +14795,28 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                   message: `Email step at index ${i} needs subject and body (use locale tabs or legacy fields)`,
                 })
               }
+              let attachList = []
+              if (Array.isArray(s.email_attachments)) {
+                attachList = [...new Set(s.email_attachments.map(String).filter((k) => FLOW_ATTACH_KEYS.has(k)))]
+              }
+              let smtpSenderId = null
+              const rawSid = s.smtp_sender_id
+              if (rawSid != null && String(rawSid).trim() !== '') {
+                const sid = String(rawSid).trim()
+                if (!SMTP_SENDER_UUID_RE.test(sid)) {
+                  await client.end()
+                  return res.status(400).json({ message: `Invalid smtp_sender_id at index ${i}` })
+                }
+                const okSid = await client.query(
+                  `SELECT 1 FROM store_smtp_sender_profiles WHERE id = $1::uuid AND seller_id = 'default'`,
+                  [sid],
+                )
+                if (!okSid.rows[0]) {
+                  await client.end()
+                  return res.status(400).json({ message: `Unknown smtp_sender_id at index ${i}` })
+                }
+                smtpSenderId = sid
+              }
               normalized.push({
                 order: i,
                 step_type: stepType,
@@ -14192,15 +14824,27 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 email_subject: subj,
                 email_body: emBody,
                 email_i18n: emailI18nObj,
+                email_attachments: attachList.length ? attachList : null,
+                smtp_sender_id: smtpSenderId,
               })
             }
           }
           await client.query(`DELETE FROM admin_hub_flow_steps WHERE flow_id = $1`, [id])
           for (const row of normalized) {
             await client.query(
-              `INSERT INTO admin_hub_flow_steps (flow_id, step_order, step_type, wait_hours, email_subject, email_body, email_i18n)
-               VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
-              [id, row.order, row.step_type, row.wait_hours, row.email_subject, row.email_body, row.email_i18n],
+              `INSERT INTO admin_hub_flow_steps (flow_id, step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::uuid)`,
+              [
+                id,
+                row.order,
+                row.step_type,
+                row.wait_hours,
+                row.email_subject,
+                row.email_body,
+                row.email_i18n,
+                row.email_attachments,
+                row.smtp_sender_id,
+              ],
             )
           }
         }
@@ -14259,6 +14903,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
         let subject
         let htmlBody
+        let stepSmtpSenderId = null
         const stepOrderArg = body.step_order
         const hasStepOrder = stepOrderArg != null && stepOrderArg !== ''
         if (hasStepOrder) {
@@ -14268,7 +14913,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             return res.status(400).json({ message: 'invalid step_order' })
           }
           const sr = await client.query(
-            `SELECT email_subject, email_body, email_i18n FROM admin_hub_flow_steps
+            `SELECT email_subject, email_body, email_i18n, smtp_sender_id FROM admin_hub_flow_steps
              WHERE flow_id = $1 AND step_order = $2 AND step_type = 'send_email'`,
             [id, so],
           )
@@ -14301,6 +14946,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           }
           subject = pickedSubj
           htmlBody = pickedBody
+          stepSmtpSenderId = sr.rows[0].smtp_sender_id || null
         } else {
           subject = String(body.email_subject || '').trim()
           htmlBody = String(body.email_body || '').trim()
@@ -14310,29 +14956,65 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           }
         }
 
+        const customerIdRaw = String(body.customer_id || '').trim()
+        let customerDerived = {}
+        if (customerIdRaw) {
+          const flowAutomation = require('./src/flow-automation')
+          const built = await flowAutomation.buildFlowEmailPlaceholderVarsForCustomer(client, customerIdRaw)
+          if (!built) {
+            await client.end()
+            return res.status(404).json({ message: 'Customer not found' })
+          }
+          customerDerived = built
+        }
+
+        let pdfAttachments = []
+        const attachReq = Array.isArray(body.attachments) ? body.attachments : []
+        const ALLOW_FLOW_TEST_ATTACH = new Set(['invoice_pdf', 'lieferschein_pdf'])
+        const filteredAttach = [...new Set(attachReq.map(String).filter((k) => ALLOW_FLOW_TEST_ATTACH.has(k)))]
+        if (filteredAttach.length && customerIdRaw) {
+          try {
+            const ordPick = await client.query(
+              `SELECT id FROM store_orders WHERE customer_id = $1::uuid ORDER BY created_at DESC LIMIT 1`,
+              [customerIdRaw],
+            )
+            if (ordPick.rows[0]?.id) {
+              const { buildFlowEmailPdfAttachments } = require('./src/order-pdf-buffers')
+              pdfAttachments = await buildFlowEmailPdfAttachments(client, ordPick.rows[0].id, filteredAttach)
+            }
+          } catch (attErr) {
+            console.error('[flow-test-email] pdf attachments', attErr?.message || attErr)
+          }
+        }
+
         const transport = await getSmtpTransport(client)
-        const smtpR = await client.query(`SELECT from_email, from_name FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
+        const bodySenderRaw = body.smtp_sender_id
+        const bodySender =
+          bodySenderRaw != null && String(bodySenderRaw).trim() !== '' ? String(bodySenderRaw).trim() : null
+        const profileForSend = bodySender || (stepSmtpSenderId ? String(stepSmtpSenderId) : null)
+        const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, profileForSend)
         await client.end()
 
         if (!transport) return res.status(400).json({ message: 'SMTP not configured' })
-        const fromEmail = String(smtpR.rows[0]?.from_email || '').trim()
-        if (!fromEmail) return res.status(400).json({ message: 'SMTP From email not set' })
-        const fromName = smtpR.rows[0]?.from_name || 'Shop'
+        const fromEmailTrim = String(fromEmail || '').trim()
+        if (!fromEmailTrim) return res.status(400).json({ message: 'SMTP From email not set' })
 
         const extraVars =
           body.placeholders && typeof body.placeholders === 'object' && !Array.isArray(body.placeholders)
             ? body.placeholders
             : {}
-        const finalSubject = applyFlowEmailPlaceholders(subject, extraVars)
-        const finalHtml = applyFlowEmailPlaceholders(htmlBody, extraVars)
+        const mergedVars = { ...customerDerived, ...extraVars }
+        const finalSubject = applyFlowEmailPlaceholders(subject, mergedVars)
+        const finalHtml = applyFlowEmailPlaceholders(htmlBody, mergedVars)
         const plain = flowEmailHtmlToPlainText(finalHtml)
 
         await transport.sendMail({
-          from: `"${String(fromName).replace(/"/g, '')}" <${fromEmail}>`,
+          from: `"${String(fromName).replace(/"/g, '')}" <${fromEmailTrim}>`,
           to: toRaw,
           subject: finalSubject,
           html: finalHtml,
           text: plain || finalSubject,
+          ...(pdfAttachments.length ? { attachments: pdfAttachments } : {}),
         })
         res.json({ success: true, message: 'Test email sent' })
       } catch (e) {

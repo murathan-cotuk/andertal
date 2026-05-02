@@ -4,6 +4,7 @@
  */
 
 const { Client } = require('pg')
+const { resolveSmtpSenderIdentity } = require('./smtp-sender-resolve')
 
 const FLOW_EMAIL_LOCALES = ['en', 'de', 'tr', 'fr', 'it', 'es']
 
@@ -45,6 +46,23 @@ function formatEuro(cents) {
   const n = Number(cents)
   if (Number.isNaN(n)) return '0,00 €'
   return `${(n / 100).toFixed(2).replace('.', ',')} €`
+}
+
+/** Carrier tracking page URL when carrier + number are known (same heuristics as storefront orders page). */
+function trackingUrlFromCarrier(carrierRaw, numberRaw) {
+  const number = String(numberRaw || '').trim()
+  if (!number) return ''
+  const c = String(carrierRaw || '').toLowerCase().trim()
+  if (c.includes('dhl')) return `https://www.dhl.de/de/privatkunden/dhl-sendungsverfolgung.html?piececode=${encodeURIComponent(number)}`
+  if (c.includes('dpd')) return `https://tracking.dpd.de/status/de_DE/parcel/${encodeURIComponent(number)}`
+  if (c.includes('ups')) return `https://www.ups.com/track?tracknum=${encodeURIComponent(number)}`
+  if (c.includes('fedex')) return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(number)}`
+  if (c.includes('hermes') || c.includes('evri'))
+    return `https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsdetails/#/${encodeURIComponent(number)}`
+  if (c.includes('gls')) return `https://gls-group.com/DE/de/paketverfolgung?match=${encodeURIComponent(number)}`
+  if (c.includes('post') || c.includes('brief'))
+    return `https://www.deutschepost.de/de/s/sendungsverfolgung.html?barcode=${encodeURIComponent(number)}`
+  return ''
 }
 
 function applyFlowEmailPlaceholders(template, vars) {
@@ -153,12 +171,72 @@ async function loadOrderContext(client, orderId) {
   return { order, items, storeName, supportEmail, siteUrl, lineSummary, productTitle }
 }
 
-function buildPlaceholderVars(ctx, triggerKey) {
+function salutationVarsFromGender(genderRaw) {
+  const g = String(genderRaw || '').trim().toLowerCase()
+  const isFemale = ['female', 'f', 'woman', 'w', 'frau'].includes(g)
+  const isMale = ['male', 'm', 'man', 'herr'].includes(g)
+  const raw = String(genderRaw || '').trim()
+  let SALUTATION_DE = ''
+  let GREETING_DE = ''
+  let SALUTATION_EN = ''
+  let GREETING_EN = ''
+  let SALUTATION_TR = ''
+  let GREETING_TR = ''
+  if (isFemale) {
+    SALUTATION_DE = 'Frau'
+    GREETING_DE = 'Sehr geehrte Frau'
+    SALUTATION_EN = 'Ms.'
+    GREETING_EN = 'Dear Ms.'
+    SALUTATION_TR = 'Bayan'
+    GREETING_TR = 'Sayın Bayan'
+  } else if (isMale) {
+    SALUTATION_DE = 'Herr'
+    GREETING_DE = 'Sehr geehrter Herr'
+    SALUTATION_EN = 'Mr.'
+    GREETING_EN = 'Dear Mr.'
+    SALUTATION_TR = 'Bay'
+    GREETING_TR = 'Sayın Bay'
+  } else {
+    GREETING_DE = 'Guten Tag'
+    GREETING_EN = 'Hello'
+    GREETING_TR = 'Merhaba'
+  }
+  return {
+    GENDER: raw,
+    SALUTATION_DE,
+    GREETING_DE,
+    SALUTATION_EN,
+    GREETING_EN,
+    SALUTATION_TR,
+    GREETING_TR,
+  }
+}
+
+function overlayCustomerProfile(vars, cust) {
+  if (!cust) return
+  const fn = String(cust.first_name || '').trim()
+  const ln = String(cust.last_name || '').trim()
+  const fullName = [fn, ln].filter(Boolean).join(' ') || String(cust.email || '').trim()
+  if (fn) vars.FIRST_NAME = fn
+  if (ln) vars.LAST_NAME = ln
+  if (fullName) {
+    vars.CUSTOMER_NAME = fullName
+    vars.CUSTOMER = fullName
+    if (!vars.SHIPPING_FULL_NAME) vars.SHIPPING_FULL_NAME = fullName
+  }
+  const em = String(cust.email || '').trim()
+  if (em) vars.EMAIL = em
+  const ph = String(cust.phone || '').trim()
+  if (ph) vars.PHONE = ph
+}
+
+function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
   const { order, items, storeName, supportEmail, siteUrl, lineSummary, productTitle } = ctx
   const fn = String(order.first_name || '').trim()
   const ln = String(order.last_name || '').trim()
   const fullName = [fn, ln].filter(Boolean).join(' ') || String(order.email || '').trim()
   const ordDate = order.created_at ? new Date(order.created_at).toLocaleDateString('de-DE') : ''
+  const baseSite = String(siteUrl || '').replace(/\/$/, '')
   const vars = {
     CUSTOMER_NAME: fullName,
     CUSTOMER: fullName,
@@ -168,6 +246,7 @@ function buildPlaceholderVars(ctx, triggerKey) {
     PHONE: String(order.phone || '').trim(),
     ORDER_NUMBER: String(order.order_number != null ? order.order_number : ''),
     ORDER_ID: String(order.order_number != null ? order.order_number : ''),
+    ORDER_UUID: String(order.id || ''),
     ORDER_DATE: ordDate,
     ORDER_TOTAL: formatEuro(order.total_cents),
     ORDER_SUBTOTAL: formatEuro(order.subtotal_cents),
@@ -191,12 +270,92 @@ function buildPlaceholderVars(ctx, triggerKey) {
     SUPPORT_EMAIL: supportEmail || String(order.email || '').trim(),
     TRACKING_NUMBER: String(order.tracking_number || '').trim(),
     CARRIER_NAME: String(order.carrier_name || '').trim(),
+    TRACKING_URL: trackingUrlFromCarrier(order.carrier_name, order.tracking_number),
+    MY_ORDERS_URL: baseSite ? `${baseSite}/orders` : '',
   }
   if (siteUrl && order.id) {
     vars.CHECKOUT_URL = `${siteUrl}/`
     vars.PRODUCT_URL = productTitle ? `${siteUrl}/` : `${siteUrl}/`
   }
+  if (customerProfile) {
+    overlayCustomerProfile(vars, customerProfile)
+    Object.assign(vars, salutationVarsFromGender(customerProfile.gender))
+  }
   return vars
+}
+
+async function placeholderVarsCustomerOnly(client, cust) {
+  const fn = String(cust.first_name || '').trim()
+  const ln = String(cust.last_name || '').trim()
+  const fullName = [fn, ln].filter(Boolean).join(' ') || String(cust.email || '').trim()
+  const sh = await client.query(`SELECT store_name, support_email FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`)
+  const storeName = String(sh.rows[0]?.store_name || 'Shop').trim() || 'Shop'
+  const supportEmail = String(sh.rows[0]?.support_email || '').trim()
+  const siteUrl = String(process.env.STOREFRONT_PUBLIC_URL || process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '')
+  return {
+    CUSTOMER_NAME: fullName,
+    CUSTOMER: fullName,
+    FIRST_NAME: fn || fullName,
+    LAST_NAME: ln,
+    EMAIL: String(cust.email || '').trim(),
+    PHONE: String(cust.phone || '').trim(),
+    ORDER_NUMBER: '',
+    ORDER_ID: '',
+    ORDER_DATE: '',
+    ORDER_TOTAL: '',
+    ORDER_SUBTOTAL: '',
+    ORDER_SHIPPING: '',
+    ORDER_DISCOUNT: '',
+    ORDER_CURRENCY: '',
+    PAYMENT_METHOD: '',
+    SHIPPING_FULL_NAME: fullName,
+    ADDRESS_LINE1: String(cust.address_line1 || ''),
+    ADDRESS_LINE2: String(cust.address_line2 || ''),
+    CITY: String(cust.city || ''),
+    POSTAL_CODE: String(cust.zip_code || ''),
+    ZIP_CODE: String(cust.zip_code || ''),
+    COUNTRY: String(cust.country || ''),
+    PRODUCT: '',
+    PRODUCT_NAME: '',
+    LINE_ITEMS_SUMMARY: '',
+    STORE_NAME: storeName,
+    SHOP_NAME: storeName,
+    SITE_URL: siteUrl || 'https://',
+    SUPPORT_EMAIL: supportEmail || String(cust.email || '').trim(),
+    TRACKING_NUMBER: '',
+    CARRIER_NAME: '',
+    TRACKING_URL: '',
+    MY_ORDERS_URL: siteUrl ? `${String(siteUrl).replace(/\/$/, '')}/orders` : '',
+    ORDER_UUID: '',
+    ...salutationVarsFromGender(cust.gender),
+  }
+}
+
+/**
+ * Merge fields for flow test emails: latest order for customer when present, else profile-only.
+ * @returns {Promise<object|null>} placeholder map, or null if customer id invalid / not found
+ */
+async function buildFlowEmailPlaceholderVarsForCustomer(client, customerId) {
+  const id = String(customerId || '').trim()
+  if (!id) return null
+  const cRes = await client.query(
+    `SELECT id, email, first_name, last_name, phone, gender, address_line1, address_line2, zip_code, city, country FROM store_customers WHERE id = $1::uuid`,
+    [id],
+  )
+  const cust = cRes.rows[0]
+  if (!cust) return null
+
+  const ordR = await client.query(
+    `SELECT id FROM store_orders WHERE customer_id = $1::uuid ORDER BY created_at DESC LIMIT 1`,
+    [id],
+  )
+
+  if (ordR.rows[0]) {
+    const ctx = await loadOrderContext(client, ordR.rows[0].id)
+    if (ctx) return buildPlaceholderVars(ctx, '*', cust)
+  }
+
+  return placeholderVarsCustomerOnly(client, cust)
 }
 
 /**
@@ -205,8 +364,6 @@ function buildPlaceholderVars(ctx, triggerKey) {
 async function sendImmediateStepsForFlow({
   client,
   transport,
-  fromEmail,
-  fromName,
   flowId,
   audience,
   triggerKey,
@@ -214,7 +371,9 @@ async function sendImmediateStepsForFlow({
   toEmail,
   templateLocale,
   placeholderVars,
+  orderId,
 }) {
+  const { buildFlowEmailPdfAttachments } = require('./order-pdf-buffers')
   let idx = 0
   while (idx < steps.length) {
     const s = steps[idx]
@@ -236,12 +395,28 @@ async function sendImmediateStepsForFlow({
     const subject = applyFlowEmailPlaceholders(tpl.subject, placeholderVars)
     const html = applyFlowEmailPlaceholders(tpl.body, placeholderVars)
     const plain = flowEmailHtmlToPlainText(html)
+    let attachments = []
+    const oid = String(orderId || '').trim()
+    const keys = Array.isArray(s.email_attachments) ? s.email_attachments : []
+    if (oid && keys.length) {
+      try {
+        attachments = await buildFlowEmailPdfAttachments(client, oid, keys)
+      } catch (e) {
+        console.error('[flow-automation] pdf attachments', e?.message || e)
+      }
+    }
+    const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, s.smtp_sender_id)
+    if (!fromEmail) {
+      idx += 1
+      continue
+    }
     await transport.sendMail({
       from: `"${String(fromName).replace(/"/g, '')}" <${fromEmail}>`,
       to: toEmail,
       subject,
       html,
       text: plain || subject,
+      ...(attachments.length ? { attachments } : {}),
     })
     idx += 1
   }
@@ -272,12 +447,18 @@ async function runAutomationFlowsForOrder(opts) {
     const transport = await getSmtpTransport(client)
     if (!transport) return
 
-    const smtpR = await client.query(`SELECT from_email, from_name FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
-    const fromEmail = String(smtpR.rows[0]?.from_email || '').trim()
-    if (!fromEmail) return
-    const fromName = smtpR.rows[0]?.from_name || 'Shop'
+    const { fromEmail: connFrom } = await resolveSmtpSenderIdentity(client, null)
+    if (!connFrom) return
 
-    const placeholderVars = buildPlaceholderVars(ctx, triggerKey)
+    let customerProfile = null
+    if (ctx.order.customer_id) {
+      const cr = await client.query(
+        `SELECT id, email, first_name, last_name, phone, gender FROM store_customers WHERE id = $1::uuid`,
+        [ctx.order.customer_id],
+      )
+      customerProfile = cr.rows[0] || null
+    }
+    const placeholderVars = buildPlaceholderVars(ctx, triggerKey, customerProfile)
     const customerLocale = resolveEmailLocaleFromCountry(ctx.order.country)
 
     const flowsR = await client.query(
@@ -292,7 +473,7 @@ async function runAutomationFlowsForOrder(opts) {
       const audience = String(fr.audience || 'customer').toLowerCase() === 'seller' ? 'seller' : 'customer'
 
       const sr = await client.query(
-        `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n
+        `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
          FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,
         [flowId],
       )
@@ -319,8 +500,6 @@ async function runAutomationFlowsForOrder(opts) {
       await sendImmediateStepsForFlow({
         client,
         transport,
-        fromEmail,
-        fromName,
         flowId,
         audience,
         triggerKey,
@@ -328,6 +507,7 @@ async function runAutomationFlowsForOrder(opts) {
         toEmail,
         templateLocale,
         placeholderVars,
+        orderId,
       })
     }
   } catch (e) {
@@ -344,4 +524,6 @@ module.exports = {
   runAutomationFlowsForOrder,
   resolveEmailLocaleFromCountry,
   FLOW_EMAIL_LOCALES,
+  buildFlowEmailPlaceholderVarsForCustomer,
+  resolveSmtpSenderIdentity,
 }

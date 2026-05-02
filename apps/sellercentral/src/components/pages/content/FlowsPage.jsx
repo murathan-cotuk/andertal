@@ -5,7 +5,7 @@ import FlowEmailBodyEditor from "@/components/content/FlowEmailBodyEditor";
 import { useLocale } from "next-intl";
 import {
   Page, Layout, Card, Text, Button, Badge, BlockStack, InlineStack,
-  Box, Spinner, Banner, Modal, TextField, Select, EmptyState, Divider, Collapsible,
+  Box, Spinner, Banner, Modal, TextField, Select, EmptyState, Divider, Collapsible, Checkbox,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
@@ -37,11 +37,17 @@ function normalizeSendEmailStep(step) {
     if (!i18n.de.subject && fbS) i18n.de.subject = fbS;
     if (!i18n.de.body && fbB) i18n.de.body = fbB;
   }
+  const rawAtt = step.email_attachments;
+  const email_attachments = Array.isArray(rawAtt)
+    ? rawAtt.filter((k) => k === "invoice_pdf" || k === "lieferschein_pdf")
+    : [];
   return {
     ...step,
     email_i18n: i18n,
     email_subject: i18n.de.subject || fbS,
     email_body: i18n.de.body || fbB,
+    email_attachments,
+    smtp_sender_id: step.smtp_sender_id || "",
   };
 }
 
@@ -109,6 +115,9 @@ const T = {
     stepEmailOption: "Send email",
     waitHoursHelp: "Pause this many hours before the next step.",
     emailSubjectLabel: "Email subject",
+    emailSenderLabel: "Sender (From)",
+    emailSenderDefaultOption: "Default — main sender",
+    emailSenderMainTag: "main",
     emailBodyLabel: "Email body",
     emailSubjectPh: "e.g. Thanks for your order",
     emailBodyPh: "<p>Dear {FIRST_NAME},</p><p>Thanks for shopping <strong>{PRODUCT}</strong>.</p>",
@@ -125,10 +134,10 @@ const T = {
     emailBodyModeHtml: "HTML",
     emailBodyModeText: "Plain text",
     placeholdersHelp:
-      "Personalization: use merge tokens from the list below. Test emails substitute sample values.",
+      "Personalization: use merge tokens from the list below. Test emails use sample values unless you choose a customer.",
     mergeFieldsTitle: "Merge tokens for this step",
     mergeFieldsIntro:
-      "Pick a token to append to the subject or HTML body, or copy it. At send time, tokens are replaced with real customer/order data (tests use samples).",
+      "Pick a token to append to the subject or HTML body, or copy it. Live sends use real data; tests use samples unless you pick a customer for test sends.",
     mergeFieldsSidebarTitle: "Merge field reference",
     mergeFieldsSidebarIntro: "Browse every supported token. Filtered tokens in the editor match this flow’s trigger.",
     mergeFieldsToggleShow: "Show list",
@@ -141,6 +150,15 @@ const T = {
     mergeFieldsErr: "Could not load the token list.",
     testEmailFieldLabel: "Send test emails to",
     testEmailFieldHelp: "Same address is used for every “Send test” below.",
+    testCustomerLabel: "Preview placeholders as customer",
+    testCustomerHelp:
+      "Uses this customer’s profile (and latest order if any). Leave empty for sample data (e.g. Jane Doe). Gender affects {GREETING_DE}, {GREETING_EN}, …",
+    testCustomerSampleOption: "Sample data (defaults)",
+    emailAttachmentsLabel: "PDF attachments (this email step)",
+    emailAttachmentsHelp:
+      "Invoice / delivery note PDFs attach when an order exists (live sends). For tests, pick a customer who has an order.",
+    attachInvoicePdf: "Invoice (Rechnung)",
+    attachLieferscheinPdf: "Delivery note (Lieferschein)",
     testEmailBtn: "Send test email",
     testEmailNeedAddress: "Enter your email above to send a test.",
     testEmailNeedStep: "Add subject and HTML body first.",
@@ -214,6 +232,9 @@ const T = {
     stepEmailOption: "E-Mail senden",
     waitHoursHelp: "So viele Stunden warten, bevor der nächste Schritt ausgeführt wird.",
     emailSubjectLabel: "Betreff",
+    emailSenderLabel: "Absender (Von)",
+    emailSenderDefaultOption: "Standard — Haupt-Absender",
+    emailSenderMainTag: "Haupt",
     emailBodyLabel: "E-Mail-Text",
     emailSubjectPh: "z. B. Danke für Ihre Bestellung",
     emailBodyPh: "<p>Hallo {FIRST_NAME},</p><p>vielen Dank für Ihren Einkauf: <strong>{PRODUCT}</strong>.</p>",
@@ -230,10 +251,10 @@ const T = {
     emailBodyModeHtml: "HTML",
     emailBodyModeText: "Klartext",
     placeholdersHelp:
-      "Personalisierung: Merge-Tokens aus der Liste unten verwenden. Tests nutzen Beispieldaten.",
+      "Personalisierung: Merge-Tokens aus der Liste unten verwenden. Tests nutzen Beispieldaten, außer Sie wählen einen Kunden.",
     mergeFieldsTitle: "Merge-Tokens für diesen Schritt",
     mergeFieldsIntro:
-      "Token an Betreff oder HTML-Text anhängen oder kopieren. Beim Versand werden echte Daten eingesetzt (Tests: Beispiele).",
+      "Token an Betreff oder HTML-Text anhängen oder kopieren. Live-Versand mit echten Daten; Tests mit Beispielen, außer beim Test einen Kunden wählen.",
     mergeFieldsSidebarTitle: "Alle Merge-Felder",
     mergeFieldsSidebarIntro: "Alle unterstützten Tokens. Im Editor werden sie nach Flow-Auslöser gefiltert.",
     mergeFieldsToggleShow: "Liste anzeigen",
@@ -246,6 +267,15 @@ const T = {
     mergeFieldsErr: "Token-Liste konnte nicht geladen werden.",
     testEmailFieldLabel: "Test-E-Mails senden an",
     testEmailFieldHelp: "Dieselbe Adresse für alle „Test senden“-Schaltflächen.",
+    testCustomerLabel: "Platzhalter-Vorschau als Kunde",
+    testCustomerHelp:
+      "Nutzt Profildaten (und letzte Bestellung, falls vorhanden). Leer lassen für Beispieldaten (z. B. Jane Doe). Geschlecht steuert {GREETING_DE}, …",
+    testCustomerSampleOption: "Beispieldaten (Standard)",
+    emailAttachmentsLabel: "PDF-Anhänge (dieser E-Mail-Schritt)",
+    emailAttachmentsHelp:
+      "Rechnung / Lieferschein werden angehängt, wenn eine Bestellung existiert (Live). Test: Kunde mit Bestellung wählen.",
+    attachInvoicePdf: "Rechnung (PDF)",
+    attachLieferscheinPdf: "Lieferschein (PDF)",
     testEmailBtn: "Test-E-Mail senden",
     testEmailNeedAddress: "Bitte oben eine E-Mail-Adresse eingeben.",
     testEmailNeedStep: "Zuerst Betreff und HTML-Text ausfüllen.",
@@ -319,6 +349,9 @@ const T = {
     stepEmailOption: "E-posta gönder",
     waitHoursHelp: "Sonraki adımdan önce beklenecek saat.",
     emailSubjectLabel: "E-posta konusu",
+    emailSenderLabel: "Gönderen (Kimden)",
+    emailSenderDefaultOption: "Varsayılan — ana gönderen",
+    emailSenderMainTag: "ana",
     emailBodyLabel: "E-posta metni",
     emailSubjectPh: "ör. Siparişiniz için teşekkürler",
     emailBodyPh: "<p>Merhaba {FIRST_NAME},</p><p><strong>{PRODUCT}</strong> için alışverişinize teşekkürler.</p>",
@@ -335,10 +368,10 @@ const T = {
     emailBodyModeHtml: "HTML",
     emailBodyModeText: "Düz metin",
     placeholdersHelp:
-      "Kişiselleştirme: aşağıdaki listeden birleştirme alanlarını kullanın. Testlerde örnek veriler kullanılır.",
+      "Kişiselleştirme: aşağıdaki listeden birleştirme alanlarını kullanın. Testte müşteri seçmezseniz örnek veriler kullanılır.",
     mergeFieldsTitle: "Bu adım için birleştirme alanları",
     mergeFieldsIntro:
-      "Konuya veya HTML gövdesine ekle veya panoya kopyala. Gönderimde gerçek müşteri/sipariş verisi gelir (testte örnek).",
+      "Konuya veya HTML gövdesine ekle veya kopyala. Canlıda gerçek veri; testte müşteri seçilmezse örnek veri.",
     mergeFieldsSidebarTitle: "Tüm birleştirme alanları",
     mergeFieldsSidebarIntro: "Desteklenen tüm alanlar. Düzenleyicide liste bu akışın tetikleyicisine göre filtrelenir.",
     mergeFieldsToggleShow: "Listeyi göster",
@@ -351,6 +384,15 @@ const T = {
     mergeFieldsErr: "Alan listesi yüklenemedi.",
     testEmailFieldLabel: "Test e-postası gönderilecek adres",
     testEmailFieldHelp: "Aşağıdaki tüm test gönderimleri bu adresi kullanır.",
+    testCustomerLabel: "Önizleme için müşteri",
+    testCustomerHelp:
+      "Profil bilgisi ve varsa son sipariş kullanılır. Boş bırakırsanız örnek veri (Jane Doe vb.). Cinsiyet {GREETING_TR}, {GREETING_DE} vb. için kullanılır.",
+    testCustomerSampleOption: "Örnek veri (varsayılan)",
+    emailAttachmentsLabel: "PDF ekleri (bu e-posta adımı)",
+    emailAttachmentsHelp:
+      "Sipariş varsa fatura / irsaliye PDF eklenir (canlı). Test: siparişi olan müşteri seçin.",
+    attachInvoicePdf: "Fatura (Rechnung)",
+    attachLieferscheinPdf: "İrsaliye (Lieferschein)",
     testEmailBtn: "Test e-postası gönder",
     testEmailNeedAddress: "Önce yukarıya e-posta yazın.",
     testEmailNeedStep: "Önce konu ve HTML gövde ekleyin.",
@@ -424,6 +466,9 @@ const T = {
     stepEmailOption: "Envoyer un e-mail",
     waitHoursHelp: "Heures d'attente avant l'étape suivante.",
     emailSubjectLabel: "Objet",
+    emailSenderLabel: "Expéditeur (De)",
+    emailSenderDefaultOption: "Par défaut — expéditeur principal",
+    emailSenderMainTag: "principal",
     emailBodyLabel: "Corps",
     emailSubjectPh: "ex. Merci pour votre commande",
     emailBodyPh: "<p>Bonjour {FIRST_NAME},</p><p>Merci pour votre achat : <strong>{PRODUCT}</strong>.</p>",
@@ -440,10 +485,10 @@ const T = {
     emailBodyModeHtml: "HTML",
     emailBodyModeText: "Texte brut",
     placeholdersHelp:
-      "Personnalisation : utilisez les jetons ci-dessous. Les tests utilisent des exemples.",
+      "Personnalisation : utilisez les jetons ci-dessous. Les tests utilisent des exemples sauf si vous choisissez un client.",
     mergeFieldsTitle: "Jetons pour cette étape",
     mergeFieldsIntro:
-      "Ajoutez au sujet ou au corps HTML, ou copiez. Les données réelles sont injectées à l’envoi.",
+      "Ajoutez au sujet ou au corps HTML, ou copiez. Envoi réel : données réelles ; test : exemples sauf si un client est choisi.",
     mergeFieldsSidebarTitle: "Référence des champs",
     mergeFieldsSidebarIntro: "Tous les jetons pris en charge. L’éditeur filtre selon le déclencheur.",
     mergeFieldsToggleShow: "Afficher la liste",
@@ -456,6 +501,15 @@ const T = {
     mergeFieldsErr: "Impossible de charger la liste.",
     testEmailFieldLabel: "Envoyer les e-mails de test à",
     testEmailFieldHelp: "La même adresse pour chaque bouton « Envoyer un test ».",
+    testCustomerLabel: "Aperçu des champs pour un client",
+    testCustomerHelp:
+      "Utilise le profil (et la dernière commande si disponible). Vide = données d’exemple. Le genre remplit {GREETING_DE}, {GREETING_EN}, …",
+    testCustomerSampleOption: "Données d’exemple",
+    emailAttachmentsLabel: "Pièces PDF (étape e-mail)",
+    emailAttachmentsHelp:
+      "Facture / bon de livraison si une commande existe (envoi réel). Test : client avec commande.",
+    attachInvoicePdf: "Facture (Rechnung)",
+    attachLieferscheinPdf: "Bon de livraison (Lieferschein)",
     testEmailBtn: "Envoyer un e-mail de test",
     testEmailNeedAddress: "Indiquez votre e-mail ci-dessus.",
     testEmailNeedStep: "Renseignez d'abord l'objet et le corps HTML.",
@@ -529,6 +583,9 @@ const T = {
     stepEmailOption: "Invia e-mail",
     waitHoursHelp: "Ore di attesa prima del passo successivo.",
     emailSubjectLabel: "Oggetto",
+    emailSenderLabel: "Mittente (Da)",
+    emailSenderDefaultOption: "Predefinito — mittente principale",
+    emailSenderMainTag: "principale",
     emailBodyLabel: "Corpo",
     emailSubjectPh: "es. Grazie per il tuo ordine",
     emailBodyPh: "<p>Ciao {FIRST_NAME},</p><p>Grazie per aver acquistato <strong>{PRODUCT}</strong>.</p>",
@@ -545,9 +602,18 @@ const T = {
     emailBodyModeHtml: "HTML",
     emailBodyModeText: "Testo",
     placeholdersHelp:
-      "Segnaposto (dati di esempio nei test): {CUSTOMER_NAME}, {FIRST_NAME}, {LAST_NAME}, {EMAIL}, {PRODUCT}, {ORDER_NUMBER}, {STORE_NAME}.",
+      "Segnaposto (dati di esempio nei test): {CUSTOMER_NAME}, {FIRST_NAME}, {LAST_NAME}, {EMAIL}, {PRODUCT}, {ORDER_NUMBER}, {STORE_NAME}. Scegli un cliente sotto per dati reali.",
     testEmailFieldLabel: "Invia e-mail di test a",
     testEmailFieldHelp: "Lo stesso indirizzo per ogni pulsante « Invia test ».",
+    testCustomerLabel: "Anteprima come cliente",
+    testCustomerHelp:
+      "Usa profilo e ultimo ordine se presente. Vuoto = dati di esempio. Il genere influenza {GREETING_DE}, {GREETING_EN}, …",
+    testCustomerSampleOption: "Dati di esempio",
+    emailAttachmentsLabel: "Allegati PDF (passaggio e-mail)",
+    emailAttachmentsHelp:
+      "Fattura / bolla di accompagnamento se esiste un ordine (invio reale). Test: cliente con ordine.",
+    attachInvoicePdf: "Fattura (Rechnung)",
+    attachLieferscheinPdf: "Documento di trasporto (Lieferschein)",
     testEmailBtn: "Invia e-mail di test",
     testEmailNeedAddress: "Inserisci sopra un indirizzo e-mail.",
     testEmailNeedStep: "Compila prima oggetto e corpo HTML.",
@@ -621,6 +687,9 @@ const T = {
     stepEmailOption: "Enviar correo",
     waitHoursHelp: "Horas de espera antes del siguiente paso.",
     emailSubjectLabel: "Asunto",
+    emailSenderLabel: "Remitente (De)",
+    emailSenderDefaultOption: "Predeterminado — remitente principal",
+    emailSenderMainTag: "principal",
     emailBodyLabel: "Cuerpo",
     emailSubjectPh: "ej. Gracias por tu pedido",
     emailBodyPh: "<p>Hola {FIRST_NAME},</p><p>Gracias por comprar <strong>{PRODUCT}</strong>.</p>",
@@ -637,10 +706,10 @@ const T = {
     emailBodyModeHtml: "HTML",
     emailBodyModeText: "Texto",
     placeholdersHelp:
-      "Personalización: usa los tokens de la lista. Las pruebas usan datos de ejemplo.",
+      "Personalización: usa los tokens de la lista. Las pruebas usan datos de ejemplo salvo que elijas un cliente.",
     mergeFieldsTitle: "Tokens para este paso",
     mergeFieldsIntro:
-      "Añade al asunto o al cuerpo HTML, o copia. En el envío se sustituyen datos reales.",
+      "Añade al asunto o al cuerpo HTML, o copia. Envío real con datos reales; pruebas con ejemplos salvo que elijas un cliente.",
     mergeFieldsSidebarTitle: "Referencia de campos",
     mergeFieldsSidebarIntro: "Todos los tokens admitidos. El editor filtra por disparador.",
     mergeFieldsToggleShow: "Mostrar lista",
@@ -653,6 +722,15 @@ const T = {
     mergeFieldsErr: "No se pudo cargar la lista.",
     testEmailFieldLabel: "Enviar correos de prueba a",
     testEmailFieldHelp: "La misma dirección para cada « Enviar prueba ».",
+    testCustomerLabel: "Vista previa como cliente",
+    testCustomerHelp:
+      "Usa el perfil (y el último pedido si existe). Vacío = datos de ejemplo. El género afecta a {GREETING_DE}, {GREETING_EN}, …",
+    testCustomerSampleOption: "Datos de ejemplo",
+    emailAttachmentsLabel: "Adjuntos PDF (paso de correo)",
+    emailAttachmentsHelp:
+      "Factura / albarán si hay pedido (envío real). Prueba: cliente con pedido.",
+    attachInvoicePdf: "Factura (Rechnung)",
+    attachLieferscheinPdf: "Albarán (Lieferschein)",
     testEmailBtn: "Enviar correo de prueba",
     testEmailNeedAddress: "Escribe tu correo arriba.",
     testEmailNeedStep: "Completa primero asunto y cuerpo HTML.",
@@ -814,6 +892,20 @@ export default function FlowsPage() {
     [],
   );
 
+  const [testFlowCustomerId, setTestFlowCustomerId] = useState("");
+  const [testFlowCustomers, setTestFlowCustomers] = useState([]);
+  const [testFlowCustomersLoading, setTestFlowCustomersLoading] = useState(false);
+
+  const testCustomerSelectOptions = useMemo(() => {
+    const base = [{ label: t.testCustomerSampleOption, value: "" }];
+    const rows = (testFlowCustomers || []).map((c) => {
+      const name = [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
+      const label = name ? `${c.email} — ${name}` : String(c.email || c.id || "");
+      return { label, value: c.id };
+    });
+    return [...base, ...rows];
+  }, [testFlowCustomers, t.testCustomerSampleOption]);
+
   const flowEmailTemplates = useMemo(
     () => [
       {
@@ -861,6 +953,7 @@ export default function FlowsPage() {
   const [newTrigger, setNewTrigger]     = useState("abandoned_cart");
   const [newNameErr, setNewNameErr]     = useState("");
   const [smtpConfigured, setSmtpConfigured] = useState(null);
+  const [smtpSenders, setSmtpSenders] = useState([]);
   const [isSuperuser, setIsSuperuser] = useState(false);
 
   const [editOpen, setEditOpen]         = useState(false);
@@ -876,6 +969,7 @@ export default function FlowsPage() {
   const [pageMergeLoading, setPageMergeLoading] = useState(true);
   const [pageMergeErr, setPageMergeErr] = useState("");
   const [sidebarMergeOpen, setSidebarMergeOpen] = useState(false);
+  const [editStepMergeOpen, setEditStepMergeOpen] = useState({});
   const [editMergeCatalog, setEditMergeCatalog] = useState(null);
   const [editMergeLoading, setEditMergeLoading] = useState(false);
   const [editMergeErr, setEditMergeErr] = useState("");
@@ -886,6 +980,18 @@ export default function FlowsPage() {
   const flowEmailBodyRefs = useRef({});
   const flowTestBannerRef = useRef(null);
   const flowTestToastTimerRef = useRef(null);
+
+  const senderSelectOptions = useMemo(() => {
+    const opts = [{ label: t.emailSenderDefaultOption, value: "" }];
+    for (const s of smtpSenders || []) {
+      const name = String(s.from_name || "").trim();
+      const email = String(s.from_email || "").trim();
+      const main = s.is_default ? ` (${t.emailSenderMainTag})` : "";
+      const label = name ? `${name} <${email}>${main}` : `${email}${main}`;
+      opts.push({ label, value: String(s.id) });
+    }
+    return opts;
+  }, [smtpSenders, t.emailSenderDefaultOption, t.emailSenderMainTag]);
 
   const showFlowTestFeedback = useCallback((tone, message) => {
     setFlowTestBanner({ tone, message });
@@ -912,7 +1018,11 @@ export default function FlowsPage() {
     client.getSmtpSettings().then((v) => {
       const ok = !!(v?.smtp_configured === true || v?.smtp?.host || v?.smtp?.smtp_host);
       setSmtpConfigured(ok);
-    }).catch(() => setSmtpConfigured(null));
+      setSmtpSenders(Array.isArray(v?.senders) ? v.senders : []);
+    }).catch(() => {
+      setSmtpConfigured(null);
+      setSmtpSenders([]);
+    });
   }, [editOpen]);
 
   useEffect(() => {
@@ -969,6 +1079,30 @@ export default function FlowsPage() {
       cancelled = true;
     };
   }, [editOpen, locale, editTrigger]);
+
+  useEffect(() => {
+    if (!editOpen || editAudience !== "customer") return;
+    let cancelled = false;
+    setTestFlowCustomersLoading(true);
+    client
+      .getCustomers({ search: "", limit: 100 })
+      .then((data) => {
+        if (!cancelled) setTestFlowCustomers(data?.customers || []);
+      })
+      .catch(() => {
+        if (!cancelled) setTestFlowCustomers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTestFlowCustomersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editOpen, editAudience]);
+
+  useEffect(() => {
+    if (editAudience !== "customer") setTestFlowCustomerId("");
+  }, [editAudience]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1035,6 +1169,8 @@ export default function FlowsPage() {
     setFlowTestToast(null);
     setTestSendingStepIdx(null);
     setStepTemplateLang({});
+    setEditStepMergeOpen({});
+    setTestFlowCustomerId("");
     setEditingFlowId(flow.id);
     setEditLoading(true);
     setEditOpen(true);
@@ -1054,6 +1190,8 @@ export default function FlowsPage() {
             email_subject: s.email_subject || "",
             email_body: s.email_body || "",
             email_i18n: s.email_i18n || null,
+            email_attachments: Array.isArray(s.email_attachments) ? s.email_attachments : [],
+            smtp_sender_id: s.smtp_sender_id || "",
           };
           return base.step_type === "send_email" ? normalizeSendEmailStep(base) : base;
         }),
@@ -1077,6 +1215,8 @@ export default function FlowsPage() {
     setTestSendingStepIdx(null);
     flowEmailBodyRefs.current = {};
     setStepTemplateLang({});
+    setEditStepMergeOpen({});
+    setTestFlowCustomerId("");
     setTranslateBusyIdx(null);
   };
 
@@ -1117,11 +1257,26 @@ export default function FlowsPage() {
     setFlowTestBanner(null);
     setFlowTestToast(null);
     try {
-      await client.sendFlowTestEmail(editingFlowId, {
+      const payload = {
         to,
         email_subject: subj,
         email_body: htmlBody,
-      });
+      };
+      const senderSel = String(step.smtp_sender_id || "").trim();
+      if (senderSel) payload.smtp_sender_id = senderSel;
+      if (editAudience === "customer" && testFlowCustomerId) {
+        payload.customer_id = testFlowCustomerId;
+      }
+      const att = step.email_attachments;
+      if (
+        editAudience === "customer"
+        && testFlowCustomerId
+        && Array.isArray(att)
+        && att.length
+      ) {
+        payload.attachments = att.filter((k) => k === "invoice_pdf" || k === "lieferschein_pdf");
+      }
+      await client.sendFlowTestEmail(editingFlowId, payload);
       showFlowTestFeedback("success", t.testEmailOk);
     } catch (e) {
       showFlowTestFeedback("critical", e?.message || t.testEmailSendFailed || "Error");
@@ -1151,6 +1306,7 @@ export default function FlowsPage() {
           next.email_subject = "";
           next.email_body = "";
           next.email_i18n = undefined;
+          next.smtp_sender_id = "";
           if (next.wait_hours == null || Number.isNaN(Number(next.wait_hours))) next.wait_hours = 1;
         }
         if (patch.step_type === "send_email") {
@@ -1220,6 +1376,17 @@ export default function FlowsPage() {
           if (langPrev[oldIdx] != null) nextLang[ni] = langPrev[oldIdx];
         });
         return nextLang;
+      });
+      setEditStepMergeOpen((mergePrev) => {
+        const nextMerge = {};
+        Object.keys(mergePrev).forEach((k) => {
+          const oldIdx = Number(k);
+          if (Number.isNaN(oldIdx)) return;
+          if (oldIdx === idx) return;
+          const ni = oldIdx < idx ? oldIdx : oldIdx - 1;
+          if (mergePrev[oldIdx]) nextMerge[ni] = true;
+        });
+        return nextMerge;
       });
       return filtered;
     });
@@ -1294,11 +1461,17 @@ export default function FlowsPage() {
         i18n[lang] = { subject: email_subject, body: email_body };
         const deS = String(i18n.de?.subject || "").trim();
         const deB = String(i18n.de?.body || "").trim();
+        const att = Array.isArray(s.email_attachments)
+          ? s.email_attachments.filter((k) => k === "invoice_pdf" || k === "lieferschein_pdf")
+          : [];
+        const sid = String(s.smtp_sender_id || "").trim();
         return {
           step_type: "send_email",
           email_subject: deS || email_subject,
           email_body: deB || email_body,
           email_i18n: i18n,
+          email_attachments: att,
+          smtp_sender_id: sid || null,
         };
       });
       const res = await client.updateFlow(editingFlowId, {
@@ -1325,6 +1498,8 @@ export default function FlowsPage() {
               email_subject: s.email_subject || "",
               email_body: s.email_body || "",
               email_i18n: s.email_i18n || null,
+              email_attachments: Array.isArray(s.email_attachments) ? s.email_attachments : [],
+              smtp_sender_id: s.smtp_sender_id || "",
             };
             return row.step_type === "send_email" ? normalizeSendEmailStep(row) : row;
           }),
@@ -1593,6 +1768,16 @@ export default function FlowsPage() {
                 helpText={t.testEmailFieldHelp}
                 autoComplete="email"
               />
+              {editAudience === "customer" && (
+                <Select
+                  label={t.testCustomerLabel}
+                  options={testCustomerSelectOptions}
+                  value={testFlowCustomerId}
+                  onChange={setTestFlowCustomerId}
+                  disabled={testFlowCustomersLoading}
+                  helpText={t.testCustomerHelp}
+                />
+              )}
               <Button onClick={addEditStep}>{t.addStepBtn}</Button>
               <BlockStack gap="300">
                 {editSteps.map((step, idx) => (
@@ -1634,6 +1819,13 @@ export default function FlowsPage() {
                             value={lang}
                             onChange={(v) => setStepTemplateLang((p) => ({ ...p, [idx]: v }))}
                           />
+                          <Select
+                            label={t.emailSenderLabel}
+                            options={senderSelectOptions}
+                            value={step.smtp_sender_id ? String(step.smtp_sender_id) : ""}
+                            onChange={(v) => patchEditStep(idx, { smtp_sender_id: v })}
+                            disabled={isSuperuser === false && senderSelectOptions.length <= 1}
+                          />
                           <InlineStack gap="200" blockAlign="center" wrap>
                             <Button
                               size="slim"
@@ -1647,22 +1839,73 @@ export default function FlowsPage() {
                           </InlineStack>
                           <Text as="p" variant="bodySm" tone="subdued">{t.emailHtmlHelp}</Text>
                           <Text as="p" variant="bodySm" tone="subdued">{t.placeholdersHelp}</Text>
-                          <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                            <BlockStack gap="200">
-                              <Text as="h4" variant="headingSm">{t.mergeFieldsTitle}</Text>
-                              <Box maxHeight="320px" overflowY="auto">
-                                <FlowMergeFieldsPanel
-                                  t={t}
-                                  catalog={editMergeCatalog}
-                                  loading={editMergeLoading}
-                                  errorText={editMergeErr === "merge-fields-error" ? t.mergeFieldsErr : editMergeErr}
-                                  stepIdx={idx}
-                                  onAppendSubject={(tok) => appendToStepEmail(idx, "subject", tok)}
-                                  onAppendBody={(tok) => appendToStepEmail(idx, "body", tok)}
-                                />
-                              </Box>
+                          {editAudience === "customer" && (
+                            <BlockStack gap="150">
+                              <Text as="span" variant="bodySm" fontWeight="semibold">{t.emailAttachmentsLabel}</Text>
+                              <Checkbox
+                                label={t.attachInvoicePdf}
+                                checked={(step.email_attachments || []).includes("invoice_pdf")}
+                                onChange={(checked) => {
+                                  setEditSteps((prev) =>
+                                    prev.map((row, i) => {
+                                      if (i !== idx || row.step_type !== "send_email") return row;
+                                      const set = new Set(row.email_attachments || []);
+                                      if (checked) set.add("invoice_pdf");
+                                      else set.delete("invoice_pdf");
+                                      return { ...row, email_attachments: Array.from(set) };
+                                    }),
+                                  );
+                                }}
+                              />
+                              <Checkbox
+                                label={t.attachLieferscheinPdf}
+                                checked={(step.email_attachments || []).includes("lieferschein_pdf")}
+                                onChange={(checked) => {
+                                  setEditSteps((prev) =>
+                                    prev.map((row, i) => {
+                                      if (i !== idx || row.step_type !== "send_email") return row;
+                                      const set = new Set(row.email_attachments || []);
+                                      if (checked) set.add("lieferschein_pdf");
+                                      else set.delete("lieferschein_pdf");
+                                      return { ...row, email_attachments: Array.from(set) };
+                                    }),
+                                  );
+                                }}
+                              />
+                              <Text as="p" variant="bodySm" tone="subdued">{t.emailAttachmentsHelp}</Text>
                             </BlockStack>
-                          </Box>
+                          )}
+                          <BlockStack gap="100">
+                            <InlineStack align="space-between" blockAlign="center">
+                              <Text as="h4" variant="headingSm">{t.mergeFieldsTitle}</Text>
+                              <Button
+                                size="slim"
+                                variant="plain"
+                                onClick={() => setEditStepMergeOpen((p) => ({ ...p, [idx]: !p[idx] }))}
+                              >
+                                {editStepMergeOpen[idx] ? t.mergeFieldsToggleHide : t.mergeFieldsToggleShow}
+                              </Button>
+                            </InlineStack>
+                            <Collapsible
+                              id={`flow-edit-merge-${editingFlowId}-${idx}`}
+                              open={!!editStepMergeOpen[idx]}
+                              transition={{ duration: "200ms", timingFunction: "ease-in-out" }}
+                            >
+                              <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                                <Box maxHeight="320px" overflowY="auto">
+                                  <FlowMergeFieldsPanel
+                                    t={t}
+                                    catalog={editMergeCatalog}
+                                    loading={editMergeLoading}
+                                    errorText={editMergeErr === "merge-fields-error" ? t.mergeFieldsErr : editMergeErr}
+                                    stepIdx={idx}
+                                    onAppendSubject={(tok) => appendToStepEmail(idx, "subject", tok)}
+                                    onAppendBody={(tok) => appendToStepEmail(idx, "body", tok)}
+                                  />
+                                </Box>
+                              </Box>
+                            </Collapsible>
+                          </BlockStack>
                           <TextField
                             label={t.emailSubjectLabel}
                             value={bundle.subject ?? ""}

@@ -210,6 +210,267 @@ function SmtpSection() {
   );
 }
 
+/** Manage From identities (same SMTP credentials); test each; one is default / main. */
+function SmtpSendersSection({ onToast }) {
+  const [senders, setSenders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [testForId, setTestForId] = useState(null);
+  const [testTo, setTestTo] = useState("");
+  const [testingId, setTestingId] = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newName, setNewName] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    client.getSmtpSettings()
+      .then((d) => setSenders(Array.isArray(d?.senders) ? d.senders : []))
+      .catch(() => setSenders([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openTest = (id) => {
+    setTestForId(id);
+    setTestTo("");
+  };
+
+  const runTest = async () => {
+    const to = testTo.trim();
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!testForId || !to || !emailRe.test(to)) {
+      onToast?.({ tone: "critical", text: "Geçerli bir test alıcı e-postası girin." });
+      return;
+    }
+    setTestingId(testForId);
+    try {
+      await client.testSmtpSender(testForId, { to });
+      onToast?.({ tone: "success", text: "Test e-postası gönderildi." });
+      setTestForId(null);
+      await load();
+    } catch (e) {
+      onToast?.({ tone: "critical", text: e?.message || "Test başarısız." });
+      await load();
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const setMain = async (id) => {
+    try {
+      await client.setDefaultSmtpSender(id);
+      onToast?.({ tone: "success", text: "Ana gönderen güncellendi." });
+      await load();
+    } catch (e) {
+      onToast?.({ tone: "critical", text: e?.message || "Kaydedilemedi." });
+    }
+  };
+
+  const removeSender = async (row) => {
+    if (!confirm(`„${row.from_email}" gönderenini silmek istiyor musunuz?`)) return;
+    try {
+      await client.deleteSmtpSender(row.id);
+      onToast?.({ tone: "success", text: "Silindi." });
+      await load();
+    } catch (e) {
+      onToast?.({ tone: "critical", text: e?.message || "Silinemedi." });
+    }
+  };
+
+  const addSender = async () => {
+    const fe = newEmail.trim();
+    if (!fe) {
+      onToast?.({ tone: "critical", text: "E-posta adresi gerekli." });
+      return;
+    }
+    setAdding(true);
+    try {
+      await client.createSmtpSender({ from_email: fe, from_name: newName.trim() || undefined });
+      onToast?.({ tone: "success", text: "Gönderen eklendi." });
+      setAddOpen(false);
+      setNewEmail("");
+      setNewName("");
+      await load();
+    } catch (e) {
+      onToast?.({ tone: "critical", text: e?.message || "Eklenemedi." });
+    }
+    setAdding(false);
+  };
+
+  if (loading) return <Box padding="400"><Text tone="subdued">Gönderenler yükleniyor…</Text></Box>;
+
+  return (
+    <BlockStack gap="400">
+      <Text as="h3" variant="headingSm">Gönderen e-postalar</Text>
+      <Text as="p" variant="bodySm" tone="subdued">
+        Her satır aynı SMTP hesabıyla farklı bir Gönderen (Kimden) adresidir. Flow ve otomatik maillerde varsayılan olarak <strong>ana</strong> gönderen kullanılır; tek adımda başka bir gönderen seçebilirsiniz.
+      </Text>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {senders.map((row) => (
+          <div
+            key={row.id}
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 12,
+              padding: "12px 14px",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              background: "#fafafa",
+            }}
+          >
+            <span style={{ fontWeight: 600, minWidth: 180 }}>{row.from_email}</span>
+            {row.from_name && (
+              <span style={{ color: "#4b5563", fontSize: 13 }}>{row.from_name}</span>
+            )}
+            {row.is_default && (
+              <Badge tone="success">Ana</Badge>
+            )}
+            <span
+              title={row.last_test_message || ""}
+              style={{
+                fontSize: 18,
+                color: row.last_test_ok === true ? "#047857" : row.last_test_ok === false ? "#b91c1c" : "#9ca3af",
+              }}
+            >
+              {row.last_test_ok === true ? "✓" : row.last_test_ok === false ? "✗" : "—"}
+            </span>
+            {!row.is_default && (
+              <Button size="slim" onClick={() => setMain(row.id)}>Ana yap</Button>
+            )}
+            <Button size="slim" onClick={() => openTest(row.id)}>Test</Button>
+            <Button size="slim" tone="critical" variant="plain" onClick={() => removeSender(row)}>Sil</Button>
+          </div>
+        ))}
+      </div>
+      <Button onClick={() => setAddOpen(true)}>Gönderen ekle</Button>
+
+      <Modal
+        open={!!testForId}
+        onClose={() => setTestForId(null)}
+        title="Göndereni test et"
+        primaryAction={{ content: "Gönder", onAction: runTest, loading: testingId != null }}
+        secondaryActions={[{ content: "İptal", onAction: () => setTestForId(null) }]}
+      >
+        <Modal.Section>
+          <TextField
+            label="Test e-postası gönderilecek adres"
+            type="email"
+            value={testTo}
+            onChange={setTestTo}
+            autoComplete="email"
+          />
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="Gönderen ekle"
+        primaryAction={{ content: "Ekle", onAction: addSender, loading: adding }}
+        secondaryActions={[{ content: "İptal", onAction: () => setAddOpen(false) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <TextField label="Gönderen e-posta" type="email" value={newEmail} onChange={setNewEmail} autoComplete="off" />
+            <TextField label="Gönderen adı (isteğe bağlı)" value={newName} onChange={setNewName} autoComplete="off" />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+    </BlockStack>
+  );
+}
+
+// ─── Trustpilot (superuser — storefront TrustBox) ─────────────────────────────
+
+function TrustpilotSuperuserSection({ onToast }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [businessUnitId, setBusinessUnitId] = useState("");
+  const [templateId, setTemplateId] = useState("");
+  const [active, setActive] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    client.getTrustpilotIntegration()
+      .then((d) => {
+        if (cancelled || !d) return;
+        setBusinessUnitId(d.business_unit_id || "");
+        setTemplateId(d.template_id || "");
+        setActive(d.is_active !== false);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const save = async () => {
+    const bu = businessUnitId.trim();
+    if (!bu) {
+      onToast?.({ tone: "critical", text: "Business Unit ID eingeben (von Trustpilot Business)." });
+      return;
+    }
+    setSaving(true);
+    try {
+      await client.saveTrustpilotIntegration({
+        business_unit_id: bu,
+        template_id: templateId.trim() || undefined,
+        is_active: active,
+      });
+      onToast?.({ tone: "success", text: "Trustpilot gespeichert. Shop-Widget lädt die Konfiguration automatisch." });
+    } catch (e) {
+      onToast?.({ tone: "critical", text: e?.message || "Speichern fehlgeschlagen." });
+    }
+    setSaving(false);
+  };
+
+  if (loading) {
+    return (
+      <Box padding="400"><Text tone="subdued">Trustpilot laden…</Text></Box>
+    );
+  }
+
+  return (
+    <BlockStack gap="400">
+      <Text as="p" variant="bodySm" tone="subdued">
+        Verbindet das öffentliche TrustBox-Widget auf der Shop-Produktseite mit eurem Trustpilot Business-Konto.
+        Die Business Unit ID ist dieselbe wie im TrustBox-Embed-Code bei Trustpilot (öffentlich).
+      </Text>
+      <TextField
+        label="Business Unit ID"
+        value={businessUnitId}
+        onChange={setBusinessUnitId}
+        autoComplete="off"
+        placeholder="z. B. a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        helpText="Trustpilot Business → Integrationen / Showcase → TrustBox einrichten — dort steht die Business Unit ID im Embed-Code (data-businessunit-id)."
+      />
+      <TextField
+        label="Template-ID (optional)"
+        value={templateId}
+        onChange={setTemplateId}
+        autoComplete="off"
+        placeholder="Standard, wenn leer"
+        helpText="TrustBox-Vorlage aus dem Trustpilot-Generator; Standard aus dem Backend wenn leer."
+      />
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14 }}>
+        <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+        Widget auf dem Shop aktivieren
+      </label>
+      <InlineStack gap="300">
+        <Button variant="primary" onClick={save} loading={saving}>
+          Speichern
+        </Button>
+      </InlineStack>
+      <Banner tone="info">
+        Automatische Bewertungs-E-Mails nach Bestellung einrichten: in Trustpilot unter Integrationen eine Plattform verbinden oder Zapier nutzen — das ist getrennt vom Widget und erfolgt im Trustpilot-Konto.
+      </Banner>
+    </BlockStack>
+  );
+}
+
 // ─── API Integrations ────────────────────────────────────────────────────────
 
 function maskKey(val) {
@@ -374,6 +635,23 @@ export default function IntegrationsSettingsPage() {
               </BlockStack>
               <Divider />
               <SmtpSection />
+              <Divider />
+              <SmtpSendersSection onToast={setMsg} />
+            </BlockStack>
+          </Card>
+        )}
+
+        {isSuperuser && (
+          <Card>
+            <BlockStack gap="400">
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd">Trustpilot (Shop-Bewertungen)</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Nur Superuser. Verknüpft den öffentlichen Sterne-/TrustBox-Bereich auf dem Shop mit eurem Trustpilot Business Profil.
+                </Text>
+              </BlockStack>
+              <Divider />
+              <TrustpilotSuperuserSection onToast={setMsg} />
             </BlockStack>
           </Card>
         )}

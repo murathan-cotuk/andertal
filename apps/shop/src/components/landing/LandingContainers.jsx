@@ -2097,7 +2097,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   // Clear gradient on unmount
   useEffect(() => {
     return () => setLandingHeaderBg(null);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!images.length) return null;
   const baseGap = container.gap != null ? Number(container.gap) : 16;
