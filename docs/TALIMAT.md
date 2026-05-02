@@ -1,5 +1,6 @@
 02.05.
 
+- saticilarin olusturdugu kampanyalari kontrol edip bagladigimiz marketing hesabinda tek tik ile yayinlayalim. saticilar zaten bütcelerini belirlemis olacak. belirlenen bütceleri sectigimiz platformlarda dagitilmis sekilde kampanyalarini olusturalim. mesela müsteri günlük 5 euro bütce ile reklam olusturdu. shoptaki algoritmada o sekilde islemeye devam etsin. müsteriden alinan bu 5 euro müsteriden tahsile edilecek ve stripe imiza düsecek. bu 5 farkli secilen google ads, meta gibi yerlerde 1er euro seklinde paylasilacak. ya da kac platform secildiyse reklam vermek icin ona bölünecek gibi. anladin mi?
 - cms
 - bir sistem ile entegre oldugunda hangi verilere get ve post yapilmasi gerektigi cok asikar. sen de gayet iyi biliyorsun. bildigini uygula.
 -- brand sayasinda bannerda sol altta marka adi yaziyor ve üstünde de marka logosu var. o marka logosu biraz daha üstte ve biraz daha büyük olsun

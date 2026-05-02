@@ -68,21 +68,41 @@ export default function SettingsLayout({ children }) {
                       padding: "12px 16px",
                       borderBottom: "1px solid var(--p-color-border-subdued)",
                       backgroundColor: active ? "var(--p-color-bg-surface-selected)" : "var(--p-color-bg-surface)",
-                      borderLeft: active ? "3px solid #008060" : "3px solid transparent",
-                      boxShadow: active ? "inset 0 0 0 1px rgba(0,128,96,0.08)" : "none",
+                      borderLeft: active
+                        ? `3px solid ${item.superuserOnly ? "#601b1b" : "#008060"}`
+                        : item.superuserOnly
+                          ? "3px solid rgba(96, 27, 27, 0.35)"
+                          : "3px solid transparent",
+                      boxShadow: active
+                        ? item.superuserOnly
+                          ? "inset 0 0 0 1px rgba(96, 27, 27, 0.15)"
+                          : "inset 0 0 0 1px rgba(0,128,96,0.08)"
+                        : "none",
                       transition: "background-color .15s ease, border-left-color .15s ease",
                     }}
                   >
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                      <Text
-                        as="span"
-                        variant="bodyMd"
-                        fontWeight={active ? "semibold" : "regular"}
-                        tone={active ? "base" : "subdued"}
-                        style={item.superuserOnly ? { color: "#601b1b" } : undefined}
-                      >
-                        {item.label}
-                      </Text>
+                      {item.superuserOnly ? (
+                        <span
+                          style={{
+                            fontSize: "var(--p-font-size-350, 13px)",
+                            lineHeight: "var(--p-font-line-height-400, 20px)",
+                            fontWeight: active ? 700 : 600,
+                            color: "#601b1b",
+                          }}
+                        >
+                          {item.label}
+                        </span>
+                      ) : (
+                        <Text
+                          as="span"
+                          variant="bodyMd"
+                          fontWeight={active ? "semibold" : "regular"}
+                          tone={active ? "base" : "subdued"}
+                        >
+                          {item.label}
+                        </Text>
+                      )}
                     </span>
                   </div>
                     );

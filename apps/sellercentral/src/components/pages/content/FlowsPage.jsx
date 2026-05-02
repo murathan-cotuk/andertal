@@ -19,6 +19,7 @@ const T = {
     createBtn: "Create flow",
     smtpWarningTitle: "Email server not configured",
     smtpWarningBody: "To send flow emails, you need to configure SMTP / Gmail settings first.",
+    smtpWarningBodySeller: "Outgoing email must be configured by a platform superuser. Contact your administrator if flows cannot send mail.",
     smtpWarningAction: "Go to SMTP settings",
     emptyHeading: "No flows yet",
     emptyAction: "Create first flow",
@@ -39,6 +40,7 @@ const T = {
     howTrigger: "Trigger → Event that starts the flow.",
     howSteps: "Steps → Send email, wait (e.g. 2 days), check condition.",
     howEmail: "Email sending is configured via Settings > Apps & Integrations (SMTP).",
+    howEmailSeller: "Outgoing email is configured by the platform superuser under Settings > Apps & Integrations (SMTP).",
     triggers: {
       new_subscriber: "New subscriber",
       abandoned_cart: "Abandoned cart",
@@ -55,6 +57,7 @@ const T = {
     createBtn: "Flow erstellen",
     smtpWarningTitle: "E-Mail-Server nicht konfiguriert",
     smtpWarningBody: "Um Flow-E-Mails zu senden, müssen zuerst die SMTP / Gmail-Einstellungen konfiguriert werden.",
+    smtpWarningBodySeller: "Der ausgehende E-Mail-Versand muss von einem Plattform-Superuser eingerichtet werden. Bitte den Administrator kontaktieren.",
     smtpWarningAction: "Zu den SMTP-Einstellungen",
     emptyHeading: "Noch keine Flows",
     emptyAction: "Ersten Flow erstellen",
@@ -75,6 +78,7 @@ const T = {
     howTrigger: "Auslöser → Ereignis, das den Flow startet.",
     howSteps: "Schritte → E-Mail senden, warten (z. B. 2 Tage), Bedingung prüfen.",
     howEmail: "E-Mail-Versand wird über Einstellungen > Apps & Integrationen (SMTP) konfiguriert.",
+    howEmailSeller: "Der E-Mail-Versand wird vom Plattform-Superuser unter Einstellungen > Apps & Integrationen (SMTP) konfiguriert.",
     triggers: {
       new_subscriber: "Neuer Abonnent",
       abandoned_cart: "Verlassener Warenkorb",
@@ -91,6 +95,7 @@ const T = {
     createBtn: "Flow oluştur",
     smtpWarningTitle: "E-posta sunucusu yapılandırılmamış",
     smtpWarningBody: "Flow e-postalarının gönderilebilmesi için önce SMTP / Gmail ayarlarını yapmanız gerekiyor.",
+    smtpWarningBodySeller: "Giden e-postayı yalnızca platform süper kullanıcısı yapılandırabilir. E-posta gönderilemiyorsa yöneticinize başvurun.",
     smtpWarningAction: "SMTP ayarlarına git",
     emptyHeading: "Henüz hiç flow yok",
     emptyAction: "İlk flow'u oluştur",
@@ -111,6 +116,7 @@ const T = {
     howTrigger: "Tetikleyici → Flow'u başlatan olay.",
     howSteps: "Adımlar → E-posta gönder, bekle (ör. 2 gün), koşul kontrol et.",
     howEmail: "E-posta gönderimi Ayarlar > Apps & Entegrasyonlar (SMTP) üzerinden yapılandırılır.",
+    howEmailSeller: "Giden e-posta, süper kullanıcı tarafından Ayarlar > Apps & Entegrasyonlar (SMTP) üzerinden yapılandırılır.",
     triggers: {
       new_subscriber: "Yeni abone",
       abandoned_cart: "Terk edilen sepet",
@@ -127,6 +133,7 @@ const T = {
     createBtn: "Créer un flux",
     smtpWarningTitle: "Serveur e-mail non configuré",
     smtpWarningBody: "Pour envoyer des e-mails de flux, vous devez d'abord configurer les paramètres SMTP / Gmail.",
+    smtpWarningBodySeller: "L'e-mail sortant doit être configuré par un super-utilisateur de la plateforme. Contactez votre administrateur.",
     smtpWarningAction: "Aller aux paramètres SMTP",
     emptyHeading: "Aucun flux pour l'instant",
     emptyAction: "Créer le premier flux",
@@ -147,6 +154,7 @@ const T = {
     howTrigger: "Déclencheur → Événement qui démarre le flux.",
     howSteps: "Étapes → Envoyer e-mail, attendre (ex. 2 jours), vérifier condition.",
     howEmail: "L'envoi d'e-mails est configuré via Paramètres > Apps & Intégrations (SMTP).",
+    howEmailSeller: "L'e-mail sortant est configuré par le super-utilisateur via Paramètres > Apps & Intégrations (SMTP).",
     triggers: {
       new_subscriber: "Nouvel abonné",
       abandoned_cart: "Panier abandonné",
@@ -163,6 +171,7 @@ const T = {
     createBtn: "Crea flusso",
     smtpWarningTitle: "Server e-mail non configurato",
     smtpWarningBody: "Per inviare e-mail di flusso, è necessario prima configurare le impostazioni SMTP / Gmail.",
+    smtpWarningBodySeller: "L'e-mail in uscita deve essere configurata da un superuser della piattaforma. Contatta l'amministratore.",
     smtpWarningAction: "Vai alle impostazioni SMTP",
     emptyHeading: "Nessun flusso ancora",
     emptyAction: "Crea il primo flusso",
@@ -183,6 +192,7 @@ const T = {
     howTrigger: "Trigger → Evento che avvia il flusso.",
     howSteps: "Passi → Invia e-mail, aspetta (es. 2 giorni), controlla condizione.",
     howEmail: "L'invio di e-mail è configurato tramite Impostazioni > App e Integrazioni (SMTP).",
+    howEmailSeller: "L'e-mail in uscita è configurata dal superuser in Impostazioni > App e Integrazioni (SMTP).",
     triggers: {
       new_subscriber: "Nuovo iscritto",
       abandoned_cart: "Carrello abbandonato",
@@ -199,6 +209,7 @@ const T = {
     createBtn: "Crear flujo",
     smtpWarningTitle: "Servidor de correo no configurado",
     smtpWarningBody: "Para enviar correos de flujo, primero debes configurar los ajustes SMTP / Gmail.",
+    smtpWarningBodySeller: "El correo saliente debe configurarlo un superusuario de la plataforma. Contacta al administrador.",
     smtpWarningAction: "Ir a ajustes SMTP",
     emptyHeading: "Aún no hay flujos",
     emptyAction: "Crear primer flujo",
@@ -219,6 +230,7 @@ const T = {
     howTrigger: "Disparador → Evento que inicia el flujo.",
     howSteps: "Pasos → Enviar correo, esperar (ej. 2 días), verificar condición.",
     howEmail: "El envío de correos se configura en Ajustes > Apps e Integraciones (SMTP).",
+    howEmailSeller: "El correo saliente lo configura el superusuario en Ajustes > Apps e Integraciones (SMTP).",
     triggers: {
       new_subscriber: "Nuevo suscriptor",
       abandoned_cart: "Carrito abandonado",
@@ -249,6 +261,11 @@ export default function FlowsPage() {
   const [newTrigger, setNewTrigger]     = useState("abandoned_cart");
   const [newNameErr, setNewNameErr]     = useState("");
   const [smtpConfigured, setSmtpConfigured] = useState(null);
+  const [isSuperuser, setIsSuperuser] = useState(false);
+
+  useEffect(() => {
+    setIsSuperuser(typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -260,7 +277,12 @@ export default function FlowsPage() {
       ]);
       setFlows(flowsRes.status === "fulfilled" ? (flowsRes.value?.flows ?? []) : []);
       if (smtpRes.status === "fulfilled" && smtpRes.value) {
-        setSmtpConfigured(!!(smtpRes.value?.smtp?.host || smtpRes.value?.smtp?.smtp_host));
+        const v = smtpRes.value;
+        setSmtpConfigured(!!(
+          v.smtp_configured === true
+          || v.smtp?.host
+          || v.smtp?.smtp_host
+        ));
       }
     } catch (e) {
       setError(e?.message || "Error");
@@ -332,9 +354,13 @@ export default function FlowsPage() {
             <Banner
               tone="warning"
               title={t.smtpWarningTitle}
-              action={{ content: t.smtpWarningAction, url: "/settings/integrations" }}
+              action={
+                isSuperuser
+                  ? { content: t.smtpWarningAction, url: "/settings/integrations" }
+                  : undefined
+              }
             >
-              {t.smtpWarningBody}
+              {isSuperuser ? t.smtpWarningBody : t.smtpWarningBodySeller}
             </Banner>
           </Layout.Section>
         )}
@@ -400,7 +426,7 @@ export default function FlowsPage() {
               <Divider />
               <Text as="p" variant="bodySm" tone="subdued">{t.howTrigger}</Text>
               <Text as="p" variant="bodySm" tone="subdued">{t.howSteps}</Text>
-              <Text as="p" variant="bodySm" tone="subdued">{t.howEmail}</Text>
+              <Text as="p" variant="bodySm" tone="subdued">{isSuperuser ? t.howEmail : t.howEmailSeller}</Text>
             </BlockStack>
           </Card>
         </Layout.Section>

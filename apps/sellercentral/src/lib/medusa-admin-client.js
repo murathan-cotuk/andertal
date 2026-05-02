@@ -1262,6 +1262,30 @@ class MedusaAdminClient {
   async deleteCampaign(id) {
     return this.request(`/admin-hub/v1/campaigns/${id}`, { method: 'DELETE' })
   }
+
+  async publishCampaign(id) {
+    return this.request(`/admin-hub/v1/campaigns/${id}/publish`, { method: 'POST' })
+  }
+
+  async pauseCampaign(id) {
+    return this.request(`/admin-hub/v1/campaigns/${id}/pause`, { method: 'POST' })
+  }
+
+  async resumeCampaign(id) {
+    return this.request(`/admin-hub/v1/campaigns/${id}/resume`, { method: 'POST' })
+  }
+
+  // ── Platform Marketing Accounts (superuser) ─────────────────────────────────
+  async getMarketingAccounts() {
+    return this.request('/admin-hub/v1/marketing-accounts')
+  }
+
+  async updateMarketingAccount(platform, data) {
+    return this.request('/admin-hub/v1/marketing-accounts', {
+      method: 'PATCH',
+      body: JSON.stringify({ platform, ...data }),
+    })
+  }
 }
 
 // Singleton instance

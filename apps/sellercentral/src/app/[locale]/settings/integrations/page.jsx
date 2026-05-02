@@ -270,6 +270,7 @@ function IntegrationCard({ integration, onEdit, onToggle, onDelete, onRotateSecr
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function IntegrationsSettingsPage() {
+  const [isSuperuser, setIsSuperuser] = useState(false);
   const [integrations, setIntegrations] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
@@ -290,6 +291,10 @@ export default function IntegrationsSettingsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    setIsSuperuser(typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
 
   const openCreate = () => { setEditingId(null); setFormName(""); setCreatedCreds(null); setModalOpen(true); };
   const openEdit = (i) => { setEditingId(i.id); setFormName(i.name || ""); setCreatedCreds(null); setModalOpen(true); };
@@ -366,7 +371,13 @@ export default function IntegrationsSettingsPage() {
               </Text>
             </BlockStack>
             <Divider />
-            <SmtpSection />
+            {isSuperuser ? (
+              <SmtpSection />
+            ) : (
+              <Banner tone="info">
+                SMTP ve giden e-posta yalnızca platform süper kullanıcısı tarafından bağlanabilir ve düzenlenebilir.
+              </Banner>
+            )}
           </BlockStack>
         </Card>
 

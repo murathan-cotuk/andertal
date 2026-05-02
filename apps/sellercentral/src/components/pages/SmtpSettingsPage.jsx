@@ -31,6 +31,7 @@ function Input({ ...props }) {
 }
 
 export default function SmtpSettingsPage() {
+  const [accessDenied, setAccessDenied] = useState(false);
   const [form, setForm] = useState({ provider: "gmail", host: "smtp.gmail.com", port: 587, secure: false, username: "", password: "", from_name: "", from_email: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,6 +41,11 @@ export default function SmtpSettingsPage() {
   const [err, setErr] = useState("");
 
   useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") !== "true") {
+      setAccessDenied(true);
+      setLoading(false);
+      return;
+    }
     getMedusaAdminClient().getSmtpSettings().then((d) => {
       if (d?.smtp) {
         const s = d.smtp;
@@ -87,6 +93,14 @@ export default function SmtpSettingsPage() {
   };
 
   const selectedProvider = PROVIDERS.find((p) => p.value === form.provider);
+
+  if (accessDenied) {
+    return (
+      <div style={{ padding: 40, maxWidth: 560, margin: "0 auto", fontSize: 14, color: "#374151" }}>
+        SMTP kann nur von einem Plattform-Superuser konfiguriert werden.
+      </div>
+    );
+  }
 
   if (loading) return <div style={{ padding: 40, color: "#9ca3af", fontSize: 14, textAlign: "center" }}>Laden…</div>;
 

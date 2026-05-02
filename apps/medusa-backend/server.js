@@ -1401,8 +1401,29 @@ async function start() {
         `).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_sc_seller ON seller_campaigns(seller_id)`).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_sc_status ON seller_campaigns(status)`).catch(() => {})
+        // PPC ad columns on seller_campaigns
+        await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS campaign_type text NOT NULL DEFAULT 'internal'`).catch(() => {})
+        await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS budget_daily_cents integer NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS bid_strategy text NOT NULL DEFAULT 'cpc'`).catch(() => {})
+        await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS ad_platforms jsonb NOT NULL DEFAULT '[]'`).catch(() => {})
+        await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS ad_status text NOT NULL DEFAULT 'draft'`).catch(() => {})
+        await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS external_campaign_ids jsonb NOT NULL DEFAULT '{}'`).catch(() => {})
+        await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS stripe_charge_id text`).catch(() => {})
+        // Platform marketing accounts (superuser-managed)
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS platform_marketing_accounts (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            platform text NOT NULL,
+            display_name text NOT NULL DEFAULT '',
+            credentials jsonb NOT NULL DEFAULT '{}',
+            is_active boolean NOT NULL DEFAULT true,
+            created_at timestamptz DEFAULT now(),
+            updated_at timestamptz DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pma_platform ON platform_marketing_accounts(platform)`).catch(() => {})
         await client.end()
-        log.info('Admin Hub: admin_hub_menus, admin_hub_menu_locations, admin_hub_media, admin_hub_pages, admin_hub_collections, admin_hub_seller_settings, admin_hub_brands, store_carts, store_cart_items, seller_product_groups, seller_campaigns tabloları hazır')
+        log.info('Admin Hub: seller_campaigns (PPC columns), platform_marketing_accounts tabloları hazır')
       } catch (migErr) {
         console.warn('Admin Hub migration (menus) skipped or failed:', migErr && migErr.message)
       }
@@ -12801,7 +12822,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.connect()
         const r = await client.query(`SELECT seller_id, provider, host, port, secure, username, from_name, from_email, updated_at FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
         await client.end()
-        res.json({ smtp: r.rows[0] || null })
+        const row = r.rows[0] || null
+        const smtpConfigured = !!(row?.host)
+        if (!req.sellerUser?.is_superuser) {
+          return res.json({ smtp: null, smtp_configured: smtpConfigured })
+        }
+        res.json({ smtp: row, smtp_configured: smtpConfigured })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -12899,9 +12925,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
     httpApp.get('/store/messages/unread-count', storeMessagesUnreadCountGET)
     httpApp.patch('/store/messages/mark-read', storeMessagesMarkReadPATCH)
-    httpApp.get('/admin-hub/v1/smtp-settings', adminHubSmtpSettingsGET)
-    httpApp.patch('/admin-hub/v1/smtp-settings', adminHubSmtpSettingsPATCH)
-    httpApp.post('/admin-hub/v1/smtp-settings/test', adminHubSmtpSettingsTestPOST)
+    httpApp.get('/admin-hub/v1/smtp-settings', requireSellerAuth, adminHubSmtpSettingsGET)
+    httpApp.patch('/admin-hub/v1/smtp-settings', requireSellerAuth, requireSuperuser, adminHubSmtpSettingsPATCH)
+    httpApp.post('/admin-hub/v1/smtp-settings/test', requireSellerAuth, requireSuperuser, adminHubSmtpSettingsTestPOST)
 
     // ── Coupons ────────────────────────────────────────────────────────────────
     const adminHubCouponsGET = async (req, res) => {
@@ -14119,15 +14145,15 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.post('/admin-hub/v1/campaigns', requireSellerAuth, async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       if (!sellerId) return res.status(403).json({ message: 'Seller ID required' })
-      const { name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, settings } = req.body || {}
+      const { name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, settings, campaign_type, budget_daily_cents, bid_strategy, ad_platforms } = req.body || {}
       if (!name?.trim()) return res.status(400).json({ message: 'name required' })
       const dVal = parseFloat(discount_value) || 0
       if (dVal < 0 || dVal > 100) return res.status(400).json({ message: 'discount_value must be 0–100' })
       const c = pgDbClient(); try {
         await c.connect()
         const r = await c.query(
-          `INSERT INTO seller_campaigns (seller_id, name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, settings) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-          [sellerId, name.trim(), description || '', status || 'draft', start_at || null, end_at || null, discount_type || 'percentage', dVal, target_type || 'products', JSON.stringify(Array.isArray(product_ids) ? product_ids : []), JSON.stringify(Array.isArray(group_ids) ? group_ids : []), JSON.stringify(settings || {})]
+          `INSERT INTO seller_campaigns (seller_id, name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, settings, campaign_type, budget_daily_cents, bid_strategy, ad_platforms) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+          [sellerId, name.trim(), description || '', status || 'draft', start_at || null, end_at || null, discount_type || 'percentage', dVal, target_type || 'products', JSON.stringify(Array.isArray(product_ids) ? product_ids : []), JSON.stringify(Array.isArray(group_ids) ? group_ids : []), JSON.stringify(settings || {}), campaign_type || 'internal', parseInt(budget_daily_cents) || 0, bid_strategy || 'cpc', JSON.stringify(Array.isArray(ad_platforms) ? ad_platforms : [])]
         )
         await c.end(); res.status(201).json({ campaign: r.rows[0] })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
@@ -14159,8 +14185,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const b = req.body || {}
         const dVal = b.discount_value !== undefined ? parseFloat(b.discount_value) : Number(camp.discount_value)
         const r = await c.query(
-          `UPDATE seller_campaigns SET name=$1, description=$2, status=$3, start_at=$4, end_at=$5, discount_type=$6, discount_value=$7, target_type=$8, product_ids=$9, group_ids=$10, settings=$11, updated_at=now() WHERE id=$12 RETURNING *`,
-          [b.name?.trim() || camp.name, b.description ?? camp.description, b.status || camp.status, b.start_at !== undefined ? (b.start_at || null) : camp.start_at, b.end_at !== undefined ? (b.end_at || null) : camp.end_at, b.discount_type || camp.discount_type, dVal, b.target_type || camp.target_type, JSON.stringify(Array.isArray(b.product_ids) ? b.product_ids : camp.product_ids), JSON.stringify(Array.isArray(b.group_ids) ? b.group_ids : camp.group_ids), JSON.stringify(b.settings || camp.settings || {}), req.params.id]
+          `UPDATE seller_campaigns SET name=$1, description=$2, status=$3, start_at=$4, end_at=$5, discount_type=$6, discount_value=$7, target_type=$8, product_ids=$9, group_ids=$10, settings=$11, campaign_type=$12, budget_daily_cents=$13, bid_strategy=$14, ad_platforms=$15, updated_at=now() WHERE id=$16 RETURNING *`,
+          [b.name?.trim() || camp.name, b.description ?? camp.description, b.status || camp.status, b.start_at !== undefined ? (b.start_at || null) : camp.start_at, b.end_at !== undefined ? (b.end_at || null) : camp.end_at, b.discount_type || camp.discount_type, dVal, b.target_type || camp.target_type, JSON.stringify(Array.isArray(b.product_ids) ? b.product_ids : camp.product_ids), JSON.stringify(Array.isArray(b.group_ids) ? b.group_ids : camp.group_ids), JSON.stringify(b.settings || camp.settings || {}), b.campaign_type || camp.campaign_type || 'internal', b.budget_daily_cents !== undefined ? parseInt(b.budget_daily_cents) : (camp.budget_daily_cents || 0), b.bid_strategy || camp.bid_strategy || 'cpc', JSON.stringify(Array.isArray(b.ad_platforms) ? b.ad_platforms : (camp.ad_platforms || [])), req.params.id]
         )
         await c.end(); res.json({ campaign: r.rows[0] })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
@@ -14177,6 +14203,92 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (!isSuperuser && camp.seller_id !== sellerId) { await c.end(); return res.status(403).json({ message: 'Forbidden' }) }
         await c.query(`DELETE FROM seller_campaigns WHERE id=$1`, [req.params.id])
         await c.end(); res.json({ deleted: true })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    // Publish PPC campaign to ad platforms (superuser only)
+    httpApp.post('/admin-hub/v1/campaigns/:id/publish', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const c = pgDbClient(); try {
+        await c.connect()
+        const exist = await c.query(`SELECT * FROM seller_campaigns WHERE id=$1`, [req.params.id])
+        const camp = exist.rows[0]
+        if (!camp) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
+        const platforms = Array.isArray(camp.ad_platforms) ? camp.ad_platforms : []
+        if (!platforms.length) { await c.end(); return res.status(400).json({ message: 'Kampanya için reklam platformu seçilmemiş' }) }
+        const maRows = await c.query(`SELECT * FROM platform_marketing_accounts WHERE platform = ANY($1) AND is_active = true`, [platforms])
+        const accounts = maRows.rows
+        if (!accounts.length) { await c.end(); return res.status(400).json({ message: 'Seçilen platformlar için bağlı pazarlama hesabı bulunamadı' }) }
+        const budgetPerPlatform = Math.floor((camp.budget_daily_cents || 0) / accounts.length)
+        const externalIds = {}
+        for (const account of accounts) {
+          externalIds[account.platform] = `sim_${account.platform}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        }
+        const r = await c.query(
+          `UPDATE seller_campaigns SET ad_status='published', external_campaign_ids=$1, status='active', updated_at=now() WHERE id=$2 RETURNING *`,
+          [JSON.stringify(externalIds), req.params.id]
+        )
+        await c.end()
+        res.json({ campaign: r.rows[0], budget_per_platform_cents: budgetPerPlatform, platforms_published: accounts.map(a => a.platform) })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    // Pause published PPC campaign (superuser only)
+    httpApp.post('/admin-hub/v1/campaigns/:id/pause', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const c = pgDbClient(); try {
+        await c.connect()
+        const r = await c.query(`UPDATE seller_campaigns SET ad_status='paused', status='paused', updated_at=now() WHERE id=$1 RETURNING *`, [req.params.id])
+        if (!r.rows[0]) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
+        await c.end(); res.json({ campaign: r.rows[0] })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    // Resume paused PPC campaign (superuser only)
+    httpApp.post('/admin-hub/v1/campaigns/:id/resume', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const c = pgDbClient(); try {
+        await c.connect()
+        const r = await c.query(`UPDATE seller_campaigns SET ad_status='published', status='active', updated_at=now() WHERE id=$1 RETURNING *`, [req.params.id])
+        if (!r.rows[0]) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
+        await c.end(); res.json({ campaign: r.rows[0] })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    // ── Platform Marketing Accounts (superuser only) ──────────────────────────────
+    httpApp.get('/admin-hub/v1/marketing-accounts', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const c = pgDbClient(); try {
+        await c.connect()
+        const r = await c.query(`SELECT * FROM platform_marketing_accounts ORDER BY platform`)
+        await c.end(); res.json({ accounts: r.rows })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    httpApp.patch('/admin-hub/v1/marketing-accounts', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const { platform, display_name, credentials, is_active } = req.body || {}
+      if (!platform) return res.status(400).json({ message: 'platform required' })
+      const c = pgDbClient(); try {
+        await c.connect()
+        const existing = await c.query(`SELECT * FROM platform_marketing_accounts WHERE platform=$1`, [platform])
+        let row
+        if (existing.rows[0]) {
+          const curr = existing.rows[0]
+          const mergedCreds = { ...(curr.credentials || {}) }
+          if (credentials && typeof credentials === 'object') {
+            for (const [k, v] of Object.entries(credentials)) {
+              if (v !== '' && v !== undefined) mergedCreds[k] = v
+            }
+          }
+          const r = await c.query(
+            `UPDATE platform_marketing_accounts SET display_name=$1, credentials=$2, is_active=$3, updated_at=now() WHERE platform=$4 RETURNING *`,
+            [display_name ?? curr.display_name, JSON.stringify(mergedCreds), is_active !== undefined ? is_active : curr.is_active, platform]
+          )
+          row = r.rows[0]
+        } else {
+          const r = await c.query(
+            `INSERT INTO platform_marketing_accounts (platform, display_name, credentials, is_active) VALUES ($1,$2,$3,$4) RETURNING *`,
+            [platform, display_name || '', JSON.stringify(credentials || {}), is_active !== undefined ? is_active : true]
+          )
+          row = r.rows[0]
+        }
+        await c.end(); res.json({ account: row })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 

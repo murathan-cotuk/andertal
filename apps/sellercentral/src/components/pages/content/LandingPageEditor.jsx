@@ -1100,12 +1100,12 @@ const IMAGE_CAROUSEL_ASPECT_OPTIONS = [
 const MOBILE_ASPECT_LIKE_DESKTOP = IMAGE_CAROUSEL_ASPECT_OPTIONS;
 
 const GRADIENT_DIRECTION_OPTIONS = [
-  { label: “Yukarıdan aşağıya (to bottom)”, value: “to bottom” },
-  { label: “Aşağıdan yukarıya (to top)”, value: “to top” },
-  { label: “Soldan sağa (to right)”, value: “to right” },
-  { label: “Sağdan sola (to left)”, value: “to left” },
-  { label: “Sol üstten sağ alta (diagonal)”, value: “to bottom right” },
-  { label: “Sağ üstten sol alta (diagonal)”, value: “to bottom left” },
+  { label: "Yukarıdan aşağıya (to bottom)", value: "to bottom" },
+  { label: "Aşağıdan yukarıya (to top)", value: "to top" },
+  { label: "Soldan sağa (to right)", value: "to right" },
+  { label: "Sağdan sola (to left)", value: "to left" },
+  { label: "Sol üstten sağ alta (diagonal)", value: "to bottom right" },
+  { label: "Sağ üstten sol alta (diagonal)", value: "to bottom left" },
 ];
 
 /** Shop ≤1023px: eine Zeile vs. Raster pro „Seite” (nach rechts wischen) */

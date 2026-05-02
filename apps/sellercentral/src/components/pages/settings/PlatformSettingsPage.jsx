@@ -27,6 +27,7 @@ export default function PlatformSettingsPage() {
   const [storeName, setStoreName] = useState("");
 
   const [snapshot, setSnapshot] = useState(null);
+  const [isSuperuser, setIsSuperuser] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,6 +49,10 @@ export default function PlatformSettingsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    setIsSuperuser(typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
 
   const isDirty =
     snapshot !== null &&
@@ -160,7 +165,7 @@ export default function PlatformSettingsPage() {
                 {[
                   { label: "Checkout & Zahlungen", href: "/settings/checkout", desc: "Stripe, PayPal, Klarna" },
                   { label: "Branding & Stile", href: "/content/styles", desc: "Logos, Farben, Favicon" },
-                  { label: "E-Mail (SMTP)", href: "/settings/integrations", desc: "Ausgehende E-Mail-Konfiguration" },
+                  ...(isSuperuser ? [{ label: "E-Mail (SMTP)", href: "/settings/integrations", desc: "Ausgehende E-Mail-Konfiguration" }] : []),
                   { label: "Billbee-Integration", href: "/settings/integrations", desc: "Auftragsabwicklung & Versand" },
                 ].map((item) => (
                   <InlineStack key={item.href} align="space-between" blockAlign="center" wrap={false}>
