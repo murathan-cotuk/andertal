@@ -1,11 +1,18 @@
 ﻿# Render deployment configuration
 # Manuel ayar: Dashboard → Service → Build & Deploy
 #
-# Bellek: Kök dizinde tam monorepo `npm install` Render'da JS heap OOM verebilir.
-# Çözüm (repo kökü Root Directory ise): kök `package.json` içindeki:
-#   npm run render:install-backend
-# veya tek satır (--omit=dev: Playwright/Turbo vb. devDeps kurulmaz, bellek düşer):
-#   NODE_OPTIONS=--max-old-space-size=8192 npm install --omit=dev --no-audit --no-fund && node apps/medusa-backend/scripts/patch-link-modules.js
+# Bellek (heap OOM): Tam monorepo `npm install` Render'da çökmez — şunlardan birini kullan:
+#
+# A) Root Directory = BOŞ (repo kökü)
+#    Build command:
+#      npm run render:install-backend
+#    Start command (örnek):
+#      node apps/medusa-backend/server.js
+#
+# B) Root Directory = apps/medusa-backend
+#    Build command:
+#      NODE_OPTIONS=--max-old-space-size=8192 npm install --omit=dev --no-audit --no-fund
+#    (postinstall zaten scripts/patch-link-modules.js çalıştırır.)
 #
 # Build Command (Root Directory: apps/medusa-backend):
 #   npm install && npm run build && (npm run db:setup || npm run db:migrate)

@@ -18,6 +18,11 @@ function lt(obj, field, locale) {
   return obj?._i18n?.[locale]?.[field] ?? obj?.[field] ?? "";
 }
 
+/** Bild/URL-Feld für die aktuelle Locale (leer = nicht anzeigen / Slot ausblenden wo sinnvoll) */
+function localizedAsset(obj, field, locale) {
+  return String(lt(obj, field, locale) || "").trim();
+}
+
 function resolveUrl(url) {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/")) return url;
@@ -272,7 +277,7 @@ function HeroBanner({ container, locale = "de" }) {
   const scrollRef = useRef(null);
   const userScrolling = useRef(false);
 
-  const slides = (container.slides || []).filter((s) => s.image);
+  const slides = (container.slides || []).filter((s) => localizedAsset(s, "image", locale));
   const height = container.height || "500px";
   const mobileHeight = container.mobile_height || "200px";
   const mobilePadding = container.mobile_padding || "0px";
@@ -373,7 +378,7 @@ function HeroBanner({ container, locale = "de" }) {
             {slides.map((s, i) => {
               const inner = (
                 <>
-                  <img src={resolveUrl(s.image)} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }} draggable="false" />
+                  <img src={resolveUrl(lt(s, "image", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }} draggable="false" />
                   <Overlay s={s} mobile />
                 </>
               );
@@ -401,7 +406,7 @@ function HeroBanner({ container, locale = "de" }) {
       <div style={getContentInnerStyle(container, 1600)}>
         <div style={{ position: "relative", width: "100%", height, overflow: "hidden" }}>
           {slides.map((s, i) => {
-            const imgEl = <img src={resolveUrl(s.image)} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
+            const imgEl = <img src={resolveUrl(lt(s, "image", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
             const wrapStyle = { position: "absolute", inset: 0, opacity: i === current ? 1 : 0, transition: "opacity 0.7s ease", pointerEvents: i === current ? "auto" : "none" };
             return s.btn_url
               ? <a key={i} href={s.btn_url} style={{ ...wrapStyle, display: "block" }}>{imgEl}</a>
@@ -509,8 +514,10 @@ function VideoBlock({ container, locale = "de" }) {
   const fileMobileRaw = String(container.video_url_mobile || "").trim() ? resolveUrl(container.video_url_mobile) : "";
   const fileSrc = isNarrow && fileMobileRaw ? fileMobileRaw : fileDesktop;
 
-  const posterD = String(container.poster_url || "").trim() ? resolveUrl(container.poster_url) : undefined;
-  const posterM = String(container.poster_url_mobile || "").trim() ? resolveUrl(container.poster_url_mobile) : undefined;
+  const posterDRaw = localizedAsset(container, "poster_url", locale);
+  const posterMRaw = localizedAsset(container, "poster_url_mobile", locale);
+  const posterD = posterDRaw ? resolveUrl(lt(container, "poster_url", locale)) : undefined;
+  const posterM = posterMRaw ? resolveUrl(lt(container, "poster_url_mobile", locale)) : undefined;
   const poster = isNarrow && posterM ? posterM : posterD;
 
   const hasEmbed = mode === "embed" && Boolean(embedSrc);
@@ -587,7 +594,7 @@ function VideoBlock({ container, locale = "de" }) {
 // ── Image + Text ──────────────────────────────────────────────────────────────
 function ImageText({ container, locale = "de" }) {
   const imageLeft = container.image_side !== "right";
-  const imgSrc = resolveUrl(container.image);
+  const imgSrc = resolveUrl(lt(container, "image", locale));
   const textAlign = container.text_align || "left";
   const title = lt(container, "title", locale);
   const body = lt(container, "body", locale);
@@ -727,7 +734,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
 
   let items = [];
   if (source === "images") {
-    items = (container.images || []).filter((i) => i && i.url);
+    items = (container.images || []).filter((i) => i && localizedAsset(i, "url", locale));
   } else if (source === "collection") {
     items = products === undefined ? null : (products || []);
   } else {
@@ -759,7 +766,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
 
   const renderImage = (img) => {
     const r = String(img.aspect_ratio || "1/1").replace(/:/g, "/");
-    const src = resolveUrl(img.url);
+    const src = resolveUrl(lt(img, "url", locale));
     const imgTitle = lt(img, "title", locale);
     const imgText = lt(img, "text", locale);
     const hasTitle = !!(imgTitle && String(imgTitle).trim());
@@ -868,7 +875,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
 function ImageGrid({ container, locale = "de" }) {
   const cols = container.cols || 2;
   const gap = container.gap || 16;
-  const images = (container.images || []).filter((i) => i.url);
+  const images = (container.images || []).filter((i) => localizedAsset(i, "url", locale));
   if (!images.length) return null;
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
@@ -877,7 +884,7 @@ function ImageGrid({ container, locale = "de" }) {
           const ratio = img.aspect_ratio || "1/1";
           const imgTitle = lt(img, "title", locale);
           const imgText = lt(img, "text", locale);
-          const imgEl = <img src={resolveUrl(img.url)} alt={imgTitle || ""} style={{ width: "100%", aspectRatio: ratio, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />;
+          const imgEl = <img src={resolveUrl(lt(img, "url", locale))} alt={imgTitle || ""} style={{ width: "100%", aspectRatio: ratio, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />;
           const hasTitle = !!(imgTitle && String(imgTitle).trim());
           const hasBody = !!(imgText && String(imgText).trim());
           const caption = (hasTitle || hasBody) ? (
@@ -1950,14 +1957,14 @@ function Testimonials({ container, locale = "de" }) {
                 </p>
               )}
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: "auto" }}>
-                {item.avatar && (
+                {localizedAsset(item, "avatar", locale) ? (
                   <img
-                    src={resolveUrl(item.avatar)}
+                    src={resolveUrl(lt(item, "avatar", locale))}
                     alt={lt(item, "author", locale) || ""}
                     style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `2px solid ${card_border_color}` }}
                   />
-                )}
-                {!item.avatar && (
+                ) : null}
+                {!localizedAsset(item, "avatar", locale) && (
                   <div style={{ width: 40, height: 40, borderRadius: "50%", background: accent_color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "1rem", fontWeight: 700, color: "#fff" }}>
                     {(lt(item, "author", locale) || "?")[0].toUpperCase()}
                   </div>
@@ -2018,7 +2025,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
   const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
   const isNarrow = useIsNarrow(1023);
-  const images = (container.images || []).filter((i) => i.url);
+  const images = (container.images || []).filter((i) => localizedAsset(i, "url", locale));
   const { setLandingHeaderBg } = useLandingChrome();
   const mobileScrollRef = useRef(null);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -2077,7 +2084,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   const mobileItemW = String(container.mobile_item_width || "").trim() || `${mobileItemWidthPx}px`;
 
   const renderImageCell = (img) => {
-    const src = resolveUrl(img.url);
+    const src = resolveUrl(lt(img, "url", locale));
     const ratio = pickImageCarouselRatio(container, isNarrow);
     const minH = isNarrow && (container.min_height_mobile != null) && String(container.min_height_mobile).trim() !== "";
     const maxH = isNarrow ? (maxHMobile || maxHDesktop) : maxHDesktop;

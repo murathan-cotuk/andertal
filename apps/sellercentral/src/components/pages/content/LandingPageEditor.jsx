@@ -48,6 +48,16 @@ function si(obj, field, lang, value) {
   };
 }
 
+/** Shop-Locales für Texte + Bilder (_i18n-Schlüssel = URL-Segment en, de, tr, …) */
+const SHOP_CONTENT_LANG_OPTIONS = [
+  { label: "DE (Standard / Fallback)", value: "de" },
+  { label: "English", value: "en" },
+  { label: "Türkçe", value: "tr" },
+  { label: "Français", value: "fr" },
+  { label: "Italiano", value: "it" },
+  { label: "Español", value: "es" },
+];
+
 function resolveUrl(url) {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/")) return url;
@@ -520,7 +530,7 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
   return (
     <BlockStack gap="400">
       {pickerIdx !== null && (
-        <MediaPickerModal open multiple={false} onClose={() => setPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateSlide(pickerIdx, "image", urls[0]); setPickerIdx(null); }} />
+        <MediaPickerModal open multiple={false} onClose={() => setPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateSlideI18n(pickerIdx, "image", urls[0]); setPickerIdx(null); }} />
       )}
 
       <Card>
@@ -563,10 +573,10 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
 
             <ImageField
               label="Bild"
-              helpText="3000×1000 px empfohlen · Das Bild ist klickbar über btn_url"
-              value={slide.image}
+              helpText="3000×1000 px empfohlen · Das Bild ist klickbar über btn_url · pro gewählter „Sprache bearbeiten“"
+              value={gi(slide, "image", editLang)}
               onPick={() => setPickerIdx(idx)}
-              onClear={() => updateSlide(idx, "image", "")}
+              onClear={() => updateSlideI18n(idx, "image", "")}
             />
 
             <InlineStack gap="400" wrap={false}>
@@ -683,9 +693,17 @@ function ImageTextEditor({ container, onChange, editLang = "de" }) {
   return (
     <BlockStack gap="400">
       {pickerOpen && (
-        <MediaPickerModal open multiple={false} onClose={() => setPickerOpen(false)} onSelect={(urls) => { if (urls[0]) onChange({ ...container, image: urls[0] }); setPickerOpen(false); }} />
+        <MediaPickerModal
+          open
+          multiple={false}
+          onClose={() => setPickerOpen(false)}
+          onSelect={(urls) => {
+            if (urls[0]) onChange(si(container, "image", editLang, urls[0]));
+            setPickerOpen(false);
+          }}
+        />
       )}
-      <ImageField label="Bild" value={container.image} onPick={() => setPickerOpen(true)} onClear={() => onChange({ ...container, image: "" })} />
+      <ImageField label="Bild" value={gi(container, "image", editLang)} onPick={() => setPickerOpen(true)} onClear={() => onChange(si(container, "image", editLang, ""))} />
       <Select label="Bildposition" options={[{ label: "Links", value: "left" }, { label: "Rechts", value: "right" }]} value={container.image_side || "left"} onChange={(v) => onChange({ ...container, image_side: v })} />
       <TextField label="Überschrift" value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
       <RichTextEditor label="Text" value={gi(container, "body", editLang)} onChange={(v) => onChange(si(container, "body", editLang, v))} placeholder="Text eingeben…" minHeight="130px" />
@@ -738,7 +756,7 @@ function ImageGridEditor({ container, onChange, editLang = "de" }) {
   const [pickerIdx, setPickerIdx] = useState(null);
   const updateImg = (idx, key, val) => {
     const images = [...(container.images || [])];
-    images[idx] = { ...images[idx], [key]: val };
+    images[idx] = key === "url" ? si(images[idx], "url", editLang, val) : { ...images[idx], [key]: val };
     onChange({ ...container, images });
   };
   const updateImgI18n = (idx, field, val) => {
@@ -772,7 +790,7 @@ function ImageGridEditor({ container, onChange, editLang = "de" }) {
                 <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
               )}
             </InlineStack>
-            <ImageField value={img.url} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
+            <ImageField value={gi(img, "url", editLang)} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
             <InlineStack gap="400" wrap={false}>
               <div style={{ flex: 1 }}>
                 <TextField label="Link-URL (optional)" value={img.link || ""} onChange={(v) => updateImg(idx, "link", v)} placeholder="https://…" autoComplete="off" />
@@ -883,7 +901,7 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
 
   const updateImg = (idx, key, val) => {
     const images = [...(container.images || [])];
-    images[idx] = { ...images[idx], [key]: val };
+    images[idx] = key === "url" ? si(images[idx], "url", editLang, val) : { ...images[idx], [key]: val };
     onChange({ ...container, images });
   };
   const updateImgI18n = (idx, field, val) => {
@@ -968,7 +986,7 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
                     <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
                   )}
                 </InlineStack>
-                <ImageField value={img.url} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
+                <ImageField value={gi(img, "url", editLang)} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
                 <InlineStack gap="400" wrap={false}>
                   <div style={{ flex: 1 }}>
                     <TextField label="Link-URL (optional)" value={img.link || ""} onChange={(v) => updateImg(idx, "link", v)} placeholder="https://…" autoComplete="off" />
@@ -1124,7 +1142,7 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
 
   const updateImg = (idx, key, val) => {
     const next = [...(container.images || [])];
-    next[idx] = { ...next[idx], [key]: val };
+    next[idx] = key === "url" ? si(next[idx], "url", editLang, val) : { ...next[idx], [key]: val };
     onChange({ ...container, images: next });
   };
   const updateImgI18n = (idx, field, val) => {
@@ -1251,7 +1269,7 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
                         <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
                       )}
                     </InlineStack>
-                    <ImageField value={img.url} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
+                    <ImageField value={gi(img, "url", editLang)} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
                     <TextField
                       label="Link (optional)"
                       value={img.link || ""}
@@ -2119,7 +2137,7 @@ function TestimonialsEditor({ container, onChange, editLang = "de" }) {
   return (
     <BlockStack gap="400">
       {pickerIdx !== null && (
-        <MediaPickerModal open multiple={false} onClose={() => setPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateItem(pickerIdx, "avatar", urls[0]); setPickerIdx(null); }} />
+        <MediaPickerModal open multiple={false} onClose={() => setPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateItemI18n(pickerIdx, "avatar", urls[0]); setPickerIdx(null); }} />
       )}
 
       <Card>
@@ -2184,9 +2202,9 @@ function TestimonialsEditor({ container, onChange, editLang = "de" }) {
             </InlineStack>
             <ImageField
               label="Avatar (optional)"
-              value={item.avatar || ""}
+              value={gi(item, "avatar", editLang)}
               onPick={() => setPickerIdx(idx)}
-              onClear={() => updateItem(idx, "avatar", "")}
+              onClear={() => updateItemI18n(idx, "avatar", "")}
             />
           </BlockStack>
         </Card>
@@ -2220,7 +2238,7 @@ function VideoBlockEditor({ container, onChange, deviceTab = 0, editLang = "de" 
           open
           multiple={false}
           onClose={() => setPosterPicker(null)}
-          onSelect={(urls) => { if (urls[0]) onChange({ ...container, poster_url: urls[0] }); setPosterPicker(null); }}
+          onSelect={(urls) => { if (urls[0]) onChange(si(container, "poster_url", editLang, urls[0])); setPosterPicker(null); }}
         />
       )}
       {posterPicker === "mobile" && (
@@ -2228,7 +2246,7 @@ function VideoBlockEditor({ container, onChange, deviceTab = 0, editLang = "de" 
           open
           multiple={false}
           onClose={() => setPosterPicker(null)}
-          onSelect={(urls) => { if (urls[0]) onChange({ ...container, poster_url_mobile: urls[0] }); setPosterPicker(null); }}
+          onSelect={(urls) => { if (urls[0]) onChange(si(container, "poster_url_mobile", editLang, urls[0])); setPosterPicker(null); }}
         />
       )}
 
@@ -2274,12 +2292,12 @@ function VideoBlockEditor({ container, onChange, deviceTab = 0, editLang = "de" 
           <div style={EDITOR_FIELD_GRID}>
             <ImageField
               label="Poster (optional)"
-              value={isMobileView ? (container.poster_url_mobile || "") : (container.poster_url || "")}
+              value={isMobileView ? gi(container, "poster_url_mobile", editLang) : gi(container, "poster_url", editLang)}
               onPick={() => setPosterPicker(isMobileView ? "mobile" : "desktop")}
-              onClear={() => onChange({
-                ...container,
-                ...(isMobileView ? { poster_url_mobile: "" } : { poster_url: "" }),
-              })}
+              onClear={() =>
+                onChange(
+                  si(container, isMobileView ? "poster_url_mobile" : "poster_url", editLang, ""),
+                )}
             />
           </div>
         </BlockStack>
@@ -2486,9 +2504,7 @@ function ContainerChromePanel({ container, onChange, deviceTab = 0 }) {
   );
 }
 
-function ContainerEditor({ container, onChange, deviceTab = 0 }) {
-  const editLang = "de";
-
+function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
   let editor = null;
   switch (container.type) {
     case "hero_banner":          editor = <HeroBannerEditor container={container} onChange={onChange} editLang={editLang} />; break;
@@ -2558,6 +2574,8 @@ export default function LandingPageEditor() {
 
   // ── Top-level tab: 0 = Seiten, 1 = Templates
   const [mainTab, setMainTab] = useState(0);
+  /** Landing-Inhalt: Texte + Bilder pro Shop-Sprache (_i18n); „de“ = Root-Felder + Fallback im Shop */
+  const [contentEditLang, setContentEditLang] = useState("de");
   // Templates: 0 = Desktop, 1 = Mobil (Kollektions- / Kategorie-Raster)
   const [templateDeviceTab, setTemplateDeviceTab] = useState(0);
 
@@ -2969,6 +2987,21 @@ export default function LandingPageEditor() {
                             />
                           </Card>
 
+                          <Banner tone="info">
+                            <p>
+                              <strong>Sprache für Texte &amp; Bilder:</strong> Oben die Shop-Sprache wählen (DE = Standard/Fallback). Pro Sprache eigene Bilder setzen — andere Sprachen bleiben unverändert.
+                              Im Shop gilt jeweils die aktive Locale; fehlt eine Übersetzung, wird Deutsch verwendet.
+                            </p>
+                          </Banner>
+                          <div style={{ maxWidth: 320 }}>
+                            <Select
+                              label="Sprache bearbeiten"
+                              options={SHOP_CONTENT_LANG_OPTIONS}
+                              value={contentEditLang}
+                              onChange={setContentEditLang}
+                            />
+                          </div>
+
                           {isCategorySelection && (
                             <Banner tone="success">Container gelten für diese Kategorie auf der zugehörigen Kollektionsseite im Shop (über dem Katalog).</Banner>
                           )}
@@ -3025,7 +3058,7 @@ export default function LandingPageEditor() {
                                     <>
                                       <Divider />
                                       <Box paddingBlockStart="400">
-                                        <ContainerEditor container={c} onChange={(updated) => updateContainer(c.id, updated)} deviceTab={seitenDeviceTab} />
+                                        <ContainerEditor container={c} onChange={(updated) => updateContainer(c.id, updated)} deviceTab={seitenDeviceTab} editLang={contentEditLang} />
                                         <Box paddingBlockStart="400">
                                           <InlineStack align="end">
                                             <Button size="slim" tone="critical" onClick={() => { if (confirm("Container entfernen?")) removeContainer(c.id); }}>
