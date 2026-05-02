@@ -6,6 +6,7 @@ import {
   Button, Banner, Badge, Modal, EmptyState, Divider, Box,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import MarketingAccountsSection from "@/components/settings/MarketingAccountsSection";
 
 const client = getMedusaAdminClient();
 
@@ -361,25 +362,37 @@ export default function IntegrationsSettingsPage() {
       <BlockStack gap="500">
         {msg && <Banner tone={msg.tone} onDismiss={() => setMsg(null)}>{msg.text}</Banner>}
 
-        {/* ── E-Mail / SMTP ─────────────────────────────────────── */}
-        <Card>
-          <BlockStack gap="400">
-            <BlockStack gap="100">
-              <Text as="h2" variant="headingMd">E-posta / SMTP</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Otomatik e-postalar ve Flow kampanyaları bu ayarlar üzerinden gönderilir.
-              </Text>
-            </BlockStack>
-            <Divider />
-            {isSuperuser ? (
+        {/* ── E-Mail / SMTP (superuser only) ───────────────────────── */}
+        {isSuperuser && (
+          <Card>
+            <BlockStack gap="400">
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd">E-posta / SMTP</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Otomatik e-postalar ve Flow kampanyaları bu ayarlar üzerinden gönderilir.
+                </Text>
+              </BlockStack>
+              <Divider />
               <SmtpSection />
-            ) : (
-              <Banner tone="info">
-                SMTP ve giden e-posta yalnızca platform süper kullanıcısı tarafından bağlanabilir ve düzenlenebilir.
-              </Banner>
-            )}
-          </BlockStack>
-        </Card>
+            </BlockStack>
+          </Card>
+        )}
+
+        {isSuperuser && (
+          <Card>
+            <BlockStack gap="400">
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd">Marketing-Konten</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Werbekonten verbinden, um Kampagnen automatisch auf Meta, Google Ads, TikTok und Snapchat zu schalten.
+                  Budgets werden gleichmäßig auf die ausgewählten Plattformen verteilt.
+                </Text>
+              </BlockStack>
+              <Divider />
+              <MarketingAccountsSection />
+            </BlockStack>
+          </Card>
+        )}
 
         {/* ── API Integrationen ──────────────────────────────────── */}
         <Card>

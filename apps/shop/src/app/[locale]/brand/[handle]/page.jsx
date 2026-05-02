@@ -19,9 +19,15 @@ import {
 } from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
+import CatalogDrawerPortal, {
+  CATALOG_DRAWER_MAX_PX,
+  CATALOG_FILTER_OVERLAY_Z,
+  CATALOG_FILTER_SIDEBAR_Z,
+  catalogDrawerMaxCss,
+} from "@/lib/catalog-drawer-portal";
 
 /* ─────────────────────────────────────────────────────────── */
-const HEADER_H = 112;
+const HEADER_H = 72;
 
 /* ─── Shimmer skeleton ───────────────────────────────────── */
 const shimmer = keyframes`
@@ -174,7 +180,7 @@ const FilterBtn = styled.button`
   svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
   &:hover { color: #111; }
 
-  @media (max-width: 767px) {
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: inline-flex;
   }
 `;
@@ -216,12 +222,12 @@ const SortSelect = styled.select`
 
 const SidebarOverlay = styled.div`
   display: none;
-  @media (max-width: 767px) {
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: block;
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.45);
-    z-index: 2147483700;
+    z-index: ${CATALOG_FILTER_OVERLAY_Z};
     opacity: ${(p) => (p.$open ? 1 : 0)};
     pointer-events: ${(p) => (p.$open ? "auto" : "none")};
     transition: opacity var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
@@ -237,18 +243,20 @@ const SidebarHead = styled.div`
   padding: ${(p) => (p.$filterMode ? "12px 14px" : "0 0 12px")};
   border-bottom: 1px solid #e8e8e6;
 
-  @media (min-width: 768px) { display: none; }
+  @media (min-width: 1024px) {
+    display: none;
+  }
 `;
 
 const DesktopSidebarContent = styled.div`
-  @media (max-width: 767px) {
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: none;
   }
 `;
 
 const MobileFilterSplit = styled.div`
   display: none;
-  @media (max-width: 767px) {
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: flex;
     flex-direction: row;
     flex: 1;
@@ -420,14 +428,14 @@ const SidebarCol = styled.aside`
   max-height: calc(100vh - ${HEADER_H + 100}px);
   overflow-y: auto;
 
-  @media (max-width: 767px) {
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     position: fixed;
     top: 0;
     left: 0;
     width: min(360px, 90vw);
     height: 100dvh;
     max-height: 100dvh;
-    z-index: 2147483701;
+    z-index: ${CATALOG_FILTER_SIDEBAR_Z};
     background: #fff;
     box-shadow: 4px 0 32px rgba(0, 0, 0, 0.2);
     transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
@@ -624,9 +632,12 @@ export default function BrandPage() {
 
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
+    if (!window.matchMedia(catalogDrawerMaxCss).matches) return undefined;
     const prev = document.body.style.overflow;
     if (panelOpen) document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [panelOpen]);
 
   useEffect(() => {
@@ -783,10 +794,12 @@ export default function BrandPage() {
           <b>{title}</b>
         </Breadcrumb>
 
-        {showCatalogSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
         <ContentWrap ref={bodyRef}>
           {showCatalogSidebar && (
-            <SidebarCol $open={panelOpen} $filterMode={hasFacets}>
+            <CatalogDrawerPortal>
+              <>
+                <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />
+                <SidebarCol $open={panelOpen} $filterMode={hasFacets}>
               <SidebarHead $filterMode={hasFacets}>
                 <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
                   Filter{activeCount > 0 ? ` (${activeCount})` : ""}
@@ -871,6 +884,8 @@ export default function BrandPage() {
                 </MobileFilterRight>
               </MobileFilterSplit>
             </SidebarCol>
+              </>
+            </CatalogDrawerPortal>
           )}
 
           <MainCol>

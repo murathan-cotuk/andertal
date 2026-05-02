@@ -85,8 +85,27 @@ export function mergeLoadedShopStyles(loaded = {}) {
   return {
     colors: { ...DEFAULT_SHOP_STYLES.colors, ...(loaded.colors || {}) },
     topbar: { ...DEFAULT_SHOP_STYLES.topbar, ...(loaded.topbar || {}) },
-    header: { ...DEFAULT_SHOP_STYLES.header, ...(loaded.header || {}) },
-    secondNav: { ...DEFAULT_SHOP_STYLES.secondNav, ...(loaded.secondNav || {}) },
+    header: {
+      ...DEFAULT_SHOP_STYLES.header,
+      ...(loaded.header || {}),
+      scopes: {
+        category: {
+          ...(DEFAULT_SHOP_STYLES.header.scopes?.category || {}),
+          ...(loaded.header?.scopes?.category || {}),
+        },
+        collection: {
+          ...(DEFAULT_SHOP_STYLES.header.scopes?.collection || {}),
+          ...(loaded.header?.scopes?.collection || {}),
+        },
+      },
+    },
+    secondNav: (() => {
+      const merged = { ...DEFAULT_SHOP_STYLES.secondNav, ...(loaded.secondNav || {}) };
+      const r = String(merged.pill_border_radius ?? "").trim();
+      /* Früherer Shop-Default 20% — auf langen Labels wie eine Pille */
+      if (r === "20%") merged.pill_border_radius = DEFAULT_SHOP_STYLES.secondNav.pill_border_radius;
+      return merged;
+    })(),
     footer: { ...DEFAULT_SHOP_STYLES.footer, ...(loaded.footer || {}) },
     typography,
     scrollUpButton: { ...DEFAULT_SHOP_STYLES.scrollUpButton, ...(loaded.scrollUpButton || {}) },

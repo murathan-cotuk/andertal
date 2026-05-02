@@ -50,6 +50,34 @@ const T = {
       win_back: "Win-back (inactive customer)",
     },
     statuses: { active: "Active", draft: "Draft", paused: "Paused" },
+    editBtn: "Edit",
+    editTitle: "Edit flow",
+    saveBtn: "Save",
+    stepsHeading: "Steps (after trigger)",
+    addStepBtn: "Add step",
+    removeStepBtn: "Remove",
+    stepTypeLabel: "Step type",
+    stepWaitOption: "Wait (hours)",
+    stepEmailOption: "Send email",
+    waitHoursHelp: "Pause this many hours before the next step.",
+    emailSubjectLabel: "Email subject",
+    emailBodyLabel: "Email body",
+    emailSubjectPh: "e.g. Thanks for your order",
+    emailBodyPh: "<p>Dear {FIRST_NAME},</p><p>Thanks for shopping <strong>{PRODUCT}</strong>.</p>",
+    emailHtmlHelp: "Body is sent as HTML. You can use headings, links, and styles.",
+    placeholdersHelp:
+      "Placeholders (sample data in test sends): {CUSTOMER}, {CUSTOMER_NAME}, {FIRST_NAME}, {LAST_NAME}, {EMAIL}, {PRODUCT}, {ORDER_NUMBER}, {STORE_NAME}.",
+    testEmailFieldLabel: "Send test emails to",
+    testEmailFieldHelp: "Same address is used for every “Send test” below.",
+    testEmailBtn: "Send test email",
+    testEmailNeedAddress: "Enter your email above to send a test.",
+    testEmailNeedStep: "Add subject and HTML body first.",
+    testEmailOk: "Test email sent.",
+    smtpRequiredForTest: "Configure SMTP first (Settings → Integrations).",
+    loadFlowErr: "Could not load flow.",
+    saveFlowErr: "Could not save flow.",
+    flowStatusLabel: "Flow status",
+    noStepsHint: "Add steps—for example wait one hour, then send an email.",
   },
   de: {
     title: "Flows",
@@ -88,6 +116,34 @@ const T = {
       win_back: "Rückgewinnung (inaktiver Kunde)",
     },
     statuses: { active: "Aktiv", draft: "Entwurf", paused: "Pausiert" },
+    editBtn: "Bearbeiten",
+    editTitle: "Flow bearbeiten",
+    saveBtn: "Speichern",
+    stepsHeading: "Schritte (nach Auslöser)",
+    addStepBtn: "Schritt hinzufügen",
+    removeStepBtn: "Entfernen",
+    stepTypeLabel: "Schritttyp",
+    stepWaitOption: "Warten (Stunden)",
+    stepEmailOption: "E-Mail senden",
+    waitHoursHelp: "So viele Stunden warten, bevor der nächste Schritt ausgeführt wird.",
+    emailSubjectLabel: "Betreff",
+    emailBodyLabel: "E-Mail-Text",
+    emailSubjectPh: "z. B. Danke für Ihre Bestellung",
+    emailBodyPh: "<p>Hallo {FIRST_NAME},</p><p>vielen Dank für Ihren Einkauf: <strong>{PRODUCT}</strong>.</p>",
+    emailHtmlHelp: "Der Text wird als HTML versendet (Überschriften, Links, Styles).",
+    placeholdersHelp:
+      "Platzhalter (Test mit Beispieldaten): {CUSTOMER_NAME}, {FIRST_NAME}, {LAST_NAME}, {EMAIL}, {PRODUCT}, {ORDER_NUMBER}, {STORE_NAME}.",
+    testEmailFieldLabel: "Test-E-Mails senden an",
+    testEmailFieldHelp: "Dieselbe Adresse für alle „Test senden“-Schaltflächen.",
+    testEmailBtn: "Test-E-Mail senden",
+    testEmailNeedAddress: "Bitte oben eine E-Mail-Adresse eingeben.",
+    testEmailNeedStep: "Zuerst Betreff und HTML-Text ausfüllen.",
+    testEmailOk: "Test-E-Mail wurde gesendet.",
+    smtpRequiredForTest: "Zuerst SMTP einrichten (Einstellungen → Integrationen).",
+    noStepsHint: "Schritte hinzufügen—z. B. 1 Stunde warten, dann E-Mail senden.",
+    loadFlowErr: "Flow konnte nicht geladen werden.",
+    saveFlowErr: "Flow konnte nicht gespeichert werden.",
+    flowStatusLabel: "Flow-Status",
   },
   tr: {
     title: "Flows",
@@ -126,6 +182,34 @@ const T = {
       win_back: "Pasif müşteri (win-back)",
     },
     statuses: { active: "Aktif", draft: "Taslak", paused: "Duraklatıldı" },
+    editBtn: "Düzenle",
+    editTitle: "Flow'u düzenle",
+    saveBtn: "Kaydet",
+    stepsHeading: "Adımlar (tetikleyiciden sonra)",
+    addStepBtn: "Adım ekle",
+    removeStepBtn: "Kaldır",
+    stepTypeLabel: "Adım türü",
+    stepWaitOption: "Bekle (saat)",
+    stepEmailOption: "E-posta gönder",
+    waitHoursHelp: "Sonraki adımdan önce beklenecek saat.",
+    emailSubjectLabel: "E-posta konusu",
+    emailBodyLabel: "E-posta metni",
+    emailSubjectPh: "ör. Siparişiniz için teşekkürler",
+    emailBodyPh: "<p>Merhaba {FIRST_NAME},</p><p><strong>{PRODUCT}</strong> için alışverişinize teşekkürler.</p>",
+    emailHtmlHelp: "Gövde HTML olarak gönderilir.",
+    placeholdersHelp:
+      "Yer tutucular (testte örnek veri): {CUSTOMER_NAME}, {FIRST_NAME}, {LAST_NAME}, {EMAIL}, {PRODUCT}, {ORDER_NUMBER}, {STORE_NAME}.",
+    testEmailFieldLabel: "Test e-postası gönderilecek adres",
+    testEmailFieldHelp: "Aşağıdaki tüm test gönderimleri bu adresi kullanır.",
+    testEmailBtn: "Test e-postası gönder",
+    testEmailNeedAddress: "Önce yukarıya e-posta yazın.",
+    testEmailNeedStep: "Önce konu ve HTML gövde ekleyin.",
+    testEmailOk: "Test e-postası gönderildi.",
+    smtpRequiredForTest: "Önce SMTP yapılandırın (Ayarlar → Entegrasyonlar).",
+    noStepsHint: "Adım ekleyin—ör. 1 saat bekleyin, sonra e-posta gönderin.",
+    loadFlowErr: "Flow yüklenemedi.",
+    saveFlowErr: "Flow kaydedilemedi.",
+    flowStatusLabel: "Flow durumu",
   },
   fr: {
     title: "Flux",
@@ -164,6 +248,34 @@ const T = {
       win_back: "Réactivation (client inactif)",
     },
     statuses: { active: "Actif", draft: "Brouillon", paused: "En pause" },
+    editBtn: "Modifier",
+    editTitle: "Modifier le flux",
+    saveBtn: "Enregistrer",
+    stepsHeading: "Étapes (après déclencheur)",
+    addStepBtn: "Ajouter une étape",
+    removeStepBtn: "Supprimer",
+    stepTypeLabel: "Type d'étape",
+    stepWaitOption: "Attendre (heures)",
+    stepEmailOption: "Envoyer un e-mail",
+    waitHoursHelp: "Heures d'attente avant l'étape suivante.",
+    emailSubjectLabel: "Objet",
+    emailBodyLabel: "Corps",
+    emailSubjectPh: "ex. Merci pour votre commande",
+    emailBodyPh: "<p>Bonjour {FIRST_NAME},</p><p>Merci pour votre achat : <strong>{PRODUCT}</strong>.</p>",
+    emailHtmlHelp: "Le corps est envoyé en HTML.",
+    placeholdersHelp:
+      "Variables (données d'exemple pour les tests) : {CUSTOMER_NAME}, {FIRST_NAME}, {LAST_NAME}, {EMAIL}, {PRODUCT}, {ORDER_NUMBER}, {STORE_NAME}.",
+    testEmailFieldLabel: "Envoyer les e-mails de test à",
+    testEmailFieldHelp: "La même adresse pour chaque bouton « Envoyer un test ».",
+    testEmailBtn: "Envoyer un e-mail de test",
+    testEmailNeedAddress: "Indiquez votre e-mail ci-dessus.",
+    testEmailNeedStep: "Renseignez d'abord l'objet et le corps HTML.",
+    testEmailOk: "E-mail de test envoyé.",
+    smtpRequiredForTest: "Configurez d'abord SMTP (Paramètres → Intégrations).",
+    noStepsHint: "Ajoutez des étapes — ex. attendre 1 heure puis envoyer un e-mail.",
+    loadFlowErr: "Impossible de charger le flux.",
+    saveFlowErr: "Impossible d'enregistrer le flux.",
+    flowStatusLabel: "Statut du flux",
   },
   it: {
     title: "Flussi",
@@ -202,6 +314,34 @@ const T = {
       win_back: "Riattivazione (cliente inattivo)",
     },
     statuses: { active: "Attivo", draft: "Bozza", paused: "In pausa" },
+    editBtn: "Modifica",
+    editTitle: "Modifica flusso",
+    saveBtn: "Salva",
+    stepsHeading: "Passi (dopo il trigger)",
+    addStepBtn: "Aggiungi passo",
+    removeStepBtn: "Rimuovi",
+    stepTypeLabel: "Tipo di passo",
+    stepWaitOption: "Attendi (ore)",
+    stepEmailOption: "Invia e-mail",
+    waitHoursHelp: "Ore di attesa prima del passo successivo.",
+    emailSubjectLabel: "Oggetto",
+    emailBodyLabel: "Corpo",
+    emailSubjectPh: "es. Grazie per il tuo ordine",
+    emailBodyPh: "<p>Ciao {FIRST_NAME},</p><p>Grazie per aver acquistato <strong>{PRODUCT}</strong>.</p>",
+    emailHtmlHelp: "Il corpo viene inviato come HTML.",
+    placeholdersHelp:
+      "Segnaposto (dati di esempio nei test): {CUSTOMER_NAME}, {FIRST_NAME}, {LAST_NAME}, {EMAIL}, {PRODUCT}, {ORDER_NUMBER}, {STORE_NAME}.",
+    testEmailFieldLabel: "Invia e-mail di test a",
+    testEmailFieldHelp: "Lo stesso indirizzo per ogni pulsante « Invia test ».",
+    testEmailBtn: "Invia e-mail di test",
+    testEmailNeedAddress: "Inserisci sopra un indirizzo e-mail.",
+    testEmailNeedStep: "Compila prima oggetto e corpo HTML.",
+    testEmailOk: "E-mail di test inviata.",
+    smtpRequiredForTest: "Configura prima SMTP (Impostazioni → Integrazioni).",
+    noStepsHint: "Aggiungi passi — es. attendi 1 ora poi invia un'e-mail.",
+    loadFlowErr: "Impossibile caricare il flusso.",
+    saveFlowErr: "Impossibile salvare il flusso.",
+    flowStatusLabel: "Stato flusso",
   },
   es: {
     title: "Flujos",
@@ -240,6 +380,34 @@ const T = {
       win_back: "Reactivación (cliente inactivo)",
     },
     statuses: { active: "Activo", draft: "Borrador", paused: "En pausa" },
+    editBtn: "Editar",
+    editTitle: "Editar flujo",
+    saveBtn: "Guardar",
+    stepsHeading: "Pasos (tras el disparador)",
+    addStepBtn: "Añadir paso",
+    removeStepBtn: "Quitar",
+    stepTypeLabel: "Tipo de paso",
+    stepWaitOption: "Esperar (horas)",
+    stepEmailOption: "Enviar correo",
+    waitHoursHelp: "Horas de espera antes del siguiente paso.",
+    emailSubjectLabel: "Asunto",
+    emailBodyLabel: "Cuerpo",
+    emailSubjectPh: "ej. Gracias por tu pedido",
+    emailBodyPh: "<p>Hola {FIRST_NAME},</p><p>Gracias por comprar <strong>{PRODUCT}</strong>.</p>",
+    emailHtmlHelp: "El cuerpo se envía como HTML.",
+    placeholdersHelp:
+      "Marcadores (datos de ejemplo en pruebas): {CUSTOMER_NAME}, {FIRST_NAME}, {LAST_NAME}, {EMAIL}, {PRODUCT}, {ORDER_NUMBER}, {STORE_NAME}.",
+    testEmailFieldLabel: "Enviar correos de prueba a",
+    testEmailFieldHelp: "La misma dirección para cada « Enviar prueba ».",
+    testEmailBtn: "Enviar correo de prueba",
+    testEmailNeedAddress: "Escribe tu correo arriba.",
+    testEmailNeedStep: "Completa primero asunto y cuerpo HTML.",
+    testEmailOk: "Correo de prueba enviado.",
+    smtpRequiredForTest: "Configura SMTP primero (Ajustes → Integraciones).",
+    noStepsHint: "Añade pasos — ej. esperar 1 hora y enviar un correo.",
+    loadFlowErr: "No se pudo cargar el flujo.",
+    saveFlowErr: "No se pudo guardar el flujo.",
+    flowStatusLabel: "Estado del flujo",
   },
 };
 
@@ -250,6 +418,15 @@ export default function FlowsPage() {
   const t = T[locale] || T.en;
 
   const triggerOptions = Object.entries(t.triggers).map(([value, label]) => ({ label, value }));
+  const statusEditOptions = [
+    { label: t.statuses.draft, value: "draft" },
+    { label: t.statuses.active, value: "active" },
+    { label: t.statuses.paused, value: "paused" },
+  ];
+  const stepTypeOptions = [
+    { label: t.stepWaitOption, value: "wait_hours" },
+    { label: t.stepEmailOption, value: "send_email" },
+  ];
 
   const [flows, setFlows]               = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -263,6 +440,19 @@ export default function FlowsPage() {
   const [smtpConfigured, setSmtpConfigured] = useState(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
 
+  const [editOpen, setEditOpen]         = useState(false);
+  const [editLoading, setEditLoading]   = useState(false);
+  const [editSaving, setEditSaving]     = useState(false);
+  const [editErr, setEditErr]           = useState("");
+  const [editingFlowId, setEditingFlowId] = useState("");
+  const [editName, setEditName]         = useState("");
+  const [editTrigger, setEditTrigger]   = useState("abandoned_cart");
+  const [editStatus, setEditStatus]     = useState("draft");
+  const [editSteps, setEditSteps]       = useState([]);
+  const [testFlowEmailTo, setTestFlowEmailTo] = useState("");
+  const [flowTestBanner, setFlowTestBanner]   = useState(null);
+  const [testSendingStepIdx, setTestSendingStepIdx] = useState(null);
+
   useEffect(() => {
     setIsSuperuser(typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true");
   }, []);
@@ -272,10 +462,16 @@ export default function FlowsPage() {
     setError("");
     try {
       const [flowsRes, smtpRes] = await Promise.allSettled([
-        client.getFlows?.() ?? Promise.resolve({ flows: [] }),
+        client.getFlows(),
         client.getSmtpSettings?.() ?? Promise.resolve(null),
       ]);
-      setFlows(flowsRes.status === "fulfilled" ? (flowsRes.value?.flows ?? []) : []);
+      if (flowsRes.status === "fulfilled") {
+        setFlows(flowsRes.value?.flows ?? []);
+      } else {
+        const msg = flowsRes.reason?.message || "Flows unavailable";
+        setFlows([]);
+        setError(msg);
+      }
       if (smtpRes.status === "fulfilled" && smtpRes.value) {
         const v = smtpRes.value;
         setSmtpConfigured(!!(
@@ -295,11 +491,15 @@ export default function FlowsPage() {
 
   const handleCreate = async () => {
     const name = newName.trim();
-    if (!name) { setNewNameErr(t.flowName + " " + t.cancel.toLowerCase()); return; }
+    if (!name) {
+      setNewNameErr(t.flowName);
+      return;
+    }
     setSaving(true);
     try {
-      const res = await client.createFlow?.({ name, trigger: newTrigger, status: "draft" });
-      setFlows((prev) => [...prev, res?.flow ?? { id: Date.now(), name, trigger: newTrigger, status: "draft", step_count: 0 }]);
+      const res = await client.createFlow({ name, trigger: newTrigger, status: "draft" });
+      const flow = res?.flow;
+      if (flow) setFlows((prev) => [...prev, { ...flow, step_count: flow.step_count ?? 0 }]);
       setCreateOpen(false);
       setNewName(""); setNewTrigger("abandoned_cart"); setNewNameErr("");
     } catch (e) {
@@ -309,11 +509,154 @@ export default function FlowsPage() {
     }
   };
 
+  const openEditModal = async (flow) => {
+    setEditErr("");
+    setFlowTestBanner(null);
+    setTestSendingStepIdx(null);
+    setEditingFlowId(flow.id);
+    setEditLoading(true);
+    setEditOpen(true);
+    try {
+      const d = await client.getFlow(flow.id);
+      const f = d?.flow;
+      setEditName(f?.name || "");
+      setEditTrigger(f?.trigger || "abandoned_cart");
+      setEditStatus(f?.status || "draft");
+      setEditSteps(
+        (d?.steps || []).map((s) => ({
+          id: s.id,
+          step_type: s.step_type === "send_email" ? "send_email" : "wait_hours",
+          wait_hours: s.wait_hours != null ? Number(s.wait_hours) : 1,
+          email_subject: s.email_subject || "",
+          email_body: s.email_body || "",
+        })),
+      );
+    } catch (e) {
+      setEditErr(e?.message || t.loadFlowErr);
+      setEditSteps([]);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const closeEditModal = () => {
+    setEditOpen(false);
+    setEditErr("");
+    setEditingFlowId("");
+    setEditSteps([]);
+    setTestFlowEmailTo("");
+    setFlowTestBanner(null);
+    setTestSendingStepIdx(null);
+  };
+
+  const sendTestFlowEmail = async (stepIdx) => {
+    const to = testFlowEmailTo.trim();
+    if (!editingFlowId) return;
+    if (!to) {
+      setFlowTestBanner({ tone: "critical", message: t.testEmailNeedAddress });
+      return;
+    }
+    if (smtpConfigured === false) {
+      setFlowTestBanner({ tone: "critical", message: t.smtpRequiredForTest });
+      return;
+    }
+    const step = editSteps[stepIdx];
+    if (!step || step.step_type !== "send_email") return;
+    const subj = String(step.email_subject || "").trim();
+    const htmlBody = String(step.email_body || "").trim();
+    if (!subj || !htmlBody) {
+      setFlowTestBanner({ tone: "critical", message: t.testEmailNeedStep });
+      return;
+    }
+    setTestSendingStepIdx(stepIdx);
+    setFlowTestBanner(null);
+    try {
+      await client.sendFlowTestEmail(editingFlowId, {
+        to,
+        email_subject: subj,
+        email_body: htmlBody,
+      });
+      setFlowTestBanner({ tone: "success", message: t.testEmailOk });
+    } catch (e) {
+      setFlowTestBanner({ tone: "critical", message: e?.message || "Error" });
+    } finally {
+      setTestSendingStepIdx(null);
+    }
+  };
+
+  const patchEditStep = (idx, patch) => {
+    setEditSteps((prev) =>
+      prev.map((row, i) => {
+        if (i !== idx) return row;
+        const next = { ...row, ...patch };
+        if (patch.step_type === "wait_hours") {
+          next.email_subject = "";
+          next.email_body = "";
+          if (next.wait_hours == null || Number.isNaN(Number(next.wait_hours))) next.wait_hours = 1;
+        }
+        if (patch.step_type === "send_email") {
+          next.wait_hours = 0;
+        }
+        return next;
+      }),
+    );
+  };
+
+  const addEditStep = () => {
+    setEditSteps((prev) => [
+      ...prev,
+      { step_type: "wait_hours", wait_hours: 1, email_subject: "", email_body: "" },
+    ]);
+  };
+
+  const removeEditStep = (idx) => {
+    setEditSteps((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const saveEditModal = async () => {
+    const name = editName.trim();
+    if (!name) {
+      setEditErr(t.flowName);
+      return;
+    }
+    setEditSaving(true);
+    setEditErr("");
+    try {
+      const stepsPayload = editSteps.map((s) =>
+        s.step_type === "wait_hours"
+          ? { step_type: "wait_hours", wait_hours: Math.max(0, parseInt(s.wait_hours, 10) || 0) }
+          : {
+              step_type: "send_email",
+              email_subject: String(s.email_subject || "").trim(),
+              email_body: String(s.email_body || "").trim(),
+            },
+      );
+      const res = await client.updateFlow(editingFlowId, {
+        name,
+        trigger: editTrigger,
+        status: editStatus,
+        steps: stepsPayload,
+      });
+      const f = res?.flow;
+      const sc = res?.steps?.length ?? f?.step_count ?? editSteps.length;
+      setFlows((prev) =>
+        prev.map((row) =>
+          row.id === editingFlowId ? { ...row, ...f, step_count: sc } : row,
+        ),
+      );
+      closeEditModal();
+    } catch (e) {
+      setEditErr(e?.message || t.saveFlowErr);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const toggleStatus = async (flow) => {
     setTogglingId(flow.id);
     const nextStatus = flow.status === "active" ? "paused" : "active";
     try {
-      await client.updateFlow?.(flow.id, { status: nextStatus });
+      await client.updateFlow(flow.id, { status: nextStatus });
       setFlows((prev) => prev.map((f) => f.id === flow.id ? { ...f, status: nextStatus } : f));
     } catch (e) {
       setError(e?.message || "Error");
@@ -325,7 +668,7 @@ export default function FlowsPage() {
   const deleteFlow = async (id) => {
     setTogglingId(id);
     try {
-      await client.deleteFlow?.(id);
+      await client.deleteFlow(id);
       setFlows((prev) => prev.filter((f) => f.id !== id));
     } catch (e) {
       setError(e?.message || "Error");
@@ -399,6 +742,9 @@ export default function FlowsPage() {
                         </Text>
                       </BlockStack>
                       <InlineStack gap="200" wrap={false}>
+                        <Button size="slim" disabled={isToggling} onClick={() => openEditModal(flow)}>
+                          {t.editBtn}
+                        </Button>
                         <Button
                           size="slim"
                           variant={flow.status === "active" ? "secondary" : "primary"}
@@ -456,6 +802,114 @@ export default function FlowsPage() {
               onChange={setNewTrigger}
             />
           </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={editOpen}
+        onClose={closeEditModal}
+        title={t.editTitle}
+        large
+        primaryAction={{ content: t.saveBtn, onAction: saveEditModal, loading: editSaving, disabled: editLoading }}
+        secondaryActions={[{ content: t.cancel, onAction: closeEditModal }]}
+      >
+        <Modal.Section>
+          {editLoading ? (
+            <Box padding="400"><InlineStack align="center"><Spinner /></InlineStack></Box>
+          ) : (
+            <BlockStack gap="400">
+              {editErr && <Banner tone="critical" onDismiss={() => setEditErr("")}>{editErr}</Banner>}
+              {flowTestBanner && (
+                <Banner tone={flowTestBanner.tone} onDismiss={() => setFlowTestBanner(null)}>
+                  {flowTestBanner.message}
+                </Banner>
+              )}
+              <TextField label={t.flowName} value={editName} onChange={setEditName} autoComplete="off" />
+              <Select label={t.triggerLabel} options={triggerOptions} value={editTrigger} onChange={setEditTrigger} />
+              <Select label={t.flowStatusLabel} options={statusEditOptions} value={editStatus} onChange={setEditStatus} />
+              <Divider />
+              <Text as="h3" variant="headingSm">{t.stepsHeading}</Text>
+              <Text as="p" variant="bodySm" tone="subdued">{t.noStepsHint}</Text>
+              <TextField
+                label={t.testEmailFieldLabel}
+                type="email"
+                value={testFlowEmailTo}
+                onChange={setTestFlowEmailTo}
+                helpText={t.testEmailFieldHelp}
+                autoComplete="email"
+              />
+              <Button onClick={addEditStep}>{t.addStepBtn}</Button>
+              <BlockStack gap="300">
+                {editSteps.map((step, idx) => (
+                  <Card key={idx}>
+                    <BlockStack gap="300">
+                      <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                        <Box minWidth="200px">
+                          <Select
+                            label={t.stepTypeLabel}
+                            options={stepTypeOptions}
+                            value={step.step_type}
+                            onChange={(v) => patchEditStep(idx, { step_type: v })}
+                          />
+                        </Box>
+                        <Button tone="critical" variant="plain" size="slim" onClick={() => removeEditStep(idx)}>
+                          {t.removeStepBtn}
+                        </Button>
+                      </InlineStack>
+                      {step.step_type === "wait_hours" ? (
+                        <TextField
+                          label={t.stepWaitOption}
+                          type="number"
+                          min={0}
+                          value={String(step.wait_hours ?? 0)}
+                          onChange={(v) => patchEditStep(idx, { wait_hours: Math.max(0, parseInt(v, 10) || 0) })}
+                          helpText={t.waitHoursHelp}
+                          autoComplete="off"
+                        />
+                      ) : (
+                        <BlockStack gap="200">
+                          <Text as="p" variant="bodySm" tone="subdued">{t.emailHtmlHelp}</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">{t.placeholdersHelp}</Text>
+                          <TextField
+                            label={t.emailSubjectLabel}
+                            value={step.email_subject}
+                            onChange={(v) => patchEditStep(idx, { email_subject: v })}
+                            placeholder={t.emailSubjectPh}
+                            autoComplete="off"
+                          />
+                          <TextField
+                            label={t.emailBodyLabel}
+                            value={step.email_body}
+                            onChange={(v) => patchEditStep(idx, { email_body: v })}
+                            placeholder={t.emailBodyPh}
+                            multiline={12}
+                            autoComplete="off"
+                          />
+                          <InlineStack gap="200" blockAlign="center" wrap>
+                            <Button
+                              size="slim"
+                              disabled={
+                                smtpConfigured === false
+                                || !testFlowEmailTo.trim()
+                                || testSendingStepIdx !== null
+                              }
+                              loading={testSendingStepIdx === idx}
+                              onClick={() => sendTestFlowEmail(idx)}
+                            >
+                              {t.testEmailBtn}
+                            </Button>
+                            {smtpConfigured === false && (
+                              <Text as="span" variant="bodySm" tone="subdued">{t.smtpRequiredForTest}</Text>
+                            )}
+                          </InlineStack>
+                        </BlockStack>
+                      )}
+                    </BlockStack>
+                  </Card>
+                ))}
+              </BlockStack>
+            </BlockStack>
+          )}
         </Modal.Section>
       </Modal>
     </Page>

@@ -23,9 +23,15 @@ import {
 } from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
+import CatalogDrawerPortal, {
+  CATALOG_DRAWER_MAX_PX,
+  CATALOG_FILTER_OVERLAY_Z,
+  CATALOG_FILTER_SIDEBAR_Z,
+  catalogDrawerMaxCss,
+} from "@/lib/catalog-drawer-portal";
 
 /* ─────────────────────────────────────────────────────────── */
-const HEADER_H = 112; /* TopBar 40px + Navbar 72px            */
+const HEADER_H = 72; /* Main header bar (announcement TopBar removed) */
 
 const RESERVED_HANDLES = [
   "search","login","register","account","bestsellers","recommended",
@@ -206,7 +212,9 @@ const FilterBtn = styled.button`
   svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
   &:hover { color: #111; }
 
-  @media (max-width: 767px) { display: inline-flex; }
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
+    display: inline-flex;
+  }
 `;
 
 const SortWrap = styled.div`
@@ -270,15 +278,15 @@ const Sidebar = styled.aside`
   max-height: calc(100vh - ${HEADER_H + 100}px);
   overflow-y: auto;
 
-  /* Mobile: hidden overlay drawer */
-  @media (max-width: 767px) {
+  /* Mobile/tablet: overlay drawer */
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     position: fixed;
     top: 0;
     left: ${(p) => (p.$open ? "0" : "-100vw")};
     width: ${(p) => (p.$mobileFilterMode ? "min(88vw, 340px)" : "250px")};
-    height: 100vh;
-    max-height: 100vh;
-    z-index: 100;
+    height: 100dvh;
+    max-height: 100dvh;
+    z-index: ${CATALOG_FILTER_SIDEBAR_Z};
     background: #fff;
     box-shadow: 4px 0 16px rgba(0,0,0,0.12);
     transition: left 0.3s ease;
@@ -292,12 +300,15 @@ const Sidebar = styled.aside`
 
 const SidebarOverlay = styled.div`
   display: none;
-  @media (max-width: 767px) {
-    display: ${(p) => (p.$open ? "block" : "none")};
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
+    display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.35);
-    z-index: 99;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: ${CATALOG_FILTER_OVERLAY_Z};
+    opacity: ${(p) => (p.$open ? 1 : 0)};
+    pointer-events: ${(p) => (p.$open ? "auto" : "none")};
+    transition: opacity var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
   }
 `;
 
@@ -310,7 +321,9 @@ const SidebarHead = styled.div`
   padding: ${(p) => (p.$filterMode ? "12px 14px" : "0 0 12px")};
   border-bottom: 1px solid #e8e8e6;
 
-  @media (min-width: 768px) { display: none; }
+  @media (min-width: 1024px) {
+    display: none;
+  }
 `;
 
 const FilterGroup = styled.div`
@@ -397,14 +410,14 @@ const ClearAllBtn = styled.button`
 const DesktopFilterContent = styled.div`
   overflow-y: auto;
   flex: 1;
-  @media (max-width: 767px) {
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: none;
   }
 `;
 
 const MobileFilterSplit = styled.div`
   display: none;
-  @media (max-width: 767px) {
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: flex;
     flex-direction: row;
     flex: 1;
@@ -846,6 +859,16 @@ export default function CollectionPage() {
     }
   }, [panelOpen, facets, activeMobileFilterGroup]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    if (!window.matchMedia(catalogDrawerMaxCss).matches) return undefined;
+    const prev = document.body.style.overflow;
+    if (panelOpen) document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [panelOpen]);
+
   /* ── Filter ── */
   const toggle = (key, val) => {
     setFilters(prev => {
@@ -1035,12 +1058,14 @@ export default function CollectionPage() {
         </BreadcrumbRow>
 
         {/* ── Sidebar + content ── */}
-        {showCatalogSidebar && showSidebar && <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />}
         <ContentWrap ref={bodyRef} style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
 
           {/* Left filter sidebar */}
           {showCatalogSidebar && showSidebar && (
-            <Sidebar $open={panelOpen} $width={sidebarWidth} $mobileFilterMode={true}>
+            <CatalogDrawerPortal>
+              <>
+                <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />
+                <Sidebar $open={panelOpen} $width={sidebarWidth} $mobileFilterMode={true}>
               <SidebarHead $filterMode={true}>
                 <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
                   Filter{activeCount > 0 ? ` (${activeCount})` : ""}
@@ -1129,6 +1154,8 @@ export default function CollectionPage() {
                 </MobileFilterRight>
               </MobileFilterSplit>
             </Sidebar>
+              </>
+            </CatalogDrawerPortal>
           )}
 
           {/* Main content */}

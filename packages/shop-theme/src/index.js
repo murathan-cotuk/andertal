@@ -9,6 +9,12 @@ export {
 export { mergeLoadedShopStyles } from "./merge-styles.js";
 export { buildShopThemeCSS, buildGoogleFontsLinkHref } from "./build-css.js";
 export {
+  buildHeaderChromeBackground,
+  resolveHeaderStringsForCss,
+  buildHeaderSurfaceCssVars,
+} from "./header-chrome.js";
+export { buildHeaderSurfaceCssVarsFromRoute } from "./header-route-vars.js";
+export {
   collectTypographyGoogleFamilies,
   buildGoogleFontsLinkHrefForFamilies,
   firstFontFamilyFromCssStack,

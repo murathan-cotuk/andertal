@@ -16,6 +16,7 @@ import {
   Banner,
   Select,
   Popover,
+  Checkbox,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import {
@@ -30,6 +31,30 @@ import {
 } from "@andertal/shop-theme";
 
 /** Deutsche Beschriftungen für Button-Farbfelder (Keys wie in DEFAULT_BUTTON_COLORS). */
+const TOPBAR_DISPLAY_MODE_OPTIONS = [
+  { label: "Alle nebeneinander", value: "inline" },
+  { label: "Karussell (je ein Eintrag, Auto + manuell)", value: "carousel" },
+];
+
+/** Header: Basis vs. nur Kategorie- oder Kollektions-Routen */
+const HEADER_EDIT_SCOPE_OPTIONS = [
+  { label: "Überall (Standard)", value: "standard" },
+  { label: "Nur Kategorie-Seiten (/category/…)", value: "category" },
+  {
+    label: "Nur Kollektion (collections, kollektion, Kurz-URL /handle)",
+    value: "collection",
+  },
+];
+
+const HEADER_GRADIENT_ANGLE_OPTIONS = [
+  { label: "Diagonal ↘ (135°)", value: "135" },
+  { label: "Nach unten (180°)", value: "180" },
+  { label: "Nach rechts (90°)", value: "90" },
+  { label: "Nach oben (0°)", value: "0" },
+  { label: "Nach links (270°)", value: "270" },
+  { label: "Diagonal ↗ (45°)", value: "45" },
+];
+
 const BUTTON_COLOR_LABELS = {
   add_to_cart: {
     bg: "Hintergrund",
@@ -81,6 +106,63 @@ function normalizeHexForColorInput(val) {
   }
   if (/^#[0-9a-fA-F]{6}$/.test(s)) return s.toLowerCase();
   return "#ffffff";
+}
+
+function clamp255Channel(x) {
+  const n = Number(x);
+  if (Number.isNaN(n)) return 255;
+  return Math.max(0, Math.min(255, Math.round(n)));
+}
+
+function clampAlphaChannel(x) {
+  const n = Number(x);
+  if (Number.isNaN(n)) return 1;
+  return Math.max(0, Math.min(1, n));
+}
+
+/** Nur Hex oder rgb/rgba — komplexes CSS (Gradient) nicht als Farbe zu parsen */
+function canParseAsSolidCssColor(css) {
+  const s = String(css || "").trim();
+  if (!s) return true;
+  if (/^rgba?\(/i.test(s)) return true;
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return true;
+  return false;
+}
+
+function parseCssColorToRgb(css) {
+  const s = String(css || "").trim();
+  const m = s.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
+  if (m) {
+    return {
+      r: clamp255Channel(m[1]),
+      g: clamp255Channel(m[2]),
+      b: clamp255Channel(m[3]),
+      a: m[4] !== undefined ? clampAlphaChannel(parseFloat(m[4])) : 1,
+    };
+  }
+  const hex = normalizeHexForColorInput(s);
+  const h = hex.slice(1);
+  const n = parseInt(h, 16);
+  if (Number.isNaN(n)) return { r: 255, g: 255, b: 255, a: 1 };
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255, a: 1 };
+}
+
+function rgbChannelsToHex(r, g, b) {
+  return `#${[r, g, b]
+    .map((x) => clamp255Channel(x).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function cssColorToHexForPicker(val) {
+  const { r, g, b } = parseCssColorToRgb(val);
+  return rgbChannelsToHex(r, g, b);
+}
+
+function mergePickerHexWithPreservedAlpha(previousCss, pickedHex) {
+  const prev = parseCssColorToRgb(previousCss);
+  const picked = parseCssColorToRgb(pickedHex);
+  if (prev.a >= 0.999) return pickedHex;
+  return `rgba(${picked.r},${picked.g},${picked.b},${prev.a})`;
 }
 
 /** Native color dialog: input fixed on the swatch so the browser anchors near the click (not top-left). */
@@ -441,20 +523,27 @@ function TypographyLevelRow({ heading, levelKey, typo, families, familiesLoading
 }
 
 // ── Color swatch input ────────────────────────────────────────────────────────
-function ColorField({ label, value, onChange }) {
+function ColorField({ label, value, onChange, preserveAlphaFromRgba = false, helpText }) {
+  const raw = String(value ?? "").trim();
+  const solidOk = canParseAsSolidCssColor(raw);
+  const useAlphaPreserve = preserveAlphaFromRgba && solidOk;
+  const swatchBg = raw && solidOk ? raw : raw || "#ffffff";
+  const pickerSeed = useAlphaPreserve ? cssColorToHexForPicker(raw) : value;
+
   return (
     <TextField
       label={label}
       value={value || ""}
       onChange={onChange}
       autoComplete="off"
+      helpText={helpText}
       prefix={
         <div
           style={{
             width: 20,
             height: 20,
             borderRadius: 4,
-            background: value || "#ffffff",
+            background: swatchBg,
             border: "1px solid var(--p-color-border)",
             cursor: "pointer",
             flexShrink: 0,
@@ -462,7 +551,10 @@ function ColorField({ label, value, onChange }) {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            openNativeColorPicker(value, onChange, e.currentTarget.getBoundingClientRect());
+            openNativeColorPicker(pickerSeed, (hex) => {
+              if (useAlphaPreserve) onChange(mergePickerHexWithPreservedAlpha(raw, hex));
+              else onChange(hex);
+            }, e.currentTarget.getBoundingClientRect());
           }}
         />
       }
@@ -655,6 +747,8 @@ export default function StylesPage() {
   });
   const [brandingSnapshot, setBrandingSnapshot] = useState(null);
   const [brandingPickerTarget, setBrandingPickerTarget] = useState(null);
+  const [headerEditScope, setHeaderEditScope] = useState("standard");
+  const [headerBgPickerScope, setHeaderBgPickerScope] = useState(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -741,6 +835,35 @@ export default function StylesPage() {
 
   const updateSection = (section, key, val) =>
     setStyles((prev) => ({ ...prev, [section]: { ...prev[section], [key]: val } }));
+
+  const headerUi = useMemo(() => {
+    const h = styles?.header;
+    if (!h) return {};
+    if (headerEditScope === "standard") return h;
+    const patch = h.scopes?.[headerEditScope] || {};
+    const { scopes, ...rest } = h;
+    return { ...rest, ...patch };
+  }, [styles?.header, headerEditScope]);
+
+  const updateHeaderField = (key, val) => {
+    if (headerEditScope === "standard") {
+      if (key === "scopes") return;
+      updateSection("header", key, val);
+      return;
+    }
+    setStyles((prev) => {
+      const header = prev.header || {};
+      const scopes = { ...(header.scopes || {}) };
+      const bucket = { ...(scopes[headerEditScope] || {}) };
+      if (val === "") {
+        delete bucket[key];
+      } else {
+        bucket[key] = val;
+      }
+      scopes[headerEditScope] = bucket;
+      return { ...prev, header: { ...header, scopes } };
+    });
+  };
 
   const updateButtonType = (key, updated) => {
     setStyles((prev) => ({
@@ -1066,6 +1189,123 @@ export default function StylesPage() {
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">Layout: Top Bar</Text>
               <Divider />
+              <Checkbox
+                label="Top Bar im Shop anzeigen"
+                checked={!!styles.topbar.enabled}
+                onChange={(checked) => updateSection("topbar", "enabled", checked)}
+              />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+                <Select
+                  label="Einträge-Anzeige"
+                  options={TOPBAR_DISPLAY_MODE_OPTIONS}
+                  value={styles.topbar.display_mode === "carousel" ? "carousel" : "inline"}
+                  onChange={(v) => updateSection("topbar", "display_mode", v)}
+                  disabled={!styles.topbar.enabled}
+                />
+                <TextField
+                  label="Karussell: Wechsel alle (Sekunden)"
+                  type="number"
+                  min={2}
+                  max={120}
+                  value={String(styles.topbar.carousel_interval_sec ?? 5)}
+                  onChange={(v) => {
+                    const n = Math.min(120, Math.max(2, parseInt(v, 10) || 5));
+                    updateSection("topbar", "carousel_interval_sec", n);
+                  }}
+                  disabled={!styles.topbar.enabled || styles.topbar.display_mode !== "carousel"}
+                  helpText="Nur bei Karussell. Zusätzlich: Wischen links/rechts und Pfeiltasten."
+                  autoComplete="off"
+                />
+              </div>
+              <Banner tone="info">
+                <p>
+                  Karussell: ein sichtbarer Eintrag, automatischer Wechsel in diesem Intervall, Pause bei Maus über der Leiste,
+                  manuell per Pfeilen oder Wisch-Geste (Touch).
+                  Nebeneinander: alle Links in einer Zeile (umbrechend auf schmalen Screens).
+                </p>
+              </Banner>
+              <Divider />
+              <Text as="h3" variant="headingSm">Top-Bar-Einträge</Text>
+              <BlockStack gap="300">
+                {(styles.topbar.items || []).map((item, idx) => (
+                  <div key={idx} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <TextField
+                        label={idx === 0 ? "Text" : undefined}
+                        placeholder="z.B. Kostenloser Versand ab 50 €"
+                        value={item.text || ""}
+                        disabled={!styles.topbar.enabled}
+                        onChange={(v) => {
+                          const next = [...(styles.topbar.items || [])];
+                          next[idx] = { ...next[idx], text: v };
+                          setStyles((prev) => ({ ...prev, topbar: { ...prev.topbar, items: next } }));
+                        }}
+                        autoComplete="off"
+                      />
+                      <TextField
+                        label={idx === 0 ? "Link (href)" : undefined}
+                        placeholder="z.B. /shipping"
+                        value={item.href || ""}
+                        disabled={!styles.topbar.enabled}
+                        onChange={(v) => {
+                          const next = [...(styles.topbar.items || [])];
+                          next[idx] = { ...next[idx], href: v };
+                          setStyles((prev) => ({ ...prev, topbar: { ...prev.topbar, items: next } }));
+                        }}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: 4, paddingTop: idx === 0 ? 22 : 0 }}>
+                      <button
+                        type="button"
+                        disabled={idx === 0 || !styles.topbar.enabled}
+                        onClick={() => {
+                          const next = [...(styles.topbar.items || [])];
+                          [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                          setStyles((prev) => ({ ...prev, topbar: { ...prev.topbar, items: next } }));
+                        }}
+                        title="Nach oben"
+                        style={{ padding: "4px 8px", cursor: idx === 0 ? "default" : "pointer", opacity: idx === 0 ? 0.3 : 1, border: "1px solid #d1d5db", borderRadius: 4, background: "#f9fafb" }}
+                      >↑</button>
+                      <button
+                        type="button"
+                        disabled={idx === (styles.topbar.items || []).length - 1 || !styles.topbar.enabled}
+                        onClick={() => {
+                          const next = [...(styles.topbar.items || [])];
+                          [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+                          setStyles((prev) => ({ ...prev, topbar: { ...prev.topbar, items: next } }));
+                        }}
+                        title="Nach unten"
+                        style={{ padding: "4px 8px", cursor: idx === (styles.topbar.items || []).length - 1 ? "default" : "pointer", opacity: idx === (styles.topbar.items || []).length - 1 ? 0.3 : 1, border: "1px solid #d1d5db", borderRadius: 4, background: "#f9fafb" }}
+                      >↓</button>
+                      <button
+                        type="button"
+                        disabled={!styles.topbar.enabled}
+                        onClick={() => {
+                          const next = (styles.topbar.items || []).filter((_, i) => i !== idx);
+                          setStyles((prev) => ({ ...prev, topbar: { ...prev.topbar, items: next } }));
+                        }}
+                        title="Entfernen"
+                        style={{ padding: "4px 8px", cursor: "pointer", border: "1px solid #fca5a5", borderRadius: 4, background: "#fef2f2", color: "#dc2626" }}
+                      >✕</button>
+                    </div>
+                  </div>
+                ))}
+                <div>
+                  <button
+                    type="button"
+                    disabled={!styles.topbar.enabled}
+                    onClick={() => {
+                      const next = [...(styles.topbar.items || []), { text: "", href: "" }];
+                      setStyles((prev) => ({ ...prev, topbar: { ...prev.topbar, items: next } }));
+                    }}
+                    style={{ padding: "6px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#f9fafb", cursor: styles.topbar.enabled ? "pointer" : "default", fontSize: 13, opacity: styles.topbar.enabled ? 1 : 0.5 }}
+                  >
+                    + Eintrag hinzufügen
+                  </button>
+                </div>
+              </BlockStack>
+              <Divider />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 <Select
                   label="Stil-Vorlage"
@@ -1118,133 +1358,122 @@ export default function StylesPage() {
           </Card>
         </Layout.Section>
 
-        {/* Ankündigungs-Banner Inhalte */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Ankündigungs-Banner Inhalte</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Auf Mobilgeräten werden die Einträge einzeln angezeigt und wechseln alle 5 Sekunden. Auf dem Desktop sind alle sichtbar.
-              </Text>
-              <Divider />
-              <BlockStack gap="300">
-                {(branding.announcement_bar_items || []).map((item, idx) => (
-                  <div key={idx} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                    <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                      <TextField
-                        label={idx === 0 ? "Text" : undefined}
-                        placeholder="z.B. Kostenloser Versand ab 50 €"
-                        value={item.text || ""}
-                        onChange={(v) => {
-                          const next = [...(branding.announcement_bar_items || [])];
-                          next[idx] = { ...next[idx], text: v };
-                          setBranding((b) => ({ ...b, announcement_bar_items: next }));
-                        }}
-                        autoComplete="off"
-                      />
-                      <TextField
-                        label={idx === 0 ? "Link (href)" : undefined}
-                        placeholder="z.B. /shipping"
-                        value={item.href || ""}
-                        onChange={(v) => {
-                          const next = [...(branding.announcement_bar_items || [])];
-                          next[idx] = { ...next[idx], href: v };
-                          setBranding((b) => ({ ...b, announcement_bar_items: next }));
-                        }}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div style={{ display: "flex", gap: 4, paddingTop: idx === 0 ? 22 : 0 }}>
-                      <button
-                        type="button"
-                        disabled={idx === 0}
-                        onClick={() => {
-                          const next = [...(branding.announcement_bar_items || [])];
-                          [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-                          setBranding((b) => ({ ...b, announcement_bar_items: next }));
-                        }}
-                        title="Nach oben"
-                        style={{ padding: "4px 8px", cursor: idx === 0 ? "default" : "pointer", opacity: idx === 0 ? 0.3 : 1, border: "1px solid #d1d5db", borderRadius: 4, background: "#f9fafb" }}
-                      >↑</button>
-                      <button
-                        type="button"
-                        disabled={idx === (branding.announcement_bar_items || []).length - 1}
-                        onClick={() => {
-                          const next = [...(branding.announcement_bar_items || [])];
-                          [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
-                          setBranding((b) => ({ ...b, announcement_bar_items: next }));
-                        }}
-                        title="Nach unten"
-                        style={{ padding: "4px 8px", cursor: idx === (branding.announcement_bar_items || []).length - 1 ? "default" : "pointer", opacity: idx === (branding.announcement_bar_items || []).length - 1 ? 0.3 : 1, border: "1px solid #d1d5db", borderRadius: 4, background: "#f9fafb" }}
-                      >↓</button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = (branding.announcement_bar_items || []).filter((_, i) => i !== idx);
-                          setBranding((b) => ({ ...b, announcement_bar_items: next }));
-                        }}
-                        title="Entfernen"
-                        style={{ padding: "4px 8px", cursor: "pointer", border: "1px solid #fca5a5", borderRadius: 4, background: "#fef2f2", color: "#dc2626" }}
-                      >✕</button>
-                    </div>
-                  </div>
-                ))}
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = [...(branding.announcement_bar_items || []), { text: "", href: "" }];
-                      setBranding((b) => ({ ...b, announcement_bar_items: next }));
-                    }}
-                    style={{ padding: "6px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#f9fafb", cursor: "pointer", fontSize: 13 }}
-                  >
-                    + Eintrag hinzufügen
-                  </button>
-                </div>
-              </BlockStack>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
         {/* Header / Navbar */}
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">Layout: Header / Navbar</Text>
+              <Banner tone="info">
+                <p>
+                  Zuerst <strong>Überall</strong> einstellen (Shop-Standard). Über „Anwendungsbereich“ können Sie für
+                  Kategorie- oder Kollektions-Seiten nur abweichende Farben, Verlauf oder Hintergrundbild setzen —
+                  leere Felder dort übernehmen weiter den Standard.
+                </p>
+              </Banner>
+              <Divider />
+              <Select
+                label="Anwendungsbereich"
+                options={HEADER_EDIT_SCOPE_OPTIONS}
+                value={headerEditScope}
+                onChange={setHeaderEditScope}
+              />
               <Divider />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-                <Select
-                  label="Stil-Vorlage"
-                  options={HEADER_PRESET_LABELS}
-                  value={styles.header.variant || "default"}
-                  onChange={(v) => updateSection("header", "variant", v)}
-                />
+                {headerEditScope === "standard" ? (
+                  <Select
+                    label="Stil-Vorlage"
+                    options={HEADER_PRESET_LABELS}
+                    value={styles.header.variant || "default"}
+                    onChange={(v) => updateSection("header", "variant", v)}
+                  />
+                ) : (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Die Stil-Vorlage gilt nur shopweit (Standard). Hier wirken nur Farbe, Verlauf, Bild und die Felder
+                      darunter.
+                    </Text>
+                  </div>
+                )}
                 <ColorField
-                  label="Hintergrundfarbe"
-                  value={styles.header.bg_color}
-                  onChange={(v) => updateSection("header", "bg_color", v)}
+                  label="Hintergrund (Basis / Verlauf Start)"
+                  value={headerUi.bg_color}
+                  onChange={(v) => updateHeaderField("bg_color", v)}
                 />
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Checkbox
+                    label="Farbverlauf für Header + Second Nav (ein gemeinsamer Hintergrund)"
+                    checked={!!headerUi.bg_gradient_enabled}
+                    onChange={(checked) => updateHeaderField("bg_gradient_enabled", checked)}
+                  />
+                </div>
+                {headerUi.bg_gradient_enabled ? (
+                  <>
+                    <ColorField
+                      label="Verlauf Ziel-Farbe"
+                      value={headerUi.bg_gradient_end || "#0f766e"}
+                      onChange={(v) => updateHeaderField("bg_gradient_end", v)}
+                    />
+                    <Select
+                      label="Verlauf-Richtung (Winkel)"
+                      options={HEADER_GRADIENT_ANGLE_OPTIONS}
+                      value={String(headerUi.bg_gradient_angle ?? 135)}
+                      onChange={(v) => updateHeaderField("bg_gradient_angle", Number(v))}
+                    />
+                    <TextField
+                      label="Verlauf-Stärke (0–100)"
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={String(headerUi.bg_gradient_intensity ?? 75)}
+                      onChange={(v) => {
+                        const n = Math.min(100, Math.max(0, parseInt(v, 10) || 0));
+                        updateHeaderField("bg_gradient_intensity", n);
+                      }}
+                      helpText="0 = sehr sanft (fast nur Basisfarbe), 100 = volle Mischung zur Ziel-Farbe"
+                      autoComplete="off"
+                    />
+                  </>
+                ) : null}
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <BlockStack gap="200">
+                    <Text as="span" variant="bodySm" fontWeight="medium">
+                      Hintergrundbild (optional, unter Farbe/Verlauf, deckend)
+                    </Text>
+                    <InlineStack gap="200" blockAlign="end" wrap>
+                      <div style={{ flex: "1 1 280px", minWidth: 200 }}>
+                        <TextField
+                          label="Bild-URL"
+                          value={headerUi.bg_image_url || ""}
+                          onChange={(v) => updateHeaderField("bg_image_url", v)}
+                          placeholder="https://…"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <Button onClick={() => setHeaderBgPickerScope(headerEditScope)}>Aus Mediathek</Button>
+                    </InlineStack>
+                  </BlockStack>
+                </div>
                 <ColorField
                   label="Textfarbe"
-                  value={styles.header.text_color}
-                  onChange={(v) => updateSection("header", "text_color", v)}
+                  value={headerUi.text_color}
+                  onChange={(v) => updateHeaderField("text_color", v)}
                 />
                 <TextField
                   label="Höhe (height)"
-                  value={styles.header.height}
-                  onChange={(v) => updateSection("header", "height", v)}
+                  value={headerUi.height}
+                  onChange={(v) => updateHeaderField("height", v)}
                   autoComplete="off"
                 />
                 <TextField
                   label="Schatten (box-shadow)"
-                  value={styles.header.shadow}
-                  onChange={(v) => updateSection("header", "shadow", v)}
+                  value={headerUi.shadow}
+                  onChange={(v) => updateHeaderField("shadow", v)}
                   autoComplete="off"
                 />
                 <TextField
                   label="Unterer Rand (border-bottom)"
-                  value={styles.header.border_bottom}
-                  onChange={(v) => updateSection("header", "border_bottom", v)}
+                  value={headerUi.border_bottom}
+                  onChange={(v) => updateHeaderField("border_bottom", v)}
                   autoComplete="off"
                 />
               </div>
@@ -1257,6 +1486,13 @@ export default function StylesPage() {
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">Layout: Second Nav</Text>
+              <Banner tone="info">
+                <p>
+                  Die Second Nav nutzt dieselbe Fläche wie der Haupt-Header: kein eigener Hintergrund-Streifen mehr.
+                  Farbe oder Verlauf stellen Sie oben unter Header ein. Die Links werden auf horizontalen, abgerundeten Rechtecken
+                  mit Frostglas angezeigt (Desktop, Tablet und Mobil).
+                </p>
+              </Banner>
               <Divider />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 <Select
@@ -1264,11 +1500,6 @@ export default function StylesPage() {
                   options={SECOND_NAV_PRESET_LABELS}
                   value={styles.secondNav.variant || "default"}
                   onChange={(v) => updateSection("secondNav", "variant", v)}
-                />
-                <ColorField
-                  label="Hintergrundfarbe"
-                  value={styles.secondNav.bg_color}
-                  onChange={(v) => updateSection("secondNav", "bg_color", v)}
                 />
                 <ColorField
                   label="Textfarbe"
@@ -1296,6 +1527,57 @@ export default function StylesPage() {
                   label="Schriftgewicht (font-weight)"
                   value={styles.secondNav.font_weight}
                   onChange={(v) => updateSection("secondNav", "font_weight", v)}
+                  autoComplete="off"
+                />
+              </div>
+              <Divider />
+              <Text as="h3" variant="headingSm">Menü-Kacheln (Second Nav Links)</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Jeder Eintrag sitzt auf einem abgerundeten <strong>Rechteck</strong> (nicht Voll-Pille): Eckenradius in{" "}
+                <code style={{ fontSize: 12 }}>px</code> einstellen — keine hohen Prozentwerte, die auf breiten Labels wie
+                Zylinder wirken. Farbe, Rand, Unschärfe frei als CSS.
+              </Text>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+                <ColorField
+                  label="Kachel-Hintergrund (CSS)"
+                  value={styles.secondNav.pill_background ?? ""}
+                  onChange={(v) => updateSection("secondNav", "pill_background", v)}
+                  preserveAlphaFromRgba
+                  helpText="Klick auf die Farbvorschau öffnet den System-Farbdialog. Bei rgba(…) bleibt die Transparenz erhalten; freier CSS-Text bleibt editierbar."
+                />
+                <TextField
+                  label="Rand (border)"
+                  value={styles.secondNav.pill_border ?? ""}
+                  onChange={(v) => updateSection("secondNav", "pill_border", v)}
+                  helpText="z.B. 1px solid rgba(255,255,255,0.2) oder none"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Unschärfe (backdrop-filter)"
+                  value={styles.secondNav.pill_backdrop ?? ""}
+                  onChange={(v) => updateSection("secondNav", "pill_backdrop", v)}
+                  helpText="z.B. blur(12px)"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Eckenradius"
+                  value={styles.secondNav.pill_border_radius ?? ""}
+                  onChange={(v) => updateSection("secondNav", "pill_border_radius", v)}
+                  helpText="Nur Ecken runden: z.B. 8px oder 12px (kein 20% / 9999px — sonst Pillen-Look)"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Innenabstand (padding)"
+                  value={styles.secondNav.pill_padding ?? ""}
+                  onChange={(v) => updateSection("secondNav", "pill_padding", v)}
+                  helpText="z.B. 6px 14px"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Schatten (box-shadow)"
+                  value={styles.secondNav.pill_shadow ?? ""}
+                  onChange={(v) => updateSection("secondNav", "pill_shadow", v)}
+                  helpText="Meist none"
                   autoComplete="off"
                 />
               </div>
@@ -1427,6 +1709,28 @@ export default function StylesPage() {
         }}
         multiple={false}
         title="Branding-Medien waehlen"
+      />
+      <MediaPickerModal
+        open={headerBgPickerScope !== null}
+        onClose={() => setHeaderBgPickerScope(null)}
+        onSelect={(urls) => {
+          const first = Array.isArray(urls) ? urls[0] : null;
+          if (!first || headerBgPickerScope === null) return;
+          if (headerBgPickerScope === "standard") {
+            updateSection("header", "bg_image_url", first);
+          } else {
+            setStyles((prev) => {
+              const header = prev.header || {};
+              const scopes = { ...(header.scopes || {}) };
+              const bucket = { ...(scopes[headerBgPickerScope] || {}), bg_image_url: first };
+              scopes[headerBgPickerScope] = bucket;
+              return { ...prev, header: { ...header, scopes } };
+            });
+          }
+          setHeaderBgPickerScope(null);
+        }}
+        multiple={false}
+        title="Header-Hintergrundbild"
       />
     </Page>
   );

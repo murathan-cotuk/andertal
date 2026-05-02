@@ -29,6 +29,13 @@ export const DEFAULT_SHOP_STYLES = {
   },
   topbar: {
     variant: "default",
+    enabled: false,
+    /** "inline" = alle Einträge nebeneinander; "carousel" = nacheinander, zeitgesteuert + Wischen/Pfeile */
+    display_mode: "inline",
+    /** Sekunden zwischen automatischen Slides (Karussell, min 2) */
+    carousel_interval_sec: 5,
+    /** Einträge: Text + optionaler Link (Pfad z.B. /contact) */
+    items: [],
     bg_color: "#111827",
     text_color: "#ffffff",
     height: "40px",
@@ -40,10 +47,25 @@ export const DEFAULT_SHOP_STYLES = {
   header: {
     variant: "default",
     bg_color: "#ffffff",
+    /** Optional URL — liegt unter Farbe/Verlauf (background-size: cover) */
+    bg_image_url: "",
+    /** Solid fallback / Verlauf Startfarbe */
+    bg_gradient_enabled: false,
+    /** Zweite Verlaufsfarbe (Zielton bei Intensität 100%) */
+    bg_gradient_end: "#0f766e",
+    /** CSS linear-gradient Winkel in Grad (z. B. 180 = oben → unten) */
+    bg_gradient_angle: 135,
+    /** 0–100: wie stark zur zweiten Farbe überblendet wird */
+    bg_gradient_intensity: 75,
     text_color: "#111827",
     height: "72px",
     shadow: "0 2px 8px rgba(0,0,0,0.08)",
     border_bottom: "1px solid #f3f4f6",
+    /** Nur auf passenden Routen — leeres Objekt = überall Standard */
+    scopes: {
+      category: {},
+      collection: {},
+    },
   },
   secondNav: {
     variant: "default",
@@ -53,6 +75,14 @@ export const DEFAULT_SHOP_STYLES = {
     height: "44px",
     font_size: "14px",
     font_weight: "500",
+    /** Glasmorphism-Kacheln je Link (Desktop/Mobil/Tablet) */
+    pill_background: "rgba(255,255,255,0.30)",
+    pill_border: "none",
+    pill_backdrop: "blur(12px)",
+    /** px — Prozent macht breite Links zu „Pillen“/Zylinder; nur Ecken leicht runden */
+    pill_border_radius: "10px",
+    pill_padding: "6px 14px",
+    pill_shadow: "none",
   },
   footer: {
     bg_color: "#111827",

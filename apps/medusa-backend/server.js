@@ -982,6 +982,31 @@ async function start() {
           UNIQUE (recipient_key, source_type, source_id)
         )`).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_seller_notif_state_recipient ON seller_hub_notification_state(recipient_key)`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_flows (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            name varchar(255) NOT NULL,
+            trigger_key varchar(80) NOT NULL,
+            status varchar(20) NOT NULL DEFAULT 'draft',
+            sent_count integer NOT NULL DEFAULT 0,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+          )
+        `).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_flow_steps (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            flow_id uuid NOT NULL REFERENCES admin_hub_flows(id) ON DELETE CASCADE,
+            step_order integer NOT NULL DEFAULT 0,
+            step_type varchar(40) NOT NULL,
+            wait_hours integer,
+            email_subject text,
+            email_body text,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+          )
+        `).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_admin_hub_flow_steps_flow ON admin_hub_flow_steps(flow_id, step_order)`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS iban text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS commission_rate numeric(5,4) NOT NULL DEFAULT 0.12;`).catch(() => {})
@@ -1490,33 +1515,148 @@ async function start() {
         return null
       }
     }
-    const adminHubCategoriesGET = async (req, res) => {
-      const adminHubService = resolveAdminHub()
-      if (!adminHubService) {
+
+    /** Row mapper + PG fallback when AdminHubService loader fails (Medusa manager / TypeORM init issues). */
+    const mapAdminHubCategoryPgRow = (row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      description: row.description,
+      parent_id: row.parent_id,
+      active: row.active,
+      is_visible: row.is_visible,
+      has_collection: row.has_collection,
+      sort_order: row.sort_order,
+      seo_title: row.seo_title,
+      seo_description: row.seo_description,
+      long_content: row.long_content,
+      banner_image_url: row.banner_image_url,
+      metadata: row.metadata,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    })
+
+    const buildAdminHubCategoryTreeFromFlat = (flat) => {
+      const categoryMap = new Map()
+      flat.forEach((cat) => categoryMap.set(cat.id, { ...cat, children: [] }))
+      const roots = []
+      flat.forEach((cat) => {
+        const node = categoryMap.get(cat.id)
+        if (cat.parent_id && categoryMap.has(cat.parent_id)) {
+          categoryMap.get(cat.parent_id).children.push(node)
+        } else {
+          roots.push(node)
+        }
+      })
+      const sortCategories = (cats) =>
+        cats
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+          .map((cat) => ({
+            ...cat,
+            children: cat.children && cat.children.length ? sortCategories(cat.children) : [],
+          }))
+      return sortCategories(roots)
+    }
+
+    const adminHubCategoriesGET_fallbackPg = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl || !dbUrl.startsWith('postgres')) {
         return res.status(503).json({ message: 'Admin Hub service not available', code: 'ADMIN_HUB_NOT_LOADED' })
       }
+      const { Client } = require('pg')
+      const client = new Client({
+        connectionString: dbUrl,
+        ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false,
+      })
       try {
+        await client.connect()
         const { active, parent_id, tree, is_visible, slug } = req.query
+
         if (slug && typeof slug === 'string') {
-          const category = await adminHubService.getCategoryBySlug(slug)
-          if (!category) return res.status(404).json({ message: 'Category not found' })
+          const r = await client.query(`SELECT * FROM admin_hub_categories WHERE slug = $1 LIMIT 1`, [slug])
+          if (!r.rows[0]) return res.status(404).json({ message: 'Category not found' })
+          const category = mapAdminHubCategoryPgRow(r.rows[0])
           return res.json({ category, categories: [category], count: 1 })
         }
+
         if (tree === 'true') {
-          const filters = {}
-          if (is_visible !== undefined) filters.is_visible = is_visible === 'true'
-          const categoryTree = await adminHubService.getCategoryTree(filters)
+          const r = await client.query(
+            `SELECT * FROM admin_hub_categories WHERE active = true ORDER BY sort_order ASC, name ASC`
+          )
+          let filtered = r.rows.map(mapAdminHubCategoryPgRow)
+          if (is_visible !== undefined) {
+            const vis = is_visible === 'true'
+            filtered = filtered.filter((c) => c.is_visible === vis)
+          }
+          const categoryTree = buildAdminHubCategoryTreeFromFlat(filtered)
           return res.json({ tree: categoryTree, categories: categoryTree, count: categoryTree.length })
         }
-        const filters = {}
-        if (active !== undefined) filters.active = active === 'true'
-        if (parent_id !== undefined) filters.parent_id = parent_id === 'null' ? null : parent_id
-        const categories = await adminHubService.listCategories(filters)
-        res.json({ categories, count: categories.length })
-      } catch (err) {
-        console.error('Admin Hub Categories GET error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+
+        let sql = `SELECT * FROM admin_hub_categories WHERE 1=1`
+        const params = []
+        let i = 1
+        if (active !== undefined) {
+          sql += ` AND active = $${i++}`
+          params.push(active === 'true')
+        }
+        if (parent_id !== undefined) {
+          if (parent_id === 'null' || parent_id === '') {
+            sql += ` AND parent_id IS NULL`
+          } else {
+            sql += ` AND parent_id = $${i++}`
+            params.push(parent_id)
+          }
+        }
+        if (is_visible !== undefined) {
+          sql += ` AND is_visible = $${i++}`
+          params.push(is_visible === 'true')
+        }
+        sql += ` ORDER BY sort_order ASC, name ASC`
+        const r = await client.query(sql, params)
+        const categories = r.rows.map(mapAdminHubCategoryPgRow)
+        return res.json({ categories, count: categories.length })
+      } catch (e) {
+        const msg = e && e.message ? String(e.message) : ''
+        if (msg.includes('does not exist') || msg.includes('admin_hub_categories')) {
+          console.warn('Admin Hub Categories GET (PG fallback): table missing?', msg)
+          return res.json({ categories: [], count: 0 })
+        }
+        console.error('Admin Hub Categories GET (PG fallback) error:', e)
+        return res.status(500).json({ message: msg || 'Internal server error' })
+      } finally {
+        await client.end().catch(() => {})
       }
+    }
+
+    const adminHubCategoriesGET = async (req, res) => {
+      const adminHubService = resolveAdminHub()
+      if (adminHubService) {
+        try {
+          const { active, parent_id, tree, is_visible, slug } = req.query
+          if (slug && typeof slug === 'string') {
+            const category = await adminHubService.getCategoryBySlug(slug)
+            if (!category) return res.status(404).json({ message: 'Category not found' })
+            return res.json({ category, categories: [category], count: 1 })
+          }
+          if (tree === 'true') {
+            const filters = {}
+            if (is_visible !== undefined) filters.is_visible = is_visible === 'true'
+            const categoryTree = await adminHubService.getCategoryTree(filters)
+            return res.json({ tree: categoryTree, categories: categoryTree, count: categoryTree.length })
+          }
+          const filters = {}
+          if (active !== undefined) filters.active = active === 'true'
+          if (parent_id !== undefined) filters.parent_id = parent_id === 'null' ? null : parent_id
+          if (is_visible !== undefined) filters.is_visible = is_visible === 'true'
+          const categories = await adminHubService.listCategories(filters)
+          return res.json({ categories, count: categories.length })
+        } catch (err) {
+          console.warn('Admin Hub Categories GET (service) failed, PG fallback:', err && err.message)
+        }
+      } else {
+        console.warn('Admin Hub Categories GET: adminHubService not loaded — PG fallback')
+      }
+      return adminHubCategoriesGET_fallbackPg(req, res)
     }
     const adminHubCategoriesPOST = async (req, res) => {
       const adminHubService = resolveAdminHub()
@@ -12928,6 +13068,372 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.get('/admin-hub/v1/smtp-settings', requireSellerAuth, adminHubSmtpSettingsGET)
     httpApp.patch('/admin-hub/v1/smtp-settings', requireSellerAuth, requireSuperuser, adminHubSmtpSettingsPATCH)
     httpApp.post('/admin-hub/v1/smtp-settings/test', requireSellerAuth, requireSuperuser, adminHubSmtpSettingsTestPOST)
+
+    // ── Automation flows (Content → Flows; superuser) ───────────────────────────
+    const FLOW_EMAIL_SAMPLE_PLACEHOLDERS = {
+      CUSTOMER: 'Jane Doe',
+      CUSTOMER_NAME: 'Jane Doe',
+      FIRST_NAME: 'Jane',
+      LAST_NAME: 'Doe',
+      EMAIL: 'customer@example.com',
+      PRODUCT: 'Sample Product',
+      PRODUCT_NAME: 'Sample Product',
+      ORDER_NUMBER: '10042',
+      ORDER_ID: '10042',
+      STORE_NAME: 'Your Store',
+      SHOP_NAME: 'Your Store',
+    }
+    const applyFlowEmailPlaceholders = (template, extra = {}) => {
+      if (template == null) return ''
+      const vars = { ...FLOW_EMAIL_SAMPLE_PLACEHOLDERS, ...extra }
+      return String(template).replace(/\{([A-Za-z0-9_]+)\}/g, (_, rawKey) => {
+        const keyUp = String(rawKey).toUpperCase()
+        const v =
+          vars[keyUp] ??
+          vars[String(rawKey)] ??
+          vars[rawKey]
+        if (v != null && v !== '') return String(v)
+        return `{${rawKey}}`
+      })
+    }
+    const flowEmailHtmlToPlainText = (html) =>
+      String(html || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(p|div|h[1-6]|li|tr|table)>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+
+    const FLOW_TRIGGER_KEYS = new Set([
+      'new_subscriber',
+      'abandoned_cart',
+      'order_placed',
+      'order_delivered',
+      'review_request',
+      'win_back',
+    ])
+    const mapFlowRow = (row) =>
+      row
+        ? {
+            id: row.id,
+            name: row.name,
+            trigger: row.trigger_key,
+            status: row.status,
+            sent_count: row.sent_count != null ? Number(row.sent_count) : 0,
+            step_count: row.step_count != null ? Number(row.step_count) : undefined,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+          }
+        : null
+    const mapStepRow = (row) => ({
+      id: row.id,
+      step_order: row.step_order != null ? Number(row.step_order) : 0,
+      step_type: row.step_type,
+      wait_hours: row.wait_hours != null ? Number(row.wait_hours) : null,
+      email_subject: row.email_subject || '',
+      email_body: row.email_body || '',
+    })
+
+    const adminHubFlowsListGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(`
+          SELECT f.*, (
+            SELECT COUNT(*)::int FROM admin_hub_flow_steps s WHERE s.flow_id = f.id
+          ) AS step_count
+          FROM admin_hub_flows f
+          ORDER BY f.updated_at DESC
+        `)
+        await client.end()
+        res.json({ flows: (r.rows || []).map(mapFlowRow), count: r.rows?.length || 0 })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubFlowsPOST = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const body = req.body || {}
+      const name = String(body.name || '').trim()
+      const triggerKey = String(body.trigger || body.trigger_key || '').trim()
+      const status = ['draft', 'active', 'paused'].includes(String(body.status || '').toLowerCase())
+        ? String(body.status).toLowerCase()
+        : 'draft'
+      if (!name) return res.status(400).json({ message: 'name is required' })
+      if (!FLOW_TRIGGER_KEYS.has(triggerKey)) return res.status(400).json({ message: 'invalid trigger' })
+      try {
+        await client.connect()
+        const ins = await client.query(
+          `INSERT INTO admin_hub_flows (name, trigger_key, status) VALUES ($1, $2, $3)
+           RETURNING id, name, trigger_key, status, sent_count, created_at, updated_at`,
+          [name, triggerKey, status],
+        )
+        await client.end()
+        const flow = mapFlowRow({ ...ins.rows[0], step_count: 0 })
+        res.status(201).json({ flow })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubFlowGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      try {
+        await client.connect()
+        const fr = await client.query(`SELECT * FROM admin_hub_flows WHERE id = $1`, [id])
+        if (!fr.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Flow not found' })
+        }
+        const sr = await client.query(
+          `SELECT * FROM admin_hub_flow_steps WHERE flow_id = $1 ORDER BY step_order ASC`,
+          [id],
+        )
+        await client.end()
+        const flow = mapFlowRow({ ...fr.rows[0], step_count: sr.rows?.length || 0 })
+        res.json({ flow, steps: (sr.rows || []).map(mapStepRow) })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubFlowPATCH = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      const body = req.body || {}
+      try {
+        await client.connect()
+        const ex = await client.query(`SELECT id FROM admin_hub_flows WHERE id = $1`, [id])
+        if (!ex.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Flow not found' })
+        }
+
+        const sets = []
+        const vals = []
+        let vi = 1
+        if (body.name !== undefined) {
+          const n = String(body.name || '').trim()
+          if (!n) {
+            await client.end()
+            return res.status(400).json({ message: 'name cannot be empty' })
+          }
+          sets.push(`name = $${vi++}`)
+          vals.push(n)
+        }
+        if (body.trigger !== undefined || body.trigger_key !== undefined) {
+          const tk = String(body.trigger || body.trigger_key || '').trim()
+          if (!FLOW_TRIGGER_KEYS.has(tk)) {
+            await client.end()
+            return res.status(400).json({ message: 'invalid trigger' })
+          }
+          sets.push(`trigger_key = $${vi++}`)
+          vals.push(tk)
+        }
+        if (body.status !== undefined) {
+          const st = String(body.status || '').toLowerCase()
+          if (!['draft', 'active', 'paused'].includes(st)) {
+            await client.end()
+            return res.status(400).json({ message: 'invalid status' })
+          }
+          sets.push(`status = $${vi++}`)
+          vals.push(st)
+        }
+
+        if (sets.length) {
+          sets.push(`updated_at = now()`)
+          vals.push(id)
+          await client.query(`UPDATE admin_hub_flows SET ${sets.join(', ')} WHERE id = $${vi}`, vals)
+        }
+
+        if (Array.isArray(body.steps)) {
+          const normalized = []
+          for (let i = 0; i < body.steps.length; i++) {
+            const s = body.steps[i] || {}
+            const stepType = String(s.step_type || '').trim()
+            if (stepType !== 'wait_hours' && stepType !== 'send_email') {
+              await client.end()
+              return res.status(400).json({ message: `Invalid step_type at index ${i}` })
+            }
+            if (stepType === 'wait_hours') {
+              normalized.push({
+                order: i,
+                step_type: stepType,
+                wait_hours: Math.max(0, parseInt(s.wait_hours, 10) || 0),
+                email_subject: null,
+                email_body: null,
+              })
+            } else {
+              const subj = String(s.email_subject || '').trim()
+              const emBody = String(s.email_body || '').trim()
+              if (!subj || !emBody) {
+                await client.end()
+                return res.status(400).json({ message: `Email step at index ${i} needs subject and body` })
+              }
+              normalized.push({
+                order: i,
+                step_type: stepType,
+                wait_hours: null,
+                email_subject: subj,
+                email_body: emBody,
+              })
+            }
+          }
+          await client.query(`DELETE FROM admin_hub_flow_steps WHERE flow_id = $1`, [id])
+          for (const row of normalized) {
+            await client.query(
+              `INSERT INTO admin_hub_flow_steps (flow_id, step_order, step_type, wait_hours, email_subject, email_body)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [id, row.order, row.step_type, row.wait_hours, row.email_subject, row.email_body],
+            )
+          }
+        }
+
+        const fr = await client.query(`SELECT * FROM admin_hub_flows WHERE id = $1`, [id])
+        const sr = await client.query(
+          `SELECT * FROM admin_hub_flow_steps WHERE flow_id = $1 ORDER BY step_order ASC`,
+          [id],
+        )
+        await client.end()
+        const flow = mapFlowRow({ ...fr.rows[0], step_count: sr.rows?.length || 0 })
+        res.json({ flow, steps: (sr.rows || []).map(mapStepRow) })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubFlowDELETE = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      try {
+        await client.connect()
+        const r = await client.query(`DELETE FROM admin_hub_flows WHERE id = $1 RETURNING id`, [id])
+        await client.end()
+        if (!r.rowCount) return res.status(404).json({ message: 'Flow not found' })
+        res.json({ deleted: true })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubFlowTestEmailPOST = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const id = String(req.params.id || '').trim()
+      const body = req.body || {}
+      const toRaw = String(body.to || '').trim()
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!id) return res.status(400).json({ message: 'id required' })
+      if (!toRaw || !emailRe.test(toRaw)) return res.status(400).json({ message: 'valid to email required' })
+      try {
+        await client.connect()
+        const ex = await client.query(`SELECT id FROM admin_hub_flows WHERE id = $1`, [id])
+        if (!ex.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Flow not found' })
+        }
+
+        let subject
+        let htmlBody
+        const stepOrderArg = body.step_order
+        const hasStepOrder = stepOrderArg != null && stepOrderArg !== ''
+        if (hasStepOrder) {
+          const so = parseInt(stepOrderArg, 10)
+          if (Number.isNaN(so) || so < 0) {
+            await client.end()
+            return res.status(400).json({ message: 'invalid step_order' })
+          }
+          const sr = await client.query(
+            `SELECT email_subject, email_body FROM admin_hub_flow_steps
+             WHERE flow_id = $1 AND step_order = $2 AND step_type = 'send_email'`,
+            [id, so],
+          )
+          if (!sr.rows[0]) {
+            await client.end()
+            return res.status(404).json({ message: 'send_email step not found for step_order' })
+          }
+          subject = sr.rows[0].email_subject
+          htmlBody = sr.rows[0].email_body
+        } else {
+          subject = String(body.email_subject || '').trim()
+          htmlBody = String(body.email_body || '').trim()
+          if (!subject || !htmlBody) {
+            await client.end()
+            return res.status(400).json({ message: 'email_subject and email_body required (or step_order)' })
+          }
+        }
+
+        const transport = await getSmtpTransport(client)
+        const smtpR = await client.query(`SELECT from_email, from_name FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
+        await client.end()
+
+        if (!transport) return res.status(400).json({ message: 'SMTP not configured' })
+        const fromEmail = String(smtpR.rows[0]?.from_email || '').trim()
+        if (!fromEmail) return res.status(400).json({ message: 'SMTP From email not set' })
+        const fromName = smtpR.rows[0]?.from_name || 'Shop'
+
+        const extraVars =
+          body.placeholders && typeof body.placeholders === 'object' && !Array.isArray(body.placeholders)
+            ? body.placeholders
+            : {}
+        const finalSubject = applyFlowEmailPlaceholders(subject, extraVars)
+        const finalHtml = applyFlowEmailPlaceholders(htmlBody, extraVars)
+        const plain = flowEmailHtmlToPlainText(finalHtml)
+
+        await transport.sendMail({
+          from: `"${String(fromName).replace(/"/g, '')}" <${fromEmail}>`,
+          to: toRaw,
+          subject: finalSubject,
+          html: finalHtml,
+          text: plain || finalSubject,
+        })
+        res.json({ success: true, message: 'Test email sent' })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        res.status(400).json({ message: e?.message || 'Send failed' })
+      }
+    }
+
+    httpApp.get('/admin-hub/v1/flows', requireSellerAuth, requireSuperuser, adminHubFlowsListGET)
+    httpApp.post('/admin-hub/v1/flows', requireSellerAuth, requireSuperuser, adminHubFlowsPOST)
+    httpApp.post('/admin-hub/v1/flows/:id/test-email', requireSellerAuth, requireSuperuser, adminHubFlowTestEmailPOST)
+    httpApp.get('/admin-hub/v1/flows/:id', requireSellerAuth, requireSuperuser, adminHubFlowGET)
+    httpApp.patch('/admin-hub/v1/flows/:id', requireSellerAuth, requireSuperuser, adminHubFlowPATCH)
+    httpApp.delete('/admin-hub/v1/flows/:id', requireSellerAuth, requireSuperuser, adminHubFlowDELETE)
 
     // ── Coupons ────────────────────────────────────────────────────────────────
     const adminHubCouponsGET = async (req, res) => {

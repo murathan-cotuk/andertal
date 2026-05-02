@@ -344,6 +344,12 @@ class MedusaAdminClient {
         return { categories: [], count: 0 }
       } catch (err) {
         lastErr = err
+        const code = err?.statusCode
+        const msg = (err?.message || '').toLowerCase()
+        if (code === 503 || msg.includes('admin hub service not available')) {
+          console.warn('getAdminHubCategories: Admin Hub unavailable — empty list')
+          return { categories: [], count: 0 }
+        }
         if (!err.message || !err.message.includes('404')) throw err
       }
     }
@@ -999,6 +1005,31 @@ class MedusaAdminClient {
   async testSmtpSettings() {
     return this.request('/admin-hub/v1/smtp-settings/test', { method: 'POST' })
   }
+
+  /** Automation flows (Content → Flows; superuser). */
+  async getFlows() {
+    return this.request('/admin-hub/v1/flows')
+  }
+  async getFlow(id) {
+    return this.request(`/admin-hub/v1/flows/${encodeURIComponent(id)}`)
+  }
+  async createFlow(data) {
+    return this.request('/admin-hub/v1/flows', { method: 'POST', body: JSON.stringify(data) })
+  }
+  async updateFlow(id, data) {
+    return this.request(`/admin-hub/v1/flows/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) })
+  }
+  async deleteFlow(id) {
+    return this.request(`/admin-hub/v1/flows/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  }
+  /** Send a test email using flow template (HTML + placeholders); superuser + SMTP required. */
+  async sendFlowTestEmail(flowId, data) {
+    return this.request(`/admin-hub/v1/flows/${encodeURIComponent(flowId)}/test-email`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
   async getTransactions(params = {}) {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
     return this.request(`/admin-hub/v1/transactions${qs}`)

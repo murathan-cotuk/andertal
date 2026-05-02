@@ -6,6 +6,7 @@ import { CartProvider } from "@/context/CartContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import { LandingChromeProvider } from "@/context/LandingChromeContext";
 import { ShopStylesProvider } from "@/context/ShopStylesContext";
+import ShopStylesInjector from "@/components/ShopStylesInjector";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useLenis } from "@/hooks/useLenis";
 import PostHogProvider from "@/components/PostHogProvider";
@@ -29,6 +30,7 @@ export default function Providers({ children }) {
         <WishlistProvider>
           <CartProvider>
             <ShopStylesProvider>
+              <ShopStylesInjector />
               <LandingChromeProvider>
                 <LenisInit />
                 {children}

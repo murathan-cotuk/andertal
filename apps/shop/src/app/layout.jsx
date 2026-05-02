@@ -1,5 +1,4 @@
 ﻿import "./globals.css";
-import ShopStylesInjector from "@/components/ShopStylesInjector";
 
 /* Safari / iOS status area + first paint: keep in sync with --header-bg fallback in ShopHeader (MIDDLE_BAR_BG) */
 const DEFAULT_STATUS_THEME = "#1b8880";
@@ -73,7 +72,6 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body suppressHydrationWarning>
-        <ShopStylesInjector />
         {children}
       </body>
     </html>

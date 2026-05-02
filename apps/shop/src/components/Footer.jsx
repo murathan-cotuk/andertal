@@ -1,9 +1,12 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
+import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
+import { formatPriceCents } from "@/lib/format";
 
 function slugify(s) {
   return (s || "")
@@ -199,9 +202,31 @@ const Bottom = styled.div`
   padding-top: 24px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 16px;
+`;
+
+const BottomLeft = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-width: 200px;
+`;
+
+const ShippingPromo = styled(Link)`
+  color: var(--footer-text, #ffffff);
+  font-size: 14px;
+  line-height: 1.4;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.95;
+
+  &:hover {
+    opacity: 1;
+    color: var(--footer-text, #ffffff);
+  }
 `;
 
 const Copyright = styled.p`
@@ -212,13 +237,23 @@ const Copyright = styled.p`
 const FOOTER_LOCATIONS = ["footer1", "footer2", "footer3", "footer4"];
 
 export default function Footer() {
+  const prefix = useMarketPrefix();
+  const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
+  const envThresholdCents =
+    typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
+      ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS)
+      : null;
+
   const [footerColumns, setFooterColumns] = useState([]);
+  const [rawThresholds, setRawThresholds] = useState(null);
 
   useEffect(() => {
-    fetch("/api/store-menus")
-      .then((r) => r.json())
-      .then((data) => {
-        const menus = data.menus || [];
+    Promise.all([
+      fetch("/api/store-menus").then((r) => r.json()),
+      fetch("/api/store-seller-settings").then((r) => r.json()),
+    ])
+      .then(([menuData, sellerData]) => {
+        const menus = menuData.menus || [];
         const columns = FOOTER_LOCATIONS.map((loc) => {
           const menu = menus.find((m) => (m.location || "").toLowerCase().trim() === loc.toLowerCase());
           if (!menu) return { location: loc, menu: null, items: [] };
@@ -226,9 +261,26 @@ export default function Footer() {
           return { location: loc, menu, items };
         });
         setFooterColumns(columns);
+
+        if (sellerData?.free_shipping_thresholds && typeof sellerData.free_shipping_thresholds === "object") {
+          setRawThresholds(sellerData.free_shipping_thresholds);
+        } else if (sellerData?.free_shipping_threshold_cents != null) {
+          setRawThresholds({ DE: sellerData.free_shipping_threshold_cents });
+        } else {
+          setRawThresholds(null);
+        }
       })
-      .catch(() => setFooterColumns([]));
+      .catch(() => {
+        setFooterColumns([]);
+        setRawThresholds(null);
+      });
   }, []);
+
+  const thresholdCents = resolveFreeShippingThresholdCents(rawThresholds, marketCountry, envThresholdCents);
+  const shippingPromoText =
+    thresholdCents != null
+      ? `Kostenloser Versand ab ${formatPriceCents(thresholdCents)} €`
+      : null;
 
   return (
     <FooterContainer className="site-footer">
@@ -286,7 +338,12 @@ export default function Footer() {
           </MobileAccordion>
         )}
         <Bottom style={{ marginTop: 24 }}>
-          <Copyright>© {new Date().getFullYear()} Andertal. All rights reserved.</Copyright>
+          <BottomLeft>
+            {shippingPromoText && (
+              <ShippingPromo href="/shipping">{shippingPromoText}</ShippingPromo>
+            )}
+            <Copyright style={{ margin: 0 }}>© {new Date().getFullYear()} Andertal. All rights reserved.</Copyright>
+          </BottomLeft>
         </Bottom>
       </Container>
     </FooterContainer>

@@ -107,10 +107,10 @@ html {
   scroll-behavior: smooth;
 }
 
-/* iOS Safari: area above/between fixed header and system status bar uses html background on overscroll; match header */
+/* iOS Safari: status bar / overscroll — görünür navbar ile aynı yüzey (--header-chrome-bg gradient dahil) */
 @media (max-width: 1023px) {
   html {
-    background-color: var(--header-bg, #1b8880);
+    background: var(--header-chrome-bg, var(--header-bg, #1b8880));
   }
 }
 

@@ -18,7 +18,7 @@ import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
-import TopBar from "@/components/TopBar";
+import ShopTopBar from "@/components/ShopTopBar";
 import UserDropdownPanel from "@/components/UserDropdown";
 import { SHOP_THEME_CSS_UPDATED } from "@/components/ShopStylesInjector";
 import { tokens } from "@/design-system/tokens";
@@ -37,9 +37,14 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useLandingChrome } from "@/context/LandingChromeContext";
 import { getShippableCountries } from "@/lib/countries";
 import { menuItemHref } from "@/lib/shop-menu-href";
+import { buildHeaderSurfaceCssVarsFromRoute } from "@andertal/shop-theme";
+import { useShopStyles } from "@/context/ShopStylesContext";
+import { detectShopHeaderRouteScope } from "@/lib/header-route-scope";
+import { extractSolidTintFromChromeCss } from "@/lib/header-status-tint";
 
 const SCROLL_THRESHOLD = 60;
-const SCROLL_DELTA = 8; /* px; only toggle direction after this much scroll to avoid jitter */
+/** Yukarı kaydırırken titreşimi süzmek için (alt menüyü tekrar göster) */
+const SCROLL_UP_DELTA = 6;
 /** Ignore “scroll up” when near the document bottom (rubber-band / overscroll / addr. bar) to avoid header ↔ spacer feedback jitter */
 const BOTTOM_IGNORE_SCROLL_UP_PX = 28;
 const MIDDLE_BAR_BG = "#1b8880";
@@ -88,25 +93,21 @@ const HeaderWrap = styled.header`
   left: 0;
   right: 0;
   z-index: 2147483600;
-  background: rgba(255, 255, 255, 0.97);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   will-change: transform;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: visible;
 
-  /* Compact mobile: header itself fades to transparent (MiddleBarWrap has its own bg) */
   &[data-mobile-compact="true"] {
     @media (max-width: ${HEADER_NARROW_MQ}px) {
       background: transparent;
     }
   }
 
-  /* Mobile notch / status-bar safe area should match header color */
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: var(--header-bg, ${MIDDLE_BAR_BG});
+    background: var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}));
 
     &::before {
       content: "";
@@ -115,36 +116,37 @@ const HeaderWrap = styled.header`
       left: 0;
       right: 0;
       height: env(safe-area-inset-top);
-      background: var(--header-bg, ${MIDDLE_BAR_BG});
+      background: var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}));
       pointer-events: none;
     }
   }
 `;
 
-/* TopBar wrapper — always in DOM, slides up smoothly when not at top */
-const TopBarWrap = styled.div`
-  overflow: hidden;
-  max-height: ${(p) => (p.$visible ? "60px" : "0px")};
-  opacity: ${(p) => (p.$visible ? 1 : 0)};
-  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
-  pointer-events: ${(p) => (p.$visible ? "auto" : "none")};
-
-  @media (max-width: 767px) {
-    display: none !important;
-  }
-`;
-
-/* —— Middle bar: zooplus-style (full-width colored bar) —— */
-
 /* Keep middle bar above mega panels so icon dropdowns render on top */
 const HEADER_MIDDLE_Z = 3;
+
+/** Einheitlicher Hintergrund für Hauptleiste + Second Nav (Farbe / Verlauf via Theme-CSS) */
+const HeaderChrome = styled.div`
+  width: 100%;
+  position: relative;
+  z-index: ${HEADER_MIDDLE_Z};
+
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    ${(p) =>
+      p.$mobileSearchCompact
+        ? `
+      box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    `
+        : ""}
+  }
+`;
 
 const MiddleBarWrap = styled.div`
   width: 100%;
   min-height: 64px;
-  background-color: var(--header-bg, ${MIDDLE_BAR_BG});
+  background-color: transparent;
   color: var(--header-text, #111827);
-  transition: background-color 0.28s ease, color 0.28s ease, backdrop-filter 0.28s ease, min-height 0.28s ease;
+  transition: color 0.28s ease, backdrop-filter 0.28s ease, min-height 0.28s ease;
   position: relative;
   z-index: ${HEADER_MIDDLE_Z};
 
@@ -153,8 +155,6 @@ const MiddleBarWrap = styled.div`
       p.$mobileSearchCompact
         ? `
       min-height: 0;
-      background-color: var(--header-bg, ${MIDDLE_BAR_BG});
-      box-shadow: 0 2px 8px rgba(0,0,0,0.10);
     `
         : ""}
   }
@@ -719,7 +719,7 @@ const UserBtn = styled.button`
 const SubNavWrap = styled.div`
   width: 100%;
   max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 50px)")};
-  background: var(--second-nav-bg, #f0f0f0);
+  background: transparent;
   overflow: hidden;
   opacity: ${(p) => (p.$hide ? 0 : 1)};
   transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
@@ -731,14 +731,28 @@ const SubNavWrap = styled.div`
   position: relative;
   z-index: 0;
 
-  @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  }
-
-  @media (max-width: 767px) {
+  /*
+   * Mobil + tablet (≤1023): kaydırmayla gizlenince tamamen çıksın — max-height:0 bazı durumlarda
+   * satırı süzdürüp dokunmatikte seçilebilir bırakabiliyor.
+   */
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
     font-size: 13px;
-    max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 40px)")};
+    ${(p) =>
+      p.$hide
+        ? `
+      display: none !important;
+      max-height: 0 !important;
+      min-height: 0 !important;
+      opacity: 0 !important;
+      overflow: hidden !important;
+      pointer-events: none !important;
+    `
+        : `
+      display: flex;
+      opacity: 1;
+      max-height: var(--second-nav-h, 44px);
+      pointer-events: auto;
+    `}
   }
 `;
 
@@ -770,23 +784,20 @@ const SecondLink = styled(Link)`
   font-weight: inherit;
   font-family: ${tokens.fontFamily.sans};
   text-decoration: none;
-  transition: color ${tokens.transition.base};
+  transition: color ${tokens.transition.base}, opacity ${tokens.transition.base};
   display: inline-flex;
   align-items: center;
-  line-height: 1;
+  line-height: 1.25;
   white-space: nowrap;
   flex-shrink: 0;
 
-  &:hover {
-    color: var(--second-nav-active, ${tokens.primary.DEFAULT});
-    text-decoration: underline;
+  &.shop-second-nav-link:hover {
+    opacity: 0.92;
   }
 
-  @media (max-width: ${HEADER_NARROW_MQ}px) {
-    &:hover,
-    &:active {
-      text-decoration: none;
-    }
+  &:not(.shop-second-nav-link):hover {
+    color: var(--second-nav-active, ${tokens.primary.DEFAULT});
+    text-decoration: underline;
   }
 `;
 
@@ -892,6 +903,13 @@ export default function ShopHeader() {
   const { showHeaderFilterBar, landingHeaderBg } = useLandingChrome();
   const ctxPrefix = useMarketPrefix();
   const pathname = usePathname() || "/";
+  const shopStyles = useShopStyles();
+  const headerRestPath = useMemo(() => restPathFromPathname(pathname), [pathname]);
+  const headerRouteScope = useMemo(() => detectShopHeaderRouteScope(headerRestPath), [headerRestPath]);
+  const headerScopeCssVars = useMemo(
+    () => buildHeaderSurfaceCssVarsFromRoute(shopStyles, headerRouteScope),
+    [shopStyles, headerRouteScope],
+  );
   const marketParsed =
     parseMarketPath(pathname) || (ctxPrefix ? parseMarketPath(ctxPrefix) : null);
   const nextRouter = useNextRouter();
@@ -899,14 +917,11 @@ export default function ShopHeader() {
   const [scrollY, setScrollY] = useState(0);
   const [scrollingDown, setScrollingDown] = useState(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
-  /** Narrow only: second menu row hidden after scroll-down; cleared on scroll-up or at top (see scroll handler). */
-  const [mobileSecondNavHidden, setMobileSecondNavHidden] = useState(false);
-  const mobileSecondNavHiddenRef = useRef(false);
   const lastScrollYRef = useRef(0);
   const headerRef = useRef(null);
   const middleBarRef = useRef(null);
   const megaMenuTimerRef = useRef(null);
-  const [headerHeight, setHeaderHeight] = useState(116);
+  const [headerHeight, setHeaderHeight] = useState(72);
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [hoveredMenuItemId, setHoveredMenuItemId] = useState(null);
   const [shopBranding, setShopBranding] = useState({ shop_logo_url: "", shop_favicon_url: "", shop_logo_height: 34 });
@@ -979,9 +994,8 @@ export default function ShopHeader() {
     if (typeof document === "undefined" || typeof window === "undefined") return;
     const mq = window.matchMedia(`(max-width: ${HEADER_NARROW_MQ}px)`);
     const root = document.documentElement;
-    const body = document.body;
     const prevRootBg = root.style.backgroundColor;
-    const prevBodyBg = body.style.backgroundColor;
+    const prevRootBackground = root.style.background;
 
     const ensureThemeMeta = () => {
       let meta = document.querySelector("meta[name='theme-color']");
@@ -993,21 +1007,33 @@ export default function ShopHeader() {
       return meta;
     };
 
-    /** Hex / rgb / '' — Safari expects a solid color for theme-color */
+    /**
+     * Görünür şerit `--header-chrome-bg` (gradient); `--header-bg` tek başına beyaz kalabiliyor.
+     * Safari theme-color ve üst safe-area için chrom’dan düz renk çıkarıyoruz; html arka planına tam chrome string’i veriyoruz.
+     */
     const apply = () => {
-      const raw = getComputedStyle(root).getPropertyValue("--header-bg").trim();
-      const headerBg = raw || MIDDLE_BAR_BG;
-      const themeMeta = ensureThemeMeta();
-      themeMeta.setAttribute("content", headerBg);
+      requestAnimationFrame(() => {
+        const el = headerRef.current;
+        const cs = el ? getComputedStyle(el) : getComputedStyle(root);
+        const chrome = cs.getPropertyValue("--header-chrome-bg").trim();
+        const headerBg = cs.getPropertyValue("--header-bg").trim() || MIDDLE_BAR_BG;
+        const solid = extractSolidTintFromChromeCss(chrome || headerBg, headerBg);
+        const themeMeta = ensureThemeMeta();
+        themeMeta.setAttribute("content", solid);
 
-      /* iOS: html background behind status bar + overscroll; keep in sync with header */
-      if (mq.matches) {
-        root.style.backgroundColor = headerBg;
-        body.style.backgroundColor = headerBg;
-      } else {
-        root.style.backgroundColor = prevRootBg;
-        body.style.backgroundColor = prevBodyBg;
-      }
+        if (mq.matches) {
+          if (chrome) {
+            root.style.background = chrome;
+            root.style.backgroundColor = "";
+          } else {
+            root.style.background = "";
+            root.style.backgroundColor = solid;
+          }
+        } else {
+          root.style.background = prevRootBackground;
+          root.style.backgroundColor = prevRootBg;
+        }
+      });
     };
 
     apply();
@@ -1018,10 +1044,10 @@ export default function ShopHeader() {
     return () => {
       mq.removeEventListener?.("change", onMq);
       window.removeEventListener(SHOP_THEME_CSS_UPDATED, onThemeInjected);
+      root.style.background = prevRootBackground;
       root.style.backgroundColor = prevRootBg;
-      body.style.backgroundColor = prevBodyBg;
     };
-  }, []);
+  }, [pathname, shopStyles, headerScopeCssVars]);
 
   useEffect(() => {
     const norm = (s) => String(s || "").toLowerCase().trim();
@@ -1086,49 +1112,54 @@ export default function ShopHeader() {
 
   useEffect(() => {
     let ticking = false;
+    const readScrollTop = () => {
+      if (typeof window === "undefined") return 0;
+      const se = document.scrollingElement || document.documentElement;
+      return (
+        window.pageYOffset ??
+        window.scrollY ??
+        se.scrollTop ??
+        0
+      );
+    };
     const handleScroll = () => {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
-        const current = window.scrollY ?? window.pageYOffset ?? 0;
+        const current = readScrollTop();
         const prev = lastScrollYRef.current;
         const delta = current - prev;
         const el = document.documentElement;
         const maxScroll = Math.max(0, (el && el.scrollHeight) - window.innerHeight);
         const nearDocumentBottom =
           maxScroll > SCROLL_THRESHOLD * 2 && current >= maxScroll - BOTTOM_IGNORE_SCROLL_UP_PX;
-        if (delta > SCROLL_DELTA) {
+        /*
+         * Aşağı: parmakla / trackpad ile küçük adımlar da sıklıkla <8px; bu yüzden eşikten sonra
+         * her pozitif delta ikinci şeridi gizler (önceki SCROLL_DELTA ile çoğu mobil kaydırmada hiç tetiklenmiyordu).
+         * Yukarı: küçük negatif deltalarda da menü gelsin; titreşim için |delta| minimum.
+         */
+        if (current <= SCROLL_THRESHOLD) {
+          setScrollingDown(false);
+        } else if (delta > 0 && current > SCROLL_THRESHOLD) {
           setScrollingDown(true);
-        } else if (delta < -SCROLL_DELTA && !nearDocumentBottom) {
+        } else if (delta < -SCROLL_UP_DELTA && !nearDocumentBottom) {
           setScrollingDown(false);
         }
         lastScrollYRef.current = current;
         setScrollY(current);
 
-        const narrow = typeof window !== "undefined" && window.innerWidth <= HEADER_NARROW_MQ;
-        let nextHideSecond = mobileSecondNavHiddenRef.current;
-        if (narrow) {
-          if (current <= SCROLL_THRESHOLD) {
-            nextHideSecond = false;
-          } else if (delta > SCROLL_DELTA) {
-            nextHideSecond = true;
-          } else if (delta < -SCROLL_DELTA && !nearDocumentBottom) {
-            nextHideSecond = false;
-          }
-        } else {
-          nextHideSecond = false;
-        }
-        if (nextHideSecond !== mobileSecondNavHiddenRef.current) {
-          mobileSecondNavHiddenRef.current = nextHideSecond;
-          setMobileSecondNavHidden(nextHideSecond);
-        }
-
         ticking = false;
       });
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
+    /* iOS / görünüm çubuğu: bazı durumlarda window ile birlikte visualViewport scroll da yararlı */
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (vv) vv.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (vv) vv.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   useEffect(() => {
@@ -1140,13 +1171,11 @@ export default function ShopHeader() {
   }, []);
 
   useEffect(() => {
-    if (isNarrowViewport) return;
-    mobileSecondNavHiddenRef.current = false;
-    setMobileSecondNavHidden(false);
-  }, [isNarrowViewport]);
-
-  useEffect(() => {
     setDrillCategoryId(null);
+    setScrollingDown(false);
+    if (typeof window !== "undefined") {
+      lastScrollYRef.current = window.scrollY ?? window.pageYOffset ?? 0;
+    }
   }, [pathname]);
 
   // Track actual header height so the spacer is always accurate
@@ -1174,9 +1203,8 @@ export default function ShopHeader() {
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  const atTop = scrollY <= SCROLL_THRESHOLD;
-  /* Second nav: desktop = hide with scroll direction (same as before); mobile = latched so it stays off after scroll-down */
-  const showSubNav = isNarrowViewport ? !mobileSecondNavHidden : !scrollingDown;
+  /* Second nav: scroll-down gizle, scroll-up veya sayfa üstü göster (mobil + tablet ≤1023 dar chrome; geniş ekranda üst çubuk da aynı scroll bayrağıyla gider) */
+  const showSubNav = !scrollingDown;
   const secondNavHidden = !showSubNav || !showHeaderFilterBar;
   const spacerHeight = Math.max(
     0,
@@ -1313,17 +1341,19 @@ export default function ShopHeader() {
         style={{
           transform: hideHeaderCompletely ? "translateY(-100%)" : "translateY(0)",
           zIndex: localeDropdownOpen ? 2147483650 : undefined,
+          ...(headerScopeCssVars || {}),
           ...(isNarrowViewport && landingHeaderBg ? { background: landingHeaderBg } : {}),
         }}
       >
-        <TopBarWrap $visible={atTop}>
-          <TopBar />
-        </TopBarWrap>
+        <ShopTopBar />
+        <HeaderChrome
+          className={`shop-header-chrome${isNarrowViewport && landingHeaderBg ? " landing-clear" : ""}`}
+          $mobileSearchCompact={isMobileSearchCompact}
+        >
         <MiddleBarWrap
           ref={middleBarRef}
           className="shop-header-main"
           $mobileSearchCompact={isMobileSearchCompact}
-          style={isNarrowViewport && landingHeaderBg ? { background: "transparent" } : undefined}
         >
           <MiddleBarInner $mobileSearchCompact={isMobileSearchCompact}>
             <NarrowHeaderChrome $hide={isMobileSearchCompact}>
@@ -1528,6 +1558,26 @@ export default function ShopHeader() {
           </MiddleBarInner>
         </MiddleBarWrap>
 
+        <SubNavWrap
+          id="subnav"
+          className="second-nav"
+          $hide={!showSubNav || !showHeaderFilterBar}
+          style={isNarrowViewport && landingHeaderBg ? { borderTop: "none", borderBottom: "none" } : undefined}
+        >
+          <SecondMenuRowInner>
+            {secondMenuItems.map((item) => (
+              <SecondLink
+                key={item.id}
+                className="shop-second-nav-link"
+                href={menuItemHref(item)}
+              >
+                {item.label}
+              </SecondLink>
+            ))}
+          </SecondMenuRowInner>
+        </SubNavWrap>
+        </HeaderChrome>
+
         {/* Mega menu panel — floats below the header bar */}
         {hasMegaNav && (
           <MegaPanel
@@ -1602,32 +1652,6 @@ export default function ShopHeader() {
             })()}
           </CategoryMegaInner>
         </CategoryMegaPanel>
-
-        <SubNavWrap
-          id="subnav"
-          className="second-nav"
-          $hide={!showSubNav || !showHeaderFilterBar}
-          style={isNarrowViewport && landingHeaderBg ? { background: "transparent", borderTop: "none", borderBottom: "none" } : undefined}
-        >
-          <SecondMenuRowInner>
-            {secondMenuItems.map((item) => (
-              <SecondLink
-                key={item.id}
-                href={menuItemHref(item)}
-                style={isNarrowViewport && landingHeaderBg ? {
-                  background: "rgba(255,255,255,0.3)",
-                  backdropFilter: "blur(8px)",
-                  WebkitBackdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255,255,255,0.45)",
-                  borderRadius: 20,
-                  padding: "4px 12px",
-                } : undefined}
-              >
-                {item.label}
-              </SecondLink>
-            ))}
-          </SecondMenuRowInner>
-        </SubNavWrap>
       </HeaderWrap>
 
       <HeaderSpacer $height={spacerHeight} />

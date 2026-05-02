@@ -1,6 +1,10 @@
 import { applyLayoutPresets } from "./layout-presets.js";
 import { mergeLoadedShopStyles } from "./merge-styles.js";
 import { buildButtonColorVarLines } from "./button-type-colors.js";
+import {
+  buildHeaderChromeBackground,
+  resolveHeaderStringsForCss,
+} from "./header-chrome.js";
 
 const PRIMARY_TOKEN = "__PRIMARY__";
 
@@ -58,8 +62,9 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   const primary = colors.primary || "#ff971c";
 
   const topbar = resolveSectionStrings(styles.topbar, primary);
-  const header = resolveSectionStrings(styles.header, primary);
+  const header = resolveHeaderStringsForCss(styles.header, primary);
   const secondNav = resolveSectionStrings(styles.secondNav, primary);
+  const headerChromeBg = buildHeaderChromeBackground(header, primary);
   const footer = styles.footer || {};
   const typo = styles.typography || {};
   const scrollUp = resolveSectionStrings(styles.scrollUpButton, primary);
@@ -92,16 +97,23 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --topbar-shadow:   ${topbar.shadow || "none"};
   --topbar-border-bottom: ${topbar.border_bottom || "none"};
   --header-bg:       ${header.bg_color};
+  --header-chrome-bg: ${headerChromeBg};
   --header-text:     ${header.text_color};
   --header-h:        ${header.height};
   --header-shadow:   ${header.shadow};
   --header-border:   ${header.border_bottom};
-  --second-nav-bg:   ${secondNav.bg_color};
+  --second-nav-bg:   transparent;
   --second-nav-text: ${secondNav.text_color};
   --second-nav-active: ${secondNav.active_color};
   --second-nav-h:    ${secondNav.height};
   --second-nav-fs:   ${secondNav.font_size};
   --second-nav-fw:   ${secondNav.font_weight};
+  --second-nav-pill-bg:       ${secondNav.pill_background != null && secondNav.pill_background !== "" ? secondNav.pill_background : "rgba(255,255,255,0.32)"};
+  --second-nav-pill-border: ${secondNav.pill_border != null && secondNav.pill_border !== "" ? secondNav.pill_border : "none"};
+  --second-nav-pill-backdrop: ${secondNav.pill_backdrop != null && secondNav.pill_backdrop !== "" ? secondNav.pill_backdrop : "blur(12px)"};
+  --second-nav-pill-radius:   ${secondNav.pill_border_radius != null && secondNav.pill_border_radius !== "" ? secondNav.pill_border_radius : "10px"};
+  --second-nav-pill-padding:  ${secondNav.pill_padding != null && secondNav.pill_padding !== "" ? secondNav.pill_padding : "6px 14px"};
+  --second-nav-pill-shadow:   ${secondNav.pill_shadow != null && secondNav.pill_shadow !== "" ? secondNav.pill_shadow : "none"};
   --footer-bg:       ${footer.bg_color};
   --footer-text:     ${footer.text_color};
   --footer-border:   ${footer.border_top};
@@ -275,26 +287,55 @@ h5 {
   border-bottom: var(--topbar-border-bottom);
 }
 .topbar a, .topbar span, .topbar p { color: var(--topbar-text) !important; }
-.shop-header-main {
-  background: var(--header-bg) !important;
-  color: var(--header-text) !important;
-  min-height: var(--header-h);
+.shop-header-chrome {
+  background: var(--header-chrome-bg) !important;
   box-shadow: var(--header-shadow) !important;
   border-bottom: var(--header-border) !important;
+  transition: background 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+.shop-header-chrome.landing-clear {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-bottom: none !important;
+}
+.shop-header-main {
+  background: transparent !important;
+  color: var(--header-text) !important;
+  min-height: var(--header-h);
+  box-shadow: none !important;
+  border-bottom: none !important;
 }
 .second-nav {
-  background: var(--second-nav-bg) !important;
+  background: transparent !important;
   color: var(--second-nav-text) !important;
   min-height: var(--second-nav-h);
   font-size: var(--second-nav-fs);
   font-weight: var(--second-nav-fw);
+  border-top: none !important;
+  border-bottom: none !important;
 }
 .second-nav a,
 nav.second-nav a { color: var(--second-nav-text) !important; }
+.second-nav a.shop-second-nav-link,
+nav.second-nav a.shop-second-nav-link {
+  background: var(--second-nav-pill-bg) !important;
+  border: var(--second-nav-pill-border) !important;
+  backdrop-filter: var(--second-nav-pill-backdrop) !important;
+  -webkit-backdrop-filter: var(--second-nav-pill-backdrop) !important;
+  border-radius: var(--second-nav-pill-radius) !important;
+  padding: var(--second-nav-pill-padding) !important;
+  box-shadow: var(--second-nav-pill-shadow) !important;
+  text-decoration: none !important;
+}
 .second-nav a.active,
 .second-nav a:hover,
 nav.second-nav a.active,
 nav.second-nav a:hover { color: var(--second-nav-active) !important; }
+.second-nav a.shop-second-nav-link:hover,
+nav.second-nav a.shop-second-nav-link:hover {
+  color: var(--second-nav-active) !important;
+  text-decoration: none !important;
+}
 footer, .site-footer {
   background: var(--footer-bg) !important;
   color: var(--footer-text) !important;
