@@ -8733,16 +8733,32 @@ async function start() {
     let storeCategoriesTreeCache = { at: 0, payload: null }
     const STORE_CATEGORIES_TREE_TTL_MS = 45_000
     const storeCategoriesGET = async (req, res) => {
+      const adminHubService = resolveAdminHub()
       try {
         const slug = (req.query.slug || '').toString().trim()
-
         if (slug) {
+          if (adminHubService) {
+            const category = await adminHubService.getCategoryBySlug(slug)
+            if (!category || category.active === false || category.is_visible === false) return res.status(404).json({ message: 'Category not found' })
+            const meta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
+            const collectionId = category.has_collection && meta.collection_id ? meta.collection_id : null
+            const rawBanner = category.banner_image_url != null ? category.banner_image_url : meta.banner_image_url
+            const cat = {
+              id: category.id, name: category.name, slug: category.slug,
+              title: category.name, handle: category.slug,
+              description: category.description || null,
+              long_content: category.long_content || null,
+              banner_image_url: resolveUploadUrl(rawBanner) || null,
+              has_collection: category.has_collection,
+              collection_id: collectionId || null,
+            }
+            return res.json({ category: cat, categories: [cat], count: 1 })
+          }
+          // DB fallback
           const client = getProductsDbClient()
-          if (!client) return res.status(200).json({ categories: [], tree: [], count: 0 })
+          if (!client) return res.status(404).json({ message: 'Category not found' })
           await client.connect()
-          const r = await client.query(
-            `SELECT * FROM admin_hub_categories WHERE slug = $1 AND active = true LIMIT 1`, [slug]
-          )
+          const r = await client.query(`SELECT * FROM admin_hub_categories WHERE slug = $1 AND active = true LIMIT 1`, [slug])
           await client.end()
           if (!r.rows[0]) return res.status(404).json({ message: 'Category not found' })
           const category = mapAdminHubCategoryPgRow(r.rows[0])
@@ -8760,26 +8776,26 @@ async function start() {
           return res.json({ category: cat, categories: [cat], count: 1 })
         }
 
-        // Tree — use in-memory cache
         const now = Date.now()
         if (storeCategoriesTreeCache.payload && now - storeCategoriesTreeCache.at < STORE_CATEGORIES_TREE_TTL_MS) {
           return res.json(storeCategoriesTreeCache.payload)
         }
 
-        const client = getProductsDbClient()
-        if (!client) return res.status(200).json({ categories: [], tree: [], count: 0 })
-        await client.connect()
-        const r = await client.query(
-          `SELECT * FROM admin_hub_categories WHERE active = true ORDER BY sort_order ASC, name ASC`
-        )
-        await client.end()
+        let tree
+        if (adminHubService) {
+          tree = await adminHubService.getCategoryTree({ is_visible: true })
+        } else {
+          // DB fallback
+          const client = getProductsDbClient()
+          if (!client) return res.status(200).json({ categories: [], tree: [], count: 0 })
+          await client.connect()
+          const r = await client.query(`SELECT * FROM admin_hub_categories WHERE active = true ORDER BY sort_order ASC, name ASC`)
+          await client.end()
+          let flat = r.rows.map(mapAdminHubCategoryPgRow)
+          flat = flat.filter((c) => c.is_visible !== false)
+          tree = buildAdminHubCategoryTreeFromFlat(flat)
+        }
 
-        let flat = r.rows.map(mapAdminHubCategoryPgRow)
-        // Filter visible ones for shop
-        flat = flat.filter((c) => c.is_visible !== false)
-        const tree = buildAdminHubCategoryTreeFromFlat(flat)
-
-        // Annotate has_products — if annotation fails or finds nothing, show all
         let categoryIdsWithProducts = new Set()
         try {
           const allProducts = await listAdminHubProductsDb({ limit: 10000 })
@@ -8795,8 +8811,9 @@ async function start() {
           for (const n of nodes || []) {
             if (!n) continue
             annotateTree(n.children)
-            n.has_products = categoryIdsWithProducts.has(String(n.id).trim().toLowerCase())
-              || (n.children || []).some((c) => c?.has_products)
+            const directHit = categoryIdsWithProducts.has(String(n.id).trim().toLowerCase())
+            const childHit = (n.children || []).some((c) => c && c.has_products)
+            n.has_products = directHit || childHit
           }
         }
         annotateTree(tree)
@@ -8806,12 +8823,12 @@ async function start() {
           relaxAll(tree)
         }
 
-        const categories = tree.map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
+        const categories = (tree || []).map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
         const payload = { categories, tree, count: categories.length }
         storeCategoriesTreeCache = { at: now, payload }
         res.json(payload)
       } catch (err) {
-        console.error('storeCategoriesGET error:', err?.message || err)
+        console.error('Store categories GET error:', err)
         res.status(200).json({ categories: [], tree: [], count: 0 })
       }
     }
