@@ -1126,6 +1126,14 @@ class MedusaAdminClient {
     });
   }
 
+  /** Superuser: Stripe Secret testen (optional aktuelle Formularwerte); siehe Backend balance.retrieve */
+  async testPlatformStripeConnection(data = {}) {
+    return this.request('/admin-hub/v1/platform-checkout-settings/test-stripe', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getSellerUsers() {
     return this.request('/admin-hub/users');
   }

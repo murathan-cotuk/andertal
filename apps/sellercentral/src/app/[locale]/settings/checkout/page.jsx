@@ -7,6 +7,7 @@ import {
   Card,
   Text,
   BlockStack,
+  InlineStack,
   TextField,
   Checkbox,
   Button,
@@ -31,6 +32,8 @@ export default function SettingsCheckoutPage() {
   const [paypalSecret, setPaypalSecret] = useState("");
   const [meta, setMeta] = useState(null);
   const [initialSnapshot, setInitialSnapshot] = useState(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [stripeTestBanner, setStripeTestBanner] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,11 +66,46 @@ export default function SettingsCheckoutPage() {
     load();
   }, [load]);
 
+  const testStripe = async () => {
+    setStripeTestBanner(null);
+    setTestLoading(true);
+    try {
+      const payload = {};
+      const pk = stripePk.trim();
+      const sk = stripeSk.trim();
+      if (pk) payload.stripe_publishable_key = pk;
+      if (sk) payload.stripe_secret_key = sk;
+      const r = await getMedusaAdminClient().testPlatformStripeConnection(payload);
+      if (r?.ok) {
+        const extra = r.mode ? ` (${r.mode === "test" ? "Testmodus" : "Live"})` : "";
+        setStripeTestBanner({ tone: "success", text: `${r.message || "Verbindung erfolgreich."}${extra}` });
+      } else {
+        setStripeTestBanner({
+          tone: "critical",
+          text: r?.message || "Stripe-Verbindung fehlgeschlagen.",
+        });
+      }
+    } catch (e) {
+      setStripeTestBanner({ tone: "critical", text: e?.message || "Anfrage fehlgeschlagen." });
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     setErr("");
     setOk("");
     try {
+      const prevPk = (meta?.stripe_publishable_key || "").trim();
+      const pkChanged = stripePk.trim() !== prevPk;
+      if (pkChanged && !stripeSk.trim()) {
+        setErr(
+          "Publishable Key wurde geändert, aber das Secret-Feld ist leer — der alte Secret Key in der Datenbank bleibt aktiv. Zahlungen laufen weiterhin über das alte Stripe-Konto. Tragen Sie das neue Secret Key (sk_…) ein und speichern Sie erneut.",
+        );
+        setSaving(false);
+        return;
+      }
       const body = {
         stripe_publishable_key: stripePk.trim(),
         pay_card: payCard,
@@ -144,6 +182,14 @@ export default function SettingsCheckoutPage() {
               Stripe-Schlüssel und aktivierte Zahlarten für den Shop-Checkout. Nur Superuser. PayPal/Klarna laufen über Stripe, falls Sie sie im Stripe-Dashboard aktiviert haben.
             </Text>
 
+            {(meta?.env_stripe_secret || meta?.env_stripe_publishable) ? (
+              <Banner tone="info">
+                <Text as="p" variant="bodySm">
+                  Auf Render/Vercel gesetzte STRIPE_* Umgebungsvariablen werden für den Shop-Checkout nicht verwendet. Maßgeblich sind ausschließlich die in Sellercentral gespeicherten Schlüssel (Datenbank).
+                </Text>
+              </Banner>
+            ) : null}
+
             {err ? (
               <Banner tone="critical" onDismiss={() => setErr("")}>
                 <Text>{err}</Text>
@@ -161,7 +207,7 @@ export default function SettingsCheckoutPage() {
                   Stripe
                 </Text>
                 <Text tone="subdued" variant="bodySm">
-                  Publishable Key (pk_…) und Secret (sk_…) werden ausschließlich aus diesen Sellercentral-Einstellungen gelesen. Leeres Secret-Feld lässt den gespeicherten Wert unverändert.
+                  Publishable (pk_…) und Secret (sk_…) müssen zum selben Stripe-Konto gehören. Leeres Secret-Feld beim Speichern lässt den bisherigen Secret Key in der Datenbank unverändert — nur publishable zu ändern reicht nicht; ohne neues Secret bleiben alle Zahlungen beim alten Konto.
                 </Text>
                 <TextField label="Stripe Publishable Key" value={stripePk} onChange={setStripePk} autoComplete="off" />
                 <TextField
@@ -176,6 +222,11 @@ export default function SettingsCheckoutPage() {
                       : "Noch kein Secret nur in der Datenbank"
                   }
                 />
+                {stripeTestBanner ? (
+                  <Banner tone={stripeTestBanner.tone} onDismiss={() => setStripeTestBanner(null)}>
+                    <Text as="p" variant="bodySm">{stripeTestBanner.text}</Text>
+                  </Banner>
+                ) : null}
               </BlockStack>
             </Card>
 
@@ -214,9 +265,17 @@ export default function SettingsCheckoutPage() {
               </BlockStack>
             </Card>
 
-            <Button variant="primary" onClick={save} loading={saving}>
-              Speichern
-            </Button>
+            <InlineStack gap="300" blockAlign="center">
+              <Button variant="primary" onClick={save} loading={saving}>
+                Speichern
+              </Button>
+              <Button onClick={testStripe} loading={testLoading} disabled={saving}>
+                Stripe-Verbindung testen
+              </Button>
+            </InlineStack>
+            <Text as="p" tone="subdued" variant="bodySm">
+              Der Test ruft bei Stripe balance.retrieve auf — Secret aus dem Formular, oder wenn leer das zuletzt gespeicherte Secret aus der Datenbank. Der Publishable Key wird nur auf Test/Live-Konsistenz gegenüber dem Secret geprüft.
+            </Text>
           </BlockStack>
         </Layout.Section>
       </Layout>

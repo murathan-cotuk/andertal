@@ -889,7 +889,7 @@ const SHOP_CCY_LABELS = {
 };
 
 export default function ShopHeader() {
-  const { showHeaderFilterBar } = useLandingChrome();
+  const { showHeaderFilterBar, landingHeaderBg } = useLandingChrome();
   const ctxPrefix = useMarketPrefix();
   const pathname = usePathname() || "/";
   const marketParsed =
@@ -1313,12 +1313,18 @@ export default function ShopHeader() {
         style={{
           transform: hideHeaderCompletely ? "translateY(-100%)" : "translateY(0)",
           zIndex: localeDropdownOpen ? 2147483650 : undefined,
+          ...(isNarrowViewport && landingHeaderBg ? { background: landingHeaderBg } : {}),
         }}
       >
         <TopBarWrap $visible={atTop}>
           <TopBar />
         </TopBarWrap>
-        <MiddleBarWrap ref={middleBarRef} className="shop-header-main" $mobileSearchCompact={isMobileSearchCompact}>
+        <MiddleBarWrap
+          ref={middleBarRef}
+          className="shop-header-main"
+          $mobileSearchCompact={isMobileSearchCompact}
+          style={isNarrowViewport && landingHeaderBg ? { background: "transparent" } : undefined}
+        >
           <MiddleBarInner $mobileSearchCompact={isMobileSearchCompact}>
             <NarrowHeaderChrome $hide={isMobileSearchCompact}>
               <MiddleBarLeft>
@@ -1597,10 +1603,28 @@ export default function ShopHeader() {
           </CategoryMegaInner>
         </CategoryMegaPanel>
 
-        <SubNavWrap id="subnav" className="second-nav" $hide={!showSubNav || !showHeaderFilterBar}>
+        <SubNavWrap
+          id="subnav"
+          className="second-nav"
+          $hide={!showSubNav || !showHeaderFilterBar}
+          style={isNarrowViewport && landingHeaderBg ? { background: "transparent", borderTop: "none", borderBottom: "none" } : undefined}
+        >
           <SecondMenuRowInner>
             {secondMenuItems.map((item) => (
-              <SecondLink key={item.id} href={menuItemHref(item)}>{item.label}</SecondLink>
+              <SecondLink
+                key={item.id}
+                href={menuItemHref(item)}
+                style={isNarrowViewport && landingHeaderBg ? {
+                  background: "rgba(255,255,255,0.3)",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.45)",
+                  borderRadius: 20,
+                  padding: "4px 12px",
+                } : undefined}
+              >
+                {item.label}
+              </SecondLink>
             ))}
           </SecondMenuRowInner>
         </SubNavWrap>

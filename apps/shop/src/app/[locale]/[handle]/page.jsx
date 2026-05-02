@@ -656,10 +656,14 @@ export default function CollectionPage() {
 
   /** Nur explizit verknüpfte Kategorien (metadata.collection_id === Collection-UUID): keine Slug-Heuristik,
    * damit freistehende Kollektionen (z. B. „Sales“ ohne Kategorie) keine fremden Subkategorien anzeigen. */
-  const findCategoryByCollection = (nodes, col) => {
+  /** WeakSet breaks cycles in malformed category trees (would otherwise overflow the stack). */
+  const findCategoryByCollection = (nodes, col, seen = new WeakSet()) => {
     if (!Array.isArray(nodes) || !col?.id) return null;
     const colId = String(col.id);
     for (const node of nodes) {
+      if (!node || typeof node !== "object") continue;
+      if (seen.has(node)) continue;
+      seen.add(node);
       let meta = node?.metadata && typeof node.metadata === "object" ? node.metadata : {};
       if (typeof node?.metadata === "string") {
         try {
@@ -672,19 +676,22 @@ export default function CollectionPage() {
       if (linkedCollectionId && linkedCollectionId === colId) {
         return node;
       }
-      const nested = findCategoryByCollection(node?.children || [], col);
+      const nested = findCategoryByCollection(node?.children || [], col, seen);
       if (nested) return nested;
     }
     return null;
   };
 
-  const findCategoryBySlug = (nodes, slug) => {
+  const findCategoryBySlug = (nodes, slug, seen = new WeakSet()) => {
     const wanted = String(slug || "").replace(/^\//, "").toLowerCase();
     if (!wanted) return null;
     for (const node of nodes || []) {
+      if (!node || typeof node !== "object") continue;
+      if (seen.has(node)) continue;
+      seen.add(node);
       const nodeSlug = String(node?.slug || node?.handle || "").replace(/^\//, "").toLowerCase();
       if (nodeSlug === wanted) return node;
-      const nested = findCategoryBySlug(node?.children || [], wanted);
+      const nested = findCategoryBySlug(node?.children || [], wanted, seen);
       if (nested) return nested;
     }
     return null;

@@ -296,6 +296,7 @@ function newContainer(type) {
         aspect_ratio_custom: "",
         aspect_ratio_mobile: "",
         aspect_ratio_mobile_custom: "",
+        mobile_item_width: "",
         min_height_mobile: "",
         max_height: "",
         max_height_mobile: "",
@@ -1098,7 +1099,16 @@ const IMAGE_CAROUSEL_ASPECT_OPTIONS = [
 ];
 const MOBILE_ASPECT_LIKE_DESKTOP = IMAGE_CAROUSEL_ASPECT_OPTIONS;
 
-/** Shop ≤1023px: eine Zeile vs. Raster pro „Seite“ (nach rechts wischen) */
+const GRADIENT_DIRECTION_OPTIONS = [
+  { label: “Yukarıdan aşağıya (to bottom)”, value: “to bottom” },
+  { label: “Aşağıdan yukarıya (to top)”, value: “to top” },
+  { label: “Soldan sağa (to right)”, value: “to right” },
+  { label: “Sağdan sola (to left)”, value: “to left” },
+  { label: “Sol üstten sağ alta (diagonal)”, value: “to bottom right” },
+  { label: “Sağ üstten sol alta (diagonal)”, value: “to bottom left” },
+];
+
+/** Shop ≤1023px: eine Zeile vs. Raster pro „Seite” (nach rechts wischen) */
 const LANDING_MOBILE_CAROUSEL_LAYOUT = [
   { label: "Eine Zeile wischen (klassisch)", value: "row" },
   { label: "Raster: Spalten×Zeilen, seitlich wischen", value: "grid" },
@@ -1149,18 +1159,25 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
             <Text as="p" variant="bodySm" tone="subdued">Başlık ve görsel sayısı ayarı.</Text>
             <TextField label="Abschnitt-Titel (optional)" value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" placeholder="z. B. Unsere Kollektionen" />
             <div style={EDITOR_FIELD_GRID}>
-              <TextField
-                label="Bilder pro Zeile"
-                type="number"
-                value={String(isMobileView ? (container.items_per_row_mobile || 2) : (container.items_per_row || 4))}
-                onChange={(v) => onChange({
-                  ...container,
-                  ...(isMobileView ? { items_per_row_mobile: Number(v) || 2 } : { items_per_row: Number(v) || 4 }),
-                })}
-                autoComplete="off"
-              />
+              {!isMobileView && (
+                <TextField
+                  label="Bilder pro Zeile (Desktop)"
+                  type="number"
+                  value={String(container.items_per_row || 4)}
+                  onChange={(v) => onChange({ ...container, items_per_row: Number(v) || 4 })}
+                  autoComplete="off"
+                />
+              )}
               {isMobileView ? (
                 <>
+                  <TextField
+                    label="Görsel genişliği (CSS değeri)"
+                    value={container.mobile_item_width != null ? String(container.mobile_item_width) : ""}
+                    onChange={(v) => onChange({ ...container, mobile_item_width: v })}
+                    autoComplete="off"
+                    placeholder="Örn: 82vw, 280px, calc(100vw - 48px)"
+                    helpText="Boş bırakırsan oran bazlı px değeri kullanılır."
+                  />
                   <Select
                     label="Görsel yönü (kare / dikey / yatay)"
                     options={MOBILE_ASPECT_LIKE_DESKTOP}
@@ -1255,6 +1272,31 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
                       placeholder="Text eingeben…"
                       minHeight="120px"
                     />
+                    <Divider />
+                    <Text as="p" variant="bodySm" tone="subdued">Header degrade rengi (bu konteyner 1. sıradaysa aktif olur)</Text>
+                    <ColorField
+                      label="Degrade rengi"
+                      value={img.color || ""}
+                      onChange={(v) => updateImg(idx, "color", v)}
+                    />
+                    {img.color && (
+                      <>
+                        <Select
+                          label="Degrade yönü"
+                          options={GRADIENT_DIRECTION_OPTIONS}
+                          value={img.gradient_direction || "to bottom"}
+                          onChange={(v) => updateImg(idx, "gradient_direction", v)}
+                        />
+                        <TextField
+                          label="Degrade durma noktası"
+                          value={img.gradient_stop != null ? String(img.gradient_stop) : ""}
+                          onChange={(v) => updateImg(idx, "gradient_stop", v)}
+                          autoComplete="off"
+                          placeholder="Örn: 80%"
+                          helpText="Rengin şeffafa döndüğü nokta (0%=anında, 100%=header'ın tamamı)"
+                        />
+                      </>
+                    )}
                   </BlockStack>
                 </Card>
               ))}

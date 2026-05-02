@@ -4730,8 +4730,12 @@ async function start() {
       return r.rows?.[0] || null
     }
 
+    /** Shop-Checkout nutzt ausschließlich Sellercentral (DB). Render/Vercel STRIPE_* Env wird ignoriert. */
     const resolveStripeSecretKeyFromPlatform = (row) =>
       row ? (row.stripe_secret_key || '').toString().trim() : ''
+
+    const resolveStripePublishableFromPlatform = (row) =>
+      row ? (row.stripe_publishable_key || '').toString().trim() : ''
 
     const paymentMethodTypesFromPlatformRow = (row) => {
       const payCard = !row || row.pay_card !== false
@@ -4756,6 +4760,8 @@ async function start() {
         const sk = (row?.stripe_secret_key || '').toString()
         const pk = (row?.stripe_publishable_key || '').toString()
         const psec = (row?.paypal_client_secret || '').toString()
+        const envSk = !!(process.env.STRIPE_SECRET_KEY || '').toString().trim()
+        const envPk = !!(process.env.STRIPE_PUBLISHABLE_KEY || '').toString().trim()
         res.json({
           stripe_publishable_key: pk,
           stripe_secret_key_set: sk.length > 0,
@@ -4766,8 +4772,8 @@ async function start() {
           paypal_client_id: (row?.paypal_client_id || '').toString(),
           paypal_client_secret_set: psec.length > 0,
           paypal_client_secret_hint: psec.length >= 4 ? `…${psec.slice(-4)}` : '',
-          env_stripe_secret: false,
-          env_stripe_publishable: false,
+          env_stripe_secret: envSk,
+          env_stripe_publishable: envPk,
         })
       } catch (err) {
         try { await client.end() } catch (_) {}
@@ -4826,8 +4832,76 @@ async function start() {
       }
     }
 
+    /** Superuser: Stripe Secret gegen die API prüfen (balance.retrieve); optional PK/SK aus Body für Test vor dem Speichern */
+    const platformCheckoutTestStripePOST = async (req, res) => {
+      const body = req.body || {}
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ ok: false, message: 'Database not configured' })
+      try {
+        await client.connect()
+        const row = await loadPlatformCheckoutRow(client)
+        await client.end()
+
+        const pkForm = (body.stripe_publishable_key || '').toString().trim()
+        const skForm = (body.stripe_secret_key || '').toString().trim()
+        const pkDb = (row?.stripe_publishable_key || '').toString().trim()
+        const skDb = (row?.stripe_secret_key || '').toString().trim()
+        const pk = pkForm || pkDb
+        const sk = skForm || skDb
+
+        if (!sk) {
+          return res.json({
+            ok: false,
+            message:
+              'Kein Secret Key — bitte im Formular eintragen oder zuerst mit „Speichern“ in der Datenbank speichern.',
+          })
+        }
+
+        const stripeModeFromKey = (k) => {
+          if (!k || typeof k !== 'string') return null
+          if (k.includes('_test_')) return 'test'
+          if (k.includes('_live_')) return 'live'
+          return null
+        }
+        const skMode = stripeModeFromKey(sk)
+        const pkMode = stripeModeFromKey(pk)
+        if (pk && skMode && pkMode && skMode !== pkMode) {
+          return res.json({
+            ok: false,
+            message:
+              'Publishable Key und Secret Key passen nicht zum selben Modus (einer ist Test, der andere Live). Beide müssen aus demselben Stripe-Konto und derselben Umgebung stammen.',
+          })
+        }
+
+        const stripe = new (require('stripe'))(sk)
+        await stripe.balance.retrieve()
+        return res.json({
+          ok: true,
+          message: 'Verbindung erfolgreich — Stripe hat den Secret Key akzeptiert.',
+          mode: skMode || undefined,
+        })
+      } catch (err) {
+        const raw = err && err.raw && typeof err.raw === 'object' ? err.raw : {}
+        const msg = raw.message || err.message || String(err)
+        const type = raw.type || err.type
+        const code = raw.code || err.code
+        return res.json({
+          ok: false,
+          message: msg,
+          stripe_type: type,
+          stripe_code: code,
+        })
+      }
+    }
+
     httpApp.get('/admin-hub/v1/platform-checkout-settings', requireSellerAuth, requireSuperuser, platformCheckoutSettingsGET)
     httpApp.put('/admin-hub/v1/platform-checkout-settings', requireSellerAuth, requireSuperuser, platformCheckoutSettingsPUT)
+    httpApp.post(
+      '/admin-hub/v1/platform-checkout-settings/test-stripe',
+      requireSellerAuth,
+      requireSuperuser,
+      platformCheckoutTestStripePOST,
+    )
 
     // Store API: public seller settings (store name) for "Sold by" on shop
     const storeSellerSettingsGET = async (req, res) => {
@@ -6250,7 +6324,7 @@ async function start() {
         const secretKeyResolved = resolveStripeSecretKeyFromPlatform(platformRow)
         if (!secretKeyResolved) {
           await client.end()
-          return res.status(503).json({ message: 'STRIPE_SECRET_KEY not configured (set in environment or Sellercentral → Settings → Checkout)' })
+          return res.status(503).json({ message: 'Stripe Secret Key nicht konfiguriert — Sellercentral → Einstellungen → Checkout speichern.' })
         }
 
         const paymentMethodTypes = paymentMethodTypesFromPlatformRow(platformRow)
@@ -7981,7 +8055,7 @@ async function start() {
         await client.connect()
         const row = await loadPlatformCheckoutRow(client)
         await client.end()
-        const dbPk = (row?.stripe_publishable_key || '').toString().trim()
+        const dbPk = resolveStripePublishableFromPlatform(row)
         res.json({
           stripe_publishable_key: dbPk || null,
           payment_method_types: paymentMethodTypesFromPlatformRow(row),
@@ -14882,7 +14956,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
       const platformRow = await loadPlatformCheckoutRowFresh()
       const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
-      if (!secretKey) return res.status(503).json({ message: 'Stripe not configured. Set STRIPE_SECRET_KEY in Settings → Checkout.' })
+      if (!secretKey) return res.status(503).json({ message: 'Stripe nicht konfiguriert — Sellercentral → Einstellungen → Checkout (Secret Key in DB).' })
 
       const stripe = new (require('stripe'))(secretKey)
       const client = getSellerDbClient()

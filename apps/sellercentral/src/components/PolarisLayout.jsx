@@ -61,28 +61,81 @@ const GroupedDropdownSearch = dynamic(
   { ssr: false, loading: () => <div style={{ width: "100%", maxWidth: 400, height: 36 }} /> }
 );
 
-const buildSuperuserLabel = (label) => (
-  <span style={{ color: "#831c1c", fontWeight: 600 }}>{label}</span>
-);
-
-const styleSuperuserOnlyNavItems = (items, isSuperuser) => {
+/**
+ * Polaris Navigation.Section passes `key: label` to Item — label must stay a string, not a React node.
+ * Strip our meta flags so unknown props are not forwarded into Navigation.Item.
+ */
+function sanitizePolarisNavItems(items) {
   if (!Array.isArray(items)) return [];
   return items.map((item) => {
+    const { superuserOnly, ...rest } = item;
     const subNavigationItems = Array.isArray(item.subNavigationItems)
       ? item.subNavigationItems.map((sub) => {
-          return {
-            ...sub,
-            label: isSuperuser && sub.superuserOnly ? buildSuperuserLabel(sub.label) : sub.label,
-          };
+          const { superuserOnly: _su, ...subRest } = sub;
+          return subRest;
         })
       : item.subNavigationItems;
+    return { ...rest, subNavigationItems };
+  });
+}
+
+/** Href path fragments for superuser-only entries (matches locale-prefixed URLs). */
+const SUPERUSER_NAV_HREF_FRAGMENTS = [
+  "/products/collections",
+  "/orders/abandoned-checkouts",
+  "/sellers-menu",
+  "/sellers",
+  "/content/menus",
+  "/content/categories",
+  "/content/landing-page",
+  "/content/styles",
+  "/content/pages",
+  "/content/blog-posts",
+  "/content/flows",
+  "/analytics/live-view",
+];
+
+const SUPERUSER_NAV_ACCENT_CSS = `${SUPERUSER_NAV_HREF_FRAGMENTS.map(
+  (frag) => `.Polaris-Navigation a[href*="${frag}"]`,
+).join(",")}{color:#601b1b!important;font-weight:600!important;}`;
+
+/** Polaris Navigation.Section uses `label` as React key — must never be a React element / object. */
+function coercePolarisNavLabel(label, urlFallback = "") {
+  if (React.isValidElement(label)) {
+    const seg = String(urlFallback || "").split("/").filter(Boolean).pop() || "menu";
+    return seg.charAt(0).toUpperCase() + seg.slice(1).replace(/-/g, " ");
+  }
+  if (typeof label === "string") return label;
+  if (typeof label === "number" || typeof label === "bigint") return String(label);
+  if (label == null || typeof label === "boolean") {
+    const u = String(urlFallback || "");
+    return u.replace(/^\//, "") || "Menu";
+  }
+  const u = String(urlFallback || "");
+  return u.replace(/^\//, "") || "Menu";
+}
+
+/** Strip ids and unknown shapes before Polaris Navigation (Section passes keys from labels internally). */
+function finalizePolarisSectionItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => {
+    const { id: _dropTopId, ...rest } = item;
+    const subNavigationItems = Array.isArray(rest.subNavigationItems)
+      ? rest.subNavigationItems.map((sub) => {
+          const { id: _sid, ...subRest } = sub;
+          return {
+            ...subRest,
+            label: coercePolarisNavLabel(subRest.label, subRest.url),
+          };
+        })
+      : rest.subNavigationItems;
     return {
-      ...item,
-      label: isSuperuser && item.superuserOnly ? buildSuperuserLabel(item.label) : item.label,
+      ...rest,
+      label: coercePolarisNavLabel(rest.label, rest.url),
       subNavigationItems,
     };
   });
-};
+}
 
 function getMenuItemsMain(t, isSuperuser = false) {
   const tx = (key, fallback) => {
@@ -211,23 +264,6 @@ const NAV_VIRTUAL_URL_FALLBACK = {
   "/customers-menu": "/customers",
   "/sellers-menu": "/sellers",
 };
-
-function withStableNavIds(items = [], sectionPrefix = "main") {
-  return items.map((item, index) => {
-    const baseId = `${sectionPrefix}:${item?.url || "item"}:${index}`;
-    const subNavigationItems = Array.isArray(item?.subNavigationItems)
-      ? item.subNavigationItems.map((sub, subIndex) => ({
-          ...sub,
-          id: `${baseId}:sub:${sub?.url || "item"}:${subIndex}`,
-        }))
-      : item?.subNavigationItems;
-    return {
-      ...item,
-      id: baseId,
-      subNavigationItems,
-    };
-  });
-}
 
 const isModifiedOrNewTabClick = (e) => {
   if (!e) return false;
@@ -867,10 +903,7 @@ export default function PolarisLayout({ children }) {
       });
   };
 
-  const menuMain = styleSuperuserOnlyNavItems(
-    filterNavForRole(getMenuItemsMain(t, isSuperuser)),
-    isSuperuser
-  );
+  const menuMain = sanitizePolarisNavItems(filterNavForRole(getMenuItemsMain(t, isSuperuser)));
   const menuSettings = getMenuItemsSettings(t, isSuperuser);
   const navLocation = pathname && pathname !== "" ? pathname : "/";
 
@@ -881,7 +914,7 @@ export default function PolarisLayout({ children }) {
       contextControl={polarisLogoContextControl}
     >
       <Navigation.Section
-        items={withStableNavIds(menuMain, "main").map((item) => {
+        items={finalizePolarisSectionItems(menuMain).map((item) => {
           const hasSub = item.subNavigationItems?.length > 0;
           const shouldToggleOnly = hasSub && PARENT_NAV_URLS.has(item.url);
           // A parent is "selected" (expanded) if we manually toggled it OR a child matches current path
@@ -892,7 +925,6 @@ export default function PolarisLayout({ children }) {
             ? ((shouldToggleOnly && expandedNavKey === item.url) || parentIsActive || childIsActive)
             : undefined;
           return {
-            id: item.id,
             url: item.url,
             label: item.label,
             icon: item.icon,
@@ -907,14 +939,13 @@ export default function PolarisLayout({ children }) {
       <Navigation.Section
         fill
         separator
-        items={withStableNavIds(menuSettings, "settings").map((item) => {
+        items={finalizePolarisSectionItems(menuSettings).map((item) => {
           const hasSub = item.subNavigationItems?.length > 0;
           const shouldToggleOnly = hasSub && PARENT_NAV_URLS.has(item.url);
           const parentIsActive = navLocation === item.url || navLocation.startsWith(item.url + "/");
           const childIsActive = hasSub && item.subNavigationItems.some((s) => navLocation.startsWith(s.url));
           const isSelected = hasSub ? (shouldToggleOnly && expandedNavKey === item.url) || parentIsActive || childIsActive : undefined;
           return {
-            id: item.id,
             url: item.url,
             label: item.label,
             icon: item.icon,
@@ -1012,6 +1043,7 @@ export default function PolarisLayout({ children }) {
         showMobileNavigation={showMobileNav}
         onNavigationDismiss={() => setShowMobileNav(false)}
       >
+        {isSuperuser ? <style>{SUPERUSER_NAV_ACCENT_CSS}</style> : null}
         {approvalBanner && (
           <div
             style={{

@@ -19,10 +19,18 @@ const intl = createNavigation(routing);
 
 const LOCALE_PREFIX_RE = /^\/(en|de|tr|fr|it|es)(?=\/|$)/i;
 
+/** One market triple: /{cc}/{locale}/{currency} — strip if href was saved with full URL by mistake. */
+const MARKET_TRIPLE_PREFIX_RE =
+  /^\/([a-z]{2})\/(en|de|tr|fr|it|es)\/(eur|gbp|chf|usd|try)(?=\/|$)/i;
+
 function normalizeAppPath(href) {
   if (typeof href !== "string") return "/";
   if (href.startsWith("http://") || href.startsWith("https://")) return href;
   let x = href.startsWith("/") ? href : `/${href}`;
+  let guard = 0;
+  while (MARKET_TRIPLE_PREFIX_RE.test(x) && guard++ < 8) {
+    x = x.replace(MARKET_TRIPLE_PREFIX_RE, "") || "/";
+  }
   x = x.replace(LOCALE_PREFIX_RE, "") || "/";
   return x;
 }

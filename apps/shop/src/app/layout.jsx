@@ -53,8 +53,18 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      translate="no"
+      className="notranslate"
+      suppressHydrationWarning
+    >
       <head>
+        {/*
+          Chrome “Bu sayfayı çevir”, DOM’a müdahale ederek React/styled-components ile uyumsuzluk ve footer/grid dağılması yapıyor.
+          Dil için yerleşik locale rotaları ve dil seçici kullanılıyor (next-intl).
+        */}
+        <meta name="google" content="notranslate" />
         <link
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -62,7 +72,7 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <ShopStylesInjector />
         {children}
       </body>

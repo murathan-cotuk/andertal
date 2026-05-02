@@ -2013,27 +2013,68 @@ function pickImageCarouselRatio(container, isNarrow) {
   return desktop;
 }
 
-function ImageCarousel({ container, locale = "de" }) {
+function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
   const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
   const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
   const isNarrow = useIsNarrow(1023);
   const images = (container.images || []).filter((i) => i.url);
+  const { setLandingHeaderBg } = useLandingChrome();
+  const mobileScrollRef = useRef(null);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  // Track active slide for header gradient
+  useEffect(() => {
+    if (!isNarrow || !isFirstContainer) return;
+    const el = mobileScrollRef.current;
+    if (!el) return;
+    const update = () => {
+      const children = Array.from(el.children);
+      const cCenter = el.scrollLeft + el.clientWidth / 2;
+      let best = 0, bestDist = Infinity;
+      children.forEach((item, i) => {
+        const dist = Math.abs((item.offsetLeft + item.offsetWidth / 2) - cCenter);
+        if (dist < bestDist) { bestDist = dist; best = i; }
+      });
+      setActiveIdx(best);
+    };
+    el.addEventListener("scroll", update, { passive: true });
+    update();
+    return () => el.removeEventListener("scroll", update);
+  }, [isNarrow, isFirstContainer]);
+
+  useEffect(() => {
+    if (!isFirstContainer) return;
+    const img = images[activeIdx];
+    if (img?.color) {
+      const dir = img.gradient_direction || "to bottom";
+      const stop = img.gradient_stop || "80%";
+      setLandingHeaderBg(`linear-gradient(${dir}, ${img.color} 0%, transparent ${stop})`);
+    } else {
+      setLandingHeaderBg(null);
+    }
+  }, [activeIdx, isFirstContainer, images, setLandingHeaderBg]);
+
+  // Clear gradient on unmount
+  useEffect(() => {
+    return () => setLandingHeaderBg(null);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!images.length) return null;
   const baseGap = container.gap != null ? Number(container.gap) : 16;
   const gapMobile = container.gap_mobile != null ? Number(container.gap_mobile) : null;
   const gap = isNarrow && gapMobile != null && !Number.isNaN(gapMobile) ? gapMobile : (Number.isNaN(baseGap) ? 16 : baseGap);
   const bg = container.bg_color || "#fff";
   const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
-  // Image carousel editor only exposes horizontal padding controls.
-  // Force vertical padding to 0 so "top spacing" is controlled by margin only.
   const rawPad = getContainerPadding(container, "0px 24px 0px 24px");
   const carouselPadding = { ...rawPad, paddingTop: 0, paddingBottom: 0 };
   const maxHDesktop = container.max_height != null ? String(container.max_height).trim() : "";
   const maxHMobile = container.max_height_mobile != null ? String(container.max_height_mobile).trim() : "";
   const mobileRatio = pickImageCarouselRatio(container, true);
   const mobileRatioNum = aspectRatioToNumber(mobileRatio, 0.8);
-  const mobileItemWidth = Math.max(110, Math.min(320, Math.round(260 * mobileRatioNum)));
+  const mobileItemWidthPx = Math.max(110, Math.min(320, Math.round(260 * mobileRatioNum)));
+  // mobile_item_width accepts any CSS length (vw, %, px). Falls back to calculated px value.
+  const mobileItemW = String(container.mobile_item_width || "").trim() || `${mobileItemWidthPx}px`;
 
   const renderImageCell = (img) => {
     const src = resolveUrl(img.url);
@@ -2092,14 +2133,63 @@ function ImageCarousel({ container, locale = "de" }) {
     );
   }
 
+  // Mobile: native scroll-snap peek carousel
+  // First image left-anchored, middle images center-snapped, last image right-anchored.
+  // Edge padding (from container padding settings) applies only to first and last items.
+  if (isNarrow) {
+    const padLeft = rawPad.paddingLeft || "0px";
+    const padRight = rawPad.paddingRight || "0px";
+    const title = lt(container, "title", locale);
+    return (
+      <div style={{ background: bg }}>
+        {title && (
+          <div style={{ padding: `0 ${padLeft}`, marginBottom: 12 }}>
+            <h2 style={{ fontSize: "clamp(1rem, 2vw, 1.375rem)", fontWeight: 600, margin: 0 }}>{title}</h2>
+          </div>
+        )}
+        <div
+          ref={mobileScrollRef}
+          style={{
+            display: "flex",
+            gap: `${gap}px`,
+            overflowX: "auto",
+            scrollSnapType: "x mandatory",
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+        >
+          {images.map((img, i) => {
+            const isFirst = i === 0;
+            const isLast = i === images.length - 1;
+            return (
+              <div
+                key={i}
+                style={{
+                  flexShrink: 0,
+                  width: mobileItemW,
+                  minWidth: mobileItemW,
+                  scrollSnapAlign: isFirst ? "start" : isLast ? "end" : "center",
+                  ...(isFirst ? { marginLeft: padLeft } : {}),
+                  ...(isLast ? { marginRight: padRight, scrollMarginRight: padRight } : {}),
+                }}
+              >
+                {renderImageCell(img)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...carouselPadding, background: bg }}>
       <div style={getContentInnerStyle(container, 1280)}>
         <Carousel
           contained={false}
           title={lt(container, "title", locale) || undefined}
-          visibleCount={isNarrow ? undefined : itemsPerRow}
-          itemWidth={isNarrow ? mobileItemWidth : 260}
+          visibleCount={itemsPerRow}
           navOnSides
           gap={gap}
           ariaLabel={lt(container, "title", locale) || "Bild-Karussell"}
@@ -2119,20 +2209,18 @@ function ImageCarousel({ container, locale = "de" }) {
 function renderContainer(c, preload = {}, ctx = {}) {
   if (!c.visible) return null;
   const v = c.visible_on || "desktop";
-  // Tablet-specific containers: only show in tablet range (600–1199px)
+  // Strict device isolation: each container only renders on its designated device range.
+  // mobile (< 600px), tablet (600–1199px), desktop (≥ 1200px)
   if (v === "tablet") {
     if (!ctx.isTablet) return null;
   } else if (v === "desktop") {
-    // Hide desktop on narrow (mobile) AND tablet — tablet has its own containers
     if (ctx.isNarrow || ctx.isTablet) return null;
   } else if (v === "mobile") {
-    // Hide on wide desktop
-    if (!ctx.isNarrow && !ctx.isTablet) return null;
-    // On tablet: hide mobile if tablet-specific containers exist (otherwise fall back to mobile)
-    if (ctx.isTablet && ctx.hasTabletContainers) return null;
+    // Show only on true mobile (isNarrow but NOT tablet, i.e. < 600px)
+    if (!ctx.isNarrow || ctx.isTablet) return null;
   } else if (v === "both") {
-    // Legacy: shown on desktop + mobile; on tablet fall back to this if no tablet containers
-    if (ctx.isTablet && ctx.hasTabletContainers) return null;
+    // Legacy "both": desktop + mobile, never tablet
+    if (ctx.isTablet) return null;
   }
   const locale = ctx.locale || "de";
   let inner = null;
@@ -2144,7 +2232,7 @@ function renderContainer(c, preload = {}, ctx = {}) {
     case "video_block":         inner = <VideoBlock container={c} locale={locale} />; break;
     case "image_text":           inner = <ImageText container={c} locale={locale} />; break;
     case "image_grid":           inner = <ImageGrid container={c} locale={locale} />; break;
-    case "image_carousel":       inner = <ImageCarousel container={c} locale={locale} />; break;
+    case "image_carousel":       inner = <ImageCarousel container={c} locale={locale} isFirstContainer={ctx.firstVisibleId === c.id} />; break;
     case "banner_cta":           inner = <BannerCta container={c} locale={locale} />; break;
     case "collection_carousel":  inner = <CollectionCarousel container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
     case "content_mosaic":       inner = <ContentMosaic container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
@@ -2279,11 +2367,22 @@ export default function LandingContainers({ pageId, categoryId }) {
   if (!containers) return null;
   if (containers.length === 0) return null;
 
-  const hasTabletContainers = containers.some((c) => c.visible_on === "tablet");
+  // First container that will actually render on the current device (for header gradient)
+  const firstVisibleId = (() => {
+    for (const c of containers) {
+      if (!c.visible) continue;
+      const v = c.visible_on || "desktop";
+      if (v === "tablet" && isTablet) return c.id;
+      if (v === "desktop" && !isNarrow && !isTablet) return c.id;
+      if (v === "mobile" && isNarrow && !isTablet) return c.id;
+      if (v === "both" && !isTablet) return c.id;
+    }
+    return null;
+  })();
 
   return (
     <div>
-      {containers.map((c) => renderContainer(c, preload, { isNarrow, isTablet, hasTabletContainers, locale }))}
+      {containers.map((c) => renderContainer(c, preload, { isNarrow, isTablet, locale, firstVisibleId }))}
     </div>
   );
 }

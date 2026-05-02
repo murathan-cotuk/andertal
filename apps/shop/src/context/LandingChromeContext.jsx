@@ -6,27 +6,35 @@ import { usePathname } from "next/navigation";
 const LandingChromeContext = createContext({
   showHeaderFilterBar: true,
   setLandingHeaderFilterBar: () => {},
+  landingHeaderBg: null,
+  setLandingHeaderBg: () => {},
 });
 
 /**
- * Steuert Shop-Chrome abhängig von Landing-Page-Settings (z. B. zweite Navigationszeile).
- * Pro Routenwechsel wird auf Standard (sichtbar) zurückgesetzt; LandingContainers setzt den Wert nach dem API-Load.
+ * Steuert Shop-Chrome abhängig von Landing-Page-Settings.
+ * Pro Routenwechsel wird auf Standard zurückgesetzt.
  */
 export function LandingChromeProvider({ children }) {
   const [showHeaderFilterBar, setShow] = useState(true);
+  const [landingHeaderBg, setLandingHeaderBg_] = useState(null);
   const pathname = usePathname();
 
   useEffect(() => {
     setShow(true);
+    setLandingHeaderBg_(null);
   }, [pathname]);
 
   const setLandingHeaderFilterBar = useCallback((visible) => {
     setShow(visible !== false);
   }, []);
 
+  const setLandingHeaderBg = useCallback((bg) => {
+    setLandingHeaderBg_(bg || null);
+  }, []);
+
   const value = useMemo(
-    () => ({ showHeaderFilterBar, setLandingHeaderFilterBar }),
-    [showHeaderFilterBar, setLandingHeaderFilterBar],
+    () => ({ showHeaderFilterBar, setLandingHeaderFilterBar, landingHeaderBg, setLandingHeaderBg }),
+    [showHeaderFilterBar, setLandingHeaderFilterBar, landingHeaderBg, setLandingHeaderBg],
   );
 
   return (
