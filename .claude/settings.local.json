@@ -109,7 +109,8 @@
       "Bash(powershell -ExecutionPolicy Bypass -File rename_project.ps1)",
       "Bash(python *)",
       "Bash(where stripe *)",
-      "WebFetch(domain:api.andertal.com)"
+      "WebFetch(domain:api.andertal.com)",
+      "Bash(xxd)"
     ]
   }
 }

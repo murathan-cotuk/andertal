@@ -48,6 +48,11 @@ const HEADER_EDIT_SCOPE_OPTIONS = [
   },
 ];
 
+const MOBILE_HEADER_ON_SCROLL_OPTIONS = [
+  { label: "Kaydırınca buzlu beyaz + blur", value: "frosted_white" },
+  { label: "Tema / Landing-Rolle beibehalten", value: "inherit" },
+];
+
 const HEADER_GRADIENT_ANGLE_OPTIONS = [
   { label: "Diagonal ↘ (135°)", value: "135" },
   { label: "Nach unten (180°)", value: "180" },
@@ -1782,6 +1787,82 @@ export default function StylesPage() {
                   label="Oberer Rand (border-top)"
                   value={styles.footer.border_top}
                   onChange={(v) => updateSection("footer", "border_top", v)}
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        {/* Mobil kaydırma + alt menü (≤1023px) */}
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">Mobil: Kaydırma &amp; untere Leiste</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Gilt für schmale/tablet Ansicht (≤1023px). Header beim Scrollen; untere Tab-Leiste (fest oder am Seitenende).
+              </Text>
+              <Divider />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+                <Select
+                  label="Header nach dem Hochscrollen"
+                  options={MOBILE_HEADER_ON_SCROLL_OPTIONS}
+                  value={styles.mobileChrome?.header_on_scroll ?? "frosted_white"}
+                  onChange={(v) => updateSection("mobileChrome", "header_on_scroll", v)}
+                />
+                <TextField
+                  label="Frosted — Hintergrund (CSS)"
+                  value={styles.mobileChrome?.frosted_bg ?? "rgba(255,255,255,0.92)"}
+                  onChange={(v) => updateSection("mobileChrome", "frosted_bg", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Frosted — Unschärfe (blur)"
+                  value={styles.mobileChrome?.frosted_blur ?? "16px"}
+                  onChange={(v) => updateSection("mobileChrome", "frosted_blur", v)}
+                  autoComplete="off"
+                  helpText="z. B. 16px oder blur(20px)"
+                />
+                <Checkbox
+                  label="Header oben fixieren (≤1023px)"
+                  checked={styles.mobileChrome?.header_sticky !== false}
+                  onChange={(v) => updateSection("mobileChrome", "header_sticky", v)}
+                  helpText="Aus = Header scrollt mit der Seite (kein Overlay)."
+                />
+                <Checkbox
+                  label="Untere Leiste am Viewport-Boden fixieren"
+                  checked={styles.mobileChrome?.bottom_nav_sticky !== false}
+                  onChange={(v) => updateSection("mobileChrome", "bottom_nav_sticky", v)}
+                  helpText="Aus = Leiste unter dem Seiteninhalt (nach dem Footer)."
+                />
+                <Checkbox
+                  label="Untere Leiste beim Runterscrollen einziehen"
+                  checked={styles.mobileChrome?.bottom_nav_recess_on_scroll === true}
+                  onChange={(v) => updateSection("mobileChrome", "bottom_nav_recess_on_scroll", v)}
+                  helpText="Standard: aus — Leiste bleibt am unteren Rand. Nur wenn die Leiste fixiert ist."
+                />
+                <TextField
+                  label="Untere Leiste — Hintergrund"
+                  value={styles.mobileChrome?.bottom_nav_bg ?? "rgba(255,255,255,0.97)"}
+                  onChange={(v) => updateSection("mobileChrome", "bottom_nav_bg", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Untere Leiste — oberer Rand (border-top)"
+                  value={styles.mobileChrome?.bottom_nav_border_top ?? "1px solid rgba(229,231,235,0.9)"}
+                  onChange={(v) => updateSection("mobileChrome", "bottom_nav_border_top", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Untere Leiste — Unschärfe"
+                  value={styles.mobileChrome?.bottom_nav_blur ?? "12px"}
+                  onChange={(v) => updateSection("mobileChrome", "bottom_nav_blur", v)}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Untere Leiste — Schatten"
+                  value={styles.mobileChrome?.bottom_nav_shadow ?? "0 -2px 12px rgba(0,0,0,0.07)"}
+                  onChange={(v) => updateSection("mobileChrome", "bottom_nav_shadow", v)}
                   autoComplete="off"
                 />
               </div>

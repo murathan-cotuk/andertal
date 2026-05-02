@@ -37,6 +37,7 @@ import ToCartButton from "@/components/ui/To Cart Button";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
+import { useIsNarrow } from "@/hooks/useIsNarrow";
 
 const Container = styled.div`
   max-width: 100%;
@@ -884,6 +885,7 @@ export default function ProductTemplate() {
   const [categoryAncestors, setCategoryAncestors] = useState([]);
   const [categoryCurrentNode, setCategoryCurrentNode] = useState(null);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
+  const narrowMobile = useIsNarrow(767);
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
   const openCartSidebar = cartState?.openCartSidebar ?? (() => {});
@@ -1894,7 +1896,7 @@ export default function ProductTemplate() {
           <Carousel
             contained={false}
             title="Kunden, die diesen Artikel gekauft haben, kauften auch"
-            visibleCount={5}
+            visibleCount={narrowMobile ? 2 : 5}
             gap={16}
             showFade={false}
             navOnSides

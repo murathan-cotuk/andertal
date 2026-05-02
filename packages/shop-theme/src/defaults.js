@@ -167,6 +167,26 @@ export const DEFAULT_SHOP_STYLES = {
     shadow: "0 4px 12px rgba(0,0,0,0.2)",
     border: "none",
   },
+  /** Mobil/tablet (≤1023px): kaydırma davranışı, üst/alt şerit */
+  mobileChrome: {
+    /**
+     * Kaydırınca (sayfa üstünden çıkınca) üst şerit yüzeyi.
+     * frosted_white = tema rengine bakmadan buzlu beyaz; inherit = tema + landing degrade korunur.
+     */
+    header_on_scroll: "frosted_white",
+    frosted_bg: "rgba(255,255,255,0.92)",
+    frosted_blur: "16px",
+    /** false = dar görünümde header sabit overlay değil, sayfa akışında */
+    header_sticky: true,
+    /** false = alt menü viewport’a yapışmaz; sayfa sütununun sonunda (footer altı) */
+    bottom_nav_sticky: true,
+    /** true = aşağı kaydırırken alt çubuğu geçici olarak gizle (yalnızca fixed alt menüde) */
+    bottom_nav_recess_on_scroll: false,
+    bottom_nav_bg: "rgba(255,255,255,0.97)",
+    bottom_nav_border_top: "1px solid rgba(229,231,235,0.9)",
+    bottom_nav_blur: "12px",
+    bottom_nav_shadow: "0 -2px 12px rgba(0,0,0,0.07)",
+  },
   /** Kollektion-Template (shop/[handle]) görünüm ayarları */
   collection_template: {
     banner_style: "strip",    // "strip" | "medium" | "tall" | "none"

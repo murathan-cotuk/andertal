@@ -5,11 +5,24 @@ import { Link } from "@/i18n/navigation";
 
 const DEFAULT_ACCENT = "#1b8880";
 
+function backdropBlurFromToken(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return "blur(0px)";
+  if (/blur\s*\(/i.test(s)) return s;
+  return `blur(${s})`;
+}
+
 export default function ModernMobileBottomNav({
   items = [],
   accentColor = DEFAULT_ACCENT,
-  /** Aşağı kaydırırken çubuğu ekran dışına kaydır (mobil) */
+  /** Aşağı kaydırırken çubuğu ekran dışına kaydır (yalnızca layout=fixed) */
   recessed = false,
+  /** fixed = viewport altı; inline = sayfa akışı (MobileShell flex sonu) */
+  layout = "fixed",
+  surfaceBg,
+  borderTop,
+  blur,
+  boxShadow,
 }) {
   const finalItems = useMemo(() => {
     const valid = Array.isArray(items) && items.length >= 2 && items.length <= 5;
@@ -51,29 +64,35 @@ export default function ModernMobileBottomNav({
 
   if (!finalItems.length) return null;
 
+  const isFixed = layout !== "inline";
+  const blurCss = backdropBlurFromToken(blur ?? "12px");
+
   return (
     <nav
       aria-label="Mobile Navigation"
-      aria-hidden={recessed ? true : undefined}
+      aria-hidden={isFixed && recessed ? true : undefined}
       style={{
         "--component-active-color": accentColor,
         display: "grid",
         gridTemplateColumns: `repeat(${finalItems.length}, minmax(0, 1fr))`,
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
+        position: isFixed ? "fixed" : "relative",
+        bottom: isFixed ? 0 : undefined,
+        left: isFixed ? 0 : undefined,
+        right: isFixed ? 0 : undefined,
+        width: "100%",
+        flexShrink: 0,
         height: "calc(60px + env(safe-area-inset-bottom, 0px))",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        background: "rgba(255,255,255,0.97)",
-        borderTop: "1px solid rgba(229,231,235,0.9)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        boxShadow: "0 -2px 12px rgba(0,0,0,0.07)",
-        zIndex: 2147483640,
-        transition: "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)",
-        transform: recessed ? "translateY(calc(100% + env(safe-area-inset-bottom, 0px)))" : "translateY(0)",
-        pointerEvents: recessed ? "none" : "auto",
+        background: surfaceBg ?? "rgba(255,255,255,0.97)",
+        borderTop: borderTop ?? "1px solid rgba(229,231,235,0.9)",
+        backdropFilter: blurCss,
+        WebkitBackdropFilter: blurCss,
+        boxShadow: boxShadow ?? "0 -2px 12px rgba(0,0,0,0.07)",
+        zIndex: isFixed ? 2147483640 : 100,
+        transition: isFixed ? "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
+        transform:
+          isFixed && recessed ? "translateY(calc(100% + env(safe-area-inset-bottom, 0px)))" : "translateY(0)",
+        pointerEvents: isFixed && recessed ? "none" : "auto",
       }}
     >
       {finalItems.map((item, index) => {

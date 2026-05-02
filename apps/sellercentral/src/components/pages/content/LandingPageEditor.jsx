@@ -1004,6 +1004,37 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
                   helpText="Im Shop: klein und grau, direkt unter dem Bild"
                 />
                 <RichTextEditor label="Text (optional)" value={gi(img, "text", editLang)} onChange={(v) => updateImgI18n(idx, "text", v)} placeholder="Text eingeben…" minHeight="120px" />
+                <div style={EDITOR_FIELD_GRID}>
+                  <TextField
+                    label="Görsel alanı — sol"
+                    value={img.cell_padding_left != null ? String(img.cell_padding_left) : ""}
+                    onChange={(v) => updateImg(idx, "cell_padding_left", v)}
+                    autoComplete="off"
+                    placeholder="0 veya 12px"
+                    helpText="Sayı (px eklenir) veya CSS uzunluğu"
+                  />
+                  <TextField
+                    label="Görsel alanı — sağ"
+                    value={img.cell_padding_right != null ? String(img.cell_padding_right) : ""}
+                    onChange={(v) => updateImg(idx, "cell_padding_right", v)}
+                    autoComplete="off"
+                    placeholder="0 veya 12px"
+                  />
+                  <TextField
+                    label="Görsel alanı — üst"
+                    value={img.cell_padding_top != null ? String(img.cell_padding_top) : ""}
+                    onChange={(v) => updateImg(idx, "cell_padding_top", v)}
+                    autoComplete="off"
+                    placeholder="0"
+                  />
+                  <TextField
+                    label="Görsel alanı — alt"
+                    value={img.cell_padding_bottom != null ? String(img.cell_padding_bottom) : ""}
+                    onChange={(v) => updateImg(idx, "cell_padding_bottom", v)}
+                    autoComplete="off"
+                    placeholder="0"
+                  />
+                </div>
               </BlockStack>
             </Card>
           ))}
@@ -1291,6 +1322,37 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
                       placeholder="Text eingeben…"
                       minHeight="120px"
                     />
+                    <div style={EDITOR_FIELD_GRID}>
+                      <TextField
+                        label="Görsel alanı — sol"
+                        value={img.cell_padding_left != null ? String(img.cell_padding_left) : ""}
+                        onChange={(v) => updateImg(idx, "cell_padding_left", v)}
+                        autoComplete="off"
+                        placeholder="0 veya 12px"
+                        helpText="Sayı (px eklenir) veya CSS uzunluğu"
+                      />
+                      <TextField
+                        label="Görsel alanı — sağ"
+                        value={img.cell_padding_right != null ? String(img.cell_padding_right) : ""}
+                        onChange={(v) => updateImg(idx, "cell_padding_right", v)}
+                        autoComplete="off"
+                        placeholder="0 veya 12px"
+                      />
+                      <TextField
+                        label="Görsel alanı — üst"
+                        value={img.cell_padding_top != null ? String(img.cell_padding_top) : ""}
+                        onChange={(v) => updateImg(idx, "cell_padding_top", v)}
+                        autoComplete="off"
+                        placeholder="0"
+                      />
+                      <TextField
+                        label="Görsel alanı — alt"
+                        value={img.cell_padding_bottom != null ? String(img.cell_padding_bottom) : ""}
+                        onChange={(v) => updateImg(idx, "cell_padding_bottom", v)}
+                        autoComplete="off"
+                        placeholder="0"
+                      />
+                    </div>
                     <Divider />
                     <Text as="p" variant="bodySm" tone="subdued">Header degrade rengi (bu konteyner 1. sıradaysa aktif olur)</Text>
                     <ColorField

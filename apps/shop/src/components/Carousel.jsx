@@ -102,6 +102,11 @@ const SIDE_NAV_WIDTH = 52;
 const CarouselWrap = styled.div`
   position: relative;
   margin: 0 -${tokens.containerPadding};
+
+  /* Dar mobil: üst container genelde 12–16px padding; -24px kartları viewport kenarında kesiyordu */
+  @media (max-width: 767px) {
+    margin: 0 -12px;
+  }
 `;
 
 const NavSide = styled(NavBtn)`
@@ -147,6 +152,11 @@ const Scroll = styled.div`
   @media (pointer: coarse) {
     padding: 12px ${tokens.containerPadding} 20px;
     scroll-padding-inline: 0;
+  }
+
+  @media (max-width: 767px) {
+    padding: 12px max(18px, env(safe-area-inset-left, 0px)) 20px max(18px, env(safe-area-inset-right, 0px));
+    scroll-padding-inline: max(14px, env(safe-area-inset-left, 0px));
   }
 
   @media (prefers-reduced-motion: reduce) {

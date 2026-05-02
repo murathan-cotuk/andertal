@@ -16,7 +16,7 @@ import PostHogProvider from "@/components/PostHogProvider";
 const CartSidebar      = dynamic(() => import("@/components/CartSidebar"),      { ssr: false });
 const ScrollToTopButton = dynamic(() => import("@/components/ScrollToTopButton"), { ssr: false });
 const CookieBanner     = dynamic(() => import("@/components/CookieBanner"),     { ssr: false });
-const MobileNav        = dynamic(() => import("@/components/MobileNav"),        { ssr: false });
+const MobileShell      = dynamic(() => import("@/components/MobileShell"),      { ssr: false });
 
 function LenisInit() {
   useLenis();
@@ -35,13 +35,12 @@ export default function Providers({ children }) {
                 <ShopStylesInjector />
                 <LandingChromeProvider>
                   <LenisInit />
-                  {children}
+                  <MobileShell>{children}</MobileShell>
                 </LandingChromeProvider>
               </ShopStylesProvider>
               <CartSidebar />
               <ScrollToTopButton />
               <CookieBanner />
-              <MobileNav />
             </MobileBottomNavScrollProvider>
           </CartProvider>
         </WishlistProvider>

@@ -21,6 +21,10 @@ const CatalogWrap = styled.div`
       grid-template-columns: repeat(${p.$mobileCols}, minmax(0, 1fr));
       gap: ${MOBILE_GRID_GAP}px;
       align-content: start;
+      /* İki sütunlu şeritte kartlar kenara yapışmasın (koleksiyon / önerilen ürünler) */
+      padding-left: 10px;
+      padding-right: 10px;
+      box-sizing: border-box;
     `}
   }
 

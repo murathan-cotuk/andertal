@@ -15,6 +15,7 @@ import { useWishlist } from "@/context/WishlistContext";
 import { restPathFromPathname } from "@/lib/shop-market";
 import { resolveImageUrl } from "@/lib/image-url";
 import ModernMobileBottomNav from "@/components/ModernMobileBottomNav";
+import { useShopStyles } from "@/context/ShopStylesContext";
 import {
   MOBILE_CHROME_SCROLL_THRESHOLD_PX,
   useMobileBottomNavScroll,
@@ -326,7 +327,9 @@ function categoryListImageUrl(node) {
 }
 
 /* ─── Main component ─────────────────────────────────────── */
-export default function MobileNav() {
+export default function MobileNav({ layout = "fixed" }) {
+  const shopStyles = useShopStyles();
+  const mc = shopStyles?.mobileChrome || {};
   const { mobileBottomNavScroll } = useMobileBottomNavScroll();
   const pathname = usePathname();
   const { isAuthenticated, user, logout } = useAuth();
@@ -445,7 +448,10 @@ export default function MobileNav() {
       ["/orders", "/addresses", "/payment-methods", "/nachrichten", "/reviews", "/bonus", "/invoices"].some(
         (h) => appPath === h || appPath.startsWith(`${h}/`),
       ));
+  /** Yalnızca temada açıkça true — varsayılan her zaman görünür sabit alt çubuk */
   const recessBottomBar =
+    layout === "fixed" &&
+    mc.bottom_nav_recess_on_scroll === true &&
     isMobileNavViewport &&
     !drawerOpen &&
     mobileBottomNavScroll.scrollingDown &&
@@ -605,8 +611,13 @@ export default function MobileNav() {
       {/* ── Bottom Navigation Bar ── */}
       {USE_MODERN_MOBILE_BOTTOM_NAV ? (
         <ModernMobileBottomNav
+          layout={layout}
           accentColor={TEAL}
           recessed={recessBottomBar}
+          surfaceBg={mc.bottom_nav_bg}
+          borderTop={mc.bottom_nav_border_top}
+          blur={mc.bottom_nav_blur}
+          boxShadow={mc.bottom_nav_shadow}
           items={[
             { key: "home", label: "Start", icon: <IcoHome />, href: "/", active: isHome },
             {

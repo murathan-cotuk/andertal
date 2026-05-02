@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useRouter as useNextRouter } from "next/navigation";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -47,6 +48,13 @@ import { extractSolidTintFromChromeCss } from "@/lib/header-status-tint";
 
 /** Yukarı kaydırırken titreşimi süzmek için (alt menüyü tekrar göster) */
 const SCROLL_UP_DELTA = 6;
+
+function backdropBlurFromToken(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return "blur(0px)";
+  if (/blur\s*\(/i.test(s)) return s;
+  return `blur(${s})`;
+}
 /** Ignore “scroll up” when near the document bottom (rubber-band / overscroll / addr. bar) to avoid header ↔ spacer feedback jitter */
 const BOTTOM_IGNORE_SCROLL_UP_PX = 28;
 const MIDDLE_BAR_BG = "#1b8880";
@@ -511,6 +519,7 @@ const MiddleBarRight = styled.div`
   justify-content: flex-end;
   gap: 4px;
   min-width: 0;
+  flex-shrink: 0;
   position: relative;
   z-index: 10;
 `;
@@ -588,8 +597,9 @@ const CategoryMegaPanel = styled.div`
   z-index: 2147483595;
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    position: absolute;
-    top: 100%;
+    /* fixed + top: HeaderWrap transform ile fixed çökmesin — portal body + üst ofset */
+    position: fixed;
+    top: ${(p) => `${Math.max(52, Number(p.$topPx) || 0)}px`};
     left: 0;
     right: 0;
     background: #fff;
@@ -1043,6 +1053,8 @@ export default function ShopHeader() {
     () => buildHeaderSurfaceCssVarsFromRoute(shopStyles, headerRouteScope),
     [shopStyles, headerRouteScope],
   );
+  const mc = shopStyles?.mobileChrome || {};
+  const headerStickyNarrow = mc.header_sticky !== false;
   const marketParsed =
     parseMarketPath(pathname) || (ctxPrefix ? parseMarketPath(ctxPrefix) : null);
   const nextRouter = useNextRouter();
@@ -1054,6 +1066,7 @@ export default function ShopHeader() {
   const middleBarRef = useRef(null);
   const megaMenuTimerRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(72);
+  const [categoryPanelPortalReady, setCategoryPanelPortalReady] = useState(false);
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [hoveredMenuItemId, setHoveredMenuItemId] = useState(null);
   const [shopBranding, setShopBranding] = useState({ shop_logo_url: "", shop_favicon_url: "", shop_logo_height: 34 });
@@ -1156,7 +1169,17 @@ export default function ShopHeader() {
         const headerBg = cs.getPropertyValue("--header-bg").trim() || MIDDLE_BAR_BG;
         const solid = extractSolidTintFromChromeCss(chrome || headerBg, headerBg);
         const themeMeta = ensureThemeMeta();
-        if (landingHeaderBg) {
+        const mcLocal = shopStyles?.mobileChrome || {};
+        const frostedScrollTint =
+          isNarrowViewport &&
+          scrollY > SCROLL_THRESHOLD &&
+          String(mcLocal.header_on_scroll || "") !== "inherit";
+        if (frostedScrollTint) {
+          themeMeta.setAttribute(
+            "content",
+            extractSolidTintFromChromeCss(mcLocal.frosted_bg || "rgba(255,255,255,0.92)", "#ffffff"),
+          );
+        } else if (landingHeaderBg) {
           themeMeta.setAttribute("content", extractSolidTintFromChromeCss(landingHeaderBg, headerBg));
         } else {
           themeMeta.setAttribute("content", solid);
@@ -1170,7 +1193,7 @@ export default function ShopHeader() {
     return () => {
       window.removeEventListener(SHOP_THEME_CSS_UPDATED, onThemeInjected);
     };
-  }, [pathname, shopStyles, headerScopeCssVars, landingHeaderBg]);
+  }, [pathname, shopStyles, headerScopeCssVars, landingHeaderBg, scrollY, isNarrowViewport]);
 
   useEffect(() => {
     const norm = (s) => String(s || "").toLowerCase().trim();
@@ -1312,6 +1335,10 @@ export default function ShopHeader() {
     }
   }, [pathname, publishMobileBottomNavScroll]);
 
+  useEffect(() => {
+    setCategoryPanelPortalReady(true);
+  }, []);
+
   // Track actual header height so the spacer is always accurate
   useEffect(() => {
     const el = headerRef.current;
@@ -1346,15 +1373,20 @@ export default function ShopHeader() {
   /* Second nav: scroll-down gizle, scroll-up veya sayfa üstü göster (mobil + tablet ≤1023 dar chrome; geniş ekranda üst çubuk da aynı scroll bayrağıyla gider) */
   const showSubNav = !scrollingDown;
   const secondNavHidden = !showSubNav || !showHeaderFilterBar;
-  const spacerHeight = Math.max(
-    0,
-    headerHeight - (isNarrowViewport && secondNavHidden ? 40 : 0)
-  );
+  const spacerHeight =
+    isNarrowViewport && !headerStickyNarrow
+      ? 0
+      : Math.max(0, headerHeight - (isNarrowViewport && secondNavHidden ? 40 : 0));
   /* Header only visible when scrolling up (or initial load when scrollingDown is false) */
   const showHeader = !scrollingDown;
   /** Mobile/tablet: thin search-only row while scrolling down (not on wide desktop) */
   const isMobileSearchCompact =
     isNarrowViewport && scrollingDown && scrollY > SCROLL_THRESHOLD;
+  /** Kaydırınca buzlu beyaz üst yüzey (tema / landing rengine bakmadan) */
+  const mobileFrostedScrollActive =
+    isNarrowViewport &&
+    scrollY > SCROLL_THRESHOLD &&
+    String(mc.header_on_scroll || "") !== "inherit";
 
   /** Theme JSON link_style_* per breakpoint; Landing kann Desktop auf klassisch erzwingen */
   const secondNavUsePillClass = useMemo(() => {
@@ -1519,22 +1551,36 @@ export default function ShopHeader() {
       <HeaderWrap
         ref={headerRef}
         data-mobile-compact={isMobileSearchCompact ? "true" : "false"}
-        data-landing-header-chrome={isNarrowViewport && landingHeaderBg ? "true" : undefined}
+        data-landing-header-chrome={
+          isNarrowViewport && landingHeaderBg && !mobileFrostedScrollActive ? "true" : undefined
+        }
         style={{
           transform: hideHeaderCompletely ? "translateY(-100%)" : "translateY(0)",
           zIndex: localeDropdownOpen ? 2147483650 : undefined,
-          ...(headerScopeCssVars || {}),
-          ...(isNarrowViewport && landingHeaderBg
-            ? {
-                background: landingHeaderBg,
-                "--narrow-header-safe-fill": landingHeaderBg,
-              }
+          ...(isNarrowViewport && !headerStickyNarrow
+            ? { position: "relative", top: "auto", left: "auto", right: "auto" }
             : {}),
+          ...(headerScopeCssVars || {}),
+          ...(mobileFrostedScrollActive
+            ? {
+                background: mc.frosted_bg || "rgba(255,255,255,0.92)",
+                backdropFilter: backdropBlurFromToken(mc.frosted_blur || "16px"),
+                WebkitBackdropFilter: backdropBlurFromToken(mc.frosted_blur || "16px"),
+                "--narrow-header-safe-fill": mc.frosted_bg || "rgba(255,255,255,0.92)",
+              }
+            : isNarrowViewport && landingHeaderBg
+              ? {
+                  background: landingHeaderBg,
+                  "--narrow-header-safe-fill": landingHeaderBg,
+                }
+              : {}),
         }}
       >
         <ShopTopBar />
         <HeaderChrome
-          className={`shop-header-chrome${isNarrowViewport && landingHeaderBg ? " landing-clear" : ""}`}
+          className={`shop-header-chrome${
+            isNarrowViewport && landingHeaderBg && !mobileFrostedScrollActive ? " landing-clear" : ""
+          }${mobileFrostedScrollActive ? " mobile-frosted-scroll" : ""}`}
           $mobileSearchCompact={isMobileSearchCompact}
           style={localeDropdownOpen ? { zIndex: 12010 } : undefined}
         >
@@ -1646,7 +1692,6 @@ export default function ShopHeader() {
               </MiddleBarSearch>
             </MiddleBarCenter>
 
-            <NarrowHeaderChrome $hide={isMobileSearchCompact}>
             <MiddleBarRight>
               <LocaleCurrencyWrap data-locale-dropdown>
                 <MiddleBarLocaleBtn type="button" onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={tLocale("label")} aria-label={tLocale("label")} aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
@@ -1733,7 +1778,6 @@ export default function ShopHeader() {
                 {itemCount > 0 && <MiddleBarCartBadge>{itemCount}</MiddleBarCartBadge>}
               </MiddleBarCartBtn>
             </MiddleBarRight>
-            </NarrowHeaderChrome>
           </MiddleBarInner>
         </MiddleBarWrap>
 
@@ -1779,89 +1823,101 @@ export default function ShopHeader() {
           </MegaPanel>
         )}
 
-        {/* Category panel — narrow: unter Header; desktop: linke Sidebar */}
-        {!isNarrowViewport ? (
-          <CategoryMegaBackdrop
-            $open={mainMenuOpen}
-            aria-hidden={!mainMenuOpen}
-            onClick={() => setMainMenuOpen(false)}
-          />
-        ) : null}
-        <CategoryMegaPanel
-          $open={mainMenuOpen}
-          $topPx={headerHeight}
-          data-categories-dropdown
-          onClick={(e) => {
-            if (!isNarrowViewport) return;
-            if (e.target === e.currentTarget) setMainMenuOpen(false);
-          }}
-        >
-          {!isNarrowViewport ? (
-            <CategoryMegaSidebarHead>
-              <span>{tCommon("categories")}</span>
-              <CategoryMegaSidebarClose
-                type="button"
-                aria-label={tAccountPanel("close")}
-                onClick={() => setMainMenuOpen(false)}
-              >
-                ×
-              </CategoryMegaSidebarClose>
-            </CategoryMegaSidebarHead>
-          ) : null}
-          <CategoryMegaInner>
-            {(() => {
-              const primaryRows =
-                !useCategoryTreeForPanel && menuPanelItems.length > 0
-                  ? menuPanelItems.map((item) => ({
-                      key: item.id,
-                      href: menuItemHref(item),
-                      label: item.label,
-                      onClick: () => { setMainMenuOpen(false); },
-                    }))
-                  : categoryPanelRows.map((row) => ({
-                      key: row.key,
-                      href: row.href || "#",
-                      label: row.label,
-                      onClick: () => { setMainMenuOpen(false); setDrillCategoryId(null); },
-                    })).filter((r) => r.href && r.href !== "#");
-
-              const rows = primaryRows.length > 0 ? primaryRows : looseMenuPanelRows;
-
-              if (rows.length === 0) {
-                return (
-                  <div style={{ padding: "8px 0", color: tokens.dark[500], fontSize: 14 }}>
-                    {tNav("categoryMenuEmpty")}
-                  </div>
-                );
-              }
-
-              if (!isNarrowViewport) {
-                return rows.map((row) => (
-                  <CategoryMegaLink key={row.key} href={row.href} onClick={row.onClick}>
-                    {row.label}
-                  </CategoryMegaLink>
-                ));
-              }
-
-              const COLS_MAX = 8;
-              const cols = [];
-              for (let i = 0; i < rows.length; i += COLS_MAX) {
-                cols.push(rows.slice(i, i + COLS_MAX));
-              }
-
-              return cols.map((col, ci) => (
-                <CategoryMegaCol key={ci}>
-                  {col.map((row) => (
-                    <CategoryMegaLink key={row.key} href={row.href} onClick={row.onClick}>
-                      {row.label}
-                    </CategoryMegaLink>
-                  ))}
-                </CategoryMegaCol>
-              ));
-            })()}
-          </CategoryMegaInner>
-        </CategoryMegaPanel>
       </HeaderWrap>
+
+      {categoryPanelPortalReady
+        ? createPortal(
+            <>
+              {!isNarrowViewport ? (
+                <CategoryMegaBackdrop
+                  $open={mainMenuOpen}
+                  aria-hidden={!mainMenuOpen}
+                  onClick={() => setMainMenuOpen(false)}
+                />
+              ) : null}
+              <CategoryMegaPanel
+                $open={mainMenuOpen}
+                $topPx={headerHeight}
+                data-categories-dropdown
+                onClick={(e) => {
+                  if (!isNarrowViewport) return;
+                  if (e.target === e.currentTarget) setMainMenuOpen(false);
+                }}
+              >
+                {!isNarrowViewport ? (
+                  <CategoryMegaSidebarHead>
+                    <span>{tCommon("categories")}</span>
+                    <CategoryMegaSidebarClose
+                      type="button"
+                      aria-label={tAccountPanel("close")}
+                      onClick={() => setMainMenuOpen(false)}
+                    >
+                      ×
+                    </CategoryMegaSidebarClose>
+                  </CategoryMegaSidebarHead>
+                ) : null}
+                <CategoryMegaInner>
+                  {(() => {
+                    const primaryRows =
+                      !useCategoryTreeForPanel && menuPanelItems.length > 0
+                        ? menuPanelItems.map((item) => ({
+                            key: item.id,
+                            href: menuItemHref(item),
+                            label: item.label,
+                            onClick: () => {
+                              setMainMenuOpen(false);
+                            },
+                          }))
+                        : categoryPanelRows.map((row) => ({
+                            key: row.key,
+                            href: row.href || "#",
+                            label: row.label,
+                            onClick: () => {
+                              setMainMenuOpen(false);
+                              setDrillCategoryId(null);
+                            },
+                          })).filter((r) => r.href && r.href !== "#");
+
+                    const rows = primaryRows.length > 0 ? primaryRows : looseMenuPanelRows;
+
+                    if (rows.length === 0) {
+                      return (
+                        <div style={{ padding: "8px 0", color: tokens.dark[500], fontSize: 14 }}>
+                          {tNav("categoryMenuEmpty")}
+                        </div>
+                      );
+                    }
+
+                    if (!isNarrowViewport) {
+                      return rows.map((row) => (
+                        <CategoryMegaLink key={row.key} href={row.href} onClick={row.onClick}>
+                          {row.label}
+                        </CategoryMegaLink>
+                      ));
+                    }
+
+                    const COLS_MAX = 8;
+                    const cols = [];
+                    for (let i = 0; i < rows.length; i += COLS_MAX) {
+                      cols.push(rows.slice(i, i + COLS_MAX));
+                    }
+
+                    return cols.map((col, ci) => (
+                      <CategoryMegaCol key={ci}>
+                        {col.map((row) => (
+                          <CategoryMegaLink key={row.key} href={row.href} onClick={row.onClick}>
+                            {row.label}
+                          </CategoryMegaLink>
+                        ))}
+                      </CategoryMegaCol>
+                    ));
+                  })()}
+                </CategoryMegaInner>
+              </CategoryMegaPanel>
+            </>,
+            document.body,
+          )
+        : null}
 
       <HeaderSpacer $height={spacerHeight} />
     </>

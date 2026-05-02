@@ -859,7 +859,16 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
             >
               {rowItems.map((it, ci) => {
                 const k = `m-${ri}-${ci}`;
-                if (source === "images") return <div key={k} style={{ minWidth: 0 }}>{renderImage(it)}</div>;
+                if (source === "images") {
+                  return (
+                    <div
+                      key={k}
+                      style={{ minWidth: 0, boxSizing: "border-box", ...getImageCellPaddingStyle(it) }}
+                    >
+                      {renderImage(it)}
+                    </div>
+                  );
+                }
                 if (source === "collection") return renderProduct(it, k, mosaicGridCellIndex(rows, ri, ci));
                 return renderCollectionCard(it, ri * 10 + ci, k);
               })}
@@ -1983,6 +1992,29 @@ function Testimonials({ container, locale = "de" }) {
   );
 }
 
+/** Landing slide / mosaic image: optional per-cell padding (Seller: cell_padding_*). */
+function getImageCellPaddingStyle(item) {
+  if (!item || typeof item !== "object") return {};
+  const toLen = (v) => {
+    if (v == null || v === "") return undefined;
+    const s = String(v).trim();
+    if (!s) return undefined;
+    if (/^[\d.]+(px|em|rem|%|vw|vh)$/i.test(s) || s.includes("calc(")) return s;
+    if (/^[\d.]+$/.test(s)) return `${s}px`;
+    return s;
+  };
+  const pl = toLen(item.cell_padding_left);
+  const pr = toLen(item.cell_padding_right);
+  const pt = toLen(item.cell_padding_top);
+  const pb = toLen(item.cell_padding_bottom);
+  const out = {};
+  if (pl) out.paddingLeft = pl;
+  if (pr) out.paddingRight = pr;
+  if (pt) out.paddingTop = pt;
+  if (pb) out.paddingBottom = pb;
+  return out;
+}
+
 // ── Image Carousel ────────────────────────────────────────────────────────────
 function normalizeImageCarouselAspect(raw) {
   if (raw == null) return null;
@@ -2115,10 +2147,14 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
         {cap}
       </>
     );
+    const pad = getImageCellPaddingStyle(img);
+    const shell = (child) => (
+      <div style={{ minWidth: 0, boxSizing: "border-box", ...pad }}>{child}</div>
+    );
     if (img.link) {
-      return <a href={img.link} style={{ display: "block", textDecoration: "none" }}>{block}</a>;
+      return shell(<a href={img.link} style={{ display: "block", textDecoration: "none" }}>{block}</a>);
     }
-    return <div>{block}</div>;
+    return shell(<div>{block}</div>);
   };
 
   if (isNarrow && isGrid) {

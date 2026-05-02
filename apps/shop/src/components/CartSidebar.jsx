@@ -291,6 +291,29 @@ const PrimaryBtn = styled.a`
   }
 `;
 
+/** Mobilde (≤767px) en üstte “Kasse” — alttaki tekrar etmesin */
+const MobileTopCheckout = styled.div`
+  display: none;
+  flex-shrink: 0;
+  padding: 12px 20px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+
+  @media (max-width: 767px) {
+    display: block;
+  }
+`;
+
+const MobileTopCheckoutBtn = styled(PrimaryBtn)`
+  margin-bottom: 0;
+`;
+
+const FooterPrimaryBtn = styled(PrimaryBtn)`
+  @media (max-width: 767px) {
+    display: none;
+  }
+`;
+
 const TextLink = styled(Link)`
   display: block;
   text-align: center;
@@ -321,84 +344,106 @@ const RecommendedTitle = styled.h3`
   color: #1f2937;
 `;
 
-const RecommendedList = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
+/** Arama panelindeki „Weiter einkaufen“ ile aynı mantık: yatay kaydırmalı kart şeridi */
+const RecommendedStrip = styled.div`
+  display: flex;
   gap: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  padding: 0 0 14px;
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    height: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 999px;
+  }
 `;
 
-const RecommendedItem = styled.div`
+const RecommendedCard = styled.div`
+  flex: 0 0 calc(50% - 5px);
+  min-width: calc(50% - 5px);
+  max-width: calc(50% - 5px);
+  scroll-snap-align: start;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
+  flex-direction: column;
+  padding: 10px;
   border: 1px solid #eceff3;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #fff;
-`;
-
-const RecommendedItemLink = styled(Link)`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-  text-decoration: none;
-  color: inherit;
+  box-sizing: border-box;
 `;
 
 const RecommendedThumb = styled.div`
-  width: 52px;
-  height: 52px;
-  flex-shrink: 0;
-  border-radius: 8px;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
   overflow: hidden;
   background: #f3f4f6;
+  margin-bottom: 8px;
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block;
   }
 `;
 
-const RecommendedMeta = styled.div`
+const RecommendedItemLink = styled(Link)`
+  display: block;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  text-decoration: none;
+  color: inherit;
   flex: 1;
 `;
 
 const RecommendedName = styled.div`
-  font-size: 0.82rem;
-  color: #111827;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
+  color: #111827;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-bottom: 4px;
 `;
 
 const RecommendedPrice = styled.div`
-  font-size: 0.78rem;
+  font-size: 11px;
   color: #6b7280;
+  margin-bottom: 8px;
 `;
 
 const QuickAddBtn = styled.button`
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
+  width: 100%;
+  height: 32px;
+  border-radius: 8px;
   border: none;
   background: #ff971c;
   color: #fff;
   font-size: 18px;
   line-height: 1;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  margin-left: 6px;
+  margin-top: auto;
+  -webkit-tap-highlight-color: transparent;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const ENV_THRESHOLD_CENTS = typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
@@ -465,7 +510,7 @@ export default function CartSidebar() {
     if (!sidebarOpen || items.length > 0) return;
     let cancelled = false;
     setRecommendedLoading(true);
-    fetch("/api/store-products?limit=4")
+    fetch("/api/store-products?limit=8")
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return;
@@ -493,7 +538,7 @@ export default function CartSidebar() {
             };
           })
           .filter((p) => p.handle && p.variantId)
-          .slice(0, 3);
+          .slice(0, 8);
         setRecommended(mapped);
       })
       .catch(() => {
@@ -519,44 +564,56 @@ export default function CartSidebar() {
             </svg>
           </CloseBtn>
         </Header>
+        {items.length > 0 && (
+          <MobileTopCheckout>
+            <MobileTopCheckoutBtn href="/cart" onClick={closeCartSidebar}>
+              Zur Kasse
+            </MobileTopCheckoutBtn>
+          </MobileTopCheckout>
+        )}
         <Scroll>
           {items.length === 0 && !loading && (
             <>
               <Empty>Ihr Warenkorb ist leer.</Empty>
               <RecommendedWrap>
                 <RecommendedTitle>Empfohlene Produkte</RecommendedTitle>
-                <RecommendedList>
-                  {recommendedLoading && <div style={{ color: "#9ca3af", fontSize: 13 }}>Wird geladen...</div>}
-                  {!recommendedLoading && recommended.length === 0 && (
-                    <div style={{ color: "#9ca3af", fontSize: 13 }}>Keine Empfehlungen verfügbar.</div>
-                  )}
-                  {!recommendedLoading &&
-                    recommended.map((p) => (
-                      <RecommendedItem key={p.id}>
+                {recommendedLoading && <div style={{ color: "#9ca3af", fontSize: 13 }}>Wird geladen...</div>}
+                {!recommendedLoading && recommended.length === 0 && (
+                  <div style={{ color: "#9ca3af", fontSize: 13 }}>Keine Empfehlungen verfügbar.</div>
+                )}
+                {!recommendedLoading && recommended.length > 0 && (
+                  <RecommendedStrip role="region" aria-label="Empfohlene Produkte">
+                    {recommended.map((p) => (
+                      <RecommendedCard key={p.id}>
                         <RecommendedItemLink href={`/produkt/${p.handle}`} onClick={closeCartSidebar}>
                           <RecommendedThumb>
-                            {p.thumbnail ? <img src={p.thumbnail} alt={p.title} /> : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />}
+                            {p.thumbnail ? (
+                              <img src={p.thumbnail} alt={p.title} />
+                            ) : (
+                              <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                            )}
                           </RecommendedThumb>
-                          <RecommendedMeta>
-                            <RecommendedName>{p.title}</RecommendedName>
-                            <RecommendedPrice>{formatPriceCents(p.price)}</RecommendedPrice>
-                          </RecommendedMeta>
+                          <RecommendedName>{p.title}</RecommendedName>
+                          <RecommendedPrice>{formatPriceCents(p.price)}</RecommendedPrice>
                         </RecommendedItemLink>
                         <QuickAddBtn
                           type="button"
                           title="Schnell hinzufügen"
                           aria-label="Schnell hinzufügen"
                           disabled={loading}
-                          onClick={async () => {
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             let out = await addToCart(p.variantId, 1, p.sellerId || null);
                             if (!out && p.sellerId) out = await addToCart(p.variantId, 1, null);
                           }}
                         >
                           +
                         </QuickAddBtn>
-                      </RecommendedItem>
+                      </RecommendedCard>
                     ))}
-                </RecommendedList>
+                  </RecommendedStrip>
+                )}
               </RecommendedWrap>
             </>
           )}
@@ -640,9 +697,9 @@ export default function CartSidebar() {
               <span>Gesamt</span>
               <span>{formatPriceCents(Math.max(0, subtotalCents - bonusDiscountCents + (isFree || shippingCents === null ? 0 : shippingCents)))} €</span>
             </RowTotal>
-            <PrimaryBtn href="/cart" onClick={closeCartSidebar}>
+            <FooterPrimaryBtn href="/cart" onClick={closeCartSidebar}>
               Zur Kasse
-            </PrimaryBtn>
+            </FooterPrimaryBtn>
             <TextLink href="/cart" onClick={closeCartSidebar}>
               Warenkorb anzeigen
             </TextLink>
