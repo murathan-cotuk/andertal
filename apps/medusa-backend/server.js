@@ -8733,15 +8733,20 @@ async function start() {
     let storeCategoriesTreeCache = { at: 0, payload: null }
     const STORE_CATEGORIES_TREE_TTL_MS = 45_000
     const storeCategoriesGET = async (req, res) => {
-      const adminHubService = resolveAdminHub()
-      if (!adminHubService) return res.status(200).json({ categories: [], tree: [], count: 0 })
+      const dbUrl = (process.env.DATABASE_URL || ‘’).replace(/^postgresql:\/\//, ‘postgres://’)
+      if (!dbUrl) return res.status(200).json({ categories: [], tree: [], count: 0 })
+      const { Client } = require(‘pg’)
       try {
-        const slug = (req.query.slug || '').toString().trim()
+        const slug = (req.query.slug || ‘’).toString().trim()
+
         if (slug) {
-          const category = await adminHubService.getCategoryBySlug(slug)
-          if (!category || category.active === false || category.is_visible === false) return res.status(404).json({ message: 'Category not found' })
-          const meta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
-          const collectionId = category.has_collection && meta.collection_id ? meta.collection_id : null
+          const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes(‘render.com’) ? { rejectUnauthorized: false } : false })
+          await client.connect()
+          const r = await client.query(`SELECT * FROM admin_hub_categories WHERE slug = $1 AND active = true AND is_visible = true LIMIT 1`, [slug])
+          await client.end()
+          if (!r.rows[0]) return res.status(404).json({ message: ‘Category not found’ })
+          const category = mapAdminHubCategoryPgRow(r.rows[0])
+          const meta = category.metadata && typeof category.metadata === ‘object’ ? category.metadata : {}
           const rawBanner = category.banner_image_url != null ? category.banner_image_url : meta.banner_image_url
           const cat = {
             id: category.id,
@@ -8753,70 +8758,61 @@ async function start() {
             long_content: category.long_content || null,
             banner_image_url: resolveUploadUrl(rawBanner) || null,
             has_collection: category.has_collection,
-            collection_id: collectionId || null,
+            collection_id: category.has_collection && meta.collection_id ? meta.collection_id : null,
           }
           return res.json({ category: cat, categories: [cat], count: 1 })
         }
+
+        // Tree response — use cache
         const now = Date.now()
-        if (
-          storeCategoriesTreeCache.payload &&
-          now - storeCategoriesTreeCache.at < STORE_CATEGORIES_TREE_TTL_MS
-        ) {
+        if (storeCategoriesTreeCache.payload && now - storeCategoriesTreeCache.at < STORE_CATEGORIES_TREE_TTL_MS) {
           return res.json(storeCategoriesTreeCache.payload)
         }
-        const tree = await adminHubService.getCategoryTree({ is_visible: true })
-        // Build set of category IDs that have at least one published product
+
+        const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes(‘render.com’) ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const r = await client.query(
+          `SELECT * FROM admin_hub_categories WHERE active = true AND is_visible = true ORDER BY sort_order ASC, name ASC`
+        )
+        await client.end()
+
+        const flat = r.rows.map(mapAdminHubCategoryPgRow)
+        const tree = buildAdminHubCategoryTreeFromFlat(flat)
+
+        // Annotate has_products
         let categoryIdsWithProducts = new Set()
         try {
           const allProducts = await listAdminHubProductsDb({ limit: 10000 })
           const approvedIds = await getApprovedSellerIdsSet()
           for (const p of allProducts) {
-            if ((p.status || '').toLowerCase() !== 'published') continue
+            if ((p.status || ‘’).toLowerCase() !== ‘published’) continue
             if (!isStoreVisibleSellerProduct(p, approvedIds)) continue
-            for (const cid of storeProductCategoryIds(p)) {
-              categoryIdsWithProducts.add(cid)
-            }
+            for (const cid of storeProductCategoryIds(p)) categoryIdsWithProducts.add(cid)
           }
         } catch (_) {}
-        // Annotate tree nodes recursively: has_products = true if this node or any descendant has products
+
         const annotateTree = (nodes) => {
           for (const n of nodes || []) {
             if (!n) continue
             annotateTree(n.children)
-            const directHit = categoryIdsWithProducts.has(String(n.id).trim().toLowerCase())
-            const childHit = (n.children || []).some((c) => c && c.has_products)
-            n.has_products = directHit || childHit
+            n.has_products = categoryIdsWithProducts.has(String(n.id).trim().toLowerCase()) || (n.children || []).some((c) => c?.has_products)
           }
         }
         annotateTree(tree)
-        /**
-         * Ürün ↔ kategori ID’leri metadata’da uyumsuzsa tüm düğümler has_products:false kalır ve shop menüsü boşalır.
-         * Hiçbir dalda ürün eşleşmesi yoksa (veya ürün listesi boşsa) navigasyonu kurtar: görünür ağacı listelemeye devam et.
-         */
-        const treeHasAnyProductCategory = (nodes) => {
-          for (const n of nodes || []) {
-            if (!n) continue
-            if (n.has_products === true) return true
-            if (treeHasAnyProductCategory(n.children)) return true
-          }
-          return false
+
+        // If no product matches found, show all categories anyway
+        const hasAny = (nodes) => (nodes || []).some((n) => n?.has_products || hasAny(n?.children))
+        if (Array.isArray(tree) && tree.length > 0 && !hasAny(tree)) {
+          const relaxAll = (nodes) => { for (const n of nodes || []) { if (!n) continue; n.has_products = true; relaxAll(n.children) } }
+          relaxAll(tree)
         }
-        const relaxAllHasProducts = (nodes) => {
-          for (const n of nodes || []) {
-            if (!n) continue
-            n.has_products = true
-            relaxAllHasProducts(n.children)
-          }
-        }
-        if (Array.isArray(tree) && tree.length > 0 && !treeHasAnyProductCategory(tree)) {
-          relaxAllHasProducts(tree)
-        }
-        const categories = (tree || []).map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
+
+        const categories = tree.map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
         const payload = { categories, tree, count: categories.length }
         storeCategoriesTreeCache = { at: now, payload }
         res.json(payload)
       } catch (err) {
-        console.error('Store categories GET error:', err)
+        console.error(‘storeCategoriesGET error:’, err?.message || err)
         res.status(200).json({ categories: [], tree: [], count: 0 })
       }
     }

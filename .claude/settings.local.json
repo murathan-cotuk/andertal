@@ -107,7 +107,9 @@
       "Bash(npx tsc *)",
       "Bash(powershell -Command ' *)",
       "Bash(powershell -ExecutionPolicy Bypass -File rename_project.ps1)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(where stripe *)",
+      "WebFetch(domain:api.andertal.com)"
     ]
   }
 }

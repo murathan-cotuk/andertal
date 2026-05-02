@@ -50,8 +50,8 @@ const Drawer = styled.aside`
     transition: none;
   }
 
-  @media (max-width: 767px) {
-    height: calc(100vh - 58px - env(safe-area-inset-bottom, 0px));
+  @media (max-width: 1023px) {
+    height: calc(100vh - 60px - env(safe-area-inset-bottom, 0px));
   }
 `;
 

@@ -1,7 +1,7 @@
 ﻿"use client";
 
 /**
- * MobileNav — Bottom navigation bar + slide-in drawer for mobile (≤767px).
+ * MobileNav — Bottom navigation bar + slide-in drawer for narrow viewports (≤1023px, mobil + tablet).
  * Bar: Home, Menü, Warenkorb, Merkzettel, Profil (search lives in ShopHeader).
  * Drawer: Kategorien (+ category image thumbs) then Mein Konto; no CMS “Menü” / Service links.
  * Rendered as a sibling of page content via Providers.jsx (display:none on desktop).
@@ -353,7 +353,7 @@ export default function MobileNav() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 767px)");
+    const mq = window.matchMedia("(max-width: 1023px)");
     const go = () => setIsMobileNavViewport(mq.matches);
     go();
     mq.addEventListener("change", go);
@@ -461,7 +461,7 @@ export default function MobileNav() {
   if (hideOnAuthPages) return null;
 
   return (
-    /* Only rendered/visible on mobile — display:none injected via globals.css on desktop */
+    /* Dar görünümde görünür (≤1023px) — globals.css ile geniş ekranda gizli */
     <div className="andertal-mobile-nav-root">
       {/* ── Drawer Overlay ── */}
       <div

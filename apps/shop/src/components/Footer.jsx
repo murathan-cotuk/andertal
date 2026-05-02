@@ -50,7 +50,7 @@ function menuItemHref(item) {
 const FooterContainer = styled.footer`
   background-color: var(--footer-bg, #136761);
   color: var(--footer-text, #ffffff);
-  padding: 48px 0 24px;
+  padding: 48px 0 calc(24px + env(safe-area-inset-bottom, 0px));
   margin-top: auto;
 
   @media (max-width: 767px) {

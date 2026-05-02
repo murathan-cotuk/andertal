@@ -88,7 +88,7 @@ export default function CookieBanner() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 768px)");
+    const mq = window.matchMedia("(max-width: 1023px)");
     const update = () => setIsMobile(mq.matches);
     update();
     if (typeof mq.addEventListener === "function") mq.addEventListener("change", update);

@@ -1,5 +1,6 @@
 /**
- * Shop URL: /{country}/{language}/{currency}/…
+ * Shop public URL: /{country}/{language}/… (no currency segment).
+ * Legacy /{country}/{language}/{currency}/… redirects to the canonical path; currency may be stored in cookie.
  * Internal Next.js routes stay /{language}/… (next-intl); middleware rewrites.
  */
 
@@ -64,23 +65,35 @@ export function isValidCurrency(s) {
 }
 
 /**
- * @param {string} pathname browser path e.g. /de/es/eur/produkt/x
+ * @param {string} pathname e.g. /de/de/produkt/x or legacy /de/de/eur/produkt/x
  * @returns {{ country: string, lang: string, currency: string, rest: string } | null}
  */
 export function parseMarketPath(pathname) {
   const p = pathname || "";
   const parts = p.split("/").filter(Boolean);
-  if (parts.length < 3) return null;
+  if (parts.length < 2) return null;
   const country = parts[0].toLowerCase();
   const lang = parts[1].toLowerCase();
-  const currency = parts[2].toLowerCase();
-  if (!isValidMarket(country) || !isValidLocale(lang) || !isValidCurrency(currency)) return null;
-  const rest = "/" + parts.slice(3).join("/");
-  return { country, lang, currency, rest: rest === "/" ? "" : rest };
+  if (!isValidMarket(country) || !isValidLocale(lang)) return null;
+
+  let currency;
+  let restParts;
+  if (parts.length >= 3 && isValidCurrency(parts[2])) {
+    currency = parts[2].toLowerCase();
+    restParts = parts.slice(3);
+  } else {
+    currency = defaultCurrencyForMarket(country);
+    restParts = parts.slice(2);
+  }
+  const joined = restParts.join("/");
+  const rest = joined === "" ? "" : `/${joined}`;
+  return { country, lang, currency, rest };
 }
 
-export function marketPrefix(country, lang, currency) {
-  return `/${String(country).toLowerCase()}/${String(lang).toLowerCase()}/${String(currency).toLowerCase()}`;
+/** Public storefront prefix (two segments). Third argument ignored — kept for call-site compatibility. */
+export function marketPrefix(country, lang, _currency) {
+  void _currency;
+  return `/${String(country).toLowerCase()}/${String(lang).toLowerCase()}`;
 }
 
 /**

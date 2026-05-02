@@ -10,7 +10,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { useRouter as useNextRouter } from "next/navigation";
-import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import styled from "styled-components";
 import { motion } from "framer-motion";
@@ -27,8 +27,10 @@ import {
   parseMarketPath,
   marketPrefix,
   restPathFromPathname,
+  defaultCurrencyForMarket,
   DEFAULT_MARKET,
   DEFAULT_CURRENCY,
+  SHOP_CURRENCIES,
 } from "@/lib/shop-market";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useLandingChrome } from "@/context/LandingChromeContext";
@@ -50,6 +52,20 @@ const BOTTOM_IGNORE_SCROLL_UP_PX = 28;
 const MIDDLE_BAR_BG = "#1b8880";
 /** @media (max-width) for mobile/tablet header chrome (matches mega menu breakpoint) */
 const HEADER_NARROW_MQ = 1023;
+
+function readCurrencyCookie() {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(/(?:^|;\s*)andertal_currency=([^;]*)/);
+  const v = m ? decodeURIComponent(m[1]).trim().toLowerCase() : "";
+  return v && /^[a-z]{3}$/.test(v) ? v : null;
+}
+
+function writeCurrencyCookie(code) {
+  if (typeof document === "undefined") return;
+  const c = String(code || "").toLowerCase();
+  if (!/^[a-z]{3}$/.test(c)) return;
+  document.cookie = `andertal_currency=${encodeURIComponent(c)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+}
 
 /**
  * Breakpoints aligned with StylesPage copy: mobile ≤767, tablet 768–1023, desktop ≥1024.
@@ -126,6 +142,24 @@ const HeaderWrap = styled.header`
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: visible;
 
+  /*
+   * Üst safe-area (çentik / durum çubuğu altı) — viewport-fit=cover;
+   * dar ve geniş ekranda aynı mantık; --header-chrome-bg :root’tan gelir.
+   */
+  &::before {
+    content: "";
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) * -1);
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top, 0px);
+    background: var(
+      --narrow-header-safe-fill,
+      var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}))
+    );
+    pointer-events: none;
+  }
+
   &[data-mobile-compact="true"] {
     @media (max-width: ${HEADER_NARROW_MQ}px) {
       background: transparent;
@@ -134,21 +168,6 @@ const HeaderWrap = styled.header`
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     background: var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}));
-
-    &::before {
-      content: "";
-      position: absolute;
-      top: calc(env(safe-area-inset-top) * -1);
-      left: 0;
-      right: 0;
-      height: env(safe-area-inset-top);
-      /* Landing carousel gradient (inline --narrow-header-safe-fill) ile çentik bandı aynı yüzey */
-      background: var(
-        --narrow-header-safe-fill,
-        var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}))
-      );
-      pointer-events: none;
-    }
   }
 `;
 
@@ -931,7 +950,7 @@ const HeaderSpacer = styled.div`
 const LocaleCurrencyWrap = styled.div`
   position: relative;
   flex-shrink: 0;
-  z-index: 3;
+  z-index: 12000;
 `;
 
 const LocaleCurrencyBtn = styled.button`
@@ -961,13 +980,13 @@ const LocaleDropdown = styled.div`
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 520px;
+  width: 720px;
   max-width: 96vw;
   background: ${tokens.background.card};
   border: 1px solid ${tokens.border.light};
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.18);
-  z-index: 3;
+  z-index: 12000;
   display: ${(p) => (p.$open ? "flex" : "none")};
   overflow: hidden;
 `;
@@ -1027,7 +1046,6 @@ export default function ShopHeader() {
   const marketParsed =
     parseMarketPath(pathname) || (ctxPrefix ? parseMarketPath(ctxPrefix) : null);
   const nextRouter = useNextRouter();
-  const router = useRouter();
   const [scrollY, setScrollY] = useState(0);
   const [scrollingDown, setScrollingDown] = useState(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
@@ -1065,16 +1083,22 @@ export default function ShopHeader() {
     return t.country.toUpperCase();
   })();
 
+  const effectiveCurrency =
+    readCurrencyCookie() || marketParsed?.currency || DEFAULT_CURRENCY;
+
   const navigateTriple = (countryLower, langLower, curLower) => {
     const tail = restPathFromPathname(pathname);
     const suffix = tail === "/" ? "" : tail;
-    nextRouter.push(`${marketPrefix(countryLower, langLower, curLower)}${suffix}`);
+    const cur = String(curLower || DEFAULT_CURRENCY).toLowerCase();
+    writeCurrencyCookie(cur);
+    nextRouter.push(`${marketPrefix(countryLower, langLower)}${suffix}`);
   };
 
   const handleSelectCountry = (countryCode) => {
     const m = countryCode.toLowerCase();
     const lang = String(locale || routing.defaultLocale || "de").toLowerCase();
-    navigateTriple(m, lang, DEFAULT_CURRENCY);
+    const cur = defaultCurrencyForMarket(m);
+    navigateTriple(m, lang, cur);
     setLocaleDropdownOpen(false);
   };
 
@@ -1108,10 +1132,7 @@ export default function ShopHeader() {
 
   useEffect(() => {
     if (typeof document === "undefined" || typeof window === "undefined") return;
-    const mq = window.matchMedia(`(max-width: ${HEADER_NARROW_MQ}px)`);
     const root = document.documentElement;
-    const prevRootBg = root.style.backgroundColor;
-    const prevRootBackground = root.style.background;
 
     const ensureThemeMeta = () => {
       let meta = document.querySelector("meta[name='theme-color']");
@@ -1124,48 +1145,30 @@ export default function ShopHeader() {
     };
 
     /**
-     * Görünür şerit `--header-chrome-bg` (gradient); `--header-bg` tek başına beyaz kalabiliyor.
-     * Safari theme-color ve üst safe-area için chrom’dan düz renk çıkarıyoruz; html arka planına tam chrome string’i veriyoruz.
+     * Safari / mobil durum çubuğu rengi — header yüzeyinden düz tint.
+     * html arka planına müdahale etmiyoruz (footer / overscroll ile çakışmayı önlemek için);
+     * üst şerit HeaderWrap::before + theme-color ile hizalanır.
      */
     const apply = () => {
       requestAnimationFrame(() => {
-        const el = headerRef.current;
-        const cs = el ? getComputedStyle(el) : getComputedStyle(root);
+        const cs = getComputedStyle(root);
         const chrome = cs.getPropertyValue("--header-chrome-bg").trim();
         const headerBg = cs.getPropertyValue("--header-bg").trim() || MIDDLE_BAR_BG;
         const solid = extractSolidTintFromChromeCss(chrome || headerBg, headerBg);
         const themeMeta = ensureThemeMeta();
-        themeMeta.setAttribute("content", solid);
-
-        if (mq.matches) {
-          if (landingHeaderBg) {
-            root.style.background = landingHeaderBg;
-            root.style.backgroundColor = "";
-            themeMeta.setAttribute("content", extractSolidTintFromChromeCss(landingHeaderBg, headerBg));
-          } else if (chrome) {
-            root.style.background = chrome;
-            root.style.backgroundColor = "";
-          } else {
-            root.style.background = "";
-            root.style.backgroundColor = solid;
-          }
+        if (landingHeaderBg) {
+          themeMeta.setAttribute("content", extractSolidTintFromChromeCss(landingHeaderBg, headerBg));
         } else {
-          root.style.background = prevRootBackground;
-          root.style.backgroundColor = prevRootBg;
+          themeMeta.setAttribute("content", solid);
         }
       });
     };
 
     apply();
-    const onMq = () => apply();
     const onThemeInjected = () => apply();
-    mq.addEventListener?.("change", onMq);
     window.addEventListener(SHOP_THEME_CSS_UPDATED, onThemeInjected);
     return () => {
-      mq.removeEventListener?.("change", onMq);
       window.removeEventListener(SHOP_THEME_CSS_UPDATED, onThemeInjected);
-      root.style.background = prevRootBackground;
-      root.style.backgroundColor = prevRootBg;
     };
   }, [pathname, shopStyles, headerScopeCssVars, landingHeaderBg]);
 
@@ -1323,15 +1326,21 @@ export default function ShopHeader() {
   }, []);
 
   useEffect(() => {
-    const close = () => {
+    const onDown = (e) => {
+      if (
+        e.target.closest("[data-categories-dropdown]") ||
+        e.target.closest("[data-user-menu]") ||
+        e.target.closest("[data-locale-dropdown]") ||
+        e.target.closest("[data-mega-nav]")
+      ) {
+        return;
+      }
       setMainMenuOpen(false);
       setLocaleDropdownOpen(false);
       setHoveredMenuItemId(null);
     };
-    document.addEventListener("mousedown", (e) => {
-      if (!e.target.closest("[data-categories-dropdown]") && !e.target.closest("[data-user-menu]") && !e.target.closest("[data-locale-dropdown]") && !e.target.closest("[data-mega-nav]")) close();
-    });
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
   /* Second nav: scroll-down gizle, scroll-up veya sayfa üstü göster (mobil + tablet ≤1023 dar chrome; geniş ekranda üst çubuk da aynı scroll bayrağıyla gider) */
@@ -1527,6 +1536,7 @@ export default function ShopHeader() {
         <HeaderChrome
           className={`shop-header-chrome${isNarrowViewport && landingHeaderBg ? " landing-clear" : ""}`}
           $mobileSearchCompact={isMobileSearchCompact}
+          style={localeDropdownOpen ? { zIndex: 12010 } : undefined}
         >
         <MiddleBarWrap
           ref={middleBarRef}
@@ -1645,7 +1655,7 @@ export default function ShopHeader() {
                   </svg>
                 </MiddleBarLocaleBtn>
                 <LocaleDropdown $open={localeDropdownOpen}>
-                  <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", padding: "16px 0" }}>
+                  <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", padding: "16px 0", minWidth: 0 }}>
                     <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Land</div>
                     {shopCountries.length === 0 ? (
                       <div style={{ padding: "8px 16px", fontSize: 13, color: "#9ca3af" }}>Keine Länder konfiguriert</div>
@@ -1659,12 +1669,14 @@ export default function ShopHeader() {
                         <span style={{ fontSize: 20 }}>{c.flag}</span>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 600 }}>{c.label}</div>
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>EUR</div>
+                          <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                            {defaultCurrencyForMarket(c.code.toLowerCase()).toUpperCase()}
+                          </div>
                         </div>
                       </LocaleOption>
                     ))}
                   </div>
-                  <div style={{ flex: 1, padding: "16px 0" }}>
+                  <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", padding: "16px 0", minWidth: 0 }}>
                     <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Sprache</div>
                     {SHOP_LOCALES.map((l) => (
                       <LocaleOption
@@ -1674,11 +1686,29 @@ export default function ShopHeader() {
                         onClick={() => {
                           setLocaleDropdownOpen(false);
                           const m = marketParsed?.country ?? DEFAULT_MARKET;
-                          navigateTriple(m, l.code, DEFAULT_CURRENCY);
+                          navigateTriple(m, l.code, effectiveCurrency);
                         }}
                       >
                         <span style={{ fontSize: 20 }}>{l.flag}</span>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{l.label}</div>
+                      </LocaleOption>
+                    ))}
+                  </div>
+                  <div style={{ flex: 1, padding: "16px 0", minWidth: 0 }}>
+                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Währung</div>
+                    {SHOP_CURRENCIES.map((code) => (
+                      <LocaleOption
+                        key={code}
+                        type="button"
+                        data-active={effectiveCurrency === code ? "true" : "false"}
+                        onClick={() => {
+                          setLocaleDropdownOpen(false);
+                          const m = marketParsed?.country ?? DEFAULT_MARKET;
+                          const lang = String(locale || routing.defaultLocale || "de").toLowerCase();
+                          navigateTriple(m, lang, code);
+                        }}
+                      >
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{code.toUpperCase()}</div>
                       </LocaleOption>
                     ))}
                   </div>

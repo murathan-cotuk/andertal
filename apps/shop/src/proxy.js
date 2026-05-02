@@ -5,6 +5,7 @@ import {
   parseMarketPath,
   DEFAULT_CURRENCY,
   DEFAULT_MARKET,
+  isValidCurrency,
   isValidLocale,
   isValidMarket,
   marketPrefix,
@@ -102,8 +103,7 @@ export default function proxy(request) {
         cookieT?.country && isValidMarket(cookieT.country)
           ? cookieT.country
           : marketFromGeoRequest(request) || DEFAULT_MARKET;
-      const cur = DEFAULT_CURRENCY;
-      const loginUrl = new URL(`/${market}/${locale}/${cur}/login`, request.url);
+      const loginUrl = new URL(`${marketPrefix(market, locale)}/login`, request.url);
       loginUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(loginUrl);
     }
@@ -119,23 +119,39 @@ export default function proxy(request) {
 
   const triple = parseMarketPath(pathname);
   if (triple) {
-    if (triple.currency !== DEFAULT_CURRENCY) {
-      const base = marketPrefix(triple.country, triple.lang, DEFAULT_CURRENCY);
-      const nextPath =
-        !triple.rest || triple.rest === "" ? `${base}/` : `${base}${triple.rest}`;
+    const rawParts = pathname.split("/").filter(Boolean);
+    const hadLegacyCurrencySegment =
+      rawParts.length >= 3 && isValidCurrency(rawParts[2]);
+
+    const mp = marketPrefix(triple.country, triple.lang);
+    const canonicalPath =
+      triple.rest === "" || triple.rest === "/"
+        ? `${mp}/`
+        : `${mp}${triple.rest.startsWith("/") ? triple.rest : `/${triple.rest}`}`;
+
+    if (hadLegacyCurrencySegment) {
       const u = request.nextUrl.clone();
-      u.pathname = nextPath;
+      u.pathname = canonicalPath;
       const redirectRes = NextResponse.redirect(u);
       try {
-        redirectRes.cookies.set("andertal_market_prefix", base, {
+        redirectRes.cookies.set("andertal_market_prefix", mp, {
           path: "/",
           maxAge: 60 * 60 * 24 * 365,
           sameSite: "lax",
           secure: process.env.NODE_ENV === "production",
         });
+        if (triple.currency && isValidCurrency(triple.currency)) {
+          redirectRes.cookies.set("andertal_currency", triple.currency.toLowerCase(), {
+            path: "/",
+            maxAge: 60 * 60 * 24 * 365,
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+          });
+        }
       } catch (_) {}
       return redirectRes;
     }
+
     const internal =
       !triple.rest || triple.rest === "/"
         ? `/${triple.lang}`
@@ -143,16 +159,16 @@ export default function proxy(request) {
     const u = request.nextUrl.clone();
     u.pathname = internal;
     const h = new Headers(request.headers);
-    h.set(
-      "x-andertal-market-prefix",
-      marketPrefix(triple.country, triple.lang, triple.currency)
-    );
+    h.set("x-andertal-market-prefix", mp);
+    const curCookie = (request.cookies.get("andertal_currency")?.value || "").trim().toLowerCase();
+    if (curCookie && isValidCurrency(curCookie)) {
+      h.set("x-andertal-currency", curCookie);
+    }
     const forwarded = new NextRequest(u, {
       headers: h,
       method: request.method,
     });
     const intlRes = intlMiddleware(forwarded);
-    const mp = marketPrefix(triple.country, triple.lang, triple.currency);
     try {
       intlRes.cookies.set("andertal_market_prefix", mp, {
         path: "/",
@@ -173,10 +189,11 @@ export default function proxy(request) {
       cookieT?.country && isValidMarket(cookieT.country)
         ? cookieT.country
         : marketFromGeoRequest(request) || DEFAULT_MARKET;
-    const cur = DEFAULT_CURRENCY;
-    const dest = new URL(`/${market}/${loc}/${cur}${rest}`, request.url);
+    const mp = marketPrefix(market, loc);
+    const destPath =
+      rest === "" || rest === "/" ? `${mp}/` : `${mp}${rest}`;
+    const dest = new URL(destPath, request.url);
     const redirectRes = NextResponse.redirect(dest);
-    const mp = marketPrefix(market, loc, cur);
     try {
       redirectRes.cookies.set("andertal_market_prefix", mp, {
         path: "/",
@@ -191,8 +208,8 @@ export default function proxy(request) {
   if (pathname === "/" || pathname === "") {
     // 1. Returning visitor: use saved cookie
     const cookieT = marketTripleFromCookie(request);
-    if (cookieT?.country && cookieT?.lang && cookieT?.currency) {
-      const mp = marketPrefix(cookieT.country, cookieT.lang, DEFAULT_CURRENCY);
+    if (cookieT?.country && cookieT?.lang) {
+      const mp = marketPrefix(cookieT.country, cookieT.lang);
       return NextResponse.redirect(new URL(mp + "/", request.url));
     }
 

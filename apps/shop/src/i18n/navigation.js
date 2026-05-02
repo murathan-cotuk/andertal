@@ -11,7 +11,6 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import {
   parseMarketPath,
   marketPrefix,
-  DEFAULT_CURRENCY,
   isValidLocale,
 } from "@/lib/shop-market";
 
@@ -19,9 +18,9 @@ const intl = createNavigation(routing);
 
 const LOCALE_PREFIX_RE = /^\/(en|de|tr|fr|it|es)(?=\/|$)/i;
 
-/** One market triple: /{cc}/{locale}/{currency} — strip if href was saved with full URL by mistake. */
+/** Public market prefix /{cc}/{locale}/ or legacy …/{currency}/ — strip mistaken prefixes from hrefs. */
 const MARKET_TRIPLE_PREFIX_RE =
-  /^\/([a-z]{2})\/(en|de|tr|fr|it|es)\/(eur|gbp|chf|usd|try)(?=\/|$)/i;
+  /^\/([a-z]{2})\/(en|de|tr|fr|it|es)(?:\/(?:eur|gbp|chf|usd|try))?(?=\/|$)/i;
 
 function normalizeAppPath(href) {
   if (typeof href !== "string") return "/";
@@ -47,11 +46,10 @@ export function Link({ href, locale, ...props }) {
   const base = marketTripleFromPathname(pathname, ctxPrefix);
   let country = base?.country ?? "de";
   let lang = base?.lang ?? "de";
-  const cur = DEFAULT_CURRENCY;
   if (locale && isValidLocale(String(locale))) {
     lang = String(locale).toLowerCase();
   }
-  const prefix = marketPrefix(country, lang, cur);
+  const prefix = marketPrefix(country, lang);
 
   if (typeof href === "string" && (href.startsWith("http://") || href.startsWith("https://"))) {
     return <NextLink href={href} {...props} />;
@@ -71,8 +69,8 @@ export function useRouter() {
   const ctxPrefix = useMarketPrefix();
   const base = marketTripleFromPathname(pathname, ctxPrefix);
   const prefix = base
-    ? marketPrefix(base.country, base.lang, DEFAULT_CURRENCY)
-    : `/de/de/${DEFAULT_CURRENCY}`;
+    ? marketPrefix(base.country, base.lang)
+    : marketPrefix("de", routing.defaultLocale);
 
   const abs = (href) => {
     if (typeof href !== "string") return href;

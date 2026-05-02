@@ -105,13 +105,8 @@
 /* Sayfa anchor / hash kaydırmaları; native app’e yakın pürüzlülük yok */
 html {
   scroll-behavior: smooth;
-}
-
-/* iOS Safari: status bar / overscroll — görünür navbar ile aynı yüzey (--header-chrome-bg gradient dahil) */
-@media (max-width: 1023px) {
-  html {
-    background: var(--header-chrome-bg, var(--header-bg, #1b8880));
-  }
+  /* Overscroll / html altında kalan şerit — mağaza zemini (header üstü HeaderWrap::before + theme-color) */
+  background-color: var(--shop-bg, var(--color-bg-main));
 }
 
 /* Mobil/tablet: promo şeridi — theme’deki --topbar-bg bazen beyaz kalıyor; üst yüzey header chrome ile hizala */
@@ -153,7 +148,7 @@ body {
   font-size: var(--text-body);
   line-height: var(--leading-normal);
   color: var(--color-dark-800);
-  background: var(--color-bg-main);
+  background: var(--shop-bg, var(--color-bg-main));
 }
 
 a {
@@ -168,8 +163,8 @@ a {
 
 /* ══════════════════════════════════════════════════════
    SHOP HEADER — mobile-only overrides
-   Bottom nav (MobileNav) handles cart/account/locale on ≤767px,
-   so we hide those icons from the header on mobile.
+   Bottom nav (MobileNav) handles cart/account/locale on ≤1023px;
+   header’daki ikonlar yalnızca çok dar mobilde (≤767px) gizlenir.
    ══════════════════════════════════════════════════════ */
 
 @media (max-width: 767px) {
@@ -193,11 +188,11 @@ a {
    MOBILE NAV — show/hide rules
    ══════════════════════════════════════════════════════ */
 
-/* Mobile nav root: visible only on ≤767px */
+/* Mobile nav root: narrow storefront only (mobil + tablet, ShopHeader narrow breakpoint ile uyumlu) */
 .andertal-mobile-nav-root {
   display: none;
 }
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   .andertal-mobile-nav-root {
     display: block;
   }
@@ -374,10 +369,10 @@ a {
 /* ══════════════════════════════════════════════════════
    FOOTER — mobile
    ══════════════════════════════════════════════════════ */
-@media (max-width: 767px) {
-  /* Shop footer only — alt nav (58px) + home indicator; başka <footer> bileşenlerine dokunma */
+@media (max-width: 1023px) {
+  /* İç boşluk + alt nav (~60px) + home indicator — footer rengi çentiğe kadar uzar */
   footer.site-footer {
-    padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(24px + 60px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
