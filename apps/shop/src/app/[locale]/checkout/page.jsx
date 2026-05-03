@@ -556,7 +556,6 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
   const { user } = useCustomerAuthHook();
   const returnRunRef = useRef(false);
   const [paymentElementReady, setPaymentElementReady] = useState(false);
-  const [selectedPayMethod, setSelectedPayMethod] = useState(() => paymentMethodTypes[0] || "card");
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [shipAddrId, setShipAddrId] = useState("");
   const [billAddrId, setBillAddrId] = useState("");
@@ -1205,16 +1204,13 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
 
       <FormCard>
         <SectionTitle>{t("payment")}</SectionTitle>
-        <PaymentMethodPicker
-          methods={paymentMethodTypes}
-          selected={selectedPayMethod}
-          onSelect={(m) => { setSelectedPayMethod(m); setPaymentElementReady(false); }}
-          layout={paymentMethodLayout}
-        />
         <StripePaymentWrap>
           <PaymentElement
-            key={selectedPayMethod}
-            options={{ defaultValues: { paymentMethodType: selectedPayMethod } }}
+            options={{
+              layout: paymentMethodLayout === "list"
+                ? { type: "accordion", defaultCollapsed: false, radios: true, spacedAccordionItems: false }
+                : "tabs",
+            }}
             onReady={() => setPaymentElementReady(true)}
             onLoadError={() => {
               setPaymentElementReady(false);

@@ -788,6 +788,7 @@ async function start() {
         `).catch(() => {})
         await client.query(`INSERT INTO store_platform_checkout (id) VALUES (1) ON CONFLICT (id) DO NOTHING`).catch(() => {})
         await client.query(`ALTER TABLE store_platform_checkout ADD COLUMN IF NOT EXISTS payment_method_layout text DEFAULT 'grid'`).catch(() => {})
+        await client.query(`ALTER TABLE store_platform_checkout ADD COLUMN IF NOT EXISTS payment_method_types_json jsonb`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS free_shipping_thresholds jsonb`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS shop_logo_url text`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS shop_favicon_url text`).catch(() => {})
@@ -4932,7 +4933,7 @@ async function start() {
 
     const loadPlatformCheckoutRow = async (pgClient) => {
       const r = await pgClient.query(
-        `SELECT stripe_publishable_key, stripe_secret_key, pay_card, pay_paypal, pay_klarna, paypal_client_id, paypal_client_secret, payment_method_layout
+        `SELECT stripe_publishable_key, stripe_secret_key, pay_card, pay_paypal, pay_klarna, paypal_client_id, paypal_client_secret, payment_method_layout, payment_method_types_json
          FROM store_platform_checkout WHERE id = 1`,
       )
       return r.rows?.[0] || null
@@ -4946,6 +4947,9 @@ async function start() {
       row ? (row.stripe_publishable_key || '').toString().trim() : ''
 
     const paymentMethodTypesFromPlatformRow = (row) => {
+      if (Array.isArray(row?.payment_method_types_json) && row.payment_method_types_json.length > 0) {
+        return row.payment_method_types_json
+      }
       const payCard = !row || row.pay_card !== false
       const payPaypal = row && row.pay_paypal === true
       const payKlarna = row && row.pay_klarna === true
@@ -4955,6 +4959,48 @@ async function start() {
       if (payKlarna) types.push('klarna')
       if (!types.length) types.push('card')
       return types
+    }
+
+    const STRIPE_PM_TYPES = [
+      'card','paypal','klarna','sepa_debit','ideal','bancontact','eps','p24','giropay',
+      'sofort','link','affirm','afterpay_clearpay','blik','cashapp','mobilepay',
+      'multibanco','oxxo','paynow','pix','promptpay','revolut_pay','swish','twint',
+      'us_bank_account','wechat_pay','zip','amazon_pay','au_becs_debit','bacs_debit',
+      'boleto','fpx','konbini','acss_debit',
+    ]
+
+    const stripePaymentMethodsGET = async (req, res) => {
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      let dbClient
+      try {
+        dbClient = client
+        await dbClient.connect()
+        const row = await loadPlatformCheckoutRow(dbClient)
+        await dbClient.end()
+        const sk = resolveStripeSecretKeyFromPlatform(row)
+        if (!sk) return res.json({ available: [], selected: paymentMethodTypesFromPlatformRow(row) })
+        const stripe = new (require('stripe'))(sk)
+        let available = []
+        try {
+          const configs = await stripe.paymentMethodConfigurations.list({ limit: 100 })
+          const root = configs.data.find((c) => !c.parent) || configs.data[0]
+          if (root) {
+            for (const pmType of STRIPE_PM_TYPES) {
+              const cfg = root[pmType]
+              if (cfg && cfg.available === true) available.push(pmType)
+            }
+          }
+        } catch (_) {
+          available = []
+        }
+        const selected = paymentMethodTypesFromPlatformRow(row)
+        res.json({ available, selected })
+      } catch (err) {
+        try { if (dbClient) await dbClient.end() } catch (_) {}
+        console.error('stripePaymentMethodsGET:', err)
+        res.status(500).json({ message: err?.message || 'Error' })
+      }
     }
 
     /** Superuser: read platform checkout / Stripe config (secrets masked in response) */
@@ -4981,6 +5027,7 @@ async function start() {
           paypal_client_secret_set: psec.length > 0,
           paypal_client_secret_hint: psec.length >= 4 ? `…${psec.slice(-4)}` : '',
           payment_method_layout: (row?.payment_method_layout || 'grid').toString(),
+          payment_method_types_json: Array.isArray(row?.payment_method_types_json) ? row.payment_method_types_json : null,
           env_stripe_secret: envSk,
           env_stripe_publishable: envPk,
         })
@@ -5019,9 +5066,13 @@ async function start() {
           if (inc) paypal_client_secret = inc
         }
         const payment_method_layout = body.payment_method_layout === 'list' ? 'list' : (body.payment_method_layout === 'grid' ? 'grid' : (cur?.payment_method_layout || 'grid'))
+        let payment_method_types_json = Array.isArray(cur?.payment_method_types_json) ? cur.payment_method_types_json : null
+        if (Array.isArray(body.payment_method_types) && body.payment_method_types.length > 0) {
+          payment_method_types_json = body.payment_method_types.filter((t) => typeof t === 'string' && t.length > 0)
+        }
         await client.query(
-          `INSERT INTO store_platform_checkout (id, stripe_publishable_key, stripe_secret_key, pay_card, pay_paypal, pay_klarna, paypal_client_id, paypal_client_secret, payment_method_layout, updated_at)
-           VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, now())
+          `INSERT INTO store_platform_checkout (id, stripe_publishable_key, stripe_secret_key, pay_card, pay_paypal, pay_klarna, paypal_client_id, paypal_client_secret, payment_method_layout, payment_method_types_json, updated_at)
+           VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, now())
            ON CONFLICT (id) DO UPDATE SET
              stripe_publishable_key = EXCLUDED.stripe_publishable_key,
              stripe_secret_key = EXCLUDED.stripe_secret_key,
@@ -5031,8 +5082,9 @@ async function start() {
              paypal_client_id = EXCLUDED.paypal_client_id,
              paypal_client_secret = EXCLUDED.paypal_client_secret,
              payment_method_layout = EXCLUDED.payment_method_layout,
+             payment_method_types_json = EXCLUDED.payment_method_types_json,
              updated_at = now()`,
-          [nextPk || null, nextSk || null, pay_card, pay_paypal, pay_klarna, paypal_client_id || null, paypal_client_secret || null, payment_method_layout],
+          [nextPk || null, nextSk || null, pay_card, pay_paypal, pay_klarna, paypal_client_id || null, paypal_client_secret || null, payment_method_layout, payment_method_types_json ? JSON.stringify(payment_method_types_json) : null],
         )
         await client.end()
         res.json({ ok: true })
@@ -5107,6 +5159,7 @@ async function start() {
 
     httpApp.get('/admin-hub/v1/platform-checkout-settings', requireSellerAuth, requireSuperuser, platformCheckoutSettingsGET)
     httpApp.put('/admin-hub/v1/platform-checkout-settings', requireSellerAuth, requireSuperuser, platformCheckoutSettingsPUT)
+    httpApp.get('/admin-hub/v1/stripe-payment-methods', requireSellerAuth, requireSuperuser, stripePaymentMethodsGET)
     httpApp.post(
       '/admin-hub/v1/platform-checkout-settings/test-stripe',
       requireSellerAuth,

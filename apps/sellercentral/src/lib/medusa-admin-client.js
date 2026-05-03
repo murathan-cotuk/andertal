@@ -1200,6 +1200,10 @@ class MedusaAdminClient {
     });
   }
 
+  async getStripePaymentMethods() {
+    return this.request('/admin-hub/v1/stripe-payment-methods');
+  }
+
   /** Superuser: Stripe Secret testen (optional aktuelle Formularwerte); siehe Backend balance.retrieve */
   async testPlatformStripeConnection(data = {}) {
     return this.request('/admin-hub/v1/platform-checkout-settings/test-stripe', {

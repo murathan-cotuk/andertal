@@ -950,7 +950,8 @@ export default function FlowsPage() {
   const [togglingId, setTogglingId]     = useState("");
   const [createOpen, setCreateOpen]     = useState(false);
   const [newName, setNewName]           = useState("");
-  const [newTrigger, setNewTrigger]     = useState("abandoned_cart");
+  /** Default order_placed: sipariş onayı akışları en sık kullanılan; sepet terk için düzenlemede "Abandoned cart" seçin. */
+  const [newTrigger, setNewTrigger]     = useState("order_placed");
   const [newNameErr, setNewNameErr]     = useState("");
   const [smtpConfigured, setSmtpConfigured] = useState(null);
   const [smtpSenders, setSmtpSenders] = useState([]);
@@ -1153,7 +1154,7 @@ export default function FlowsPage() {
       if (flow) setFlows((prev) => [...prev, { ...flow, step_count: flow.step_count ?? 0 }]);
       setCreateOpen(false);
       setNewName("");
-      setNewTrigger(newAudience === "seller" ? "order_placed" : "abandoned_cart");
+      setNewTrigger("order_placed");
       setNewAudience("customer");
       setNewNameErr("");
     } catch (e) {
@@ -1548,7 +1549,7 @@ export default function FlowsPage() {
         content: t.createBtn,
         onAction: () => {
           setNewName("");
-          setNewTrigger("abandoned_cart");
+          setNewTrigger("order_placed");
           setNewAudience("customer");
           setNewNameErr("");
           setCreateOpen(true);
