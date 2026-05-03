@@ -71,7 +71,7 @@ const nextConfig = {
     const csp = [
       "default-src 'self'",
       // Next.js hydration, styled-components, Stripe SDK, Trustpilot widget
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://widget.trustpilot.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://widget.trustpilot.com https://invitejs.trustpilot.com",
       // Styled-components injects inline styles
       "style-src 'self' 'unsafe-inline'",
       // Product images from any HTTPS source; data URIs for QR codes / placeholders

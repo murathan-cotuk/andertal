@@ -366,6 +366,9 @@ function computeParentPresent(parentRow, idx) {
     hersteller: kp("hersteller"),
     hersteller_information: kp("hersteller_information"),
     verantwortliche_person_information: kp("verantwortliche_person_information"),
+    weee_number: kp("weee_number"),
+    eprel_number: kp("eprel_number"),
+    productFilesTouched: [1, 2, 3, 4, 5].some((n) => kp(`file_${n}_url`)),
     type: kp("type"),
     ean: kp("ean"),
     weight_grams: kp("weight_grams"),
@@ -462,6 +465,21 @@ function collectVariantMetafields(row, headers, idx) {
     if (k) out.push({ key: k, value: v });
   }
   return out.length ? out : undefined;
+}
+
+function collectProductFiles(row, idx) {
+  const files = [];
+  for (let n = 1; n <= 5; n++) {
+    const urlCol = idx[`file_${n}_url`];
+    if (urlCol === undefined) continue;
+    const url = str(row[urlCol] ?? "");
+    if (!url) continue;
+    const nameCol = idx[`file_${n}_name`];
+    const rawName = nameCol !== undefined ? str(row[nameCol] ?? "") : "";
+    const name = rawName || url.split("/").pop().split("?")[0] || `Datei ${n}`;
+    files.push({ name, url });
+  }
+  return files.length ? files : undefined;
 }
 
 function collectImageSlotsFromRow(row, idx) {
@@ -781,6 +799,9 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
   if (parentPresent.verantwortliche_person_information && pm.verantwortliche_person_information) {
     m.verantwortliche_person_information = pm.verantwortliche_person_information;
   }
+  if (parentPresent.weee_number && pm.weee_number) m.weee_number = pm.weee_number;
+  if (parentPresent.eprel_number && pm.eprel_number) m.eprel_number = pm.eprel_number;
+  if (parentPresent.productFilesTouched && Array.isArray(pm.product_files)) m.product_files = pm.product_files;
   if (parentPresent.type && pm.type) m.type = pm.type;
 
   if (parentPresent.metafieldTouched && Array.isArray(pm.metafields)) {
@@ -995,6 +1016,9 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     hersteller: G("hersteller") || undefined,
     hersteller_information: G("hersteller_information") || undefined,
     verantwortliche_person_information: G("verantwortliche_person_information") || undefined,
+    weee_number: G("weee_number") || undefined,
+    eprel_number: G("eprel_number") || undefined,
+    ...((() => { const pf = collectProductFiles(parentRow, idx); return pf ? { product_files: pf } : {}; })()),
     ...(metafields ? { metafields } : {}),
   };
 

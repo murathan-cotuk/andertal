@@ -101,7 +101,19 @@
     "bonusApply": "Anwenden",
     "bonusDiscount": "Bonus-Rabatt",
     "bonusLogin": "Melden Sie sich an, um Bonuspunkte einzulösen.",
-    "bonusError": "Bonuspunkte konnten nicht angewendet werden."
+    "bonusError": "Bonuspunkte konnten nicht angewendet werden.",
+    "saveAddress": "Diese Lieferadresse in meinem Konto speichern",
+    "methodCard": "Karte",
+    "methodPaypal": "PayPal",
+    "methodKlarna": "Klarna",
+    "methodSepa": "SEPA-Lastschrift",
+    "methodLink": "Link",
+    "methodIdeal": "iDEAL",
+    "methodBancontact": "Bancontact",
+    "methodEps": "EPS",
+    "methodP24": "Przelewy24",
+    "methodGiropay": "Giropay",
+    "methodSofort": "Sofort"
   },
   "accountPanel": {
     "hello": "Hallo, {name}",

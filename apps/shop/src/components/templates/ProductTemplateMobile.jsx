@@ -1942,12 +1942,19 @@ export default function ProductTemplateMobile() {
                   { label: "Rückgabe", value: `${returnDays} Tage, ${returnCost}` },
                   { label: "Verkäufer", value: effectiveStoreName },
                   ...((variant?.ean || meta.ean) ? [{ label: "EAN", value: variant?.ean || meta.ean }] : []),
+                  ...(meta.weee_number ? [{ label: "WEEE-Reg.", value: String(meta.weee_number) }] : []),
                 ].map(({ label, value }) => (
                   <InfoRow key={label}>
                     <InfoLabel>{label}</InfoLabel>
                     <InfoValue title={String(value ?? "")}>{value}</InfoValue>
                   </InfoRow>
                 ))}
+                {meta.eprel_number && (
+                  <InfoRow>
+                    <InfoLabel>EPREL</InfoLabel>
+                    <InfoValue>{String(meta.eprel_number)}</InfoValue>
+                  </InfoRow>
+                )}
               </InfoList>
             </BuyboxInner>
           </BuyboxCard>
@@ -2062,6 +2069,38 @@ export default function ProductTemplateMobile() {
         </DescriptionSection>
       )}
 
+      {Array.isArray(meta.product_files) && meta.product_files.length > 0 && (
+        <DescriptionSection as="section" style={{ marginTop: 24 }}>
+          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>
+            {{ de: "Dateien", en: "Files", tr: "Dosyalar", fr: "Fichiers", it: "File", es: "Archivos" }[locale] ?? "Dateien"}
+          </h3>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {meta.product_files.map((file, i) => {
+              const url = String(file?.url || "");
+              const name = String(file?.name || url.split("/").pop().split("?")[0] || "Datei");
+              const isPdf = url.toLowerCase().includes(".pdf") || String(file?.type || "").toLowerCase().includes("pdf");
+              return (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 7,
+                    padding: "8px 14px", background: "#f9fafb",
+                    border: "1px solid #e5e7eb", borderRadius: 8,
+                    textDecoration: "none", color: "#111827",
+                    fontSize: "0.875rem", fontWeight: 500,
+                  }}
+                >
+                  <span style={{ fontSize: 15, flexShrink: 0 }}>{isPdf ? "📄" : "📎"}</span>
+                  <span style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                </a>
+              );
+            })}
+          </div>
+        </DescriptionSection>
+      )}
 
       <ReviewsSection id="reviews">
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>

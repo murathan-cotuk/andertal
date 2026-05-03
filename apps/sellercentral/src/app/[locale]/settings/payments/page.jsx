@@ -3,17 +3,23 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Page, Layout, Card, Text, BlockStack, InlineStack,
-  Button, Banner, Badge, Box, Select,
+  Button, Banner, Badge, Box, Select, TextField, Divider,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-const fmt = (cents) =>
-  (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+// ── Constants ──────────────────────────────────────────────────────────────────
+const COMMISSION_RATE = 0.12;
 
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
-const fmtDateTime = (d) => d ? new Date(d).toLocaleString("de-DE") : "—";
+// ── Formatters ────────────────────────────────────────────────────────────────
+const fmt = (cents) =>
+  ((cents || 0) / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+
+const fmtDate = (d) =>
+  d ? new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+
+const fmtDateTime = (d) =>
+  d ? new Date(d).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
 const csvEscape = (v) => {
   const s = v == null ? "" : String(v);
@@ -21,67 +27,53 @@ const csvEscape = (v) => {
   return s;
 };
 
-/** Generate the last N 15-day settlement periods, newest first */
+// ── Period generator (15-day settlement periods) ──────────────────────────────
 function generatePeriods(count = 12) {
   const periods = [];
-  // Periods: 1st-15th and 16th-end-of-month
   const now = new Date();
   let year = now.getFullYear();
-  let month = now.getMonth(); // 0-indexed
-
+  let month = now.getMonth();
   for (let i = 0; i < count; i++) {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    // Second half: 16 → end
     periods.push({
       label: `16.${String(month + 1).padStart(2, "0")}.${year} – ${daysInMonth}.${String(month + 1).padStart(2, "0")}.${year}`,
       start: new Date(year, month, 16).toISOString(),
       end: new Date(year, month, daysInMonth, 23, 59, 59).toISOString(),
       key: `${year}-${String(month + 1).padStart(2, "0")}-2`,
     });
-    // First half: 1 → 15
     periods.push({
       label: `01.${String(month + 1).padStart(2, "0")}.${year} – 15.${String(month + 1).padStart(2, "0")}.${year}`,
       start: new Date(year, month, 1).toISOString(),
       end: new Date(year, month, 15, 23, 59, 59).toISOString(),
       key: `${year}-${String(month + 1).padStart(2, "0")}-1`,
     });
-    // Go to previous month
     month -= 1;
     if (month < 0) { month = 11; year -= 1; }
   }
   return periods;
 }
-
 const PERIODS = generatePeriods(12);
-const COMMISSION_RATE = 0.12;
 
-// Badge color for payout status
+// ── Status helpers ────────────────────────────────────────────────────────────
 const statusTone = (s) => {
   if (s === "bezahlt" || s === "paid") return "success";
-  if (s === "ausstehend" || s === "pending") return "warning";
-  if (s === "verarbeitung" || s === "processing") return "info";
+  if (s === "pending" || s === "ausstehend") return "warning";
+  if (s === "processing" || s === "verarbeitung") return "info";
+  if (s === "failed") return "critical";
   return "new";
 };
-
 const statusLabel = (s) => {
-  const map = { bezahlt: "Bezahlt", paid: "Bezahlt", ausstehend: "Ausstehend", pending: "Ausstehend", processing: "In Verarbeitung", verarbeitung: "In Verarbeitung" };
+  const map = {
+    bezahlt: "Bezahlt", paid: "Bezahlt",
+    ausstehend: "Ausstehend", pending: "Ausstehend",
+    processing: "In Verarbeitung", verarbeitung: "In Verarbeitung",
+    failed: "Fehlgeschlagen", skipped: "Übersprungen",
+    not_applicable: "—",
+  };
   return map[s] || s || "Offen";
 };
 
-// ── Stat Card ─────────────────────────────────────────────────────────────────
-function StatBox({ label, value, sub, tone }) {
-  return (
-    <div style={{ flex: 1, minWidth: 140, background: "#f9fafb", borderRadius: 10, padding: "14px 18px", border: "1px solid #f3f4f6" }}>
-      <Text variant="bodySm" tone="subdued">{label}</Text>
-      <div style={{ fontSize: 22, fontWeight: 700, color: tone === "success" ? "#059669" : tone === "critical" ? "#dc2626" : "#111827", marginTop: 4 }}>
-        {value}
-      </div>
-      {sub && <Text variant="bodySm" tone="subdued">{sub}</Text>}
-    </div>
-  );
-}
-
-// ── IBAN Helpers ──────────────────────────────────────────────────────────────
+// ── IBAN helpers ──────────────────────────────────────────────────────────────
 function validateIban(raw) {
   const v = raw.replace(/\s/g, "").toUpperCase();
   if (!v) return { ok: false, error: "IBAN darf nicht leer sein." };
@@ -101,31 +93,80 @@ function formatIbanInput(raw) {
   return v.match(/.{1,4}/g)?.join(" ") || v;
 }
 
-// ── IBAN Management Card ───────────────────────────────────────────────────────
+// ── KPI Card ──────────────────────────────────────────────────────────────────
+function KpiCard({ label, value, sub, tone, highlight, icon }) {
+  const color =
+    tone === "success" ? "#059669" :
+    tone === "critical" ? "#dc2626" :
+    tone === "info" ? "#2563eb" : "#111827";
+  return (
+    <div style={{
+      flex: "1 1 160px", minWidth: 150,
+      background: highlight ? "#f0fdf4" : "#fff",
+      borderRadius: 12, padding: "18px 20px",
+      border: highlight ? "1.5px solid #6ee7b7" : "1px solid #e5e7eb",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+    }}>
+      <InlineStack gap="100" blockAlign="center">
+        {icon && <span style={{ fontSize: 15 }}>{icon}</span>}
+        <Text variant="bodySm" tone="subdued">{label}</Text>
+      </InlineStack>
+      <div style={{ fontSize: 22, fontWeight: 700, color, marginTop: 6, letterSpacing: "-0.3px" }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{ marginTop: 3 }}>
+          <Text variant="bodySm" tone="subdued">{sub}</Text>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Sortable Column Header ────────────────────────────────────────────────────
+function SortTh({ label, col, sortCol, sortDir, onSort, style }) {
+  const active = sortCol === col;
+  return (
+    <div
+      onClick={() => onSort(col)}
+      style={{
+        cursor: "pointer", userSelect: "none",
+        display: "flex", alignItems: "center", gap: 3,
+        color: active ? "#111827" : "#6b7280",
+        ...style,
+      }}
+    >
+      {label}
+      <span style={{ fontSize: 9, color: active ? "#2563eb" : "#d1d5db", lineHeight: 1 }}>
+        {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+      </span>
+    </div>
+  );
+}
+
+// ── IBAN Management Section ──────────────────────────────────────────────────
 function IbanSection({ commissionRate }) {
   const client = getMedusaAdminClient();
   const unsaved = useUnsavedChanges();
-  const sellerPct = Math.round((1 - (commissionRate ?? 0.12)) * 100);
-  const platformPct = 100 - sellerPct;
+  const sellerPct = Math.round((1 - (commissionRate ?? COMMISSION_RATE)) * 100);
 
-  const [loading, setLoading]       = useState(true);
-  const [saving, setSaving]         = useState(false);
-  const [editing, setEditing]       = useState(false);
-  const [err, setErr]               = useState("");
-  const [ok, setOk]                 = useState("");
-  const [ibanError, setIbanError]   = useState("");
-  const [stripeConnect, setStripeConnect] = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
+  const [editing, setEditing]     = useState(false);
+  const [err, setErr]             = useState("");
+  const [ok, setOk]               = useState("");
+  const [ibanError, setIbanError] = useState("");
 
-  const [savedIban, setSavedIban]           = useState("");
-  const [savedHolder, setSavedHolder]       = useState("");
-  const [savedBic, setSavedBic]             = useState("");
-  const [savedBankName, setSavedBankName]   = useState("");
+  const [savedIban, setSavedIban]         = useState("");
+  const [savedHolder, setSavedHolder]     = useState("");
+  const [savedBic, setSavedBic]           = useState("");
+  const [savedBankName, setSavedBankName] = useState("");
   const [initialSnapshot, setInitialSnapshot] = useState(null);
 
-  const [iban, setIban]             = useState("");
-  const [holder, setHolder]         = useState("");
-  const [bic, setBic]               = useState("");
-  const [bankName, setBankName]     = useState("");
+  const [iban, setIban]         = useState("");
+  const [holder, setHolder]     = useState("");
+  const [bic, setBic]           = useState("");
+  const [bankName, setBankName] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -144,15 +185,11 @@ function IbanSection({ commissionRate }) {
           bankName: s.payment_bank_name || "",
         }));
       } catch (_) {}
-      try {
-        const sc = await client.stripeConnectStatus();
-        setStripeConnect(sc || null);
-      } catch (_) {}
       finally { setLoading(false); }
     })();
   }, [client]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     setErr(""); setOk(""); setIbanError("");
     const trimmed = iban.replace(/\s/g, "").toUpperCase();
     if (trimmed) {
@@ -180,18 +217,20 @@ function IbanSection({ commissionRate }) {
       setOk("Bankdaten gespeichert."); setEditing(false);
     } catch (e) { setErr(e?.message || "Fehler beim Speichern."); }
     finally { setSaving(false); }
-  };
+  }, [client, iban, holder, bic, bankName]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setIban(savedIban); setHolder(savedHolder); setBic(savedBic); setBankName(savedBankName);
     setIbanError(""); setErr(""); setEditing(false);
-  };
+  }, [savedIban, savedHolder, savedBic, savedBankName]);
+
   const currentSnapshot = useMemo(() => JSON.stringify({
     iban: (iban || "").replace(/\s/g, "").toUpperCase(),
     holder: holder || "",
     bic: (bic || "").replace(/\s/g, "").toUpperCase(),
     bankName: bankName || "",
   }), [iban, holder, bic, bankName]);
+
   const isDirty = !loading && initialSnapshot !== null && currentSnapshot !== initialSnapshot;
 
   useEffect(() => {
@@ -202,7 +241,7 @@ function IbanSection({ commissionRate }) {
       unsaved.clearHandlers();
       unsaved.setDirty(false);
     };
-  }, [unsaved, isDirty, handleSave]);
+  }, [unsaved, isDirty, handleSave, handleCancel]);
 
   if (loading) return null;
 
@@ -213,14 +252,14 @@ function IbanSection({ commissionRate }) {
 
       {/* How payouts work */}
       <Box paddingBlockEnd="400">
-        <div style={{ background: "#f9fafb", borderRadius: 12, border: "1px solid #f3f4f6", padding: "20px 24px" }}>
+        <div style={{ background: "#f8fafc", borderRadius: 12, border: "1px solid #e2e8f0", padding: "20px 24px" }}>
           <BlockStack gap="300">
-            <Text as="p" variant="bodyMd" fontWeight="semibold">💳 So funktionieren Auszahlungen</Text>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <Text as="p" variant="bodyMd" fontWeight="semibold">So funktionieren Auszahlungen</Text>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
               {[
-                { n: "1", label: "Kunde kauft", desc: "Zahlung geht über Stripe." },
-                { n: "2", label: "Sperrfrist", desc: "Auszahlung wird nach Lieferung +14 Tagen freigegeben." },
-                { n: "3", label: "Auszahlung", desc: stripeConnect?.onboarding_complete ? "Stripe Connect zahlt automatisch auf dein verbundenes Bankkonto aus." : "Bitte Stripe Connect Onboarding abschließen, damit Auszahlungen laufen." },
+                { n: "1", label: "Kunde kauft", desc: "Zahlung geht sicher über Stripe ein." },
+                { n: "2", label: "Sperrfrist 14 Tage", desc: "Nach Lieferbestätigung beginnt die 14-tägige Auszahlungssperrfrist." },
+                { n: "3", label: `Auszahlung (${sellerPct}%)`, desc: "Nach Ablauf der Sperrfrist wird der Betrag automatisch auf die hinterlegte IBAN überwiesen." },
               ].map(({ n, label, desc }) => (
                 <div key={n} style={{ background: "#fff", borderRadius: 8, padding: "12px 14px", border: "1px solid #e5e7eb" }}>
                   <InlineStack gap="200" blockAlign="center">
@@ -237,30 +276,6 @@ function IbanSection({ commissionRate }) {
         </div>
       </Box>
 
-      {stripeConnect?.connected && (
-        <Box paddingBlockEnd="300">
-          <Banner tone={stripeConnect?.onboarding_complete ? "success" : "warning"}>
-            {stripeConnect?.onboarding_complete
-              ? "Stripe Connect ist aktiv. Auszahlungen laufen über das bei Stripe hinterlegte Bankkonto."
-              : "Stripe Connect verbunden, aber Onboarding noch unvollständig. Bitte unter Settings > Stripe Connect abschließen."}
-          </Banner>
-        </Box>
-      )}
-
-      {stripeConnect?.payout_bank?.last4 && (
-        <Box paddingBlockEnd="300">
-          <Card>
-            <BlockStack gap="100">
-              <Text as="h3" variant="headingSm">Stripe-Auszahlungskonto (synchronisiert)</Text>
-              <Text as="p" variant="bodySm">Bank: {stripeConnect.payout_bank.bank_name || "—"}</Text>
-              <Text as="p" variant="bodySm">Kontoinhaber: {stripeConnect.payout_bank.holder_name || "—"}</Text>
-              <Text as="p" variant="bodySm">Letzte 4: {`•••• ${stripeConnect.payout_bank.last4}`}</Text>
-              <Text as="p" variant="bodySm">Land / Währung: {`${(stripeConnect.payout_bank.country || "—").toUpperCase()} / ${(stripeConnect.payout_bank.currency || "—").toUpperCase()}`}</Text>
-            </BlockStack>
-          </Card>
-        </Box>
-      )}
-
       {/* IBAN card */}
       <Card>
         <BlockStack gap="400">
@@ -276,7 +291,6 @@ function IbanSection({ commissionRate }) {
             )}
           </InlineStack>
 
-          {/* Saved display */}
           {!editing && (
             savedIban ? (
               <div style={{ background: "#f9fafb", borderRadius: 10, padding: "16px 20px", border: "1px solid #f3f4f6" }}>
@@ -326,7 +340,6 @@ function IbanSection({ commissionRate }) {
             )
           )}
 
-          {/* Edit form */}
           {editing && (
             <BlockStack gap="300">
               <Box borderBlockStartWidth="025" borderColor="border-subdued" paddingBlockStart="300">
@@ -381,14 +394,23 @@ function IbanSection({ commissionRate }) {
   );
 }
 
-// ── SELLER VIEW ───────────────────────────────────────────────────────────────
+// ── Seller Payments View ──────────────────────────────────────────────────────
 function SellerPaymentsView() {
-  const [periodKey, setPeriodKey] = useState(PERIODS[0].key);
-  const [summary, setSummary] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const [periodKey, setPeriodKey]     = useState(PERIODS[0].key);
+  const [summary, setSummary]         = useState(null);
+  const [history, setHistory]         = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading]         = useState(false);
+  const [err, setErr]                 = useState("");
+
+  // Table controls
+  const [sortCol, setSortCol]         = useState("created_at");
+  const [sortDir, setSortDir]         = useState("desc");
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterType, setFilterType]   = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [pageSize, setPageSize]       = useState("20");
+  const [page, setPage]               = useState(0);
 
   const selectedPeriod = PERIODS.find((p) => p.key === periodKey) || PERIODS[0];
 
@@ -403,142 +425,223 @@ function SellerPaymentsView() {
       ]);
       if (sumRes.status === "fulfilled") setSummary(sumRes.value?.summary || null);
       if (histRes.status === "fulfilled") setHistory(histRes.value?.payouts || []);
-      if (txRes && txRes.status === "fulfilled") {
-        setTransactions(Array.isArray(txRes.value?.transactions) ? txRes.value.transactions : []);
-      } else {
-        setTransactions([]);
-      }
+      if (txRes.status === "fulfilled") setTransactions(Array.isArray(txRes.value?.transactions) ? txRes.value.transactions : []);
+      else setTransactions([]);
     } catch (e) {
       setErr(e?.message || "Fehler beim Laden");
     } finally {
       setLoading(false);
     }
-  }, [periodKey]);
+  }, [selectedPeriod.start, selectedPeriod.end]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const revenue = summary?.total_cents ?? 0;
-  const commission = Math.round(revenue * COMMISSION_RATE);
-  const shipping = summary?.shipping_cents ?? 0;
-  const refunds = summary?.refund_cents ?? 0;
-  const net = revenue - commission - refunds + shipping;
-  const payoutStatus = summary?.status || null;
-  const selectedStartTs = new Date(selectedPeriod.start).getTime();
-  const selectedEndTs = new Date(selectedPeriod.end).getTime();
-  const periodTransactions = transactions.filter((t) => {
-    const byDelivery = t?.delivery_date ? new Date(t.delivery_date).getTime() : NaN;
-    const byCreated = t?.created_at ? new Date(t.created_at).getTime() : NaN;
-    const ts = Number.isFinite(byDelivery) ? byDelivery : byCreated;
-    return Number.isFinite(ts) && ts >= selectedStartTs && ts <= selectedEndTs;
-  });
+  // Period-filtered transactions
+  const selectedStartTs = useMemo(() => new Date(selectedPeriod.start).getTime(), [selectedPeriod.start]);
+  const selectedEndTs   = useMemo(() => new Date(selectedPeriod.end).getTime(), [selectedPeriod.end]);
 
-  const exportTransactionsCsv = () => {
+  const periodTransactions = useMemo(() => transactions.filter((t) => {
+    const ts = t?.delivery_date
+      ? new Date(t.delivery_date).getTime()
+      : t?.created_at ? new Date(t.created_at).getTime() : NaN;
+    return Number.isFinite(ts) && ts >= selectedStartTs && ts <= selectedEndTs;
+  }), [transactions, selectedStartTs, selectedEndTs]);
+
+  // Sort handler — toggles direction if same column, resets to desc for new column
+  const handleSort = useCallback((col) => {
+    setSortCol((prev) => {
+      if (prev === col) setSortDir((d) => d === "asc" ? "desc" : "asc");
+      else setSortDir("desc");
+      return col;
+    });
+    setPage(0);
+  }, []);
+
+  // Filtered + sorted transactions
+  const displayTransactions = useMemo(() => {
+    let rows = periodTransactions;
+
+    if (filterSearch.trim()) {
+      const q = filterSearch.toLowerCase();
+      rows = rows.filter((t) =>
+        String(t.order_number || "").toLowerCase().includes(q) ||
+        [t.first_name, t.last_name].filter(Boolean).join(" ").toLowerCase().includes(q)
+      );
+    }
+    if (filterType === "refund") rows = rows.filter((t) => (t.refund_cents || 0) > 0 || t.is_refund);
+    if (filterType === "sale")   rows = rows.filter((t) => (t.refund_cents || 0) === 0 && !t.is_refund);
+    if (filterStatus === "eligible") rows = rows.filter((t) => t.payout_eligible);
+    if (filterStatus === "pending")  rows = rows.filter((t) => !t.payout_eligible);
+
+    rows = [...rows].sort((a, b) => {
+      let av, bv;
+      if (sortCol === "created_at") { av = new Date(a.created_at || 0).getTime(); bv = new Date(b.created_at || 0).getTime(); }
+      else if (sortCol === "total_cents")      { av = a.total_cents || 0;      bv = b.total_cents || 0; }
+      else if (sortCol === "commission_cents") { av = a.commission_cents || 0; bv = b.commission_cents || 0; }
+      else if (sortCol === "payout_cents")     { av = a.payout_cents || 0;     bv = b.payout_cents || 0; }
+      else if (sortCol === "delivery_date")    { av = new Date(a.delivery_date || 0).getTime(); bv = new Date(b.delivery_date || 0).getTime(); }
+      else { av = 0; bv = 0; }
+      return sortDir === "asc" ? av - bv : bv - av;
+    });
+
+    return rows;
+  }, [periodTransactions, sortCol, sortDir, filterSearch, filterType, filterStatus]);
+
+  const totalFiltered = displayTransactions.length;
+  const ps = Number(pageSize) || 0;
+  const pagedTransactions = ps > 0
+    ? displayTransactions.slice(page * ps, page * ps + ps)
+    : displayTransactions;
+  const totalPages = ps > 0 ? Math.ceil(totalFiltered / ps) : 1;
+
+  // KPI calculations
+  const revenue    = summary?.total_cents ?? 0;
+  const commission = Math.round(revenue * COMMISSION_RATE);
+  const shipping   = summary?.shipping_cents ?? 0;
+  const refunds    = summary?.refund_cents ?? 0;
+  const adSpend    = summary?.ad_spend_cents ?? 0;
+  const net        = revenue - commission - adSpend - refunds + shipping;
+  const payoutStatus = summary?.status || null;
+
+  const exportCsv = () => {
     const rows = [
-      [
-        "order_number",
-        "created_at",
-        "delivery_date",
-        "customer",
-        "currency",
-        "gross_revenue_cents",
-        "commission_rate",
-        "commission_cents",
-        "payout_cents",
-        "shipping_cents",
-        "discount_cents",
-        "payout_eligible",
-      ],
-      ...periodTransactions.map((t) => [
+      ["Bestellnr.", "Datum", "Lieferdatum", "Kunde", "Brutto (€)", "Provision (€)", "Versand (€)", "Rabatt (€)", "Netto (€)", "Auszahl-Status"],
+      ...displayTransactions.map((t) => [
         t.order_number || "",
-        t.created_at || "",
-        t.delivery_date || "",
+        fmtDateTime(t.created_at),
+        fmtDate(t.delivery_date),
         [t.first_name, t.last_name].filter(Boolean).join(" ").trim(),
-        t.currency || "EUR",
-        t.total_cents || 0,
-        t.commission_rate || 0,
-        t.commission_cents || 0,
-        t.payout_cents || 0,
-        t.shipping_cents || 0,
-        t.discount_cents || 0,
-        t.payout_eligible ? "yes" : "no",
+        ((t.total_cents || 0) / 100).toFixed(2),
+        ((t.commission_cents || 0) / 100).toFixed(2),
+        ((t.shipping_cents || 0) / 100).toFixed(2),
+        ((t.discount_cents || 0) / 100).toFixed(2),
+        ((t.payout_cents || 0) / 100).toFixed(2),
+        t.payout_eligible ? "Freigegeben" : "Ausstehend",
       ]),
     ];
     const csv = rows.map((r) => r.map(csvEscape).join(";")).join("\n");
-    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `transactions-${selectedPeriod.key}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    a.download = `transaktionen-${selectedPeriod.key}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   };
 
   const periodOptions = PERIODS.map((p) => ({ label: p.label, value: p.key }));
+  const hasActiveFilters = filterSearch.trim() || filterType !== "all" || filterStatus !== "all";
 
   return (
     <Page title="Zahlungen & Auszahlungen">
       <Layout>
         <Layout.Section>
-          {err && <Banner tone="critical" onDismiss={() => setErr("")}><Text>{err}</Text></Banner>}
+          {err && (
+            <Box paddingBlockEnd="400">
+              <Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner>
+            </Box>
+          )}
 
-          {/* Period selector */}
+          {/* ── Period Selector ── */}
           <Card>
-            <BlockStack gap="400">
-              <InlineStack align="space-between" blockAlign="center">
+            <InlineStack align="space-between" blockAlign="center" wrap={false}>
+              <BlockStack gap="100">
                 <Text variant="headingMd" as="h2">Abrechnungszeitraum</Text>
+                <Text variant="bodySm" tone="subdued">15-tägige Abrechnungsperioden (1.–15. und 16.–Monatsende)</Text>
+              </BlockStack>
+              <InlineStack gap="300" blockAlign="center">
+                <div style={{ width: 300 }}>
+                  <Select
+                    label=""
+                    labelHidden
+                    options={periodOptions}
+                    value={periodKey}
+                    onChange={(v) => { setPeriodKey(v); setPage(0); }}
+                  />
+                </div>
                 <Button onClick={loadData} loading={loading} size="slim">Aktualisieren</Button>
               </InlineStack>
-              <div style={{ maxWidth: 340 }}>
-                <Select
-                  label="Zeitraum auswählen"
-                  options={periodOptions}
-                  value={periodKey}
-                  onChange={setPeriodKey}
-                />
-              </div>
-            </BlockStack>
+            </InlineStack>
           </Card>
 
-          {/* Summary stats */}
+          {/* ── KPI Dashboard ── */}
           <Box paddingBlockStart="400">
             <Card>
               <BlockStack gap="400">
                 <InlineStack align="space-between" blockAlign="center">
-                  <Text variant="headingMd" as="h2">Übersicht — {selectedPeriod.label}</Text>
-                  {payoutStatus && (
-                    <Badge tone={statusTone(payoutStatus)}>{statusLabel(payoutStatus)}</Badge>
-                  )}
+                  <BlockStack gap="050">
+                    <Text variant="headingMd" as="h2">Finanzübersicht</Text>
+                    <Text variant="bodySm" tone="subdued">{selectedPeriod.label}</Text>
+                  </BlockStack>
+                  {payoutStatus && <Badge tone={statusTone(payoutStatus)}>{statusLabel(payoutStatus)}</Badge>}
                 </InlineStack>
+
                 {loading ? (
-                  <Text tone="subdued">Laden…</Text>
+                  <Text tone="subdued">Daten werden geladen…</Text>
                 ) : (
                   <>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                      <StatBox label="Gesamtumsatz (brutto)" value={fmt(revenue)} />
-                      <StatBox label={`Provision (${(COMMISSION_RATE * 100).toFixed(0)} %)`} value={`– ${fmt(commission)}`} tone="critical" />
-                      <StatBox label="Rückerstattungen" value={refunds > 0 ? `– ${fmt(refunds)}` : fmt(0)} tone={refunds > 0 ? "critical" : undefined} />
-                      <StatBox label="Versandkostenbeteiligung" value={fmt(shipping)} />
-                      <StatBox label="Netto-Auszahlung" value={fmt(Math.max(0, net))} tone="success"
-                        sub="(Lieferbestätigte Bestellungen > 14 Tage)" />
+                      <KpiCard
+                        icon="📦"
+                        label="Gesamtumsatz (brutto)"
+                        value={fmt(revenue)}
+                        sub={`${periodTransactions.length} Bestellungen`}
+                      />
+                      <KpiCard
+                        icon="💸"
+                        label={`Provision (${(COMMISSION_RATE * 100).toFixed(0)} %)`}
+                        value={`– ${fmt(commission)}`}
+                        tone="critical"
+                        sub="Plattformgebühr"
+                      />
+                      <KpiCard
+                        icon="📣"
+                        label="Werbekosten"
+                        value={adSpend > 0 ? `– ${fmt(adSpend)}` : "–"}
+                        tone={adSpend > 0 ? "critical" : undefined}
+                        sub="Reklam giderleri"
+                      />
+                      <KpiCard
+                        icon="↩️"
+                        label="Rückerstattungen"
+                        value={refunds > 0 ? `– ${fmt(refunds)}` : fmt(0)}
+                        tone={refunds > 0 ? "critical" : undefined}
+                      />
+                      <KpiCard
+                        icon="🚚"
+                        label="Versandkostenbeteiligung"
+                        value={fmt(shipping)}
+                        tone="info"
+                      />
+                      <KpiCard
+                        icon="✅"
+                        label="Netto-Auszahlung"
+                        value={fmt(Math.max(0, net))}
+                        tone="success"
+                        highlight
+                        sub="Nach 14-Tage-Sperrfrist"
+                      />
                     </div>
-                    {summary === null && (
-                      <Banner tone="info">
-                        <Text>Für diesen Zeitraum liegen noch keine Daten vor.</Text>
-                      </Banner>
-                    )}
-                    {net > 0 && payoutStatus !== "bezahlt" && (
-                      <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "12px 16px" }}>
-                        <Text variant="bodySm">
-                          <strong>Verwendungszweck (Stripe):</strong>{" "}
-                          <code style={{ background: "#e0f2fe", padding: "2px 6px", borderRadius: 4, fontSize: 12 }}>
-                            {typeof window !== "undefined" ? localStorage.getItem("sellerId") || "SELLER_ID" : "SELLER_ID"}
-                            -{selectedPeriod.key}
-                          </code>
-                        </Text>
-                        <Text variant="bodySm" tone="subdued">Die Auszahlung erfolgt über Stripe. Keine IBAN-Angabe notwendig.</Text>
+
+                    {/* Net payout breakdown */}
+                    {revenue > 0 && (
+                      <div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 18px", border: "1px solid #e2e8f0" }}>
+                        <BlockStack gap="150">
+                          <Text variant="bodySm" fontWeight="semibold" tone="subdued">Berechnungsgrundlage</Text>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 32px", fontSize: 13 }}>
+                            <span>{fmt(revenue)} <span style={{ color: "#6b7280" }}>Umsatz</span></span>
+                            {commission > 0 && <span style={{ color: "#dc2626" }}>– {fmt(commission)} <span style={{ color: "#6b7280" }}>Provision</span></span>}
+                            {adSpend > 0  && <span style={{ color: "#dc2626" }}>– {fmt(adSpend)} <span style={{ color: "#6b7280" }}>Werbekosten</span></span>}
+                            {refunds > 0  && <span style={{ color: "#dc2626" }}>– {fmt(refunds)} <span style={{ color: "#6b7280" }}>Erstattungen</span></span>}
+                            {shipping > 0 && <span style={{ color: "#059669" }}>+ {fmt(shipping)} <span style={{ color: "#6b7280" }}>Versand</span></span>}
+                            <span style={{ fontWeight: 700, color: "#059669" }}>= {fmt(Math.max(0, net))} <span style={{ color: "#6b7280", fontWeight: 400 }}>Netto</span></span>
+                          </div>
+                        </BlockStack>
                       </div>
+                    )}
+
+                    {summary === null && (
+                      <Banner tone="info">Für diesen Zeitraum liegen noch keine Daten vor.</Banner>
                     )}
                   </>
                 )}
@@ -546,7 +649,202 @@ function SellerPaymentsView() {
             </Card>
           </Box>
 
-          {/* Payout history */}
+          {/* ── Transaction Table ── */}
+          <Box paddingBlockStart="400">
+            <Card padding="0">
+              {/* Table header */}
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
+                <InlineStack align="space-between" blockAlign="center">
+                  <BlockStack gap="050">
+                    <Text variant="headingMd" as="h2">Transaktionen</Text>
+                    <Text variant="bodySm" tone="subdued">
+                      {totalFiltered} Einträge{hasActiveFilters ? " (gefiltert)" : ""}
+                      {totalFiltered !== periodTransactions.length && ` von ${periodTransactions.length} gesamt`}
+                    </Text>
+                  </BlockStack>
+                  <InlineStack gap="200">
+                    {hasActiveFilters && (
+                      <Button
+                        size="slim"
+                        tone="critical"
+                        variant="plain"
+                        onClick={() => { setFilterSearch(""); setFilterType("all"); setFilterStatus("all"); setPage(0); }}
+                      >
+                        Filter zurücksetzen
+                      </Button>
+                    )}
+                    <Button size="slim" onClick={exportCsv} disabled={displayTransactions.length === 0}>
+                      CSV Export
+                    </Button>
+                  </InlineStack>
+                </InlineStack>
+              </div>
+
+              {/* Filter bar */}
+              <div style={{ padding: "12px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div style={{ flex: "1 1 200px", minWidth: 180 }}>
+                  <TextField
+                    label="Suche"
+                    labelHidden
+                    value={filterSearch}
+                    onChange={(v) => { setFilterSearch(v); setPage(0); }}
+                    placeholder="Bestellnr. oder Kundenname…"
+                    clearButton
+                    onClearButtonClick={() => { setFilterSearch(""); setPage(0); }}
+                    autoComplete="off"
+                  />
+                </div>
+                <div style={{ width: 160 }}>
+                  <Select
+                    label="Typ"
+                    labelHidden
+                    options={[
+                      { label: "Alle Typen", value: "all" },
+                      { label: "Bestellungen", value: "sale" },
+                      { label: "Rückerstattungen", value: "refund" },
+                    ]}
+                    value={filterType}
+                    onChange={(v) => { setFilterType(v); setPage(0); }}
+                  />
+                </div>
+                <div style={{ width: 160 }}>
+                  <Select
+                    label="Auszahl-Status"
+                    labelHidden
+                    options={[
+                      { label: "Alle Status", value: "all" },
+                      { label: "Freigegeben", value: "eligible" },
+                      { label: "Ausstehend", value: "pending" },
+                    ]}
+                    value={filterStatus}
+                    onChange={(v) => { setFilterStatus(v); setPage(0); }}
+                  />
+                </div>
+                <div style={{ width: 140 }}>
+                  <Select
+                    label="Einträge"
+                    labelHidden
+                    options={[
+                      { label: "20 pro Seite", value: "20" },
+                      { label: "50 pro Seite", value: "50" },
+                      { label: "100 pro Seite", value: "100" },
+                      { label: "Alle anzeigen", value: "0" },
+                    ]}
+                    value={pageSize}
+                    onChange={(v) => { setPageSize(v); setPage(0); }}
+                  />
+                </div>
+              </div>
+
+              {/* Table */}
+              {loading ? (
+                <Box padding="500"><Text tone="subdued" alignment="center">Transaktionen werden geladen…</Text></Box>
+              ) : displayTransactions.length === 0 ? (
+                <Box padding="500">
+                  <Text tone="subdued" alignment="center">
+                    {hasActiveFilters ? "Keine Transaktionen für die gewählten Filter." : "Keine Transaktionen in diesem Zeitraum."}
+                  </Text>
+                </Box>
+              ) : (
+                <>
+                  {/* Column headers */}
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "160px 1fr 1fr 100px 100px 80px 80px 100px 110px",
+                    gap: 8, padding: "10px 20px",
+                    borderBottom: "1px solid #e5e7eb",
+                    fontSize: 11, fontWeight: 600, color: "#6b7280",
+                    background: "#fafafa",
+                  }}>
+                    <SortTh label="Datum" col="created_at" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                    <div>Bestellnr.</div>
+                    <div>Kunde</div>
+                    <SortTh label="Brutto" col="total_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
+                    <SortTh label="Provision" col="commission_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
+                    <div style={{ textAlign: "right" }}>Versand</div>
+                    <div style={{ textAlign: "right" }}>Rabatt</div>
+                    <SortTh label="Netto" col="payout_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
+                    <SortTh label="Status" col="delivery_date" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "center" }} />
+                  </div>
+
+                  {/* Rows */}
+                  {pagedTransactions.map((t, i) => (
+                    <div
+                      key={`${t.id || ""}-${i}`}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "160px 1fr 1fr 100px 100px 80px 80px 100px 110px",
+                        gap: 8, padding: "11px 20px",
+                        borderBottom: "1px solid #f3f4f6",
+                        fontSize: 13, alignItems: "center",
+                        background: i % 2 === 0 ? "#fff" : "#fafafa",
+                      }}
+                    >
+                      <div style={{ color: "#374151" }}>
+                        <div>{fmtDate(t.created_at)}</div>
+                        {t.delivery_date && (
+                          <div style={{ fontSize: 11, color: "#9ca3af" }}>Lief.: {fmtDate(t.delivery_date)}</div>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, color: "#111827" }}>{t.order_number || t.id}</div>
+                      </div>
+                      <div style={{ color: "#374151" }}>
+                        {[t.first_name, t.last_name].filter(Boolean).join(" ") || "—"}
+                      </div>
+                      <div style={{ textAlign: "right", fontWeight: 500 }}>{fmt(t.total_cents)}</div>
+                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(t.commission_cents)}</div>
+                      <div style={{ textAlign: "right", color: "#2563eb" }}>{fmt(t.shipping_cents)}</div>
+                      <div style={{ textAlign: "right", color: "#6b7280" }}>{fmt(t.discount_cents)}</div>
+                      <div style={{ textAlign: "right", fontWeight: 700, color: "#059669" }}>{fmt(t.payout_cents)}</div>
+                      <div style={{ textAlign: "center" }}>
+                        <Badge tone={t.payout_eligible ? "success" : "warning"}>
+                          {t.payout_eligible ? "Freigegeben" : "Ausstehend"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Totals row */}
+                  {pagedTransactions.length > 1 && (
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "160px 1fr 1fr 100px 100px 80px 80px 100px 110px",
+                      gap: 8, padding: "11px 20px",
+                      borderTop: "2px solid #e5e7eb",
+                      fontSize: 13, fontWeight: 700,
+                      background: "#f9fafb",
+                    }}>
+                      <div style={{ color: "#6b7280", fontSize: 11 }}>Gesamt ({pagedTransactions.length})</div>
+                      <div /><div />
+                      <div style={{ textAlign: "right" }}>{fmt(pagedTransactions.reduce((s, t) => s + (t.total_cents || 0), 0))}</div>
+                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(pagedTransactions.reduce((s, t) => s + (t.commission_cents || 0), 0))}</div>
+                      <div style={{ textAlign: "right", color: "#2563eb" }}>{fmt(pagedTransactions.reduce((s, t) => s + (t.shipping_cents || 0), 0))}</div>
+                      <div style={{ textAlign: "right" }}>{fmt(pagedTransactions.reduce((s, t) => s + (t.discount_cents || 0), 0))}</div>
+                      <div style={{ textAlign: "right", color: "#059669" }}>{fmt(pagedTransactions.reduce((s, t) => s + (t.payout_cents || 0), 0))}</div>
+                      <div />
+                    </div>
+                  )}
+
+                  {/* Pagination */}
+                  {ps > 0 && totalPages > 1 && (
+                    <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text variant="bodySm" tone="subdued">
+                        {page * ps + 1}–{Math.min((page + 1) * ps, totalFiltered)} von {totalFiltered}
+                      </Text>
+                      <InlineStack gap="200">
+                        <Button size="slim" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>← Zurück</Button>
+                        <Text variant="bodySm" tone="subdued">Seite {page + 1} / {totalPages}</Text>
+                        <Button size="slim" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>Weiter →</Button>
+                      </InlineStack>
+                    </div>
+                  )}
+                </>
+              )}
+            </Card>
+          </Box>
+
+          {/* ── Payout History ── */}
           <Box paddingBlockStart="400">
             <Card padding="0">
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
@@ -558,7 +856,7 @@ function SellerPaymentsView() {
                 </Box>
               ) : (
                 <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 110px 110px 110px 90px", gap: 8, padding: "10px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 110px 110px 120px 100px", gap: 8, padding: "10px 20px", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#fafafa" }}>
                     <div>Zeitraum</div>
                     <div style={{ textAlign: "right" }}>Umsatz</div>
                     <div style={{ textAlign: "right" }}>Provision</div>
@@ -566,11 +864,9 @@ function SellerPaymentsView() {
                     <div style={{ textAlign: "center" }}>Status</div>
                   </div>
                   {history.map((p, i) => (
-                    <div key={p.id || i} style={{ display: "grid", gridTemplateColumns: "1.5fr 110px 110px 110px 90px", gap: 8, padding: "11px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center" }}>
+                    <div key={p.id || i} style={{ display: "grid", gridTemplateColumns: "1.5fr 110px 110px 120px 100px", gap: 8, padding: "12px 20px", borderBottom: "1px solid #f3f4f6", fontSize: 13, alignItems: "center" }}>
                       <div>
-                        <div style={{ fontSize: 12, color: "#374151" }}>
-                          {fmtDate(p.period_start)} – {fmtDate(p.period_end)}
-                        </div>
+                        <div style={{ color: "#111827", fontWeight: 500 }}>{fmtDate(p.period_start)} – {fmtDate(p.period_end)}</div>
                         {p.reference && (
                           <div style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{p.reference}</div>
                         )}
@@ -588,69 +884,42 @@ function SellerPaymentsView() {
             </Card>
           </Box>
 
-          {/* Detailed transactions */}
+          {/* ── IBAN Section ── */}
           <Box paddingBlockStart="400">
-            <Card padding="0">
-              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text variant="headingMd" as="h2">Transaktionen (Bestellungen / Rückgaben)</Text>
-                  <Button size="slim" onClick={exportTransactionsCsv} disabled={periodTransactions.length === 0}>
-                    CSV export
-                  </Button>
-                </InlineStack>
-              </div>
-              {periodTransactions.length === 0 ? (
-                <Box padding="500">
-                  <Text tone="subdued" alignment="center">Bu dönem için transaction girdisi yok.</Text>
-                </Box>
-              ) : (
-                <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.4fr 120px 120px 120px 90px 90px", gap: 8, padding: "10px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
-                    <div>Bestellung</div>
-                    <div style={{ textAlign: "right" }}>Umsatz</div>
-                    <div style={{ textAlign: "right" }}>Provision</div>
-                    <div style={{ textAlign: "right" }}>Netto</div>
-                    <div style={{ textAlign: "right" }}>Rabatt</div>
-                    <div style={{ textAlign: "center" }}>Status</div>
-                  </div>
-                  {periodTransactions.map((t, i) => (
-                    <div key={`${t.id || ""}-${i}`} style={{ display: "grid", gridTemplateColumns: "1.4fr 120px 120px 120px 90px 90px", gap: 8, padding: "11px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{t.order_number || t.id}</div>
-                        <div style={{ color: "#6b7280", fontSize: 12 }}>{[t.first_name, t.last_name].filter(Boolean).join(" ") || "—"}</div>
-                        <div style={{ color: "#9ca3af", fontSize: 11 }}>
-                          Oluşturma: {fmtDateTime(t.created_at)} | Teslim: {fmtDate(t.delivery_date)}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>{fmt(t.total_cents || 0)}</div>
-                      <div style={{ textAlign: "right", color: "#dc2626" }}>- {fmt(t.commission_cents || 0)}</div>
-                      <div style={{ textAlign: "right", fontWeight: 700, color: "#059669" }}>{fmt(t.payout_cents || 0)}</div>
-                      <div style={{ textAlign: "right" }}>{fmt(t.discount_cents || 0)}</div>
-                      <div style={{ textAlign: "center" }}>
-                        <Badge tone={t.payout_eligible ? "success" : "warning"}>
-                          {t.payout_eligible ? "Eligible" : "Pending"}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
+            <Card>
+              <BlockStack gap="300">
+                <BlockStack gap="050">
+                  <Text as="h2" variant="headingMd">Bankverbindung</Text>
+                  <Text as="p" tone="subdued" variant="bodySm">Hinterlegte IBAN für automatische Auszahlungen</Text>
+                </BlockStack>
+                <Divider />
+              </BlockStack>
             </Card>
+            <Box paddingBlockStart="300">
+              <IbanSection commissionRate={COMMISSION_RATE} />
+            </Box>
           </Box>
+
         </Layout.Section>
       </Layout>
     </Page>
   );
 }
 
-// ── SUPERUSER / ADMIN VIEW ────────────────────────────────────────────────────
+// ── Admin / Superuser Payments View ──────────────────────────────────────────
 function AdminPaymentsView() {
   const [periodKey, setPeriodKey] = useState(PERIODS[0].key);
-  const [sellers, setSellers] = useState([]);
-  const [txRows, setTxRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-  const [paying, setPaying] = useState(null);
+  const [sellers, setSellers]     = useState([]);
+  const [txRows, setTxRows]       = useState([]);
+  const [loading, setLoading]     = useState(false);
+  const [err, setErr]             = useState("");
+  const [paying, setPaying]       = useState(null);
+
+  // Monitor filters
+  const [monitorSort, setMonitorSort]   = useState("created_at");
+  const [monitorDir, setMonitorDir]     = useState("desc");
+  const [monitorSearch, setMonitorSearch] = useState("");
+  const [monitorStatus, setMonitorStatus] = useState("all");
 
   const selectedPeriod = PERIODS.find((p) => p.key === periodKey) || PERIODS[0];
 
@@ -675,14 +944,13 @@ function AdminPaymentsView() {
     } finally {
       setLoading(false);
     }
-  }, [periodKey]);
+  }, [selectedPeriod.start, selectedPeriod.end]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleMarkPaid = async (seller) => {
     if (!confirm(
-      `Auszahlung für "${seller.store_name || seller.email}" als extern überwiesen markieren?\n\n` +
-      `Hinweis: Bu adım ödeme göndermez. Önce gerçek transferi yapın, sonra status'u "bezahlt" yapın.`
+      `Auszahlung für "${seller.store_name || seller.email}" als überwiesen markieren?\n\nBitte stelle sicher, dass die tatsächliche Überweisung bereits erfolgt ist.`
     )) return;
     setPaying(seller.seller_id);
     try {
@@ -701,13 +969,43 @@ function AdminPaymentsView() {
     }
   };
 
-  const totalRevenue = sellers.reduce((s, x) => s + (x.total_cents || 0), 0);
+  // Admin KPIs
+  const totalRevenue    = sellers.reduce((s, x) => s + (x.total_cents || 0), 0);
   const totalCommission = sellers.reduce((s, x) => s + Math.round((x.total_cents || 0) * COMMISSION_RATE), 0);
-  const totalPayout = sellers.reduce((s, x) => s + (x.payout_cents || 0), 0);
-  const totalPaid = sellers.filter((s) => s.status === "bezahlt" || s.status === "paid").reduce((acc, x) => acc + (x.payout_cents || 0), 0);
-  const totalPending = totalPayout - totalPaid;
-  const txByTransferStatus = txRows.reduce((acc, t) => {
-    const k = String(t?.stripe_transfer_status || "unknown");
+  const totalPayout     = sellers.reduce((s, x) => s + (x.payout_cents || 0), 0);
+  const totalPaid       = sellers.filter((s) => s.status === "bezahlt" || s.status === "paid").reduce((acc, x) => acc + (x.payout_cents || 0), 0);
+  const totalPending    = totalPayout - totalPaid;
+
+  // Monitor filtered/sorted
+  const handleMonitorSort = (col) => {
+    setMonitorSort((prev) => { if (prev === col) setMonitorDir((d) => d === "asc" ? "desc" : "asc"); else setMonitorDir("desc"); return col; });
+  };
+
+  const displayMonitor = useMemo(() => {
+    let rows = txRows;
+    if (monitorSearch.trim()) {
+      const q = monitorSearch.toLowerCase();
+      rows = rows.filter((t) =>
+        String(t.order_number || "").toLowerCase().includes(q) ||
+        String(t.store_name || t.seller_id || "").toLowerCase().includes(q)
+      );
+    }
+    if (monitorStatus !== "all") {
+      rows = rows.filter((t) => (t.stripe_payout_status || "pending") === monitorStatus);
+    }
+    rows = [...rows].sort((a, b) => {
+      let av, bv;
+      if (monitorSort === "created_at") { av = new Date(a.created_at || 0).getTime(); bv = new Date(b.created_at || 0).getTime(); }
+      else if (monitorSort === "payout_cents") { av = a.payout_cents || 0; bv = b.payout_cents || 0; }
+      else { av = 0; bv = 0; }
+      return monitorDir === "asc" ? av - bv : bv - av;
+    });
+    return rows.slice(0, 200);
+  }, [txRows, monitorSearch, monitorStatus, monitorSort, monitorDir]);
+
+  // Status counts for badge summary
+  const payoutStatusCounts = txRows.reduce((acc, t) => {
+    const k = String(t?.stripe_payout_status || "pending");
     acc[k] = (acc[k] || 0) + 1;
     return acc;
   }, {});
@@ -718,59 +1016,60 @@ function AdminPaymentsView() {
     <Page title="Zahlungen & Auszahlungen (Admin)">
       <Layout>
         <Layout.Section>
-          {err && <Banner tone="critical" onDismiss={() => setErr("")}><Text>{err}</Text></Banner>}
+          {err && (
+            <Box paddingBlockEnd="400">
+              <Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner>
+            </Box>
+          )}
 
           {/* Period selector */}
           <Card>
-            <BlockStack gap="400">
-              <InlineStack align="space-between" blockAlign="center">
+            <InlineStack align="space-between" blockAlign="center" wrap={false}>
+              <BlockStack gap="100">
                 <Text variant="headingMd" as="h2">Abrechnungszeitraum</Text>
+                <Text variant="bodySm" tone="subdued">Plattform-Übersicht für alle Seller</Text>
+              </BlockStack>
+              <InlineStack gap="300" blockAlign="center">
+                <div style={{ width: 300 }}>
+                  <Select label="" labelHidden options={periodOptions} value={periodKey} onChange={setPeriodKey} />
+                </div>
                 <Button onClick={loadData} loading={loading} size="slim">Aktualisieren</Button>
               </InlineStack>
-              <div style={{ maxWidth: 340 }}>
-                <Select
-                  label="Zeitraum auswählen"
-                  options={periodOptions}
-                  value={periodKey}
-                  onChange={setPeriodKey}
-                />
-              </div>
-            </BlockStack>
+            </InlineStack>
           </Card>
 
-          {/* Global summary */}
+          {/* Global KPIs */}
           <Box paddingBlockStart="400">
             <Card>
               <BlockStack gap="400">
-                <Text variant="headingMd" as="h2">Gesamtübersicht — {selectedPeriod.label}</Text>
+                <BlockStack gap="050">
+                  <Text variant="headingMd" as="h2">Plattform-Finanzen</Text>
+                  <Text variant="bodySm" tone="subdued">{selectedPeriod.label}</Text>
+                </BlockStack>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                  <StatBox label="Plattform-Umsatz (gesamt)" value={fmt(totalRevenue)} />
-                  <StatBox label={`Provision (${(COMMISSION_RATE * 100).toFixed(0)} %)`} value={fmt(totalCommission)} tone="success" />
-                  <StatBox label="Auszuzahlen (gesamt)" value={fmt(totalPayout)} tone="critical" />
-                  <StatBox label="Bereits bezahlt" value={fmt(totalPaid)} tone="success" />
-                  <StatBox label="Noch ausstehend" value={fmt(totalPending)} tone={totalPending > 0 ? "critical" : undefined} />
+                  <KpiCard icon="📦" label="Plattform-Umsatz (gesamt)" value={fmt(totalRevenue)} sub={`${sellers.length} aktive Seller`} />
+                  <KpiCard icon="💰" label={`Provision (${(COMMISSION_RATE * 100).toFixed(0)} %)`} value={fmt(totalCommission)} tone="success" sub="Einnahmen der Plattform" highlight />
+                  <KpiCard icon="💸" label="Auszuzahlen (gesamt)" value={fmt(totalPayout)} tone="critical" />
+                  <KpiCard icon="✅" label="Bereits bezahlt" value={fmt(totalPaid)} tone="success" />
+                  <KpiCard icon="⏳" label="Noch ausstehend" value={fmt(totalPending)} tone={totalPending > 0 ? "critical" : undefined} />
                 </div>
               </BlockStack>
             </Card>
           </Box>
 
-          {/* Per-seller table */}
+          {/* Per-seller payout table */}
           <Box paddingBlockStart="400">
             <Card padding="0">
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
                 <Text variant="headingMd" as="h2">Seller-Auszahlungen ({sellers.length})</Text>
               </div>
-
               {loading ? (
                 <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
               ) : sellers.length === 0 ? (
-                <Box padding="500">
-                  <Text tone="subdued" alignment="center">Für diesen Zeitraum liegen keine Daten vor.</Text>
-                </Box>
+                <Box padding="500"><Text tone="subdued" alignment="center">Für diesen Zeitraum liegen keine Daten vor.</Text></Box>
               ) : (
                 <>
-                  {/* Header */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 100px 100px 110px 120px 90px auto", gap: 8, padding: "10px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 100px 100px 120px 130px 100px auto", gap: 8, padding: "10px 20px", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#fafafa" }}>
                     <div>Seller</div>
                     <div style={{ textAlign: "right" }}>Umsatz</div>
                     <div style={{ textAlign: "right" }}>Provision</div>
@@ -780,18 +1079,18 @@ function AdminPaymentsView() {
                     <div></div>
                   </div>
                   {sellers.map((seller, i) => {
-                    const commission = Math.round((seller.total_cents || 0) * COMMISSION_RATE);
+                    const comm = Math.round((seller.total_cents || 0) * COMMISSION_RATE);
                     const reference = `${seller.seller_id}-${periodKey}`;
                     const isPaid = seller.status === "bezahlt" || seller.status === "paid";
                     return (
-                      <div key={seller.seller_id || i} style={{ display: "grid", gridTemplateColumns: "1.8fr 100px 100px 110px 120px 90px auto", gap: 8, padding: "12px 16px", borderBottom: "1px solid #f9fafb", alignItems: "center" }}>
+                      <div key={seller.seller_id || i} style={{ display: "grid", gridTemplateColumns: "1.8fr 100px 100px 120px 130px 100px auto", gap: 8, padding: "12px 20px", borderBottom: "1px solid #f3f4f6", alignItems: "center", background: isPaid ? "#f0fdf4" : "#fff" }}>
                         <div>
                           <Text variant="bodyMd" fontWeight="semibold">{seller.store_name || seller.email}</Text>
                           {seller.store_name && <Text variant="bodySm" tone="subdued">{seller.email}</Text>}
                           <Text variant="bodySm" tone="subdued">{seller.order_count || 0} Bestellungen</Text>
                         </div>
                         <div style={{ textAlign: "right", fontSize: 13 }}>{fmt(seller.total_cents || 0)}</div>
-                        <div style={{ textAlign: "right", fontSize: 13, color: "#059669", fontWeight: 600 }}>+{fmt(commission)}</div>
+                        <div style={{ textAlign: "right", fontSize: 13, color: "#059669", fontWeight: 600 }}>+{fmt(comm)}</div>
                         <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: isPaid ? "#6b7280" : "#dc2626" }}>
                           {fmt(seller.payout_cents || 0)}
                         </div>
@@ -805,16 +1104,11 @@ function AdminPaymentsView() {
                         </div>
                         <div>
                           {!isPaid && (seller.payout_cents || 0) > 0 ? (
-                            <Button
-                              size="slim"
-                              variant="primary"
-                              onClick={() => handleMarkPaid(seller)}
-                              loading={paying === seller.seller_id}
-                            >
-                              Als überwiesen markieren
+                            <Button size="slim" variant="primary" onClick={() => handleMarkPaid(seller)} loading={paying === seller.seller_id}>
+                              Als bezahlt markieren
                             </Button>
                           ) : isPaid ? (
-                            <Text variant="bodySm" tone="subdued">✓ Bezahlt{seller.paid_at ? ` ${fmtDate(seller.paid_at)}` : ""}</Text>
+                            <Text variant="bodySm" tone="success">✓ {seller.paid_at ? fmtDate(seller.paid_at) : "Bezahlt"}</Text>
                           ) : (
                             <Text variant="bodySm" tone="subdued">Kein Betrag</Text>
                           )}
@@ -827,60 +1121,103 @@ function AdminPaymentsView() {
             </Card>
           </Box>
 
+          {/* IBAN Auszahlungsmonitor */}
           <Box paddingBlockStart="400">
             <Card padding="0">
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
                 <InlineStack align="space-between" blockAlign="center">
-                  <Text variant="headingMd" as="h2">Stripe Transfer Monitor</Text>
-                  <InlineStack gap="200">
-                    <Badge tone="success">completed: {txByTransferStatus.completed || 0}</Badge>
-                    <Badge tone="warning">pending: {txByTransferStatus.pending || 0}</Badge>
-                    <Badge tone="attention">waiting_onboarding: {txByTransferStatus.waiting_onboarding || 0}</Badge>
-                    <Badge tone="critical">failed: {txByTransferStatus.failed || 0}</Badge>
+                  <BlockStack gap="050">
+                    <Text variant="headingMd" as="h2">IBAN Auszahlungsmonitor</Text>
+                    <Text variant="bodySm" tone="subdued">Automatische Auszahlungsstatus aller Bestellungen</Text>
+                  </BlockStack>
+                  <InlineStack gap="200" wrap={false}>
+                    {[
+                      { k: "paid",    t: "success",   l: "Bezahlt" },
+                      { k: "pending", t: "warning",   l: "Ausstehend" },
+                      { k: "processing", t: "info",   l: "In Verarbeitung" },
+                      { k: "failed",  t: "critical",  l: "Fehlgeschlagen" },
+                    ].map(({ k, t, l }) => (payoutStatusCounts[k] || 0) > 0 ? (
+                      <Badge key={k} tone={t}>{l}: {payoutStatusCounts[k]}</Badge>
+                    ) : null)}
                   </InlineStack>
                 </InlineStack>
               </div>
+
+              {/* Monitor filters */}
+              <div style={{ padding: "12px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div style={{ flex: "1 1 200px", minWidth: 180 }}>
+                  <TextField
+                    label="Suche"
+                    labelHidden
+                    value={monitorSearch}
+                    onChange={setMonitorSearch}
+                    placeholder="Bestellnr. oder Seller…"
+                    clearButton
+                    onClearButtonClick={() => setMonitorSearch("")}
+                    autoComplete="off"
+                  />
+                </div>
+                <div style={{ width: 180 }}>
+                  <Select
+                    label="Status"
+                    labelHidden
+                    options={[
+                      { label: "Alle Status", value: "all" },
+                      { label: "Ausstehend", value: "pending" },
+                      { label: "In Verarbeitung", value: "processing" },
+                      { label: "Bezahlt", value: "paid" },
+                      { label: "Fehlgeschlagen", value: "failed" },
+                    ]}
+                    value={monitorStatus}
+                    onChange={setMonitorStatus}
+                  />
+                </div>
+              </div>
+
               {txRows.length === 0 ? (
-                <Box padding="500">
-                  <Text tone="subdued" alignment="center">Keine Transferdaten im Zeitraum.</Text>
-                </Box>
+                <Box padding="500"><Text tone="subdued" alignment="center">Keine Daten im Zeitraum.</Text></Box>
               ) : (
                 <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.1fr 110px 130px 150px 1.4fr", gap: 8, padding: "10px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
-                    <div>Order</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "160px 1.2fr 1fr 100px 120px 1.2fr", gap: 8, padding: "10px 20px", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#fafafa" }}>
+                    <SortTh label="Datum" col="created_at" sortCol={monitorSort} sortDir={monitorDir} onSort={handleMonitorSort} />
+                    <div>Bestellung</div>
                     <div>Seller</div>
-                    <div style={{ textAlign: "right" }}>Payout</div>
-                    <div>Status</div>
-                    <div>Transfer ID</div>
-                    <div>Fehler</div>
+                    <SortTh label="Auszahlung" col="payout_cents" sortCol={monitorSort} sortDir={monitorDir} onSort={handleMonitorSort} style={{ justifyContent: "flex-end" }} />
+                    <div style={{ textAlign: "center" }}>Status</div>
+                    <div>Payout-ID</div>
                   </div>
-                  {txRows.slice(0, 200).map((t, i) => (
-                    <div key={`${t.id || ""}-${i}`} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.1fr 110px 130px 150px 1.4fr", gap: 8, padding: "11px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center" }}>
+                  {displayMonitor.map((t, i) => (
+                    <div key={`${t.id || ""}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 1.2fr 1fr 100px 120px 1.2fr", gap: 8, padding: "11px 20px", borderBottom: "1px solid #f3f4f6", fontSize: 13, alignItems: "center" }}>
+                      <div style={{ color: "#374151" }}>
+                        <div>{fmtDate(t.created_at)}</div>
+                        {t.delivery_date && <div style={{ fontSize: 11, color: "#9ca3af" }}>Lief.: {fmtDate(t.delivery_date)}</div>}
+                      </div>
                       <div>
                         <div style={{ fontWeight: 600 }}>#{t.order_number || t.id}</div>
-                        <div style={{ color: "#6b7280", fontSize: 12 }}>Teslim: {fmtDate(t.delivery_date)}</div>
                       </div>
-                      <div>{t.store_name || t.seller_id}</div>
-                      <div style={{ textAlign: "right" }}>{fmt(t.payout_cents || 0)}</div>
-                      <div>
-                        <Badge tone={
-                          t.stripe_transfer_status === "completed" ? "success" :
-                          t.stripe_transfer_status === "failed" ? "critical" :
-                          t.stripe_transfer_status === "waiting_onboarding" ? "attention" : "warning"
-                        }>
-                          {String(t.stripe_transfer_status || "pending")}
+                      <div style={{ color: "#374151" }}>{t.store_name || t.seller_id}</div>
+                      <div style={{ textAlign: "right", fontWeight: 600 }}>{fmt(t.payout_cents || 0)}</div>
+                      <div style={{ textAlign: "center" }}>
+                        <Badge tone={statusTone(t.stripe_payout_status)}>
+                          {statusLabel(t.stripe_payout_status || "pending")}
                         </Badge>
                       </div>
                       <div>
-                        <code style={{ fontSize: 11, background: "#f3f4f6", padding: "2px 5px", borderRadius: 4, color: "#374151" }}>
-                          {t.stripe_transfer_id || "—"}
-                        </code>
-                      </div>
-                      <div style={{ color: "#b91c1c", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {t.stripe_transfer_error || "—"}
+                        {t.stripe_payout_id ? (
+                          <code style={{ fontSize: 11, background: "#f3f4f6", padding: "2px 5px", borderRadius: 4, color: "#374151" }}>
+                            {t.stripe_payout_id}
+                          </code>
+                        ) : (
+                          <Text variant="bodySm" tone="subdued">—</Text>
+                        )}
                       </div>
                     </div>
                   ))}
+                  {displayMonitor.length === 200 && (
+                    <Box padding="300">
+                      <Text variant="bodySm" tone="subdued" alignment="center">Maximal 200 Einträge angezeigt. Nutze die Filter um spezifische Ergebnisse zu sehen.</Text>
+                    </Box>
+                  )}
                 </>
               )}
             </Card>

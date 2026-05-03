@@ -101,7 +101,19 @@
     "bonusApply": "Apply",
     "bonusDiscount": "Bonus discount",
     "bonusLogin": "Log in to redeem bonus points.",
-    "bonusError": "Could not apply bonus points."
+    "bonusError": "Could not apply bonus points.",
+    "saveAddress": "Save this delivery address to my account",
+    "methodCard": "Card",
+    "methodPaypal": "PayPal",
+    "methodKlarna": "Klarna",
+    "methodSepa": "SEPA Direct Debit",
+    "methodLink": "Link",
+    "methodIdeal": "iDEAL",
+    "methodBancontact": "Bancontact",
+    "methodEps": "EPS",
+    "methodP24": "Przelewy24",
+    "methodGiropay": "Giropay",
+    "methodSofort": "Sofort"
   },
   "accountPanel": {
     "hello": "Hello, {name}",

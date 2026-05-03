@@ -101,7 +101,19 @@
     "bonusApply": "Uygula",
     "bonusDiscount": "Bonus indirimi",
     "bonusLogin": "Puan kullanmak için giriş yapın.",
-    "bonusError": "Puanlar uygulanamadı."
+    "bonusError": "Puanlar uygulanamadı.",
+    "saveAddress": "Bu teslimat adresini hesabıma kaydet",
+    "methodCard": "Kart",
+    "methodPaypal": "PayPal",
+    "methodKlarna": "Klarna",
+    "methodSepa": "SEPA Banka Transferi",
+    "methodLink": "Link",
+    "methodIdeal": "iDEAL",
+    "methodBancontact": "Bancontact",
+    "methodEps": "EPS",
+    "methodP24": "Przelewy24",
+    "methodGiropay": "Giropay",
+    "methodSofort": "Sofort"
   },
   "accountPanel": {
     "hello": "Merhaba, {name}",

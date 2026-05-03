@@ -391,6 +391,7 @@ function TrustpilotSuperuserSection({ onToast }) {
   const [saving, setSaving] = useState(false);
   const [businessUnitId, setBusinessUnitId] = useState("");
   const [templateId, setTemplateId] = useState("");
+  const [evaluateUrl, setEvaluateUrl] = useState("");
   const [active, setActive] = useState(true);
 
   useEffect(() => {
@@ -400,6 +401,7 @@ function TrustpilotSuperuserSection({ onToast }) {
         if (cancelled || !d) return;
         setBusinessUnitId(d.business_unit_id || "");
         setTemplateId(d.template_id || "");
+        setEvaluateUrl(d.evaluate_url || "");
         setActive(d.is_active !== false);
       })
       .catch(() => {})
@@ -418,6 +420,7 @@ function TrustpilotSuperuserSection({ onToast }) {
       await client.saveTrustpilotIntegration({
         business_unit_id: bu,
         template_id: templateId.trim() || undefined,
+        evaluate_url: evaluateUrl.trim(),
         is_active: active,
       });
       onToast?.({ tone: "success", text: "Trustpilot gespeichert. Shop-Widget lädt die Konfiguration automatisch." });
@@ -455,6 +458,14 @@ function TrustpilotSuperuserSection({ onToast }) {
         placeholder="Standard, wenn leer"
         helpText="TrustBox-Vorlage aus dem Trustpilot-Generator; Standard aus dem Backend wenn leer."
       />
+      <TextField
+        label="Trustpilot-Bewertungs-Link (optional, https)"
+        value={evaluateUrl}
+        onChange={setEvaluateUrl}
+        autoComplete="off"
+        placeholder="https://de.trustpilot.com/evaluate/ihre-domain.de"
+        helpText="Nach einer Shop-Bewertung erscheint im Kundenkonto ein Link hierher. Öffentliche Trustpilot-„Bewerten“-URL (nicht die Einladungs-JS). Leer lassen = kein Link."
+      />
       <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14 }}>
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
         Widget auf dem Shop aktivieren
@@ -465,7 +476,9 @@ function TrustpilotSuperuserSection({ onToast }) {
         </Button>
       </InlineStack>
       <Banner tone="info">
-        Automatische Bewertungs-E-Mails nach Bestellung einrichten: in Trustpilot unter Integrationen eine Plattform verbinden oder Zapier nutzen — das ist getrennt vom Widget und erfolgt im Trustpilot-Konto.
+        Invitation-JavaScript: Schlüssel als{" "}
+        <Text as="span" variant="bodySm" fontWeight="semibold">NEXT_PUBLIC_TRUSTPILOT_INVITE_REGISTER_KEY</Text>{" "}
+        im Shop (.env). Automatische E-Mails zusätzlich in Trustpilot (Integrationen / Zapier). Shop-Bewertungen werden nicht automatisch als Trustpilot-Text importiert — der optionale Link lädt Kunden ein, dort selbst zu bewerten.
       </Banner>
     </BlockStack>
   );

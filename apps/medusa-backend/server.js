@@ -787,6 +787,7 @@ async function start() {
           );
         `).catch(() => {})
         await client.query(`INSERT INTO store_platform_checkout (id) VALUES (1) ON CONFLICT (id) DO NOTHING`).catch(() => {})
+        await client.query(`ALTER TABLE store_platform_checkout ADD COLUMN IF NOT EXISTS payment_method_layout text DEFAULT 'grid'`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS free_shipping_thresholds jsonb`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS shop_logo_url text`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS shop_favicon_url text`).catch(() => {})
@@ -4931,7 +4932,7 @@ async function start() {
 
     const loadPlatformCheckoutRow = async (pgClient) => {
       const r = await pgClient.query(
-        `SELECT stripe_publishable_key, stripe_secret_key, pay_card, pay_paypal, pay_klarna, paypal_client_id, paypal_client_secret
+        `SELECT stripe_publishable_key, stripe_secret_key, pay_card, pay_paypal, pay_klarna, paypal_client_id, paypal_client_secret, payment_method_layout
          FROM store_platform_checkout WHERE id = 1`,
       )
       return r.rows?.[0] || null
@@ -4979,6 +4980,7 @@ async function start() {
           paypal_client_id: (row?.paypal_client_id || '').toString(),
           paypal_client_secret_set: psec.length > 0,
           paypal_client_secret_hint: psec.length >= 4 ? `…${psec.slice(-4)}` : '',
+          payment_method_layout: (row?.payment_method_layout || 'grid').toString(),
           env_stripe_secret: envSk,
           env_stripe_publishable: envPk,
         })
@@ -5016,9 +5018,10 @@ async function start() {
           const inc = (body.paypal_client_secret || '').toString().trim()
           if (inc) paypal_client_secret = inc
         }
+        const payment_method_layout = body.payment_method_layout === 'list' ? 'list' : (body.payment_method_layout === 'grid' ? 'grid' : (cur?.payment_method_layout || 'grid'))
         await client.query(
-          `INSERT INTO store_platform_checkout (id, stripe_publishable_key, stripe_secret_key, pay_card, pay_paypal, pay_klarna, paypal_client_id, paypal_client_secret, updated_at)
-           VALUES (1, $1, $2, $3, $4, $5, $6, $7, now())
+          `INSERT INTO store_platform_checkout (id, stripe_publishable_key, stripe_secret_key, pay_card, pay_paypal, pay_klarna, paypal_client_id, paypal_client_secret, payment_method_layout, updated_at)
+           VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, now())
            ON CONFLICT (id) DO UPDATE SET
              stripe_publishable_key = EXCLUDED.stripe_publishable_key,
              stripe_secret_key = EXCLUDED.stripe_secret_key,
@@ -5027,8 +5030,9 @@ async function start() {
              pay_klarna = EXCLUDED.pay_klarna,
              paypal_client_id = EXCLUDED.paypal_client_id,
              paypal_client_secret = EXCLUDED.paypal_client_secret,
+             payment_method_layout = EXCLUDED.payment_method_layout,
              updated_at = now()`,
-          [nextPk || null, nextSk || null, pay_card, pay_paypal, pay_klarna, paypal_client_id || null, paypal_client_secret || null],
+          [nextPk || null, nextSk || null, pay_card, pay_paypal, pay_klarna, paypal_client_id || null, paypal_client_secret || null, payment_method_layout],
         )
         await client.end()
         res.json({ ok: true })
@@ -8652,6 +8656,7 @@ async function start() {
         res.json({
           stripe_publishable_key: dbPk || null,
           payment_method_types: paymentMethodTypesFromPlatformRow(row),
+          payment_method_layout: (row?.payment_method_layout || 'grid').toString(),
         })
       } catch (err) {
         if (client) try { await client.end() } catch (_) {}
@@ -11262,7 +11267,7 @@ async function start() {
         await client.end()
         const row = r.rows[0]
         if (!row) {
-          return res.json({ configured: false, business_unit_id: '', template_id: '', is_active: false })
+          return res.json({ configured: false, business_unit_id: '', template_id: '', evaluate_url: '', is_active: false })
         }
         let cfg = {}
         try {
@@ -11270,10 +11275,12 @@ async function start() {
           cfg = typeof c === 'string' ? JSON.parse(c) : (c && typeof c === 'object' ? c : {})
         } catch (_) {}
         const tid = (cfg.template_id || cfg.templateId || '').toString().trim()
+        const evaluateUrl = (cfg.evaluate_url || cfg.evaluateUrl || '').toString().trim()
         res.json({
           configured: true,
           business_unit_id: row.api_key ? String(row.api_key).trim() : '',
           template_id: tid,
+          evaluate_url: evaluateUrl,
           is_active: row.is_active !== false,
         })
       } catch (e) {
@@ -11285,7 +11292,6 @@ async function start() {
     const adminHubTrustpilotPUT = async (req, res) => {
       const body = req.body || {}
       const bu = String(body.business_unit_id ?? body.businessUnitId ?? '').trim()
-      const templateRaw = body.template_id ?? body.templateId
       const is_active = body.is_active !== false && body.is_active !== 'false'
       if (!bu) return res.status(400).json({ message: 'business_unit_id required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -11294,8 +11300,34 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const cfg = {}
-        if (templateRaw != null && String(templateRaw).trim()) cfg.template_id = String(templateRaw).trim()
+        const prev = await client.query(
+          `SELECT config FROM store_integrations WHERE LOWER(TRIM(slug)) = 'trustpilot' LIMIT 1`,
+        )
+        let cfg = {}
+        try {
+          const c = prev.rows[0] && prev.rows[0].config
+          cfg = typeof c === 'string' ? JSON.parse(c) : c && typeof c === 'object' ? { ...c } : {}
+        } catch (_) {
+          cfg = {}
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'template_id') || Object.prototype.hasOwnProperty.call(body, 'templateId')) {
+          const templateRaw = body.template_id ?? body.templateId
+          const t = templateRaw != null ? String(templateRaw).trim() : ''
+          if (t) cfg.template_id = t
+          else delete cfg.template_id
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'evaluate_url') || Object.prototype.hasOwnProperty.call(body, 'evaluateUrl')) {
+          const evaluateRaw = body.evaluate_url ?? body.evaluateUrl
+          const u = evaluateRaw != null ? String(evaluateRaw).trim() : ''
+          if (u) {
+            const ok = /^https:\/\//i.test(u)
+            if (!ok) {
+              await client.end()
+              return res.status(400).json({ message: 'evaluate_url must be an https URL' })
+            }
+            cfg.evaluate_url = u
+          } else delete cfg.evaluate_url
+        }
         const configJson = JSON.stringify(cfg)
         const r = await client.query(
           `INSERT INTO store_integrations (name, slug, logo_url, api_key, api_secret, webhook_url, config, is_active, category, seller_scope_key)
@@ -12608,7 +12640,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     // ── Public Trustpilot widget config (Business Unit ID is public in TrustBox embeds) ──
     const storeTrustpilotConfigGET = async (req, res) => {
       const client = getDbClient()
-      if (!client) return res.json({ enabled: false, businessUnitId: null, templateId: null })
+      if (!client) return res.json({ enabled: false, businessUnitId: null, templateId: null, evaluateUrl: null })
       try {
         await client.connect()
         const r = await client.query(
@@ -12616,17 +12648,19 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         )
         const row = r.rows[0]
         const bu = row && row.api_key ? String(row.api_key).trim() : ''
-        if (!bu) return res.json({ enabled: false, businessUnitId: null, templateId: null })
+        if (!bu) return res.json({ enabled: false, businessUnitId: null, templateId: null, evaluateUrl: null })
         let cfg = {}
         try {
           const c = row.config
           cfg = typeof c === 'string' ? JSON.parse(c) : (c && typeof c === 'object' ? c : {})
         } catch (_) {}
         const templateId = (cfg.template_id || cfg.templateId || '').toString().trim() || '5419b732-fbfb-4c9d-8b9d-0a9952a935df'
-        res.json({ enabled: true, businessUnitId: bu, templateId })
+        const evaluateUrl = (cfg.evaluate_url || cfg.evaluateUrl || '').toString().trim()
+        const evaluateOut = /^https:\/\//i.test(evaluateUrl) ? evaluateUrl : null
+        res.json({ enabled: true, businessUnitId: bu, templateId, evaluateUrl: evaluateOut })
       } catch (err) {
         console.error('storeTrustpilotConfigGET:', err)
-        res.json({ enabled: false, businessUnitId: null, templateId: null })
+        res.json({ enabled: false, businessUnitId: null, templateId: null, evaluateUrl: null })
       } finally {
         await client.end().catch(() => {})
       }

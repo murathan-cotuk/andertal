@@ -101,7 +101,19 @@
     "bonusApply": "Aplicar",
     "bonusDiscount": "Descuento bonus",
     "bonusLogin": "Inicia sesión para canjear puntos.",
-    "bonusError": "No se pudieron aplicar los puntos."
+    "bonusError": "No se pudieron aplicar los puntos.",
+    "saveAddress": "Guardar esta dirección de envío en mi cuenta",
+    "methodCard": "Tarjeta",
+    "methodPaypal": "PayPal",
+    "methodKlarna": "Klarna",
+    "methodSepa": "Débito SEPA",
+    "methodLink": "Link",
+    "methodIdeal": "iDEAL",
+    "methodBancontact": "Bancontact",
+    "methodEps": "EPS",
+    "methodP24": "Przelewy24",
+    "methodGiropay": "Giropay",
+    "methodSofort": "Sofort"
   },
   "accountPanel": {
     "hello": "Hola, {name}",

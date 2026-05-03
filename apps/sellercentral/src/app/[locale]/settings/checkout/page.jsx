@@ -10,6 +10,7 @@ import {
   InlineStack,
   TextField,
   Checkbox,
+  RadioButton,
   Button,
   Banner,
   Box,
@@ -30,6 +31,7 @@ export default function SettingsCheckoutPage() {
   const [payKlarna, setPayKlarna] = useState(false);
   const [paypalClientId, setPaypalClientId] = useState("");
   const [paypalSecret, setPaypalSecret] = useState("");
+  const [paymentMethodLayout, setPaymentMethodLayout] = useState("grid");
   const [meta, setMeta] = useState(null);
   const [initialSnapshot, setInitialSnapshot] = useState(null);
   const [testLoading, setTestLoading] = useState(false);
@@ -47,6 +49,7 @@ export default function SettingsCheckoutPage() {
       setPayKlarna(!!d.pay_klarna);
       setPaypalClientId(d.paypal_client_id || "");
       setPaypalSecret("");
+      setPaymentMethodLayout(d.payment_method_layout === "list" ? "list" : "grid");
       setMeta(d);
       setInitialSnapshot(JSON.stringify({
         stripePk: d.stripe_publishable_key || "",
@@ -54,6 +57,7 @@ export default function SettingsCheckoutPage() {
         payPaypal: !!d.pay_paypal,
         payKlarna: !!d.pay_klarna,
         paypalClientId: d.paypal_client_id || "",
+        paymentMethodLayout: d.payment_method_layout === "list" ? "list" : "grid",
       }));
     } catch (e) {
       setErr(e?.message || "Laden fehlgeschlagen");
@@ -112,6 +116,7 @@ export default function SettingsCheckoutPage() {
         pay_paypal: payPaypal,
         pay_klarna: payKlarna,
         paypal_client_id: paypalClientId.trim(),
+        payment_method_layout: paymentMethodLayout,
       };
       if (stripeSk.trim()) body.stripe_secret_key = stripeSk.trim();
       if (paypalSecret.trim()) body.paypal_client_secret = paypalSecret.trim();
@@ -135,8 +140,9 @@ export default function SettingsCheckoutPage() {
         payPaypal: !!payPaypal,
         payKlarna: !!payKlarna,
         paypalClientId: paypalClientId.trim(),
+        paymentMethodLayout,
       }),
-    [stripePk, payCard, payPaypal, payKlarna, paypalClientId]
+    [stripePk, payCard, payPaypal, payKlarna, paypalClientId, paymentMethodLayout]
   );
   const isDirty = !loading && initialSnapshot !== null && currentSnapshot !== initialSnapshot;
 
@@ -149,6 +155,7 @@ export default function SettingsCheckoutPage() {
     setPayKlarna(!!meta.pay_klarna);
     setPaypalClientId(meta.paypal_client_id || "");
     setPaypalSecret("");
+    setPaymentMethodLayout(meta.payment_method_layout === "list" ? "list" : "grid");
     setErr("");
     setOk("");
   }, [meta]);
@@ -231,13 +238,36 @@ export default function SettingsCheckoutPage() {
             </Card>
 
             <Card>
-              <BlockStack gap="300">
+              <BlockStack gap="400">
                 <Text variant="headingMd" as="h2">
                   Zahlarten im Checkout
                 </Text>
-                <Checkbox label="Kredit- / Debitkarte" checked={payCard} onChange={(v) => setPayCard(v)} />
-                <Checkbox label="PayPal (Stripe)" checked={payPaypal} onChange={(v) => setPayPaypal(v)} />
-                <Checkbox label="Klarna (Stripe)" checked={payKlarna} onChange={(v) => setPayKlarna(v)} />
+                <BlockStack gap="200">
+                  <Text variant="bodyMd" fontWeight="medium">Aktive Zahlmethoden</Text>
+                  <Checkbox label="Kredit- / Debitkarte" checked={payCard} onChange={(v) => setPayCard(v)} />
+                  <Checkbox label="PayPal (Stripe)" checked={payPaypal} onChange={(v) => setPayPaypal(v)} />
+                  <Checkbox label="Klarna (Stripe)" checked={payKlarna} onChange={(v) => setPayKlarna(v)} />
+                </BlockStack>
+                <BlockStack gap="200">
+                  <Text variant="bodyMd" fontWeight="medium">Darstellung der Zahlmethoden im Shop</Text>
+                  <Text tone="subdued" variant="bodySm">Wählen Sie, wie die Zahlmethoden-Auswahl für den Kunden angezeigt wird.</Text>
+                  <RadioButton
+                    label="Raster (nebeneinander, Kacheln)"
+                    helpText="Zahlmethoden werden als Kacheln nebeneinander angezeigt — empfohlen bei 2–4 Methoden."
+                    checked={paymentMethodLayout === "grid"}
+                    id="layout-grid"
+                    name="paymentMethodLayout"
+                    onChange={() => setPaymentMethodLayout("grid")}
+                  />
+                  <RadioButton
+                    label="Liste (untereinander, Zeilen)"
+                    helpText="Zahlmethoden werden als kompakte Liste untereinander angezeigt."
+                    checked={paymentMethodLayout === "list"}
+                    id="layout-list"
+                    name="paymentMethodLayout"
+                    onChange={() => setPaymentMethodLayout("list")}
+                  />
+                </BlockStack>
               </BlockStack>
             </Card>
 

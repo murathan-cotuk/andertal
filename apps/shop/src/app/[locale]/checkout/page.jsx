@@ -304,6 +304,76 @@ const StripePaymentWrap = styled.div`
   overflow-x: clip;
 `;
 
+const PayMethodPickerGrid = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+`;
+
+const PayMethodPickerList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+`;
+
+const PayMethodCard = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 2px solid ${(p) => (p.$active ? tokens.primary.DEFAULT : "#e5e7eb")};
+  border-radius: 10px;
+  background: ${(p) => (p.$active ? `${tokens.primary.DEFAULT}0d` : "#fff")};
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: ${(p) => (p.$active ? "600" : "500")};
+  color: #111827;
+  transition: border-color 0.15s, background 0.15s;
+  min-width: 110px;
+  &:hover { border-color: ${tokens.primary.DEFAULT}; }
+`;
+
+const PayMethodListRow = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 2px solid ${(p) => (p.$active ? tokens.primary.DEFAULT : "#e5e7eb")};
+  border-radius: 10px;
+  background: ${(p) => (p.$active ? `${tokens.primary.DEFAULT}0d` : "#fff")};
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: ${(p) => (p.$active ? "600" : "500")};
+  color: #111827;
+  width: 100%;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  &:hover { border-color: ${tokens.primary.DEFAULT}; }
+`;
+
+const RadioDot = styled.span`
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid ${(p) => (p.$active ? tokens.primary.DEFAULT : "#9ca3af")};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  &::after {
+    content: '';
+    display: ${(p) => (p.$active ? "block" : "none")};
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: ${tokens.primary.DEFAULT};
+  }
+`;
+
 const checkoutSubmitWrapButtonCss = `
   button {
     width: 100%;
@@ -381,6 +451,53 @@ function useField(initial = "") {
   return { value, touched, onChange: (e) => setValue(e.target.value), onBlur: () => setTouched(true), reset: () => { setValue(initial); setTouched(false); } };
 }
 
+const PAY_METHOD_META = {
+  card:       { labelKey: "methodCard",    icon: "💳" },
+  paypal:     { labelKey: "methodPaypal",  icon: "🅿" },
+  klarna:     { labelKey: "methodKlarna",  icon: "K"  },
+  sepa_debit: { labelKey: "methodSepa",    icon: "🏦" },
+  link:       { labelKey: "methodLink",    icon: "🔗" },
+  ideal:      { labelKey: "methodIdeal",   icon: "iD" },
+  bancontact: { labelKey: "methodBancontact", icon: "B" },
+  eps:        { labelKey: "methodEps",     icon: "€"  },
+  p24:        { labelKey: "methodP24",     icon: "P"  },
+  giropay:    { labelKey: "methodGiropay", icon: "G"  },
+  sofort:     { labelKey: "methodSofort",  icon: "S"  },
+};
+
+function PaymentMethodPicker({ methods, selected, onSelect, layout }) {
+  const t = useTranslations("checkout");
+  if (!methods || methods.length <= 1) return null;
+  const getLabel = (m) => {
+    const key = PAY_METHOD_META[m]?.labelKey;
+    try { return key ? t(key) : m; } catch { return m; }
+  };
+  const getIcon = (m) => PAY_METHOD_META[m]?.icon || "💳";
+  if (layout === "list") {
+    return (
+      <PayMethodPickerList>
+        {methods.map((m) => (
+          <PayMethodListRow key={m} type="button" $active={selected === m} onClick={() => onSelect(m)}>
+            <RadioDot $active={selected === m} />
+            <span style={{ fontSize: "1.1rem" }}>{getIcon(m)}</span>
+            <span>{getLabel(m)}</span>
+          </PayMethodListRow>
+        ))}
+      </PayMethodPickerList>
+    );
+  }
+  return (
+    <PayMethodPickerGrid>
+      {methods.map((m) => (
+        <PayMethodCard key={m} type="button" $active={selected === m} onClick={() => onSelect(m)}>
+          <span style={{ fontSize: "1.25rem" }}>{getIcon(m)}</span>
+          <span>{getLabel(m)}</span>
+        </PayMethodCard>
+      ))}
+    </PayMethodPickerGrid>
+  );
+}
+
 function CheckoutFormField({
   label,
   field,
@@ -417,7 +534,7 @@ function applyToField(field, value) {
   field.onChange({ target: { value: value ?? "" } });
 }
 
-function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry, shippableCountries, paymentIntentRefreshing = false }) {
+function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry, shippableCountries, paymentIntentRefreshing = false, paymentMethodTypes = ["card"], paymentMethodLayout = "grid" }) {
   const shipList = useMemo(() => shippableCountries || [], [shippableCountries]);
   const pickShipCountry = (raw) => {
     const u = String(raw || "DE").toUpperCase();
@@ -439,6 +556,7 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
   const { user } = useCustomerAuthHook();
   const returnRunRef = useRef(false);
   const [paymentElementReady, setPaymentElementReady] = useState(false);
+  const [selectedPayMethod, setSelectedPayMethod] = useState(() => paymentMethodTypes[0] || "card");
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [shipAddrId, setShipAddrId] = useState("");
   const [billAddrId, setBillAddrId] = useState("");
@@ -1080,15 +1198,23 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
               onChange={(e) => setSaveNewAddress(e.target.checked)}
               size={18}
             />
-            Diese Lieferadresse in meinem Konto speichern
+            {t("saveAddress")}
           </label>
         </div>
       )}
 
       <FormCard>
         <SectionTitle>{t("payment")}</SectionTitle>
+        <PaymentMethodPicker
+          methods={paymentMethodTypes}
+          selected={selectedPayMethod}
+          onSelect={(m) => { setSelectedPayMethod(m); setPaymentElementReady(false); }}
+          layout={paymentMethodLayout}
+        />
         <StripePaymentWrap>
           <PaymentElement
+            key={selectedPayMethod}
+            options={{ defaultValues: { paymentMethodType: selectedPayMethod } }}
             onReady={() => setPaymentElementReady(true)}
             onLoadError={() => {
               setPaymentElementReady(false);
@@ -1196,6 +1322,7 @@ export default function CheckoutPage() {
   const [stripePromiseState, setStripePromiseState] = useState(null);
   const [stripePkLoading, setStripePkLoading] = useState(true);
   const [paymentMethodTypes, setPaymentMethodTypes] = useState(["card"]);
+  const [paymentMethodLayout, setPaymentMethodLayout] = useState("grid");
 
   useEffect(() => {
     let cancelled = false;
@@ -1208,6 +1335,7 @@ export default function CheckoutPage() {
           ? d.payment_method_types.map((x) => String(x || "").toLowerCase()).filter(Boolean)
           : ["card"];
         setPaymentMethodTypes(pmTypes);
+        setPaymentMethodLayout(d?.payment_method_layout === "list" ? "list" : "grid");
         if (pk) setStripePromiseState(loadStripe(pk));
         setStripePkLoading(false);
       })
@@ -1421,6 +1549,7 @@ export default function CheckoutPage() {
                   stripe={stripePromiseState}
                   options={{
                     clientSecret,
+                    locale,
                     appearance: {
                       theme: "stripe",
                       variables: {
@@ -1442,6 +1571,8 @@ export default function CheckoutPage() {
                     defaultCountry={shippingCountry}
                     shippableCountries={shippableCountries}
                     paymentIntentRefreshing={loadingPI}
+                    paymentMethodTypes={paymentMethodTypes}
+                    paymentMethodLayout={paymentMethodLayout}
                   />
                 </Elements>
               )}

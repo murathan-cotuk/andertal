@@ -340,6 +340,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [newCatalogMetaErr, setNewCatalogMetaErr] = useState("");
   const [pendingChangeRequests, setPendingChangeRequests] = useState([]);
   const [changeRequestActionId, setChangeRequestActionId] = useState("");
+  const [fileUploading, setFileUploading] = useState(false);
+  const [addingFile, setAddingFile] = useState(false);
+  const [newFileUrl, setNewFileUrl] = useState("");
+  const [newFileName, setNewFileName] = useState("");
+  const [fileUploadErr, setFileUploadErr] = useState("");
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -1455,6 +1461,47 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     return url.startsWith("http") || url.startsWith("data:") ? url : `${baseUrl.replace(/\/$/, "")}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
+  const productFiles = useMemo(() => {
+    const f = getMeta(product, "product_files");
+    return Array.isArray(f) ? f : [];
+  }, [product]);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileUploading(true); setFileUploadErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const result = await client.uploadMedia(fd, { purpose: "document" });
+      if (result?.url) {
+        const updated = [...productFiles, { name: file.name, url: result.url }];
+        updateMeta("product_files", updated);
+      } else {
+        setFileUploadErr("Upload fehlgeschlagen.");
+      }
+    } catch (err) {
+      setFileUploadErr(err?.message || "Upload fehlgeschlagen.");
+    } finally {
+      setFileUploading(false);
+      if (e.target) e.target.value = "";
+    }
+  };
+
+  const handleAddFileUrl = () => {
+    const url = newFileUrl.trim();
+    if (!url) return;
+    const name = newFileName.trim() || url.split("/").pop().split("?")[0] || "Datei";
+    const updated = [...productFiles, { name, url }];
+    updateMeta("product_files", updated);
+    setNewFileUrl(""); setNewFileName(""); setAddingFile(false);
+  };
+
+  const removeProductFile = (i) => {
+    const updated = productFiles.filter((_, idx) => idx !== i);
+    updateMeta("product_files", updated.length ? updated : null);
+  };
+
   return (
     <Page title="">
       <style>{`
@@ -2038,6 +2085,93 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   setSwatchPickerTarget(null);
                 }}
               />
+
+              <Divider />
+              <Text as="h2" variant="bodyMd" fontWeight="regular">Produktdokumente &amp; Compliance</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                WEEE-Reg.-Nummer, EPREL-Nummer und Produktdateien (z. B. Produktdatenblatt, EEK-Label). Dateien werden im Shop unter der Produktbeschreibung angezeigt.
+              </Text>
+              <InlineStack gap="300" wrap>
+                <Box minWidth="240px" flex="1">
+                  <TextField
+                    label="WEEE-Reg.-Nummer"
+                    value={getMeta(product, "weee_number") || ""}
+                    onChange={(v) => updateMeta("weee_number", v || null)}
+                    placeholder="DE12345678"
+                    helpText="Elektroaltgeräte-Registrierungsnummer (ElektroG)"
+                    autoComplete="off"
+                  />
+                </Box>
+                <Box minWidth="240px" flex="1">
+                  <TextField
+                    label="EPREL-Nummer"
+                    value={getMeta(product, "eprel_number") || ""}
+                    onChange={(v) => updateMeta("eprel_number", v || null)}
+                    placeholder="123456"
+                    helpText="EU-Energielabel-Registrierungsnummer"
+                    autoComplete="off"
+                  />
+                </Box>
+              </InlineStack>
+
+              {/* Product files */}
+              <Text as="h3" variant="bodySm" fontWeight="semibold">Produktdateien</Text>
+              {productFiles.length > 0 && (
+                <BlockStack gap="200">
+                  {productFiles.map((file, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                      <span style={{ fontSize: 16, flexShrink: 0 }}>
+                        {(String(file.url || "")).toLowerCase().includes(".pdf") ? "📄" : "📎"}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name || "Datei"}</div>
+                        <div style={{ fontSize: 11, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.url}</div>
+                      </div>
+                      <Button size="micro" tone="critical" variant="plain" onClick={() => removeProductFile(i)}>✕</Button>
+                    </div>
+                  ))}
+                </BlockStack>
+              )}
+              {addingFile && (
+                <BlockStack gap="200">
+                  <TextField
+                    label="Datei-URL"
+                    value={newFileUrl}
+                    onChange={setNewFileUrl}
+                    placeholder="https://example.com/produktdatenblatt.pdf"
+                    autoComplete="off"
+                  />
+                  <TextField
+                    label="Dateiname (optional)"
+                    value={newFileName}
+                    onChange={setNewFileName}
+                    placeholder="Produktdatenblatt.pdf"
+                    autoComplete="off"
+                  />
+                  <InlineStack gap="200">
+                    <Button onClick={handleAddFileUrl} disabled={!newFileUrl.trim()} size="slim" variant="primary">Hinzufügen</Button>
+                    <Button onClick={() => { setAddingFile(false); setNewFileUrl(""); setNewFileName(""); }} size="slim">Abbrechen</Button>
+                  </InlineStack>
+                </BlockStack>
+              )}
+              {fileUploadErr && <Text tone="critical" variant="bodySm">{fileUploadErr}</Text>}
+              <InlineStack gap="200">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  style={{ display: "none" }}
+                  onChange={handleFileUpload}
+                />
+                <Button size="slim" onClick={() => { setFileUploadErr(""); fileInputRef.current?.click(); }} loading={fileUploading}>
+                  Datei hochladen
+                </Button>
+                {!addingFile && (
+                  <Button size="slim" onClick={() => setAddingFile(true)}>
+                    URL hinzufügen
+                  </Button>
+                )}
+              </InlineStack>
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">Pricing</Text>

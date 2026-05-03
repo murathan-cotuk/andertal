@@ -101,7 +101,19 @@
     "bonusApply": "Applica",
     "bonusDiscount": "Sconto bonus",
     "bonusLogin": "Accedi per riscattare i punti.",
-    "bonusError": "Impossibile applicare i punti."
+    "bonusError": "Impossibile applicare i punti.",
+    "saveAddress": "Salva questo indirizzo di consegna nel mio account",
+    "methodCard": "Carta",
+    "methodPaypal": "PayPal",
+    "methodKlarna": "Klarna",
+    "methodSepa": "Addebito SEPA",
+    "methodLink": "Link",
+    "methodIdeal": "iDEAL",
+    "methodBancontact": "Bancontact",
+    "methodEps": "EPS",
+    "methodP24": "Przelewy24",
+    "methodGiropay": "Giropay",
+    "methodSofort": "Sofort"
   },
   "accountPanel": {
     "hello": "Ciao, {name}",

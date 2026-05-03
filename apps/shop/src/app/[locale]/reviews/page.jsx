@@ -51,7 +51,7 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-function ReviewForm({ orderId, item, existing, onSaved }) {
+function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl }) {
   const [rating, setRating] = useState(existing?.rating || 0);
   const [comment, setComment] = useState(existing?.comment || "");
   const [saving, setSaving] = useState(false);
@@ -83,6 +83,14 @@ function ReviewForm({ orderId, item, existing, onSaved }) {
         <p style={{ margin: "0 0 4px", fontSize: 13, color: "#15803d", fontWeight: 600 }}>✓ Bewertung gespeichert</p>
         <StarDisplay value={rating} />
         {comment && <p style={{ margin: "6px 0 0", fontSize: 13, color: "#374151" }}>{comment}</p>}
+        {trustpilotEvaluateUrl ? (
+          <p style={{ margin: "12px 0 0", fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
+            Optional: dieselbe Bewertung auch öffentlich bei Trustpilot abgeben —{" "}
+            <a href={trustpilotEvaluateUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#048068", fontWeight: 600 }}>
+              Zu Trustpilot
+            </a>
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -120,6 +128,15 @@ export default function ReviewsPage() {
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [editingKey, setEditingKey] = useState(null);
+  const [trustpilotEvaluateUrl, setTrustpilotEvaluateUrl] = useState(null);
+
+  useEffect(() => {
+    const base = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
+    fetch(`${base}/store/trustpilot-config`)
+      .then((r) => r.json())
+      .then((d) => setTrustpilotEvaluateUrl(typeof d?.evaluateUrl === "string" && d.evaluateUrl ? d.evaluateUrl : null))
+      .catch(() => setTrustpilotEvaluateUrl(null));
+  }, []);
 
   const load = useCallback(async () => {
     const token = getToken("customer");
@@ -221,6 +238,13 @@ export default function ReviewsPage() {
                                       </span>
                                     </div>
                                     {existing.comment && <p style={{ margin: "4px 0 0", fontSize: 13, color: "#374151" }}>{existing.comment}</p>}
+                                    {trustpilotEvaluateUrl ? (
+                                      <p style={{ margin: "10px 0 0", fontSize: 12, color: "#6b7280", lineHeight: 1.45 }}>
+                                        <a href={trustpilotEvaluateUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#048068", fontWeight: 600 }}>
+                                          Auch bei Trustpilot bewerten
+                                        </a>
+                                      </p>
+                                    ) : null}
                                     <button
                                       type="button"
                                       onClick={() => setEditingKey(key)}
@@ -235,6 +259,7 @@ export default function ReviewsPage() {
                                     item={item}
                                     existing={isEditing ? existing : null}
                                     onSaved={handleSaved}
+                                    trustpilotEvaluateUrl={trustpilotEvaluateUrl}
                                   />
                                 )}
                               </div>

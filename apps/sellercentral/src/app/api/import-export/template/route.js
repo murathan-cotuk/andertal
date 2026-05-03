@@ -133,8 +133,18 @@ function buildColumns() {
     { key: "unit_type", label: "unit_type", note: "Dropdown: kg | g | L | ml | piece", width: 12, group: "core" },
     { key: "unit_value", label: "unit_value", note: "e.g. 200", width: 12, group: "core" },
     { key: "per_unit", label: "per_unit", note: "Reference quantity for price per unit (g/ml => 1000, kg/l/piece => 1)", width: 12, group: "core" },
+    { key: "weee_number", label: "weee_number", note: "WEEE-Reg.-Nr. (Elektroaltgeräte-Registrierung)", width: 22, group: "core" },
+    { key: "eprel_number", label: "eprel_number", note: "EPREL-Reg.-Nr. (EU-Energielabel)", width: 22, group: "core" },
   ];
   cols.push(...core);
+
+  const FILE_SLOTS = 5;
+  for (let i = 1; i <= FILE_SLOTS; i++) {
+    cols.push(
+      { key: `file_${i}_url`, label: `file_${i}_url`, note: `Datei ${i} URL (PDF oder Bild)`, width: 44, group: "files", outline: 1 },
+      { key: `file_${i}_name`, label: `file_${i}_name`, note: `Datei ${i} Name (z.B. Produktdatenblatt.pdf)`, width: 30, group: "files", outline: 1 }
+    );
+  }
 
   for (let i = 1; i <= METAFIELD_PAIRS; i++) {
     cols.push(
@@ -181,11 +191,13 @@ const COLORS = {
   price: { argb: "FF7B3F00" },
   seo: { argb: "FF4A235A" },
   meta: { argb: "FF5F4B0B" },
+  files: { argb: "FF1A5276" },
   coreBg: { argb: "FFCCE5FF" },
   langBg: { argb: "FFD5F5E3" },
   priceBg: { argb: "FFFDEBD0" },
   seoBg: { argb: "FFF3E5F5" },
   metaBg: { argb: "FFF9E79F" },
+  filesBg: { argb: "FFD6EAF8" },
   groupRow: { argb: "FFE8F4F8" },
 };
 
@@ -379,6 +391,7 @@ async function buildWorkbook({
     variations: { label: "Variations", bg: COLORS.coreBg, fg: COLORS.core },
     seo: { label: "SEO", bg: COLORS.seoBg, fg: COLORS.seo },
     metafields: { label: "Metafields (optional +)", bg: COLORS.metaBg, fg: COLORS.meta },
+    files: { label: "📁 Dateien (optional)", bg: COLORS.filesBg, fg: COLORS.files },
   };
   LANGS.forEach((l) => {
     groupMeta[`lang_${l}`] = { label: `🌐 ${LANG_LABELS[l]}`, bg: COLORS.langBg, fg: COLORS.lang };
@@ -409,12 +422,13 @@ async function buildWorkbook({
     const isLang = col.group.startsWith("lang_");
     const isPri = col.group.startsWith("price_");
     const isMeta = col.group === "metafields";
+    const isFiles = col.group === "files";
     cell.fill = headerFill(
-      isLang ? COLORS.langBg : isPri ? COLORS.priceBg : col.group === "seo" ? COLORS.seoBg : isMeta ? COLORS.metaBg : COLORS.coreBg
+      isLang ? COLORS.langBg : isPri ? COLORS.priceBg : col.group === "seo" ? COLORS.seoBg : isMeta ? COLORS.metaBg : isFiles ? COLORS.filesBg : COLORS.coreBg
     );
     cell.font = {
       bold: true,
-      color: isLang ? COLORS.lang : isPri ? COLORS.price : col.group === "seo" ? COLORS.seo : isMeta ? COLORS.meta : COLORS.core,
+      color: isLang ? COLORS.lang : isPri ? COLORS.price : col.group === "seo" ? COLORS.seo : isMeta ? COLORS.meta : isFiles ? COLORS.files : COLORS.core,
       size: 9,
     };
     cell.alignment = { horizontal: "left", vertical: "middle" };
