@@ -1844,12 +1844,13 @@ export default function ProductTemplate() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {meta.product_files.map((file, i) => {
               const url = String(file?.url || "");
+              const resolvedUrl = resolveImageUrl(url);
               const name = String(file?.name || url.split("/").pop().split("?")[0] || "Datei");
               const isPdf = url.toLowerCase().includes(".pdf") || String(file?.type || "").toLowerCase().includes("pdf");
               return (
                 <a
                   key={i}
-                  href={url}
+                  href={resolvedUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{

@@ -15401,11 +15401,11 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         }
         if (req.query.period_start) {
           params.push(req.query.period_start)
-          where.push(`o.created_at >= $${params.length}`)
+          where.push(`DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) >= $${params.length}::date`)
         }
         if (req.query.period_end) {
           params.push(req.query.period_end)
-          where.push(`o.created_at < ($${params.length}::date + interval '1 day')`)
+          where.push(`DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) <= $${params.length}::date`)
         }
         if (filterSellerId) { params.push(filterSellerId); where.push(`o.seller_id = $${params.length}`) }
         const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
@@ -15647,6 +15647,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     }
 
     // GET /admin-hub/v1/payout-summary — seller's own summary for a period
+    /** Settlement attribution: DATE(COALESCE(delivery_date, created_at)) ∈ [period_start, period_end] (same as transactions list). */
     const adminHubPayoutSummaryGET = async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
@@ -15657,38 +15658,58 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const { period_start, period_end } = req.query
         const params = [sellerId]
         const dateFilter = period_start && period_end
-          ? `AND o.created_at >= $2 AND o.created_at <= $3`
+          ? `AND DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) >= $2::date
+             AND DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) <= $3::date`
           : ''
         if (period_start) params.push(period_start)
         if (period_end) params.push(period_end)
         const r = await client.query(
           `SELECT
-             COALESCE(SUM(o.subtotal_cents), 0) AS total_cents,
-             COALESCE(SUM(o.shipping_cents), 0) AS shipping_cents,
-             COUNT(*) FILTER (WHERE o.payment_status = 'bezahlt') AS paid_count,
-             COALESCE(SUM(o.subtotal_cents) FILTER (WHERE o.refund_status = 'refunded'), 0) AS refund_cents
+             COALESCE(SUM(
+               CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::bigint ELSE GREATEST(0, COALESCE(o.total_cents, 0))::bigint END
+             ), 0)::bigint AS total_cents,
+             COALESCE(SUM(
+               ROUND(
+                 (CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::numeric ELSE GREATEST(0, COALESCE(o.total_cents, 0))::numeric END)
+                 * COALESCE(s.commission_rate::numeric, 0.12)
+               )
+             ), 0)::bigint AS commission_cents,
+             COALESCE(SUM(o.shipping_cents), 0)::bigint AS shipping_cents,
+             COUNT(*)::int AS paid_count,
+             COALESCE(SUM(
+               CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::bigint ELSE GREATEST(0, COALESCE(o.total_cents, 0))::bigint END
+             ) FILTER (WHERE LOWER(TRIM(COALESCE(o.order_status, ''))) = 'refunded'), 0)::bigint AS refund_cents
            FROM store_orders o
+           LEFT JOIN seller_users s ON s.seller_id = o.seller_id
            WHERE o.seller_id = $1 AND o.payment_status = 'bezahlt' ${dateFilter}`,
           params
         )
         const row = r.rows[0] || {}
+        const basis = parseInt(row.total_cents, 10) || 0
+        const commission = parseInt(row.commission_cents, 10) || 0
+        const shipping = parseInt(row.shipping_cents, 10) || 0
+        const refunds = parseInt(row.refund_cents, 10) || 0
         // Also get payout status for this period
         let payoutStatus = null
         if (period_start && period_end) {
           const po = await client.query(
-            `SELECT status FROM seller_payouts WHERE seller_id = $1 AND period_start <= $3 AND period_end >= $2 ORDER BY created_at DESC LIMIT 1`,
+            `SELECT status FROM seller_payouts WHERE seller_id = $1 AND period_start <= $3::date AND period_end >= $2::date ORDER BY created_at DESC LIMIT 1`,
             [sellerId, period_start, period_end]
           )
           payoutStatus = po.rows[0]?.status || null
         }
         await client.end()
-        res.json({ summary: {
-          total_cents: parseInt(row.total_cents) || 0,
-          shipping_cents: parseInt(row.shipping_cents) || 0,
-          refund_cents: parseInt(row.refund_cents) || 0,
-          paid_count: parseInt(row.paid_count) || 0,
-          status: payoutStatus,
-        }})
+        res.json({
+          summary: {
+            total_cents: basis,
+            commission_cents: commission,
+            shipping_cents: shipping,
+            refund_cents: refunds,
+            paid_count: parseInt(row.paid_count, 10) || 0,
+            status: payoutStatus,
+            ad_spend_cents: 0,
+          },
+        })
       } catch (e) {
         try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -15705,7 +15726,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const { period_start, period_end } = req.query
         const params = []
         const dateFilter = period_start && period_end
-          ? `AND o.created_at >= $1 AND o.created_at <= $2`
+          ? `AND DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) >= $1::date
+             AND DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) <= $2::date`
           : ''
         if (period_start) params.push(period_start)
         if (period_end) params.push(period_end)
@@ -15714,10 +15736,23 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
              o.seller_id,
              s.store_name,
              s.email,
-             COALESCE(SUM(o.subtotal_cents), 0) AS total_cents,
+             COALESCE(SUM(
+               CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::bigint ELSE GREATEST(0, COALESCE(o.total_cents, 0))::bigint END
+             ), 0)::bigint AS total_cents,
              COUNT(*) AS order_count,
-             ROUND((COALESCE(SUM(o.subtotal_cents), 0)::numeric * COALESCE(MAX(s.commission_rate), 0.12)))::bigint AS commission_cents,
-             ROUND((COALESCE(SUM(o.subtotal_cents), 0)::numeric * (1 - COALESCE(MAX(s.commission_rate), 0.12))))::bigint AS payout_cents
+             COALESCE(SUM(
+               ROUND(
+                 (CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::numeric ELSE GREATEST(0, COALESCE(o.total_cents, 0))::numeric END)
+                 * COALESCE(s.commission_rate::numeric, 0.12)
+               )
+             ), 0)::bigint AS commission_cents,
+             COALESCE(SUM(
+               (CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::bigint ELSE GREATEST(0, COALESCE(o.total_cents, 0))::bigint END)
+               - ROUND(
+                 (CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::numeric ELSE GREATEST(0, COALESCE(o.total_cents, 0))::numeric END)
+                 * COALESCE(s.commission_rate::numeric, 0.12)
+               )
+             ), 0)::bigint AS payout_cents
            FROM store_orders o
            LEFT JOIN seller_users s ON s.seller_id = o.seller_id
            WHERE o.payment_status = 'bezahlt'
@@ -15760,30 +15795,51 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    // Returns the day-of-month (1-based) of the nth Friday in year/month (month 0-indexed).
+    const nthFridayOfMonth = (year, month, n) => {
+      const dow = new Date(year, month, 1).getDay() // 0=Sun … 6=Sat
+      const offset = (5 - dow + 7) % 7              // days until 1st Friday
+      return 1 + offset + (n - 1) * 7
+    }
+
+    // Returns { is: true, n: 2|4 } when today is the 2nd or 4th Friday, else { is: false }.
+    const isPayoutFridayToday = (d = new Date()) => {
+      if (d.getDay() !== 5) return { is: false }
+      const y = d.getFullYear(), m = d.getMonth(), day = d.getDate()
+      if (day === nthFridayOfMonth(y, m, 2)) return { is: true, n: 2 }
+      if (day === nthFridayOfMonth(y, m, 4)) return { is: true, n: 4 }
+      return { is: false }
+    }
+
     const autoPayoutPeriodForDate = (d = new Date()) => {
       const now = new Date(d)
-      const day = now.getDate()
       const y = now.getFullYear()
       const m = now.getMonth()
-      if (day === 1) {
-        const prevMonthDate = new Date(y, m - 1, 1)
-        const py = prevMonthDate.getFullYear()
-        const pm = prevMonthDate.getMonth()
-        const endDay = new Date(py, pm + 1, 0).getDate()
-        return {
-          runKey: `AUTO-${y}-${String(m + 1).padStart(2, '0')}-01`,
-          periodStart: `${py}-${String(pm + 1).padStart(2, '0')}-16`,
-          periodEnd: `${py}-${String(pm + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`,
-        }
+      const day = now.getDate()
+      const fri = isPayoutFridayToday(now)
+      if (!fri.is) return null
+
+      const mm = String(m + 1).padStart(2, '0')
+      const pad = (n) => String(n).padStart(2, '0')
+      const iso = (yr, mo, da) => `${yr}-${String(mo + 1).padStart(2, '0')}-${pad(da)}`
+
+      if (fri.n === 2) {
+        // Period: (4th Friday of previous month + 1) → 2nd Friday of this month
+        const prevM = m === 0 ? 11 : m - 1
+        const prevY = m === 0 ? y - 1 : y
+        const f4prev = nthFridayOfMonth(prevY, prevM, 4)
+        const startDate = new Date(prevY, prevM, f4prev + 1)
+        const periodStart = iso(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+        const periodEnd = iso(y, m, day)
+        return { runKey: `AUTO-${y}-${mm}-F2`, periodStart, periodEnd }
       }
-      if (day === 15) {
-        return {
-          runKey: `AUTO-${y}-${String(m + 1).padStart(2, '0')}-15`,
-          periodStart: `${y}-${String(m + 1).padStart(2, '0')}-01`,
-          periodEnd: `${y}-${String(m + 1).padStart(2, '0')}-15`,
-        }
-      }
-      return null
+      // fri.n === 4
+      // Period: (2nd Friday of this month + 1) → 4th Friday of this month
+      const f2 = nthFridayOfMonth(y, m, 2)
+      const startDate = new Date(y, m, f2 + 1)
+      const periodStart = iso(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+      const periodEnd = iso(y, m, day)
+      return { runKey: `AUTO-${y}-${mm}-F4`, periodStart, periodEnd }
     }
 
     const runAutomaticPayoutsIfDue = async () => {
@@ -16103,10 +16159,17 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     // Finds orders: stripe_payout_status='pending', stripe_account_id IS NULL, delivery 14+ days ago
     // Groups by seller, transfers platform → custom account → IBAN
     const runSellerIbanPayoutsIfDue = async () => {
+      if (!isPayoutFridayToday().is) return   // only execute on 2nd and 4th Friday of each month
       const client = getDbClient()
       if (!client) return
       try {
         await client.connect()
+
+        // Idempotency: skip if we already ran this Friday's payout
+        const todayKey = `IBAN-${new Date().toISOString().slice(0, 10)}`
+        const alreadyRan = await client.query('SELECT run_key FROM seller_payout_auto_runs WHERE run_key = $1 LIMIT 1', [todayKey])
+        if (alreadyRan.rows.length) { await client.end(); return }
+
         const platformRow = await loadPlatformCheckoutRow(client)
         const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
         if (!secretKey) { await client.end(); return }
@@ -16208,6 +16271,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             console.error(`runSellerIbanPayoutsIfDue: seller ${seller_id} failed:`, e?.message)
           }
         }
+        // Record that we ran this Friday so subsequent hourly ticks skip it
+        await client.query(
+          `INSERT INTO seller_payout_auto_runs (run_key, period_start, period_end, source_iban, created_count)
+           VALUES ($1, $2::date, $3::date, '', 0) ON CONFLICT (run_key) DO NOTHING`,
+          [todayKey, new Date().toISOString().slice(0, 10), new Date().toISOString().slice(0, 10)]
+        ).catch(() => {})
         await client.end()
       } catch (e) {
         console.error('runSellerIbanPayoutsIfDue:', e?.message || e)
@@ -16322,7 +16391,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           `SELECT id, email, store_name, seller_id, is_superuser, sub_of_seller_id, first_name, last_name,
                   approval_status, created_at, iban, payment_account_holder, payment_bic, payment_bank_name,
                   company_name, authorized_person_name, tax_id, vat_id,
-                  business_address, phone, documents, rejection_reason, approved_at
+                  business_address, phone, documents, rejection_reason, approved_at,
+                  commission_rate
            FROM seller_users WHERE id = $1`,
           [userId],
         )
@@ -16354,6 +16424,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             documents: row.documents,
             rejection_reason: row.rejection_reason,
             approved_at: row.approved_at,
+            commission_rate: row.commission_rate != null ? parseFloat(row.commission_rate) : 0.12,
           },
           // legacy alias
           user: {
@@ -16363,6 +16434,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             seller_id: row.seller_id,
             is_superuser: row.is_superuser === true,
             approval_status: row.approval_status || 'registered',
+            commission_rate: row.commission_rate != null ? parseFloat(row.commission_rate) : 0.12,
           },
         })
       } catch (e) {

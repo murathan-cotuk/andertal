@@ -3,7 +3,9 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Page, Layout, Card, Text, BlockStack } from "@shopify/polaris";
+import { useRouter } from "@/i18n/navigation";
+import { Layout, Card, Text, BlockStack, Box, InlineStack, Button } from "@shopify/polaris";
+import { ArrowLeftIcon } from "@shopify/polaris-icons";
 
 const SETTINGS_ITEMS_ALL = [
   { href: "/settings/general", label: "General" },
@@ -23,6 +25,7 @@ const SETTINGS_ITEMS_ALL = [
 
 export default function SettingsLayout({ children }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isSuperuser, setIsSuperuser] = useState(false);
 
   useEffect(() => {
@@ -45,11 +48,19 @@ export default function SettingsLayout({ children }) {
   };
 
   return (
-    <Page
-      title="Settings"
-      backAction={{ content: "Back", url: "/" }}
-      divider
-    >
+    <div className="andertal-settings-shell">
+      <Box paddingBlockEnd="200">
+        <InlineStack gap="200" blockAlign="center">
+          <Button
+            variant="plain"
+            icon={ArrowLeftIcon}
+            onClick={() => router.push("/")}
+            accessibilityLabel="Back"
+          >
+            Back
+          </Button>
+        </InlineStack>
+      </Box>
       <Layout>
         <Layout.Section variant="oneThird">
           <Card padding="0">
@@ -114,6 +125,6 @@ export default function SettingsLayout({ children }) {
         </Layout.Section>
         <Layout.Section>{children}</Layout.Section>
       </Layout>
-    </Page>
+    </div>
   );
 }

@@ -194,6 +194,25 @@ body[data-pathname]:not([data-pathname="/"]) .Polaris-Frame .Polaris-Navigation 
   }
 }
 
+/* Einstellungen: kompaktere Page-Überschrift, weniger Abstand unter der Top Bar */
+body[data-pathname*="/settings"] .andertal-page-content .Polaris-Page__Content {
+  padding-block-start: var(--p-space-100, 4px);
+}
+@media (min-width: 48em) {
+  body[data-pathname*="/settings"] .andertal-page-content .Polaris-Page__Content {
+    padding-block-start: var(--p-space-100, 4px);
+  }
+}
+body[data-pathname*="/settings"] .andertal-page-content .Polaris-Page-Header__TitleWrapper {
+  margin-top: 0;
+}
+body[data-pathname*="/settings"] .andertal-page-content .Polaris-Page-Header__TitleWrapper .Polaris-Header-Title,
+body[data-pathname*="/settings"] .andertal-page-content .Polaris-Page-Header__TitleWrapper .Polaris-Text--headingLg {
+  font-size: var(--p-font-size-450, 18px);
+  line-height: var(--p-font-line-height-600, 24px);
+  font-weight: var(--p-font-weight-semibold, 600);
+}
+
 /* Settings sol menüde en alta sabit */
 .Polaris-Navigation__PrimaryNavigation {
   display: flex;

@@ -9,7 +9,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const COMMISSION_RATE = 0.12;
+const DEFAULT_COMMISSION_RATE = 0.12;
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const fmt = (cents) =>
@@ -27,7 +27,8 @@ const csvEscape = (v) => {
   return s;
 };
 
-// ── Period generator (15-day settlement periods) ──────────────────────────────
+// ── Period generator (15-day settlement periods, Amazon-style) ────────────────
+/** Inclusive calendar dates YYYY-MM-DD — matches backend DATE(COALESCE(delivery_date, created_at)). */
 function generatePeriods(count = 12) {
   const periods = [];
   const now = new Date();
@@ -35,23 +36,36 @@ function generatePeriods(count = 12) {
   let month = now.getMonth();
   for (let i = 0; i < count; i++) {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const mm = String(month + 1).padStart(2, "0");
+    const ym = `${year}-${mm}`;
     periods.push({
-      label: `16.${String(month + 1).padStart(2, "0")}.${year} – ${daysInMonth}.${String(month + 1).padStart(2, "0")}.${year}`,
-      start: new Date(year, month, 16).toISOString(),
-      end: new Date(year, month, daysInMonth, 23, 59, 59).toISOString(),
-      key: `${year}-${String(month + 1).padStart(2, "0")}-2`,
+      label: `16.${mm}.${year} – ${String(daysInMonth).padStart(2, "0")}.${mm}.${year}`,
+      startDate: `${ym}-16`,
+      endDate: `${ym}-${String(daysInMonth).padStart(2, "0")}`,
+      key: `${ym}-2`,
+      monthLabel: `${mm}.${year}`,
     });
     periods.push({
-      label: `01.${String(month + 1).padStart(2, "0")}.${year} – 15.${String(month + 1).padStart(2, "0")}.${year}`,
-      start: new Date(year, month, 1).toISOString(),
-      end: new Date(year, month, 15, 23, 59, 59).toISOString(),
-      key: `${year}-${String(month + 1).padStart(2, "0")}-1`,
+      label: `01.${mm}.${year} – 15.${mm}.${year}`,
+      startDate: `${ym}-01`,
+      endDate: `${ym}-15`,
+      key: `${ym}-1`,
+      monthLabel: `${mm}.${year}`,
     });
     month -= 1;
     if (month < 0) { month = 11; year -= 1; }
   }
   return periods;
 }
+
+/** Aktueller Halbmonat (1–15 oder 16–Monatsende) — Standardauswahl wie Marktplatz-Abrechnung. */
+function initialPeriodKeyForToday(periods) {
+  const now = new Date();
+  const half = now.getDate() <= 15 ? "1" : "2";
+  const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${half}`;
+  return periods.some((p) => p.key === key) ? key : periods[0]?.key || key;
+}
+
 const PERIODS = generatePeriods(12);
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -148,7 +162,7 @@ function SortTh({ label, col, sortCol, sortDir, onSort, style }) {
 function IbanSection({ commissionRate }) {
   const client = getMedusaAdminClient();
   const unsaved = useUnsavedChanges();
-  const sellerPct = Math.round((1 - (commissionRate ?? COMMISSION_RATE)) * 100);
+  const sellerPct = Math.round((1 - (commissionRate ?? DEFAULT_COMMISSION_RATE)) * 100);
 
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
@@ -396,12 +410,13 @@ function IbanSection({ commissionRate }) {
 
 // ── Seller Payments View ──────────────────────────────────────────────────────
 function SellerPaymentsView() {
-  const [periodKey, setPeriodKey]     = useState(PERIODS[0].key);
+  const [periodKey, setPeriodKey]     = useState(() => initialPeriodKeyForToday(PERIODS));
   const [summary, setSummary]         = useState(null);
   const [history, setHistory]         = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading]         = useState(false);
   const [err, setErr]                 = useState("");
+  const [commissionRate, setCommissionRate] = useState(DEFAULT_COMMISSION_RATE);
 
   // Table controls
   const [sortCol, setSortCol]         = useState("created_at");
@@ -414,14 +429,29 @@ function SellerPaymentsView() {
 
   const selectedPeriod = PERIODS.find((p) => p.key === periodKey) || PERIODS[0];
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const acc = await getMedusaAdminClient().getSellerAccount();
+        const u = acc?.sellerUser || acc?.user || {};
+        const r = u.commission_rate != null ? Number(u.commission_rate) : DEFAULT_COMMISSION_RATE;
+        if (!cancelled && Number.isFinite(r) && r >= 0 && r <= 1) setCommissionRate(r);
+      } catch (_) {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const loadData = useCallback(async () => {
     setLoading(true); setErr("");
     try {
       const client = getMedusaAdminClient();
+      const ps = selectedPeriod.startDate;
+      const pe = selectedPeriod.endDate;
       const [sumRes, histRes, txRes] = await Promise.allSettled([
-        client.getPayoutSummary({ period_start: selectedPeriod.start, period_end: selectedPeriod.end }),
+        client.getPayoutSummary({ period_start: ps, period_end: pe }),
         client.getPayouts(),
-        client.getTransactions({ include_pending: "true", payout_days: "14" }),
+        client.getTransactions({ include_pending: "true", payout_days: "14", period_start: ps, period_end: pe }),
       ]);
       if (sumRes.status === "fulfilled") setSummary(sumRes.value?.summary || null);
       if (histRes.status === "fulfilled") setHistory(histRes.value?.payouts || []);
@@ -432,20 +462,12 @@ function SellerPaymentsView() {
     } finally {
       setLoading(false);
     }
-  }, [selectedPeriod.start, selectedPeriod.end]);
+  }, [selectedPeriod.startDate, selectedPeriod.endDate]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Period-filtered transactions
-  const selectedStartTs = useMemo(() => new Date(selectedPeriod.start).getTime(), [selectedPeriod.start]);
-  const selectedEndTs   = useMemo(() => new Date(selectedPeriod.end).getTime(), [selectedPeriod.end]);
-
-  const periodTransactions = useMemo(() => transactions.filter((t) => {
-    const ts = t?.delivery_date
-      ? new Date(t.delivery_date).getTime()
-      : t?.created_at ? new Date(t.created_at).getTime() : NaN;
-    return Number.isFinite(ts) && ts >= selectedStartTs && ts <= selectedEndTs;
-  }), [transactions, selectedStartTs, selectedEndTs]);
+  /** Bereits nach Zeitraum vom Backend gefiltert (Lieferdatum oder Bestelldatum). */
+  const periodTransactions = transactions;
 
   // Sort handler — toggles direction if same column, resets to desc for new column
   const handleSort = useCallback((col) => {
@@ -494,14 +516,16 @@ function SellerPaymentsView() {
     : displayTransactions;
   const totalPages = ps > 0 ? Math.ceil(totalFiltered / ps) : 1;
 
-  // KPI calculations
+  // KPI calculations (Backend-Zusammenfassung = gleiche Logik wie Transaktionsliste)
   const revenue    = summary?.total_cents ?? 0;
-  const commission = Math.round(revenue * COMMISSION_RATE);
+  const commission = summary?.commission_cents != null ? summary.commission_cents : Math.round(revenue * commissionRate);
   const shipping   = summary?.shipping_cents ?? 0;
   const refunds    = summary?.refund_cents ?? 0;
   const adSpend    = summary?.ad_spend_cents ?? 0;
   const net        = revenue - commission - adSpend - refunds + shipping;
   const payoutStatus = summary?.status || null;
+  const eligibleCount = periodTransactions.filter((t) => t.payout_eligible).length;
+  const pendingPayCount = periodTransactions.length - eligibleCount;
 
   const exportCsv = () => {
     const rows = [
@@ -531,9 +555,14 @@ function SellerPaymentsView() {
 
   const periodOptions = PERIODS.map((p) => ({ label: p.label, value: p.key }));
   const hasActiveFilters = filterSearch.trim() || filterType !== "all" || filterStatus !== "all";
+  const currentPeriodKeyToday = initialPeriodKeyForToday(PERIODS);
+  const isSelectedCurrentPeriod = periodKey === currentPeriodKeyToday;
 
   return (
-    <Page title="Zahlungen & Auszahlungen">
+    <Page
+      title="Zahlungen & Auszahlungen"
+      subtitle="Marktplatz-Abrechnung: Alle Beträge im gewählten 15-Tage-Zeitraum nach Lieferdatum — ohne Lieferdatum nach Bestelldatum."
+    >
       <Layout>
         <Layout.Section>
           {err && (
@@ -542,15 +571,39 @@ function SellerPaymentsView() {
             </Box>
           )}
 
+          <Box paddingBlockEnd="400">
+            <Banner tone="info">
+              <BlockStack gap="150">
+                <Text as="p" variant="bodySm">
+                  <strong>Sperrfrist:</strong> Auszahlung erst ca. <strong>14 Tage nach Lieferdatum</strong> (Status „Zugestellt“ mit Datum). Bis dahin zeigt die Liste „Ausstehend“ — Beträge sind aber bereits im Umsatz sichtbar.
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Der Dropdown-Zeitraum entspricht halben Kalendermonaten (wie bei großen Marktplätzen). Standard ist automatisch die Periode, in der sich das heutige Datum befindet.
+                </Text>
+              </BlockStack>
+            </Banner>
+          </Box>
+
           {/* ── Period Selector ── */}
           <Card>
-            <InlineStack align="space-between" blockAlign="center" wrap={false}>
-              <BlockStack gap="100">
-                <Text variant="headingMd" as="h2">Abrechnungszeitraum</Text>
-                <Text variant="bodySm" tone="subdued">15-tägige Abrechnungsperioden (1.–15. und 16.–Monatsende)</Text>
+            <InlineStack align="space-between" blockAlign="center" wrap>
+              <BlockStack gap="150">
+                <InlineStack gap="200" blockAlign="center" wrap>
+                  <Text variant="headingMd" as="h2">Abrechnungszeitraum</Text>
+                  {isSelectedCurrentPeriod ? (
+                    <Badge tone="success">Aktuelle Periode</Badge>
+                  ) : (
+                    <Badge tone="info">Vergangenheit / Vorschau</Badge>
+                  )}
+                </InlineStack>
+                <Text variant="bodySm" tone="subdued">
+                  {selectedPeriod.monthLabel}: {selectedPeriod.startDate === selectedPeriod.endDate
+                    ? selectedPeriod.startDate
+                    : `${selectedPeriod.startDate} → ${selectedPeriod.endDate}`} (Kalendertage)
+                </Text>
               </BlockStack>
-              <InlineStack gap="300" blockAlign="center">
-                <div style={{ width: 300 }}>
+              <InlineStack gap="300" blockAlign="center" wrap={false}>
+                <div style={{ minWidth: 280, flex: "1 1 280px" }}>
                   <Select
                     label=""
                     labelHidden
@@ -583,13 +636,13 @@ function SellerPaymentsView() {
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                       <KpiCard
                         icon="📦"
-                        label="Gesamtumsatz (brutto)"
+                        label="Warenumsatz (Seller-Basis)"
                         value={fmt(revenue)}
-                        sub={`${periodTransactions.length} Bestellungen`}
+                        sub={`${summary?.paid_count ?? periodTransactions.length} bezahlte Positionen · ${eligibleCount} auszahlungsreif · ${pendingPayCount} Sperrfrist`}
                       />
                       <KpiCard
                         icon="💸"
-                        label={`Provision (${(COMMISSION_RATE * 100).toFixed(0)} %)`}
+                        label={`Provision (${(commissionRate * 100).toFixed(1).replace(/\.0$/, "")} %)`}
                         value={`– ${fmt(commission)}`}
                         tone="critical"
                         sub="Plattformgebühr"
@@ -640,8 +693,10 @@ function SellerPaymentsView() {
                       </div>
                     )}
 
-                    {summary === null && (
-                      <Banner tone="info">Für diesen Zeitraum liegen noch keine Daten vor.</Banner>
+                    {!loading && periodTransactions.length === 0 && (
+                      <Banner tone="info">
+                        Für diesen Abrechnungszeitraum gibt es keine bezahlten Bestellungen (nach Liefer-/Bestelldatum). Prüfe einen anderen Halbmonat oder ob die Bestellungen auf „bezahlt“ stehen.
+                      </Banner>
                     )}
                   </>
                 )}
@@ -805,8 +860,8 @@ function SellerPaymentsView() {
                     </div>
                   ))}
 
-                  {/* Totals row */}
-                  {pagedTransactions.length > 1 && (
+                  {/* Summenzeile: immer über alle gefilterten Zeilen (nicht nur aktuelle Seite) */}
+                  {displayTransactions.length > 0 && (
                     <div style={{
                       display: "grid",
                       gridTemplateColumns: "160px 1fr 1fr 100px 100px 80px 80px 100px 110px",
@@ -815,13 +870,15 @@ function SellerPaymentsView() {
                       fontSize: 13, fontWeight: 700,
                       background: "#f9fafb",
                     }}>
-                      <div style={{ color: "#6b7280", fontSize: 11 }}>Gesamt ({pagedTransactions.length})</div>
+                      <div style={{ color: "#6b7280", fontSize: 11 }}>
+                        Summe ({displayTransactions.length}{totalFiltered !== periodTransactions.length ? ` von ${periodTransactions.length}` : ""})
+                      </div>
                       <div /><div />
-                      <div style={{ textAlign: "right" }}>{fmt(pagedTransactions.reduce((s, t) => s + (t.total_cents || 0), 0))}</div>
-                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(pagedTransactions.reduce((s, t) => s + (t.commission_cents || 0), 0))}</div>
-                      <div style={{ textAlign: "right", color: "#2563eb" }}>{fmt(pagedTransactions.reduce((s, t) => s + (t.shipping_cents || 0), 0))}</div>
-                      <div style={{ textAlign: "right" }}>{fmt(pagedTransactions.reduce((s, t) => s + (t.discount_cents || 0), 0))}</div>
-                      <div style={{ textAlign: "right", color: "#059669" }}>{fmt(pagedTransactions.reduce((s, t) => s + (t.payout_cents || 0), 0))}</div>
+                      <div style={{ textAlign: "right" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.total_cents || 0), 0))}</div>
+                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(displayTransactions.reduce((s, t) => s + (t.commission_cents || 0), 0))}</div>
+                      <div style={{ textAlign: "right", color: "#2563eb" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.shipping_cents || 0), 0))}</div>
+                      <div style={{ textAlign: "right" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.discount_cents || 0), 0))}</div>
+                      <div style={{ textAlign: "right", color: "#059669" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.payout_cents || 0), 0))}</div>
                       <div />
                     </div>
                   )}
@@ -872,7 +929,7 @@ function SellerPaymentsView() {
                         )}
                       </div>
                       <div style={{ textAlign: "right" }}>{fmt(p.total_cents || 0)}</div>
-                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(Math.round((p.total_cents || 0) * COMMISSION_RATE))}</div>
+                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(p.commission_cents != null ? p.commission_cents : Math.round((p.total_cents || 0) * commissionRate))}</div>
                       <div style={{ textAlign: "right", fontWeight: 700, color: "#059669" }}>{fmt(p.payout_cents || 0)}</div>
                       <div style={{ textAlign: "center" }}>
                         <Badge tone={statusTone(p.status)}>{statusLabel(p.status)}</Badge>
@@ -896,7 +953,7 @@ function SellerPaymentsView() {
               </BlockStack>
             </Card>
             <Box paddingBlockStart="300">
-              <IbanSection commissionRate={COMMISSION_RATE} />
+              <IbanSection commissionRate={commissionRate} />
             </Box>
           </Box>
 
@@ -908,7 +965,7 @@ function SellerPaymentsView() {
 
 // ── Admin / Superuser Payments View ──────────────────────────────────────────
 function AdminPaymentsView() {
-  const [periodKey, setPeriodKey] = useState(PERIODS[0].key);
+  const [periodKey, setPeriodKey] = useState(() => initialPeriodKeyForToday(PERIODS));
   const [sellers, setSellers]     = useState([]);
   const [txRows, setTxRows]       = useState([]);
   const [loading, setLoading]     = useState(false);
@@ -928,13 +985,13 @@ function AdminPaymentsView() {
     try {
       const [overview, tx] = await Promise.all([
         getMedusaAdminClient().getAdminPayoutOverview({
-          period_start: selectedPeriod.start,
-          period_end: selectedPeriod.end,
+          period_start: selectedPeriod.startDate,
+          period_end: selectedPeriod.endDate,
         }),
         getMedusaAdminClient().getTransactions({
           include_pending: "true",
-          period_start: selectedPeriod.start,
-          period_end: selectedPeriod.end,
+          period_start: selectedPeriod.startDate,
+          period_end: selectedPeriod.endDate,
         }),
       ]);
       setSellers(overview?.sellers || []);
@@ -944,7 +1001,7 @@ function AdminPaymentsView() {
     } finally {
       setLoading(false);
     }
-  }, [selectedPeriod.start, selectedPeriod.end]);
+  }, [selectedPeriod.startDate, selectedPeriod.endDate]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -956,8 +1013,8 @@ function AdminPaymentsView() {
     try {
       await getMedusaAdminClient().markPayoutPaid({
         seller_id: seller.seller_id,
-        period_start: selectedPeriod.start,
-        period_end: selectedPeriod.end,
+        period_start: selectedPeriod.startDate,
+        period_end: selectedPeriod.endDate,
         amount_cents: seller.payout_cents,
         reference: `${seller.seller_id}-${periodKey}`,
       });
@@ -971,7 +1028,7 @@ function AdminPaymentsView() {
 
   // Admin KPIs
   const totalRevenue    = sellers.reduce((s, x) => s + (x.total_cents || 0), 0);
-  const totalCommission = sellers.reduce((s, x) => s + Math.round((x.total_cents || 0) * COMMISSION_RATE), 0);
+  const totalCommission = sellers.reduce((s, x) => s + (x.commission_cents != null ? x.commission_cents : Math.round((x.total_cents || 0) * DEFAULT_COMMISSION_RATE)), 0);
   const totalPayout     = sellers.reduce((s, x) => s + (x.payout_cents || 0), 0);
   const totalPaid       = sellers.filter((s) => s.status === "bezahlt" || s.status === "paid").reduce((acc, x) => acc + (x.payout_cents || 0), 0);
   const totalPending    = totalPayout - totalPaid;
@@ -1048,7 +1105,7 @@ function AdminPaymentsView() {
                 </BlockStack>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                   <KpiCard icon="📦" label="Plattform-Umsatz (gesamt)" value={fmt(totalRevenue)} sub={`${sellers.length} aktive Seller`} />
-                  <KpiCard icon="💰" label={`Provision (${(COMMISSION_RATE * 100).toFixed(0)} %)`} value={fmt(totalCommission)} tone="success" sub="Einnahmen der Plattform" highlight />
+                  <KpiCard icon="💰" label="Provision (geschätzt)" value={fmt(totalCommission)} tone="success" sub="Einnahmen der Plattform" highlight />
                   <KpiCard icon="💸" label="Auszuzahlen (gesamt)" value={fmt(totalPayout)} tone="critical" />
                   <KpiCard icon="✅" label="Bereits bezahlt" value={fmt(totalPaid)} tone="success" />
                   <KpiCard icon="⏳" label="Noch ausstehend" value={fmt(totalPending)} tone={totalPending > 0 ? "critical" : undefined} />
@@ -1079,7 +1136,7 @@ function AdminPaymentsView() {
                     <div></div>
                   </div>
                   {sellers.map((seller, i) => {
-                    const comm = Math.round((seller.total_cents || 0) * COMMISSION_RATE);
+                    const comm = seller.commission_cents != null ? seller.commission_cents : Math.round((seller.total_cents || 0) * DEFAULT_COMMISSION_RATE);
                     const reference = `${seller.seller_id}-${periodKey}`;
                     const isPaid = seller.status === "bezahlt" || seller.status === "paid";
                     return (

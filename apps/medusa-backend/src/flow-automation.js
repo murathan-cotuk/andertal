@@ -394,7 +394,14 @@ async function sendImmediateStepsForFlow({
       continue
     }
     const tpl = pickStepTemplate(s, templateLocale)
-    if (!tpl || !toEmail) {
+    if (!tpl) {
+      console.warn(
+        `[flow-automation] flow ${flowId} step ${idx + 1}: skipped — email subject/body is empty. Fill in the template in Content → Flows.`,
+      )
+      idx += 1
+      continue
+    }
+    if (!toEmail) {
       idx += 1
       continue
     }
@@ -467,12 +474,6 @@ async function runAutomationFlowsForOrder(opts) {
     const transport = await getSmtpTransport(client)
     if (!transport) {
       console.warn('[flow-automation] skip: SMTP not configured (store_smtp_settings needs host + username)')
-      return
-    }
-
-    const { fromEmail: connFrom } = await resolveSmtpSenderIdentity(client, null)
-    if (!connFrom) {
-      console.warn('[flow-automation] skip: no From email — set SMTP / gönderen in Seller Central integrations')
       return
     }
 

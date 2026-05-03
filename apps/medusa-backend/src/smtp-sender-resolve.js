@@ -30,9 +30,9 @@ async function resolveSmtpSenderIdentity(client, profileIdNullable, sellerId = '
     }
   }
 
-  const leg = await client.query(`SELECT from_email, from_name FROM store_smtp_settings WHERE seller_id = $1 LIMIT 1`, [sid])
+  const leg = await client.query(`SELECT from_email, from_name, username FROM store_smtp_settings WHERE seller_id = $1 LIMIT 1`, [sid])
   return {
-    fromEmail: String(leg.rows[0]?.from_email || '').trim(),
+    fromEmail: String(leg.rows[0]?.from_email || leg.rows[0]?.username || '').trim(),
     fromName: String(leg.rows[0]?.from_name || 'Shop').trim() || 'Shop',
   }
 }
