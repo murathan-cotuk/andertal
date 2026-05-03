@@ -649,53 +649,6 @@ export default function AccountPage() {
                 </Link>
               </Section>
 
-              <Section title="Konto löschen">
-                <p style={{ fontSize: 14, color: GRAY, margin: "0 0 14px", lineHeight: 1.55 }}>
-                  Wenn Sie Ihr Konto löschen, werden Ihr Profil, gespeicherte Adressen, Merkzettel und Bonuspunkte entfernt.
-                  Bestellhistorien können aus buchhalterischen Gründen weiterhin anonym gespeichert bleiben.
-                </p>
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginBottom: 14, fontSize: 14, color: DARK, lineHeight: 1.45 }}>
-                  <input
-                    type="checkbox"
-                    checked={deleteUnderstand}
-                    onChange={(e) => setDeleteUnderstand(e.target.checked)}
-                    style={{ marginTop: 3, flexShrink: 0 }}
-                  />
-                  <span>Ich möchte mein Kundenkonto dauerhaft löschen und habe die Hinweise gelesen.</span>
-                </label>
-                <div style={{ maxWidth: 360, marginBottom: 12 }}>
-                  <label htmlFor="acc-delete-password" style={lbl}>Passwort zur Bestätigung</label>
-                  <input
-                    id="acc-delete-password"
-                    type="password"
-                    autoComplete="current-password"
-                    style={inp}
-                    value={deletePassword}
-                    onChange={(e) => setDeletePassword(e.target.value)}
-                    placeholder="Ihr aktuelles Passwort"
-                  />
-                </div>
-                {deleteErr && <p style={{ color: "#b91c1c", fontSize: 13, marginBottom: 12 }}>{deleteErr}</p>}
-                <button
-                  type="button"
-                  disabled={deleteBusy}
-                  onClick={handleDeleteAccount}
-                  style={{
-                    padding: "10px 18px",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: "#fff",
-                    background: deleteBusy ? "#9ca3af" : "#b91c1c",
-                    border: "none",
-                    borderRadius: 8,
-                    cursor: deleteBusy ? "not-allowed" : "pointer",
-                    boxShadow: "0 2px 0 2px #000",
-                  }}
-                >
-                  {deleteBusy ? "Wird gelöscht…" : "Konto endgültig löschen"}
-                </button>
-              </Section>
-
               {/* Meine Bestellungen carousel */}
               {recentOrders.length > 0 && (
                 <CarouselSection>
@@ -788,6 +741,53 @@ export default function AccountPage() {
                   </CarouselTrack>
                 </CarouselSection>
               )}
+
+              <Section title="Konto löschen">
+                <p style={{ fontSize: 14, color: GRAY, margin: "0 0 14px", lineHeight: 1.55 }}>
+                  Wenn Sie Ihr Konto löschen, werden Ihr Profil, gespeicherte Adressen, Merkzettel und Bonuspunkte entfernt.
+                  Bestellhistorien können aus buchhalterischen Gründen weiterhin anonym gespeichert bleiben.
+                </p>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginBottom: 14, fontSize: 14, color: DARK, lineHeight: 1.45 }}>
+                  <input
+                    type="checkbox"
+                    checked={deleteUnderstand}
+                    onChange={(e) => setDeleteUnderstand(e.target.checked)}
+                    style={{ marginTop: 3, flexShrink: 0 }}
+                  />
+                  <span>Ich möchte mein Kundenkonto dauerhaft löschen und habe die Hinweise gelesen.</span>
+                </label>
+                <div style={{ maxWidth: 360, marginBottom: 12 }}>
+                  <label htmlFor="acc-delete-password" style={lbl}>Passwort zur Bestätigung</label>
+                  <input
+                    id="acc-delete-password"
+                    type="password"
+                    autoComplete="current-password"
+                    style={inp}
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    placeholder="Ihr aktuelles Passwort"
+                  />
+                </div>
+                {deleteErr && <p style={{ color: "#b91c1c", fontSize: 13, marginBottom: 12 }}>{deleteErr}</p>}
+                <button
+                  type="button"
+                  disabled={deleteBusy}
+                  onClick={handleDeleteAccount}
+                  style={{
+                    padding: "10px 18px",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#fff",
+                    background: deleteBusy ? "#9ca3af" : "#b91c1c",
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: deleteBusy ? "not-allowed" : "pointer",
+                    boxShadow: "0 2px 0 2px #000",
+                  }}
+                >
+                  {deleteBusy ? "Wird gelöscht…" : "Konto endgültig löschen"}
+                </button>
+              </Section>
 
             </div>
           </AccountPageLayout>

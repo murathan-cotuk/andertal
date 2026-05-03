@@ -32,6 +32,10 @@ const Main = styled.main`
   margin: 0 auto;
   width: 100%;
   padding: 24px 24px 64px;
+
+  @media (max-width: 768px) {
+    padding: 16px 16px 56px;
+  }
 `;
 
 const Title = styled.h1`
@@ -39,6 +43,11 @@ const Title = styled.h1`
   font-weight: 700;
   color: #111827;
   margin: 0 0 32px;
+
+  @media (max-width: 768px) {
+    font-size: 1.375rem;
+    margin-bottom: 20px;
+  }
 `;
 
 const Layout = styled.div`
@@ -208,35 +217,106 @@ const SummaryCard = styled.div`
   top: 64px;
 
   @media (max-width: 768px) {
-    order: -1;
     position: relative;
     top: auto;
+    padding: 18px 16px 20px;
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(17, 24, 39, 0.06);
   }
 `;
 
-const SummaryTitle = styled.h2`
-  font-size: 1.125rem;
-  font-weight: 600;
+const SummaryHeading = styled.h2`
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: #111827;
-  margin: 0 0 20px;
+  margin: 0 0 14px;
+  line-height: 1.3;
+
+  @media (min-width: 769px) {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
 `;
 
-const SummaryRow = styled.div`
-  display: flex;
-  justify-content: space-between;
+/** Mobilde Zwischensumme / Versand satırlarını tek görsel blokta toplar */
+const SummaryLines = styled.div`
+  @media (max-width: 768px) {
+    background: #f3f4f6;
+    border-radius: 12px;
+    padding: 2px 14px;
+    margin-bottom: 14px;
+  }
+`;
+
+const SummaryRowLine = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 18px;
+  align-items: baseline;
   font-size: 0.9375rem;
   color: #4b5563;
-  margin-bottom: 10px;
+
+  @media (max-width: 768px) {
+    padding: 12px 0;
+    &:not(:last-child) {
+      border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+    }
+  }
+
+  @media (min-width: 769px) {
+    padding: 0;
+    margin-bottom: 10px;
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
 `;
 
-const SummaryTotal = styled(SummaryRow)`
-  font-weight: 700;
-  font-size: 1.0625rem;
+const SummaryAmount = styled.span`
+  font-weight: 600;
   color: #111827;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-  margin-bottom: 20px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+`;
+
+const SummaryTotalBar = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  border-radius: 12px;
+  border: 1px solid #e8eaee;
+  background: linear-gradient(180deg, #fafafa 0%, #f4f5f7 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+
+  @media (min-width: 769px) {
+    margin-top: 16px;
+    padding: 16px 0 20px;
+    margin-bottom: 20px;
+    border-radius: 0;
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    background: transparent;
+    box-shadow: none;
+  }
+`;
+
+const SummaryTotalLabel = styled.span`
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+`;
+
+const SummaryTotalAmount = styled.span`
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+  font-variant-numeric: tabular-nums;
 `;
 
 const ContinueLink = styled(Link)`
@@ -427,25 +507,39 @@ export default function CartPage() {
             </ItemsSection>
 
             <SummaryCard>
-              <SummaryTitle>{t("subtotal")}</SummaryTitle>
-              <SummaryRow>
-                <span>{t("subtotal")}</span>
-                <span>{formatPriceCents(subtotalCents)} €</span>
-              </SummaryRow>
-              {bonusDiscountCents > 0 && (
-                <SummaryRow style={{ color: "#16a34a" }}>
-                  <span>Bonusrabatt</span>
-                  <span>−{formatPriceCents(bonusDiscountCents)} €</span>
-                </SummaryRow>
-              )}
-              <SummaryRow>
-                <span>{t("shippingLabel")}</span>
-                <span style={{ color: effectiveTotal >= (freeShippingThreshold ?? Infinity) ? "#16a34a" : undefined }}>{shippingLabel}</span>
-              </SummaryRow>
-              <SummaryTotal>
-                <span>{t("total")}</span>
-                <span>{formatPriceCents(Math.max(0, subtotalCents - bonusDiscountCents + (isFree || shippingCents === null ? 0 : shippingCents)))} €</span>
-              </SummaryTotal>
+              <SummaryHeading>{t("summaryTitle")}</SummaryHeading>
+              <SummaryLines>
+                <SummaryRowLine>
+                  <span>{t("subtotal")}</span>
+                  <SummaryAmount>{formatPriceCents(subtotalCents)} €</SummaryAmount>
+                </SummaryRowLine>
+                {bonusDiscountCents > 0 && (
+                  <SummaryRowLine style={{ color: "#15803d" }}>
+                    <span>Bonusrabatt</span>
+                    <SummaryAmount style={{ color: "#16a34a" }}>
+                      −{formatPriceCents(bonusDiscountCents)} €
+                    </SummaryAmount>
+                  </SummaryRowLine>
+                )}
+                <SummaryRowLine>
+                  <span>{t("shippingLabel")}</span>
+                  <SummaryAmount
+                    style={{
+                      color: effectiveTotal >= (freeShippingThreshold ?? Infinity) ? "#16a34a" : undefined,
+                      fontWeight: effectiveTotal >= (freeShippingThreshold ?? Infinity) ? 700 : 600,
+                    }}
+                  >
+                    {shippingLabel}
+                  </SummaryAmount>
+                </SummaryRowLine>
+              </SummaryLines>
+              <SummaryTotalBar>
+                <SummaryTotalLabel>{t("total")}</SummaryTotalLabel>
+                <SummaryTotalAmount>
+                  {formatPriceCents(Math.max(0, subtotalCents - bonusDiscountCents + (isFree || shippingCents === null ? 0 : shippingCents)))}{" "}
+                  €
+                </SummaryTotalAmount>
+              </SummaryTotalBar>
               <PayNowButton href="/checkout">{t("checkout")}</PayNowButton>
               <ContinueLink href="/">Weiter einkaufen</ContinueLink>
               <ClearCartBtn

@@ -12,6 +12,21 @@ import { getMedusaClient } from "@/lib/medusa-client";
 const ORANGE = "#ff971c";
 const BACKEND = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
+function stripHtmlTags(html) {
+  return String(html || "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+}
+
+function MessageBody({ body }) {
+  const raw = String(body || "");
+  const looksHtml = /<[a-z][\s\S]*>/i.test(raw);
+  if (!looksHtml) return <span>{raw}</span>;
+  const safe = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/\s(on\w+|javascript:)\s*=/gi, " data-blocked=");
+  return <span dangerouslySetInnerHTML={{ __html: safe }} />;
+}
+
 function fmtDate(d) {
   if (!d) return "";
   return new Date(d).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -213,8 +228,9 @@ export default function NachrichtenPage() {
                           padding: "10px 14px",
                           fontSize: 13,
                           lineHeight: 1.55,
+                          wordBreak: "break-word",
                         }}>
-                          {m.body}
+                          <MessageBody body={m.body} />
                         </div>
                         <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 4, textAlign: isCustomer ? "right" : "left" }}>
                           {fmtDate(m.created_at)}
@@ -298,7 +314,7 @@ export default function NachrichtenPage() {
                       </div>
                       <div style={{ fontSize: 12, color: unread > 0 ? "#374151" : "#9ca3af", fontWeight: unread > 0 ? 500 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         <span style={{ color: "#6b7280" }}>{lastSenderName}: </span>
-                        {last?.body?.slice(0, 70) || "—"}
+                        {stripHtmlTags(last?.body || "").slice(0, 70) || "—"}
                       </div>
                     </div>
                     <div style={{ color: "#d1d5db", fontSize: 18, flexShrink: 0 }}>›</div>

@@ -136,16 +136,15 @@ export default function GeneralSettingsPage() {
         },
       });
       await client.updateSellerIban(formData.iban.trim() || null);
-      if (typeof window !== "undefined" && formData.storeName.trim()) {
-        localStorage.setItem("storeName", formData.storeName.trim());
+      const newName = formData.storeName.trim();
+      if (typeof window !== "undefined" && newName) {
+        localStorage.setItem("storeName", newName);
+        window.dispatchEvent(new CustomEvent("sellerStoreNameChanged", { detail: { storeName: newName } }));
       }
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
       setSaveError(e?.message || "Failed to save settings.");
-      if (typeof window !== "undefined" && formData.storeName.trim()) {
-        localStorage.setItem("storeName", formData.storeName.trim());
-      }
     } finally {
       setSaving(false);
     }

@@ -219,6 +219,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
   const [placeholderInsert, setPlaceholderInsert] = useState("");
   const [searchQ, setSearchQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
+  const [sortFilter, setSortFilter] = useState("unread_first");
   const bottomRef = useRef(null);
   const replyEditorRef = useRef(null);
   const { templates, templatesLoading, templatesErr, loadTemplates } = useMessageTemplates(client);
@@ -234,10 +235,42 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
     return () => clearTimeout(t);
   }, [searchQ]);
 
+  const unreadCount = (thread) =>
+    thread.messages.filter((m) => m.sender_type === "customer" && !m.is_read_by_seller).length;
+
+  const sortedThreads = useMemo(() => {
+    let arr = sortFilter === "unread_only"
+      ? threads.filter((t) => unreadCount(t) > 0)
+      : [...threads];
+    if (sortFilter === "unread_first") {
+      arr.sort((a, b) => {
+        const au = unreadCount(a) > 0 ? 1 : 0;
+        const bu = unreadCount(b) > 0 ? 1 : 0;
+        if (bu !== au) return bu - au;
+        const aL = a.messages[a.messages.length - 1]?.created_at || "";
+        const bL = b.messages[b.messages.length - 1]?.created_at || "";
+        return bL.localeCompare(aL);
+      });
+    } else if (sortFilter === "newest" || sortFilter === "unread_only") {
+      arr.sort((a, b) => {
+        const aL = a.messages[a.messages.length - 1]?.created_at || "";
+        const bL = b.messages[b.messages.length - 1]?.created_at || "";
+        return bL.localeCompare(aL);
+      });
+    } else if (sortFilter === "oldest") {
+      arr.sort((a, b) => {
+        const aL = a.messages[a.messages.length - 1]?.created_at || "";
+        const bL = b.messages[b.messages.length - 1]?.created_at || "";
+        return aL.localeCompare(bL);
+      });
+    }
+    return arr;
+  }, [threads, sortFilter]);
+
   const partitioned = useMemo(() => {
     if (!isSuperuser) return null;
-    return partitionSuperuserCustomerThreads(threads, sellerNames || {});
-  }, [threads, isSuperuser, sellerNames]);
+    return partitionSuperuserCustomerThreads(sortedThreads, sellerNames || {});
+  }, [sortedThreads, isSuperuser, sellerNames]);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -272,6 +305,11 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
     const toMark = thread.messages.filter((m) => m.sender_type === "customer" && !m.is_read_by_seller);
     if (toMark.length) {
       await Promise.all(toMark.map((m) => client.markMessageRead(m.id).catch(() => {})));
+      const threadKey = thread.order_id || "__no_order__";
+      setThreads((prev) => prev.map((t) => {
+        if ((t.order_id || "__no_order__") !== threadKey) return t;
+        return { ...t, messages: t.messages.map((m) => m.sender_type === "customer" && !m.is_read_by_seller ? { ...m, is_read_by_seller: true } : m) };
+      }));
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("andertal-msg-unread-refresh"));
       }
@@ -340,9 +378,6 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
     }
   };
 
-  const unreadCount = (thread) =>
-    thread.messages.filter((m) => m.sender_type === "customer" && !m.is_read_by_seller).length;
-
   const renderThreadRow = (thread, keySuffix = "") => {
     const last = thread.messages[thread.messages.length - 1];
     const unread = unreadCount(thread);
@@ -356,8 +391,8 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
           onClick={() => handleSelectThread(thread)}
           style={{
             width: "100%", textAlign: "left", padding: "10px 14px",
-            background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
-            borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : "3px solid transparent",
+            background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : unread > 0 ? "#eff6ff" : "transparent",
+            borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : unread > 0 ? "3px solid #3b82f6" : "3px solid transparent",
             borderTop: "none", borderRight: "none", borderBottom: "none",
             cursor: "pointer", display: "block",
           }}
@@ -402,6 +437,18 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
               clearButton
               onClearButtonClick={() => setSearchQ("")}
             />
+            <Select
+              label="Sortierung"
+              labelHidden
+              options={[
+                { label: "Ungelesen zuerst", value: "unread_first" },
+                { label: "Neueste zuerst", value: "newest" },
+                { label: "Älteste zuerst", value: "oldest" },
+                { label: "Nur ungelesen", value: "unread_only" },
+              ]}
+              value={sortFilter}
+              onChange={setSortFilter}
+            />
             {isSuperuser && (
               <Text as="p" variant="bodySm" tone="subdued">
                 Oben: Plattform / ohne Verkäufer · Unten: Kundenkontakte pro Verkäufer
@@ -414,7 +461,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
           {!loading && threads.length === 0 && (
             <Box padding="400"><Text as="p" variant="bodySm" tone="subdued" alignment="center">Keine Nachrichten</Text></Box>
           )}
-          {!loading && !isSuperuser && threads.map((thread) => renderThreadRow(thread))}
+          {!loading && !isSuperuser && sortedThreads.map((thread) => renderThreadRow(thread))}
           {!loading && isSuperuser && partitioned && (
             <>
               {partitioned.platformThreads.length > 0 && (

@@ -55,6 +55,7 @@
     "decreaseQty": "Decrease quantity",
     "increaseQty": "Increase quantity",
     "remove": "Remove",
+    "summaryTitle": "Order summary",
     "subtotal": "Subtotal",
     "shippingLabel": "Shipping",
     "freeShipping": "Free",

@@ -547,18 +547,24 @@ export default function PolarisLayout({ children }) {
         router.replace("/dashboard");
         return;
       }
-      // Fetch store name from backend if not cached
-      const cached = localStorage.getItem("storeName");
-      if (!cached) {
-        getMedusaAdminClient().getSellerSettings().then((data) => {
-          if (data?.store_name) {
-            localStorage.setItem("storeName", data.store_name);
-            setStoreName(data.store_name);
-          }
-        }).catch(() => {});
-      }
+      getMedusaAdminClient().getSellerSettings().then((data) => {
+        if (data?.store_name) {
+          localStorage.setItem("storeName", data.store_name);
+          setStoreName(data.store_name);
+        }
+      }).catch(() => {});
     }
   }, [pathname, router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e) => {
+      const name = e.detail?.storeName;
+      if (name) setStoreName(name);
+    };
+    window.addEventListener("sellerStoreNameChanged", handler);
+    return () => window.removeEventListener("sellerStoreNameChanged", handler);
+  }, []);
 
   // Nav seçili öğe: sadece mevcut path vurgulansın (Home "/" başka sayfadayken vurgulu kalmasın)
   useEffect(() => {

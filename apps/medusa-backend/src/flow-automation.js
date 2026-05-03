@@ -42,6 +42,44 @@ function resolveEmailLocaleFromCountry(countryRaw) {
   return 'en'
 }
 
+/** Mirrors apps/shop/src/lib/shop-market.js — URL language segment from market country. */
+function storefrontLangFromMarketCountry(market) {
+  const m = String(market || 'de').toLowerCase()
+  if (['de', 'at', 'ch', 'li', 'lu', 'be'].includes(m)) return 'de'
+  if (['fr', 'mc', 'sn', 'ci', 'cm', 'cd'].includes(m)) return 'fr'
+  if (['it', 'sm', 'va'].includes(m)) return 'it'
+  if (
+    ['es', 'mx', 'ar', 'co', 'cl', 'pe', 've', 'ec', 'bo', 'py', 'uy', 'cr', 'gt', 'hn', 'sv', 'ni', 'pa', 'do', 'cu', 'pr'].includes(
+      m,
+    )
+  )
+    return 'es'
+  if (m === 'tr') return 'tr'
+  return 'en'
+}
+
+/**
+ * Shop canonical URLs: /{market}/{lang}/… (middleware). Derives market from shipping country.
+ * Override via env: STOREFRONT_EMAIL_MARKET, STOREFRONT_EMAIL_LANG (ISO2 lowercase).
+ */
+function storefrontPathPrefixFromShippingCountry(shippingCountryRaw) {
+  const envM = String(process.env.STOREFRONT_EMAIL_MARKET || '').trim().toLowerCase()
+  const envL = String(process.env.STOREFRONT_EMAIL_LANG || '').trim().toLowerCase()
+  const ship = String(shippingCountryRaw || '').trim().toLowerCase()
+  const market = /^[a-z]{2}$/.test(envM) ? envM : /^[a-z]{2}$/.test(ship) ? ship : 'de'
+  const lang =
+    /^[a-z]{2}$/.test(envL) && FLOW_EMAIL_LOCALES.includes(envL) ? envL : storefrontLangFromMarketCountry(market)
+  return { market, lang, prefix: `/${market}/${lang}` }
+}
+
+function absoluteStorefrontUrl(baseSite, path) {
+  const b = String(baseSite || '').replace(/\/$/, '')
+  const p = String(path || '')
+  if (!b) return ''
+  if (!p.startsWith('/')) return `${b}/${p}`
+  return `${b}${p}`
+}
+
 function formatEuro(cents) {
   const n = Number(cents)
   if (Number.isNaN(n)) return '0,00 €'
@@ -167,8 +205,44 @@ async function loadOrderContext(client, orderId) {
   const lineSummary = parts.length ? `${parts.join('; ')} · ${formatEuro(order.total_cents)}` : formatEuro(order.total_cents)
   const first = items[0]
   const productTitle = first ? String(first.title || '').trim() : ''
+  const productImage = first?.thumbnail ? String(first.thumbnail).trim() : ''
 
-  return { order, items, storeName, supportEmail, siteUrl, lineSummary, productTitle }
+  const backendUrl = String(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || process.env.BACKEND_URL || '').replace(/\/$/, '')
+  const resolveUrl = (u) => {
+    if (!u) return ''
+    if (/^https?:\/\//i.test(u)) return u
+    return backendUrl ? `${backendUrl}${u.startsWith('/') ? '' : '/'}${u}` : u
+  }
+
+  const orderItemsHtml = items.length
+    ? `<table style="border-collapse:collapse;width:100%;font-family:inherit;font-size:13px;">\n` +
+      items.map((it) => {
+        const imgSrc = resolveUrl(it.thumbnail || '')
+        const imgTag = imgSrc ? `<img src="${imgSrc}" alt="" width="48" height="48" style="object-fit:cover;border-radius:4px;display:block;" />` : ''
+        const qty = Number(it.quantity || 1)
+        const price = formatEuro(it.unit_price_cents)
+        const title = String(it.title || '').trim()
+        return `<tr><td style="padding:6px 10px 6px 0;vertical-align:top;width:56px;">${imgTag}</td>` +
+          `<td style="padding:6px 0;vertical-align:top;">${title}</td>` +
+          `<td style="padding:6px 0 6px 10px;vertical-align:top;white-space:nowrap;text-align:right;">${qty}× ${price}</td></tr>`
+      }).join('\n') +
+      `\n</table>`
+    : ''
+
+  const prefixParts = storefrontPathPrefixFromShippingCountry(order.country)
+  return {
+    order,
+    items,
+    storeName,
+    supportEmail,
+    siteUrl,
+    lineSummary,
+    productTitle,
+    productImage,
+    orderItemsHtml,
+    resolveUrl,
+    prefixParts,
+  }
 }
 
 function salutationVarsFromGender(genderRaw) {
@@ -231,12 +305,26 @@ function overlayCustomerProfile(vars, cust) {
 }
 
 function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
-  const { order, items, storeName, supportEmail, siteUrl, lineSummary, productTitle } = ctx
+  const {
+    order,
+    items,
+    storeName,
+    supportEmail,
+    siteUrl,
+    lineSummary,
+    productTitle,
+    productImage,
+    orderItemsHtml,
+    resolveUrl,
+    prefixParts,
+  } = ctx
   const fn = String(order.first_name || '').trim()
   const ln = String(order.last_name || '').trim()
   const fullName = [fn, ln].filter(Boolean).join(' ') || String(order.email || '').trim()
   const ordDate = order.created_at ? new Date(order.created_at).toLocaleDateString('de-DE') : ''
   const baseSite = String(siteUrl || '').replace(/\/$/, '')
+  const { market, lang, prefix } = prefixParts || storefrontPathPrefixFromShippingCountry(order.country)
+  const firstHandle = items[0]?.product_handle ? String(items[0].product_handle).trim() : ''
   const vars = {
     CUSTOMER_NAME: fullName,
     CUSTOMER: fullName,
@@ -263,6 +351,8 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     COUNTRY: String(order.country || ''),
     PRODUCT: productTitle,
     PRODUCT_NAME: productTitle,
+    PRODUCT_IMAGE: productImage || '',
+    ORDER_ITEMS_HTML: orderItemsHtml || '',
     LINE_ITEMS_SUMMARY: lineSummary,
     STORE_NAME: storeName,
     SHOP_NAME: storeName,
@@ -271,12 +361,27 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     TRACKING_NUMBER: String(order.tracking_number || '').trim(),
     CARRIER_NAME: String(order.carrier_name || '').trim(),
     TRACKING_URL: trackingUrlFromCarrier(order.carrier_name, order.tracking_number),
-    MY_ORDERS_URL: baseSite ? `${baseSite}/orders` : '',
+    MY_ORDERS_URL: absoluteStorefrontUrl(baseSite, `${prefix}/orders`),
+    SHOP_HOME_URL: absoluteStorefrontUrl(baseSite, `${prefix}/`),
+    ACCOUNT_URL: absoluteStorefrontUrl(baseSite, `${prefix}/account`),
+    ORDER_DETAIL_URL: order.id ? absoluteStorefrontUrl(baseSite, `${prefix}/order/${order.id}`) : '',
+    IMPRESSUM_URL: absoluteStorefrontUrl(baseSite, `${prefix}/impressum`),
+    DATENSCHUTZ_URL: absoluteStorefrontUrl(baseSite, `${prefix}/datenschutz`),
+    MARKET_COUNTRY: String(market || '').toUpperCase(),
+    STOREFRONT_LOCALE: lang,
+    CHECKOUT_URL: absoluteStorefrontUrl(baseSite, `${prefix}/checkout`),
+    PRODUCT_URL: firstHandle
+      ? absoluteStorefrontUrl(baseSite, `${prefix}/produkt/${encodeURIComponent(firstHandle)}`)
+      : absoluteStorefrontUrl(baseSite, `${prefix}/`),
   }
-  if (siteUrl && order.id) {
-    vars.CHECKOUT_URL = `${siteUrl}/`
-    vars.PRODUCT_URL = productTitle ? `${siteUrl}/` : `${siteUrl}/`
-  }
+  items.slice(0, 5).forEach((it, i) => {
+    const n = i + 1
+    vars[`ITEM_${n}_NAME`] = String(it.title || '').trim()
+    vars[`ITEM_${n}_IMAGE`] = resolveUrl ? resolveUrl(it.thumbnail || '') : (it.thumbnail || '')
+    vars[`ITEM_${n}_QUANTITY`] = String(Number(it.quantity || 1))
+    vars[`ITEM_${n}_PRICE`] = formatEuro(it.unit_price_cents)
+    vars[`ITEM_${n}_SKU`] = String(it.sku || it.variant_sku || '').trim()
+  })
   if (customerProfile) {
     overlayCustomerProfile(vars, customerProfile)
     Object.assign(vars, salutationVarsFromGender(customerProfile.gender))
@@ -292,6 +397,8 @@ async function placeholderVarsCustomerOnly(client, cust) {
   const storeName = String(sh.rows[0]?.store_name || 'Shop').trim() || 'Shop'
   const supportEmail = String(sh.rows[0]?.support_email || '').trim()
   const siteUrl = String(process.env.STOREFRONT_PUBLIC_URL || process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '')
+  const { market, lang, prefix } = storefrontPathPrefixFromShippingCountry(cust.country)
+  const absPath = (p) => absoluteStorefrontUrl(siteUrl, p)
   return {
     CUSTOMER_NAME: fullName,
     CUSTOMER: fullName,
@@ -325,8 +432,19 @@ async function placeholderVarsCustomerOnly(client, cust) {
     TRACKING_NUMBER: '',
     CARRIER_NAME: '',
     TRACKING_URL: '',
-    MY_ORDERS_URL: siteUrl ? `${String(siteUrl).replace(/\/$/, '')}/orders` : '',
+    MY_ORDERS_URL: absPath(`${prefix}/orders`),
+    SHOP_HOME_URL: absPath(`${prefix}/`),
+    ACCOUNT_URL: absPath(`${prefix}/account`),
+    ORDER_DETAIL_URL: '',
+    IMPRESSUM_URL: absPath(`${prefix}/impressum`),
+    DATENSCHUTZ_URL: absPath(`${prefix}/datenschutz`),
+    MARKET_COUNTRY: String(market || '').toUpperCase(),
+    STOREFRONT_LOCALE: lang,
+    CHECKOUT_URL: absPath(`${prefix}/checkout`),
+    PRODUCT_URL: absPath(`${prefix}/`),
     ORDER_UUID: '',
+    ORDER_ITEMS_HTML: '',
+    PRODUCT_IMAGE: '',
     ...salutationVarsFromGender(cust.gender),
   }
 }
