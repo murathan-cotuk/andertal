@@ -14938,6 +14938,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
               })
             }
           }
+          await client.query('BEGIN')
           await client.query(`DELETE FROM admin_hub_flow_steps WHERE flow_id = $1`, [id])
           for (const row of normalized) {
             const jI18n = flowStepJsonbOrNull(row.email_i18n)
@@ -14956,12 +14957,13 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 row.wait_hours,
                 row.email_subject,
                 row.email_body,
-                jI18n,
-                jAtt,
+                jI18n !== null ? JSON.stringify(jI18n) : null,
+                jAtt !== null ? JSON.stringify(jAtt) : null,
                 uuidSender,
               ],
             )
           }
+          await client.query('COMMIT')
         }
 
         const fr = await client.query(`SELECT * FROM admin_hub_flows WHERE id = $1`, [id])
@@ -14973,9 +14975,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const flow = mapFlowRow({ ...fr.rows[0], step_count: sr.rows?.length || 0 })
         res.json({ flow, steps: (sr.rows || []).map(mapStepRow) })
       } catch (e) {
-        try {
-          await client.end()
-        } catch (_) {}
+        try { await client.query('ROLLBACK') } catch (_) {}
+        try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     }
