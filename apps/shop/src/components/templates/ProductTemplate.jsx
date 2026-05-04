@@ -163,6 +163,11 @@ const DesktopOnly = styled.div`
   @media (max-width: 768px) {
     display: none;
   }
+  @media (min-width: 1025px) {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
 `;
 
 const MobileHeaderBlock = styled.div`

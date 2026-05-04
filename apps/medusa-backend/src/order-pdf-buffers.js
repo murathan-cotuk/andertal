@@ -2,6 +2,8 @@
  * Generate Rechnung / Lieferschein PDF buffers for nodemailer attachments (same layout as HTTP PDF routes).
  */
 
+const { resolveOrderPaidTotalCents, orderBonusDiscountCents, orderCouponDiscountCents } = require('./order-money')
+
 const pdfDeLatin = (s) => {
   if (s == null || s === undefined) return ''
   return String(s)
@@ -45,7 +47,9 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
       : itemRows.reduce((sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
   const shipping = Number(row.shipping_cents || 0)
   const discount = Number(row.discount_cents || 0)
-  const grandTotal = row.total_cents != null ? Number(row.total_cents) : subtotal + shipping - discount
+  const bonusDisc = orderBonusDiscountCents(row)
+  const couponDisc = orderCouponDiscountCents(row)
+  const grandTotal = resolveOrderPaidTotalCents(row)
   const ensureY = (minY) => {
     if (doc.y > minY) {
       doc.addPage()
@@ -151,7 +155,12 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   doc.moveDown(0.4)
   drawTotalLine('Zwischensumme', pdfCents(subtotal))
   drawTotalLine('Versand', shipping > 0 ? pdfCents(shipping) : '0,00 EUR (kostenlos)')
-  if (discount > 0) drawTotalLine('Rabatt', `-${pdfCents(discount)}`)
+  const pts = Number(row.bonus_points_redeemed || 0)
+  if (bonusDisc > 0) drawTotalLine(`Bonuspunkte (${pts} Pkt.)`, `-${pdfCents(bonusDisc)}`)
+  const cc = row.coupon_code ? String(row.coupon_code).trim() : ''
+  if (couponDisc > 0) drawTotalLine(cc ? `Gutschein (${pdfDeLatin(cc)})` : 'Gutschein', `-${pdfCents(couponDisc)}`)
+  const remainder = Math.max(0, discount - bonusDisc - couponDisc)
+  if (remainder > 0) drawTotalLine('Rabatt', `-${pdfCents(remainder)}`)
   doc.moveTo(totalsX, doc.y).lineTo(right, doc.y).lineWidth(1).strokeColor('#d1d5db').stroke()
   doc.y += 4
   drawTotalLine('Gesamt', pdfCents(grandTotal), true)
@@ -299,4 +308,5 @@ module.exports = {
   buildFlowEmailPdfAttachments,
   buildInvoicePdfBuffer,
   buildLieferscheinPdfBuffer,
+  renderInvoicePdfDocument,
 }

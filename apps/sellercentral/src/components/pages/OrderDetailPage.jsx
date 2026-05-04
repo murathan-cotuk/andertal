@@ -182,7 +182,19 @@ export default function OrderDetailPage() {
   }
 
   const items = order?.items || [];
-  const total = order?.total_cents || order?.subtotal_cents || 0;
+  const total =
+    order != null && order.total_cents !== undefined && order.total_cents !== null && order.total_cents !== ""
+      ? Number(order.total_cents)
+      : Math.max(
+          0,
+          Number(order?.subtotal_cents || 0) +
+            Number(order?.shipping_cents || 0) -
+            Number(order?.discount_cents || 0),
+        );
+  const shippingCents = Number(order?.shipping_cents || 0);
+  const discountCents = Number(order?.discount_cents || 0);
+  const couponDisc = Number(order?.coupon_discount_cents || 0);
+  const bonusDisc = Math.max(0, discountCents - couponDisc);
 
   // Billing address
   const billingSame = order?.billing_same_as_shipping !== false;
@@ -325,8 +337,34 @@ export default function OrderDetailPage() {
               <tfoot>
                 <tr>
                   <td colSpan={3} style={{ textAlign: "right", padding: "8px 0 4px", color: "#6b7280", fontSize: 12 }}>Versand</td>
-                  <td style={{ textAlign: "right", padding: "8px 0 4px", fontSize: 12 }}>Kostenlos</td>
+                  <td style={{ textAlign: "right", padding: "8px 0 4px", fontSize: 12 }}>
+                    {shippingCents > 0 ? fmtCents(shippingCents) : "Kostenlos"}
+                  </td>
                 </tr>
+                {bonusDisc > 0 && (
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", color: "#6b7280", fontSize: 12 }}>
+                      Bonuspunkte ({Number(order?.bonus_points_redeemed || 0)} Pkt.)
+                    </td>
+                    <td style={{ textAlign: "right", padding: "4px 0", fontSize: 12, color: "#15803d" }}>−{fmtCents(bonusDisc)}</td>
+                  </tr>
+                )}
+                {couponDisc > 0 && (
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", color: "#6b7280", fontSize: 12 }}>
+                      Gutschein{order?.coupon_code ? ` (${order.coupon_code})` : ""}
+                    </td>
+                    <td style={{ textAlign: "right", padding: "4px 0", fontSize: 12, color: "#15803d" }}>−{fmtCents(couponDisc)}</td>
+                  </tr>
+                )}
+                {discountCents > bonusDisc + couponDisc && (
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", color: "#6b7280", fontSize: 12 }}>Rabatt</td>
+                    <td style={{ textAlign: "right", padding: "4px 0", fontSize: 12, color: "#15803d" }}>
+                      −{fmtCents(discountCents - bonusDisc - couponDisc)}
+                    </td>
+                  </tr>
+                )}
                 <tr>
                   <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", fontWeight: 700, borderTop: "2px solid #e5e7eb", paddingTop: 10 }}>Gesamt</td>
                   <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 700, borderTop: "2px solid #e5e7eb", paddingTop: 10, fontSize: 15 }}>{fmtCents(total)}</td>

@@ -5,6 +5,7 @@
 
 const { Client } = require('pg')
 const { resolveSmtpSenderIdentity } = require('./smtp-sender-resolve')
+const { resolveOrderPaidTotalCents } = require('./order-money')
 
 const FLOW_EMAIL_LOCALES = ['en', 'de', 'tr', 'fr', 'it', 'es']
 
@@ -80,6 +81,32 @@ function absoluteStorefrontUrl(baseSite, path) {
   return `${b}${p}`
 }
 
+/**
+ * Absolute shop URL for emails (flow placeholders). Backend Render jobs often lack Next.js env;
+ * accept several aliases used across deployments.
+ */
+function resolvePublicShopBaseUrl() {
+  const candidates = [
+    process.env.STOREFRONT_PUBLIC_URL,
+    process.env.SHOP_PUBLIC_URL,
+    process.env.PUBLIC_SHOP_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXT_PUBLIC_SHOP_URL,
+    process.env.SITE_URL,
+  ]
+  for (const raw of candidates) {
+    const s = String(raw || '').trim().replace(/\/$/, '')
+    if (!s) continue
+    if (/^https?:\/\//i.test(s)) return s
+  }
+  const vercel = String(process.env.VERCEL_URL || process.env.NEXT_PUBLIC_VERCEL_URL || '').trim()
+  if (vercel) {
+    const host = vercel.replace(/^https?:\/\//i, '').replace(/\/$/, '')
+    if (host) return `https://${host}`
+  }
+  return ''
+}
+
 function formatEuro(cents) {
   const n = Number(cents)
   if (Number.isNaN(n)) return '0,00 €'
@@ -107,7 +134,8 @@ function applyFlowEmailPlaceholders(template, vars) {
   return String(template || '').replace(/\{([A-Za-z0-9_]+)\}/g, (_, rawKey) => {
     const keyUp = String(rawKey).toUpperCase()
     const v = vars[keyUp] ?? vars[String(rawKey)] ?? vars[rawKey]
-    if (v != null && v !== '') return String(v)
+    const str = v == null ? '' : String(v).trim()
+    if (str !== '') return str
     return `{${rawKey}}`
   })
 }
@@ -172,8 +200,9 @@ async function getSmtpTransport(client) {
 
 async function loadOrderContext(client, orderId) {
   const oRes = await client.query(`SELECT * FROM store_orders WHERE id = $1::uuid`, [orderId])
-  const order = oRes.rows[0]
-  if (!order) return null
+  const orderRaw = oRes.rows[0]
+  if (!orderRaw) return null
+  const order = { ...orderRaw, total_cents: resolveOrderPaidTotalCents(orderRaw) }
   const iRes = await client.query(
     `SELECT * FROM store_order_items WHERE order_id = $1::uuid ORDER BY created_at ASC`,
     [orderId],
@@ -192,10 +221,12 @@ async function loadOrderContext(client, orderId) {
       supportEmail = String(sh.rows[0].support_email || '').trim()
     }
   }
-  const siteUrl = String(process.env.STOREFRONT_PUBLIC_URL || process.env.NEXT_PUBLIC_SITE_URL || '').replace(
-    /\/$/,
-    '',
-  )
+  const siteUrl = resolvePublicShopBaseUrl()
+  if (!siteUrl) {
+    console.warn(
+      '[flow-automation] Public shop URL missing: set STOREFRONT_PUBLIC_URL or SHOP_PUBLIC_URL (or NEXT_PUBLIC_SITE_URL) on the backend — otherwise merge tokens like {ORDER_DETAIL_URL} stay unreplaced in emails.',
+    )
+  }
   const parts = []
   for (const it of items) {
     const q = Number(it.quantity || 1)
@@ -321,10 +352,12 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
   const fn = String(order.first_name || '').trim()
   const ln = String(order.last_name || '').trim()
   const fullName = [fn, ln].filter(Boolean).join(' ') || String(order.email || '').trim()
-  const ordDate = order.created_at ? new Date(order.created_at).toLocaleDateString('de-DE') : ''
+  const ordDate = order.created_at ? new Date(order.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
   const baseSite = String(siteUrl || '').replace(/\/$/, '')
   const { market, lang, prefix } = prefixParts || storefrontPathPrefixFromShippingCountry(order.country)
   const firstHandle = items[0]?.product_handle ? String(items[0].product_handle).trim() : ''
+  const orderDetailUrl = order.id ? absoluteStorefrontUrl(baseSite, `${prefix}/order/${order.id}`) : ''
+  const trackingUrl = trackingUrlFromCarrier(order.carrier_name, order.tracking_number)
   const vars = {
     CUSTOMER_NAME: fullName,
     CUSTOMER: fullName,
@@ -339,7 +372,7 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     ORDER_TOTAL: formatEuro(order.total_cents),
     ORDER_SUBTOTAL: formatEuro(order.subtotal_cents),
     ORDER_SHIPPING: formatEuro(order.shipping_cents),
-    ORDER_DISCOUNT: formatEuro(order.discount_cents || order.coupon_discount_cents || 0),
+    ORDER_DISCOUNT: formatEuro(Math.max(0, Number(order.discount_cents || 0))),
     ORDER_CURRENCY: String(order.currency || 'EUR').toUpperCase(),
     PAYMENT_METHOD: String(order.payment_method || ''),
     SHIPPING_FULL_NAME: fullName,
@@ -351,7 +384,10 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     COUNTRY: String(order.country || ''),
     PRODUCT: productTitle,
     PRODUCT_NAME: productTitle,
-    PRODUCT_IMAGE: productImage || '',
+    PRODUCT_IMAGE: resolveUrl ? resolveUrl(productImage) : (productImage || ''),
+    PRODUCT_IMAGE_HTML: productImage
+      ? `<img src="${resolveUrl ? resolveUrl(productImage) : productImage}" alt="${productTitle.replace(/"/g, '&quot;')}" style="max-width:200px;width:100%;height:auto;display:block;border-radius:6px;" />`
+      : '',
     ORDER_ITEMS_HTML: orderItemsHtml || '',
     LINE_ITEMS_SUMMARY: lineSummary,
     STORE_NAME: storeName,
@@ -360,11 +396,14 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     SUPPORT_EMAIL: supportEmail || String(order.email || '').trim(),
     TRACKING_NUMBER: String(order.tracking_number || '').trim(),
     CARRIER_NAME: String(order.carrier_name || '').trim(),
-    TRACKING_URL: trackingUrlFromCarrier(order.carrier_name, order.tracking_number),
+    TRACKING_URL: trackingUrl,
+    /** Deutsch alternative token often used in templates */
+    SENDUNGSVERFOLGUNG_URL: trackingUrl || orderDetailUrl,
+    TRACKING_LINK: trackingUrl,
     MY_ORDERS_URL: absoluteStorefrontUrl(baseSite, `${prefix}/orders`),
     SHOP_HOME_URL: absoluteStorefrontUrl(baseSite, `${prefix}/`),
     ACCOUNT_URL: absoluteStorefrontUrl(baseSite, `${prefix}/account`),
-    ORDER_DETAIL_URL: order.id ? absoluteStorefrontUrl(baseSite, `${prefix}/order/${order.id}`) : '',
+    ORDER_DETAIL_URL: orderDetailUrl,
     IMPRESSUM_URL: absoluteStorefrontUrl(baseSite, `${prefix}/impressum`),
     DATENSCHUTZ_URL: absoluteStorefrontUrl(baseSite, `${prefix}/datenschutz`),
     MARKET_COUNTRY: String(market || '').toUpperCase(),
@@ -373,6 +412,8 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     PRODUCT_URL: firstHandle
       ? absoluteStorefrontUrl(baseSite, `${prefix}/produkt/${encodeURIComponent(firstHandle)}`)
       : absoluteStorefrontUrl(baseSite, `${prefix}/`),
+    LOGIN_URL: absoluteStorefrontUrl(baseSite, `${prefix}/login`),
+    REGISTER_URL: absoluteStorefrontUrl(baseSite, `${prefix}/register`),
   }
   items.slice(0, 5).forEach((it, i) => {
     const n = i + 1
@@ -396,7 +437,7 @@ async function placeholderVarsCustomerOnly(client, cust) {
   const sh = await client.query(`SELECT store_name, support_email FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`)
   const storeName = String(sh.rows[0]?.store_name || 'Shop').trim() || 'Shop'
   const supportEmail = String(sh.rows[0]?.support_email || '').trim()
-  const siteUrl = String(process.env.STOREFRONT_PUBLIC_URL || process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '')
+  const siteUrl = resolvePublicShopBaseUrl()
   const { market, lang, prefix } = storefrontPathPrefixFromShippingCountry(cust.country)
   const absPath = (p) => absoluteStorefrontUrl(siteUrl, p)
   return {
@@ -424,6 +465,8 @@ async function placeholderVarsCustomerOnly(client, cust) {
     COUNTRY: String(cust.country || ''),
     PRODUCT: '',
     PRODUCT_NAME: '',
+    PRODUCT_IMAGE: '',
+    PRODUCT_IMAGE_HTML: '',
     LINE_ITEMS_SUMMARY: '',
     STORE_NAME: storeName,
     SHOP_NAME: storeName,
@@ -432,6 +475,8 @@ async function placeholderVarsCustomerOnly(client, cust) {
     TRACKING_NUMBER: '',
     CARRIER_NAME: '',
     TRACKING_URL: '',
+    SENDUNGSVERFOLGUNG_URL: '',
+    TRACKING_LINK: '',
     MY_ORDERS_URL: absPath(`${prefix}/orders`),
     SHOP_HOME_URL: absPath(`${prefix}/`),
     ACCOUNT_URL: absPath(`${prefix}/account`),
@@ -442,9 +487,10 @@ async function placeholderVarsCustomerOnly(client, cust) {
     STOREFRONT_LOCALE: lang,
     CHECKOUT_URL: absPath(`${prefix}/checkout`),
     PRODUCT_URL: absPath(`${prefix}/`),
+    LOGIN_URL: absPath(`${prefix}/login`),
+    REGISTER_URL: absPath(`${prefix}/register`),
     ORDER_UUID: '',
     ORDER_ITEMS_HTML: '',
-    PRODUCT_IMAGE: '',
     ...salutationVarsFromGender(cust.gender),
   }
 }

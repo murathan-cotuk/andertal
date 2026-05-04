@@ -18,6 +18,8 @@ const path = require('path')
 const fs = require('fs')
 const { runAutomationFlowsForOrder } = require('./src/flow-automation')
 const { resolveSmtpSenderIdentity } = require('./src/smtp-sender-resolve')
+const { renderInvoicePdfDocument } = require('./src/order-pdf-buffers')
+const { resolveOrderPaidTotalCents } = require('./src/order-money')
 
 let backendLinkModulesPath
 try {
@@ -6737,7 +6739,7 @@ async function start() {
     // --- Store Orders (Stripe payment success sonrası) ---
     const getOrderWithItems = async (client, orderId) => {
       const oRes = await client.query(
-        'SELECT id, order_number, cart_id, payment_intent_id, status, order_status, payment_status, delivery_status, email, first_name, last_name, phone, address_line1, address_line2, city, postal_code, country, billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping, payment_method, customer_id, is_guest, newsletter_opted_in, subtotal_cents, total_cents, COALESCE(discount_cents,0) AS discount_cents, COALESCE(bonus_points_redeemed,0) AS bonus_points_redeemed, currency, created_at, updated_at FROM store_orders WHERE id = $1',
+        `SELECT id, order_number, cart_id, payment_intent_id, status, order_status, payment_status, delivery_status, email, first_name, last_name, phone, address_line1, address_line2, city, postal_code, country, billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping, payment_method, customer_id, is_guest, newsletter_opted_in, subtotal_cents, total_cents, COALESCE(shipping_cents,0) AS shipping_cents, COALESCE(discount_cents,0) AS discount_cents, COALESCE(coupon_discount_cents,0) AS coupon_discount_cents, coupon_code, COALESCE(bonus_points_redeemed,0) AS bonus_points_redeemed, currency, created_at, updated_at FROM store_orders WHERE id = $1`,
         [orderId]
       )
       const oRow = oRes.rows && oRes.rows[0]
@@ -6799,9 +6801,12 @@ async function start() {
         postal_code: oRow.postal_code,
         country: oRow.country,
         subtotal_cents: oRow.subtotal_cents,
+        shipping_cents: Number(oRow.shipping_cents || 0),
         discount_cents: Number(oRow.discount_cents || 0),
+        coupon_discount_cents: Number(oRow.coupon_discount_cents || 0),
+        coupon_code: oRow.coupon_code || null,
         bonus_points_redeemed: Number(oRow.bonus_points_redeemed || 0),
-        total_cents: oRow.total_cents,
+        total_cents: resolveOrderPaidTotalCents(oRow),
         currency: oRow.currency,
         created_at: oRow.created_at,
         updated_at: oRow.updated_at,
@@ -8118,6 +8123,7 @@ async function start() {
           if (tst === 'completed') cancellation_allowed = false
           return {
             ...row,
+            total_cents: resolveOrderPaidTotalCents(row),
             order_number: row.order_number ? Number(row.order_number) : null,
             items: itemsMap[row.id] || [],
             returns: returnsMap[row.id] || [],
@@ -9727,7 +9733,7 @@ async function start() {
         const orderBy = sortMap[sort] || 'o.created_at DESC'
         const lim = Math.min(Number(limit) || 50, 200)
         const off = Number(offset) || 0
-        const r = await client.query(`SELECT o.id, o.order_number, o.order_status, o.payment_status, o.delivery_status, o.seller_id, o.email, o.first_name, o.last_name, o.phone, o.address_line1, o.address_line2, o.city, o.postal_code, o.country, o.subtotal_cents, o.total_cents, o.currency, o.payment_intent_id, o.cart_id, o.created_at, o.is_guest, o.tracking_number, o.carrier_name, o.shipped_at, c.customer_number, c.id AS customer_id, (c.password_hash IS NOT NULL) AS c_is_registered FROM store_orders o LEFT JOIN store_customers c ON LOWER(c.email) = LOWER(o.email) ${where} ORDER BY ${orderBy} LIMIT $${params.length+1} OFFSET $${params.length+2}`, [...params, lim, off])
+        const r = await client.query(`SELECT o.id, o.order_number, o.order_status, o.payment_status, o.delivery_status, o.seller_id, o.email, o.first_name, o.last_name, o.phone, o.address_line1, o.address_line2, o.city, o.postal_code, o.country, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents, o.currency, o.payment_intent_id, o.cart_id, o.created_at, o.is_guest, o.tracking_number, o.carrier_name, o.shipped_at, c.customer_number, c.id AS customer_id, (c.password_hash IS NOT NULL) AS c_is_registered FROM store_orders o LEFT JOIN store_customers c ON LOWER(c.email) = LOWER(o.email) ${where} ORDER BY ${orderBy} LIMIT $${params.length+1} OFFSET $${params.length+2}`, [...params, lim, off])
         const countR = await client.query(`SELECT COUNT(*) FROM store_orders o ${where}`, params)
         const orders = (r.rows || []).map(row => ({
           id: row.id, order_number: row.order_number ? Number(row.order_number) : null,
@@ -9737,7 +9743,11 @@ async function start() {
           email: row.email, first_name: row.first_name, last_name: row.last_name, phone: row.phone,
           address_line1: row.address_line1, address_line2: row.address_line2, city: row.city,
           postal_code: row.postal_code, country: row.country,
-          subtotal_cents: row.subtotal_cents, total_cents: row.total_cents, currency: row.currency,
+          subtotal_cents: row.subtotal_cents,
+          shipping_cents: Number(row.shipping_cents || 0),
+          discount_cents: Number(row.discount_cents || 0),
+          total_cents: resolveOrderPaidTotalCents(row),
+          currency: row.currency,
           payment_intent_id: row.payment_intent_id, created_at: row.created_at,
           tracking_number: row.tracking_number || null,
           carrier_name: row.carrier_name || null,
@@ -9781,7 +9791,17 @@ async function start() {
           } catch (_) {}
         }
         await client.end()
-        res.json({ order: { ...row, order_number: row.order_number ? Number(row.order_number) : null, items, customer_number: customerNumber, is_registered: isRegistered, is_first_order: isFirstOrder } })
+        res.json({
+          order: {
+            ...row,
+            total_cents: resolveOrderPaidTotalCents(row),
+            order_number: row.order_number ? Number(row.order_number) : null,
+            items,
+            customer_number: customerNumber,
+            is_registered: isRegistered,
+            is_first_order: isFirstOrder,
+          },
+        })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -9803,143 +9823,6 @@ async function start() {
         return '—'
       }
     }
-    const pdfCents = (c) => (Number(c || 0) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' EUR'
-    function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, shopName }) {
-      const left = doc.page.margins.left
-      const right = doc.page.width - doc.page.margins.right
-      const contentWidth = right - left
-      const invoiceMetaWidth = 220
-      const tableTop = 292
-      const tableTitleW = Math.round(contentWidth * 0.54)
-      const tableQtyW = 52
-      const tableUnitW = 110
-      const tableTotalW = contentWidth - tableTitleW - tableQtyW - tableUnitW
-      const tableUnitX = right - tableTotalW - tableUnitW
-      const tableTotalX = right - tableTotalW
-      const customerName = [row.first_name, row.last_name].filter(Boolean).join(' ')
-      const billingAddressDifferent = row.billing_same_as_shipping === false && row.billing_address_line1
-      const subtotal = row.subtotal_cents != null ? Number(row.subtotal_cents) : itemRows.reduce((sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
-      const shipping = Number(row.shipping_cents || 0)
-      const discount = Number(row.discount_cents || 0)
-      const grandTotal = row.total_cents != null ? Number(row.total_cents) : subtotal + shipping - discount
-      const ensureY = (minY) => {
-        if (doc.y > minY) {
-          doc.addPage()
-        }
-      }
-
-      doc.rect(left, 34, contentWidth, 44).fill('#111827')
-      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16).text(pdfDeLatin(shopName || 'Andertal'), left + 14, 49, { width: contentWidth - 28, align: 'left' })
-
-      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(25).text('RECHNUNG', left, 94)
-      doc.font('Helvetica').fontSize(10).fillColor('#4b5563').text(`Rechnungs-Nr.: ${invoiceNumber}`, right - invoiceMetaWidth, 96, { width: invoiceMetaWidth, align: 'right' })
-      doc.text(`Datum: ${pdfFmtDate(row.created_at)}`, right - invoiceMetaWidth, 111, { width: invoiceMetaWidth, align: 'right' })
-      doc.text(`Bestell-ID: ${orderId}`, right - invoiceMetaWidth, 126, { width: invoiceMetaWidth, align: 'right' })
-
-      doc.fillColor('#111827').font('Helvetica-Bold').fontSize(10).text('KUNDE', left, 152)
-      doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
-      ;[customerName || '—', row.email || null].filter(Boolean).forEach((line) => {
-        doc.text(pdfDeLatin(line), left, doc.y + 1)
-      })
-
-      const addressTop = 152
-      const rightColumnX = left + Math.round(contentWidth / 2) + 8
-      doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text('LIEFERADRESSE', rightColumnX, addressTop)
-      doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
-      ;[
-        customerName,
-        row.address_line1,
-        row.address_line2,
-        [row.postal_code, row.city].filter(Boolean).join(' '),
-        row.country,
-      ]
-        .filter(Boolean)
-        .forEach((line) => doc.text(pdfDeLatin(line), rightColumnX, doc.y + 1))
-
-      if (billingAddressDifferent) {
-        const nextY = Math.max(doc.y, 216)
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text('RECHNUNGSADRESSE', rightColumnX, nextY)
-        doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
-        ;[
-          [row.first_name, row.last_name].filter(Boolean).join(' '),
-          row.billing_address_line1,
-          row.billing_address_line2,
-          [row.billing_postal_code, row.billing_city].filter(Boolean).join(' '),
-          row.billing_country,
-        ]
-          .filter(Boolean)
-          .forEach((line) => doc.text(pdfDeLatin(line), rightColumnX, doc.y + 1))
-      }
-
-      ensureY(tableTop)
-      doc.rect(left, tableTop, contentWidth, 22).fill('#f3f4f6')
-      doc.fillColor('#111827').font('Helvetica-Bold').fontSize(9)
-      doc.text('ARTIKEL', left + 8, tableTop + 7, { width: tableTitleW - 16 })
-      doc.text('MENGE', left + tableTitleW + 4, tableTop + 7, { width: tableQtyW - 8, align: 'right' })
-      doc.text('EINZELPREIS', tableUnitX + 4, tableTop + 7, { width: tableUnitW - 8, align: 'right' })
-      doc.text('GESAMT', tableTotalX + 4, tableTop + 7, { width: tableTotalW - 8, align: 'right' })
-      doc.y = tableTop + 27
-
-      const drawItemRow = (it) => {
-        const qty = Number(it.quantity || 1)
-        const unit = Number(it.unit_price_cents || 0)
-        const lineTotal = unit * qty
-        const title = pdfDeLatin(it.title || 'Artikel')
-        const titleHeight = doc.heightOfString(title, { width: tableTitleW - 16, align: 'left' })
-        const rowHeight = Math.max(20, titleHeight + 8)
-        const y = doc.y
-        if (y + rowHeight + 120 > doc.page.height - doc.page.margins.bottom) {
-          doc.addPage()
-          doc.rect(left, doc.page.margins.top, contentWidth, 22).fill('#f3f4f6')
-          doc.fillColor('#111827').font('Helvetica-Bold').fontSize(9)
-          doc.text('ARTIKEL', left + 8, doc.page.margins.top + 7, { width: tableTitleW - 16 })
-          doc.text('MENGE', left + tableTitleW + 4, doc.page.margins.top + 7, { width: tableQtyW - 8, align: 'right' })
-          doc.text('EINZELPREIS', tableUnitX + 4, doc.page.margins.top + 7, { width: tableUnitW - 8, align: 'right' })
-          doc.text('GESAMT', tableTotalX + 4, doc.page.margins.top + 7, { width: tableTotalW - 8, align: 'right' })
-          doc.y = doc.page.margins.top + 27
-        }
-        const rowY = doc.y
-        doc.font('Helvetica').fontSize(10).fillColor('#111827').text(title, left + 8, rowY + 4, { width: tableTitleW - 16 })
-        doc.text(String(qty), left + tableTitleW + 4, rowY + 4, { width: tableQtyW - 8, align: 'right' })
-        doc.text(pdfCents(unit), tableUnitX + 4, rowY + 4, { width: tableUnitW - 8, align: 'right' })
-        doc.text(pdfCents(lineTotal), tableTotalX + 4, rowY + 4, { width: tableTotalW - 8, align: 'right' })
-        doc.moveTo(left, rowY + rowHeight).lineTo(right, rowY + rowHeight).lineWidth(0.5).strokeColor('#e5e7eb').stroke()
-        doc.y = rowY + rowHeight + 2
-      }
-
-      if (!itemRows.length) {
-        drawItemRow({ title: 'Keine Artikel', quantity: 1, unit_price_cents: 0 })
-      } else {
-        itemRows.forEach(drawItemRow)
-      }
-
-      if (doc.y + 120 > doc.page.height - doc.page.margins.bottom) doc.addPage()
-      const totalsWidth = 250
-      const totalsX = right - totalsWidth
-      const drawTotalLine = (label, value, bold = false) => {
-        const y = doc.y
-        doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 11 : 10).fillColor('#111827')
-        doc.text(label, totalsX, y, { width: totalsWidth * 0.55, align: 'left' })
-        doc.text(value, totalsX + totalsWidth * 0.55, y, { width: totalsWidth * 0.45, align: 'right' })
-        doc.y = y + (bold ? 18 : 16)
-      }
-      doc.moveDown(0.4)
-      drawTotalLine('Zwischensumme', pdfCents(subtotal))
-      drawTotalLine('Versand', shipping > 0 ? pdfCents(shipping) : '0,00 EUR (kostenlos)')
-      if (discount > 0) drawTotalLine('Rabatt', `-${pdfCents(discount)}`)
-      doc.moveTo(totalsX, doc.y).lineTo(right, doc.y).lineWidth(1).strokeColor('#d1d5db').stroke()
-      doc.y += 4
-      drawTotalLine('Gesamt', pdfCents(grandTotal), true)
-
-      doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
-      doc.text(
-        pdfDeLatin('Hinweis: Dies ist eine vereinfachte Rechnung. Bei Rueckfragen wenden Sie sich bitte an den Verkaeufer.'),
-        left,
-        doc.page.height - doc.page.margins.bottom - 22,
-        { width: contentWidth, align: 'left' },
-      )
-    }
-
     const adminHubOrderPdfInvoiceGET = async (req, res) => {
       const id = (req.params.id || '').trim()
       if (!id) return res.status(400).json({ message: 'id required' })
@@ -10114,7 +9997,14 @@ async function start() {
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
         const items = (iRes.rows || []).map(r => ({ id: r.id, variant_id: r.variant_id, product_id: r.product_id, quantity: r.quantity, unit_price_cents: r.unit_price_cents, title: r.title, thumbnail: r.thumbnail, product_handle: r.product_handle }))
         await client.end()
-        res.json({ order: { ...row, order_number: row.order_number ? Number(row.order_number) : null, items } })
+        res.json({
+          order: {
+            ...row,
+            total_cents: resolveOrderPaidTotalCents(row),
+            order_number: row.order_number ? Number(row.order_number) : null,
+            items,
+          },
+        })
         if (fireOrderShipped) {
           setImmediate(() => {
             runAutomationFlowsForOrder({ triggerKey: 'order_shipped', orderId: id }).catch((fe) => {
@@ -14349,6 +14239,34 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         },
       },
       {
+        key: 'TRACKING_LINK',
+        sample: 'https://www.dhl.de/…',
+        category: 'shipping',
+        triggers: ['order_shipped', 'order_delivered'],
+        desc: {
+          en: 'Alias of TRACKING_URL',
+          de: 'Alias für TRACKING_URL',
+          tr: 'TRACKING_URL ile aynı',
+          fr: 'Alias de TRACKING_URL',
+          it: 'Alias di TRACKING_URL',
+          es: 'Alias de TRACKING_URL',
+        },
+      },
+      {
+        key: 'SENDUNGSVERFOLGUNG_URL',
+        sample: 'https://www.dhl.de/…',
+        category: 'shipping',
+        triggers: ['order_shipped', 'order_delivered', 'order_placed'],
+        desc: {
+          en: 'Tracking URL if known; otherwise falls back to ORDER_DETAIL_URL',
+          de: 'Sendungsverfolgung; sonst Link zur Bestellung',
+          tr: 'Takip varsa takip linki, yoksa sipariş detayı',
+          fr: 'Suivi ou page commande',
+          it: 'Tracking o dettaglio ordine',
+          es: 'Seguimiento o detalle del pedido',
+        },
+      },
+      {
         key: 'MY_ORDERS_URL',
         sample: 'https://shop.example.com/de/de/orders',
         category: 'shop',
@@ -14402,6 +14320,34 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           fr: 'Accueil boutique avec préfixe',
           it: 'Home negozio con prefisso',
           es: 'Inicio de la tienda con prefijo',
+        },
+      },
+      {
+        key: 'LOGIN_URL',
+        sample: 'https://shop.example.com/de/de/login',
+        category: 'shop',
+        triggers: ['*'],
+        desc: {
+          en: 'Shop login page (/market/lang/login)',
+          de: 'Shop-Login',
+          tr: 'Mağaza giriş sayfası',
+          fr: 'Connexion boutique',
+          it: 'Login negozio',
+          es: 'Inicio de sesión tienda',
+        },
+      },
+      {
+        key: 'REGISTER_URL',
+        sample: 'https://shop.example.com/de/de/register',
+        category: 'shop',
+        triggers: ['*'],
+        desc: {
+          en: 'Shop registration page',
+          de: 'Shop-Registrierung',
+          tr: 'Kayıt sayfası',
+          fr: 'Inscription boutique',
+          it: 'Registrazione',
+          es: 'Registro tienda',
         },
       },
       {
@@ -14678,6 +14624,20 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         },
       },
       {
+        key: 'PRODUCT_IMAGE_HTML',
+        sample: '<img src="https://shop.example/uploads/media/product.jpg" alt="Produkt" style="max-width:200px;width:100%;height:auto;display:block;border-radius:6px;" />',
+        category: 'product_cart',
+        triggers: ['order_placed', 'order_shipped', 'order_delivered', 'review_request', 'abandoned_cart'],
+        desc: {
+          en: 'Ready-to-use <img> tag of the first ordered product (embed directly in email body)',
+          de: 'Fertiges <img>-Tag des ersten Produktbilds (direkt in E-Mail-Text einfügen)',
+          tr: 'İlk ürünün görseli – e-posta gövdesine doğrudan eklenebilen <img> etiketi',
+          fr: 'Balise <img> prête à l\'emploi de la première image produit',
+          it: 'Tag <img> pronto per il corpo e-mail del primo prodotto',
+          es: 'Etiqueta <img> lista para insertar en el cuerpo del email del primer producto',
+        },
+      },
+      {
         key: 'ORDER_ITEMS_HTML',
         sample: '<table>…</table>',
         category: 'product_cart',
@@ -14785,11 +14745,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const vars = { ...FLOW_EMAIL_SAMPLE_PLACEHOLDERS, ...extra }
       return String(template).replace(/\{([A-Za-z0-9_]+)\}/g, (_, rawKey) => {
         const keyUp = String(rawKey).toUpperCase()
-        const v =
+        const raw =
           vars[keyUp] ??
           vars[String(rawKey)] ??
           vars[rawKey]
-        if (v != null && v !== '') return String(v)
+        const v = raw == null ? '' : String(raw).trim()
+        if (v !== '') return v
         return `{${rawKey}}`
       })
     }
@@ -15620,7 +15581,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const transactions = r.rows.map(row => {
           const commRate = parseFloat(row.commission_rate ?? 0.12)
           const sellerBasis = sellerOrderRevenueBasisCents(row)
-          const customerPaid = Number(row.total_cents || 0)
+          const customerPaid = resolveOrderPaidTotalCents(row)
           const commission = Math.round(sellerBasis * commRate)
           const payout = sellerBasis - commission
           return {

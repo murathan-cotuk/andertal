@@ -25,7 +25,7 @@ const Main = styled.main`
   max-width: 680px;
   margin: 0 auto;
   width: 100%;
-  padding: 60px 24px 80px;
+  padding: 24px 24px 80px;
   text-align: center;
 `;
 
@@ -182,7 +182,9 @@ export default function OrderConfirmationPage() {
         ) : (
           <>
             <SuccessIcon>
-              <i className="fas fa-check" />
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
             </SuccessIcon>
             <Title>{t("confirmationTitle")}</Title>
             <Subtitle>{t("confirmationSubtitle")}</Subtitle>

@@ -220,8 +220,15 @@ const SummaryCard = styled.div`
     position: relative;
     top: auto;
     padding: 18px 16px 20px;
-    border-radius: 14px;
-    box-shadow: 0 1px 3px rgba(17, 24, 39, 0.06);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    box-shadow: none;
+    margin-left: -16px;
+    margin-right: -16px;
+    width: calc(100% + 32px);
+    background: #fff;
+    color: #111827;
   }
 `;
 
