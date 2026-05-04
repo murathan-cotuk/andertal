@@ -57,7 +57,22 @@ const EMPTY_FORM = {
     max_uses: "",
     stackable: false,
   },
+  variant_ids: [],
 };
+
+function normalizeJsonIdArray(raw) {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+  if (typeof raw === "string") {
+    try {
+      const x = JSON.parse(raw);
+      return Array.isArray(x) ? x.map(String).filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
 
 const fmtDate = (v) => (v ? new Date(v).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "—");
 
@@ -65,11 +80,12 @@ const statusTone = { active: "success", draft: "info", paused: "warning", ended:
 const statusLabel = { active: "Aktiv", draft: "Entwurf", paused: "Pausiert", ended: "Beendet" };
 
 function CampaignCard({ campaign, groups, products, onEdit, onDelete }) {
+  const variantSel = normalizeJsonIdArray(campaign.variant_ids);
   const targetDesc = campaign.target_type === "all"
     ? "Alle Produkte"
     : campaign.target_type === "groups"
       ? `${(campaign.group_ids || []).length} Gruppe(n)`
-      : `${(campaign.product_ids || []).length} Produkt(e)`;
+      : `${(campaign.product_ids || []).length} Produkt(e)${variantSel.length ? ` · ${variantSel.length} Variante(n)` : ""}`;
 
   const discountLabel = campaign.discount_type === "percentage"
     ? `${campaign.discount_value}%`
@@ -167,6 +183,7 @@ export default function CampaignsPage() {
       target_type: c.target_type || "products",
       product_ids: Array.isArray(c.product_ids) ? [...c.product_ids] : [],
       group_ids: Array.isArray(c.group_ids) ? [...c.group_ids] : [],
+      variant_ids: normalizeJsonIdArray(c.variant_ids),
       settings: {
         show_badge: c.settings?.show_badge !== false,
         badge_text: c.settings?.badge_text || "",
@@ -238,12 +255,49 @@ export default function CampaignsPage() {
     }
   };
 
-  const toggleProduct = (id) => {
+  const toggleProduct = (product) => {
+    const pid = product.id;
+    const variantIdSet = new Set(
+      (product.variants || []).map((v) => String(v?.id || "").trim()).filter(Boolean),
+    );
     setForm((prev) => {
       const ids = new Set(prev.product_ids);
-      if (ids.has(id)) ids.delete(id); else ids.add(id);
-      return { ...prev, product_ids: Array.from(ids) };
+      const vids = new Set(prev.variant_ids);
+      if (ids.has(pid)) {
+        ids.delete(pid);
+        for (const vid of [...vids]) {
+          if (variantIdSet.has(vid)) vids.delete(vid);
+        }
+      } else {
+        ids.add(pid);
+      }
+      return { ...prev, product_ids: Array.from(ids), variant_ids: Array.from(vids) };
     });
+  };
+
+  const toggleVariant = (product, variantId) => {
+    const vid = String(variantId || "").trim();
+    if (!vid) return;
+    setForm((prev) => {
+      const ids = new Set(prev.product_ids);
+      const vids = new Set(prev.variant_ids);
+      if (vids.has(vid)) {
+        vids.delete(vid);
+      } else {
+        ids.add(product.id);
+        vids.add(vid);
+      }
+      return { ...prev, product_ids: Array.from(ids), variant_ids: Array.from(vids) };
+    });
+  };
+
+  const variantRowLabel = (v) => {
+    const t = (v?.title || "").trim();
+    if (t) return t;
+    const sku = (v?.sku || "").trim();
+    if (sku) return sku;
+    const id = String(v?.id || "");
+    return id ? `Variante ${id.slice(0, 8)}…` : "Variante";
   };
 
   const toggleGroup = (id) => {
@@ -403,7 +457,10 @@ export default function CampaignsPage() {
 
             {form.target_type === "products" && (
               <BlockStack gap="200">
-                <Text as="span" variant="bodySm" tone="subdued">{form.product_ids.length} Produkt(e) ausgewählt</Text>
+                <Text as="span" variant="bodySm" tone="subdued">
+                  {form.product_ids.length} Produkt(e) ausgewählt
+                  {form.variant_ids.length > 0 ? ` · ${form.variant_ids.length} Variante(n) eingeschränkt` : ""}
+                </Text>
                 <TextField
                   label=""
                   labelHidden
@@ -417,14 +474,34 @@ export default function CampaignsPage() {
                 <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #e4e5e7", borderRadius: 8 }}>
                   {filteredProducts.map((p) => {
                     const checked = form.product_ids.includes(p.id);
+                    const variants = Array.isArray(p.variants) ? p.variants.filter((v) => v?.id) : [];
                     return (
-                      <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer", background: checked ? "#f0f9ff" : "transparent", borderBottom: "1px solid #f4f5f7" }}>
-                        <CustomCheckbox checked={checked} onChange={() => toggleProduct(p.id)} size={18} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#202223", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title || p.id}</div>
-                          {p.ean && <div style={{ fontSize: 11, color: "#6d7175" }}>EAN: {p.ean}</div>}
-                        </div>
-                      </label>
+                      <div key={p.id} style={{ borderBottom: "1px solid #f4f5f7" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer", background: checked ? "#f0f9ff" : "transparent" }}>
+                          <CustomCheckbox checked={checked} onChange={() => toggleProduct(p)} size={18} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#202223", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title || p.id}</div>
+                            {p.ean && <div style={{ fontSize: 11, color: "#6d7175" }}>EAN: {p.ean}</div>}
+                          </div>
+                        </label>
+                        {checked && variants.length > 0 ? (
+                          <div style={{ padding: "4px 12px 10px 44px", background: checked ? "#f7fcff" : "transparent" }}>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Varianten — keine Teilauswahl = Rabatt gilt für alle Varianten.
+                            </Text>
+                            {variants.map((v) => {
+                              const vid = String(v.id);
+                              const vChecked = form.variant_ids.includes(vid);
+                              return (
+                                <label key={vid} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0 2px", cursor: "pointer" }}>
+                                  <CustomCheckbox checked={vChecked} onChange={() => toggleVariant(p, vid)} size={16} />
+                                  <span style={{ fontSize: 12, color: "#202223" }}>{variantRowLabel(v)}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
                     );
                   })}
                 </div>

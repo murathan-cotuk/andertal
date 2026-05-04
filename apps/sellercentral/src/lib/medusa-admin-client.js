@@ -1323,6 +1323,10 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/campaigns')
   }
 
+  async getCampaign(id) {
+    return this.request(`/admin-hub/v1/campaigns/${encodeURIComponent(id)}`)
+  }
+
   async createCampaign(data) {
     return this.request('/admin-hub/v1/campaigns', {
       method: 'POST',

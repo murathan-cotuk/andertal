@@ -1484,6 +1484,7 @@ async function start() {
         await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS ad_status text NOT NULL DEFAULT 'draft'`).catch(() => {})
         await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS external_campaign_ids jsonb NOT NULL DEFAULT '{}'`).catch(() => {})
         await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS stripe_charge_id text`).catch(() => {})
+        await client.query(`ALTER TABLE seller_campaigns ADD COLUMN IF NOT EXISTS variant_ids jsonb NOT NULL DEFAULT '[]'`).catch(() => {})
         // Platform marketing accounts (superuser-managed)
         await client.query(`
           CREATE TABLE IF NOT EXISTS platform_marketing_accounts (
@@ -6756,6 +6757,17 @@ async function start() {
             [String(product.id || productId), chosenSellerId]
           )
           if (listingRow.rows[0]) unitPriceCents = Number(listingRow.rows[0].price_cents)
+        }
+        const sellerForCamp = chosenSellerId || (product.seller_id ? String(product.seller_id).trim() : '')
+        if (sellerForCamp) {
+          try {
+            const campRow = await findBestSellerCampaignDiscountRow(client, {
+              productId: String(product.id || productId),
+              variantId,
+              sellerId: sellerForCamp,
+            })
+            if (campRow) unitPriceCents = applySellerCampaignToPriceCents(unitPriceCents, campRow)
+          } catch (_) {}
         }
         const title = (product.title || 'Product') + (variantLabel ? ` (${variantLabel})` : '')
         const handle = product.handle || product.id
@@ -17302,15 +17314,17 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.post('/admin-hub/v1/campaigns', requireSellerAuth, async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       if (!sellerId) return res.status(403).json({ message: 'Seller ID required' })
-      const { name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, settings, campaign_type, budget_daily_cents, bid_strategy, ad_platforms } = req.body || {}
+      const { name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, variant_ids, settings, campaign_type, budget_daily_cents, bid_strategy, ad_platforms } = req.body || {}
       if (!name?.trim()) return res.status(400).json({ message: 'name required' })
+      const dType = String(discount_type || 'percentage').toLowerCase()
       const dVal = parseFloat(discount_value) || 0
-      if (dVal < 0 || dVal > 100) return res.status(400).json({ message: 'discount_value must be 0–100' })
+      if (dVal < 0) return res.status(400).json({ message: 'discount_value must be >= 0' })
+      if (dType === 'percentage' && dVal > 100) return res.status(400).json({ message: 'percentage discount must be 0–100' })
       const c = pgDbClient(); try {
         await c.connect()
         const r = await c.query(
-          `INSERT INTO seller_campaigns (seller_id, name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, settings, campaign_type, budget_daily_cents, bid_strategy, ad_platforms) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
-          [sellerId, name.trim(), description || '', status || 'draft', start_at || null, end_at || null, discount_type || 'percentage', dVal, target_type || 'products', JSON.stringify(Array.isArray(product_ids) ? product_ids : []), JSON.stringify(Array.isArray(group_ids) ? group_ids : []), JSON.stringify(settings || {}), campaign_type || 'internal', parseInt(budget_daily_cents) || 0, bid_strategy || 'cpc', JSON.stringify(Array.isArray(ad_platforms) ? ad_platforms : [])]
+          `INSERT INTO seller_campaigns (seller_id, name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, variant_ids, settings, campaign_type, budget_daily_cents, bid_strategy, ad_platforms) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+          [sellerId, name.trim(), description || '', status || 'draft', start_at || null, end_at || null, discount_type || 'percentage', dVal, target_type || 'products', JSON.stringify(Array.isArray(product_ids) ? product_ids : []), JSON.stringify(Array.isArray(group_ids) ? group_ids : []), JSON.stringify(Array.isArray(variant_ids) ? variant_ids : []), JSON.stringify(settings || {}), campaign_type || 'internal', parseInt(budget_daily_cents) || 0, bid_strategy || 'cpc', JSON.stringify(Array.isArray(ad_platforms) ? ad_platforms : [])]
         )
         await c.end(); res.status(201).json({ campaign: r.rows[0] })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
@@ -17341,9 +17355,27 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (!isSuperuser && camp.seller_id !== sellerId) { await c.end(); return res.status(403).json({ message: 'Forbidden' }) }
         const b = req.body || {}
         const dVal = b.discount_value !== undefined ? parseFloat(b.discount_value) : Number(camp.discount_value)
+        const dTypePut = String(b.discount_type || camp.discount_type || 'percentage').toLowerCase()
+        if (dVal < 0 || !Number.isFinite(dVal)) {
+          await c.end()
+          return res.status(400).json({ message: 'discount_value invalid' })
+        }
+        if (dTypePut === 'percentage' && dVal > 100) {
+          await c.end()
+          return res.status(400).json({ message: 'percentage discount must be 0–100' })
+        }
+        let nextVariants = Array.isArray(b.variant_ids) ? b.variant_ids : camp.variant_ids
+        if (!Array.isArray(nextVariants)) {
+          try {
+            nextVariants = camp.variant_ids != null && typeof camp.variant_ids === 'string' ? JSON.parse(camp.variant_ids) : []
+          } catch (_) {
+            nextVariants = []
+          }
+          if (!Array.isArray(nextVariants)) nextVariants = []
+        }
         const r = await c.query(
-          `UPDATE seller_campaigns SET name=$1, description=$2, status=$3, start_at=$4, end_at=$5, discount_type=$6, discount_value=$7, target_type=$8, product_ids=$9, group_ids=$10, settings=$11, campaign_type=$12, budget_daily_cents=$13, bid_strategy=$14, ad_platforms=$15, updated_at=now() WHERE id=$16 RETURNING *`,
-          [b.name?.trim() || camp.name, b.description ?? camp.description, b.status || camp.status, b.start_at !== undefined ? (b.start_at || null) : camp.start_at, b.end_at !== undefined ? (b.end_at || null) : camp.end_at, b.discount_type || camp.discount_type, dVal, b.target_type || camp.target_type, JSON.stringify(Array.isArray(b.product_ids) ? b.product_ids : camp.product_ids), JSON.stringify(Array.isArray(b.group_ids) ? b.group_ids : camp.group_ids), JSON.stringify(b.settings || camp.settings || {}), b.campaign_type || camp.campaign_type || 'internal', b.budget_daily_cents !== undefined ? parseInt(b.budget_daily_cents) : (camp.budget_daily_cents || 0), b.bid_strategy || camp.bid_strategy || 'cpc', JSON.stringify(Array.isArray(b.ad_platforms) ? b.ad_platforms : (camp.ad_platforms || [])), req.params.id]
+          `UPDATE seller_campaigns SET name=$1, description=$2, status=$3, start_at=$4, end_at=$5, discount_type=$6, discount_value=$7, target_type=$8, product_ids=$9, group_ids=$10, variant_ids=$11, settings=$12, campaign_type=$13, budget_daily_cents=$14, bid_strategy=$15, ad_platforms=$16, updated_at=now() WHERE id=$17 RETURNING *`,
+          [b.name?.trim() || camp.name, b.description ?? camp.description, b.status || camp.status, b.start_at !== undefined ? (b.start_at || null) : camp.start_at, b.end_at !== undefined ? (b.end_at || null) : camp.end_at, b.discount_type || camp.discount_type, dVal, b.target_type || camp.target_type, JSON.stringify(Array.isArray(b.product_ids) ? b.product_ids : camp.product_ids), JSON.stringify(Array.isArray(b.group_ids) ? b.group_ids : camp.group_ids), JSON.stringify(Array.isArray(nextVariants) ? nextVariants : []), JSON.stringify(b.settings || camp.settings || {}), b.campaign_type || camp.campaign_type || 'internal', b.budget_daily_cents !== undefined ? parseInt(b.budget_daily_cents) : (camp.budget_daily_cents || 0), b.bid_strategy || camp.bid_strategy || 'cpc', JSON.stringify(Array.isArray(b.ad_platforms) ? b.ad_platforms : (camp.ad_platforms || [])), req.params.id]
         )
         await c.end(); res.json({ campaign: r.rows[0] })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
@@ -17449,48 +17481,141 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    // Store API: active campaign discounts for a product (used by shop)
+    /** Rabatt aus seller_campaigns auf Listenpreis (Cent) anwenden — fixed = € aus DB. */
+    const applySellerCampaignToPriceCents = (priceCents, camp) => {
+      const p = Math.max(0, Number(priceCents || 0))
+      if (!camp || p <= 0) return p
+      const t = String(camp.discount_type || 'percentage').toLowerCase()
+      const v = Number(camp.discount_value || 0)
+      if (t === 'fixed') {
+        const off = Math.round(v * 100)
+        return Math.max(0, p - off)
+      }
+      const pct = Math.min(100, Math.max(0, v))
+      return Math.round(p * (1 - pct / 100))
+    }
+
+    const parseJsonbArray = (raw) => {
+      if (raw == null) return []
+      if (Array.isArray(raw)) return raw.map(String)
+      if (typeof raw === 'string') {
+        try {
+          const x = JSON.parse(raw)
+          return Array.isArray(x) ? x.map(String) : []
+        } catch (_) {
+          return []
+        }
+      }
+      return []
+    }
+
+    async function sellerCampaignCoversProductVariant(c, camp, productId, variantId) {
+      const pid = String(productId || '').trim()
+      const vid = String(variantId || '').trim()
+      const targetType = String(camp.target_type || 'products').toLowerCase()
+      const variantIdsList = parseJsonbArray(camp.variant_ids)
+
+      let productMatch = false
+      if (targetType === 'all') {
+        productMatch = true
+      } else if (targetType === 'groups') {
+        const groupIds = parseJsonbArray(camp.group_ids)
+        for (const gid of groupIds) {
+          const gr = await c.query(`SELECT product_ids FROM seller_product_groups WHERE id=$1`, [gid]).catch(() => ({ rows: [] }))
+          const gProds = parseJsonbArray(gr.rows[0]?.product_ids)
+          if (gProds.includes(pid)) {
+            productMatch = true
+            break
+          }
+        }
+      } else {
+        const productIds = parseJsonbArray(camp.product_ids)
+        productMatch = productIds.includes(pid)
+      }
+
+      if (variantIdsList.length > 0) {
+        if (!vid || !variantIdsList.includes(vid)) return false
+        if (productMatch || targetType === 'all') return true
+        return vid.startsWith(`${pid}-`)
+      }
+      return productMatch
+    }
+
+    async function findBestSellerCampaignDiscountRow(c, { productId, variantId, sellerId }) {
+      const pid = String(productId || '').trim()
+      const vid = String(variantId || '').trim()
+      const sid = String(sellerId || '').trim()
+      if (!pid || !sid) return null
+      const nowIso = new Date().toISOString()
+      const r = await c.query(
+        `SELECT * FROM seller_campaigns
+         WHERE seller_id = $1
+           AND status = 'active'
+           AND COALESCE(campaign_type, 'internal') = 'internal'
+           AND (start_at IS NULL OR start_at <= $2::timestamptz)
+           AND (end_at IS NULL OR end_at >= $2::timestamptz)
+         ORDER BY discount_value DESC`,
+        [sid, nowIso],
+      )
+      let bestDiscount = null
+      for (const camp of r.rows || []) {
+        const covered = await sellerCampaignCoversProductVariant(c, camp, pid, vid)
+        if (covered) {
+          if (!bestDiscount || parseFloat(camp.discount_value) > parseFloat(bestDiscount.discount_value)) {
+            bestDiscount = camp
+          }
+        }
+      }
+      return bestDiscount
+    }
+
+    // Store API: active campaign discounts for a product + variant (shop PDP)
     httpApp.get('/store/campaigns/discount', async (req, res) => {
-      const { product_id } = req.query
+      const product_id = (req.query.product_id || '').toString().trim()
+      const variant_id = (req.query.variant_id || '').toString().trim()
+      const seller_id_query = (req.query.seller_id || '').toString().trim()
       if (!product_id) return res.status(400).json({ message: 'product_id required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { Client } = require('pg')
       const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
       try {
         await c.connect()
-        const now = new Date().toISOString()
-        // Find active campaigns where this product is included directly or via a group
-        const r = await c.query(`
-          SELECT sc.* FROM seller_campaigns sc
-          WHERE sc.status = 'active'
-            AND (sc.start_at IS NULL OR sc.start_at <= $1)
-            AND (sc.end_at IS NULL OR sc.end_at >= $1)
-          ORDER BY sc.discount_value DESC
-        `, [now])
-        const activeCampaigns = r.rows
-        let bestDiscount = null
-        for (const camp of activeCampaigns) {
-          const productIds = Array.isArray(camp.product_ids) ? camp.product_ids.map(String) : []
-          const groupIds = Array.isArray(camp.group_ids) ? camp.group_ids : []
-          let covered = productIds.includes(String(product_id))
-          if (!covered && groupIds.length > 0) {
-            for (const gid of groupIds) {
-              const gr = await c.query(`SELECT product_ids FROM seller_product_groups WHERE id=$1`, [gid]).catch(() => ({ rows: [] }))
-              const gProds = Array.isArray(gr.rows[0]?.product_ids) ? gr.rows[0].product_ids.map(String) : []
-              if (gProds.includes(String(product_id))) { covered = true; break }
-            }
-          }
-          if (covered) {
-            if (!bestDiscount || parseFloat(camp.discount_value) > parseFloat(bestDiscount.discount_value)) {
-              bestDiscount = camp
-            }
-          }
+        let sellerId = seller_id_query
+        if (!sellerId) {
+          const product = await getAdminHubProductByIdOrHandleDb(product_id)
+          sellerId = product?.seller_id ? String(product.seller_id).trim() : ''
         }
+        if (!sellerId) {
+          await c.end()
+          return res.json({ discount: null })
+        }
+        const bestDiscount = await findBestSellerCampaignDiscountRow(c, {
+          productId: product_id,
+          variantId: variant_id,
+          sellerId,
+        })
         await c.end()
         if (!bestDiscount) return res.json({ discount: null })
-        res.json({ discount: { campaign_id: bestDiscount.id, campaign_name: bestDiscount.name, discount_type: bestDiscount.discount_type, discount_value: parseFloat(bestDiscount.discount_value) } })
+        let settings = bestDiscount.settings || {}
+        if (typeof settings === 'string') {
+          try {
+            settings = JSON.parse(settings)
+          } catch (_) {
+            settings = {}
+          }
+        }
+        res.json({
+          discount: {
+            campaign_id: bestDiscount.id,
+            campaign_name: bestDiscount.name,
+            discount_type: bestDiscount.discount_type,
+            discount_value: parseFloat(bestDiscount.discount_value),
+            show_badge: settings.show_badge !== false,
+            badge_text: settings.badge_text ? String(settings.badge_text) : '',
+          },
+        })
       } catch (e) {
-        try { await c.end() } catch(_) {}
+        try { await c.end() } catch (_) {}
         res.json({ discount: null })
       }
     })

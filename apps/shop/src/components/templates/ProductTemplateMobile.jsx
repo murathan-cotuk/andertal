@@ -17,6 +17,7 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import NewtonsCradle from "@/components/NewtonsCradle";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
+import { useStoreCampaignDiscount } from "@/hooks/useStoreCampaignDiscount";
 import { findShippingGroup, resolveShippingQuoteCents, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import Carousel from "@/components/Carousel";
 import { StarRating } from "@/components/ProductCard";
@@ -874,6 +875,66 @@ function BrandRow({ brandName, brandHandle, brandLogo, reviewCount }) {
   );
 }
 
+/** PDP buybox / mobile price: seller campaign discount overlay on listing price. */
+function ProductCampaignPriceBlock({
+  productId,
+  variantId,
+  sellerId,
+  effectiveDisplayCents,
+  discountPercent,
+  hasSale,
+  priceCents,
+  uvpCents,
+  grundpreis,
+}) {
+  const { promo: campaignPromo, finalPriceCents: campaignFinalCents } = useStoreCampaignDiscount({
+    productId,
+    variantId,
+    sellerId: sellerId ? String(sellerId) : null,
+    basePriceCents: effectiveDisplayCents,
+  });
+  const buyBoxPriceCents =
+    campaignFinalCents != null && Number.isFinite(Number(campaignFinalCents))
+      ? Number(campaignFinalCents)
+      : effectiveDisplayCents;
+  const showCampaignStrike = !!(campaignPromo && buyBoxPriceCents < effectiveDisplayCents);
+  const campaignDiscountPct =
+    showCampaignStrike && effectiveDisplayCents > 0
+      ? Math.round(((effectiveDisplayCents - buyBoxPriceCents) / effectiveDisplayCents) * 100)
+      : null;
+  const discountPillPercent =
+    campaignDiscountPct != null && campaignDiscountPct > 0 ? campaignDiscountPct : discountPercent;
+  return (
+    <PriceTop>
+      <PriceStack>
+        <PriceMainRow>
+          <PriceMain>{formatPriceCents(buyBoxPriceCents)} €</PriceMain>
+          {campaignPromo?.show_badge && (campaignPromo.badge_text || "").trim() ? (
+            <DiscountPill title={campaignPromo.campaign_name || ""}>{campaignPromo.badge_text.trim()}</DiscountPill>
+          ) : null}
+          {!campaignPromo?.badge_text?.trim() && discountPillPercent != null && discountPillPercent > 0 && (
+            <DiscountPill>-{discountPillPercent}%</DiscountPill>
+          )}
+        </PriceMainRow>
+        {(showCampaignStrike || hasSale || (uvpCents != null && uvpCents > 0)) && (
+          <PriceSubRow>
+            {showCampaignStrike && <Strike>{formatPriceCents(effectiveDisplayCents)} €</Strike>}
+            {hasSale && <Strike>{formatPriceCents(priceCents)} €</Strike>}
+            {uvpCents != null && uvpCents > 0 && <MSRP>UVP {formatPriceCents(uvpCents)} €</MSRP>}
+          </PriceSubRow>
+        )}
+        <TaxLine>inkl. MwSt. · zzgl. Versandkosten</TaxLine>
+        {grundpreis && (
+          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+            {grundpreis.contentLabel && <span>{grundpreis.contentLabel} · </span>}
+            <span>{grundpreis.display}</span>
+          </div>
+        )}
+      </PriceStack>
+    </PriceTop>
+  );
+}
+
 function findCategoryNodeBySlug(nodes, slug) {
   const norm = String(slug || "").replace(/^\//, "");
   for (const n of nodes || []) {
@@ -1605,25 +1666,17 @@ export default function ProductTemplateMobile() {
 
         {/* 6. Price */}
         <MobileSection>
-          <PriceMainRow style={{ marginBottom: 4 }}>
-            <PriceMain>{formatPriceCents(effectiveDisplayCents)} €</PriceMain>
-            {discountPercent != null && discountPercent > 0 && (
-              <DiscountPill>-{discountPercent}%</DiscountPill>
-            )}
-          </PriceMainRow>
-          {(hasSale || (uvpCents != null && uvpCents > 0)) && (
-            <PriceSubRow>
-              {hasSale && <Strike>{formatPriceCents(priceCents)} €</Strike>}
-              {uvpCents != null && uvpCents > 0 && <MSRP>UVP {formatPriceCents(uvpCents)} €</MSRP>}
-            </PriceSubRow>
-          )}
-          <TaxLine>inkl. MwSt. · zzgl. Versandkosten</TaxLine>
-          {grundpreis && (
-            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-              {grundpreis.contentLabel && <span>{grundpreis.contentLabel} · </span>}
-              <span>{grundpreis.display}</span>
-            </div>
-          )}
+          <ProductCampaignPriceBlock
+            productId={product.id}
+            variantId={variant?.id}
+            sellerId={selectedSellerId || product.seller_id}
+            effectiveDisplayCents={effectiveDisplayCents}
+            discountPercent={discountPercent}
+            hasSale={hasSale}
+            priceCents={priceCents}
+            uvpCents={uvpCents}
+            grundpreis={grundpreis}
+          />
         </MobileSection>
 
         {/* 7. Qty + CTA */}
@@ -1862,29 +1915,17 @@ export default function ProductTemplateMobile() {
                   ) : null}
                 </p>
               ) : null}
-              <PriceTop>
-                <PriceStack>
-                  <PriceMainRow>
-                    <PriceMain>{formatPriceCents(effectiveDisplayCents)} €</PriceMain>
-                    {discountPercent != null && discountPercent > 0 && (
-                      <DiscountPill>-{discountPercent}%</DiscountPill>
-                    )}
-                  </PriceMainRow>
-                  {(hasSale || (uvpCents != null && uvpCents > 0)) && (
-                    <PriceSubRow>
-                      {hasSale && <Strike>{formatPriceCents(priceCents)} €</Strike>}
-                      {uvpCents != null && uvpCents > 0 && <MSRP>UVP {formatPriceCents(uvpCents)} €</MSRP>}
-                    </PriceSubRow>
-                  )}
-                  <TaxLine>inkl. MwSt. · zzgl. Versandkosten</TaxLine>
-                  {grundpreis && (
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                      {grundpreis.contentLabel && <span>{grundpreis.contentLabel} · </span>}
-                      <span>{grundpreis.display}</span>
-                    </div>
-                  )}
-                </PriceStack>
-              </PriceTop>
+              <ProductCampaignPriceBlock
+                productId={product.id}
+                variantId={variant?.id}
+                sellerId={selectedSellerId || product.seller_id}
+                effectiveDisplayCents={effectiveDisplayCents}
+                discountPercent={discountPercent}
+                hasSale={hasSale}
+                priceCents={priceCents}
+                uvpCents={uvpCents}
+                grundpreis={grundpreis}
+              />
 
               <StockRow>
                 <QtyWrap>
