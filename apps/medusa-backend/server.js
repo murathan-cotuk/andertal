@@ -1608,16 +1608,297 @@ async function start() {
       return sortCategories(roots)
     }
 
-    const adminHubCategoriesGET_fallbackPg = async (req, res) => {
+    /** PG client for Admin Hub categories (routes register before getProductsDbClient in this file). */
+    const getCategoriesPgClient = () => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-      if (!dbUrl || !dbUrl.startsWith('postgres')) {
-        return res.status(503).json({ message: 'Admin Hub service not available', code: 'ADMIN_HUB_NOT_LOADED' })
-      }
+      if (!dbUrl || !dbUrl.startsWith('postgres')) return null
       const { Client } = require('pg')
-      const client = new Client({
+      return new Client({
         connectionString: dbUrl,
         ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false,
       })
+    }
+
+    const categoriesPgUnavailable = (res) =>
+      res.status(503).json({
+        message:
+          'DATABASE_URL yok veya postgres değil. Render/hosting ortamında Postgres bağlantı dizesini ayarlayın (postgresql:// veya postgres://). Admin Hub TypeORM servisi kapalı olsa bile kategoriler veritabanından okunabilir.',
+        code: 'DATABASE_URL_MISSING',
+      })
+
+    const syncCategoryCmsToCollectionFromBody = async (body) => {
+      try {
+        const meta = (body && typeof body.metadata === 'object' && body.metadata) || {}
+        const linkedId = (meta.collection_id || '').toString().trim()
+        if (!linkedId) return
+        const patchMeta = {
+          ...(meta.display_title !== undefined ? { display_title: meta.display_title || null } : {}),
+          ...(meta.meta_title !== undefined ? { meta_title: meta.meta_title || null } : {}),
+          ...(meta.meta_description !== undefined ? { meta_description: meta.meta_description || null } : {}),
+          ...(meta.keywords !== undefined ? { keywords: meta.keywords || null } : {}),
+          ...(meta.richtext !== undefined ? { richtext: meta.richtext || null } : {}),
+          ...(meta.image_url !== undefined ? { image_url: meta.image_url || null } : {}),
+          ...(meta.banner_image_url !== undefined ? { banner_image_url: meta.banner_image_url || null } : {}),
+        }
+        if (Object.keys(patchMeta).length === 0) return
+        await updateAdminHubCollectionDb(linkedId, null, null, patchMeta)
+      } catch (e) {
+        console.warn('syncCategoryCmsToCollectionFromBody:', e && e.message)
+      }
+    }
+
+    const adminHubCategoriesPOST_fallbackPg = async (req, res) => {
+      const client = getCategoriesPgClient()
+      if (!client) return categoriesPgUnavailable(res)
+      const b = req.body || {}
+      const name = b.name
+      const slug = b.slug
+      if (!name || !slug) return res.status(400).json({ message: 'name ve slug zorunludur' })
+      try {
+        await client.connect()
+        const dup = await client.query(`SELECT id FROM admin_hub_categories WHERE LOWER(TRIM(slug)) = LOWER(TRIM($1)) LIMIT 1`, [String(slug).trim()])
+        if (dup.rows[0]) {
+          await client.end()
+          return res.status(409).json({ message: 'Bu slug zaten kullanılıyor' })
+        }
+        const metaVal = b.metadata !== undefined && b.metadata !== null && typeof b.metadata === 'object' ? JSON.stringify(b.metadata) : null
+        const ir = await client.query(
+          `INSERT INTO admin_hub_categories
+            (name, slug, description, parent_id, active, is_visible, has_collection, sort_order, seo_title, seo_description, long_content, banner_image_url, metadata)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $13::text IS NULL THEN NULL ELSE $13::jsonb END)
+           RETURNING *`,
+          [
+            String(name).trim(),
+            String(slug).trim(),
+            b.description != null ? String(b.description) : null,
+            b.parent_id || null,
+            b.active !== undefined ? !!b.active : true,
+            b.is_visible !== undefined ? !!b.is_visible : true,
+            b.has_collection !== undefined ? !!b.has_collection : false,
+            parseInt(b.sort_order, 10) || 0,
+            b.seo_title != null ? String(b.seo_title) : null,
+            b.seo_description != null ? String(b.seo_description) : null,
+            b.long_content != null ? String(b.long_content) : null,
+            b.banner_image_url != null ? String(b.banner_image_url) : null,
+            metaVal,
+          ]
+        )
+        await client.end()
+        const category = mapAdminHubCategoryPgRow(ir.rows[0])
+        await syncCategoryCmsToCollectionFromBody(b)
+        return res.status(201).json({ category })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        console.error('Admin Hub Categories POST (PG fallback):', e)
+        return res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+      }
+    }
+
+    const adminHubCategoryByIdGET_fallbackPg = async (req, res) => {
+      const client = getCategoriesPgClient()
+      if (!client) return categoriesPgUnavailable(res)
+      const id = (req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      try {
+        await client.connect()
+        const r = await client.query(`SELECT * FROM admin_hub_categories WHERE id = $1::uuid`, [id])
+        await client.end()
+        if (!r.rows[0]) return res.status(404).json({ message: 'Category not found' })
+        return res.json({ category: mapAdminHubCategoryPgRow(r.rows[0]) })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        console.error('Admin Hub Category GET (PG fallback):', e)
+        return res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+      }
+    }
+
+    const adminHubCategoryByIdPUT_fallbackPg = async (req, res) => {
+      const client = getCategoriesPgClient()
+      if (!client) return categoriesPgUnavailable(res)
+      const id = (req.params.id || '').trim()
+      const body = req.body || {}
+      if (!id) return res.status(400).json({ message: 'id required' })
+      try {
+        await client.connect()
+        const ex = await client.query(`SELECT * FROM admin_hub_categories WHERE id = $1::uuid`, [id])
+        if (!ex.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Category not found' })
+        }
+        const row = ex.rows[0]
+        if (body.slug != null && String(body.slug).trim() !== String(row.slug || '').trim()) {
+          const dup = await client.query(
+            `SELECT id FROM admin_hub_categories WHERE LOWER(TRIM(slug)) = LOWER(TRIM($1)) AND id <> $2::uuid LIMIT 1`,
+            [String(body.slug).trim(), id]
+          )
+          if (dup.rows[0]) {
+            await client.end()
+            return res.status(409).json({ message: 'Bu slug zaten kullanılıyor' })
+          }
+        }
+        let mergedMeta = row.metadata && typeof row.metadata === 'object' ? { ...row.metadata } : {}
+        if (body.metadata !== undefined && body.metadata !== null && typeof body.metadata === 'object') {
+          mergedMeta = { ...mergedMeta, ...body.metadata }
+        }
+        const next = {
+          name: body.name !== undefined ? String(body.name).trim() : row.name,
+          slug: body.slug !== undefined ? String(body.slug).trim() : row.slug,
+          description: body.description !== undefined ? (body.description === '' ? null : String(body.description)) : row.description,
+          parent_id: body.parent_id !== undefined ? body.parent_id || null : row.parent_id,
+          active: body.active !== undefined ? !!body.active : row.active,
+          is_visible: body.is_visible !== undefined ? !!body.is_visible : row.is_visible,
+          has_collection: body.has_collection !== undefined ? !!body.has_collection : row.has_collection,
+          sort_order: body.sort_order !== undefined ? parseInt(body.sort_order, 10) || 0 : row.sort_order,
+          seo_title: body.seo_title !== undefined ? (body.seo_title === '' ? null : String(body.seo_title)) : row.seo_title,
+          seo_description: body.seo_description !== undefined ? (body.seo_description === '' ? null : String(body.seo_description)) : row.seo_description,
+          long_content: body.long_content !== undefined ? (body.long_content === '' ? null : String(body.long_content)) : row.long_content,
+          banner_image_url: body.banner_image_url !== undefined ? (body.banner_image_url === '' ? null : String(body.banner_image_url)) : row.banner_image_url,
+          metadata: Object.keys(mergedMeta).length ? mergedMeta : null,
+        }
+        const ur = await client.query(
+          `UPDATE admin_hub_categories SET
+            name = $1, slug = $2, description = $3, parent_id = $4, active = $5, is_visible = $6, has_collection = $7,
+            sort_order = $8, seo_title = $9, seo_description = $10, long_content = $11, banner_image_url = $12,
+            metadata = CASE WHEN $13::text IS NULL THEN NULL ELSE $13::jsonb END, updated_at = now()
+           WHERE id = $14::uuid RETURNING *`,
+          [
+            next.name,
+            next.slug,
+            next.description,
+            next.parent_id,
+            next.active,
+            next.is_visible,
+            next.has_collection,
+            next.sort_order,
+            next.seo_title,
+            next.seo_description,
+            next.long_content,
+            next.banner_image_url,
+            next.metadata ? JSON.stringify(next.metadata) : null,
+            id,
+          ]
+        )
+        await client.end()
+        const category = mapAdminHubCategoryPgRow(ur.rows[0])
+        try {
+          const meta = (body.metadata && typeof body.metadata === 'object' && body.metadata) || {}
+          const categoryMeta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
+          const linkedId = (meta.collection_id || categoryMeta.collection_id || '').toString().trim()
+          if (linkedId) {
+            const patchMeta = {
+              ...(meta.display_title !== undefined ? { display_title: meta.display_title || null } : {}),
+              ...(meta.meta_title !== undefined ? { meta_title: meta.meta_title || body.seo_title || null } : {}),
+              ...(meta.meta_description !== undefined ? { meta_description: meta.meta_description || body.seo_description || null } : {}),
+              ...(meta.keywords !== undefined ? { keywords: meta.keywords || null } : {}),
+              ...(meta.richtext !== undefined ? { richtext: meta.richtext || body.long_content || null } : {}),
+              ...(meta.image_url !== undefined ? { image_url: meta.image_url || null } : {}),
+              ...(meta.banner_image_url !== undefined ? { banner_image_url: meta.banner_image_url || body.banner_image_url || null } : {}),
+            }
+            if (Object.keys(patchMeta).length > 0) {
+              await updateAdminHubCollectionDb(linkedId, null, null, patchMeta)
+            }
+          }
+        } catch (cmsErr) {
+          console.warn('syncCategoryCmsToCollection (PUT PG):', cmsErr && cmsErr.message)
+        }
+        return res.json({ category })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        console.error('Admin Hub Category PUT (PG fallback):', e)
+        return res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+      }
+    }
+
+    const adminHubCategoryByIdDELETE_fallbackPg = async (req, res) => {
+      const client = getCategoriesPgClient()
+      if (!client) return categoriesPgUnavailable(res)
+      const id = (req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      try {
+        await client.connect()
+        const ch = await client.query(`SELECT COUNT(*)::int AS n FROM admin_hub_categories WHERE parent_id = $1::uuid`, [id])
+        if (Number(ch.rows[0]?.n || 0) > 0) {
+          await client.end()
+          return res.status(400).json({ message: 'Alt kategoriler varken silinemez. Önce alt kategorileri taşıyın veya silin.' })
+        }
+        const dr = await client.query(`DELETE FROM admin_hub_categories WHERE id = $1::uuid RETURNING id`, [id])
+        await client.end()
+        if (!dr.rows[0]) return res.status(404).json({ message: 'Category not found' })
+        return res.status(200).json({ deleted: true })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        console.error('Admin Hub Category DELETE (PG fallback):', e)
+        return res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+      }
+    }
+
+    const slugFromImportKeyPg = (key) => {
+      const slug = String(key || '')
+        .toLowerCase()
+        .trim()
+        .replace(/\|/g, '-')
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'category'
+      return slug.slice(0, 255)
+    }
+
+    const adminHubCategoriesImportPOST_fallbackPg = async (req, res) => {
+      const client = getCategoriesPgClient()
+      if (!client) return categoriesPgUnavailable(res)
+      const { items } = req.body || {}
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: 'items array is required and must not be empty' })
+      }
+      const idByKey = new Map()
+      const slugCount = new Map()
+      const categories = []
+      try {
+        await client.connect()
+        for (const item of items) {
+          const key = String(item.key || '').trim()
+          const label = String(item.label || '').trim()
+          if (!key || !label) continue
+          let baseSlug = slugFromImportKeyPg(key)
+          const sc = (slugCount.get(baseSlug) || 0) + 1
+          slugCount.set(baseSlug, sc)
+          const slug = sc === 1 ? baseSlug : `${baseSlug}-${sc - 1}`
+          const parent_id = item.parentKey === '' || item.parentKey == null ? null : idByKey.get(String(item.parentKey).trim()) || null
+          const sort_order = Number(item.sortOrder) || 0
+          const ir = await client.query(
+            `INSERT INTO admin_hub_categories
+              (name, slug, description, parent_id, active, is_visible, has_collection, sort_order, metadata)
+             VALUES ($1,$2,NULL,$3,true,true,false,$4,NULL)
+             RETURNING *`,
+            [label, slug, parent_id, sort_order]
+          )
+          const row = ir.rows[0]
+          idByKey.set(key, row.id)
+          categories.push(mapAdminHubCategoryPgRow(row))
+        }
+        await client.end()
+        return res.status(201).json({ imported: categories.length, categories })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        console.error('Admin Hub Categories import (PG fallback):', e)
+        return res.status(500).json({ message: (e && e.message) || 'Import failed' })
+      }
+    }
+
+    const adminHubCategoriesGET_fallbackPg = async (req, res) => {
+      const client = getCategoriesPgClient()
+      if (!client) return categoriesPgUnavailable(res)
       try {
         await client.connect()
         const { active, parent_id, tree, is_visible, slug } = req.query
@@ -1710,128 +1991,119 @@ async function start() {
     }
     const adminHubCategoriesPOST = async (req, res) => {
       const adminHubService = resolveAdminHub()
-      if (!adminHubService) {
-        return res.status(503).json({ message: 'Admin Hub service not available', code: 'ADMIN_HUB_NOT_LOADED' })
-      }
-      try {
-        const b = req.body || {}
-        const name = b.name
-        const slug = b.slug
-        if (!name || !slug) return res.status(400).json({ message: 'name ve slug zorunludur' })
-        const category = await adminHubService.createCategory({
-          name,
-          slug,
-          description: b.description || undefined,
-          parent_id: b.parent_id || null,
-          active: b.active !== undefined ? b.active : true,
-          is_visible: b.is_visible !== undefined ? b.is_visible : true,
-          has_collection: b.has_collection !== undefined ? b.has_collection : false,
-          sort_order: b.sort_order || 0,
-          seo_title: b.seo_title || null,
-          seo_description: b.seo_description || null,
-          long_content: b.long_content || null,
-          banner_image_url: b.banner_image_url || null,
-          metadata: b.metadata,
-        })
-        const syncCategoryCmsToCollection = async (cat, body) => {
-          try {
-            const meta = (body && typeof body.metadata === 'object' && body.metadata) || {}
-            const linkedId = (meta.collection_id || '').toString().trim()
-            if (!linkedId) return
-            const patchMeta = {
-              ...(meta.display_title !== undefined ? { display_title: meta.display_title || null } : {}),
-              ...(meta.meta_title !== undefined ? { meta_title: meta.meta_title || null } : {}),
-              ...(meta.meta_description !== undefined ? { meta_description: meta.meta_description || null } : {}),
-              ...(meta.keywords !== undefined ? { keywords: meta.keywords || null } : {}),
-              ...(meta.richtext !== undefined ? { richtext: meta.richtext || null } : {}),
-              ...(meta.image_url !== undefined ? { image_url: meta.image_url || null } : {}),
-              ...(meta.banner_image_url !== undefined ? { banner_image_url: meta.banner_image_url || null } : {}),
-            }
-            if (Object.keys(patchMeta).length === 0) return
-            await updateAdminHubCollectionDb(linkedId, null, null, patchMeta)
-          } catch (e) {
-            console.warn('syncCategoryCmsToCollection (POST):', e && e.message)
-          }
+      const b = req.body || {}
+      const name = b.name
+      const slug = b.slug
+      if (!name || !slug) return res.status(400).json({ message: 'name ve slug zorunludur' })
+      if (adminHubService) {
+        try {
+          const category = await adminHubService.createCategory({
+            name,
+            slug,
+            description: b.description || undefined,
+            parent_id: b.parent_id || null,
+            active: b.active !== undefined ? b.active : true,
+            is_visible: b.is_visible !== undefined ? b.is_visible : true,
+            has_collection: b.has_collection !== undefined ? b.has_collection : false,
+            sort_order: b.sort_order || 0,
+            seo_title: b.seo_title || null,
+            seo_description: b.seo_description || null,
+            long_content: b.long_content || null,
+            banner_image_url: b.banner_image_url || null,
+            metadata: b.metadata,
+          })
+          await syncCategoryCmsToCollectionFromBody(b)
+          return res.status(201).json({ category })
+        } catch (err) {
+          console.warn('Admin Hub Categories POST (service) failed, PG fallback:', err && err.message)
         }
-        await syncCategoryCmsToCollection(category, b)
-        res.status(201).json({ category })
-      } catch (err) {
-        console.error('Admin Hub Categories POST error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } else {
+        console.warn('Admin Hub Categories POST: adminHubService not loaded — PG fallback')
       }
+      return adminHubCategoriesPOST_fallbackPg(req, res)
     }
     const adminHubCategoriesImportPOST = async (req, res) => {
+      const { items } = req.body || {}
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: 'items array is required and must not be empty' })
+      }
       const adminHubService = resolveAdminHub()
-      if (!adminHubService) {
-        return res.status(503).json({ message: 'Admin Hub service not available', code: 'ADMIN_HUB_NOT_LOADED' })
-      }
-      try {
-        const { items } = req.body || {}
-        if (!Array.isArray(items) || items.length === 0) {
-          return res.status(400).json({ message: 'items array is required and must not be empty' })
+      if (adminHubService) {
+        try {
+          const { imported, categories } = await adminHubService.importCategories(items)
+          return res.status(201).json({ imported, categories })
+        } catch (err) {
+          console.warn('Admin Hub Categories import (service) failed, PG fallback:', err && err.message)
         }
-        const { imported, categories } = await adminHubService.importCategories(items)
-        res.status(201).json({ imported, categories })
-      } catch (err) {
-        console.error('Admin Hub Categories import error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Import failed' })
+      } else {
+        console.warn('Admin Hub Categories import: adminHubService not loaded — PG fallback')
       }
+      return adminHubCategoriesImportPOST_fallbackPg(req, res)
     }
     const adminHubCategoryByIdGET = async (req, res) => {
       const adminHubService = resolveAdminHub()
-      if (!adminHubService) return res.status(503).json({ message: 'Admin Hub service not available', code: 'ADMIN_HUB_NOT_LOADED' })
-      try {
-        const category = await adminHubService.getCategoryById(req.params.id)
-        if (!category) return res.status(404).json({ message: 'Category not found' })
-        res.json({ category })
-      } catch (err) {
-        console.error('Admin Hub Category GET error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      if (adminHubService) {
+        try {
+          const category = await adminHubService.getCategoryById(req.params.id)
+          if (!category) return res.status(404).json({ message: 'Category not found' })
+          return res.json({ category })
+        } catch (err) {
+          console.warn('Admin Hub Category GET (service) failed, PG fallback:', err && err.message)
+        }
+      } else {
+        console.warn('Admin Hub Category GET: adminHubService not loaded — PG fallback')
       }
+      return adminHubCategoryByIdGET_fallbackPg(req, res)
     }
     const adminHubCategoryByIdPUT = async (req, res) => {
       const adminHubService = resolveAdminHub()
-      if (!adminHubService) return res.status(503).json({ message: 'Admin Hub service not available', code: 'ADMIN_HUB_NOT_LOADED' })
-      try {
-        const body = req.body || {}
-        const category = await adminHubService.updateCategory(req.params.id, body)
+      const body = req.body || {}
+      if (adminHubService) {
         try {
-          const meta = (body && typeof body.metadata === 'object' && body.metadata) || {}
-          const categoryMeta = (category && category.metadata && typeof category.metadata === 'object') ? category.metadata : {}
-          const linkedId = (meta.collection_id || categoryMeta.collection_id || '').toString().trim()
-          if (linkedId) {
-            const patchMeta = {
-              ...(meta.display_title !== undefined ? { display_title: meta.display_title || null } : {}),
-              ...(meta.meta_title !== undefined ? { meta_title: meta.meta_title || body.seo_title || null } : {}),
-              ...(meta.meta_description !== undefined ? { meta_description: meta.meta_description || body.seo_description || null } : {}),
-              ...(meta.keywords !== undefined ? { keywords: meta.keywords || null } : {}),
-              ...(meta.richtext !== undefined ? { richtext: meta.richtext || body.long_content || null } : {}),
-              ...(meta.image_url !== undefined ? { image_url: meta.image_url || null } : {}),
-              ...(meta.banner_image_url !== undefined ? { banner_image_url: meta.banner_image_url || body.banner_image_url || null } : {}),
+          const category = await adminHubService.updateCategory(req.params.id, body)
+          try {
+            const meta = (body && typeof body.metadata === 'object' && body.metadata) || {}
+            const categoryMeta = category && category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
+            const linkedId = (meta.collection_id || categoryMeta.collection_id || '').toString().trim()
+            if (linkedId) {
+              const patchMeta = {
+                ...(meta.display_title !== undefined ? { display_title: meta.display_title || null } : {}),
+                ...(meta.meta_title !== undefined ? { meta_title: meta.meta_title || body.seo_title || null } : {}),
+                ...(meta.meta_description !== undefined ? { meta_description: meta.meta_description || body.seo_description || null } : {}),
+                ...(meta.keywords !== undefined ? { keywords: meta.keywords || null } : {}),
+                ...(meta.richtext !== undefined ? { richtext: meta.richtext || body.long_content || null } : {}),
+                ...(meta.image_url !== undefined ? { image_url: meta.image_url || null } : {}),
+                ...(meta.banner_image_url !== undefined ? { banner_image_url: meta.banner_image_url || body.banner_image_url || null } : {}),
+              }
+              if (Object.keys(patchMeta).length > 0) {
+                await updateAdminHubCollectionDb(linkedId, null, null, patchMeta)
+              }
             }
-            if (Object.keys(patchMeta).length > 0) {
-              await updateAdminHubCollectionDb(linkedId, null, null, patchMeta)
-            }
+          } catch (e) {
+            console.warn('syncCategoryCmsToCollection (PUT):', e && e.message)
           }
-        } catch (e) {
-          console.warn('syncCategoryCmsToCollection (PUT):', e && e.message)
+          return res.json({ category })
+        } catch (err) {
+          console.warn('Admin Hub Category PUT (service) failed, PG fallback:', err && err.message)
         }
-        res.json({ category })
-      } catch (err) {
-        console.error('Admin Hub Category PUT error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      } else {
+        console.warn('Admin Hub Category PUT: adminHubService not loaded — PG fallback')
       }
+      return adminHubCategoryByIdPUT_fallbackPg(req, res)
     }
     const adminHubCategoryByIdDELETE = async (req, res) => {
       const adminHubService = resolveAdminHub()
-      if (!adminHubService) return res.status(503).json({ message: 'Admin Hub service not available', code: 'ADMIN_HUB_NOT_LOADED' })
-      try {
-        await adminHubService.deleteCategory(req.params.id)
-        res.status(200).json({ deleted: true })
-      } catch (err) {
-        console.error('Admin Hub Category DELETE error:', err)
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      if (adminHubService) {
+        try {
+          await adminHubService.deleteCategory(req.params.id)
+          return res.status(200).json({ deleted: true })
+        } catch (err) {
+          console.warn('Admin Hub Category DELETE (service) failed, PG fallback:', err && err.message)
+        }
+      } else {
+        console.warn('Admin Hub Category DELETE: adminHubService not loaded — PG fallback')
       }
+      return adminHubCategoryByIdDELETE_fallbackPg(req, res)
     }
     httpApp.get('/admin-hub/categories', (req, res) => adminHubCategoriesGET(req, res))
     httpApp.post('/admin-hub/categories', (req, res) => adminHubCategoriesPOST(req, res))
@@ -5524,13 +5796,37 @@ async function start() {
         const categorySlugFilter = (query.category || query.category_slug || '').toString().trim()
         let allowedCategoryIds = null
         if (categorySlugFilter) {
+          const subtreeIdsForSlug = (tree) => collectCategorySubtreeIdsBySlug(tree, categorySlugFilter)
           const ah = resolveAdminHub()
           if (ah) {
             try {
-              const tree = await ah.getCategoryTree({ is_visible: true })
-              allowedCategoryIds = collectCategorySubtreeIdsBySlug(tree, categorySlugFilter)
+              allowedCategoryIds = subtreeIdsForSlug(await ah.getCategoryTree({ is_visible: true }))
             } catch (_) {
               allowedCategoryIds = null
+            }
+          }
+          // Same as GET /store/categories: if AdminHubService is unavailable or slug is missing from the
+          // in-memory tree, rebuild visible categories from Postgres so category PLPs still resolve.
+          if (!allowedCategoryIds || allowedCategoryIds.size === 0) {
+            let fbClient
+            try {
+              fbClient = getProductsDbClient()
+              if (fbClient) {
+                await fbClient.connect()
+                const cr = await fbClient.query(
+                  `SELECT * FROM admin_hub_categories WHERE active = true ORDER BY sort_order ASC, name ASC`,
+                )
+                await fbClient.end()
+                fbClient = null
+                const flat = (cr.rows || [])
+                  .map(mapAdminHubCategoryPgRow)
+                  .filter((c) => c && c.is_visible !== false)
+                allowedCategoryIds = subtreeIdsForSlug(buildAdminHubCategoryTreeFromFlat(flat))
+              }
+            } catch (__) {
+              try {
+                if (fbClient) await fbClient.end()
+              } catch (___) {}
             }
           }
         }
@@ -6150,6 +6446,31 @@ async function start() {
       return p
     }
 
+    /** Single source for PI amount + order verification (bonus/coupon + Versand). */
+    const computeCartCheckoutMoney = (cart, shippingCentsInput) => {
+      const items = Array.isArray(cart?.items) ? cart.items : []
+      const subtotalCents = items.reduce(
+        (sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1),
+        0,
+      )
+      const reservedPts = Number(cart.bonus_points_reserved || 0)
+      const bonusDiscountCents = discountCentsFromBonusPoints(reservedPts)
+      const couponDiscountCents = Math.max(0, Number(cart.coupon_discount_cents || 0))
+      const discountCents = Math.max(0, bonusDiscountCents + couponDiscountCents)
+      const shippingCents = Math.max(0, Number(shippingCentsInput || 0))
+      const merchandiseAfterDiscount = Math.max(0, subtotalCents - discountCents)
+      const payTotalCents = Math.max(0, merchandiseAfterDiscount + shippingCents)
+      return {
+        subtotalCents,
+        bonusDiscountCents,
+        couponDiscountCents,
+        discountCents,
+        shippingCents,
+        merchandiseAfterDiscount,
+        payTotalCents,
+      }
+    }
+
     const clearCartBonusReserve = async (client, cartId) => {
       await client.query('UPDATE store_carts SET bonus_points_reserved = 0, updated_at = now() WHERE id = $1', [cartId]).catch(() => {})
     }
@@ -6598,13 +6919,16 @@ async function start() {
           return res.status(400).json({ message: 'Cart is empty' })
         }
         
-        const subtotalCents = items.reduce((sum, it) => sum + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0)
-        const reservedPts = Number(cart.bonus_points_reserved || 0)
-        const bonusDiscountCents = discountCentsFromBonusPoints(reservedPts)
-        const couponDiscountCents = Math.max(0, Number(cart.coupon_discount_cents || 0))
-        const discountCents = Math.max(0, bonusDiscountCents + couponDiscountCents)
-        const shippingCents = Math.max(0, Number(body.shipping_cents || 0))
-        const payCents = Math.max(0, subtotalCents - discountCents + shippingCents)
+        const shippingCentsRaw = Math.max(0, Number(body.shipping_cents || 0))
+        const money = computeCartCheckoutMoney(cart, shippingCentsRaw)
+        const {
+          subtotalCents,
+          bonusDiscountCents,
+          couponDiscountCents,
+          discountCents,
+          shippingCents,
+          payTotalCents: payCents,
+        } = money
         if (payCents <= 0) {
           await client.end()
           return res.status(400).json({
@@ -6668,6 +6992,7 @@ async function start() {
             }
           }
         }
+        const reservedPts = Number(cart.bonus_points_reserved || 0)
         const piBody = {
           amount: payCents,
           currency: 'eur',
@@ -6678,13 +7003,33 @@ async function start() {
             seller_id: String(cartSellerId),
             seller_name: truncateForStripeDescription(cartSellerDisplay, 500) || cartSellerLabel,
             subtotal_cents: String(subtotalCents),
+            /** Seller/commerce basis before bonus (same as subtotal lines); bonus is platform-funded. */
+            seller_settlement_basis_cents: String(subtotalCents),
+            platform_bonus_subsidy_cents: String(bonusDiscountCents),
             discount_cents: String(discountCents),
             coupon_discount_cents: String(couponDiscountCents),
             coupon_code: String(cart.coupon_code || ''),
             bonus_points_redeemed: String(reservedPts),
+            shipping_cents_snapshot: String(shippingCents),
+            pay_total_cents: String(payCents),
           },
         }
         if (stripeCustomerId) piBody.customer = stripeCustomerId
+
+        const cancelPiId = (body.cancel_payment_intent_id || '').toString().trim()
+        if (cancelPiId && cancelPiId.startsWith('pi_')) {
+          try {
+            const prev = await stripe.paymentIntents.retrieve(cancelPiId)
+            const prevCart = String(prev.metadata?.cart_id || '').trim()
+            if (
+              prevCart === cartId &&
+              prev.status !== 'succeeded' &&
+              prev.status !== 'canceled'
+            ) {
+              await stripe.paymentIntents.cancel(cancelPiId).catch(() => {})
+            }
+          } catch (_) {}
+        }
 
         let paymentIntent
         try {
@@ -6724,8 +7069,9 @@ async function start() {
           amount_cents: payCents,
           subtotal_cents: subtotalCents,
           shipping_cents: shippingCents,
-          bonus_discount_cents: discountCents,
+          bonus_discount_cents: bonusDiscountCents,
           coupon_discount_cents: couponDiscountCents,
+          discount_cents: discountCents,
           coupon_code: cart.coupon_code || null,
           bonus_points_reserved: reservedPts,
         })
@@ -8427,16 +8773,6 @@ async function start() {
         const items = Array.isArray(cart.items) ? cart.items : []
         if (!items.length) { await client.end(); return res.status(400).json({ message: 'Cart is empty' }) }
 
-        const subtotalCents = items.reduce((sum, it) => sum + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0)
-        const reservedPts = Number(cart.bonus_points_reserved || 0)
-        const bonusDiscountCents = discountCentsFromBonusPoints(reservedPts)
-        const couponDiscountCents = Math.max(0, Number(cart.coupon_discount_cents || 0))
-        const discountCents = Math.max(0, bonusDiscountCents + couponDiscountCents)
-        const shippingCentsOrder = Math.max(0, Number(body.shipping_cents || 0))
-        const merchandiseAfterDiscount = Math.max(0, subtotalCents - discountCents)
-        const orderPaidTotalCents = Math.max(0, merchandiseAfterDiscount + shippingCentsOrder)
-        const bonusPointsRedeemed = reservedPts
-
         let email = (body.email || '').toString().trim() || null
         let first_name = (body.first_name || '').toString().trim() || null
         let last_name = (body.last_name || '').toString().trim() || null
@@ -8512,7 +8848,12 @@ async function start() {
           }
         } catch (_) {}
 
-        // Get payment method from Stripe + verify paid amount matches cart (incl. bonus + Versand)
+        // Get payment method from Stripe + verify paid amount matches PI snapshot & cart (bonus + Versand)
+        const shippingFromBody = Math.max(0, Number(body.shipping_cents || 0))
+        let shippingCentsOrder = shippingFromBody
+        let orderPaidTotalCents = 0
+        let paidCentsFromStripe = 0
+
         const platformRowOrders = await loadPlatformCheckoutRow(client)
         const secretKey = resolveStripeSecretKeyFromPlatform(platformRowOrders)
         let paymentMethod = 'card'
@@ -8523,11 +8864,28 @@ async function start() {
           try {
             stripeInst = new (require('stripe'))(secretKey)
             const pi = await stripeInst.paymentIntents.retrieve(paymentIntentId, { expand: ['payment_method'] })
-            const paidCents = Number(pi.amount)
-            if (paidCents !== orderPaidTotalCents) {
-              await client.end()
-              return res.status(400).json({ message: 'Zahlungsbetrag stimmt nicht mit dem Warenkorb überein. Bitte Checkout neu laden.' })
+            paidCentsFromStripe = Number(pi.amount)
+            const m = pi.metadata || {}
+            const snapPay = parseInt(String(m.pay_total_cents || ''), 10)
+            const snapShip = parseInt(String(m.shipping_cents_snapshot || ''), 10)
+
+            if (Number.isFinite(snapPay) && Number.isFinite(snapShip) && snapPay === paidCentsFromStripe) {
+              const verifyMoney = computeCartCheckoutMoney(cart, snapShip)
+              if (verifyMoney.payTotalCents !== paidCentsFromStripe || verifyMoney.payTotalCents !== snapPay) {
+                await client.end()
+                return res.status(400).json({ message: 'Zahlungsbetrag stimmt nicht mit dem Warenkorb überein. Bitte Checkout neu laden.' })
+              }
+              shippingCentsOrder = snapShip
+              orderPaidTotalCents = paidCentsFromStripe
+            } else {
+              const fb = computeCartCheckoutMoney(cart, shippingFromBody)
+              orderPaidTotalCents = fb.payTotalCents
+              if (paidCentsFromStripe !== orderPaidTotalCents) {
+                await client.end()
+                return res.status(400).json({ message: 'Zahlungsbetrag stimmt nicht mit dem Warenkorb überein. Bitte Checkout neu laden.' })
+              }
             }
+
             const pm = pi.payment_method
             if (pm && typeof pm === 'object') {
               if (pm.type === 'card' && pm.card && pm.card.brand) { paymentMethod = pm.card.brand }
@@ -8535,15 +8893,26 @@ async function start() {
             } else if (pi.payment_method_types && pi.payment_method_types[0]) {
               paymentMethod = pi.payment_method_types[0]
             }
-            // Extract destination charge fields set during PaymentIntent creation
             piStripeAccountId = (typeof pi.transfer_data?.destination === 'string' ? pi.transfer_data.destination : pi.transfer_data?.destination?.id) || null
             piAppFeeCents = pi.application_fee_amount || null
           } catch (e) {
             await client.end()
             return res.status(400).json({ message: e?.message || 'Zahlung konnte nicht verifiziert werden' })
           }
-        } else if (orderPaidTotalCents > 0) {
-          console.warn('storeOrdersPOST: STRIPE_SECRET_KEY missing — skipping PaymentIntent amount verification')
+        } else {
+          const fb = computeCartCheckoutMoney(cart, shippingFromBody)
+          orderPaidTotalCents = fb.payTotalCents
+          console.warn('storeOrdersPOST: Stripe secret missing — skipping PaymentIntent amount verification')
+        }
+
+        const moneyInsert = computeCartCheckoutMoney(cart, shippingCentsOrder)
+        const subtotalCents = moneyInsert.subtotalCents
+        const discountCents = moneyInsert.discountCents
+        const couponDiscountCents = moneyInsert.couponDiscountCents
+        const bonusPointsRedeemed = Number(cart.bonus_points_reserved || 0)
+        if (secretKey && moneyInsert.payTotalCents !== paidCentsFromStripe) {
+          await client.end()
+          return res.status(400).json({ message: 'Zahlungsbetrag stimmt nicht mit dem Warenkorb überein. Bitte Checkout neu laden.' })
         }
 
         if (bonusPointsRedeemed > 0 && customerId) {
@@ -8579,16 +8948,19 @@ async function start() {
         const orderNumber = ins.rows && ins.rows[0] ? ins.rows[0].order_number : null
         if (!orderId) { await client.end(); return res.status(500).json({ message: 'Order insert failed' }) }
 
-        // Update Stripe payment intent with order number and seller display name
+        // Update Stripe payment intent with order number and seller display name (merge metadata — keep PI snapshot keys)
         if (secretKey && orderNumber) {
           try {
             const stripeForUpdate = stripeInst || new (require('stripe'))(secretKey)
+            const curPi = await stripeForUpdate.paymentIntents.retrieve(paymentIntentId)
+            const prevMeta = curPi.metadata && typeof curPi.metadata === 'object' ? curPi.metadata : {}
             await stripeForUpdate.paymentIntents.update(paymentIntentId, {
-              description: `Order #${orderNumber} — ${sellerLabelShort}`,
+              description: `#${orderNumber} — ${sellerLabelShort}`,
               metadata: {
+                ...prevMeta,
                 order_number: String(orderNumber),
-                order_id: orderId,
-                seller_id: sellerId,
+                order_id: String(orderId),
+                seller_id: String(sellerId),
                 seller_name: truncateForStripeDescription(sellerDisplayForStripe, 500) || sellerLabelShort,
               },
             })

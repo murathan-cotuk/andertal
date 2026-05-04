@@ -4,7 +4,8 @@ import { normalizeIsoCountryCode as normalizeIso } from "@/lib/iso-country";
  * Resolves free-shipping threshold (cents) for a single country.
  * - Normalizes ISO keys (case, UK→GB).
  * - Never applies another country's threshold (avoids GB using DE's lower limit).
- * - Uses env fallback only when the seller has no per-country map at all.
+ * - Uses env fallback only when thresholds are missing/null (not loaded).
+ * - An empty object `{}` means thresholds were configured but no rule applies — returns null (no env fallback).
  */
 
 function toCents(v) {
@@ -28,17 +29,16 @@ export function resolveFreeShippingThresholdCents(rawThresholds, countryCode, en
     return env;
   }
 
-  const keys = Object.keys(rawThresholds);
-  if (keys.length === 0) {
-    return env;
-  }
-
   const byCountry = {};
   for (const [k, v] of Object.entries(rawThresholds)) {
     const iso = normalizeIso(k);
     if (!iso) continue;
     const cents = toCents(v);
     if (cents != null) byCountry[iso] = cents;
+  }
+
+  if (Object.keys(byCountry).length === 0) {
+    return null;
   }
 
   if (!code) {

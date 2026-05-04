@@ -77,7 +77,7 @@ const Title = styled.h1`
 
 const Layout = styled.div`
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: minmax(260px, 360px) 1fr;
   gap: 32px;
   align-items: flex-start;
   min-width: 0;
@@ -179,13 +179,6 @@ const SummaryCard = styled.div`
     top: auto;
     padding: 16px;
   }
-`;
-
-const SummaryTitle = styled.h2`
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 16px;
 `;
 
 const SummaryItem = styled.div`
@@ -1314,6 +1307,8 @@ export default function CheckoutPage() {
   const [couponApplying, setCouponApplying] = useState(false);
   const [piRefreshKey, setPiRefreshKey] = useState(0);
   const [customerToken, setCustomerToken] = useState(null);
+  /** Cancel previous unpaid PI when bonus/Versand triggers a new PaymentIntent (fewer orphaned „incomplete“ in Stripe). */
+  const lastPaymentIntentIdRef = useRef(null);
 
   const [stripePromiseState, setStripePromiseState] = useState(null);
   const [stripePkLoading, setStripePkLoading] = useState(true);
@@ -1349,6 +1344,10 @@ export default function CheckoutPage() {
   useEffect(() => {
     setCustomerToken(getToken("customer"));
   }, []);
+
+  useEffect(() => {
+    lastPaymentIntentIdRef.current = null;
+  }, [cart?.id]);
 
   useEffect(() => {
     const pts = cart?.bonus_points_reserved ?? 0;
@@ -1474,6 +1473,8 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!cart?.id || items.length === 0 || !stripePromiseState) return;
 
+    const effectiveShippingCents = isFreeShipping ? 0 : (shippingCents ?? 0);
+
     if (typeof window !== "undefined") {
       const returnedSecret = new URLSearchParams(window.location.search).get(
         "payment_intent_client_secret",
@@ -1482,7 +1483,8 @@ export default function CheckoutPage() {
         setClientSecret(returnedSecret);
         setPiError(null);
         setLoadingPI(false);
-        setPayCents(subtotalCents);
+        const couponDisc = Number(cart?.coupon_discount_cents || 0);
+        setPayCents(Math.max(0, subtotalCents - bonusDiscountCents - couponDisc + effectiveShippingCents));
         return;
       }
     }
@@ -1491,20 +1493,25 @@ export default function CheckoutPage() {
     setPiError(null);
     setClientSecret(null);
     setPayCents(null);
-    const effectiveShippingCents = isFreeShipping ? 0 : (shippingCents ?? 0);
-    const customerToken = getToken("customer");
+    const custTok = getToken("customer");
     const paymentIntentHeaders = { "Content-Type": "application/json" };
-    if (customerToken) paymentIntentHeaders.Authorization = `Bearer ${customerToken}`;
+    if (custTok) paymentIntentHeaders.Authorization = `Bearer ${custTok}`;
+    const cancelId = lastPaymentIntentIdRef.current;
     fetch("/api/store-payment-intent", {
       method: "POST",
       headers: paymentIntentHeaders,
-      body: JSON.stringify({ cart_id: cart.id, shipping_cents: effectiveShippingCents }),
+      body: JSON.stringify({
+        cart_id: cart.id,
+        shipping_cents: effectiveShippingCents,
+        ...(cancelId ? { cancel_payment_intent_id: cancelId } : {}),
+      }),
     })
       .then((r) => r.json())
       .then((data) => {
         if (data?.client_secret) {
           setClientSecret(data.client_secret);
-          setPayCents(typeof data.amount_cents === "number" ? data.amount_cents : subtotalCents + effectiveShippingCents);
+          if (data.payment_intent_id) lastPaymentIntentIdRef.current = data.payment_intent_id;
+          setPayCents(typeof data.amount_cents === "number" ? data.amount_cents : subtotalCents - bonusDiscountCents - Number(cart?.coupon_discount_cents || 0) + effectiveShippingCents);
         } else {
           setPiError(data?.message || t("configError"));
           setPayCents(null);
@@ -1515,7 +1522,7 @@ export default function CheckoutPage() {
         setPayCents(null);
       })
       .finally(() => setLoadingPI(false));
-  }, [cart?.id, subtotalCents, shippingCents, isFreeShipping, shippingCountry, t, items.length, piRefreshKey, stripePromiseState]);
+  }, [cart?.id, subtotalCents, bonusDiscountCents, cart?.coupon_discount_cents, shippingCents, isFreeShipping, shippingCountry, t, items.length, piRefreshKey, stripePromiseState]);
 
   return (
     <PageWrap>
@@ -1536,46 +1543,8 @@ export default function CheckoutPage() {
           </div>
         ) : (
           <Layout>
-            <div>
-              {piError && <ErrorBox style={{ marginBottom: 24 }}>{piError}</ErrorBox>}
-              {loadingPI && <GlobalPageLoader label={t("processing")} />}
-              {clientSecret && stripePromiseState && (
-                <Elements
-                  key={`${cart.id}-${clientSecret}`}
-                  stripe={stripePromiseState}
-                  options={{
-                    clientSecret,
-                    locale,
-                    appearance: {
-                      theme: "stripe",
-                      variables: {
-                        colorPrimary: tokens.primary.DEFAULT,
-                        fontFamily: tokens.fontFamily.sans,
-                        borderRadius: "8px",
-                      },
-                    },
-                  }}
-                >
-                  <CheckoutForm
-                    clientSecret={clientSecret}
-                    cartId={cart.id}
-                    items={items}
-                    subtotalCents={subtotalCents}
-                    amountToPayCents={payCents}
-                    shippingCents={isFreeShipping ? 0 : (shippingCents ?? 0)}
-                    onCountryChange={setShippingCountry}
-                    defaultCountry={shippingCountry}
-                    shippableCountries={shippableCountries}
-                    paymentIntentRefreshing={loadingPI}
-                    paymentMethodTypes={paymentMethodTypes}
-                    paymentMethodLayout={paymentMethodLayout}
-                  />
-                </Elements>
-              )}
-            </div>
-
             <SummaryCard>
-              <SummaryTitle>{t("orderSummary")}</SummaryTitle>
+              <SectionTitle>{t("orderSummary")}</SectionTitle>
               {items.map((item) => {
                 const productHref = item.product_handle ? `/produkt/${item.product_handle}` : null;
                 const lineTitle = getLocalizedCartLineTitle(item, locale);
@@ -1610,7 +1579,7 @@ export default function CheckoutPage() {
               })}
               <Divider />
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#111827", marginBottom: 8 }}>{t("bonusTitle")}</div>
+                <Label as="div" style={{ marginBottom: 8, display: "block" }}>{t("bonusTitle")}</Label>
                 {customerToken ? (
                   <>
                     {balancePoints != null && (
@@ -1667,7 +1636,7 @@ export default function CheckoutPage() {
                 )}
               </div>
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#111827", marginBottom: 8 }}>Coupon code</div>
+                <Label as="div" style={{ marginBottom: 8, display: "block" }}>Coupon code</Label>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <input
                     type="text"
@@ -1774,6 +1743,44 @@ export default function CheckoutPage() {
                 <span>{formatPriceCents(payCents != null ? payCents : subtotalCents)} €</span>
               </SummaryTotal>
             </SummaryCard>
+
+            <div>
+              {piError && <ErrorBox style={{ marginBottom: 24 }}>{piError}</ErrorBox>}
+              {loadingPI && <GlobalPageLoader label={t("processing")} />}
+              {clientSecret && stripePromiseState && (
+                <Elements
+                  key={`${cart.id}-${clientSecret}`}
+                  stripe={stripePromiseState}
+                  options={{
+                    clientSecret,
+                    locale,
+                    appearance: {
+                      theme: "stripe",
+                      variables: {
+                        colorPrimary: tokens.primary.DEFAULT,
+                        fontFamily: tokens.fontFamily.sans,
+                        borderRadius: "8px",
+                      },
+                    },
+                  }}
+                >
+                  <CheckoutForm
+                    clientSecret={clientSecret}
+                    cartId={cart.id}
+                    items={items}
+                    subtotalCents={subtotalCents}
+                    amountToPayCents={payCents}
+                    shippingCents={isFreeShipping ? 0 : (shippingCents ?? 0)}
+                    onCountryChange={setShippingCountry}
+                    defaultCountry={shippingCountry}
+                    shippableCountries={shippableCountries}
+                    paymentIntentRefreshing={loadingPI}
+                    paymentMethodTypes={paymentMethodTypes}
+                    paymentMethodLayout={paymentMethodLayout}
+                  />
+                </Elements>
+              )}
+            </div>
           </Layout>
         )}
       </Main>

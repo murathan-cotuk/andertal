@@ -518,7 +518,7 @@ const PRESET_CARRIERS = [
   { name: "USPS", tracking_url_template: "https://tools.usps.com/go/TrackConfirmAction?tLabels={tracking}" },
 ];
 
-const LS_THRESHOLDS_KEY = "andertal_free_shipping_thresholds";
+/** Platform free-shipping thresholds live on `seller_id === 'default'` (same row the storefront reads). */
 
 export default function ShippingSettingsPage() {
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -535,15 +535,16 @@ export default function ShippingSettingsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [carriersData, settings] = await Promise.all([
+    const loadSuperuser =
+      typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
+    const [carriersData, settings, platformSettings] = await Promise.all([
       getMedusaAdminClient().getCarriers(),
       getMedusaAdminClient().getSellerSettings().catch(() => ({})),
+      loadSuperuser ? getMedusaAdminClient().getSellerSettings("default").catch(() => ({})) : Promise.resolve({}),
     ]);
     setCarriers(carriersData.carriers || []);
     setCurrentStoreName(settings?.store_name || "");
-    const fromBackend = settings?.free_shipping_thresholds;
-    const fromLS = typeof window !== "undefined" ? window.localStorage.getItem(LS_THRESHOLDS_KEY) : null;
-    const thresholdData = fromBackend ?? (fromLS ? JSON.parse(fromLS) : null);
+    const thresholdData = loadSuperuser ? platformSettings?.free_shipping_thresholds : null;
     if (thresholdData && typeof thresholdData === "object") {
       const display = {};
       const codes = [];
@@ -555,6 +556,9 @@ export default function ShippingSettingsPage() {
       }
       setThresholdCountries(codes);
       setThresholds(display);
+    } else if (loadSuperuser) {
+      setThresholdCountries([]);
+      setThresholds({});
     }
     setLoading(false);
   }, []);
@@ -577,10 +581,9 @@ export default function ShippingSettingsPage() {
     setSavingThreshold(true); setThresholdErr("");
     try {
       await getMedusaAdminClient().updateSellerSettings({
-        store_name: currentStoreName,
+        seller_id: "default",
         free_shipping_thresholds: thresholdCents,
       });
-      if (typeof window !== "undefined") window.localStorage.setItem(LS_THRESHOLDS_KEY, JSON.stringify(thresholdCents));
       setSavedThreshold(true);
       setTimeout(() => setSavedThreshold(false), 3000);
     } catch (e) {
@@ -629,7 +632,7 @@ export default function ShippingSettingsPage() {
             <InlineStack align="space-between" blockAlign="center">
               <BlockStack gap="100">
                 <Text variant="headingSm" as="h3">Versandkostenfrei ab</Text>
-                <Text variant="bodySm" tone="subdued">Mindestbestellwert für kostenlosen Versand pro Land.</Text>
+                <Text variant="bodySm" tone="subdued">Mindestbestellwert für kostenlosen Versand pro Land — dieselben Daten wie im Shop.</Text>
               </BlockStack>
               {savedThreshold && <Badge tone="success">Gespeichert ✓</Badge>}
             </InlineStack>
