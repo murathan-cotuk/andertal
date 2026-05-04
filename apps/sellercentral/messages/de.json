@@ -587,9 +587,9 @@
         "step1Desc": "Zahlung geht direkt an die Plattform (Stripe)",
         "step2Label": "Abrechnung",
         "step2Desc": "{sellerPct}% deines Umsatzes wird berechnet — {platformPct}% Plattformgebühr",
-        "step3Label": "Banküberweisung",
-        "step3Desc": "Betrag wird an deine IBAN überwiesen",
-        "note": "Auszahlungen erfolgen manuell durch die Plattform. Du wirst per E-Mail benachrichtigt, wenn eine Überweisung eingeleitet wird."
+        "step3Label": "SEPA-Auszahlung",
+        "step3Desc": "Nach der Sperrfrist wird der Betrag automatisch per SEPA auf die hier hinterlegte IBAN ausgezahlt (2. und 4. Freitag im Monat, Europe/Berlin).",
+        "note": "Verwende eine für SEPA-Zahlungen geeignete IBAN (typischerweise EU/EWR). Auszahlungen laufen automatisch über Stripe an die gespeicherte Bankverbindung."
       },
       "bankAccount": {
         "title": "Bankkonto für Auszahlungen",
@@ -604,7 +604,7 @@
         "holderPlaceholder": "Max Mustermann oder Musterfirma GmbH",
         "bicPlaceholder": "COBADEFFXXX",
         "bankNamePlaceholder": "Commerzbank AG",
-        "ibanHelp": "Internationale Bankkontonummer (ohne Leerzeichen eingeben oder mit Leerzeichen — beides wird akzeptiert)",
+        "ibanHelp": "IBAN für SEPA-Überweisungen (EU/EWR üblich). Format und Prüfziffer werden beim Speichern geprüft.",
         "saveButton": "Bankdaten speichern",
         "cancelButton": "Abbrechen",
         "accountReady": "Bankkonto hinterlegt — bereit für Auszahlungen",

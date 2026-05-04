@@ -587,9 +587,9 @@
         "step1Desc": "Ödeme doğrudan platforma gider (Stripe)",
         "step2Label": "Hesaplama",
         "step2Desc": "Gelirinizin {sellerPct}%'i hesaplanır — {platformPct}% platform ücreti",
-        "step3Label": "Banka transferi",
-        "step3Desc": "Tutar IBAN'ınıza transfer edilir",
-        "note": "Ödemeler platform tarafından manuel olarak işlenir. Transfer başlatıldığında e-posta ile bilgilendirileceksiniz."
+        "step3Label": "SEPA ödemesi",
+        "step3Desc": "Süre sonrasında tutar, kayıtlı IBAN'ınıza otomatik SEPA ile ödenir (ayın 2. ve 4. cuması, Europe/Berlin).",
+        "note": "SEPA kabul eden bir IBAN kullanın (çoğunlukla AB/AEA). Ödemeler Stripe üzerinden kayıtlı banka bilgisine otomatik yapılır."
       },
       "bankAccount": {
         "title": "Ödeme banka hesabı",
@@ -604,7 +604,7 @@
         "holderPlaceholder": "Ahmet Yılmaz veya Yılmaz Ltd. Şti.",
         "bicPlaceholder": "COBADEFFXXX",
         "bankNamePlaceholder": "Ziraat Bankası",
-        "ibanHelp": "Uluslararası banka hesap numarası (boşluklu veya boşluksuz — ikisi de kabul edilir)",
+        "ibanHelp": "SEPA ödemeleri için IBAN (çoğunlukla AB/AEA). Kaydederken format ve kontrol rakamı doğrulanır.",
         "saveButton": "Banka bilgilerini kaydet",
         "cancelButton": "İptal",
         "accountReady": "Banka hesabı eklendi — ödemeler için hazır",

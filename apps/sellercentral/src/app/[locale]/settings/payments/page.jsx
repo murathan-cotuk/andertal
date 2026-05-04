@@ -88,6 +88,21 @@ const statusLabel = (s) => {
 };
 
 // ── IBAN helpers ──────────────────────────────────────────────────────────────
+/** ISO 13616 MOD-97 — SEPA uses standard IBAN. */
+function ibanMod97(iban) {
+  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  let expanded = "";
+  for (let i = 0; i < rearranged.length; i++) {
+    const c = rearranged[i];
+    expanded += /[A-Z]/.test(c) ? String(c.charCodeAt(0) - 55) : c;
+  }
+  let rem = 0;
+  for (let i = 0; i < expanded.length; i++) {
+    rem = (rem * 10 + parseInt(expanded[i], 10)) % 97;
+  }
+  return rem === 1;
+}
+
 function validateIban(raw) {
   const v = raw.replace(/\s/g, "").toUpperCase();
   if (!v) return { ok: false, error: "IBAN darf nicht leer sein." };
@@ -95,6 +110,7 @@ function validateIban(raw) {
     return { ok: false, error: "Ungültiges IBAN-Format (z.B. DE89 3704 0044 0532 0130 00)." };
   if (v.length < 15 || v.length > 34)
     return { ok: false, error: "IBAN-Länge ungültig." };
+  if (!ibanMod97(v)) return { ok: false, error: "IBAN-Prüfziffer ungültig." };
   return { ok: true, error: null };
 }
 function maskIban(iban) {

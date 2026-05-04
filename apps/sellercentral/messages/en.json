@@ -587,9 +587,9 @@
         "step1Desc": "Payment goes directly to the platform (Stripe)",
         "step2Label": "Settlement",
         "step2Desc": "{sellerPct}% of your revenue is calculated — {platformPct}% platform fee",
-        "step3Label": "Bank transfer",
-        "step3Desc": "Amount is transferred to your IBAN",
-        "note": "Payouts are processed manually by the platform. You will be notified by email when a transfer is initiated."
+        "step3Label": "SEPA payout",
+        "step3Desc": "After the hold period, your balance is paid automatically via SEPA to the IBAN saved here (2nd and 4th Friday each month, Europe/Berlin).",
+        "note": "Use an IBAN that accepts SEPA transfers (typically EU/EEA). Payouts run automatically through Stripe to your saved bank details."
       },
       "bankAccount": {
         "title": "Payout bank account",
@@ -604,7 +604,7 @@
         "holderPlaceholder": "John Smith or Smith LLC",
         "bicPlaceholder": "COBADEFFXXX",
         "bankNamePlaceholder": "Commerzbank AG",
-        "ibanHelp": "International bank account number (enter with or without spaces — both are accepted)",
+        "ibanHelp": "IBAN for SEPA payouts (EU/EEA typical). Format and checksum are validated when you save.",
         "saveButton": "Save bank details",
         "cancelButton": "Cancel",
         "accountReady": "Bank account added — ready for payouts",

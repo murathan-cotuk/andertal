@@ -9210,7 +9210,8 @@ async function start() {
           sellerCommissionRate,
         )
 
-        const stripeTransferInit = isZeroPayOrder ? 'pending' : 'not_applicable'
+        /** Seller settlements run via IBAN/SEPA batch only — never Stripe Connect transfer-from-platform. */
+        const stripeTransferInit = 'not_applicable'
         const checkoutPaymentKind = isZeroPayOrder ? 'platform_loyalty' : 'stripe'
         const sellerNetMerchandiseCents = Math.max(0, subtotalCents - platformFeeMerchandiseBasis)
         const paymentIntentForDb = isZeroPayOrder ? null : paymentIntentId
@@ -16645,6 +16646,29 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                  AND COALESCE(r.status, '') NOT IN ('abgelehnt', 'abgeschlossen')
              )`
 
+    /** ISO 13616 MOD-97 IBAN check — SEPA-capable accounts use standard IBAN. */
+    const validateSepaIbanChecksum = (raw) => {
+      const iban = String(raw || '').replace(/\s/g, '').toUpperCase()
+      if (!iban) return { ok: false, message: 'IBAN erforderlich' }
+      if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]+$/.test(iban)) return { ok: false, message: 'Ungültiges IBAN-Format' }
+      if (iban.length < 15 || iban.length > 34) return { ok: false, message: 'IBAN-Länge ungültig' }
+      const rearranged = iban.slice(4) + iban.slice(0, 4)
+      let expanded = ''
+      for (let i = 0; i < rearranged.length; i++) {
+        const c = rearranged[i]
+        if (c >= 'A' && c <= 'Z') expanded += String(c.charCodeAt(0) - 55)
+        else expanded += c
+      }
+      let rem = 0
+      for (let i = 0; i < expanded.length; i++) {
+        const d = expanded.charCodeAt(i) - 48
+        if (d < 0 || d > 9) return { ok: false, message: 'Ungültiges IBAN-Format' }
+        rem = (rem * 10 + d) % 97
+      }
+      if (rem !== 1) return { ok: false, message: 'IBAN-Prüfziffer ungültig' }
+      return { ok: true, iban }
+    }
+
     const autoPayoutPeriodForDate = () => {
       const fri = isPayoutFridayToday()
       if (!fri.is) return null
@@ -16768,258 +16792,25 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
-    // Dispatch Stripe Connect transfers for delivered orders after 14 days.
-    // Runs only on the 2nd and 4th Friday (Europe/Berlin), same cadence as IBAN payouts.
-    const runStripeConnectTransfersIfDue = async () => {
-      if (!isPayoutFridayToday().is) return
-      const client = getDbClient()
-      if (!client) return
-      try {
-        await client.connect()
-        const platformRow = await loadPlatformCheckoutRow(client)
-        const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
-        if (!secretKey) { await client.end(); return }
-        const stripe = new (require('stripe'))(secretKey)
+    // Stripe Connect transfers to seller Connect accounts are disabled — all settlements use Sellercentral IBAN (SEPA)
+    // via runSellerIbanPayoutsIfDue (platform → Stripe Custom recipient → bank payout).
+    const runStripeConnectTransfersIfDue = async () => {}
 
-        for (let batch = 0; batch < 100; batch += 1) {
-          const due = await client.query(
-            `SELECT o.id, o.order_number, o.seller_id, o.payment_intent_id, o.subtotal_cents, o.cart_id,
-                    COALESCE(o.checkout_payment_kind, 'stripe') AS checkout_payment_kind,
-                    COALESCE(o.seller_net_after_commission_cents, 0)::bigint AS seller_net_after_commission_cents
-             FROM store_orders o
-             WHERE ${payoutEligibleOrderSql}
-               AND (
-                 o.payment_intent_id IS NOT NULL
-                 OR COALESCE(o.checkout_payment_kind, 'stripe') = 'platform_loyalty'
-               )
-               AND COALESCE(o.stripe_transfer_status, 'legacy_skipped') IN ('pending', 'failed', 'waiting_onboarding')
-             ORDER BY o.delivery_date ASC
-             LIMIT 200`
-          )
-          const rows = due.rows || []
-          if (!rows.length) break
+    const runStripePayoutsIfDue = async () => {}
 
-          for (const row of rows) {
-          const orderId = row.id
-          const sellerId = String(row.seller_id || '').trim()
-          if (!sellerId || sellerId === 'default') {
-            await client.query(
-              `UPDATE store_orders SET stripe_transfer_status = 'skipped', stripe_transfer_error = 'No eligible seller_id', stripe_transfer_at = now(), updated_at = now() WHERE id = $1::uuid`,
-              [orderId]
-            )
-            continue
-          }
-          try {
-            const sRes = await client.query(
-              `SELECT stripe_account_id, stripe_onboarding_complete, commission_rate
-               FROM seller_users WHERE seller_id = $1`,
-              [sellerId]
-            )
-            const s = sRes.rows?.[0]
-            if (!s?.stripe_account_id || !s?.stripe_onboarding_complete) {
-              await client.query(
-                `UPDATE store_orders SET stripe_transfer_status = 'waiting_onboarding', stripe_transfer_error = 'Seller Stripe onboarding incomplete', updated_at = now() WHERE id = $1::uuid`,
-                [orderId]
-              )
-              continue
-            }
-
-            const commissionRate = Number(s.commission_rate ?? 0.12)
-            const merchBasis = sellerOrderRevenueBasisCents(row)
-            const storedNet = Number(row.seller_net_after_commission_cents || 0)
-            const transferAmount =
-              Number.isFinite(storedNet) && storedNet > 0
-                ? Math.floor(storedNet)
-                : Math.floor(merchBasis * (1 - commissionRate))
-
-            const piIdRaw = row.payment_intent_id ? String(row.payment_intent_id).trim() : ''
-            let chargeId = null
-            if (piIdRaw) {
-              const pi = await stripe.paymentIntents.retrieve(piIdRaw, { expand: ['latest_charge'] })
-              chargeId = typeof pi.latest_charge === 'object' ? pi.latest_charge?.id : pi.latest_charge
-              if (!chargeId) throw new Error('No latest_charge on payment intent')
-            }
-
-            if (transferAmount <= 0) {
-              await client.query(
-                `UPDATE store_orders SET stripe_transfer_status = 'skipped', stripe_transfer_error = 'Computed transfer amount <= 0', stripe_transfer_at = now(), updated_at = now() WHERE id = $1::uuid`,
-                [orderId]
-              )
-              continue
-            }
-
-            const xferSellerDisplay = await resolveSellerDisplayNameForStripe(client, sellerId)
-            const xferSellerLabel =
-              truncateForStripeDescription(xferSellerDisplay) ||
-              sellerId
-
-            const transferPayload = {
-              amount: transferAmount,
-              currency: 'eur',
-              destination: s.stripe_account_id,
-              transfer_group: `cart_${row.cart_id || ''}`,
-              description: `Order #${row.order_number || ''} — ${xferSellerLabel}`,
-              metadata: {
-                order_id: orderId,
-                order_number: String(row.order_number || ''),
-                seller_id: sellerId,
-                seller_name: truncateForStripeDescription(xferSellerDisplay, 500) || xferSellerLabel,
-                checkout_payment_kind: String(row.checkout_payment_kind || 'stripe'),
-              },
-            }
-            if (chargeId) transferPayload.source_transaction = chargeId
-
-            const tr = await stripe.transfers.create(transferPayload)
-
-            await client.query(
-              `UPDATE store_orders
-               SET stripe_transfer_status = 'completed',
-                   stripe_transfer_id = $2,
-                   stripe_transfer_error = NULL,
-                   stripe_transfer_at = now(),
-                   updated_at = now()
-               WHERE id = $1::uuid`,
-              [orderId, tr.id]
-            )
-          } catch (e) {
-            await client.query(
-              `UPDATE store_orders
-               SET stripe_transfer_status = 'failed',
-                   stripe_transfer_error = LEFT($2, 500),
-                   updated_at = now()
-               WHERE id = $1::uuid`,
-              [orderId, String(e?.message || 'Stripe transfer failed')]
-            )
-          }
-          }
-        }
-        await client.end()
-      } catch (e) {
-        try { await client.end() } catch (_) {}
-        console.error('runStripeConnectTransfersIfDue:', e?.message || e)
-      }
-    }
-
-    // Destination Charges + Manual Payouts: dispatch bank payouts for eligible delivered orders.
-    // Orders using the new model have stripe_account_id set (destination charge) and
-    // stripe_payout_status = 'pending'. Same payout Fridays (Berlin) + 14-day / no-return rules as Connect transfers.
-    const runStripePayoutsIfDue = async () => {
-      if (!isPayoutFridayToday().is) return
-      const client = getDbClient()
-      if (!client) return
-      try {
-        await client.connect()
-        const platformRow = await loadPlatformCheckoutRow(client)
-        const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
-        if (!secretKey) { await client.end(); return }
-        const stripe = new (require('stripe'))(secretKey)
-
-        for (let batch = 0; batch < 100; batch += 1) {
-          const due = await client.query(
-            `SELECT o.id, o.order_number, o.seller_id, o.stripe_account_id,
-                    o.subtotal_cents, o.total_cents, o.stripe_application_fee_cents,
-                    s.commission_rate AS seller_commission_rate
-             FROM store_orders o
-             LEFT JOIN seller_users s ON s.seller_id = o.seller_id
-             WHERE o.stripe_payout_status = 'pending'
-               AND o.stripe_account_id IS NOT NULL
-               AND ${payoutEligibleOrderSql}
-             ORDER BY o.delivery_date ASC
-             LIMIT 200`
-          )
-          const rows = due.rows || []
-          if (!rows.length) break
-
-          for (const row of rows) {
-          const orderId = row.id
-          const stripeAccountId = row.stripe_account_id
-
-          // Mark as processing to prevent double-payout (idempotency guard)
-          const guard = await client.query(
-            `UPDATE store_orders SET stripe_payout_status = 'processing', updated_at = now()
-             WHERE id = $1::uuid AND stripe_payout_status = 'pending'`,
-            [orderId]
-          )
-          if (!guard.rowCount) continue // Another process already grabbed it
-
-          try {
-            // Auszahlung: Kundenbetrag abzüglich Provision auf WarennZwischensumme (subtotal), nicht auf rabattiertem total_cents.
-            const totalCents = Number(row.total_cents || 0)
-            const feeCents = resolvePlatformApplicationFeeCents(row, row.seller_commission_rate ?? 0.12)
-            const payoutAmount = Math.max(0, totalCents - feeCents)
-            if (payoutAmount <= 0) {
-              await client.query(
-                `UPDATE store_orders SET stripe_payout_status = 'skipped', updated_at = now() WHERE id = $1::uuid`,
-                [orderId]
-              )
-              continue
-            }
-
-            // Check available balance on connected account before creating payout
-            const balance = await stripe.balance.retrieve({ stripeAccount: stripeAccountId })
-            const available = balance.available?.find(b => b.currency === 'eur')?.amount || 0
-            if (available < payoutAmount) {
-              // Funds not yet settled — try again next run
-              await client.query(
-                `UPDATE store_orders SET stripe_payout_status = 'pending', updated_at = now() WHERE id = $1::uuid`,
-                [orderId]
-              )
-              continue
-            }
-
-            const payout = await stripe.payouts.create(
-              {
-                amount: payoutAmount,
-                currency: 'eur',
-                description: `Order #${row.order_number || ''} — 14-day release`,
-                metadata: {
-                  order_id: orderId,
-                  order_number: String(row.order_number || ''),
-                  seller_id: row.seller_id || '',
-                },
-              },
-              { stripeAccount: stripeAccountId }
-            )
-
-            await client.query(
-              `UPDATE store_orders
-               SET stripe_payout_status = 'paid',
-                   stripe_payout_id = $2,
-                   updated_at = now()
-               WHERE id = $1::uuid`,
-              [orderId, payout.id]
-            )
-          } catch (e) {
-            await client.query(
-              `UPDATE store_orders
-               SET stripe_payout_status = CASE WHEN $2 ILIKE '%insufficient%funds%' THEN 'pending' ELSE 'failed' END,
-                   updated_at = now()
-               WHERE id = $1::uuid`,
-              [orderId, String(e?.message || '')]
-            )
-            console.error(`[stripePayouts] Order #${row.order_number} payout failed:`, e?.message)
-          }
-          }
-        }
-        await client.end()
-      } catch (e) {
-        try { await client.end() } catch (_) {}
-        console.error('runStripePayoutsIfDue:', e?.message || e)
-      }
-    }
-
-    // IBAN payout cron — runs hourly, pays sellers via their IBAN using Stripe Custom accounts
-    // Finds orders: stripe_payout_status='pending', stripe_account_id IS NULL, same eligibility as Connect (14d, no open return)
-    // Groups by seller, transfers platform → custom account → IBAN
+    // IBAN / SEPA payout — Sellercentral bank account (seller_users.iban). Platform PI funds settle here.
+    // Eligible: stripe_payout_status pending, order stripe_account_id NULL (all store orders today), 14d + no open return.
     const runSellerIbanPayoutsIfDue = async () => {
-      if (!isPayoutFridayToday().is) return   // 2nd / 4th Friday (Europe/Berlin), same as Connect transfers
+      if (!isPayoutFridayToday().is) return   // 2nd / 4th Friday (Europe/Berlin)
       const client = getDbClient()
       if (!client) return
       try {
         await client.connect()
 
-        // Idempotency: skip if we already ran this Friday's payout
-        const todayKey = `IBAN-${new Date().toISOString().slice(0, 10)}`
+        const { y: by, m: bm, d: bd } = civilDatePartsBerlin()
+        const berlinIso = `${by}-${String(bm + 1).padStart(2, '0')}-${String(bd).padStart(2, '0')}`
+        // Idempotency: one batch per payout calendar day (Berlin)
+        const todayKey = `IBAN-${berlinIso}`
         const alreadyRan = await client.query('SELECT run_key FROM seller_payout_auto_runs WHERE run_key = $1 LIMIT 1', [todayKey])
         if (alreadyRan.rows.length) { await client.end(); return }
 
@@ -17028,14 +16819,15 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (!secretKey) { await client.end(); return }
         const stripeInst = new (require('stripe'))(secretKey)
 
-        // Find eligible orders grouped by seller
+        // Per-order seller net (stored at checkout); fallback = merchandise × (1 − commission).
         const due = await client.query(
           `SELECT o.seller_id,
                   SUM(
-                    CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::bigint
-                         ELSE GREATEST(0, COALESCE(o.total_cents, 0))::bigint END
-                  ) AS merchandise_cents,
-                  SUM(o.total_cents) AS customer_paid_cents,
+                    GREATEST(0,
+                      COALESCE(o.seller_net_after_commission_cents::bigint,
+                        FLOOR(o.subtotal_cents::numeric * (1 - COALESCE(s.commission_rate, 0.12)))::bigint)
+                    )
+                  )::bigint AS payout_cents_sum,
                   s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email
            FROM store_orders o
            JOIN seller_users s ON s.seller_id = o.seller_id
@@ -17046,18 +16838,20 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         )
 
         for (const row of due.rows || []) {
-          const { seller_id, commission_rate, iban, payment_account_holder, email } = row
+          const { seller_id, iban, payment_account_holder, email } = row
           let customAccountId = row.stripe_custom_account_id
 
           if (!iban) {
             console.warn(`runSellerIbanPayoutsIfDue: seller ${seller_id} has no IBAN, skipping`)
             continue
           }
+          const ibChk = validateSepaIbanChecksum(iban)
+          if (!ibChk.ok) {
+            console.warn(`runSellerIbanPayoutsIfDue: seller ${seller_id} invalid IBAN — ${ibChk.message}`)
+            continue
+          }
 
-          const commissionRate = Number(commission_rate || 0.12)
-          const merchandiseCents = Number(row.merchandise_cents || 0)
-          const commissionCents = Math.round(merchandiseCents * commissionRate)
-          const payoutCents = merchandiseCents - commissionCents
+          const payoutCents = Math.floor(Number(row.payout_cents_sum || 0))
           if (payoutCents <= 50) continue // Stripe minimum payout
 
           // Idempotency: mark all eligible orders as processing first
@@ -17131,7 +16925,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.query(
           `INSERT INTO seller_payout_auto_runs (run_key, period_start, period_end, source_iban, created_count)
            VALUES ($1, $2::date, $3::date, '', 0) ON CONFLICT (run_key) DO NOTHING`,
-          [todayKey, new Date().toISOString().slice(0, 10), new Date().toISOString().slice(0, 10)]
+          [todayKey, berlinIso, berlinIso]
         ).catch(() => {})
         await client.end()
       } catch (e) {
@@ -17162,6 +16956,13 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.connect()
         const { iban, payment_account_holder, payment_bic, payment_bank_name } = req.body || {}
         const cleanIban = (iban || '').replace(/\s/g, '').toUpperCase() || null
+        if (cleanIban) {
+          const ichk = validateSepaIbanChecksum(cleanIban)
+          if (!ichk.ok) {
+            await client.end()
+            return res.status(400).json({ message: ichk.message || 'Ungültige IBAN' })
+          }
+        }
         await client.query(
           `UPDATE seller_users SET iban = $1, payment_account_holder = $2, payment_bic = $3, payment_bank_name = $4, updated_at = now() WHERE seller_id = $5`,
           [cleanIban, payment_account_holder || null, payment_bic || null, payment_bank_name || null, sellerId]
