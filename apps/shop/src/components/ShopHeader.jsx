@@ -1052,6 +1052,7 @@ export default function ShopHeader() {
   const [scrollingDown, setScrollingDown] = useState(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const lastScrollYRef = useRef(0);
+  const scrollingDownRef = useRef(false);
   const headerRef = useRef(null);
   const middleBarRef = useRef(null);
   const megaMenuTimerRef = useRef(null);
@@ -1274,15 +1275,12 @@ export default function ShopHeader() {
          * her pozitif delta ikinci şeridi gizler (önceki SCROLL_DELTA ile çoğu mobil kaydırmada hiç tetiklenmiyordu).
          * Yukarı: küçük negatif deltalarda da menü gelsin; titreşim için |delta| minimum.
          */
-        let nextScrollingDown;
-        setScrollingDown((prevDown) => {
-          let next = prevDown;
-          if (current <= SCROLL_THRESHOLD) next = false;
-          else if (delta > 0 && current > SCROLL_THRESHOLD) next = true;
-          else if (delta < -SCROLL_UP_DELTA && !nearDocumentBottom) next = false;
-          nextScrollingDown = next;
-          return next;
-        });
+        let nextScrollingDown = scrollingDownRef.current;
+        if (current <= SCROLL_THRESHOLD) nextScrollingDown = false;
+        else if (delta > 0 && current > SCROLL_THRESHOLD) nextScrollingDown = true;
+        else if (delta < -SCROLL_UP_DELTA && !nearDocumentBottom) nextScrollingDown = false;
+        scrollingDownRef.current = nextScrollingDown;
+        setScrollingDown(nextScrollingDown);
         publishMobileBottomNavScroll({
           scrollY: current,
           scrollingDown: nextScrollingDown,

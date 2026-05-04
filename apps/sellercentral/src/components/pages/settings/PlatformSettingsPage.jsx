@@ -25,6 +25,7 @@ export default function PlatformSettingsPage() {
   const [platformName, setPlatformName] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
   const [storeName, setStoreName] = useState("");
+  const [storefrontUrl, setStorefrontUrl] = useState("");
 
   const [snapshot, setSnapshot] = useState(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -37,10 +38,12 @@ export default function PlatformSettingsPage() {
       const pn = d?.platform_name || "";
       const se = d?.support_email || "";
       const sn = d?.store_name || "";
+      const su = d?.storefront_url || "";
       setPlatformName(pn);
       setSupportEmail(se);
       setStoreName(sn);
-      setSnapshot(JSON.stringify({ pn, se, sn }));
+      setStorefrontUrl(su);
+      setSnapshot(JSON.stringify({ pn, se, sn, su }));
     } catch (e) {
       setErr(e?.message || "Laden fehlgeschlagen.");
     } finally {
@@ -56,7 +59,7 @@ export default function PlatformSettingsPage() {
 
   const isDirty =
     snapshot !== null &&
-    snapshot !== JSON.stringify({ pn: platformName, se: supportEmail, sn: storeName });
+    snapshot !== JSON.stringify({ pn: platformName, se: supportEmail, sn: storeName, su: storefrontUrl });
 
   const save = async () => {
     setSaving(true);
@@ -68,6 +71,7 @@ export default function PlatformSettingsPage() {
         store_name: storeName.trim(),
         platform_name: platformName.trim(),
         support_email: supportEmail.trim(),
+        storefront_url: storefrontUrl.trim(),
       });
       setOk("Einstellungen gespeichert.");
       await load();
@@ -84,6 +88,7 @@ export default function PlatformSettingsPage() {
     setPlatformName(s.pn);
     setSupportEmail(s.se);
     setStoreName(s.sn);
+    setStorefrontUrl(s.su);
     setErr("");
     setOk("");
   };
@@ -152,6 +157,15 @@ export default function PlatformSettingsPage() {
                   placeholder="support@andertal.de"
                   autoComplete="off"
                   helpText="Kontakt-E-Mail für Käufer und automatische E-Mails"
+                />
+                <TextField
+                  label="Shop-URL"
+                  value={storefrontUrl}
+                  onChange={setStorefrontUrl}
+                  type="url"
+                  placeholder="https://www.andertal.com"
+                  autoComplete="off"
+                  helpText="Öffentliche URL des Shops – wird in Flow-E-Mails für Links wie 'Bestellung ansehen' verwendet"
                 />
               </BlockStack>
             </Card>

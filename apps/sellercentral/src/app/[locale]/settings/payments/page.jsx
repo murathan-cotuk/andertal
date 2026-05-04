@@ -545,7 +545,7 @@ function SellerPaymentsView() {
 
   const exportCsv = () => {
     const rows = [
-      ["Bestellnr.", "Datum", "Lieferdatum", "Kunde", "Brutto (€)", "Provision (€)", "Versand (€)", "Rabatt (€)", "Netto (€)", "Auszahl-Status"],
+      ["Bestellnr.", "Datum", "Lieferdatum", "Kunde", "Brutto (€)", "Provision (€)", "Versand (€)", "Netto (€)", "Auszahl-Status"],
       ...displayTransactions.map((t) => [
         t.order_number || "",
         fmtDateTime(t.created_at),
@@ -554,7 +554,6 @@ function SellerPaymentsView() {
         ((t.total_cents || 0) / 100).toFixed(2),
         ((t.commission_cents || 0) / 100).toFixed(2),
         ((t.shipping_cents || 0) / 100).toFixed(2),
-        ((t.discount_cents || 0) / 100).toFixed(2),
         ((t.payout_cents || 0) / 100).toFixed(2),
         t.payout_eligible ? "Freigegeben" : "Ausstehend",
       ]),
@@ -821,7 +820,7 @@ function SellerPaymentsView() {
                   {/* Column headers */}
                   <div style={{
                     display: "grid",
-                    gridTemplateColumns: "160px 1fr 1fr 100px 100px 80px 80px 100px 110px",
+                    gridTemplateColumns: "160px 1fr 1fr 100px 100px 80px 100px 110px",
                     gap: 8, padding: "10px 20px",
                     borderBottom: "1px solid #e5e7eb",
                     fontSize: 11, fontWeight: 600, color: "#6b7280",
@@ -833,7 +832,6 @@ function SellerPaymentsView() {
                     <SortTh label="Brutto" col="total_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
                     <SortTh label="Provision" col="commission_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
                     <div style={{ textAlign: "right" }}>Versand</div>
-                    <div style={{ textAlign: "right" }}>Rabatt</div>
                     <SortTh label="Netto" col="payout_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
                     <SortTh label="Status" col="delivery_date" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "center" }} />
                   </div>
@@ -844,7 +842,7 @@ function SellerPaymentsView() {
                       key={`${t.id || ""}-${i}`}
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "160px 1fr 1fr 100px 100px 80px 80px 100px 110px",
+                        gridTemplateColumns: "160px 1fr 1fr 100px 100px 80px 100px 110px",
                         gap: 8, padding: "11px 20px",
                         borderBottom: "1px solid #f3f4f6",
                         fontSize: 13, alignItems: "center",
@@ -866,7 +864,6 @@ function SellerPaymentsView() {
                       <div style={{ textAlign: "right", fontWeight: 500 }}>{fmt(t.total_cents)}</div>
                       <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(t.commission_cents)}</div>
                       <div style={{ textAlign: "right", color: "#2563eb" }}>{fmt(t.shipping_cents)}</div>
-                      <div style={{ textAlign: "right", color: "#6b7280" }}>{fmt(t.discount_cents)}</div>
                       <div style={{ textAlign: "right", fontWeight: 700, color: "#059669" }}>{fmt(t.payout_cents)}</div>
                       <div style={{ textAlign: "center" }}>
                         <Badge tone={t.payout_eligible ? "success" : "warning"}>
@@ -880,7 +877,7 @@ function SellerPaymentsView() {
                   {displayTransactions.length > 0 && (
                     <div style={{
                       display: "grid",
-                      gridTemplateColumns: "160px 1fr 1fr 100px 100px 80px 80px 100px 110px",
+                      gridTemplateColumns: "160px 1fr 1fr 100px 100px 80px 100px 110px",
                       gap: 8, padding: "11px 20px",
                       borderTop: "2px solid #e5e7eb",
                       fontSize: 13, fontWeight: 700,
@@ -893,7 +890,6 @@ function SellerPaymentsView() {
                       <div style={{ textAlign: "right" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.total_cents || 0), 0))}</div>
                       <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(displayTransactions.reduce((s, t) => s + (t.commission_cents || 0), 0))}</div>
                       <div style={{ textAlign: "right", color: "#2563eb" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.shipping_cents || 0), 0))}</div>
-                      <div style={{ textAlign: "right" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.discount_cents || 0), 0))}</div>
                       <div style={{ textAlign: "right", color: "#059669" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.payout_cents || 0), 0))}</div>
                       <div />
                     </div>

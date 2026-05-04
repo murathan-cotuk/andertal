@@ -83,15 +83,14 @@ export default function ModernMobileBottomNav({
         flexShrink: 0,
         height: "calc(60px + env(safe-area-inset-bottom, 0px))",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        background: surfaceBg ?? "rgba(255,255,255,0.97)",
+        background: surfaceBg ?? "#fff",
         borderTop: borderTop ?? "1px solid rgba(229,231,235,0.9)",
-        backdropFilter: blurCss,
-        WebkitBackdropFilter: blurCss,
+        backdropFilter: recessed ? undefined : blurCss,
+        WebkitBackdropFilter: recessed ? undefined : blurCss,
         boxShadow: boxShadow ?? "0 -2px 12px rgba(0,0,0,0.07)",
         zIndex: isFixed ? 2147483640 : 100,
         transition: isFixed ? "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
-        transform:
-          isFixed && recessed ? "translateY(calc(100% + env(safe-area-inset-bottom, 0px)))" : "translateY(0)",
+        transform: isFixed && recessed ? "translateY(calc(100% + env(safe-area-inset-bottom, 0px)))" : undefined,
         pointerEvents: isFixed && recessed ? "none" : "auto",
       }}
     >

@@ -211,20 +211,28 @@ async function loadOrderContext(client, orderId) {
   let storeName = 'Shop'
   let supportEmail = ''
   const sid = order.seller_id
+  let dbStorefrontUrl = ''
   if (sid) {
     const sh = await client.query(
-      `SELECT store_name, support_email FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
+      `SELECT store_name, support_email, storefront_url FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
       [sid],
     )
     if (sh.rows[0]) {
       storeName = String(sh.rows[0].store_name || storeName).trim() || storeName
       supportEmail = String(sh.rows[0].support_email || '').trim()
+      dbStorefrontUrl = String(sh.rows[0].storefront_url || '').trim().replace(/\/$/, '')
     }
   }
-  const siteUrl = resolvePublicShopBaseUrl()
+  if (!dbStorefrontUrl) {
+    const defRow = await client.query(
+      `SELECT storefront_url FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`,
+    )
+    dbStorefrontUrl = String(defRow.rows[0]?.storefront_url || '').trim().replace(/\/$/, '')
+  }
+  const siteUrl = resolvePublicShopBaseUrl() || dbStorefrontUrl
   if (!siteUrl) {
     console.warn(
-      '[flow-automation] Public shop URL missing: set STOREFRONT_PUBLIC_URL or SHOP_PUBLIC_URL (or NEXT_PUBLIC_SITE_URL) on the backend — otherwise merge tokens like {ORDER_DETAIL_URL} stay unreplaced in emails.',
+      '[flow-automation] Public shop URL missing: set STOREFRONT_PUBLIC_URL on the backend or configure it in Sellercentral → Settings → Plattform — otherwise tokens like {ORDER_DETAIL_URL} stay empty in emails.',
     )
   }
   const parts = []
@@ -434,10 +442,11 @@ async function placeholderVarsCustomerOnly(client, cust) {
   const fn = String(cust.first_name || '').trim()
   const ln = String(cust.last_name || '').trim()
   const fullName = [fn, ln].filter(Boolean).join(' ') || String(cust.email || '').trim()
-  const sh = await client.query(`SELECT store_name, support_email FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`)
+  const sh = await client.query(`SELECT store_name, support_email, storefront_url FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`)
   const storeName = String(sh.rows[0]?.store_name || 'Shop').trim() || 'Shop'
   const supportEmail = String(sh.rows[0]?.support_email || '').trim()
-  const siteUrl = resolvePublicShopBaseUrl()
+  const dbStorefrontUrl = String(sh.rows[0]?.storefront_url || '').trim().replace(/\/$/, '')
+  const siteUrl = resolvePublicShopBaseUrl() || dbStorefrontUrl
   const { market, lang, prefix } = storefrontPathPrefixFromShippingCountry(cust.country)
   const absPath = (p) => absoluteStorefrontUrl(siteUrl, p)
   return {

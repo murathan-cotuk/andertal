@@ -2038,6 +2038,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!cart?.id || items.length === 0) return;
+    if (!stripePromiseState) return;
 
     const effectiveShippingCents = isFreeShipping ? 0 : (shippingCents ?? 0);
 

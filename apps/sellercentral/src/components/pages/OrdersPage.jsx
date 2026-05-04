@@ -255,7 +255,7 @@ function buildCarrierTrackingUrl(carrierName, trackingNumber) {
 function ExpandedRow({ order, locale = "de", onSaveFields }) {
   const items = order._items || [];
   const subtotal = items.reduce((s, it) => s + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0);
-  const total = order.total_cents || order.subtotal_cents || 0;
+  const total = subtotal || order.subtotal_cents || order.total_cents || 0;
   const vat = getVatInfo(order.country);
   const totalNetto = vat.rate > 0 ? Math.round(total / (1 + vat.rate / 100)) : total;
   const totalVat = total - totalNetto;
@@ -432,12 +432,7 @@ function ExpandedRow({ order, locale = "de", onSaveFields }) {
                 <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#6b7280" }}>Versandkosten</td>
                 <td style={{ textAlign: "right", padding: "5px 8px" }}>Kostenlos</td>
               </tr>
-              {/* 5. Rabatt */}
-              <tr>
-                <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#6b7280" }}>Rabatt</td>
-                <td style={{ textAlign: "right", padding: "5px 8px" }}>—</td>
-              </tr>
-              {/* 6. Gesamtkosten (bolder) */}
+              {/* 5. Gesamtkosten (bolder) */}
               <tr style={{ borderTop: "2px solid #e5e7eb" }}>
                 <td colSpan={3} style={{ textAlign: "right", padding: "7px 8px", fontWeight: 800, fontSize: 13 }}>Gesamtkosten</td>
                 <td style={{ textAlign: "right", padding: "7px 8px", fontWeight: 800, fontSize: 13 }}>{fmtCents(total)}</td>

@@ -451,7 +451,7 @@ export default function MobileNav({ layout = "fixed" }) {
   /** Yalnızca temada açıkça true — varsayılan her zaman görünür sabit alt çubuk */
   const recessBottomBar =
     layout === "fixed" &&
-    mc.bottom_nav_recess_on_scroll === true &&
+    !!mc.bottom_nav_recess_on_scroll &&
     isMobileNavViewport &&
     !drawerOpen &&
     mobileBottomNavScroll.scrollingDown &&

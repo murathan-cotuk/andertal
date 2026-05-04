@@ -182,15 +182,12 @@ export default function OrderDetailPage() {
   }
 
   const items = order?.items || [];
-  const total =
-    order != null && order.total_cents !== undefined && order.total_cents !== null && order.total_cents !== ""
-      ? Number(order.total_cents)
-      : Math.max(
-          0,
-          Number(order?.subtotal_cents || 0) +
-            Number(order?.shipping_cents || 0) -
-            Number(order?.discount_cents || 0),
-        );
+  const total = Math.max(
+    0,
+    Number(order?.subtotal_cents || 0) +
+      Number(order?.shipping_cents || 0) -
+      Number(order?.coupon_discount_cents || 0),
+  );
   const shippingCents = Number(order?.shipping_cents || 0);
   const discountCents = Number(order?.discount_cents || 0);
   const couponDisc = Number(order?.coupon_discount_cents || 0);
@@ -341,28 +338,12 @@ export default function OrderDetailPage() {
                     {shippingCents > 0 ? fmtCents(shippingCents) : "Kostenlos"}
                   </td>
                 </tr>
-                {bonusDisc > 0 && (
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", color: "#6b7280", fontSize: 12 }}>
-                      Bonuspunkte ({Number(order?.bonus_points_redeemed || 0)} Pkt.)
-                    </td>
-                    <td style={{ textAlign: "right", padding: "4px 0", fontSize: 12, color: "#15803d" }}>−{fmtCents(bonusDisc)}</td>
-                  </tr>
-                )}
                 {couponDisc > 0 && (
                   <tr>
                     <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", color: "#6b7280", fontSize: 12 }}>
                       Gutschein{order?.coupon_code ? ` (${order.coupon_code})` : ""}
                     </td>
                     <td style={{ textAlign: "right", padding: "4px 0", fontSize: 12, color: "#15803d" }}>−{fmtCents(couponDisc)}</td>
-                  </tr>
-                )}
-                {discountCents > bonusDisc + couponDisc && (
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", color: "#6b7280", fontSize: 12 }}>Rabatt</td>
-                    <td style={{ textAlign: "right", padding: "4px 0", fontSize: 12, color: "#15803d" }}>
-                      −{fmtCents(discountCents - bonusDisc - couponDisc)}
-                    </td>
                   </tr>
                 )}
                 <tr>

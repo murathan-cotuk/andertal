@@ -981,6 +981,7 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_basic_password text;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_updated_at timestamp;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_connection_name text;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS storefront_url text;`).catch(() => {})
         await client.query(`CREATE TABLE IF NOT EXISTS admin_hub_notifications (
           id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
           type varchar(50) NOT NULL,
@@ -4556,7 +4557,7 @@ async function start() {
       try {
         await client.connect()
         try {
-          const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+          const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, storefront_url FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
           const row = r.rows && r.rows[0]
           const store_name = row && row.store_name != null ? String(row.store_name) : ''
           let free_shipping_thresholds = (row && row.free_shipping_thresholds) || null
@@ -4571,7 +4572,8 @@ async function start() {
           const sellercentral_logo_height = row && row.sellercentral_logo_height != null ? Number(row.sellercentral_logo_height) : 30
           const platform_name = row && row.platform_name ? String(row.platform_name) : ''
           const support_email = row && row.support_email ? String(row.support_email) : ''
-          res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email })
+          const storefront_url = row && row.storefront_url ? String(row.storefront_url) : ''
+          res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, storefront_url })
         } finally {
           await client.end().catch(() => {})
         }
@@ -4599,6 +4601,7 @@ async function start() {
           : undefined
         const platform_name = body.platform_name !== undefined ? (body.platform_name ? String(body.platform_name).trim() : null) : undefined
         const support_email = body.support_email !== undefined ? (body.support_email ? String(body.support_email).trim() : null) : undefined
+        const storefront_url = body.storefront_url !== undefined ? (body.storefront_url ? String(body.storefront_url).trim().replace(/\/$/, '') : null) : undefined
         const announcement_bar_items = body.announcement_bar_items !== undefined
           ? (Array.isArray(body.announcement_bar_items) ? body.announcement_bar_items : null)
           : undefined
@@ -4613,8 +4616,8 @@ async function start() {
         const announcementJson = announcement_bar_items !== undefined ? JSON.stringify(announcement_bar_items) : undefined
         await client.query(
           `INSERT INTO admin_hub_seller_settings (
-             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, updated_at
-           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, now())
+             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, storefront_url, updated_at
+           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, now())
            ON CONFLICT (seller_id) DO UPDATE SET
              store_name = COALESCE($2, admin_hub_seller_settings.store_name),
              free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds),
@@ -4627,8 +4630,9 @@ async function start() {
              platform_name = COALESCE($10, admin_hub_seller_settings.platform_name),
              support_email = COALESCE($11, admin_hub_seller_settings.support_email),
              announcement_bar_items = COALESCE($12::jsonb, admin_hub_seller_settings.announcement_bar_items),
+             storefront_url = COALESCE($13, admin_hub_seller_settings.storefront_url),
              updated_at = now()`,
-          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null]
+          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null, storefront_url]
         )
         await client.end()
         log.info('[sellerSettingsPATCH] saved OK')

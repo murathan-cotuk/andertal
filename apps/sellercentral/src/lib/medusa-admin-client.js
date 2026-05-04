@@ -295,6 +295,7 @@ class MedusaAdminClient {
       sellercentral_favicon_url: res?.sellercentral_favicon_url ?? '',
       shop_logo_height: res?.shop_logo_height != null ? Number(res.shop_logo_height) : 34,
       sellercentral_logo_height: res?.sellercentral_logo_height != null ? Number(res.sellercentral_logo_height) : 30,
+      storefront_url: res?.storefront_url ?? '',
     };
   }
 
