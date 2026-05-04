@@ -16596,29 +16596,59 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
-    // Returns the day-of-month (1-based) of the nth Friday in year/month (month 0-indexed).
+    // Gregorian weekday (0=Sun … 5=Fri) for Y-M-D — timezone-independent.
+    const utcWeekday = (year, month0, day) => new Date(Date.UTC(year, month0, day)).getUTCDay()
+
+    // Day-of-month (1-based) of the nth Friday in year/month (month 0-indexed).
     const nthFridayOfMonth = (year, month, n) => {
-      const dow = new Date(year, month, 1).getDay() // 0=Sun … 6=Sat
-      const offset = (5 - dow + 7) % 7              // days until 1st Friday
+      const dow = utcWeekday(year, month, 1)
+      const offset = (5 - dow + 7) % 7
       return 1 + offset + (n - 1) * 7
     }
 
-    // Returns { is: true, n: 2|4 } when today is the 2nd or 4th Friday, else { is: false }.
-    const isPayoutFridayToday = (d = new Date()) => {
-      if (d.getDay() !== 5) return { is: false }
-      const y = d.getFullYear(), m = d.getMonth(), day = d.getDate()
-      if (day === nthFridayOfMonth(y, m, 2)) return { is: true, n: 2 }
-      if (day === nthFridayOfMonth(y, m, 4)) return { is: true, n: 4 }
+    /** Civil date (Y-M-D) in Europe/Berlin — drives payout calendar regardless of server TZ. */
+    const civilDatePartsBerlin = (instant = new Date()) => {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Berlin',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(instant)
+      let y
+      let mo
+      let da
+      for (const p of parts) {
+        if (p.type === 'year') y = Number(p.value)
+        if (p.type === 'month') mo = Number(p.value) - 1
+        if (p.type === 'day') da = Number(p.value)
+      }
+      return { y, m: mo, d: da }
+    }
+
+    // Returns { is: true, n: 2|4 } when today (Berlin) is the 2nd or 4th Friday, else { is: false }.
+    const isPayoutFridayToday = () => {
+      const { y, m, d } = civilDatePartsBerlin()
+      if (utcWeekday(y, m, d) !== 5) return { is: false }
+      if (d === nthFridayOfMonth(y, m, 2)) return { is: true, n: 2 }
+      if (d === nthFridayOfMonth(y, m, 4)) return { is: true, n: 4 }
       return { is: false }
     }
 
-    const autoPayoutPeriodForDate = (d = new Date()) => {
-      const now = new Date(d)
-      const y = now.getFullYear()
-      const m = now.getMonth()
-      const day = now.getDate()
-      const fri = isPayoutFridayToday(now)
+    /** Orders eligible for seller payout: paid, delivered 14d+, no refund flow / open return. */
+    const payoutEligibleOrderSql = `o.payment_status = 'bezahlt'
+             AND o.delivery_date IS NOT NULL
+             AND o.delivery_date <= now() - interval '14 days'
+             AND COALESCE(o.order_status, '') NOT IN ('storniert', 'refunded', 'retoure', 'retoure_anfrage')
+             AND NOT EXISTS (
+               SELECT 1 FROM store_returns r
+               WHERE r.order_id = o.id
+                 AND COALESCE(r.status, '') NOT IN ('abgelehnt', 'abgeschlossen')
+             )`
+
+    const autoPayoutPeriodForDate = () => {
+      const fri = isPayoutFridayToday()
       if (!fri.is) return null
+      const { y, m, day } = civilDatePartsBerlin()
 
       const mm = String(m + 1).padStart(2, '0')
       const pad = (n) => String(n).padStart(2, '0')
@@ -16629,22 +16659,22 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const prevM = m === 0 ? 11 : m - 1
         const prevY = m === 0 ? y - 1 : y
         const f4prev = nthFridayOfMonth(prevY, prevM, 4)
-        const startDate = new Date(prevY, prevM, f4prev + 1)
-        const periodStart = iso(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+        const sd = new Date(Date.UTC(prevY, prevM, f4prev + 1))
+        const periodStart = iso(sd.getUTCFullYear(), sd.getUTCMonth(), sd.getUTCDate())
         const periodEnd = iso(y, m, day)
         return { runKey: `AUTO-${y}-${mm}-F2`, periodStart, periodEnd }
       }
       // fri.n === 4
       // Period: (2nd Friday of this month + 1) → 4th Friday of this month
       const f2 = nthFridayOfMonth(y, m, 2)
-      const startDate = new Date(y, m, f2 + 1)
-      const periodStart = iso(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+      const sd = new Date(Date.UTC(y, m, f2 + 1))
+      const periodStart = iso(sd.getUTCFullYear(), sd.getUTCMonth(), sd.getUTCDate())
       const periodEnd = iso(y, m, day)
       return { runKey: `AUTO-${y}-${mm}-F4`, periodStart, periodEnd }
     }
 
     const runAutomaticPayoutsIfDue = async () => {
-      const period = autoPayoutPeriodForDate(new Date())
+      const period = autoPayoutPeriodForDate()
       if (!period) return
       const client = getDbClient()
       if (!client) return
@@ -16670,9 +16700,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
              ROUND((COALESCE(SUM(o.subtotal_cents), 0)::numeric * (1 - COALESCE(MAX(s.commission_rate), 0.12))))::bigint AS payout_cents
            FROM store_orders o
            LEFT JOIN seller_users s ON s.seller_id = o.seller_id
-           WHERE o.payment_status = 'bezahlt'
-             AND o.delivery_date IS NOT NULL
-             AND o.delivery_date <= now() - interval '14 days'
+           WHERE ${payoutEligibleOrderSql}
              AND o.created_at >= $1::date
              AND o.created_at < ($2::date + interval '1 day')
              AND LOWER(COALESCE(s.approval_status, '')) = 'approved'
@@ -16741,8 +16769,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     }
 
     // Dispatch Stripe Connect transfers for delivered orders after 14 days.
-    // This keeps funds on platform first, then releases seller share on payout-eligible date.
+    // Runs only on the 2nd and 4th Friday (Europe/Berlin), same cadence as IBAN payouts.
     const runStripeConnectTransfersIfDue = async () => {
+      if (!isPayoutFridayToday().is) return
       const client = getDbClient()
       if (!client) return
       try {
@@ -16752,24 +16781,25 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (!secretKey) { await client.end(); return }
         const stripe = new (require('stripe'))(secretKey)
 
-        const due = await client.query(
-          `SELECT id, order_number, seller_id, payment_intent_id, subtotal_cents, cart_id,
-                  COALESCE(checkout_payment_kind, 'stripe') AS checkout_payment_kind,
-                  COALESCE(seller_net_after_commission_cents, 0)::bigint AS seller_net_after_commission_cents
-           FROM store_orders
-           WHERE payment_status = 'bezahlt'
-             AND delivery_date IS NOT NULL
-             AND delivery_date <= now() - interval '14 days'
-             AND (
-               payment_intent_id IS NOT NULL
-               OR COALESCE(checkout_payment_kind, 'stripe') = 'platform_loyalty'
-             )
-             AND COALESCE(stripe_transfer_status, 'legacy_skipped') IN ('pending', 'failed', 'waiting_onboarding')
-           ORDER BY delivery_date ASC
-           LIMIT 200`
-        )
+        for (let batch = 0; batch < 100; batch += 1) {
+          const due = await client.query(
+            `SELECT o.id, o.order_number, o.seller_id, o.payment_intent_id, o.subtotal_cents, o.cart_id,
+                    COALESCE(o.checkout_payment_kind, 'stripe') AS checkout_payment_kind,
+                    COALESCE(o.seller_net_after_commission_cents, 0)::bigint AS seller_net_after_commission_cents
+             FROM store_orders o
+             WHERE ${payoutEligibleOrderSql}
+               AND (
+                 o.payment_intent_id IS NOT NULL
+                 OR COALESCE(o.checkout_payment_kind, 'stripe') = 'platform_loyalty'
+               )
+               AND COALESCE(o.stripe_transfer_status, 'legacy_skipped') IN ('pending', 'failed', 'waiting_onboarding')
+             ORDER BY o.delivery_date ASC
+             LIMIT 200`
+          )
+          const rows = due.rows || []
+          if (!rows.length) break
 
-        for (const row of due.rows || []) {
+          for (const row of rows) {
           const orderId = row.id
           const sellerId = String(row.seller_id || '').trim()
           if (!sellerId || sellerId === 'default') {
@@ -16861,6 +16891,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
               [orderId, String(e?.message || 'Stripe transfer failed')]
             )
           }
+          }
         }
         await client.end()
       } catch (e) {
@@ -16871,9 +16902,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
     // Destination Charges + Manual Payouts: dispatch bank payouts for eligible delivered orders.
     // Orders using the new model have stripe_account_id set (destination charge) and
-    // stripe_payout_status = 'pending'. After 14 days from delivery we create a Stripe payout
-    // on the seller's connected account to move funds from their Stripe balance to their bank.
+    // stripe_payout_status = 'pending'. Same payout Fridays (Berlin) + 14-day / no-return rules as Connect transfers.
     const runStripePayoutsIfDue = async () => {
+      if (!isPayoutFridayToday().is) return
       const client = getDbClient()
       if (!client) return
       try {
@@ -16883,22 +16914,23 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (!secretKey) { await client.end(); return }
         const stripe = new (require('stripe'))(secretKey)
 
-        const due = await client.query(
-          `SELECT o.id, o.order_number, o.seller_id, o.stripe_account_id,
-                  o.subtotal_cents, o.total_cents, o.stripe_application_fee_cents,
-                  s.commission_rate AS seller_commission_rate
-           FROM store_orders o
-           LEFT JOIN seller_users s ON s.seller_id = o.seller_id
-           WHERE o.stripe_payout_status = 'pending'
-             AND o.stripe_account_id IS NOT NULL
-             AND o.payment_status = 'bezahlt'
-             AND o.delivery_date IS NOT NULL
-             AND o.delivery_date <= now() - interval '14 days'
-           ORDER BY o.delivery_date ASC
-           LIMIT 200`
-        )
+        for (let batch = 0; batch < 100; batch += 1) {
+          const due = await client.query(
+            `SELECT o.id, o.order_number, o.seller_id, o.stripe_account_id,
+                    o.subtotal_cents, o.total_cents, o.stripe_application_fee_cents,
+                    s.commission_rate AS seller_commission_rate
+             FROM store_orders o
+             LEFT JOIN seller_users s ON s.seller_id = o.seller_id
+             WHERE o.stripe_payout_status = 'pending'
+               AND o.stripe_account_id IS NOT NULL
+               AND ${payoutEligibleOrderSql}
+             ORDER BY o.delivery_date ASC
+             LIMIT 200`
+          )
+          const rows = due.rows || []
+          if (!rows.length) break
 
-        for (const row of due.rows || []) {
+          for (const row of rows) {
           const orderId = row.id
           const stripeAccountId = row.stripe_account_id
 
@@ -16967,6 +16999,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             )
             console.error(`[stripePayouts] Order #${row.order_number} payout failed:`, e?.message)
           }
+          }
         }
         await client.end()
       } catch (e) {
@@ -16976,10 +17009,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     }
 
     // IBAN payout cron — runs hourly, pays sellers via their IBAN using Stripe Custom accounts
-    // Finds orders: stripe_payout_status='pending', stripe_account_id IS NULL, delivery 14+ days ago
+    // Finds orders: stripe_payout_status='pending', stripe_account_id IS NULL, same eligibility as Connect (14d, no open return)
     // Groups by seller, transfers platform → custom account → IBAN
     const runSellerIbanPayoutsIfDue = async () => {
-      if (!isPayoutFridayToday().is) return   // only execute on 2nd and 4th Friday of each month
+      if (!isPayoutFridayToday().is) return   // 2nd / 4th Friday (Europe/Berlin), same as Connect transfers
       const client = getDbClient()
       if (!client) return
       try {
@@ -17008,9 +17041,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
            JOIN seller_users s ON s.seller_id = o.seller_id
            WHERE o.stripe_payout_status = 'pending'
              AND o.stripe_account_id IS NULL
-             AND o.payment_status = 'bezahlt'
-             AND o.delivery_date IS NOT NULL
-             AND o.delivery_date <= now() - interval '14 days'
+             AND ${payoutEligibleOrderSql}
            GROUP BY o.seller_id, s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email`
         )
 
@@ -17033,7 +17064,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           const guard = await client.query(
             `UPDATE store_orders SET stripe_payout_status = 'processing', updated_at = now()
              WHERE seller_id = $1 AND stripe_payout_status = 'pending' AND stripe_account_id IS NULL
-               AND payment_status = 'bezahlt' AND delivery_date IS NOT NULL AND delivery_date <= now() - interval '14 days'`,
+               AND ${payoutEligibleOrderSql.replace(/\bo\./g, 'store_orders.')}`,
             [seller_id]
           )
           if (!guard.rowCount) continue
