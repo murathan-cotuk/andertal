@@ -6477,6 +6477,45 @@ async function start() {
     }
 
     /**
+     * Recalculate coupon_discount_cents from store_carts.coupon_code and current line totals.
+     * Stale values after qty/item changes caused PI vs order mismatches (Stripe amount ≠ computeCartCheckoutMoney).
+     */
+    const syncCartCouponDiscountFromLines = async (client, cartId, cartMaybe = null) => {
+      const cart = cartMaybe || (await getCartWithItems(client, cartId))
+      if (!cart) return null
+      const items = Array.isArray(cart.items) ? cart.items : []
+      const subtotalCents = items.reduce(
+        (sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1),
+        0,
+      )
+      let sellerId = 'default'
+      try {
+        const firstItem = items[0]
+        if (firstItem && firstItem.product_id) {
+          const sellerRow = await client.query('SELECT seller_id FROM admin_hub_products WHERE id = $1', [firstItem.product_id])
+          if (sellerRow.rows?.[0]?.seller_id) sellerId = sellerRow.rows[0].seller_id
+        }
+      } catch (_) {}
+      let nextCouponCode = cart.coupon_code || null
+      let couponDiscountCents = 0
+      if (nextCouponCode) {
+        const couponRow = await loadValidCouponForSeller(client, sellerId, nextCouponCode)
+        if (!couponRow) {
+          nextCouponCode = null
+          couponDiscountCents = 0
+        } else {
+          nextCouponCode = normalizeCouponCode(couponRow.code)
+          couponDiscountCents = resolveCouponDiscountCents(couponRow, subtotalCents)
+        }
+      }
+      await client.query(
+        'UPDATE store_carts SET coupon_code = $1, coupon_discount_cents = $2, updated_at = now() WHERE id = $3',
+        [nextCouponCode, couponDiscountCents, cartId],
+      )
+      return getCartWithItems(client, cartId)
+    }
+
+    /**
      * @param {import('pg').Client} client
      * @param {{ customerId: string, pointsDelta: number, description: string, source?: string, orderId?: string|null, occurredAt?: string|Date|null, skipBalanceUpdate?: boolean }} opts
      */
@@ -6784,7 +6823,7 @@ async function start() {
           )
         }
         await clearCartBonusReserve(client, cartId)
-        const cart = await getCartWithItems(client, cartId)
+        const cart = await syncCartCouponDiscountFromLines(client, cartId)
         await client.end()
         res.json({ cart })
       } catch (err) {
@@ -6812,7 +6851,7 @@ async function start() {
           if (!up.rows || !up.rows[0]) { await client.end(); return res.status(404).json({ message: 'Line item not found' }) }
         }
         await clearCartBonusReserve(client, cartId)
-        const cart = await getCartWithItems(client, cartId)
+        const cart = await syncCartCouponDiscountFromLines(client, cartId)
         await client.end()
         res.json({ cart })
       } catch (err) {
@@ -6835,7 +6874,7 @@ async function start() {
         const del = await client.query('DELETE FROM store_cart_items WHERE cart_id = $1 AND id = $2 RETURNING id', [cartId, lineId])
         if (!del.rows || !del.rows[0]) { await client.end(); return res.status(404).json({ message: 'Line item not found' }) }
         await clearCartBonusReserve(client, cartId)
-        const cart = await getCartWithItems(client, cartId)
+        const cart = await syncCartCouponDiscountFromLines(client, cartId)
         await client.end()
         res.json({ cart })
       } catch (err) {
@@ -6861,7 +6900,7 @@ async function start() {
         if (!cartExists.rows || !cartExists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
         await client.query('DELETE FROM store_cart_items WHERE cart_id = $1', [cartId])
         await clearCartBonusReserve(client, cartId)
-        const cart = await getCartWithItems(client, cartId)
+        const cart = await syncCartCouponDiscountFromLines(client, cartId)
         await client.end()
         res.json({ cart })
       } catch (err) {
@@ -6919,11 +6958,12 @@ async function start() {
       try {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const cart = await getCartWithItems(client, cartId)
+        let cart = await getCartWithItems(client, cartId)
         if (!cart) {
           await client.end()
           return res.status(404).json({ message: 'Cart not found' })
         }
+        cart = (await syncCartCouponDiscountFromLines(client, cartId, cart)) || cart
 
         const items = Array.isArray(cart.items) ? cart.items : []
         if (!items.length) {
@@ -8780,8 +8820,9 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
 
-        const cart = await getCartWithItems(client, cartId)
+        let cart = await getCartWithItems(client, cartId)
         if (!cart) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
+        cart = (await syncCartCouponDiscountFromLines(client, cartId, cart)) || cart
         const items = Array.isArray(cart.items) ? cart.items : []
         if (!items.length) { await client.end(); return res.status(400).json({ message: 'Cart is empty' }) }
 
