@@ -61,7 +61,11 @@
     "freeShipping": "Ücretsiz",
     "shipping": "Ödeme sayfasında hesaplanır",
     "total": "Toplam",
-    "checkout": "Ödemeye geç"
+    "checkout": "Ödemeye geç",
+    "sellerHeading": "Satıcı",
+    "sellerMarketplace": "Pazar yeri",
+    "sellerFallback": "Satıcı",
+    "sellerSubtotal": "Ara toplam ({name})"
   },
   "checkout": {
     "title": "Ödeme",
@@ -114,7 +118,16 @@
     "methodEps": "EPS",
     "methodP24": "Przelewy24",
     "methodGiropay": "Giropay",
-    "methodSofort": "Sofort"
+    "methodSofort": "Sofort",
+    "sellerHeading": "Satıcı",
+    "sellerMarketplace": "Pazar yeri",
+    "sellerFallback": "Satıcı",
+    "sellerSubtotal": "Ara toplam ({name})",
+    "zeroCheckoutPaymentTitle": "Ödeme — 0 €",
+    "zeroCheckoutExplanation": "Toplam tutar bonus puanlarınız ve/veya kupon ile tamamen karşılanıyor. Stripe üzerinden kart ödemesi alınmaz.",
+    "zeroCheckoutStripeNote": "Stripe: PaymentIntent yok, kart çekimi yok. Pazaryeri siparişi ödendi olarak işaretler (sadakat/indirim). Satıcı ödemeleri, pazar kurallarına göre daha sonra platform Stripe bakiyesinden yapılır.",
+    "zeroCheckoutPlaceOrder": "Siparişi onayla — 0 €",
+    "zeroCheckoutLoginHint": "0 € ödeme için giriş yapmanız gerekir (kart yok)."
   },
   "accountPanel": {
     "hello": "Merhaba, {name}",
@@ -152,7 +165,15 @@
     "total": "Toplam",
     "continueShopping": "Alışverişe devam et",
     "paymentStatus": "Ödeme durumu",
-    "paid": "Ödendi"
+    "paid": "Ödendi",
+    "settlementHeading": "Ödeme ve mahsuplaşma",
+    "paymentFlow": "Ödeme yolu",
+    "paymentFlowStripe": "Kart ile ödeme (Stripe)",
+    "paymentFlowPlatform": "Kartsız (bonus / indirim)",
+    "paidTotal": "Sizin ödediğiniz",
+    "chargedViaStripe": "Stripe ile tahsil edilen",
+    "noStripeCharge": "Stripe tahsilatı yok",
+    "platformCoverage": "Bonus/kupon ile karşılanan (ürün + kargo)"
   },
   "pages": {
     "orders": {

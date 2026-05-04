@@ -170,6 +170,7 @@ export default function OrderConfirmationPage() {
   }, [orderId]);
 
   const items = Array.isArray(order?.items) ? order.items : [];
+  const settlement = order?.settlement_breakdown || null;
 
   return (
     <PageWrap>
@@ -213,6 +214,40 @@ export default function OrderConfirmationPage() {
                 </MetaRow>
               )}
             </Card>
+
+            {settlement && (
+              <Card>
+                <div style={{ fontWeight: 600, color: "#111827", marginBottom: 12, fontSize: "0.9375rem" }}>
+                  {t("settlementHeading")}
+                </div>
+                <MetaRow>
+                  <MetaLabel>{t("paymentFlow")}</MetaLabel>
+                  <span>
+                    {settlement.checkout_payment_kind === "platform_loyalty"
+                      ? t("paymentFlowPlatform")
+                      : t("paymentFlowStripe")}
+                  </span>
+                </MetaRow>
+                <MetaRow>
+                  <MetaLabel>{t("paidTotal")}</MetaLabel>
+                  <span>{formatPriceCents(settlement.customer_paid_cents || 0)} €</span>
+                </MetaRow>
+                <MetaRow>
+                  <MetaLabel>{t("chargedViaStripe")}</MetaLabel>
+                  <span>
+                    {(settlement.stripe_charge_cents || 0) > 0
+                      ? `${formatPriceCents(settlement.stripe_charge_cents)} €`
+                      : t("noStripeCharge")}
+                  </span>
+                </MetaRow>
+                {(settlement.platform_subsidy_cents || 0) > 0 && settlement.checkout_payment_kind === "platform_loyalty" ? (
+                  <MetaRow>
+                    <MetaLabel>{t("platformCoverage")}</MetaLabel>
+                    <span>{formatPriceCents(settlement.platform_subsidy_cents)} €</span>
+                  </MetaRow>
+                ) : null}
+              </Card>
+            )}
 
             {items.length > 0 && (
               <Card>

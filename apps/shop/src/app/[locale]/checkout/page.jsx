@@ -30,6 +30,7 @@ import { normalizeIsoCountryCode } from "@/lib/iso-country";
 import { CHECKOUT_SHIPPING_COUNTRY_LS, CHECKOUT_SHIPPING_MARKET_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
+import { groupCartItemsBySeller } from "@/lib/cart-seller-groups";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
@@ -253,6 +254,35 @@ const SummaryItemLink = styled(Link)`
     color: ${tokens.primary.DEFAULT};
     text-decoration: underline;
   }
+`;
+
+const SummarySellerSection = styled.div`
+  &:not(:first-of-type) {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #f3f4f6;
+  }
+`;
+
+const SummarySellerLabel = styled.div`
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+`;
+
+const SummarySellerSubtotalRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  margin-bottom: 2px;
+  padding-top: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #4b5563;
 `;
 
 const Divider = styled.hr`
@@ -527,7 +557,7 @@ function applyToField(field, value) {
   field.onChange({ target: { value: value ?? "" } });
 }
 
-function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry, shippableCountries, paymentIntentRefreshing = false, paymentMethodTypes = ["card"], paymentMethodLayout = "grid" }) {
+function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry, shippableCountries, paymentIntentRefreshing = false, paymentMethodTypes = ["card"], paymentMethodLayout = "grid" }) {
   const shipList = useMemo(() => shippableCountries || [], [shippableCountries]);
   const pickShipCountry = (raw) => {
     const u = String(raw || "DE").toUpperCase();
@@ -1225,11 +1255,540 @@ function CheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayC
   );
 }
 
+
+function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry, shippableCountries, paymentIntentRefreshing = false }) {
+  const shipList = useMemo(() => shippableCountries || [], [shippableCountries]);
+  const pickShipCountry = (raw) => {
+    const u = String(raw || "DE").toUpperCase();
+    if (!shipList.length) return u;
+    return shipList.some((c) => c.code === u) ? u : shipList[0].code;
+  };
+  /** Latest Versand-land from parent (summary); avoids async customer fetch overwriting GB with default DE */
+  const defaultCountryRef = useRef(defaultCountry);
+  defaultCountryRef.current = defaultCountry;
+  const shipListRef = useRef(shipList);
+  shipListRef.current = shipList;
+  const t = useTranslations("checkout");
+  const router = useRouter();
+  const params = useParams();
+  const locale = params?.locale || "de";
+  const { setCart } = useCart();
+  const { user } = useCustomerAuthHook();
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [shipAddrId, setShipAddrId] = useState("");
+  const [billAddrId, setBillAddrId] = useState("");
+  const [saveNewAddress, setSaveNewAddress] = useState(false);
+
+  const email = useField("");
+  const firstName = useField("");
+  const lastName = useField("");
+  const phone = useField("");
+  const address = useField("");
+  const address2 = useField("");
+  const city = useField("");
+  const postalCode = useField("");
+  const country = useField(defaultCountry || "DE");
+
+  useEffect(() => {
+    if (!defaultCountry) return;
+    applyToField(country, defaultCountry);
+  }, [defaultCountry]);
+
+  useEffect(() => {
+    if (!shipList.length) return;
+    const codes = new Set(shipList.map((c) => c.code));
+    if (!codes.has(billingCountry.value)) applyToField(billingCountry, shipList[0].code);
+  }, [shipList]);
+
+  /** Unchecked = Rechnung wie Lieferadresse; checked = separate Rechnungsadresse erfassen */
+  const [billingSeparateFromShipping, setBillingSeparateFromShipping] = useState(false);
+  const billingSameAsShipping = !billingSeparateFromShipping;
+  const billingAddress = useField("");
+  const billingAddress2 = useField("");
+  const billingCity = useField("");
+  const billingPostalCode = useField("");
+  const billingCountry = useField("DE");
+
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState(null);
+  const payCentsDisplay = amountToPayCents != null ? amountToPayCents : subtotalCents;
+
+  useEffect(() => {
+    if (!user?.id) {
+      setSavedAddresses([]);
+      setShipAddrId("");
+      setBillAddrId("");
+      return;
+    }
+    const token = getToken("customer");
+    if (!token) return;
+    (async () => {
+      const client = getMedusaClient();
+      const me = await client.getCustomer(token);
+      const addrs = me?.customer?.addresses || [];
+      setSavedAddresses(addrs);
+      const c = me?.customer;
+      if (c?.email) applyToField(email, c.email);
+      if (c?.first_name) applyToField(firstName, c.first_name);
+      if (c?.last_name) applyToField(lastName, c.last_name);
+      if (c?.phone) applyToField(phone, c.phone);
+      // Save customer info to cart so it shows in abandoned checkouts
+      if (cartId && (c?.email || c?.first_name || c?.last_name)) {
+        const patch = {};
+        if (c?.email) patch.email = c.email;
+        if (c?.first_name) patch.first_name = c.first_name;
+        if (c?.last_name) patch.last_name = c.last_name;
+        client.patchStoreCart(cartId, patch).catch(() => {});
+      }
+      const list = shipListRef.current;
+      const pickNow = (raw) => {
+        const u = String(raw || "DE").toUpperCase();
+        if (!list.length) return u;
+        return list.some((c) => c.code === u) ? u : list[0].code;
+      };
+      const wantC = pickNow(defaultCountryRef.current);
+      const def = addrs.find((a) => a.is_default_shipping) || addrs[0];
+      if (def?.id) {
+        const defC = pickNow(def.country);
+        if (list.length > 0 && defC !== wantC) {
+          setShipAddrId("");
+        } else {
+          setShipAddrId(def.id);
+          applyToField(address, def.address_line1 || "");
+          applyToField(address2, def.address_line2 || "");
+          applyToField(city, def.city || "");
+          applyToField(postalCode, def.zip_code || "");
+          applyToField(country, defC);
+          onCountryChange?.(defC);
+        }
+      }
+      const defB = addrs.find((a) => a.is_default_billing) || def;
+      if (defB?.id) setBillAddrId(defB.id);
+    })();
+  }, [user?.id]);
+
+
+
+  const validateEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const required = (field) => field.touched && !field.value.trim();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    [email, firstName, lastName, address, city, postalCode, country].forEach((f) => f.onBlur());
+
+    if (!email.value.trim() || !validateEmail(email.value) || !firstName.value.trim() || !lastName.value.trim() || !address.value.trim() || !city.value.trim() || !postalCode.value.trim()) {
+      return;
+    }
+
+    getMedusaClient().patchStoreCart(cartId, {
+      email: email.value.trim(),
+      first_name: firstName.value.trim(),
+      last_name: lastName.value.trim(),
+      phone: phone.value.trim() || undefined,
+    }).catch(() => {});
+
+    const custTok = typeof window !== "undefined" ? getToken("customer") : null;
+    if (!custTok) {
+      setError(t("bonusLogin"));
+      return;
+    }
+
+    setProcessing(true);
+    setError(null);
+
+    try {
+      sessionStorage.setItem(
+        CHECKOUT_SNAPSHOT_KEY,
+        JSON.stringify({
+          cartId,
+          email: email.value.trim(),
+          first_name: firstName.value.trim(),
+          last_name: lastName.value.trim(),
+          phone: phone.value.trim(),
+          address_line1: address.value.trim(),
+          address_line2: address2.value.trim(),
+          city: city.value.trim(),
+          postal_code: postalCode.value.trim(),
+          country: country.value.trim(),
+          billing_same_as_shipping: billingSameAsShipping,
+          billing_address_line1: billingSameAsShipping ? undefined : billingAddress.value.trim(),
+          billing_address_line2: billingSameAsShipping ? undefined : billingAddress2.value.trim(),
+          billing_city: billingSameAsShipping ? undefined : billingCity.value.trim(),
+          billing_postal_code: billingSameAsShipping ? undefined : billingPostalCode.value.trim(),
+          billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
+          save_new_address: saveNewAddress,
+          ship_addr_id: shipAddrId || "",
+          addr_count: savedAddresses.length,
+        }),
+      );
+    } catch (_) {}
+
+    try {
+      const orderHeaders = { "Content-Type": "application/json" };
+      orderHeaders.Authorization = `Bearer ${custTok}`;
+      const res = await fetch("/api/store-orders", {
+        method: "POST",
+        headers: orderHeaders,
+        body: JSON.stringify({
+          cart_id: cartId,
+          shipping_cents: shippingCents ?? 0,
+          email: email.value.trim(),
+          first_name: firstName.value.trim(),
+          last_name: lastName.value.trim(),
+          phone: phone.value.trim(),
+          address_line1: address.value.trim(),
+          address_line2: address2.value.trim(),
+          city: city.value.trim(),
+          postal_code: postalCode.value.trim(),
+          country: country.value.trim(),
+          billing_same_as_shipping: billingSameAsShipping,
+          billing_address_line1: billingSameAsShipping ? undefined : billingAddress.value.trim(),
+          billing_address_line2: billingSameAsShipping ? undefined : billingAddress2.value.trim(),
+          billing_city: billingSameAsShipping ? undefined : billingCity.value.trim(),
+          billing_postal_code: billingSameAsShipping ? undefined : billingPostalCode.value.trim(),
+          billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
+        }),
+      });
+      const data = await res.json();
+      const orderId = data?.order?.id;
+      if (!res.ok || !orderId) {
+        setError(data?.message || t("paymentError"));
+      } else {
+        if (custTok && saveNewAddress && !shipAddrId && address.value.trim()) {
+          try {
+            const client = getMedusaClient();
+            await client.createCustomerAddress(custTok, {
+              address_line1: address.value.trim(),
+              address_line2: address2.value.trim() || null,
+              zip_code: postalCode.value.trim() || null,
+              city: city.value.trim() || null,
+              country: country.value.trim() || "DE",
+              is_default_shipping: savedAddresses.length === 0,
+              is_default_billing: savedAddresses.length === 0,
+            });
+          } catch (_) {}
+        }
+        try {
+          sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY);
+        } catch (_) {}
+        if (typeof window !== "undefined") {
+          try { window.localStorage.removeItem("andertal_cart_id"); } catch (_) {}
+        }
+        setCart(null);
+        router.push(`/${locale}/order/${orderId}`);
+      }
+    } catch (err) {
+      setError(err?.message || t("paymentError"));
+    }
+    setProcessing(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} noValidate>
+      <FormCard style={{ marginBottom: 24 }}>
+        <SectionTitle>{t("contactInfo")}</SectionTitle>
+        <FieldGrid>
+          <CheckoutFormField
+            label={t("email")}
+            field={{
+              ...email,
+              onBlur: (e) => {
+                email.onBlur(e);
+                const v = (e?.target?.value || email.value || "").trim();
+                if (v && validateEmail(v)) {
+                  getMedusaClient().patchStoreCart(cartId, { email: v }).catch(() => {});
+                }
+              },
+            }}
+            type="email"
+            validate={validateEmail}
+            autoComplete="email"
+          />
+          <CheckoutFormField label={t("phone")} field={phone} type="tel" autoComplete="tel" />
+        </FieldGrid>
+        <FieldGrid $cols="1fr 1fr">
+          <CheckoutFormField
+            label={t("firstName")}
+            field={{
+              ...firstName,
+              onBlur: (e) => {
+                firstName.onBlur(e);
+                const v = (e?.target?.value || firstName.value || "").trim();
+                if (v) getMedusaClient().patchStoreCart(cartId, { first_name: v }).catch(() => {});
+              },
+            }}
+            autoComplete="given-name"
+          />
+          <CheckoutFormField
+            label={t("lastName")}
+            field={{
+              ...lastName,
+              onBlur: (e) => {
+                lastName.onBlur(e);
+                const v = (e?.target?.value || lastName.value || "").trim();
+                if (v) getMedusaClient().patchStoreCart(cartId, { last_name: v }).catch(() => {});
+              },
+            }}
+            autoComplete="family-name"
+          />
+        </FieldGrid>
+      </FormCard>
+
+      <FormCard style={{ marginBottom: 24 }}>
+        <SectionTitle>{t("shippingAddress")}</SectionTitle>
+        {savedAddresses.length > 0 && (
+          <FieldWrap style={{ marginBottom: 16 }}>
+            <Label>Gespeicherte Adresse wählen</Label>
+            <select
+              value={shipAddrId}
+              onChange={(e) => {
+                const id = e.target.value;
+                setShipAddrId(id);
+                const a = savedAddresses.find((x) => x.id === id);
+                if (a) {
+                  applyToField(address, a.address_line1 || "");
+                  applyToField(address2, a.address_line2 || "");
+                  applyToField(city, a.city || "");
+                  applyToField(postalCode, a.zip_code || "");
+                  const sc = pickShipCountry(a.country);
+                  applyToField(country, sc);
+                  onCountryChange?.(sc);
+                }
+              }}
+              style={{
+                padding: "10px 12px",
+                border: "1px solid #d1d5db",
+                borderRadius: 8,
+                fontSize: "0.9375rem",
+                fontFamily: "inherit",
+                color: "#111827",
+                background: "#fff",
+                width: "100%",
+                maxWidth: "100%",
+                boxSizing: "border-box",
+              }}
+            >
+              <option value="">Neue Adresse eingeben …</option>
+              {savedAddresses.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {[a.label, a.address_line1, a.zip_code, a.city].filter(Boolean).join(" · ")}
+                </option>
+              ))}
+            </select>
+          </FieldWrap>
+        )}
+        <FieldGrid>
+          <CheckoutFormField label={t("address")} field={address} fullWidth autoComplete="street-address" />
+          <CheckoutFormField label={t("address2")} field={address2} fullWidth autoComplete="address-line2" />
+        </FieldGrid>
+        <FieldGrid $cols="1fr 1fr">
+          <CheckoutFormField label={t("postalCode")} field={postalCode} autoComplete="postal-code" />
+          <CheckoutFormField label={t("city")} field={city} autoComplete="address-level2" />
+        </FieldGrid>
+        <FieldGrid>
+          <FieldWrap>
+            <Label>{t("country")}</Label>
+            {shipList.length === 0 ? (
+              <p style={{ margin: 0, fontSize: "0.875rem", color: "#6b7280" }}>
+                {t("noShippableCountries")}
+              </p>
+            ) : (
+              <select
+                value={shipList.some((c) => c.code === country.value) ? country.value : shipList[0].code}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  country.onChange({ target: { value: v } });
+                  onCountryChange?.(v);
+                }}
+                autoComplete="country"
+                style={{
+                  width: "100%",
+                  maxWidth: "100%",
+                  boxSizing: "border-box",
+                  padding: "10px 12px",
+                  border: "1px solid #d1d5db",
+                  borderRadius: 8,
+                  fontSize: "0.9375rem",
+                  fontFamily: "inherit",
+                  color: "#111827",
+                  background: "#fff",
+                }}
+              >
+                {shipList.map((c) => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+              </select>
+            )}
+          </FieldWrap>
+        </FieldGrid>
+
+        {/* Separate billing address — unchecked: bill to shipping */}
+        <div
+          style={{
+            marginTop: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            minWidth: 0,
+          }}
+        >
+          <CustomCheckbox
+            id="billing-separate"
+            checked={billingSeparateFromShipping}
+            onChange={(e) => setBillingSeparateFromShipping(e.target.checked)}
+            size={18}
+          />
+          <label htmlFor="billing-separate" style={{ fontSize: "0.875rem", color: "#374151", cursor: "pointer", userSelect: "none" }}>
+            {t("billingSeparateFromShipping")}
+          </label>
+        </div>
+      </FormCard>
+
+      {billingSeparateFromShipping && (
+        <FormCard style={{ marginBottom: 24 }}>
+          <SectionTitle>{t("billingAddress")}</SectionTitle>
+          {savedAddresses.length > 0 && (
+            <FieldWrap style={{ marginBottom: 16 }}>
+              <Label>Rechnungsadresse aus Konto</Label>
+              <select
+                value={billAddrId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setBillAddrId(id);
+                  const a = savedAddresses.find((x) => x.id === id);
+                  if (a) {
+                    applyToField(billingAddress, a.address_line1 || "");
+                    applyToField(billingAddress2, a.address_line2 || "");
+                    applyToField(billingCity, a.city || "");
+                    applyToField(billingPostalCode, a.zip_code || "");
+                    applyToField(billingCountry, pickShipCountry(a.country));
+                  }
+                }}
+                style={{
+                  padding: "10px 12px",
+                  border: "1px solid #d1d5db",
+                  borderRadius: 8,
+                  fontSize: "0.9375rem",
+                  fontFamily: "inherit",
+                  color: "#111827",
+                  background: "#fff",
+                  width: "100%",
+                  maxWidth: "100%",
+                  boxSizing: "border-box",
+                }}
+              >
+                <option value="">Andere Rechnungsadresse eingeben …</option>
+                {savedAddresses.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {[a.label, a.address_line1, a.zip_code, a.city].filter(Boolean).join(" · ")}
+                  </option>
+                ))}
+              </select>
+            </FieldWrap>
+          )}
+          <FieldGrid>
+            <CheckoutFormField label={t("address")} field={billingAddress} fullWidth autoComplete="billing street-address" />
+            <CheckoutFormField label={t("address2")} field={billingAddress2} fullWidth autoComplete="billing address-line2" />
+          </FieldGrid>
+          <FieldGrid $cols="1fr 1fr">
+            <CheckoutFormField label={t("postalCode")} field={billingPostalCode} autoComplete="billing postal-code" />
+            <CheckoutFormField label={t("city")} field={billingCity} autoComplete="billing address-level2" />
+          </FieldGrid>
+          <FieldGrid>
+            <FieldWrap>
+              <Label>{t("country")}</Label>
+              {shipList.length === 0 ? (
+                <p style={{ margin: 0, fontSize: "0.875rem", color: "#6b7280" }}>{t("noShippableCountries")}</p>
+              ) : (
+                <select
+                  value={shipList.some((c) => c.code === billingCountry.value) ? billingCountry.value : shipList[0].code}
+                  onChange={(e) => billingCountry.onChange({ target: { value: e.target.value } })}
+                  autoComplete="billing country"
+                  style={{
+                    width: "100%",
+                    maxWidth: "100%",
+                    boxSizing: "border-box",
+                    padding: "10px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: 8,
+                    fontSize: "0.9375rem",
+                    fontFamily: "inherit",
+                    color: "#111827",
+                    background: "#fff",
+                  }}
+                >
+                  {shipList.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
+              )}
+            </FieldWrap>
+          </FieldGrid>
+        </FormCard>
+      )}
+
+      {user?.id && !shipAddrId && (
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              fontSize: "0.875rem",
+              color: "#374151",
+              cursor: "pointer",
+              flexWrap: "wrap",
+              minWidth: 0,
+            }}
+          >
+            <CustomCheckbox
+              checked={saveNewAddress}
+              onChange={(e) => setSaveNewAddress(e.target.checked)}
+              size={18}
+            />
+            {t("saveAddress")}
+          </label>
+        </div>
+      )}
+
+      <FormCard>
+        <SectionTitle>{t("zeroCheckoutPaymentTitle")}</SectionTitle>
+        <p style={{ margin: "0 0 12px", fontSize: "0.875rem", color: "#374151", lineHeight: 1.5 }}>
+          {t("zeroCheckoutExplanation")}
+        </p>
+        <div
+          style={{
+            borderRadius: 8,
+            padding: "12px 14px",
+            background: "#ecfdf5",
+            border: "1px solid #a7f3d0",
+            fontSize: "0.8125rem",
+            color: "#065f46",
+            lineHeight: 1.45,
+            marginBottom: 16,
+          }}
+        >
+          {t("zeroCheckoutStripeNote")}
+        </div>
+        {error && <ErrorBox>{error}</ErrorBox>}
+        <CheckoutSubmitWrapFooter>
+          <PayNowButton type="submit" disabled={processing || paymentIntentRefreshing}>
+            {processing ? t("processing") : paymentIntentRefreshing ? t("processing") : t("zeroCheckoutPlaceOrder")}
+          </PayNowButton>
+        </CheckoutSubmitWrapFooter>
+      </FormCard>
+    </form>
+  );
+}
+
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const locale = useLocale();
   const { cart, subtotalCents, setCart, clearBonusPoints, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
+  const cartBySeller = useMemo(() => groupCartItemsBySeller(items), [items]);
 
   const prefix = useMarketPrefix();
   const marketCountryCode = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
@@ -1298,6 +1857,8 @@ export default function CheckoutPage() {
   const [loadingPI, setLoadingPI] = useState(false);
   const [piError, setPiError] = useState(null);
   const [payCents, setPayCents] = useState(null);
+  /** Bonus/Coupon deckt alles — kein PaymentIntent, Checkout ohne Stripe Elements */
+  const [zeroCheckoutMode, setZeroCheckoutMode] = useState(false);
   const [bonusDraft, setBonusDraft] = useState("");
   const [bonusErr, setBonusErr] = useState("");
   const [balancePoints, setBalancePoints] = useState(null);
@@ -1347,6 +1908,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     lastPaymentIntentIdRef.current = null;
+    setZeroCheckoutMode(false);
   }, [cart?.id]);
 
   useEffect(() => {
@@ -1393,6 +1955,7 @@ export default function CheckoutPage() {
       // Force a fresh PaymentIntent whenever bonus changes.
       setClientSecret(null);
       setPayCents(null);
+      setZeroCheckoutMode(false);
       setPiRefreshKey((k) => k + 1);
       // Fetch updated balance in background
       client.getCustomer(tok).then((r2) => {
@@ -1414,6 +1977,7 @@ export default function CheckoutPage() {
       setBonusDraft("");
       setClientSecret(null);
       setPayCents(null);
+      setZeroCheckoutMode(false);
       setPiRefreshKey((k) => k + 1);
     } catch (_) {}
     finally {
@@ -1439,6 +2003,7 @@ export default function CheckoutPage() {
       setCouponDraft(String(newCode || ""));
       setClientSecret(null);
       setPayCents(null);
+      setZeroCheckoutMode(false);
       setPiRefreshKey((k) => k + 1);
     } catch (e) {
       setCouponErr(e?.message || "Coupon konnte nicht angewendet werden.");
@@ -1462,6 +2027,7 @@ export default function CheckoutPage() {
       setCouponDraft("");
       setClientSecret(null);
       setPayCents(null);
+      setZeroCheckoutMode(false);
       setPiRefreshKey((k) => k + 1);
     } catch (e) {
       setCouponErr(e?.message || "Coupon konnte nicht entfernt werden.");
@@ -1471,7 +2037,7 @@ export default function CheckoutPage() {
   };
 
   useEffect(() => {
-    if (!cart?.id || items.length === 0 || !stripePromiseState) return;
+    if (!cart?.id || items.length === 0) return;
 
     const effectiveShippingCents = isFreeShipping ? 0 : (shippingCents ?? 0);
 
@@ -1480,6 +2046,8 @@ export default function CheckoutPage() {
         "payment_intent_client_secret",
       );
       if (returnedSecret) {
+        if (!stripePromiseState) return;
+        setZeroCheckoutMode(false);
         setClientSecret(returnedSecret);
         setPiError(null);
         setLoadingPI(false);
@@ -1508,16 +2076,27 @@ export default function CheckoutPage() {
     })
       .then((r) => r.json())
       .then((data) => {
+        if (data?.zero_checkout) {
+          setZeroCheckoutMode(true);
+          setClientSecret(null);
+          lastPaymentIntentIdRef.current = null;
+          setPiError(null);
+          setPayCents(0);
+          return;
+        }
+        setZeroCheckoutMode(false);
         if (data?.client_secret) {
           setClientSecret(data.client_secret);
           if (data.payment_intent_id) lastPaymentIntentIdRef.current = data.payment_intent_id;
           setPayCents(typeof data.amount_cents === "number" ? data.amount_cents : subtotalCents - bonusDiscountCents - Number(cart?.coupon_discount_cents || 0) + effectiveShippingCents);
         } else {
+          setZeroCheckoutMode(false);
           setPiError(data?.message || t("configError"));
           setPayCents(null);
         }
       })
       .catch(() => {
+        setZeroCheckoutMode(false);
         setPiError(t("configError"));
         setPayCents(null);
       })
@@ -1535,8 +2114,6 @@ export default function CheckoutPage() {
 
         {stripePkLoading && items.length > 0 ? (
           <GlobalPageLoader label={t("processing")} />
-        ) : !stripePromiseState ? (
-          <ErrorBox style={{ maxWidth: 540 }}>{t("configError")}</ErrorBox>
         ) : items.length === 0 ? (
           <div style={{ color: "#6b7280", fontSize: "1rem" }}>
             <Link href="/cart" style={{ color: tokens.primary.DEFAULT }}>{t("backToCart")}</Link>
@@ -1545,36 +2122,52 @@ export default function CheckoutPage() {
           <Layout>
             <SummaryCard>
               <SectionTitle>{t("orderSummary")}</SectionTitle>
-              {items.map((item) => {
-                const productHref = item.product_handle ? `/produkt/${item.product_handle}` : null;
-                const lineTitle = getLocalizedCartLineTitle(item, locale);
-                const row = (
-                  <>
-                    <SummaryThumb>
-                      {item.thumbnail ? (
-                        <img src={resolveImageUrl(item.thumbnail)} alt={lineTitle} />
+              {cartBySeller.map((group) => {
+                const displayName =
+                  group.sellerStoreName ||
+                  (group.sellerId === "default" ? t("sellerMarketplace") : t("sellerFallback"));
+                return (
+                  <SummarySellerSection key={group.sellerId}>
+                    <SummarySellerLabel>
+                      {t("sellerHeading")}: {displayName}
+                    </SummarySellerLabel>
+                    {group.items.map((item) => {
+                      const productHref = item.product_handle ? `/produkt/${item.product_handle}` : null;
+                      const lineTitle = getLocalizedCartLineTitle(item, locale);
+                      const row = (
+                        <>
+                          <SummaryThumb>
+                            {item.thumbnail ? (
+                              <img src={resolveImageUrl(item.thumbnail)} alt={lineTitle} />
+                            ) : (
+                              <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                            )}
+                          </SummaryThumb>
+                          <SummaryItemDetails>
+                            <SummaryItemTitle>
+                              <span>{lineTitle}</span>
+                              {isBestsellerMetadata(item?.product_metadata || {}) && <BestsellerBadge />}
+                            </SummaryItemTitle>
+                            <SummaryItemQty>× {item.quantity}</SummaryItemQty>
+                          </SummaryItemDetails>
+                          <SummaryItemPrice>
+                            {formatPriceCents((item.unit_price_cents || 0) * (item.quantity || 1))} €
+                          </SummaryItemPrice>
+                        </>
+                      );
+                      return productHref ? (
+                        <SummaryItemLink key={item.id} href={productHref} title={lineTitle}>
+                          {row}
+                        </SummaryItemLink>
                       ) : (
-                        <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
-                      )}
-                    </SummaryThumb>
-                    <SummaryItemDetails>
-                      <SummaryItemTitle>
-                        <span>{lineTitle}</span>
-                        {isBestsellerMetadata(item?.product_metadata || {}) && <BestsellerBadge />}
-                      </SummaryItemTitle>
-                      <SummaryItemQty>× {item.quantity}</SummaryItemQty>
-                    </SummaryItemDetails>
-                    <SummaryItemPrice>
-                      {formatPriceCents((item.unit_price_cents || 0) * (item.quantity || 1))} €
-                    </SummaryItemPrice>
-                  </>
-                );
-                return productHref ? (
-                  <SummaryItemLink key={item.id} href={productHref} title={lineTitle}>
-                    {row}
-                  </SummaryItemLink>
-                ) : (
-                  <SummaryItem key={item.id}>{row}</SummaryItem>
+                        <SummaryItem key={item.id}>{row}</SummaryItem>
+                      );
+                    })}
+                    <SummarySellerSubtotalRow>
+                      <span>{t("sellerSubtotal", { name: displayName })}</span>
+                      <span>{formatPriceCents(group.subtotalCents)} €</span>
+                    </SummarySellerSubtotalRow>
+                  </SummarySellerSection>
                 );
               })}
               <Divider />
@@ -1742,12 +2335,33 @@ export default function CheckoutPage() {
                 <span>{t("total")}</span>
                 <span>{formatPriceCents(payCents != null ? payCents : subtotalCents)} €</span>
               </SummaryTotal>
+              {zeroCheckoutMode && !customerToken ? (
+                <p style={{ margin: "12px 0 0", fontSize: "0.8125rem", color: "#b45309", lineHeight: 1.45 }}>
+                  {t("zeroCheckoutLoginHint")}
+                </p>
+              ) : null}
             </SummaryCard>
 
             <div>
               {piError && <ErrorBox style={{ marginBottom: 24 }}>{piError}</ErrorBox>}
               {loadingPI && <GlobalPageLoader label={t("processing")} />}
-              {clientSecret && stripePromiseState && (
+              {!loadingPI && !zeroCheckoutMode && !stripePromiseState ? (
+                <ErrorBox style={{ marginBottom: 24 }}>{t("configError")}</ErrorBox>
+              ) : null}
+              {zeroCheckoutMode && (
+                <ZeroCheckoutForm
+                  cartId={cart.id}
+                  items={items}
+                  subtotalCents={subtotalCents}
+                  amountToPayCents={payCents}
+                  shippingCents={isFreeShipping ? 0 : (shippingCents ?? 0)}
+                  onCountryChange={setShippingCountry}
+                  defaultCountry={shippingCountry}
+                  shippableCountries={shippableCountries}
+                  paymentIntentRefreshing={loadingPI}
+                />
+              )}
+              {!zeroCheckoutMode && clientSecret && stripePromiseState && (
                 <Elements
                   key={`${cart.id}-${clientSecret}`}
                   stripe={stripePromiseState}
@@ -1764,7 +2378,7 @@ export default function CheckoutPage() {
                     },
                   }}
                 >
-                  <CheckoutForm
+                  <StripeCheckoutForm
                     clientSecret={clientSecret}
                     cartId={cart.id}
                     items={items}

@@ -816,6 +816,8 @@ async function start() {
           )
         `).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS bonus_points_redeemed integer NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS checkout_payment_kind varchar(32) NOT NULL DEFAULT 'stripe'`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS seller_net_after_commission_cents integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_shipping_carriers (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -6424,6 +6426,73 @@ async function start() {
       return row
     }
 
+    /** Normalize seller key on cart lines (matches getCartWithItems). */
+    const cartLineSellerKey = (it) => {
+      const s = String(it?.seller_id ?? it?.sellerId ?? '').trim()
+      return s || 'default'
+    }
+
+    /** Subtotal (cents) that a coupon may discount — platform coupons use full cart; seller coupons only that seller's lines. */
+    const couponEligibleSubtotalCents = (items, couponRow) => {
+      if (!couponRow) return 0
+      const list = Array.isArray(items) ? items : []
+      const couponSeller = String(couponRow.seller_id || 'default')
+      if (couponSeller === 'default') {
+        return list.reduce((sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
+      }
+      return list.reduce((sum, it) => {
+        if (cartLineSellerKey(it) !== couponSeller) return sum
+        return sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1)
+      }, 0)
+    }
+
+    /**
+     * Resolve coupon row + discount for the whole cart (multi-seller safe).
+     * Picks among coupons matching the code whose seller_id is on the cart or platform default.
+     */
+    const resolveCartCouponDiscountSync = async (client, items, rawCouponCode) => {
+      const normalizedInput = normalizeCouponCode(rawCouponCode)
+      if (!normalizedInput) {
+        return { nextCouponCode: null, couponDiscountCents: 0, invalid: false }
+      }
+      const list = Array.isArray(items) ? items : []
+      const sellersOnCart = [...new Set(list.map((it) => cartLineSellerKey(it)))]
+      const sellerCandidates = [...new Set([...sellersOnCart, 'default'])]
+      const r = await client.query(
+        `SELECT *
+         FROM admin_hub_coupons
+         WHERE lower(code) = lower($1)
+           AND seller_id = ANY($2::varchar[])
+           AND active = true
+           AND (expires_at IS NULL OR expires_at > now())
+         ORDER BY CASE WHEN seller_id = 'default' THEN 1 ELSE 0 END, seller_id ASC`,
+        [normalizedInput, sellerCandidates],
+      )
+      const candidates = (r.rows || []).filter((row) => {
+        const usageLimit = row.usage_limit == null ? null : Number(row.usage_limit)
+        const usedCount = Number(row.used_count || 0)
+        return !(usageLimit != null && usedCount >= usageLimit)
+      })
+      if (!candidates.length) {
+        return { nextCouponCode: null, couponDiscountCents: 0, invalid: true }
+      }
+      let couponRow =
+        candidates.find((c) => String(c.seller_id || 'default') !== 'default' && sellersOnCart.includes(String(c.seller_id))) ||
+        candidates.find((c) => String(c.seller_id || 'default') === 'default') ||
+        candidates[0]
+      const eligible = couponEligibleSubtotalCents(list, couponRow)
+      const couponSeller = String(couponRow.seller_id || 'default')
+      if (couponSeller !== 'default' && eligible <= 0) {
+        return { nextCouponCode: null, couponDiscountCents: 0, invalid: true }
+      }
+      const couponDiscountCents = resolveCouponDiscountCents(couponRow, eligible)
+      return {
+        nextCouponCode: normalizeCouponCode(couponRow.code),
+        couponDiscountCents,
+        invalid: false,
+      }
+    }
+
     const bonusPointsEarnedFromOrderPaidCents = (paidCents) =>
       Math.ceil(Number(paidCents || 0) / 100)
 
@@ -6433,6 +6502,48 @@ async function start() {
       if (Number.isFinite(sub) && sub > 0) return Math.round(sub)
       const tot = row.total_cents != null ? Number(row.total_cents) : 0
       return Math.max(0, Math.round(tot))
+    }
+
+    /** Komisyon her zaman sepet (ürün) tutarı üzerinden — müşterinin ödediği total_cents veya bonus/kupon sonrası net üzerinden değil. */
+    const platformCommissionCentsFromMerchandise = (orderRow, commissionRate) => {
+      const basis = sellerOrderRevenueBasisCents(orderRow)
+      const r = Number(commissionRate ?? 0.12)
+      const rate = Number.isFinite(r) && r >= 0 ? r : 0.12
+      return Math.max(0, Math.round(basis * rate))
+    }
+
+    const resolvePlatformApplicationFeeCents = (orderRow, commissionRate) => {
+      const stored = Number(orderRow.stripe_application_fee_cents)
+      if (Number.isFinite(stored) && stored > 0) return stored
+      return platformCommissionCentsFromMerchandise(orderRow, commissionRate)
+    }
+
+    /** Einheitliche API-Aufschlüsselung für Shop / Seller / Admin (kein Stripe-Geld bei platform_loyalty). */
+    const buildOrderSettlementBreakdown = (orderRow, commissionRateFallback = 0.12) => {
+      const sub = sellerOrderRevenueBasisCents(orderRow)
+      const ship = Math.max(0, Number(orderRow.shipping_cents || 0))
+      const disc = Math.max(0, Number(orderRow.discount_cents || 0))
+      const paid = Math.max(0, resolveOrderPaidTotalCents(orderRow))
+      const commission = resolvePlatformApplicationFeeCents(orderRow, commissionRateFallback)
+      const sellerNetStored = Number(orderRow.seller_net_after_commission_cents)
+      const sellerNet =
+        Number.isFinite(sellerNetStored) && sellerNetStored >= 0
+          ? sellerNetStored
+          : Math.max(0, sub - commission)
+      const kind = String(orderRow.checkout_payment_kind || 'stripe').trim() || 'stripe'
+      const stripeCharged = paid > 0 && kind === 'stripe'
+      const platformSubsidy = Math.max(0, sub + ship - paid)
+      return {
+        checkout_payment_kind: kind,
+        merchandise_subtotal_cents: sub,
+        shipping_cents: ship,
+        discount_total_cents: disc,
+        customer_paid_cents: paid,
+        stripe_charge_cents: stripeCharged ? paid : 0,
+        platform_subsidy_cents: platformSubsidy,
+        platform_commission_cents: commission,
+        seller_net_merchandise_cents: sellerNet,
+      }
     }
 
     const clampCartBonusRedemption = (requestedPoints, balance, subtotalCents) => {
@@ -6484,35 +6595,64 @@ async function start() {
       const cart = cartMaybe || (await getCartWithItems(client, cartId))
       if (!cart) return null
       const items = Array.isArray(cart.items) ? cart.items : []
-      const subtotalCents = items.reduce(
-        (sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1),
-        0,
-      )
-      let sellerId = 'default'
-      try {
-        const firstItem = items[0]
-        if (firstItem && firstItem.product_id) {
-          const sellerRow = await client.query('SELECT seller_id FROM admin_hub_products WHERE id = $1', [firstItem.product_id])
-          if (sellerRow.rows?.[0]?.seller_id) sellerId = sellerRow.rows[0].seller_id
-        }
-      } catch (_) {}
       let nextCouponCode = cart.coupon_code || null
       let couponDiscountCents = 0
       if (nextCouponCode) {
-        const couponRow = await loadValidCouponForSeller(client, sellerId, nextCouponCode)
-        if (!couponRow) {
-          nextCouponCode = null
-          couponDiscountCents = 0
-        } else {
-          nextCouponCode = normalizeCouponCode(couponRow.code)
-          couponDiscountCents = resolveCouponDiscountCents(couponRow, subtotalCents)
-        }
+        const result = await resolveCartCouponDiscountSync(client, items, nextCouponCode)
+        nextCouponCode = result.nextCouponCode
+        couponDiscountCents = result.couponDiscountCents
       }
       await client.query(
         'UPDATE store_carts SET coupon_code = $1, coupon_discount_cents = $2, updated_at = now() WHERE id = $3',
         [nextCouponCode, couponDiscountCents, cartId],
       )
       return getCartWithItems(client, cartId)
+    }
+
+    /**
+     * Sipariş tamamlanırken DB'deki bonus/kupon PI oluşturulurkenki Stripe metadata ile uyumsuz kalabiliyor
+     * (sekme/redirect, PATCH yarışı). Satır ara toplamı metadata ile aynıysa indirimleri metadata'dan geri yaz.
+     */
+    const reconcileCartCheckoutFromPaymentIntent = async (client, cartId, cart, pi) => {
+      const m = pi.metadata && typeof pi.metadata === 'object' ? pi.metadata : {}
+      const metaCartId = String(m.cart_id || '').trim()
+      if (metaCartId && metaCartId !== cartId) {
+        return { ok: false, reason: 'cart_id' }
+      }
+      const lineItems = Array.isArray(cart.items) ? cart.items : []
+      const lineSubtotal = lineItems.reduce(
+        (sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1),
+        0,
+      )
+      const metaSub = parseInt(String(m.subtotal_cents || ''), 10)
+      if (Number.isFinite(metaSub) && metaSub >= 0 && metaSub !== lineSubtotal) {
+        return { ok: false, reason: 'subtotal' }
+      }
+
+      const metaBonusRaw = parseInt(String(m.bonus_points_redeemed != null ? m.bonus_points_redeemed : ''), 10)
+      const bonusPts =
+        Number.isFinite(metaBonusRaw) && metaBonusRaw >= 0
+          ? metaBonusRaw
+          : Number(cart.bonus_points_reserved || 0)
+
+      const metaCouponDiscRaw = parseInt(String(m.coupon_discount_cents != null ? m.coupon_discount_cents : ''), 10)
+      const couponDisc =
+        Number.isFinite(metaCouponDiscRaw) && metaCouponDiscRaw >= 0
+          ? metaCouponDiscRaw
+          : Math.max(0, Number(cart.coupon_discount_cents || 0))
+
+      let couponCode = cart.coupon_code || null
+      if (Object.prototype.hasOwnProperty.call(m, 'coupon_code')) {
+        const rawCc = String(m.coupon_code || '').trim()
+        couponCode = rawCc ? normalizeCouponCode(rawCc) : null
+      }
+
+      await client.query(
+        'UPDATE store_carts SET bonus_points_reserved = $1, coupon_discount_cents = $2, coupon_code = $3, updated_at = now() WHERE id = $4',
+        [bonusPts, couponDisc, couponCode, cartId],
+      )
+      const nextCart = await getCartWithItems(client, cartId)
+      return { ok: true, cart: nextCart }
     }
 
     /**
@@ -6562,10 +6702,13 @@ async function start() {
         `SELECT ci.id, ci.variant_id, ci.product_id, ci.quantity, ci.unit_price_cents, ci.title, ci.thumbnail, ci.product_handle,
          COALESCE(p1.metadata->>'shipping_group_id', p2.metadata->>'shipping_group_id') AS shipping_group_id,
          COALESCE(p1.title, p2.title) AS product_title,
-         COALESCE(p1.metadata, p2.metadata) AS product_metadata
+         COALESCE(p1.metadata, p2.metadata) AS product_metadata,
+         COALESCE(NULLIF(TRIM(ci.seller_id), ''), p1.seller_id, p2.seller_id, 'default') AS seller_id,
+         COALESCE(ss.store_name, '') AS seller_store_name
          FROM store_cart_items ci
          LEFT JOIN admin_hub_products p1 ON p1.id::text = ci.product_id
          LEFT JOIN admin_hub_products p2 ON p1.id IS NULL AND p2.handle = ci.product_handle
+         LEFT JOIN admin_hub_seller_settings ss ON ss.seller_id = COALESCE(NULLIF(TRIM(ci.seller_id), ''), p1.seller_id, p2.seller_id)
          WHERE ci.cart_id = $1 ORDER BY ci.created_at`,
         [cartId]
       )
@@ -6595,6 +6738,8 @@ async function start() {
           shipping_group_id: r.shipping_group_id || null,
           product_title: r.product_title || null,
           product_metadata: metadataOut,
+          seller_id: r.seller_id || 'default',
+          seller_store_name: String(r.seller_store_name || '').trim() || null,
         }
       })
       return {
@@ -6673,17 +6818,6 @@ async function start() {
         const items = Array.isArray(cart.items) ? cart.items : []
         const subtotalCents = items.reduce((sum, it) => sum + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0)
 
-        let sellerId = 'default'
-        try {
-          const firstItem = items[0]
-          if (firstItem && firstItem.product_id) {
-            const sellerRow = await client.query('SELECT seller_id FROM admin_hub_products WHERE id = $1', [firstItem.product_id])
-            if (sellerRow.rows && sellerRow.rows[0] && sellerRow.rows[0].seller_id) {
-              sellerId = sellerRow.rows[0].seller_id
-            }
-          }
-        } catch (_) {}
-
         let reserved = 0
         if (requested > 0) {
           const authHeader = req.headers.authorization || ''
@@ -6708,13 +6842,18 @@ async function start() {
           nextCouponCode = incoming || null
         }
         if (nextCouponCode) {
-          const couponRow = await loadValidCouponForSeller(client, sellerId, nextCouponCode)
-          if (!couponRow) {
-            await client.end()
-            return res.status(400).json({ message: 'Ungültiger oder abgelaufener Coupon-Code' })
+          const result = await resolveCartCouponDiscountSync(client, items, nextCouponCode)
+          if (result.invalid) {
+            if (couponCodeRaw !== undefined) {
+              await client.end()
+              return res.status(400).json({ message: 'Ungültiger oder abgelaufener Coupon-Code' })
+            }
+            nextCouponCode = null
+            couponDiscountCents = 0
+          } else {
+            nextCouponCode = result.nextCouponCode
+            couponDiscountCents = result.couponDiscountCents
           }
-          nextCouponCode = normalizeCouponCode(couponRow.code)
-          couponDiscountCents = resolveCouponDiscountCents(couponRow, subtotalCents)
         }
 
         // Save customer contact info if provided
@@ -6981,11 +7120,23 @@ async function start() {
           shippingCents,
           payTotalCents: payCents,
         } = money
+        const reservedPtsPre = Number(cart.bonus_points_reserved || 0)
         if (payCents <= 0) {
           await client.end()
-          return res.status(400).json({
+          return res.status(200).json({
+            zero_checkout: true,
+            amount_cents: 0,
+            pay_total_cents: 0,
+            subtotal_cents: subtotalCents,
+            shipping_cents: shippingCents,
+            bonus_discount_cents: bonusDiscountCents,
+            coupon_discount_cents: couponDiscountCents,
+            discount_cents: discountCents,
+            coupon_code: cart.coupon_code || null,
+            bonus_points_reserved: reservedPtsPre,
+            requires_customer_auth: true,
             message:
-              'Der Bestellbetrag ist 0 €. Vollständige Bezahlung nur mit Bonuspunkten ist derzeit nicht möglich — bitte Punkte reduzieren oder Artikel hinzufügen.',
+              'Der zu zahlende Betrag ist 0 €. Sie können die Bestellung mit eingelösten Bonuspunkten / Rabatt abschließen (ohne Kartenzahlung).',
           })
         }
 
@@ -7137,7 +7288,11 @@ async function start() {
     // --- Store Orders (Stripe payment success sonrası) ---
     const getOrderWithItems = async (client, orderId) => {
       const oRes = await client.query(
-        `SELECT id, order_number, cart_id, payment_intent_id, status, order_status, payment_status, delivery_status, email, first_name, last_name, phone, address_line1, address_line2, city, postal_code, country, billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping, payment_method, customer_id, is_guest, newsletter_opted_in, subtotal_cents, total_cents, COALESCE(shipping_cents,0) AS shipping_cents, COALESCE(discount_cents,0) AS discount_cents, COALESCE(coupon_discount_cents,0) AS coupon_discount_cents, coupon_code, COALESCE(bonus_points_redeemed,0) AS bonus_points_redeemed, currency, created_at, updated_at FROM store_orders WHERE id = $1`,
+        `SELECT id, order_number, cart_id, payment_intent_id, status, order_status, payment_status, delivery_status, email, first_name, last_name, phone, address_line1, address_line2, city, postal_code, country, billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping, payment_method, customer_id, is_guest, newsletter_opted_in, subtotal_cents, total_cents, COALESCE(shipping_cents,0) AS shipping_cents, COALESCE(discount_cents,0) AS discount_cents, COALESCE(coupon_discount_cents,0) AS coupon_discount_cents, coupon_code, COALESCE(bonus_points_redeemed,0) AS bonus_points_redeemed, currency, created_at, updated_at,
+          COALESCE(checkout_payment_kind, 'stripe') AS checkout_payment_kind,
+          COALESCE(seller_net_after_commission_cents, 0) AS seller_net_after_commission_cents,
+          COALESCE(stripe_application_fee_cents, 0) AS stripe_application_fee_cents
+         FROM store_orders WHERE id = $1`,
         [orderId]
       )
       const oRow = oRes.rows && oRes.rows[0]
@@ -7205,6 +7360,21 @@ async function start() {
         coupon_code: oRow.coupon_code || null,
         bonus_points_redeemed: Number(oRow.bonus_points_redeemed || 0),
         total_cents: resolveOrderPaidTotalCents(oRow),
+        checkout_payment_kind: oRow.checkout_payment_kind || 'stripe',
+        seller_net_after_commission_cents: Number(oRow.seller_net_after_commission_cents || 0),
+        stripe_application_fee_cents: Number(oRow.stripe_application_fee_cents || 0),
+        settlement_breakdown: buildOrderSettlementBreakdown(
+          {
+            subtotal_cents: oRow.subtotal_cents,
+            total_cents: oRow.total_cents,
+            shipping_cents: oRow.shipping_cents,
+            discount_cents: oRow.discount_cents,
+            stripe_application_fee_cents: oRow.stripe_application_fee_cents,
+            checkout_payment_kind: oRow.checkout_payment_kind,
+            seller_net_after_commission_cents: oRow.seller_net_after_commission_cents,
+          },
+          0.12,
+        ),
         currency: oRow.currency,
         created_at: oRow.created_at,
         updated_at: oRow.updated_at,
@@ -8795,9 +8965,7 @@ async function start() {
     const storeOrdersPOST = async (req, res) => {
       const body = req.body || {}
       const cartId = (body.cart_id || body.cartId || '').toString().trim()
-      const paymentIntentId = (body.payment_intent_id || body.paymentIntentId || '').toString().trim()
       if (!cartId) return res.status(400).json({ message: 'cart_id required' })
-      if (!paymentIntentId) return res.status(400).json({ message: 'payment_intent_id required' })
 
       const authHdr = (req.headers.authorization || '').toString()
       const bearerTok = authHdr.startsWith('Bearer ') ? authHdr.slice(7).trim() : ''
@@ -8901,8 +9069,27 @@ async function start() {
           }
         } catch (_) {}
 
-        // Get payment method from Stripe + verify paid amount matches PI snapshot & cart (bonus + Versand)
         const shippingFromBody = Math.max(0, Number(body.shipping_cents || 0))
+        const moneyRoute = computeCartCheckoutMoney(cart, shippingFromBody)
+        const isZeroPayOrder = moneyRoute.payTotalCents === 0
+        const paymentIntentId = (body.payment_intent_id || body.paymentIntentId || '').toString().trim()
+
+        if (!isZeroPayOrder && !paymentIntentId) {
+          await client.end()
+          return res.status(400).json({ message: 'payment_intent_id required' })
+        }
+        if (isZeroPayOrder && !jwtCustomerId) {
+          await client.end()
+          return res.status(401).json({
+            message:
+              'Anmeldung erforderlich für einen 0 €-Checkout (Bonus / Rabatt deckt den gesamten Betrag). Keine Kartenzahlung bei Stripe.',
+          })
+        }
+        if (isZeroPayOrder && paymentIntentId.startsWith('pi_')) {
+          await client.end()
+          return res.status(400).json({ message: 'Ungültige Kombination: 0 €-Checkout darf keine PaymentIntent-ID enthalten.' })
+        }
+
         let shippingCentsOrder = shippingFromBody
         let orderPaidTotalCents = 0
         let paidCentsFromStripe = 0
@@ -8913,11 +9100,34 @@ async function start() {
         let stripeInst = null
         let piStripeAccountId = null   // connected account from destination charge
         let piAppFeeCents = null       // application_fee_amount from destination charge
-        if (secretKey) {
+
+        if (isZeroPayOrder) {
+          orderPaidTotalCents = 0
+          paidCentsFromStripe = 0
+          shippingCentsOrder = shippingFromBody
+          const bDisc = Number(moneyRoute.bonusDiscountCents || 0)
+          const cDisc = Number(moneyRoute.couponDiscountCents || 0)
+          if (bDisc > 0 && cDisc > 0) paymentMethod = 'bonus_points_coupon'
+          else if (bDisc > 0) paymentMethod = 'bonus_points'
+          else if (cDisc > 0) paymentMethod = 'coupon'
+          else paymentMethod = 'promotion'
+        } else if (secretKey) {
           try {
             stripeInst = new (require('stripe'))(secretKey)
             const pi = await stripeInst.paymentIntents.retrieve(paymentIntentId, { expand: ['payment_method'] })
             paidCentsFromStripe = Number(pi.amount)
+
+            const recon = await reconcileCartCheckoutFromPaymentIntent(client, cartId, cart, pi)
+            if (!recon.ok) {
+              await client.end()
+              const msg =
+                recon.reason === 'subtotal'
+                  ? 'Der Warenkorb hat sich seit der Zahlung geändert. Bitte Checkout neu laden.'
+                  : 'Die Zahlung passt nicht zu diesem Warenkorb. Bitte Checkout neu laden.'
+              return res.status(400).json({ message: msg })
+            }
+            cart = recon.cart
+
             const m = pi.metadata || {}
             const snapPay = parseInt(String(m.pay_total_cents || ''), 10)
             const snapShip = parseInt(String(m.shipping_cents_snapshot || ''), 10)
@@ -8963,9 +9173,17 @@ async function start() {
         const discountCents = moneyInsert.discountCents
         const couponDiscountCents = moneyInsert.couponDiscountCents
         const bonusPointsRedeemed = Number(cart.bonus_points_reserved || 0)
-        if (secretKey && moneyInsert.payTotalCents !== paidCentsFromStripe) {
+        if (!isZeroPayOrder && secretKey && moneyInsert.payTotalCents !== paidCentsFromStripe) {
           await client.end()
           return res.status(400).json({ message: 'Zahlungsbetrag stimmt nicht mit dem Warenkorb überein. Bitte Checkout neu laden.' })
+        }
+        if (isZeroPayOrder && moneyInsert.payTotalCents !== 0) {
+          await client.end()
+          return res.status(400).json({ message: 'Warenkorb nicht mehr 0 € — Checkout neu laden.' })
+        }
+        if (isZeroPayOrder && !customerId) {
+          await client.end()
+          return res.status(401).json({ message: 'Kundenkonto für 0 €-Checkout erforderlich.' })
         }
 
         if (bonusPointsRedeemed > 0 && customerId) {
@@ -8977,6 +9195,26 @@ async function start() {
           }
         }
 
+        let sellerCommissionRate = 0.12
+        try {
+          const crR = await client.query(
+            'SELECT commission_rate FROM seller_users WHERE seller_id = $1 LIMIT 1',
+            [sellerId],
+          )
+          if (crR.rows?.[0] && crR.rows[0].commission_rate != null) {
+            sellerCommissionRate = Number(crR.rows[0].commission_rate)
+          }
+        } catch (_) {}
+        const platformFeeMerchandiseBasis = platformCommissionCentsFromMerchandise(
+          { subtotal_cents: subtotalCents, total_cents: orderPaidTotalCents },
+          sellerCommissionRate,
+        )
+
+        const stripeTransferInit = isZeroPayOrder ? 'pending' : 'not_applicable'
+        const checkoutPaymentKind = isZeroPayOrder ? 'platform_loyalty' : 'stripe'
+        const sellerNetMerchandiseCents = Math.max(0, subtotalCents - platformFeeMerchandiseBasis)
+        const paymentIntentForDb = isZeroPayOrder ? null : paymentIntentId
+
         const ins = await client.query(
           `INSERT INTO store_orders
             (cart_id, payment_intent_id, status, seller_id, email, first_name, last_name, phone,
@@ -8985,15 +9223,20 @@ async function start() {
              payment_method, customer_id, is_guest, newsletter_opted_in,
              order_status, payment_status, stripe_transfer_status,
              stripe_account_id, stripe_application_fee_cents, stripe_payout_status,
+             checkout_payment_kind, seller_net_after_commission_cents,
              subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency)
            VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt',
-             'not_applicable',NULL,NULL,'pending',
-             $23,$24,$25,$26,$27,$28,$29,'eur')
+             '${stripeTransferInit}',NULL,$23,'pending',
+             $24,$25,
+             $26,$27,$28,$29,$30,$31,$32,'eur')
            RETURNING id, order_number`,
-          [cartId, paymentIntentId, sellerId, email, first_name, last_name, phone,
+          [cartId, paymentIntentForDb, sellerId, email, first_name, last_name, phone,
            address_line1, address_line2, city, postal_code, country,
            billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billingSame,
            paymentMethod, customerId, isGuest, newsletter_opted_in,
+           platformFeeMerchandiseBasis,
+           checkoutPaymentKind,
+           sellerNetMerchandiseCents,
            subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents]
         )
 
@@ -9002,7 +9245,7 @@ async function start() {
         if (!orderId) { await client.end(); return res.status(500).json({ message: 'Order insert failed' }) }
 
         // Update Stripe payment intent with order number and seller display name (merge metadata — keep PI snapshot keys)
-        if (secretKey && orderNumber) {
+        if (!isZeroPayOrder && secretKey && orderNumber && paymentIntentId) {
           try {
             const stripeForUpdate = stripeInst || new (require('stripe'))(secretKey)
             const curPi = await stripeForUpdate.paymentIntents.retrieve(paymentIntentId)
@@ -15962,6 +16205,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           `SELECT o.id, o.order_number, o.seller_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents,
                   o.payment_status, o.delivery_status, o.delivery_date, o.created_at,
                   o.stripe_transfer_status, o.stripe_transfer_id, o.stripe_transfer_error, o.stripe_transfer_at,
+                  o.payment_intent_id, COALESCE(o.checkout_payment_kind, 'stripe') AS checkout_payment_kind,
+                  o.stripe_application_fee_cents,
+                  COALESCE(o.seller_net_after_commission_cents, 0)::bigint AS seller_net_after_commission_cents,
+                  o.stripe_payout_status, o.stripe_payout_id, o.stripe_account_id,
                   o.first_name, o.last_name, o.email, o.currency,
                   s.store_name, s.commission_rate, s.iban,
                   (o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days') AS payout_eligible
@@ -16007,8 +16254,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           const commRate = parseFloat(row.commission_rate ?? 0.12)
           const sellerBasis = sellerOrderRevenueBasisCents(row)
           const customerPaid = resolveOrderPaidTotalCents(row)
-          const commission = Math.round(sellerBasis * commRate)
-          const payout = sellerBasis - commission
+          const commission = resolvePlatformApplicationFeeCents(row, commRate)
+          const storedNet = Number(row.seller_net_after_commission_cents)
+          const payout =
+            Number.isFinite(storedNet) && storedNet >= 0 ? storedNet : Math.max(0, sellerBasis - commission)
           return {
             id: row.id,
             type: 'order',
@@ -16022,6 +16271,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             commission_rate: commRate,
             commission_cents: commission,
             payout_cents: payout,
+            checkout_payment_kind: row.checkout_payment_kind || 'stripe',
+            payment_intent_id: row.payment_intent_id || null,
+            settlement_breakdown: buildOrderSettlementBreakdown(row, commRate),
             payout_eligible: row.payout_eligible === true || row.payout_eligible === 't',
             payment_status: row.payment_status || 'offen',
             delivery_status: row.delivery_status || null,
@@ -16501,12 +16753,17 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const stripe = new (require('stripe'))(secretKey)
 
         const due = await client.query(
-          `SELECT id, order_number, seller_id, payment_intent_id, subtotal_cents, cart_id
+          `SELECT id, order_number, seller_id, payment_intent_id, subtotal_cents, cart_id,
+                  COALESCE(checkout_payment_kind, 'stripe') AS checkout_payment_kind,
+                  COALESCE(seller_net_after_commission_cents, 0)::bigint AS seller_net_after_commission_cents
            FROM store_orders
            WHERE payment_status = 'bezahlt'
              AND delivery_date IS NOT NULL
              AND delivery_date <= now() - interval '14 days'
-             AND payment_intent_id IS NOT NULL
+             AND (
+               payment_intent_id IS NOT NULL
+               OR COALESCE(checkout_payment_kind, 'stripe') = 'platform_loyalty'
+             )
              AND COALESCE(stripe_transfer_status, 'legacy_skipped') IN ('pending', 'failed', 'waiting_onboarding')
            ORDER BY delivery_date ASC
            LIMIT 200`
@@ -16537,13 +16794,22 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
               continue
             }
 
-            const pi = await stripe.paymentIntents.retrieve(String(row.payment_intent_id), { expand: ['latest_charge'] })
-            const chargeId = typeof pi.latest_charge === 'object' ? pi.latest_charge?.id : pi.latest_charge
-            if (!chargeId) throw new Error('No latest_charge on payment intent')
-
             const commissionRate = Number(s.commission_rate ?? 0.12)
-            const subtotalCents = Number(row.subtotal_cents || 0)
-            const transferAmount = Math.floor(subtotalCents * (1 - commissionRate))
+            const merchBasis = sellerOrderRevenueBasisCents(row)
+            const storedNet = Number(row.seller_net_after_commission_cents || 0)
+            const transferAmount =
+              Number.isFinite(storedNet) && storedNet > 0
+                ? Math.floor(storedNet)
+                : Math.floor(merchBasis * (1 - commissionRate))
+
+            const piIdRaw = row.payment_intent_id ? String(row.payment_intent_id).trim() : ''
+            let chargeId = null
+            if (piIdRaw) {
+              const pi = await stripe.paymentIntents.retrieve(piIdRaw, { expand: ['latest_charge'] })
+              chargeId = typeof pi.latest_charge === 'object' ? pi.latest_charge?.id : pi.latest_charge
+              if (!chargeId) throw new Error('No latest_charge on payment intent')
+            }
+
             if (transferAmount <= 0) {
               await client.query(
                 `UPDATE store_orders SET stripe_transfer_status = 'skipped', stripe_transfer_error = 'Computed transfer amount <= 0', stripe_transfer_at = now(), updated_at = now() WHERE id = $1::uuid`,
@@ -16557,11 +16823,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
               truncateForStripeDescription(xferSellerDisplay) ||
               sellerId
 
-            const tr = await stripe.transfers.create({
+            const transferPayload = {
               amount: transferAmount,
               currency: 'eur',
               destination: s.stripe_account_id,
-              source_transaction: chargeId,
               transfer_group: `cart_${row.cart_id || ''}`,
               description: `Order #${row.order_number || ''} — ${xferSellerLabel}`,
               metadata: {
@@ -16569,8 +16834,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 order_number: String(row.order_number || ''),
                 seller_id: sellerId,
                 seller_name: truncateForStripeDescription(xferSellerDisplay, 500) || xferSellerLabel,
+                checkout_payment_kind: String(row.checkout_payment_kind || 'stripe'),
               },
-            })
+            }
+            if (chargeId) transferPayload.source_transaction = chargeId
+
+            const tr = await stripe.transfers.create(transferPayload)
 
             await client.query(
               `UPDATE store_orders
@@ -16616,8 +16885,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
         const due = await client.query(
           `SELECT o.id, o.order_number, o.seller_id, o.stripe_account_id,
-                  o.subtotal_cents, o.total_cents, o.stripe_application_fee_cents
+                  o.subtotal_cents, o.total_cents, o.stripe_application_fee_cents,
+                  s.commission_rate AS seller_commission_rate
            FROM store_orders o
+           LEFT JOIN seller_users s ON s.seller_id = o.seller_id
            WHERE o.stripe_payout_status = 'pending'
              AND o.stripe_account_id IS NOT NULL
              AND o.payment_status = 'bezahlt'
@@ -16640,10 +16911,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           if (!guard.rowCount) continue // Another process already grabbed it
 
           try {
-            // Payout amount = total paid - platform commission
+            // Auszahlung: Kundenbetrag abzüglich Provision auf WarennZwischensumme (subtotal), nicht auf rabattiertem total_cents.
             const totalCents = Number(row.total_cents || 0)
-            const feeCents = Number(row.stripe_application_fee_cents || 0)
-            const payoutAmount = totalCents - feeCents
+            const feeCents = resolvePlatformApplicationFeeCents(row, row.seller_commission_rate ?? 0.12)
+            const payoutAmount = Math.max(0, totalCents - feeCents)
             if (payoutAmount <= 0) {
               await client.query(
                 `UPDATE store_orders SET stripe_payout_status = 'skipped', updated_at = now() WHERE id = $1::uuid`,
@@ -16726,7 +16997,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
         // Find eligible orders grouped by seller
         const due = await client.query(
-          `SELECT o.seller_id, SUM(o.total_cents) AS total_cents,
+          `SELECT o.seller_id,
+                  SUM(
+                    CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::bigint
+                         ELSE GREATEST(0, COALESCE(o.total_cents, 0))::bigint END
+                  ) AS merchandise_cents,
+                  SUM(o.total_cents) AS customer_paid_cents,
                   s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email
            FROM store_orders o
            JOIN seller_users s ON s.seller_id = o.seller_id
@@ -16739,7 +17015,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         )
 
         for (const row of due.rows || []) {
-          const { seller_id, total_cents, commission_rate, iban, payment_account_holder, email } = row
+          const { seller_id, commission_rate, iban, payment_account_holder, email } = row
           let customAccountId = row.stripe_custom_account_id
 
           if (!iban) {
@@ -16748,9 +17024,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           }
 
           const commissionRate = Number(commission_rate || 0.12)
-          const totalCents = Number(total_cents || 0)
-          const commissionCents = Math.round(totalCents * commissionRate)
-          const payoutCents = totalCents - commissionCents
+          const merchandiseCents = Number(row.merchandise_cents || 0)
+          const commissionCents = Math.round(merchandiseCents * commissionRate)
+          const payoutCents = merchandiseCents - commissionCents
           if (payoutCents <= 50) continue // Stripe minimum payout
 
           // Idempotency: mark all eligible orders as processing first
@@ -18618,9 +18894,14 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
         if (order.stripe_account_id) {
           // ── Destination charge model: create payout on connected account ───
+          const sRateRow = await client.query(
+            'SELECT commission_rate FROM seller_users WHERE seller_id = $1 LIMIT 1',
+            [order.seller_id],
+          )
+          const commRt = Number(sRateRow.rows?.[0]?.commission_rate ?? 0.12)
           const totalCents = Number(order.total_cents || 0)
-          const feeCents = Number(order.stripe_application_fee_cents || Math.round(totalCents * 0.12))
-          const payoutAmount = totalCents - feeCents
+          const feeCents = resolvePlatformApplicationFeeCents(order, commRt)
+          const payoutAmount = Math.max(0, totalCents - feeCents)
           if (payoutAmount <= 0) { await client.end(); return res.status(400).json({ message: 'Payout amount <= 0' }) }
 
           const payout = await stripe.payouts.create(

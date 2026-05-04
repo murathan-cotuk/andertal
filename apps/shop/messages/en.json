@@ -61,7 +61,11 @@
     "freeShipping": "Free",
     "shipping": "Calculated at checkout",
     "total": "Total",
-    "checkout": "Checkout"
+    "checkout": "Checkout",
+    "sellerHeading": "Seller",
+    "sellerMarketplace": "Marketplace",
+    "sellerFallback": "Seller",
+    "sellerSubtotal": "Subtotal ({name})"
   },
   "checkout": {
     "title": "Checkout",
@@ -114,7 +118,16 @@
     "methodEps": "EPS",
     "methodP24": "Przelewy24",
     "methodGiropay": "Giropay",
-    "methodSofort": "Sofort"
+    "methodSofort": "Sofort",
+    "sellerHeading": "Seller",
+    "sellerMarketplace": "Marketplace",
+    "sellerFallback": "Seller",
+    "sellerSubtotal": "Subtotal ({name})",
+    "zeroCheckoutPaymentTitle": "Payment — €0",
+    "zeroCheckoutExplanation": "Your bonus points and/or coupon cover the full amount. No card payment will be processed through Stripe.",
+    "zeroCheckoutStripeNote": "Stripe: no PaymentIntent and no card charge. The marketplace records the order as paid (loyalty/discount). Seller payouts are handled later from the platform Stripe balance per marketplace rules.",
+    "zeroCheckoutPlaceOrder": "Place order — €0",
+    "zeroCheckoutLoginHint": "You must be signed in for €0 checkout (no card payment)."
   },
   "accountPanel": {
     "hello": "Hello, {name}",
@@ -152,7 +165,15 @@
     "total": "Total",
     "continueShopping": "Continue shopping",
     "paymentStatus": "Payment status",
-    "paid": "Paid"
+    "paid": "Paid",
+    "settlementHeading": "Payment & settlement",
+    "paymentFlow": "Payment flow",
+    "paymentFlowStripe": "Card payment (Stripe)",
+    "paymentFlowPlatform": "No card charge (bonus / discount)",
+    "paidTotal": "You paid",
+    "chargedViaStripe": "Charged via Stripe",
+    "noStripeCharge": "No Stripe charge",
+    "platformCoverage": "Covered by bonus/discount (goods + shipping)"
   },
   "pages": {
     "orders": {
