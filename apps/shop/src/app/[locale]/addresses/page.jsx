@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuthGuard, getToken } from "@andertal/lib";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
@@ -150,7 +150,7 @@ export default function AddressesPage() {
           <AccountPageLayout title="Adressen">
             <div>
               {loading ? (
-                <NewtonsCradle />
+                <GlobalPageLoader />
               ) : (
                 <div
                   style={{

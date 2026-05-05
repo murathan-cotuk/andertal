@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@andertal/lib";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -179,7 +179,7 @@ export default function NachrichtenPage() {
           <AccountPageLayout title="Nachrichten">
         <div style={{ flex: 1, minWidth: 0 }}>
           {loading ? (
-            <NewtonsCradle />
+            <GlobalPageLoader />
           ) : threads.length === 0 ? (
             <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 48, textAlign: "center", color: "#9ca3af", fontSize: 14 }}>Noch keine Nachrichten</div>
           ) : selected ? (

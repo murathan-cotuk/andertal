@@ -5,7 +5,7 @@ import styled from "styled-components";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import Footer from "@/components/Footer";
 import { useCart } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
@@ -411,7 +411,7 @@ export default function CartPage() {
       <Main>
         <Title>{t("title")}</Title>
         {loading && items.length === 0 ? (
-          <NewtonsCradle />
+          <GlobalPageLoader />
         ) : items.length === 0 ? (
           <EmptyState>
             <p style={{ fontSize: "1.125rem", marginBottom: 24 }}>{t("empty")}</p>

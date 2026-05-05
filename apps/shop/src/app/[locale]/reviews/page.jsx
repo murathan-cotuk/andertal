@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuthGuard, getToken } from "@andertal/lib";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -172,7 +172,7 @@ export default function ReviewsPage() {
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
           <AccountPageLayout title="Bewertungen">
             <div>
-              {loading && <NewtonsCradle />}
+              {loading && <GlobalPageLoader />}
               {!loading && ordersWithItems.length === 0 && (
                 <p style={{ color: GRAY }}>Noch keine Bestellungen vorhanden.</p>
               )}

@@ -6,7 +6,7 @@ import { useRouter } from "@/i18n/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import ShopHeader from "@/components/ShopHeader";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
@@ -194,7 +194,7 @@ export default function PaymentMethodsPage() {
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
           <AccountPageLayout title="Zahlungsmethoden">
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {loading && <NewtonsCradle />}
+              {loading && <GlobalPageLoader />}
               {err && (
                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: "10px 14px", borderRadius: 8, fontSize: 13 }}>
                   {err}

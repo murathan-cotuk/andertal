@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@andertal/lib";
 import styled from "styled-components";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { Link, useRouter } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -524,7 +524,7 @@ export default function AccountPage() {
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fff" }}>
         <ShopHeader />
         <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <NewtonsCradle />
+          <GlobalPageLoader />
         </main>
         <Footer />
       </div>

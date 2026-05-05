@@ -756,6 +756,7 @@ export default function StylesPage() {
   const [brandingPickerTarget, setBrandingPickerTarget] = useState(null);
   const [headerEditScope, setHeaderEditScope] = useState("standard");
   const [headerBgPickerScope, setHeaderBgPickerScope] = useState(null);
+  const [catalogNavOpen, setCatalogNavOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -922,7 +923,14 @@ export default function StylesPage() {
         <Layout>
           <Layout.Section>
             <Card>
-              <Box paddingBlock="600">
+              <Box
+                style={{
+                  minHeight: "55vh",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
                 <Text as="p" tone="subdued" alignment="center">Laden…</Text>
               </Box>
             </Card>
@@ -1162,40 +1170,75 @@ export default function StylesPage() {
                 onLevelChange={updateTypoLevel}
               />
               <Divider />
-              <Text as="h3" variant="headingSm">
-                Katalog &amp; Navigation
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Unabhängig von H1–H5 im Fließtext (Blog, Produktbeschreibung): Produktname, Listen-Überschriften
-                und Kategorie-Menü separat steuern.
-              </Text>
-              <Divider />
-              <TypographyLevelRow
-                heading="Produkttitel (Produktseite)"
-                levelKey="product_title"
-                typo={styles.typography}
-                families={googleFontList || []}
-                familiesLoading={googleFontsLoading}
-                onLevelChange={updateTypoLevel}
-              />
-              <Divider />
-              <TypographyLevelRow
-                heading="Katalog-Titel (Kategorien, Kollektionen, Marken-Seiten)"
-                levelKey="catalog_title"
-                typo={styles.typography}
-                families={googleFontList || []}
-                familiesLoading={googleFontsLoading}
-                onLevelChange={updateTypoLevel}
-              />
-              <Divider />
-              <TypographyLevelRow
-                heading="Menü: Kategorien-Dropdown"
-                levelKey="menu_catalog"
-                typo={styles.typography}
-                families={googleFontList || []}
-                familiesLoading={googleFontsLoading}
-                onLevelChange={updateTypoLevel}
-              />
+              <button
+                type="button"
+                onClick={() => setCatalogNavOpen((v) => !v)}
+                aria-expanded={catalogNavOpen}
+                aria-controls="catalog-navigation-settings"
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  background: "var(--p-color-bg-surface-secondary)",
+                  border: "1px solid var(--p-color-border)",
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <Text as="span" variant="headingSm">
+                  Katalog &amp; Navigation
+                </Text>
+                <span
+                  aria-hidden
+                  style={{
+                    fontSize: 14,
+                    lineHeight: 1,
+                    transform: catalogNavOpen ? "rotate(90deg)" : "rotate(0deg)",
+                    transition: "transform 160ms ease",
+                  }}
+                >
+                  ▶
+                </span>
+              </button>
+              {catalogNavOpen && (
+                <BlockStack id="catalog-navigation-settings" gap="400">
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Unabhängig von H1–H5 im Fließtext (Blog, Produktbeschreibung): Produktname, Listen-Überschriften
+                    und Kategorie-Menü separat steuern.
+                  </Text>
+                  <Divider />
+                  <TypographyLevelRow
+                    heading="Produkttitel (Produktseite)"
+                    levelKey="product_title"
+                    typo={styles.typography}
+                    families={googleFontList || []}
+                    familiesLoading={googleFontsLoading}
+                    onLevelChange={updateTypoLevel}
+                  />
+                  <Divider />
+                  <TypographyLevelRow
+                    heading="Katalog-Titel (Kategorien, Kollektionen, Marken-Seiten)"
+                    levelKey="catalog_title"
+                    typo={styles.typography}
+                    families={googleFontList || []}
+                    familiesLoading={googleFontsLoading}
+                    onLevelChange={updateTypoLevel}
+                  />
+                  <Divider />
+                  <TypographyLevelRow
+                    heading="Menü: Kategorien-Dropdown"
+                    levelKey="menu_catalog"
+                    typo={styles.typography}
+                    families={googleFontList || []}
+                    familiesLoading={googleFontsLoading}
+                    onLevelChange={updateTypoLevel}
+                  />
+                </BlockStack>
+              )}
             </BlockStack>
           </Card>
         </Layout.Section>

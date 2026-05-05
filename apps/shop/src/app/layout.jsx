@@ -1,5 +1,6 @@
 ﻿import "./globals.css";
 import TrustpilotInviteBootstrap from "@/components/TrustpilotInviteBootstrap";
+import UnhandledRejectionGuard from "@/components/UnhandledRejectionGuard";
 
 /* Safari / iOS status area + first paint: keep in sync with --header-bg fallback in ShopHeader (MIDDLE_BAR_BG) */
 const DEFAULT_STATUS_THEME = "#1b8880";
@@ -73,6 +74,7 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body suppressHydrationWarning>
+        <UnhandledRejectionGuard />
         <TrustpilotInviteBootstrap />
         {children}
       </body>

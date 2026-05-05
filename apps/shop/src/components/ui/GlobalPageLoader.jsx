@@ -1,44 +1,45 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 
-export default function GlobalPageLoader({ label = "Loading..." }) {
+export default function GlobalPageLoader({ label: _label } = {}) {
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={{
-        minHeight: "60vh",
-        width: "100%",
-        display: "grid",
-        placeItems: "center",
-        padding: "48px 16px",
-      }}
-    >
-      <div style={{ display: "grid", placeItems: "center", gap: 14 }}>
+    <>
+      <div
+        role="status"
+        aria-label="Loading"
+        style={{
+          position: "fixed",
+          top: "112px",
+          left: 0,
+          right: 0,
+          height: "3px",
+          zIndex: 9998,
+          backgroundColor: "#1a1a1a",
+          overflow: "hidden",
+        }}
+      >
         <div
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: "999px",
-            border: "3px solid #d1d5db",
-            borderTopColor: "#1b8880",
-            animation: "andertal-spin 0.9s linear infinite",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            height: "100%",
+            width: "0%",
+            borderRadius: "30px",
+            background: "linear-gradient(90deg, #ff0000, #ff4d4d, #ff0000)",
+            boxShadow: "0 0 8px 2px rgba(255,0,0,0.7), 0 0 20px 4px rgba(255,0,0,0.35)",
+            animation: "gpl-move 1s ease-in-out infinite",
           }}
         />
-        <div style={{ fontSize: 14, color: "#6b7280", fontWeight: 500 }}>{label}</div>
       </div>
-      <style jsx>{`
-        @keyframes andertal-spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
+      <style>{`
+        @keyframes gpl-move {
+          0%   { width: 0%;   left: 0;    right: auto; }
+          50%  { width: 100%; left: 0;    right: auto; }
+          100% { width: 0%;   left: auto; right: 0; }
         }
       `}</style>
-    </div>
+    </>
   );
 }
-

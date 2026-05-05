@@ -14,7 +14,7 @@ import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { findShippingGroup, resolveShippingQuoteCents, resolveShippingQuoteStrict } from "@/lib/shipping-price";
@@ -52,19 +52,43 @@ const Container = styled.div`
   }
 `;
 
-const ThreeCol = styled.div`
+/* Two-column outer layout: [gallery sticky] [all content] */
+const PageLayout = styled.div`
   display: grid;
-  grid-template-columns: 0.55fr 1fr 290px;
-  gap: 32px;
-  margin-bottom: 48px;
+  grid-template-columns: 0.55fr 1fr;
+  gap: 24px;
   align-items: start;
   @media (max-width: 1024px) {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
   }
   @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-    gap: 16px;
-    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+`;
+
+const PageRight = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  @media (max-width: 768px) {
+    order: 2;
+  }
+`;
+
+/* Inner two-column: [center info] [buybox] */
+const InnerGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 290px;
+  gap: 24px;
+  margin-bottom: 48px;
+  align-items: start;
+  @media (max-width: 768px) {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 0;
   }
 `;
 
@@ -75,12 +99,12 @@ const GalleryCol = styled.div`
   position: sticky;
   top: 116px;
   margin-left: -40px;
+  align-self: start;
   @media (max-width: 1024px) {
     position: static;
     top: auto;
     margin-left: 0;
   }
-  /* Mobile: gallery first */
   @media (max-width: 768px) {
     order: 1;
   }
@@ -151,13 +175,16 @@ const CenterCol = styled.div`
   flex-direction: column;
   gap: 12px;
   min-height: 200px;
-  /* Mobile: description goes after gallery + buybox for better conversion */
   @media (max-width: 768px) {
     order: 3;
   }
 `;
 
-const Title = styled.h1.attrs({ className: "shop-typo-product-title" })``;
+const Title = styled.h1.attrs({ className: "shop-typo-product-title" })`
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+`;
 
 const DesktopOnly = styled.div`
   display: block;
@@ -344,10 +371,6 @@ const RightCol = styled.div`
   display: flex;
   flex-direction: column;
   gap: 16px;
-  @media (max-width: 1024px) {
-    grid-column: 1 / -1;
-  }
-  /* Mobile: show buybox immediately after gallery (order 2, center col goes last) */
   @media (max-width: 768px) {
     order: 2;
   }
@@ -677,6 +700,7 @@ const DescriptionSection = styled.section`
 
 const ReviewsSection = styled.section`
   margin-bottom: 48px;
+  max-width: 780px;
 `;
 
 function sanitizeHtml(html) {
@@ -1123,7 +1147,7 @@ export default function ProductTemplate() {
       .catch(() => {});
   }, [product?.id, multiOffer?.review_product_ids]);
 
-  if (loading) return <Container><NewtonsCradle /></Container>;
+  if (loading) return <GlobalPageLoader />;
   if (error) return <Container>Fehler: {error}</Container>;
   if (!product) return <Container>Produkt nicht gefunden.</Container>;
 
@@ -1545,8 +1569,8 @@ export default function ProductTemplate() {
         </MobileBadgeCategoryRow>
       </MobileHeaderBlock>
 
-      <ThreeCol>
-        {/* Left: Gallery — sticky until Kunden section */}
+      <PageLayout>
+        {/* Left: Gallery — sticky through descriptions */}
         <GalleryCol>
           <div style={{ position: "relative", width: "100%" }}>
             <MainImageWrap onClick={() => displayImages.length > 0 && setLightboxOpen(true)}>
@@ -1596,6 +1620,8 @@ export default function ProductTemplate() {
           <MobileVariantsWrap>{variantSelectorContent}</MobileVariantsWrap>
         </GalleryCol>
 
+        <PageRight>
+        <InnerGrid>
         {/* Center: Title, brand, reviews, price, variants, bullets, meta */}
         <CenterCol>
           <DesktopOnly>
@@ -1870,119 +1896,121 @@ export default function ProductTemplate() {
             </OtherSellersCard>
           ) : null}
         </RightCol>
-      </ThreeCol>
+        </InnerGrid>
 
-      {(effectiveDescription || product.subtitle) && (
-        <DescriptionSection
-          id="description"
-          dangerouslySetInnerHTML={{
-            __html: sanitizeHtml(effectiveDescription || product.subtitle || "") || "",
-          }}
-        />
-      )}
+        {(effectiveDescription || product.subtitle) && (
+          <DescriptionSection
+            id="description"
+            dangerouslySetInnerHTML={{
+              __html: sanitizeHtml(effectiveDescription || product.subtitle || "") || "",
+            }}
+          />
+        )}
 
-      {(meta.hersteller || meta.hersteller_information || meta.verantwortliche_person_information) && (
-        <DescriptionSection id="produktsicherheit" as="section" style={{ marginTop: 24 }}>
-          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>Produktsicherheitsinformationen</h3>
-          {meta.hersteller && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem" }}><strong>Hersteller:</strong> {String(meta.hersteller)}</p>}
-          {meta.hersteller_information && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Hersteller-Informationen:</strong><br />{String(meta.hersteller_information)}</p>}
-          {meta.verantwortliche_person_information && <p style={{ marginBottom: 0, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Verantwortliche Person (EU):</strong><br />{String(meta.verantwortliche_person_information)}</p>}
-        </DescriptionSection>
-      )}
+        {(meta.hersteller || meta.hersteller_information || meta.verantwortliche_person_information) && (
+          <DescriptionSection id="produktsicherheit" as="section" style={{ marginTop: 24 }}>
+            <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>Produktsicherheitsinformationen</h3>
+            {meta.hersteller && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem" }}><strong>Hersteller:</strong> {String(meta.hersteller)}</p>}
+            {meta.hersteller_information && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Hersteller-Informationen:</strong><br />{String(meta.hersteller_information)}</p>}
+            {meta.verantwortliche_person_information && <p style={{ marginBottom: 0, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Verantwortliche Person (EU):</strong><br />{String(meta.verantwortliche_person_information)}</p>}
+          </DescriptionSection>
+        )}
 
-      {Array.isArray(meta.product_files) && meta.product_files.length > 0 && (
-        <DescriptionSection as="section" style={{ marginTop: 24 }}>
-          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>
-            {{ de: "Dateien", en: "Files", tr: "Dosyalar", fr: "Fichiers", it: "File", es: "Archivos" }[locale] ?? "Dateien"}
-          </h3>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {meta.product_files.map((file, i) => {
-              const url = String(file?.url || "");
-              const resolvedUrl = resolveImageUrl(url);
-              const name = String(file?.name || url.split("/").pop().split("?")[0] || "Datei");
-              const isPdf = url.toLowerCase().includes(".pdf") || String(file?.type || "").toLowerCase().includes("pdf");
-              return (
-                <a
-                  key={i}
-                  href={resolvedUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+        {Array.isArray(meta.product_files) && meta.product_files.length > 0 && (
+          <DescriptionSection as="section" style={{ marginTop: 24 }}>
+            <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>
+              {{ de: "Dateien", en: "Files", tr: "Dosyalar", fr: "Fichiers", it: "File", es: "Archivos" }[locale] ?? "Dateien"}
+            </h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {meta.product_files.map((file, i) => {
+                const url = String(file?.url || "");
+                const resolvedUrl = resolveImageUrl(url);
+                const name = String(file?.name || url.split("/").pop().split("?")[0] || "Datei");
+                const isPdf = url.toLowerCase().includes(".pdf") || String(file?.type || "").toLowerCase().includes("pdf");
+                return (
+                  <a
+                    key={i}
+                    href={resolvedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 7,
+                      padding: "8px 14px", background: "#f9fafb",
+                      border: "1px solid #e5e7eb", borderRadius: 8,
+                      textDecoration: "none", color: "#111827",
+                      fontSize: "0.875rem", fontWeight: 500,
+                    }}
+                  >
+                    <span style={{ fontSize: 15, flexShrink: 0 }}>{isPdf ? "📄" : "📎"}</span>
+                    <span style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                  </a>
+                );
+              })}
+            </div>
+          </DescriptionSection>
+        )}
+
+        <ReviewsSection id="reviews">
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+            <SectionTitle style={{ marginBottom: 0 }}>
+              Kundenbewertungen {reviewCount > 0 && `(${reviewCount})`}
+            </SectionTitle>
+            <a
+              href="https://www.trustpilot.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "none" }}
+              aria-label="Trustpilot"
+            >
+              <TrustpilotWordmark />
+            </a>
+          </div>
+          <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>
+            Bewertungen stammen aus diesem Shop. Darstellung im Trustpilot-Stil. Vollständiges Profil siehe Widget unten.
+          </p>
+          <StarRating average={reviewAvg} count={reviewCount} />
+          {productReviews.length > 0 ? (
+            <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+              {productReviews.map((rv) => (
+                <div
+                  key={rv.id}
                   style={{
-                    display: "inline-flex", alignItems: "center", gap: 7,
-                    padding: "8px 14px", background: "#f9fafb",
-                    border: "1px solid #e5e7eb", borderRadius: 8,
-                    textDecoration: "none", color: "#111827",
-                    fontSize: "0.875rem", fontWeight: 500,
+                    padding: "18px 20px",
+                    background: "#fff",
+                    borderRadius: 4,
+                    border: "1px solid #e5e7eb",
+                    boxShadow: "0 1px 2px rgba(25,25,25,0.06)",
                   }}
                 >
-                  <span style={{ fontSize: 15, flexShrink: 0 }}>{isPdf ? "📄" : "📎"}</span>
-                  <span style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-                </a>
-              );
-            })}
-          </div>
-        </DescriptionSection>
-      )}
-
-      <ReviewsSection id="reviews">
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-          <SectionTitle style={{ marginBottom: 0 }}>
-            Kundenbewertungen {reviewCount > 0 && `(${reviewCount})`}
-          </SectionTitle>
-          <a
-            href="https://www.trustpilot.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ textDecoration: "none" }}
-            aria-label="Trustpilot"
-          >
-            <TrustpilotWordmark />
-          </a>
-        </div>
-        <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>
-          Bewertungen stammen aus diesem Shop. Darstellung im Trustpilot-Stil. Vollständiges Profil siehe Widget unten.
-        </p>
-        <StarRating average={reviewAvg} count={reviewCount} />
-        {productReviews.length > 0 ? (
-          <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-            {productReviews.map((rv) => (
-              <div
-                key={rv.id}
-                style={{
-                  padding: "18px 20px",
-                  background: "#fff",
-                  borderRadius: 4,
-                  border: "1px solid #e5e7eb",
-                  boxShadow: "0 1px 2px rgba(25,25,25,0.06)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-                  <span style={{ fontWeight: 600, fontSize: 14, color: "#191919" }}>
-                    {rv.customer_name || [rv.first_name, rv.last_name].filter(Boolean).join(" ") || "Verifizierter Kauf"}
-                  </span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 16, letterSpacing: 1 }} aria-hidden>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <span key={n} style={{ color: rv.rating >= n ? "#00B67A" : "#dcdce6" }}>★</span>
-                      ))}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: "#191919" }}>
+                      {rv.customer_name || [rv.first_name, rv.last_name].filter(Boolean).join(" ") || "Verifizierter Kauf"}
                     </span>
-                    <span style={{ fontSize: 12, color: "#6b7280" }}>
-                      {new Date(rv.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 16, letterSpacing: 1 }} aria-hidden>
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <span key={n} style={{ color: rv.rating >= n ? "#00B67A" : "#dcdce6" }}>★</span>
+                        ))}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>
+                        {new Date(rv.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                      </span>
+                    </div>
                   </div>
+                  {rv.comment ? <p style={{ margin: 0, fontSize: 14, color: "#191919", lineHeight: 1.65 }}>{rv.comment}</p> : null}
                 </div>
-                {rv.comment ? <p style={{ margin: 0, fontSize: 14, color: "#191919", lineHeight: 1.65 }}>{rv.comment}</p> : null}
-              </div>
-            ))}
-          </div>
-        ) : reviewCount === 0 ? (
-          <p className="text-gray-500 text-sm mt-2">Noch keine Bewertungen vorhanden.</p>
-        ) : null}
-        <TrustpilotTrustBox
-          locale={locale === "en" ? "en-US" : "de-DE"}
-          style={{ marginTop: 28 }}
-        />
-      </ReviewsSection>
+              ))}
+            </div>
+          ) : reviewCount === 0 ? (
+            <p className="text-gray-500 text-sm mt-2">Noch keine Bewertungen vorhanden.</p>
+          ) : null}
+          <TrustpilotTrustBox
+            locale={locale === "en" ? "en-US" : "de-DE"}
+            style={{ marginTop: 28 }}
+          />
+        </ReviewsSection>
+        </PageRight>
+      </PageLayout>
 
       {/* Full width below */}
       {alsoBought.length > 0 && (

@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useRouter, Link } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { getToken } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
@@ -368,7 +368,7 @@ export default function OrderDetailPage() {
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>
         <ShopHeader />
         <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <NewtonsCradle />
+          <GlobalPageLoader />
         </main>
         <Footer />
       </div>

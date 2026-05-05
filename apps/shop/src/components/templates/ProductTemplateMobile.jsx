@@ -14,7 +14,7 @@ import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { useStoreCampaignDiscount } from "@/hooks/useStoreCampaignDiscount";
@@ -1169,7 +1169,7 @@ export default function ProductTemplateMobile() {
     }
   }, [selectedImage]);
 
-  if (loading) return <Container><NewtonsCradle /></Container>;
+  if (loading) return <Container><GlobalPageLoader /></Container>;
   if (error) return <Container>Fehler: {error}</Container>;
   if (!product) return <Container>Produkt nicht gefunden.</Container>;
 

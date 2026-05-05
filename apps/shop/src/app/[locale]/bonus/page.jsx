@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@andertal/lib";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
@@ -105,7 +105,7 @@ export default function BonusPage() {
               <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "14px 10px 14px", marginBottom: 24 }}>
                 <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 12px", paddingLeft: 4 }}>Verlauf</h2>
                 {loading ? (
-                  <NewtonsCradle />
+                  <GlobalPageLoader />
                 ) : ledger.length === 0 ? (
                   <p style={{ color: GRAY, margin: 0 }}>Noch keine Einträge.</p>
                 ) : (

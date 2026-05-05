@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import NewtonsCradle from "@/components/NewtonsCradle";
+import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { useAuthGuard, getToken } from "@andertal/lib";
 import { Link } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
@@ -645,7 +645,7 @@ export default function OrdersPage() {
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
           <AccountPageLayout title="Meine Bestellungen">
             <div>
-              {loading && <NewtonsCradle />}
+              {loading && <GlobalPageLoader />}
 
               {error && (
                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: "12px 16px", borderRadius: 10, fontSize: 13 }}>
