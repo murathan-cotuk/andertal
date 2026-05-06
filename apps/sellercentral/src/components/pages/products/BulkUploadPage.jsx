@@ -1,25 +1,13 @@
-﻿"use client";
+"use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import styled from "styled-components";
 import { Card, Button } from "@andertal/ui";
+import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
-const Container = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-`;
-
-const Title = styled.h1`
-  font-size: 32px;
-  font-weight: 700;
-  margin-bottom: 32px;
-  color: #1f2937;
-`;
-
-const Section = styled(Card)`
-  padding: 24px;
-  margin-bottom: 24px;
-`;
+const Container = styled.div`max-width: 1200px; margin: 0 auto;`;
+const Title = styled.h1`font-size: 32px; font-weight: 700; margin-bottom: 32px; color: #1f2937;`;
+const Section = styled(Card)`padding: 24px; margin-bottom: 24px;`;
 
 const UploadArea = styled.div`
   border: 2px dashed #d1d5db;
@@ -29,278 +17,248 @@ const UploadArea = styled.div`
   background-color: #f9fafb;
   transition: all 0.2s ease;
   cursor: pointer;
-
-  &:hover {
-    border-color: #0ea5e9;
-    background-color: #f0f9ff;
-  }
-
-  ${({ $isDragging }) =>
-    $isDragging &&
-    `
-    border-color: #0ea5e9;
-    background-color: #f0f9ff;
-  `}
+  &:hover { border-color: #0ea5e9; background-color: #f0f9ff; }
+  ${({ $isDragging }) => $isDragging && `border-color: #0ea5e9; background-color: #f0f9ff;`}
 `;
 
-const UploadIcon = styled.div`
-  font-size: 48px;
-  color: #0ea5e9;
-  margin-bottom: 16px;
-`;
+const CSV_COLUMNS = [
+  "title", "sku", "description", "price", "inventory", "status",
+  "category", "brand", "weight", "ean",
+  "image_url_1", "image_url_2", "image_url_3",
+];
 
-const UploadText = styled.p`
-  font-size: 16px;
-  color: #6b7280;
-  margin-bottom: 8px;
-`;
+const CSV_TEMPLATE_ROW = [
+  "Beispielprodukt", "SKU-001", "Produktbeschreibung", "29.99", "100", "published",
+  "Elektronik", "Musterfirma", "0.5", "4012345678901",
+  "https://example.com/bild1.jpg", "", "",
+];
 
-const UploadHint = styled.p`
-  font-size: 14px;
-  color: #9ca3af;
-`;
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, "").trim());
+  return lines.slice(1).map(line => {
+    const vals = [];
+    let inQuote = false, cur = "";
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQuote = !inQuote; continue; }
+      if (ch === "," && !inQuote) { vals.push(cur); cur = ""; continue; }
+      cur += ch;
+    }
+    vals.push(cur);
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || "").trim(); });
+    return obj;
+  }).filter(r => Object.values(r).some(v => v));
+}
 
-const TemplateSection = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  background-color: #f3f4f6;
-  border-radius: 8px;
-  margin-bottom: 24px;
-`;
-
-const TemplateInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-`;
-
-const TemplateIcon = styled.div`
-  font-size: 24px;
-  color: #0ea5e9;
-`;
-
-const TemplateText = styled.div`
-  h3 {
-    font-size: 16px;
-    font-weight: 600;
-    color: #1f2937;
-    margin: 0 0 4px 0;
-  }
-  p {
-    font-size: 14px;
-    color: #6b7280;
-    margin: 0;
-  }
-`;
-
-const downloadTemplate = () => {
-  // Create Excel template structure
-  const templateData = {
-    headers: [
-      "Title",
-      "SKU",
-      "Description",
-      "Price",
-      "Inventory",
-      "Status",
-      "Category",
-      "Brand",
-      "Weight",
-      "Dimensions",
-      "Image URL 1",
-      "Image URL 2",
-      "Image URL 3",
-    ],
-    sampleRow: [
-      "Sample Product",
-      "sample-product",
-      "This is a sample product description",
-      "29,99",
-      "100",
-      "published",
-      "Electronics",
-      "Sample Brand",
-      "SKU-001",
-      "0,5",
-      "10x10x5",
-      "https://example.com/image1.jpg",
-      "https://example.com/image2.jpg",
-      "https://example.com/image3.jpg",
-    ],
-  };
-
-  // Convert to CSV format
-  const csvContent = [
-    templateData.headers.join(","),
-    templateData.sampleRow.join(","),
-  ].join("\n");
-
-  // Create blob and download
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+function downloadTemplate() {
+  const csvContent = [CSV_COLUMNS.join(","), CSV_TEMPLATE_ROW.join(",")].join("\n");
+  const blob = new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", "product-bulk-upload-template.csv");
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
+  link.href = URL.createObjectURL(blob);
+  link.download = "andertal-produkt-vorlage.csv";
   link.click();
-  document.body.removeChild(link);
+}
+
+const STATUS_COLOR = {
+  created: { bg: "#d1fae5", color: "#065f46" },
+  error:   { bg: "#fee2e2", color: "#991b1b" },
+  skipped: { bg: "#fef3c7", color: "#92400e" },
 };
 
 export default function BulkUploadPage() {
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState(null);
-  const [uploadStatus, setUploadStatus] = useState("");
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null); // array of parsed rows
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [results, setResults] = useState(null);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
+  const handleFile = (f) => {
+    if (!f) return;
+    if (!f.name.endsWith(".csv")) { setError("Bitte eine .csv Datei hochladen."); return; }
+    setError("");
+    setResults(null);
+    setFile(f);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const rows = parseCSV(e.target.result);
+        setPreview(rows);
+      } catch {
+        setError("CSV konnte nicht gelesen werden.");
+      }
+    };
+    reader.readAsText(f, "utf-8");
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-
-    const file = e.dataTransfer.files[0];
-    if (file && (file.type === "text/csv" || file.name.endsWith(".csv"))) {
-      setUploadedFile(file);
-      setUploadStatus("File ready for upload");
-    } else {
-      setUploadStatus("Please upload a CSV file");
-    }
-  };
-
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file && (file.type === "text/csv" || file.name.endsWith(".csv"))) {
-      setUploadedFile(file);
-      setUploadStatus("File ready for upload");
-    } else {
-      setUploadStatus("Please upload a CSV file");
-    }
+    handleFile(e.dataTransfer.files[0]);
   };
 
   const handleUpload = async () => {
-    if (!uploadedFile) {
-      setUploadStatus("Please select a file first");
-      return;
+    if (!preview?.length) return;
+    setUploading(true);
+    setProgress(0);
+    setResults(null);
+    setError("");
+    try {
+      const client = getMedusaAdminClient();
+      const BATCH = 50;
+      const allResults = [];
+      for (let i = 0; i < preview.length; i += BATCH) {
+        const chunk = preview.slice(i, i + BATCH);
+        const resp = await client.request("/admin-hub/v1/products/bulk-import", {
+          method: "POST",
+          body: JSON.stringify({ rows: chunk }),
+        });
+        if (Array.isArray(resp?.results)) allResults.push(...resp.results);
+        setProgress(Math.round(((i + chunk.length) / preview.length) * 100));
+      }
+      setResults(allResults);
+    } catch (e) {
+      setError(e?.message || "Upload fehlgeschlagen.");
+    } finally {
+      setUploading(false);
+      setProgress(100);
     }
-
-    setUploadStatus("Uploading...");
-    // TODO: Implement actual upload logic with Medusa REST API
-    setTimeout(() => {
-      setUploadStatus("Upload successful! Processing products...");
-    }, 2000);
   };
+
+  const created = results?.filter(r => r.status === "created").length ?? 0;
+  const errors  = results?.filter(r => r.status === "error").length ?? 0;
+  const skipped = results?.filter(r => r.status === "skipped").length ?? 0;
 
   return (
     <Container>
-      <Title>Bulk Product Upload</Title>
+      <Title>Produkte per CSV hochladen</Title>
 
       <Section>
-        <TemplateSection>
-          <TemplateInfo>
-            <TemplateIcon>
-              <i className="fas fa-file-excel" />
-            </TemplateIcon>
-            <TemplateText>
-              <h3>Download Excel Template</h3>
-              <p>Use our template to ensure your product data is formatted correctly</p>
-            </TemplateText>
-          </TemplateInfo>
+        {/* Template download */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", backgroundColor: "#f3f4f6", borderRadius: "8px", marginBottom: "24px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <i className="fas fa-file-csv" style={{ fontSize: "24px", color: "#0ea5e9" }} />
+            <div>
+              <p style={{ margin: 0, fontWeight: 600, color: "#1f2937" }}>CSV-Vorlage herunterladen</p>
+              <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>Spalten: {CSV_COLUMNS.join(", ")}</p>
+            </div>
+          </div>
           <Button onClick={downloadTemplate}>
-            <i className="fas fa-download" style={{ marginRight: "8px" }} />
-            Download Template
+            <i className="fas fa-download" style={{ marginRight: "8px" }} />Vorlage
           </Button>
-        </TemplateSection>
+        </div>
 
-        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
-          Upload Products CSV
-        </h2>
-
+        {/* Drop zone */}
         <UploadArea
           $isDragging={isDragging}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
-          onClick={() => document.getElementById("file-input").click()}
+          onClick={() => fileInputRef.current?.click()}
         >
-          <input
-            id="file-input"
-            type="file"
-            accept=".csv"
-            style={{ display: "none" }}
-            onChange={handleFileSelect}
-          />
-          <UploadIcon>
-            <i className="fas fa-cloud-upload-alt" />
-          </UploadIcon>
-          <UploadText>Drag and drop your CSV file here, or click to browse</UploadText>
-          <UploadHint>CSV files only. Maximum file size: 10MB</UploadHint>
+          <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
+          <i className="fas fa-cloud-upload-alt" style={{ fontSize: "48px", color: "#0ea5e9", marginBottom: "16px", display: "block" }} />
+          <p style={{ fontSize: "16px", color: "#6b7280", margin: "0 0 8px" }}>CSV-Datei hier ablegen oder klicken</p>
+          <p style={{ fontSize: "14px", color: "#9ca3af", margin: 0 }}>Nur .csv – max. 500 Produkte, max. 10 MB</p>
         </UploadArea>
 
-        {uploadedFile && (
-          <div
-            style={{
-              padding: "16px",
-              backgroundColor: "#f0f9ff",
-              borderRadius: "8px",
-              marginTop: "16px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <i className="fas fa-file-csv" style={{ fontSize: "24px", color: "#0ea5e9" }} />
-              <div>
-                <p style={{ margin: 0, fontWeight: "600", color: "#1f2937" }}>{uploadedFile.name}</p>
-                <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>
-                  {(uploadedFile.size / 1024).toFixed(2)} KB
-                </p>
+        {error && (
+          <div style={{ padding: "12px 16px", marginTop: "16px", borderRadius: "8px", backgroundColor: "#fee2e2", color: "#991b1b" }}>{error}</div>
+        )}
+
+        {/* Preview table */}
+        {preview && !results && (
+          <div style={{ marginTop: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <p style={{ margin: 0, fontWeight: 600, color: "#1f2937" }}>{preview.length} Produkte erkannt</p>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <Button onClick={() => { setFile(null); setPreview(null); setError(""); }}>Abbrechen</Button>
+                <Button onClick={handleUpload} disabled={uploading}>
+                  {uploading ? `Hochladen… ${progress}%` : `${preview.length} Produkte importieren`}
+                </Button>
               </div>
             </div>
-            <Button onClick={handleUpload}>
-              <i className="fas fa-upload" style={{ marginRight: "8px" }} />
-              Upload Products
-            </Button>
+            {uploading && (
+              <div style={{ width: "100%", height: "8px", backgroundColor: "#e5e7eb", borderRadius: "4px", marginBottom: "12px" }}>
+                <div style={{ width: `${progress}%`, height: "100%", backgroundColor: "#0ea5e9", borderRadius: "4px", transition: "width 0.3s" }} />
+              </div>
+            )}
+            <div style={{ overflowX: "auto", maxHeight: "320px", overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: "8px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <thead>
+                  <tr style={{ backgroundColor: "#f9fafb", position: "sticky", top: 0 }}>
+                    {["Titel", "SKU", "Preis", "Bestand", "Status", "EAN", "Kategorie", "Marke"].map(h => (
+                      <th key={h} style={{ padding: "8px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.slice(0, 100).map((row, i) => (
+                    <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      {[row.title || row.Title, row.sku || row.SKU, row.price || row.Price, row.inventory || row.Inventory, row.status || row.Status, row.ean || row.EAN, row.category || row.Category, row.brand || row.Brand].map((v, j) => (
+                        <td key={j} style={{ padding: "6px 12px", color: "#374151" }}>{v || "—"}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {preview.length > 100 && <p style={{ padding: "8px 12px", color: "#6b7280", margin: 0 }}>… und {preview.length - 100} weitere Zeilen</p>}
+            </div>
           </div>
         )}
 
-        {uploadStatus && (
-          <div
-            style={{
-              padding: "12px 16px",
-              marginTop: "16px",
-              borderRadius: "8px",
-              backgroundColor: uploadStatus.includes("success") ? "#d1fae5" : "#fef3c7",
-              color: uploadStatus.includes("success") ? "#065f46" : "#92400e",
-            }}
-          >
-            {uploadStatus}
+        {/* Results */}
+        {results && (
+          <div style={{ marginTop: "24px" }}>
+            <div style={{ display: "flex", gap: "16px", marginBottom: "16px", flexWrap: "wrap" }}>
+              {[
+                { label: "Erstellt", count: created, color: "#065f46", bg: "#d1fae5" },
+                { label: "Fehler",   count: errors,  color: "#991b1b", bg: "#fee2e2" },
+                { label: "Übersprungen", count: skipped, color: "#92400e", bg: "#fef3c7" },
+              ].map(s => (
+                <div key={s.label} style={{ padding: "12px 20px", borderRadius: "8px", backgroundColor: s.bg, color: s.color, fontWeight: 600 }}>
+                  {s.count} {s.label}
+                </div>
+              ))}
+            </div>
+            <div style={{ overflowX: "auto", maxHeight: "400px", overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: "8px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <thead>
+                  <tr style={{ backgroundColor: "#f9fafb", position: "sticky", top: 0 }}>
+                    {["Titel", "Status", "Info"].map(h => (
+                      <th key={h} style={{ padding: "8px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 600, color: "#374151" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r, i) => {
+                    const st = STATUS_COLOR[r.status] || {};
+                    return (
+                      <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        <td style={{ padding: "6px 12px", color: "#374151" }}>{r.title || "—"}</td>
+                        <td style={{ padding: "6px 12px" }}>
+                          <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "12px", backgroundColor: st.bg, color: st.color, fontWeight: 600 }}>{r.status}</span>
+                        </td>
+                        <td style={{ padding: "6px 12px", color: "#6b7280" }}>{r.reason || r.id || ""}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: "12px" }}>
+              <Button onClick={() => { setFile(null); setPreview(null); setResults(null); setError(""); setProgress(0); }}>
+                Neuer Upload
+              </Button>
+            </div>
           </div>
         )}
-
-        <div style={{ marginTop: "32px", padding: "20px", backgroundColor: "#f9fafb", borderRadius: "8px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", marginBottom: "12px" }}>
-            Instructions:
-          </h3>
-          <ul style={{ margin: 0, paddingLeft: "20px", color: "#6b7280", lineHeight: "1.8" }}>
-            <li>Download the template CSV file above</li>
-            <li>Fill in your product information following the template format</li>
-            <li>Ensure all required fields (Title, Price, Inventory) are filled</li>
-            <li>Upload the completed CSV file</li>
-            <li>Review and confirm the products before finalizing</li>
-          </ul>
-        </div>
       </Section>
     </Container>
   );
 }
-

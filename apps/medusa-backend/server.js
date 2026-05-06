@@ -4428,6 +4428,79 @@ async function start() {
     httpApp.get('/admin-hub/products/:id', adminHubProductByIdGET)
     httpApp.put('/admin-hub/products/:id', adminHubProductByIdPUT)
     httpApp.delete('/admin-hub/products/:id', adminHubProductByIdDELETE)
+
+    // POST /admin-hub/v1/products/bulk-import — batch create products from CSV rows
+    httpApp.post('/admin-hub/v1/products/bulk-import', requireSellerAuth, async (req, res) => {
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = (!isSuperuser && req.sellerUser?.seller_id) ? String(req.sellerUser.seller_id).trim() : null
+      const rows = Array.isArray(req.body?.rows) ? req.body.rows : []
+      if (!rows.length) return res.status(400).json({ message: 'rows array required' })
+      if (rows.length > 500) return res.status(400).json({ message: 'Max 500 rows per request' })
+
+      const results = []
+      for (const row of rows) {
+        try {
+          const title = String(row.title || row.Title || row.name || '').trim()
+          if (!title) { results.push({ title: '', status: 'skipped', reason: 'Missing title' }); continue }
+
+          const price = parseFloat(String(row.price || row.Price || row['Preis'] || '0').replace(',', '.')) || 0
+          const inventory = parseInt(String(row.inventory || row.Inventory || row['Bestand'] || row['inventory_quantity'] || '0'), 10) || 0
+          const sku = String(row.sku || row.SKU || '').trim() || null
+          const description = String(row.description || row.Description || row['Beschreibung'] || '').trim() || null
+          const status = String(row.status || row.Status || 'draft').toLowerCase()
+          const categoryName = String(row.category || row.Category || row['Kategorie'] || '').trim() || null
+          const brandName = String(row.brand || row.Brand || row['Marke'] || '').trim() || null
+          const weight = parseFloat(String(row.weight || row.Weight || row['Gewicht'] || '0').replace(',', '.')) || null
+          const ean = String(row.ean || row.EAN || row['ean'] || '').trim() || null
+          const imageUrls = [
+            row['image_url_1'] || row['Image URL 1'] || row['image1'] || '',
+            row['image_url_2'] || row['Image URL 2'] || row['image2'] || '',
+            row['image_url_3'] || row['Image URL 3'] || row['image3'] || '',
+          ].map(u => String(u || '').trim()).filter(Boolean)
+
+          const productPayload = {
+            title,
+            sku,
+            description,
+            status: ['published', 'draft', 'archived'].includes(status) ? status : 'draft',
+            price,
+            inventory,
+            seller_id: callerSellerId,
+            metadata: {
+              ...(ean ? { ean } : {}),
+              ...(brandName ? { brand_name: brandName } : {}),
+              ...(categoryName ? { category_name: categoryName } : {}),
+              ...(weight ? { weight } : {}),
+              ...(imageUrls.length ? { media: imageUrls.map(url => ({ url, type: 'image' })) } : {}),
+              seller_id: callerSellerId,
+            },
+          }
+
+          // Use fetch to call own POST /admin-hub/products endpoint (reuse existing creation logic)
+          const backendBase = `http://localhost:${process.env.PORT || 9000}`
+          const authHeader = req.headers.authorization || ''
+          const createRes = await fetch(`${backendBase}/admin-hub/products`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+            body: JSON.stringify(productPayload),
+          })
+          const createData = await createRes.json().catch(() => ({}))
+          if (!createRes.ok) {
+            results.push({ title, status: 'error', reason: createData?.message || `HTTP ${createRes.status}` })
+          } else {
+            results.push({ title, status: 'created', id: createData?.product?.id || createData?.id || null })
+          }
+        } catch (e) {
+          results.push({ title: String(row.title || row.Title || ''), status: 'error', reason: e?.message || 'Unknown error' })
+        }
+      }
+
+      const created = results.filter(r => r.status === 'created').length
+      const errors = results.filter(r => r.status === 'error').length
+      const skipped = results.filter(r => r.status === 'skipped').length
+      res.json({ results, summary: { total: rows.length, created, errors, skipped } })
+    })
+
     // PATCH /admin-hub/products/:id/variants — variant-only update (no GPSR validation)
     httpApp.patch('/admin-hub/products/:id/variants', requireSellerAuth, async (req, res) => {
       try {
@@ -6453,6 +6526,8 @@ async function start() {
     /**
      * Resolve coupon row + discount for the whole cart (multi-seller safe).
      * Picks among coupons matching the code whose seller_id is on the cart or platform default.
+     * Also checks seller_listings so that a seller's coupon works even when their products
+     * are master-products (seller_id = null / 'default' on cart items).
      */
     const resolveCartCouponDiscountSync = async (client, items, rawCouponCode) => {
       const normalizedInput = normalizeCouponCode(rawCouponCode)
@@ -6461,7 +6536,21 @@ async function start() {
       }
       const list = Array.isArray(items) ? items : []
       const sellersOnCart = [...new Set(list.map((it) => cartLineSellerKey(it)))]
-      const sellerCandidates = [...new Set([...sellersOnCart, 'default'])]
+
+      // Also find sellers who have listings for products in this cart (covers master-product case)
+      let sellersViaListings = []
+      try {
+        const productIds = list.map((it) => String(it.product_id || '')).filter(Boolean)
+        if (productIds.length) {
+          const lq = await client.query(
+            `SELECT DISTINCT seller_id FROM admin_hub_seller_listings WHERE product_id = ANY($1::varchar[]) AND status = 'active'`,
+            [productIds]
+          )
+          sellersViaListings = (lq.rows || []).map((r) => String(r.seller_id || '')).filter(Boolean)
+        }
+      } catch (_) {}
+
+      const sellerCandidates = [...new Set([...sellersOnCart, ...sellersViaListings, 'default'])]
       const r = await client.query(
         `SELECT *
          FROM admin_hub_coupons
@@ -6480,13 +6569,25 @@ async function start() {
       if (!candidates.length) {
         return { nextCouponCode: null, couponDiscountCents: 0, invalid: true }
       }
+      // Prefer seller-specific coupon, fall back to platform-wide
+      const allSellerIds = new Set([...sellersOnCart, ...sellersViaListings])
       let couponRow =
-        candidates.find((c) => String(c.seller_id || 'default') !== 'default' && sellersOnCart.includes(String(c.seller_id))) ||
+        candidates.find((c) => String(c.seller_id || 'default') !== 'default' && allSellerIds.has(String(c.seller_id))) ||
         candidates.find((c) => String(c.seller_id || 'default') === 'default') ||
         candidates[0]
-      const eligible = couponEligibleSubtotalCents(list, couponRow)
       const couponSeller = String(couponRow.seller_id || 'default')
-      if (couponSeller !== 'default' && eligible <= 0) {
+      // For seller coupons, compute eligible subtotal using full cart (since master products map to 'default')
+      const eligible = couponSeller === 'default'
+        ? list.reduce((sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
+        : (() => {
+            const direct = couponEligibleSubtotalCents(list, couponRow)
+            if (direct > 0) return direct
+            // Fallback: if seller's products are master products (default seller_id), use full cart
+            return allSellerIds.has(couponSeller) || sellersViaListings.includes(couponSeller)
+              ? list.reduce((sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
+              : 0
+          })()
+      if (eligible <= 0) {
         return { nextCouponCode: null, couponDiscountCents: 0, invalid: true }
       }
       const couponDiscountCents = resolveCouponDiscountCents(couponRow, eligible)
@@ -6822,8 +6923,9 @@ async function start() {
         const items = Array.isArray(cart.items) ? cart.items : []
         const subtotalCents = items.reduce((sum, it) => sum + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0)
 
-        let reserved = 0
-        if (requested > 0) {
+        // Preserve existing bonus_points_reserved if not explicitly provided in this request
+        let reserved = rawReq !== undefined ? 0 : Number(cart.bonus_points_reserved || 0)
+        if (rawReq !== undefined && requested > 0) {
           const authHeader = req.headers.authorization || ''
           const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
           const payload = verifyCustomerToken(token)
@@ -11384,6 +11486,11 @@ async function start() {
       return null
     }
 
+    // Returns order row if the caller has access (direct seller_id match OR via seller listings)
+    const sellerOrderAccessSQL = (isSuperuser) => isSuperuser
+      ? ''
+      : ` AND (seller_id=$2 OR EXISTS (SELECT 1 FROM store_order_items oi WHERE oi.order_id=store_orders.id AND (EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id=oi.product_id AND sl.seller_id=$2) OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text=oi.product_id AND ap.seller_id=$2))))`
+
     const adminHubShipmentEventsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const isSuperuser = req.sellerUser?.is_superuser === true
@@ -11396,7 +11503,7 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const ownerCheck = await client.query(
-          'SELECT id, carrier_name, tracking_number FROM store_orders WHERE id=$1::uuid' + (isSuperuser ? '' : ' AND seller_id=$2'),
+          'SELECT id, carrier_name, tracking_number FROM store_orders WHERE id=$1::uuid' + sellerOrderAccessSQL(isSuperuser),
           isSuperuser ? [id] : [id, callerSellerId]
         )
         if (!ownerCheck.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
@@ -11427,7 +11534,7 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const ownerCheck = await client.query(
-          'SELECT id FROM store_orders WHERE id=$1::uuid' + (isSuperuser ? '' : ' AND seller_id=$2'),
+          'SELECT id FROM store_orders WHERE id=$1::uuid' + sellerOrderAccessSQL(isSuperuser),
           isSuperuser ? [id] : [id, callerSellerId]
         )
         if (!ownerCheck.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
@@ -11461,8 +11568,9 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        const sellerEventAccessSQL = isSuperuser ? '' : ` AND (o.seller_id=$2 OR EXISTS (SELECT 1 FROM store_order_items oi WHERE oi.order_id=o.id AND (EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id=oi.product_id AND sl.seller_id=$2) OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text=oi.product_id AND ap.seller_id=$2))))`
         const ownerCheck = await client.query(
-          `SELECT e.id FROM store_shipment_events e JOIN store_orders o ON o.id=e.order_id WHERE e.id=$1::uuid` + (isSuperuser ? '' : ' AND o.seller_id=$2'),
+          `SELECT e.id FROM store_shipment_events e JOIN store_orders o ON o.id=e.order_id WHERE e.id=$1::uuid` + sellerEventAccessSQL,
           isSuperuser ? [eventId] : [eventId, callerSellerId]
         )
         if (!ownerCheck.rows[0]) { await client.end(); return res.status(404).json({ message: 'Event not found' }) }
@@ -11518,7 +11626,7 @@ async function start() {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const ownerQ = await client.query(
-          'SELECT id, carrier_name, tracking_number, postal_code FROM store_orders WHERE id=$1::uuid' + (isSuperuser ? '' : ' AND seller_id=$2'),
+          'SELECT id, carrier_name, tracking_number, postal_code FROM store_orders WHERE id=$1::uuid' + sellerOrderAccessSQL(isSuperuser),
           isSuperuser ? [id] : [id, callerSellerId]
         )
         if (!ownerQ.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
@@ -12958,41 +13066,47 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
     // ── Landing Page CMS ──────────────────────────────────────────────────
 
-    // Enrich collections_carousel containers with live image_url from DB
+    // Enrich collections_carousel containers with live name + image_url from DB (always refresh)
     const enrichCollectionImages = async (containers, client) => {
       if (!Array.isArray(containers)) return containers
-      // Collect all collection IDs that are missing images
-      const missingIds = new Set()
+      // Collect ALL collection IDs across all carousels (always refresh, not only missing)
+      const allIds = new Set()
       containers.forEach(c => {
         if (c.type === 'collections_carousel' && Array.isArray(c.collections)) {
-          c.collections.forEach(col => { if (!col.image && col.id) missingIds.add(col.id) })
+          c.collections.forEach(col => { if (col.id) allIds.add(String(col.id)) })
         }
       })
-      if (!missingIds.size) return containers
-      // Fetch images for missing IDs
-      const idList = [...missingIds]
-      const placeholders = idList.map((_, i) => `$${i + 1}`).join(',')
-      let imageMap = {}
+      if (!allIds.size) return containers
+      const idList = [...allIds]
+      let collectionMap = {}
       try {
         const res = await client.query(
-          `SELECT id, metadata FROM admin_hub_collections WHERE id::text = ANY($1::text[])`,
+          `SELECT id, title, handle, metadata FROM admin_hub_collections WHERE id::text = ANY($1::text[])`,
           [idList]
         )
         res.rows.forEach(row => {
           const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
-          // Main image only — not banner (carousel cards must match Kollektion “Main image” in Seller)
-          const img = meta.image_url || null
-          if (img) imageMap[row.id] = img
+          collectionMap[String(row.id)] = {
+            title: row.title || null,
+            handle: row.handle || null,
+            image: meta.image_url || null,
+          }
         })
       } catch (_) {}
-      // Inject images into containers
+      // Inject fresh name + image for every collection in carousel
       return containers.map(c => {
         if (c.type !== 'collections_carousel' || !Array.isArray(c.collections)) return c
         return {
           ...c,
           collections: c.collections.map(col => {
-            if (col.image || !imageMap[col.id]) return col
-            return { ...col, image: imageMap[col.id] }
+            const live = collectionMap[String(col.id)]
+            if (!live) return col
+            return {
+              ...col,
+              image: live.image || col.image || null,
+              title: live.title || col.title || null,
+              handle: live.handle || col.handle || null,
+            }
           })
         }
       })
@@ -16204,8 +16318,26 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           params.push(req.query.period_end)
           where.push(`DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) <= $${params.length}::date`)
         }
-        if (filterSellerId) { params.push(filterSellerId); where.push(`o.seller_id = $${params.length}`) }
+        let sellerParamNum = null
+        if (filterSellerId) {
+          params.push(filterSellerId)
+          sellerParamNum = params.length
+          // Match orders directly assigned to this seller OR orders whose items link to this seller via listings/products
+          where.push(`(
+            o.seller_id = $${sellerParamNum}
+            OR EXISTS (
+              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
+                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id = oi.product_id AND sl.seller_id = $${sellerParamNum})
+                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id AND ap.seller_id = $${sellerParamNum})
+              )
+            )
+          )`)
+        }
         const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+        // Join seller_users using the actual seller or falling back to filterSellerId for 'default' orders
+        const sellerJoin = sellerParamNum
+          ? `LEFT JOIN seller_users s ON s.seller_id = CASE WHEN o.seller_id IS NOT NULL AND o.seller_id != 'default' THEN o.seller_id ELSE $${sellerParamNum}::varchar END`
+          : `LEFT JOIN seller_users s ON s.seller_id = o.seller_id`
         const r = await client.query(
           `SELECT o.id, o.order_number, o.seller_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents,
                   o.payment_status, o.delivery_status, o.delivery_date, o.created_at,
@@ -16218,7 +16350,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                   s.store_name, s.commission_rate, s.iban,
                   (o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days') AS payout_eligible
            FROM store_orders o
-           LEFT JOIN seller_users s ON s.seller_id = o.seller_id
+           ${sellerJoin}
            ${whereClause}
            ORDER BY o.created_at DESC
            LIMIT 1000`,
@@ -16227,7 +16359,20 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         // Also fetch returns for this seller in the same time window
         const returnWhere = []
         const returnParams = []
-        if (filterSellerId) { returnParams.push(filterSellerId); returnWhere.push(`o.seller_id = $${returnParams.length}`) }
+        let returnSellerParamNum = null
+        if (filterSellerId) {
+          returnParams.push(filterSellerId)
+          returnSellerParamNum = returnParams.length
+          returnWhere.push(`(
+            o.seller_id = $${returnSellerParamNum}
+            OR EXISTS (
+              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
+                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id = oi.product_id AND sl.seller_id = $${returnSellerParamNum})
+                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id AND ap.seller_id = $${returnSellerParamNum})
+              )
+            )
+          )`)
+        }
         if (req.query.period_start) {
           returnParams.push(req.query.period_start)
           returnWhere.push(`r.created_at >= $${returnParams.length}`)
@@ -16237,6 +16382,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           returnWhere.push(`r.created_at < ($${returnParams.length}::date + interval '1 day')`)
         }
         const returnWhereClause = returnWhere.length ? `WHERE ${returnWhere.join(' AND ')}` : ''
+        const returnSellerJoin = returnSellerParamNum
+          ? `LEFT JOIN seller_users s ON s.seller_id = CASE WHEN o.seller_id IS NOT NULL AND o.seller_id != 'default' THEN o.seller_id ELSE $${returnSellerParamNum}::varchar END`
+          : `LEFT JOIN seller_users s ON s.seller_id = o.seller_id`
         let returnRows = []
         try {
           const rr = await client.query(
@@ -16246,7 +16394,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                     COALESCE((SELECT SUM(ri.refund_amount_cents) FROM return_items ri WHERE ri.return_id = r.id), 0) AS refund_cents
              FROM store_returns r
              LEFT JOIN store_orders o ON o.id = r.order_id
-             LEFT JOIN seller_users s ON s.seller_id = o.seller_id
+             ${returnSellerJoin}
              ${returnWhereClause}
              ORDER BY r.created_at DESC
              LIMIT 500`,
@@ -16486,8 +16634,16 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::bigint ELSE GREATEST(0, COALESCE(o.total_cents, 0))::bigint END
              ) FILTER (WHERE LOWER(TRIM(COALESCE(o.order_status, ''))) = 'refunded'), 0)::bigint AS refund_cents
            FROM store_orders o
-           LEFT JOIN seller_users s ON s.seller_id = o.seller_id
-           WHERE o.seller_id = $1 AND o.payment_status = 'bezahlt' ${dateFilter}`,
+           LEFT JOIN seller_users s ON s.seller_id = CASE WHEN o.seller_id IS NOT NULL AND o.seller_id != 'default' THEN o.seller_id ELSE $1::varchar END
+           WHERE (
+             o.seller_id = $1
+             OR EXISTS (
+               SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
+                 EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id = oi.product_id AND sl.seller_id = $1)
+                 OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id AND ap.seller_id = $1)
+               )
+             )
+           ) AND o.payment_status = 'bezahlt' ${dateFilter}`,
           params
         )
         const row = r.rows[0] || {}
@@ -16948,6 +17104,87 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       runStripePayoutsIfDue().catch(() => {})
       runSellerIbanPayoutsIfDue().catch(() => {})
     }, 60 * 60 * 1000)
+
+    // Background tracking refresh: every 3 hours, refresh DHL tracking for all in-transit orders
+    const runAutoTrackingRefresh = async () => {
+      const client = getDbClient()
+      if (!client) return
+      try {
+        await client.connect()
+        const r = await client.query(
+          `SELECT o.id, o.carrier_name, o.tracking_number, o.postal_code
+           FROM store_orders o
+           WHERE o.tracking_number IS NOT NULL AND o.tracking_number != ''
+             AND o.delivery_status NOT IN ('zugestellt', 'storniert')
+             AND o.created_at > now() - interval '60 days'
+           ORDER BY o.created_at DESC
+           LIMIT 200`
+        )
+        await client.end()
+        for (const order of r.rows) {
+          const cn = String(order.carrier_name || '').toLowerCase().trim()
+          if (!(cn === 'dhl' || cn.startsWith('dhl'))) continue
+          try {
+            // Reuse the tracking logic inline for background job
+            const envDhlKey = (process.env.DHL_API_KEY || process.env.DHL_TRACK_API_KEY || process.env.DHLPARCEL_API_KEY || '').toString().trim()
+            const dbUrl2 = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+            const { Client: PgClient2 } = require('pg')
+            const c2 = new PgClient2({ connectionString: dbUrl2, ssl: dbUrl2.includes('render.com') ? { rejectUnauthorized: false } : false })
+            await c2.connect()
+            const cq = await c2.query('SELECT api_key FROM store_shipping_carriers WHERE LOWER(TRIM(name)) LIKE $1 AND is_active=true LIMIT 1', ['dhl%'])
+            const apiKey = (cq.rows[0]?.api_key && String(cq.rows[0].api_key).trim()) || envDhlKey
+            if (!apiKey) { await c2.end(); continue }
+            const trackingNumber = String(order.tracking_number).trim()
+            const https = require('https')
+            const pc = String(order.postal_code || '').trim().replace(/\s+/g, '')
+            let path = `/track/shipments?trackingNumber=${encodeURIComponent(trackingNumber)}`
+            if (pc) path += `&recipientPostalCode=${encodeURIComponent(pc)}`
+            const dhlData = await new Promise((resolve) => {
+              const req2 = https.request(
+                { hostname: 'api-eu.dhl.com', path, method: 'GET', headers: { 'DHL-API-Key': apiKey, Accept: 'application/json' } },
+                (resp) => {
+                  let body = ''; resp.on('data', (d) => { body += d }); resp.on('end', () => { try { resolve(JSON.parse(body || '{}')); } catch { resolve({}) } })
+                }
+              )
+              req2.on('error', () => resolve({})); req2.end()
+            })
+            const shipment = dhlData?.shipments?.[0] || null
+            const events = Array.isArray(shipment?.events) ? shipment.events : (shipment?.status ? [{ timestamp: shipment.timestamp, status: shipment.status, location: shipment.location }] : [])
+            let mostRecentStatus = null
+            for (const ev of events) {
+              const ts = ev.timestamp ? new Date(ev.timestamp).toISOString() : new Date().toISOString()
+              const addr = ev.location?.address || {}
+              const location = [addr.addressLocality, addr.countryCode].filter(Boolean).join(', ') || null
+              const desc = (ev.description || ev.status?.description || '').trim()
+              const status = mapDhlStatus(ev)
+              mostRecentStatus = status
+              const exists = await c2.query(
+                `SELECT id FROM store_shipment_events WHERE order_id=$1::uuid AND status=$2 AND event_time=$3::timestamptz AND description IS NOT DISTINCT FROM $4 LIMIT 1`,
+                [order.id, status, ts, desc || null]
+              )
+              if (!exists.rows.length) {
+                await c2.query(
+                  `INSERT INTO store_shipment_events (order_id, status, description, location, event_time, source) VALUES ($1::uuid,$2,$3,$4,$5::timestamptz,'auto')`,
+                  [order.id, status, desc || null, location, ts]
+                )
+              }
+            }
+            if (mostRecentStatus === 'zugestellt') {
+              await c2.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date,now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [order.id])
+              await c2.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [order.id])
+            } else if (mostRecentStatus === 'versendet' || mostRecentStatus === 'in_transit') {
+              await c2.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [order.id])
+            }
+            await c2.end()
+          } catch (_) {}
+        }
+      } catch (_) {
+        try { await client.end() } catch (_2) {}
+      }
+    }
+    // Run 5 min after boot, then every 3 hours
+    setTimeout(() => runAutoTrackingRefresh().catch(() => {}), 5 * 60 * 1000)
+    setInterval(() => runAutoTrackingRefresh().catch(() => {}), 3 * 60 * 60 * 1000)
 
     // PATCH /admin-hub/v1/seller/iban — save IBAN + payment info, create Stripe Custom account
     const adminHubSellerIbanPATCH = async (req, res) => {

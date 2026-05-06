@@ -108,6 +108,13 @@ export default function ShipOrdersModal({ orders, onClose, onDone }) {
       setSaved(true);
       onDone?.();
       window.setTimeout(() => openShipCombinedPrintWindow(resolvedRef.current, carrierName, trackings, dateStr), 300);
+      // Auto-refresh tracking events from carrier API for orders that have a tracking number
+      for (const o of orders) {
+        const tn = trackings[o.id] != null ? String(trackings[o.id]).trim() : "";
+        if (tn) {
+          client.refreshTracking(o.id).catch(() => {});
+        }
+      }
     } catch (e) {
       setSaveError(e?.message || "Speichern fehlgeschlagen. Bitte erneut versuchen.");
     }
