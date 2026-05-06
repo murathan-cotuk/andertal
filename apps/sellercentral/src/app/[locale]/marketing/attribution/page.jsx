@@ -1,12 +1,12 @@
 "use client";
 
 import DashboardLayout from "@/components/DashboardLayout";
-import MinimalPage from "@/components/MinimalPage";
+import MarketingAttributionPage from "@/components/pages/marketing/MarketingAttributionPage";
 
-export default function MarketingAttribution() {
+export default function AttributionPage() {
   return (
     <DashboardLayout>
-      <MinimalPage title="Attribution" subtitle="Marketing attribution" />
+      <MarketingAttributionPage />
     </DashboardLayout>
   );
 }

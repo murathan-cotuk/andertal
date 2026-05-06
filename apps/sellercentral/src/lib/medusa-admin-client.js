@@ -1358,6 +1358,16 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/campaigns/${id}/resume`, { method: 'POST' })
   }
 
+  async getCampaignAttribution(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.from) qs.set("from", params.from);
+    if (params.to) qs.set("to", params.to);
+    if (params.campaign_id) qs.set("campaign_id", params.campaign_id);
+    if (params.model) qs.set("model", params.model);
+    const q = qs.toString();
+    return this.request(`/admin-hub/v1/campaigns/attribution${q ? "?" + q : ""}`);
+  }
+
   // ── Platform Marketing Accounts (superuser) ─────────────────────────────────
   async getMarketingAccounts() {
     return this.request('/admin-hub/v1/marketing-accounts')

@@ -111,7 +111,9 @@
       "Bash(where stripe *)",
       "WebFetch(domain:api.andertal.com)",
       "Bash(xxd)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(findstr /i \"campaign\\\\|marketing\\\\|werbung\\\\|kampagne\")",
+      "Bash(findstr /v node_modules)"
     ]
   }
 }

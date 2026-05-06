@@ -33,6 +33,23 @@ import { resolveImageUrl } from "@/lib/image-url";
 const VIDEO_ACCEPT = "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov";
 const VIDEO_MAX_BYTES = 120 * 1024 * 1024;
 
+const AUDIENCE_OPTIONS = [
+  "Sommer-Käufer",
+  "Winter-Fans",
+  "Frühlings-Shopper",
+  "Herbst-Käufer",
+  "Schnäppchenjäger",
+  "Geschenk-Shopper",
+  "Fitness-Begeisterte",
+  "Mode-Fans",
+  "Eltern & Familie",
+  "Beauty-Fans",
+  "Outdoor-Liebhaber",
+  "Heimwerker",
+  "Tech-Enthusiasten",
+  "Tierliebhaber",
+];
+
 const shell = {
   pageBg: "#f4f6fb",
   heroGradient: "linear-gradient(135deg, #0b1220 0%, #151f35 42%, #251e45 72%, #312066 100%)",
@@ -109,7 +126,7 @@ function ShopPreviewMock({ name, budgetEuro, goalLabel, targetType, productCount
               border: "1px solid #e2e8f0",
             }}
           >
-            <video src={shopClip} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            <video key={shopClip} src={shopClip} controls muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
         ) : null}
         <div
@@ -229,6 +246,7 @@ function CampaignVideoSlot({
       >
         {resolved ? (
           <video
+            key={resolved}
             src={resolved}
             controls
             playsInline
@@ -306,6 +324,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
   const [form, setForm] = useState(() => parseCampaignToForm({}));
   const [productSearch, setProductSearch] = useState("");
   const [videoUploadSlot, setVideoUploadSlot] = useState(null);
+  const [keywordInput, setKeywordInput] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -395,6 +414,31 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
     const g = SHOP_GOAL_OPTIONS.find((o) => o.value === form.seller_shop_goal);
     return g?.label || SHOP_GOAL_OPTIONS[0].label;
   }, [form.seller_shop_goal]);
+
+  const keywords = useMemo(
+    () => (form.seller_creative_note ? form.seller_creative_note.split(",").map((k) => k.trim()).filter(Boolean) : []),
+    [form.seller_creative_note],
+  );
+  const addKeyword = (kw) => {
+    const trimmed = kw.trim();
+    if (!trimmed || keywords.includes(trimmed)) return;
+    setField("seller_creative_note", [...keywords, trimmed].join(", "));
+  };
+  const removeKeyword = (kw) => {
+    setField("seller_creative_note", keywords.filter((k) => k !== kw).join(", "));
+  };
+
+  const selectedAudiences = useMemo(
+    () => (form.seller_audience_note ? form.seller_audience_note.split(",").map((k) => k.trim()).filter(Boolean) : []),
+    [form.seller_audience_note],
+  );
+  const toggleAudience = (aud) => {
+    if (selectedAudiences.includes(aud)) {
+      setField("seller_audience_note", selectedAudiences.filter((a) => a !== aud).join(", "));
+    } else {
+      setField("seller_audience_note", [...selectedAudiences, aud].join(", "));
+    }
+  };
 
   const uploadCampaignVideo = async (slot, file) => {
     const okMime = ["video/mp4", "video/webm", "video/quicktime"].includes(file.type || "");
@@ -508,7 +552,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
     <Page
       fullWidth
       title={sellerExperience ? "Shop-Werbung bearbeiten" : form.name.trim() || "Werbekampagne"}
-      subtitle={sellerExperience ? undefined : `Kampagnen-ID: ${campaignId}`}
+      subtitle={undefined}
       backAction={{ content: "Zurück zur Übersicht", url: "/marketing/campaigns" }}
       primaryAction={{ content: "Speichern", onAction: save, loading: saving }}
     >
@@ -544,14 +588,9 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 {form.name.trim() || "Neue Shop-Kampagne"}
               </h1>
               <p style={{ margin: "14px 0 0", fontSize: 15, color: "rgba(226, 232, 240, 0.88)", maxWidth: 620, lineHeight: 1.55 }}>
-                Steigere die Sichtbarkeit deiner Angebote im Marktplatz: Sponsored-Badge, bessere Platzierung und mehr Aufmerksamkeit —
-                unabhängig davon, wie wir die Reichweite technisch ausspielen.
+                Steigere die Sichtbarkeit deiner Angebote im Marktplatz: Sponsored-Badge, bessere Platzierung und mehr Aufmerksamkeit.
               </p>
               <div style={{ marginTop: 22, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: "rgba(226,232,240,0.75)", fontFamily: "ui-monospace, monospace" }}>
-                  ID {campaignId}
-                </span>
-                <span style={{ opacity: 0.35, color: "#fff" }}>|</span>
                 <span style={{ fontSize: 13, color: "rgba(248,250,252,0.9)" }}>
                   Budget {form.budget_daily_cents ? `${form.budget_daily_cents} €/Tag` : fmtBudget(loadedCampaign?.budget_daily_cents)}
                 </span>
@@ -648,22 +687,121 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                           );
                         })}
                       </div>
-                      <TextField
-                        label="Zielgruppe / Hinweise (optional)"
-                        value={form.seller_audience_note}
-                        onChange={(v) => setField("seller_audience_note", v)}
-                        multiline={2}
-                        autoComplete="off"
-                        placeholder="z.B. Beauty-Käufer:innen, Geschenk-Saison …"
-                      />
-                      <TextField
-                        label="Botschaften & Highlights (optional)"
-                        value={form.seller_creative_note}
-                        onChange={(v) => setField("seller_creative_note", v)}
-                        multiline={2}
-                        autoComplete="off"
-                        placeholder="USP, Materialien, Sets, Trustpilot …"
-                      />
+                      <div>
+                        <Text as="p" variant="bodySm" tone="subdued">Zielgruppe (optional)</Text>
+                        <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {AUDIENCE_OPTIONS.map((aud) => {
+                            const active = selectedAudiences.includes(aud);
+                            return (
+                              <button
+                                key={aud}
+                                type="button"
+                                onClick={() => toggleAudience(aud)}
+                                style={{
+                                  cursor: "pointer",
+                                  padding: "6px 14px",
+                                  borderRadius: 999,
+                                  fontSize: 13,
+                                  fontWeight: active ? 650 : 400,
+                                  border: active ? "2px solid #6366f1" : "1px solid #e2e8f0",
+                                  background: active ? "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.08))" : "#fafafa",
+                                  color: active ? "#4338ca" : "#475569",
+                                  transition: "all 0.15s",
+                                }}
+                              >
+                                {aud}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {selectedAudiences.length > 0 && (
+                          <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b" }}>
+                            Ausgewählt: {selectedAudiences.join(", ")}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Text as="p" variant="bodySm" tone="subdued">Keywords & Botschaften (optional)</Text>
+                        {keywords.length > 0 && (
+                          <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {keywords.map((kw) => (
+                              <span
+                                key={kw}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  padding: "4px 10px",
+                                  borderRadius: 999,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  background: "rgba(99,102,241,0.1)",
+                                  border: "1px solid rgba(99,102,241,0.25)",
+                                  color: "#4338ca",
+                                }}
+                              >
+                                {kw}
+                                <button
+                                  type="button"
+                                  onClick={() => removeKeyword(kw)}
+                                  style={{
+                                    border: "none",
+                                    background: "none",
+                                    cursor: "pointer",
+                                    color: "#6366f1",
+                                    fontSize: 14,
+                                    lineHeight: 1,
+                                    padding: 0,
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                          <input
+                            type="text"
+                            value={keywordInput}
+                            onChange={(e) => setKeywordInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addKeyword(keywordInput);
+                                setKeywordInput("");
+                              }
+                            }}
+                            placeholder="Keyword eingeben + Enter …"
+                            style={{
+                              flex: 1,
+                              padding: "8px 12px",
+                              borderRadius: 10,
+                              border: "1px solid #e2e8f0",
+                              fontSize: 13,
+                              outline: "none",
+                              fontFamily: "inherit",
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => { addKeyword(keywordInput); setKeywordInput(""); }}
+                            style={{
+                              padding: "8px 14px",
+                              borderRadius: 10,
+                              border: "1px solid #e2e8f0",
+                              background: shell.accentSoft,
+                              color: "#4338ca",
+                              fontSize: 13,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Hinzufügen
+                          </button>
+                        </div>
+                      </div>
                     </>
                   )}
                 </BlockStack>
@@ -693,8 +831,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                     <Banner tone="warning">
                       <p style={{ margin: 0, lineHeight: 1.55 }}>
                         <strong>Gutes Creative wird zusätzlich ausgespielt:</strong> Wenn deine Videos überzeugen, können wir sie neben dem Shop
-                        auch in bezahlten <strong>Instagram-, Facebook-, TikTok- und Snapchat</strong>-Kampagnen (Reels / Stories) einsetzen.
-                        Plane deshalb dein <strong>Tagesbudget etwas großzügiger</strong> — so stehen Reichweite und Frequenz im Verhältnis zur Werbewirkung.
+                        auch in bezahlten <strong>Social-Media</strong>-Kampagnen (Reels / Stories) einsetzen.
                       </p>
                     </Banner>
                   </div>
@@ -722,8 +859,8 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                   <div style={{ flex: "1 1 280px", minWidth: 0 }}>
                     <CampaignVideoSlot
                       title="Reels / Stories · 9 : 16"
-                      badge="Instagram · FB · TikTok · Snapchat"
-                      roleLine="Vertikales Video für bezahlte Werbung bei Instagram, Facebook, TikTok und Snapchat (Reels / Stories)."
+                      badge="Social Media"
+                      roleLine="Vertikales Video für bezahlte Social-Media-Werbung (Reels / Stories)."
                       specsLine="Empfehlung: 1080 × 1920 px · MP4 (H.264) · max. 120 MB"
                       aspectMode="916"
                       url={form.seller_video_reels_url}
@@ -794,7 +931,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                     padding: "26px 26px 28px",
                   }}
                 >
-                  <StepHeader step="★" title="Externe Ausspielung (Admin)" subtitle="Plattform-Zuweisung nur für Team mit verbundenen Konten." />
+                  <StepHeader step={4} title="Externe Ausspielung (Admin)" subtitle="Plattform-Zuweisung nur für Team mit verbundenen Konten." />
                   <BlockStack gap="300">
                     <Text tone="subdued" as="p" variant="bodySm">
                       Budget {form.budget_daily_cents ? `${form.budget_daily_cents} €/Tag` : "—"} auf {form.ad_platforms.length || "keine"} Kanäle.
@@ -830,7 +967,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 </div>
               )}
 
-              {/* Step 4 */}
+              {/* Step 4/5 */}
               <div
                 style={{
                   borderRadius: shell.cardRadius,
@@ -841,7 +978,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 }}
               >
                 <StepHeader
-                  step={4}
+                  step={isSuperuser ? 5 : 4}
                   title="Produkte im Fokus"
                   subtitle={
                     sellerExperience
@@ -967,27 +1104,6 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                   productCount={form.product_ids.length}
                   highlightVideoUrl={form.seller_video_shop_url}
                 />
-                {sellerExperience && (
-                  <div
-                    style={{
-                      borderRadius: shell.cardRadius,
-                      padding: 18,
-                      border: shell.border,
-                      background: "linear-gradient(145deg, #ffffff, #f8fafc)",
-                      boxShadow: shell.cardShadow,
-                    }}
-                  >
-                    <Text as="h3" variant="headingSm">
-                      Kurzüberblick
-                    </Text>
-                    <ul style={{ margin: "12px 0 0", paddingLeft: 18, fontSize: 13, color: "#475569", lineHeight: 1.6 }}>
-                      <li>Sponsored-Hervorhebung im Shop</li>
-                      <li>16:9-Video als Shop-Highlight möglich</li>
-                      <li>Starke Creatives können zusätzlich bei Social-Reels eingesetzt werden</li>
-                      <li>Algorithmischer Ranking-Boost im Marktplatz</li>
-                    </ul>
-                  </div>
-                )}
               </BlockStack>
             </aside>
           </div>
