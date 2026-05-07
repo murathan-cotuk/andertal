@@ -506,6 +506,160 @@ function CarrierModal({ mode, carrier, onClose, onSaved }) {
   );
 }
 
+/* ── Sendcloud Config Section (superuser only) ───────────────── */
+function SendcloudSection() {
+  const [cfg, setCfg] = useState({ public_key: "", secret_key: "", markup_pct: 5, is_active: true });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [testResult, setTestResult] = useState(null); // null | { ok, message }
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    getMedusaAdminClient().getSendcloudIntegration()
+      .then((d) => {
+        if (d?.configured || d?.public_key) {
+          setCfg({
+            public_key: d.public_key || "",
+            secret_key: d.secret_key || "",
+            markup_pct: d.markup_pct ?? 5,
+            is_active: d.is_active !== false,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleTest = async () => {
+    setTesting(true); setTestResult(null); setErr("");
+    try {
+      const r = await getMedusaAdminClient().testSendcloudIntegration({
+        public_key: cfg.public_key.trim(),
+        secret_key: cfg.secret_key.trim(),
+      });
+      setTestResult({ ok: true, message: `Verbunden — ${r.company || "Sendcloud"}` });
+    } catch (e) {
+      setTestResult({ ok: false, message: e?.message || "Verbindung fehlgeschlagen" });
+    }
+    setTesting(false);
+  };
+
+  const handleSave = async () => {
+    if (!cfg.public_key.trim() || !cfg.secret_key.trim()) { setErr("Public Key und Secret Key sind Pflichtfelder."); return; }
+    setSaving(true); setErr(""); setSaved(false);
+    try {
+      await getMedusaAdminClient().saveSendcloudIntegration({
+        public_key: cfg.public_key.trim(),
+        secret_key: cfg.secret_key.trim(),
+        markup_pct: Number(cfg.markup_pct) || 5,
+        is_active: cfg.is_active,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setErr(e?.message || "Fehler beim Speichern");
+    }
+    setSaving(false);
+  };
+
+  if (loading) return null;
+
+  return (
+    <Card>
+      <BlockStack gap="400">
+        <InlineStack align="space-between" blockAlign="center">
+          <BlockStack gap="100">
+            <InlineStack gap="200" blockAlign="center">
+              <div style={{ width: 32, height: 32, borderRadius: 6, background: "#003087", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>SC</div>
+              <Text variant="headingSm" as="h3">Sendcloud — Plattform-Versandintegration</Text>
+            </InlineStack>
+            <Text variant="bodySm" tone="subdued">API-Zugangsdaten für Etikett-Generierung. Satıcılar diese Versandlösung nutzen können, um Etiketten direkt aus Bestellungen zu erstellen.</Text>
+          </BlockStack>
+          <InlineStack gap="200" blockAlign="center">
+            {saved && <Badge tone="success">Gespeichert ✓</Badge>}
+            <Badge tone={cfg.is_active ? "success" : undefined}>{cfg.is_active ? "Aktiv" : "Inaktiv"}</Badge>
+          </InlineStack>
+        </InlineStack>
+
+        <Divider />
+
+        <InlineGrid columns={2} gap="300">
+          <TextField
+            label="Public Key"
+            value={cfg.public_key}
+            onChange={(v) => { setCfg((c) => ({ ...c, public_key: v })); setTestResult(null); }}
+            placeholder="sc-api-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            autoComplete="off"
+            monospaced
+          />
+          <TextField
+            label="Secret Key"
+            type={showSecret ? "text" : "password"}
+            value={cfg.secret_key}
+            onChange={(v) => { setCfg((c) => ({ ...c, secret_key: v })); setTestResult(null); }}
+            placeholder="••••••••••••••••"
+            autoComplete="off"
+            monospaced
+            suffix={
+              <Button variant="plain" size="slim" onClick={() => setShowSecret((s) => !s)}>
+                {showSecret ? "Verstecken" : "Anzeigen"}
+              </Button>
+            }
+          />
+        </InlineGrid>
+
+        <InlineGrid columns={2} gap="300">
+          <TextField
+            label="Aufschlag (%)"
+            type="number"
+            value={String(cfg.markup_pct)}
+            onChange={(v) => setCfg((c) => ({ ...c, markup_pct: v }))}
+            suffix="%"
+            helpText="Carrier-Preis × (1 + Aufschlag/100) = Verkaufspreis an Seller"
+            min="0"
+            max="50"
+            autoComplete="off"
+          />
+          <div style={{ paddingTop: 24 }}>
+            <Button onClick={() => setCfg((c) => ({ ...c, is_active: !c.is_active }))}>
+              {cfg.is_active ? "Deaktivieren" : "Aktivieren"}
+            </Button>
+          </div>
+        </InlineGrid>
+
+        {testResult && (
+          <Banner tone={testResult.ok ? "success" : "critical"} onDismiss={() => setTestResult(null)}>
+            {testResult.message}
+          </Banner>
+        )}
+        {err && <Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner>}
+
+        <InlineStack gap="300">
+          <Button onClick={handleTest} loading={testing} disabled={!cfg.public_key.trim() || !cfg.secret_key.trim()}>
+            Verbindung testen
+          </Button>
+          <Button variant="primary" onClick={handleSave} loading={saving}>
+            Speichern
+          </Button>
+        </InlineStack>
+
+        <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+          <BlockStack gap="100">
+            <Text variant="bodySm" fontWeight="semibold" tone="subdued">Webhook URL für Sendcloud</Text>
+            <div style={{ fontFamily: "monospace", fontSize: 13, color: "#374151", background: "#f3f4f6", padding: "8px 12px", borderRadius: 6, userSelect: "all" }}>
+              https://api.andertal.com/webhook/sendcloud
+            </div>
+            <Text variant="bodySm" tone="subdued">Sendcloud → Settings → Webhooks → diese URL eintragen und "Webhook feedback" aktivieren.</Text>
+          </BlockStack>
+        </Box>
+      </BlockStack>
+    </Card>
+  );
+}
+
 /* ── Main page ───────────────────────────────────────────────── */
 const PRESET_CARRIERS = [
   { name: "DHL", tracking_url_template: "https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode={tracking}" },
@@ -709,6 +863,8 @@ export default function ShippingSettingsPage() {
             </InlineStack>
           </BlockStack>
         </Card>}
+
+        {isSuperuser && <SendcloudSection />}
 
         <Divider />
 

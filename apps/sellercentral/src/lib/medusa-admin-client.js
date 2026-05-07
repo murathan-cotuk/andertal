@@ -858,6 +858,16 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/integrations/trustpilot', { method: 'PUT', body: JSON.stringify(data) })
   }
 
+  async getSendcloudIntegration() {
+    return this.request('/admin-hub/v1/integrations/sendcloud')
+  }
+  async saveSendcloudIntegration(data) {
+    return this.request('/admin-hub/v1/integrations/sendcloud', { method: 'PUT', body: JSON.stringify(data) })
+  }
+  async testSendcloudIntegration(data) {
+    return this.request('/admin-hub/v1/integrations/sendcloud/test', { method: 'POST', body: JSON.stringify(data) })
+  }
+
   async testBillbeeIntegration(data) {
     return this.request('/admin-hub/v1/integrations/billbee/test', {
       method: 'POST',
