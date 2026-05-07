@@ -11762,10 +11762,13 @@ async function start() {
 
     const getSendcloudCredentials = async (pgClient) => {
       const r = await pgClient.query(
-        `SELECT config_json FROM store_integrations WHERE slug='sendcloud' AND seller_scope_key='platform' LIMIT 1`
+        `SELECT api_key, api_secret, config FROM store_integrations WHERE LOWER(TRIM(slug))='sendcloud' AND seller_scope_key='platform' LIMIT 1`
       )
-      const cfg = r.rows[0]?.config_json || {}
-      return { public_key: cfg.public_key || '', secret_key: cfg.secret_key || '', markup_pct: cfg.markup_pct ?? 5 }
+      const row = r.rows[0]
+      if (!row) return { public_key: '', secret_key: '', markup_pct: 5 }
+      let extraCfg = {}
+      try { extraCfg = typeof row.config === 'string' ? JSON.parse(row.config) : (row.config || {}) } catch (_) {}
+      return { public_key: row.api_key || '', secret_key: row.api_secret || '', markup_pct: extraCfg.markup_pct ?? 5 }
     }
 
     const sendcloudRequest = async (path, { public_key, secret_key }, opts = {}) => {
