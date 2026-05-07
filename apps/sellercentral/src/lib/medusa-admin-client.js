@@ -969,6 +969,12 @@ class MedusaAdminClient {
   async getNewsletterSubscribers() {
     return this.request('/admin-hub/v1/newsletter-subscribers')
   }
+  async updateNewsletterSubscriber(id, data = {}) {
+    return this.request(`/admin-hub/v1/newsletter-subscribers/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data || {}),
+    })
+  }
   async getMessages(params = {}) {
     const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';
     const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;

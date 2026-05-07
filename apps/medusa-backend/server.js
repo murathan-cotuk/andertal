@@ -20158,9 +20158,13 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       email text NOT NULL,
       source text DEFAULT 'landing_page',
+      status text NOT NULL DEFAULT 'active',
       subscribed_at timestamptz DEFAULT now(),
+      unsubscribed_at timestamptz,
       UNIQUE(email)
     )`).catch(() => {})
+    await dbQ(`ALTER TABLE store_newsletter_subscribers ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active'`).catch(() => {})
+    await dbQ(`ALTER TABLE store_newsletter_subscribers ADD COLUMN IF NOT EXISTS unsubscribed_at timestamptz`).catch(() => {})
     httpApp.post('/store/newsletter-subscribe', async (req, res) => {
       const { email, source } = req.body || {}
       if (!email || !String(email).includes('@')) return res.status(400).json({ message: 'Valid email required' })
@@ -20172,9 +20176,32 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       try {
         await c.connect()
         await c.query(
-          `INSERT INTO store_newsletter_subscribers (email, source) VALUES ($1, $2)
-           ON CONFLICT (email) DO UPDATE SET source = EXCLUDED.source, subscribed_at = now()`,
+          `INSERT INTO store_newsletter_subscribers (email, source, status, subscribed_at, unsubscribed_at)
+           VALUES ($1, $2, 'active', now(), NULL)
+           ON CONFLICT (email) DO UPDATE
+           SET source = EXCLUDED.source, status = 'active', subscribed_at = now(), unsubscribed_at = NULL`,
           [String(email).trim().toLowerCase(), sourceValue]
+        )
+        await c.end()
+        res.json({ ok: true })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+    httpApp.post('/store/newsletter-unsubscribe', async (req, res) => {
+      const { email } = req.body || {}
+      if (!email || !String(email).includes('@')) return res.status(400).json({ message: 'Valid email required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        await c.query(
+          `UPDATE store_newsletter_subscribers
+           SET status = 'unsubscribed', unsubscribed_at = now()
+           WHERE email = $1`,
+          [String(email).trim().toLowerCase()]
         )
         await c.end()
         res.json({ ok: true })
@@ -20189,7 +20216,58 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
       try {
         await c.connect()
-        const r = await c.query('SELECT * FROM store_newsletter_subscribers ORDER BY subscribed_at DESC LIMIT 500')
+        const r = await c.query('SELECT * FROM store_newsletter_subscribers ORDER BY subscribed_at DESC NULLS LAST LIMIT 500')
+        await c.end()
+        res.json({ subscribers: r.rows })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.json({ subscribers: [] })
+      }
+    })
+    httpApp.patch('/admin-hub/v1/newsletter-subscribers/:id', requireSellerAuth, async (req, res) => {
+      const user = req.sellerUser || {}
+      if (String(user.is_superuser || '').toLowerCase() !== 'true' && user.is_superuser !== true) {
+        return res.status(403).json({ message: 'Forbidden' })
+      }
+      const id = String(req.params?.id || '').trim()
+      const status = String(req.body?.status || '').trim().toLowerCase()
+      if (!id) return res.status(400).json({ message: 'id is required' })
+      if (!['active', 'deactivated', 'unsubscribed'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' })
+      }
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        const r = await c.query(
+          `UPDATE store_newsletter_subscribers
+           SET status = $2,
+               unsubscribed_at = CASE WHEN $2 = 'unsubscribed' THEN now() ELSE NULL END
+           WHERE id = $1
+           RETURNING *`,
+          [id, status]
+        )
+        await c.end()
+        if (!r.rows?.length) return res.status(404).json({ message: 'Not found' })
+        res.json({ subscriber: r.rows[0] })
+      } catch (e) {
+        try { await c.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+    httpApp.get('/admin-hub/v1/newsletter-subscribers/active', requireSellerAuth, async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { Client } = require('pg')
+      const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      try {
+        await c.connect()
+        const r = await c.query(
+          `SELECT * FROM store_newsletter_subscribers
+           WHERE status = 'active'
+           ORDER BY subscribed_at DESC NULLS LAST
+           LIMIT 500`
+        )
         await c.end()
         res.json({ subscribers: r.rows })
       } catch (e) {

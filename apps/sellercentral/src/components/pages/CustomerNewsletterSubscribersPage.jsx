@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useRouter } from "@/i18n/navigation";
 import { Page, Layout, Card, Text, BlockStack, InlineStack, Box, TextField } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
@@ -10,53 +9,69 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-function fmtCents(c) {
-  return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
-}
-
 export default function CustomerNewsletterSubscribersPage() {
-  const router = useRouter();
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState("");
   const [search, setSearch] = useState("");
-  const [customers, setCustomers] = useState([]);
+  const [subscribers, setSubscribers] = useState([]);
 
   useEffect(() => {
     const ok = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
     setIsSuperuser(ok);
     setAuthChecked(true);
-    if (!ok) {
-      router.replace("/dashboard");
-    }
-  }, [router]);
+  }, []);
 
-  useEffect(() => {
+  const loadSubscribers = React.useCallback(() => {
     if (!isSuperuser) return;
     setLoading(true);
     getMedusaAdminClient()
-      .getCustomers()
+      .getNewsletterSubscribers()
       .then((d) => {
-        const list = Array.isArray(d?.customers) ? d.customers : [];
-        setCustomers(list.filter((c) => !!c.newsletter_opted_in));
+        setSubscribers(Array.isArray(d?.subscribers) ? d.subscribers : []);
       })
-      .catch(() => setCustomers([]))
+      .catch(() => setSubscribers([]))
       .finally(() => setLoading(false));
   }, [isSuperuser]);
 
+  useEffect(() => {
+    if (!isSuperuser) return;
+    loadSubscribers();
+  }, [isSuperuser, loadSubscribers]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return customers;
-    return customers.filter((c) =>
-      [c.first_name, c.last_name, c.email, c.customer_number, c.country]
+    if (!q) return subscribers;
+    return subscribers.filter((s) =>
+      [s.email, s.source]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
         .includes(q),
     );
-  }, [customers, search]);
+  }, [subscribers, search]);
 
   if (!authChecked || !isSuperuser) return null;
+
+  const setStatus = async (id, status) => {
+    if (!id) return;
+    setBusyId(id);
+    try {
+      await getMedusaAdminClient().updateNewsletterSubscriber(id, { status });
+      await loadSubscribers();
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const statusBadge = (statusRaw) => {
+    const status = String(statusRaw || "active").toLowerCase();
+    if (status === "active") return { label: "Kayıtlı", bg: "#dcfce7", color: "#166534" };
+    if (status === "unsubscribed") return { label: "Çıkmış", bg: "#fee2e2", color: "#991b1b" };
+    if (status === "deactivated") return { label: "Deaktif", bg: "#e5e7eb", color: "#374151" };
+    return { label: status, bg: "#f3f4f6", color: "#4b5563" };
+  };
 
   return (
     <Page title="Newsletter-Abonnenten">
@@ -66,7 +81,7 @@ export default function CustomerNewsletterSubscribersPage() {
             <BlockStack gap="400">
               <InlineStack align="space-between" blockAlign="center" wrap>
                 <Text as="h2" variant="headingSm">
-                  Nur Kunden mit Newsletter-Opt-in
+                  Newsletter-Abonnenten (Datenbankgruppe)
                 </Text>
                 <Text as="p" variant="bodySm" tone="subdued">
                   {filtered.length} Abonnent{filtered.length !== 1 ? "en" : ""}
@@ -80,7 +95,7 @@ export default function CustomerNewsletterSubscribersPage() {
                   value={search}
                   onChange={setSearch}
                   autoComplete="off"
-                  placeholder="Name, E-Mail, Kundennummer…"
+                  placeholder="E-Mail veya Quelle…"
                 />
               </Box>
 
@@ -88,7 +103,7 @@ export default function CustomerNewsletterSubscribersPage() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                      {["Kundennr.", "Name", "E-Mail", "Land", "Bestellungen", "Umsatz", "Letzter Kauf"].map((h) => (
+                      {["E-Mail", "Quelle", "Durum", "Abonniert am", "Aksiyon"].map((h) => (
                         <th
                           key={h}
                           style={{
@@ -110,24 +125,23 @@ export default function CustomerNewsletterSubscribersPage() {
                   <tbody>
                     {loading && (
                       <tr>
-                        <td colSpan={7} style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>
+                        <td colSpan={5} style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>
                           Laden…
                         </td>
                       </tr>
                     )}
                     {!loading && filtered.length === 0 && (
                       <tr>
-                        <td colSpan={7} style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>
+                        <td colSpan={5} style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>
                           Keine Newsletter-Abonnenten gefunden.
                         </td>
                       </tr>
                     )}
                     {!loading &&
-                      filtered.map((c, i) => (
+                      filtered.map((s, i) => (
                         <tr
-                          key={c.id || i}
-                          style={{ borderBottom: "1px solid #f3f4f6", cursor: c.id ? "pointer" : "default" }}
-                          onClick={() => c.id && router.push(`/customers/${c.id}`)}
+                          key={s.id || i}
+                          style={{ borderBottom: "1px solid #f3f4f6" }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.background = "#fafafa";
                           }}
@@ -135,22 +149,73 @@ export default function CustomerNewsletterSubscribersPage() {
                             e.currentTarget.style.background = "";
                           }}
                         >
-                          <td style={{ padding: "10px 12px", fontWeight: 700, color: "#6b7280", fontSize: 12 }}>
-                            {c.customer_number ? `#${c.customer_number}` : "—"}
+                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                            {s.email || "—"}
                           </td>
-                          <td style={{ padding: "10px 12px", fontWeight: 500 }}>
-                            {[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}
-                          </td>
-                          <td style={{ padding: "10px 12px", color: "#4b5563" }}>{c.email || "—"}</td>
-                          <td style={{ padding: "10px 12px", color: "#6b7280" }}>{c.country || "—"}</td>
-                          <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600 }}>
-                            {c.order_count || 0}
-                          </td>
-                          <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600 }}>
-                            {fmtCents(c.total_spent)}
+                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12, textTransform: "capitalize" }}>
+                            {String(s.source || "landing_page").replace(/_/g, " ")}
                           </td>
                           <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
-                            {fmtDate(c.last_order)}
+                            {(() => {
+                              const b = statusBadge(s.status);
+                              return (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    padding: "3px 8px",
+                                    borderRadius: 999,
+                                    fontWeight: 700,
+                                    background: b.bg,
+                                    color: b.color,
+                                  }}
+                                >
+                                  {b.label}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                            {fmtDate(s.subscribed_at)}
+                          </td>
+                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                            <InlineStack gap="200" wrap={false}>
+                              {String(s.status || "active").toLowerCase() !== "active" ? (
+                                <button
+                                  type="button"
+                                  disabled={busyId === s.id}
+                                  onClick={() => setStatus(s.id, "active")}
+                                  style={{
+                                    padding: "4px 8px",
+                                    border: "1px solid #16a34a",
+                                    borderRadius: 6,
+                                    background: "#f0fdf4",
+                                    color: "#166534",
+                                    fontSize: 12,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Aktif et
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={busyId === s.id}
+                                  onClick={() => setStatus(s.id, "deactivated")}
+                                  style={{
+                                    padding: "4px 8px",
+                                    border: "1px solid #9ca3af",
+                                    borderRadius: 6,
+                                    background: "#f9fafb",
+                                    color: "#374151",
+                                    fontSize: 12,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Deaktif et
+                                </button>
+                              )}
+                            </InlineStack>
                           </td>
                         </tr>
                       ))}

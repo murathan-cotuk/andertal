@@ -300,17 +300,24 @@ export default function RegisterPage() {
       };
       const registerResult = await registerMedusa(formData.email, formData.password, formData.firstName, formData.lastName, extra);
       if (!registerResult?.customer) { setError(t("registerFailed")); return; }
+      if (formData.legalConsent && formData.email) {
+        try {
+          const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
+          await fetch(`${backendUrl}/store/newsletter-subscribe`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: formData.email.trim().toLowerCase(),
+              source: "register",
+            }),
+          });
+        } catch {
+          // Newsletter signup must not block account creation.
+        }
+      }
 
       const loginResult = await loginMedusa(formData.email, formData.password);
       if (loginResult?.customer?.id) {
-        if (formData.legalConsent && formData.email) {
-          const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
-          fetch(`${backendUrl}/store/newsletter-subscribe`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: formData.email.trim().toLowerCase() }),
-          }).catch(() => {});
-        }
         const token = loginResult.access_token || loginResult.token;
         if (token) {
           login(token, loginResult.customer.id);
