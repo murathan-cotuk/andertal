@@ -16,7 +16,9 @@ const FLOW_TEMPLATE_LANGS = ["de", "en", "tr", "fr", "it", "es"];
 
 function emptyLocaleBundle() {
   const o = {};
-  for (const loc of FLOW_TEMPLATE_LANGS) o[loc] = { subject: "", body: "" };
+  for (const loc of FLOW_TEMPLATE_LANGS) {
+    o[loc] = { subject: "", body: "", subject_b: "" };
+  }
   return o;
 }
 
@@ -29,6 +31,7 @@ function normalizeSendEmailStep(step) {
     i18n[loc] = {
       subject: String(b?.subject ?? "").trim(),
       body: String(b?.body ?? "").trim(),
+      subject_b: String(b?.subject_b ?? "").trim(),
     };
   }
   const fbS = String(step.email_subject || "").trim();
@@ -115,6 +118,8 @@ const T = {
     stepEmailOption: "Send email",
     waitHoursHelp: "Pause this many hours before the next step.",
     emailSubjectLabel: "Email subject",
+    emailSubjectAltLabel: "Subject line B (optional A/B)",
+    emailSubjectAltHelp: "If set, each recipient gets subject A or B (50/50), stable per send (idempotent). Same HTML body.",
     emailSenderLabel: "Sender (From)",
     emailSenderDefaultOption: "Default — main sender",
     emailSenderMainTag: "main",
@@ -143,6 +148,7 @@ const T = {
     mergeFieldsToggleShow: "Show list",
     mergeFieldsToggleHide: "Hide list",
     mergeFieldsSubject: "Subject",
+    mergeFieldsSubjectB: "Subject B (A/B)",
     mergeFieldsBody: "Body",
     mergeFieldsCopy: "Copy",
     mergeFieldsCopied: "Copied",
@@ -232,6 +238,8 @@ const T = {
     stepEmailOption: "E-Mail senden",
     waitHoursHelp: "So viele Stunden warten, bevor der nächste Schritt ausgeführt wird.",
     emailSubjectLabel: "Betreff",
+    emailSubjectAltLabel: "Betreff Variante B (optional A/B)",
+    emailSubjectAltHelp: "Wenn gesetzt: pro Empfänger zufällig A oder B (50/50), stabil bei Wiederholungen. Gleicher HTML-Text.",
     emailSenderLabel: "Absender (Von)",
     emailSenderDefaultOption: "Standard — Haupt-Absender",
     emailSenderMainTag: "Haupt",
@@ -260,6 +268,7 @@ const T = {
     mergeFieldsToggleShow: "Liste anzeigen",
     mergeFieldsToggleHide: "Liste ausblenden",
     mergeFieldsSubject: "Betreff",
+    mergeFieldsSubjectB: "Betreff B (A/B)",
     mergeFieldsBody: "Text",
     mergeFieldsCopy: "Kopieren",
     mergeFieldsCopied: "Kopiert",
@@ -349,6 +358,8 @@ const T = {
     stepEmailOption: "E-posta gönder",
     waitHoursHelp: "Sonraki adımdan önce beklenecek saat.",
     emailSubjectLabel: "E-posta konusu",
+    emailSubjectAltLabel: "Konu satırı B (isteğe bağlı A/B)",
+    emailSubjectAltHelp: "Doldurulursa: Alıcı başına A veya B (sabit, tekrarda aynı). Aynı HTML gövdesi.",
     emailSenderLabel: "Gönderen (Kimden)",
     emailSenderDefaultOption: "Varsayılan — ana gönderen",
     emailSenderMainTag: "ana",
@@ -377,6 +388,7 @@ const T = {
     mergeFieldsToggleShow: "Listeyi göster",
     mergeFieldsToggleHide: "Listeyi gizle",
     mergeFieldsSubject: "Konu",
+    mergeFieldsSubjectB: "Konu B (A/B)",
     mergeFieldsBody: "Gövde",
     mergeFieldsCopy: "Kopyala",
     mergeFieldsCopied: "Kopyalandı",
@@ -466,6 +478,8 @@ const T = {
     stepEmailOption: "Envoyer un e-mail",
     waitHoursHelp: "Heures d'attente avant l'étape suivante.",
     emailSubjectLabel: "Objet",
+    emailSubjectAltLabel: "Objet B (A/B, optionnel)",
+    emailSubjectAltHelp: "Si renseigné : A ou B par destinataire (50/50), stable aux renvois. Même HTML.",
     emailSenderLabel: "Expéditeur (De)",
     emailSenderDefaultOption: "Par défaut — expéditeur principal",
     emailSenderMainTag: "principal",
@@ -494,6 +508,7 @@ const T = {
     mergeFieldsToggleShow: "Afficher la liste",
     mergeFieldsToggleHide: "Masquer la liste",
     mergeFieldsSubject: "Objet",
+    mergeFieldsSubjectB: "Objet B (A/B)",
     mergeFieldsBody: "Corps",
     mergeFieldsCopy: "Copier",
     mergeFieldsCopied: "Copié",
@@ -583,6 +598,8 @@ const T = {
     stepEmailOption: "Invia e-mail",
     waitHoursHelp: "Ore di attesa prima del passo successivo.",
     emailSubjectLabel: "Oggetto",
+    emailSubjectAltLabel: "Oggetto B (A/B, opzionale)",
+    emailSubjectAltHelp: "Se impostato: A o B per destinatario (50/50), stabile alle re-invio. Stesso HTML.",
     emailSenderLabel: "Mittente (Da)",
     emailSenderDefaultOption: "Predefinito — mittente principale",
     emailSenderMainTag: "principale",
@@ -603,6 +620,19 @@ const T = {
     emailBodyModeText: "Testo",
     placeholdersHelp:
       "Segnaposto (dati di esempio nei test): {CUSTOMER_NAME}, {FIRST_NAME}, {LAST_NAME}, {EMAIL}, {PRODUCT}, {ORDER_NUMBER}, {STORE_NAME}. Scegli un cliente sotto per dati reali.",
+    mergeFieldsTitle: "Token per questo passaggio",
+    mergeFieldsIntro: "Aggiungi a oggetto o corpo HTML, oppure copia.",
+    mergeFieldsSidebarTitle: "Riferimento campi merge",
+    mergeFieldsSidebarIntro: "Tutti i token supportati.",
+    mergeFieldsToggleShow: "Mostra lista",
+    mergeFieldsToggleHide: "Nascondi lista",
+    mergeFieldsSubject: "Oggetto",
+    mergeFieldsSubjectB: "Oggetto B (A/B)",
+    mergeFieldsBody: "Corpo",
+    mergeFieldsCopy: "Copia",
+    mergeFieldsCopied: "Copiato",
+    mergeFieldsLoading: "Caricamento…",
+    mergeFieldsErr: "Impossibile caricare i token.",
     testEmailFieldLabel: "Invia e-mail di test a",
     testEmailFieldHelp: "Lo stesso indirizzo per ogni pulsante « Invia test ».",
     testCustomerLabel: "Anteprima come cliente",
@@ -687,6 +717,8 @@ const T = {
     stepEmailOption: "Enviar correo",
     waitHoursHelp: "Horas de espera antes del siguiente paso.",
     emailSubjectLabel: "Asunto",
+    emailSubjectAltLabel: "Asunto B (A/B opcional)",
+    emailSubjectAltHelp: "Si se rellena: A o B por destinatario (50/50), estable al reintentar. Mismo HTML.",
     emailSenderLabel: "Remitente (De)",
     emailSenderDefaultOption: "Predeterminado — remitente principal",
     emailSenderMainTag: "principal",
@@ -715,6 +747,7 @@ const T = {
     mergeFieldsToggleShow: "Mostrar lista",
     mergeFieldsToggleHide: "Ocultar lista",
     mergeFieldsSubject: "Asunto",
+    mergeFieldsSubjectB: "Asunto B (A/B)",
     mergeFieldsBody: "Cuerpo",
     mergeFieldsCopy: "Copiar",
     mergeFieldsCopied: "Copiado",
@@ -764,7 +797,7 @@ function groupMergeCatalogFields(catalog) {
   return MERGE_CATEGORY_ORDER.filter((k) => map.has(k)).map((k) => map.get(k));
 }
 
-function FlowMergeFieldsPanel({ t, catalog, loading, errorText, stepIdx, onAppendSubject, onAppendBody }) {
+function FlowMergeFieldsPanel({ t, catalog, loading, errorText, stepIdx, onAppendSubject, onAppendBody, onAppendSubjectB }) {
   const [copiedTok, setCopiedTok] = useState(null);
   const grouped = useMemo(() => groupMergeCatalogFields(catalog), [catalog]);
 
@@ -823,6 +856,9 @@ function FlowMergeFieldsPanel({ t, catalog, loading, errorText, stepIdx, onAppen
                       {stepIdx != null && onAppendSubject && onAppendBody && (
                         <>
                           <Button size="slim" onClick={() => onAppendSubject(f.token)}>{t.mergeFieldsSubject}</Button>
+                          {typeof onAppendSubjectB === "function" && (
+                            <Button size="slim" onClick={() => onAppendSubjectB(f.token)}>{t.mergeFieldsSubjectB}</Button>
+                          )}
                           <Button size="slim" onClick={() => onAppendBody(f.token)}>{t.mergeFieldsBody}</Button>
                         </>
                       )}
@@ -1326,8 +1362,9 @@ export default function FlowsPage() {
         if (i !== stepIdx || row.step_type !== "send_email") return row;
         const base = row.email_i18n && typeof row.email_i18n === "object" ? row.email_i18n : emptyLocaleBundle();
         const i18n = { ...base };
-        const cur = { ...(i18n[lang] || { subject: "", body: "" }) };
+        const cur = { ...(i18n[lang] || { subject: "", body: "", subject_b: "" }) };
         if (part === "subject") cur.subject = String(cur.subject || "") + token;
+        else if (part === "subject_b") cur.subject_b = String(cur.subject_b || "") + token;
         else cur.body = String(cur.body || "") + token;
         i18n[lang] = cur;
         const next = { ...row, email_i18n: i18n };
@@ -1345,8 +1382,9 @@ export default function FlowsPage() {
       prev.map((row, i) => {
         if (i !== idx || row.step_type !== "send_email") return row;
         const i18n = { ...(row.email_i18n || emptyLocaleBundle()) };
-        const cur = { ...(i18n[lang] || { subject: "", body: "" }) };
+        const cur = { ...(i18n[lang] || { subject: "", body: "", subject_b: "" }) };
         if (part === "subject") cur.subject = value;
+        else if (part === "subject_b") cur.subject_b = value;
         else cur.body = value;
         i18n[lang] = cur;
         const next = { ...row, email_i18n: i18n };
@@ -1459,7 +1497,12 @@ export default function FlowsPage() {
         }
         const email_subject = String(s.email_i18n?.[lang]?.subject ?? s.email_subject ?? "").trim();
         const i18n = { ...(s.email_i18n || emptyLocaleBundle()) };
-        i18n[lang] = { subject: email_subject, body: email_body };
+        const prevBundle = i18n[lang] || {};
+        i18n[lang] = {
+          subject: email_subject,
+          body: email_body,
+          subject_b: String(prevBundle.subject_b || "").trim(),
+        };
         const deS = String(i18n.de?.subject || "").trim();
         const deB = String(i18n.de?.body || "").trim();
         const att = Array.isArray(s.email_attachments)
@@ -1811,7 +1854,7 @@ export default function FlowsPage() {
                         <BlockStack gap="200">
                           {(() => {
                             const lang = stepTemplateLang[idx] || "de";
-                            const bundle = step.email_i18n?.[lang] || { subject: "", body: "" };
+                            const bundle = step.email_i18n?.[lang] || { subject: "", body: "", subject_b: "" };
                             return (
                               <>
                           <Select
@@ -1901,6 +1944,7 @@ export default function FlowsPage() {
                                     errorText={editMergeErr === "merge-fields-error" ? t.mergeFieldsErr : editMergeErr}
                                     stepIdx={idx}
                                     onAppendSubject={(tok) => appendToStepEmail(idx, "subject", tok)}
+                                    onAppendSubjectB={(tok) => appendToStepEmail(idx, "subject_b", tok)}
                                     onAppendBody={(tok) => appendToStepEmail(idx, "body", tok)}
                                   />
                                 </Box>
@@ -1912,6 +1956,13 @@ export default function FlowsPage() {
                             value={bundle.subject ?? ""}
                             onChange={(v) => patchStepEmailI18n(idx, lang, "subject", v)}
                             placeholder={t.emailSubjectPh}
+                            autoComplete="off"
+                          />
+                          <TextField
+                            label={t.emailSubjectAltLabel}
+                            value={bundle.subject_b ?? ""}
+                            onChange={(v) => patchStepEmailI18n(idx, lang, "subject_b", v)}
+                            helpText={t.emailSubjectAltHelp}
                             autoComplete="off"
                           />
                           <FlowEmailBodyEditor

@@ -3,9 +3,12 @@
  * Uses multi-locale templates from admin_hub_flow_steps.email_i18n when present.
  */
 
+const crypto = require('crypto')
 const { Client } = require('pg')
 const { resolveSmtpSenderIdentity } = require('./smtp-sender-resolve')
 const { resolveOrderPaidTotalCents } = require('./order-money')
+const { resolveFlowMailProvider, sendFlowOutboundEmail } = require('./email-providers')
+const { consumeFlowEmailSlot } = require('./flow-email-rate-limit')
 
 const FLOW_EMAIL_LOCALES = ['en', 'de', 'tr', 'fr', 'it', 'es']
 
@@ -156,6 +159,12 @@ function flowEmailHtmlToPlainText(html) {
     .trim()
 }
 
+function bundleSubjectB(b) {
+  if (!b || typeof b !== 'object') return ''
+  return String(b.subject_b || b.subjectAlt || '').trim()
+}
+
+/** Picks localized template; optional A/B subject line B per locale ({ subject_b } in bundle). */
 function pickStepTemplate(step, locale) {
   const i18n = step.email_i18n
   const tryLocales = [locale, 'en', 'de']
@@ -165,19 +174,38 @@ function pickStepTemplate(step, locale) {
       const b = i18n[loc]
       const subj = String(b?.subject || '').trim()
       const body = String(b?.body || '').trim()
-      if (subj && body) return { subject: subj, body }
+      if (subj && body) {
+        const sb = bundleSubjectB(b)
+        return { subject: subj, body, subject_b: sb || undefined }
+      }
     }
     for (const loc of FLOW_EMAIL_LOCALES) {
       const b = i18n[loc]
       const subj = String(b?.subject || '').trim()
       const body = String(b?.body || '').trim()
-      if (subj && body) return { subject: subj, body }
+      if (subj && body) {
+        const sb = bundleSubjectB(b)
+        return { subject: subj, body, subject_b: sb || undefined }
+      }
     }
   }
   const ls = String(step.email_subject || '').trim()
   const lb = String(step.email_body || '').trim()
   if (ls && lb) return { subject: ls, body: lb }
   return null
+}
+
+/** Deterministic A/B from idempotency key so retries keep the same subject line. */
+function pickSubjectForAb(idempotencyKey, primary, variantB) {
+  const b = String(variantB || '').trim()
+  if (!b) return { text: String(primary || '').trim(), variant: null }
+  const off = String(process.env.FLOW_AB_SUBJECT_SPLIT || '1').trim().toLowerCase()
+  if (off === '0' || off === 'false' || off === 'off') {
+    return { text: String(primary || '').trim(), variant: 'a' }
+  }
+  const digest = crypto.createHash('sha256').update(String(idempotencyKey || '')).digest()
+  const useB = digest[0] % 2 === 1
+  return useB ? { text: b, variant: 'b' } : { text: String(primary || '').trim(), variant: 'a' }
 }
 
 async function getSmtpTransport(client) {
@@ -196,6 +224,62 @@ async function getSmtpTransport(client) {
     secure: !!s.secure,
     auth: { user: s.username, pass: s.password_enc || '' },
   })
+}
+
+function buildFlowStepIdempotencyKey({ triggerKey, flowId, stepOrder, audience, recipientEmail, orderId, customerId }) {
+  const raw = [
+    String(triggerKey || '').trim().toLowerCase(),
+    String(flowId || '').trim().toLowerCase(),
+    String(stepOrder != null ? stepOrder : '').trim(),
+    String(audience || '').trim().toLowerCase(),
+    String(recipientEmail || '').trim().toLowerCase(),
+    String(orderId || '').trim().toLowerCase(),
+    String(customerId || '').trim().toLowerCase(),
+  ].join('|')
+  return crypto.createHash('sha256').update(raw).digest('hex')
+}
+
+async function reserveFlowExecutionLog(client, entry) {
+  const r = await client.query(
+    `INSERT INTO store_flow_execution_logs
+      (trigger_key, flow_id, step_order, audience, recipient_email, order_id, customer_id, idempotency_key, status, attempts, metadata, created_at, updated_at)
+     VALUES
+      ($1, $2::uuid, $3, $4, $5, NULLIF($6,'')::uuid, NULLIF($7,'')::uuid, $8, 'pending', 1, $9::jsonb, now(), now())
+     ON CONFLICT (idempotency_key) DO UPDATE
+       SET attempts = store_flow_execution_logs.attempts + 1,
+           updated_at = now()
+     RETURNING id, status, attempts`,
+    [
+      String(entry.triggerKey || '').trim(),
+      String(entry.flowId || '').trim(),
+      Number(entry.stepOrder || 0),
+      String(entry.audience || '').trim(),
+      String(entry.recipientEmail || '').trim().toLowerCase(),
+      String(entry.orderId || '').trim(),
+      String(entry.customerId || '').trim(),
+      String(entry.idempotencyKey || '').trim(),
+      JSON.stringify(entry.metadata || {}),
+    ],
+  )
+  return r.rows[0] || null
+}
+
+async function finalizeFlowExecutionLog(client, idempotencyKey, patch) {
+  await client.query(
+    `UPDATE store_flow_execution_logs
+     SET status = $2,
+         error_message = $3,
+         sent_at = CASE WHEN $2 = 'sent' THEN now() ELSE sent_at END,
+         metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb,
+         updated_at = now()
+     WHERE idempotency_key = $1`,
+    [
+      String(idempotencyKey || '').trim(),
+      String(patch.status || '').trim() || 'pending',
+      patch.errorMessage ? String(patch.errorMessage).slice(0, 1500) : null,
+      JSON.stringify(patch.metadata || {}),
+    ],
+  )
 }
 
 async function loadOrderContext(client, orderId) {
@@ -537,6 +621,7 @@ async function buildFlowEmailPlaceholderVarsForCustomer(client, customerId) {
 async function sendImmediateStepsForFlow({
   client,
   transport,
+  rateScopeKey,
   flowId,
   audience,
   triggerKey,
@@ -545,6 +630,7 @@ async function sendImmediateStepsForFlow({
   templateLocale,
   placeholderVars,
   orderId,
+  customerId,
 }) {
   const { buildFlowEmailPdfAttachments } = require('./order-pdf-buffers')
   let idx = 0
@@ -566,8 +652,40 @@ async function sendImmediateStepsForFlow({
       idx += 1
       continue
     }
+    const stepOrder = Number(s.step_order || idx + 1)
+    const idempotencyKey = buildFlowStepIdempotencyKey({
+      triggerKey,
+      flowId,
+      stepOrder,
+      audience,
+      recipientEmail: toEmail,
+      orderId,
+      customerId,
+    })
+    const reserved = await reserveFlowExecutionLog(client, {
+      triggerKey,
+      flowId,
+      stepOrder,
+      audience,
+      recipientEmail: toEmail,
+      orderId,
+      customerId,
+      idempotencyKey,
+      metadata: { templateLocale, step_type: s.step_type, channel: 'email' },
+    })
+    if (reserved && reserved.attempts > 1 && reserved.status === 'sent') {
+      console.log(
+        `[flow-automation] idempotent-skip trigger=${triggerKey} flow=${flowId} step=${stepOrder} recipient=${String(toEmail || '').toLowerCase()}`,
+      )
+      idx += 1
+      continue
+    }
     const tpl = pickStepTemplate(s, templateLocale)
     if (!tpl) {
+      await finalizeFlowExecutionLog(client, idempotencyKey, {
+        status: 'skipped',
+        errorMessage: 'template_empty',
+      })
       console.warn(
         `[flow-automation] flow ${flowId} step ${idx + 1}: skipped — email subject/body is empty. Fill in the template in Content → Flows.`,
       )
@@ -575,10 +693,15 @@ async function sendImmediateStepsForFlow({
       continue
     }
     if (!toEmail) {
+      await finalizeFlowExecutionLog(client, idempotencyKey, {
+        status: 'skipped',
+        errorMessage: 'recipient_missing',
+      })
       idx += 1
       continue
     }
-    const subject = applyFlowEmailPlaceholders(tpl.subject, placeholderVars)
+    const { text: subjectRaw, variant: abVariant } = pickSubjectForAb(idempotencyKey, tpl.subject, tpl.subject_b)
+    const subject = applyFlowEmailPlaceholders(subjectRaw, placeholderVars)
     const html = applyFlowEmailPlaceholders(tpl.body, placeholderVars)
     const plain = flowEmailHtmlToPlainText(html)
     let attachments = []
@@ -593,25 +716,70 @@ async function sendImmediateStepsForFlow({
     }
     const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, s.smtp_sender_id)
     if (!fromEmail) {
+      await finalizeFlowExecutionLog(client, idempotencyKey, {
+        status: 'skipped',
+        errorMessage: 'smtp_sender_missing',
+      })
       idx += 1
       continue
     }
-    await transport.sendMail({
-      from: `"${String(fromName).replace(/"/g, '')}" <${fromEmail}>`,
-      to: toEmail,
-      subject,
-      html,
-      text: plain || subject,
-      ...(attachments.length ? { attachments } : {}),
-    })
+    let sendMeta = { provider: resolveFlowMailProvider() === 'resend' ? 'resend' : 'smtp' }
+    try {
+      try {
+        consumeFlowEmailSlot(rateScopeKey || 'default')
+      } catch (rlErr) {
+        await finalizeFlowExecutionLog(client, idempotencyKey, {
+          status: 'failed',
+          errorMessage: rlErr?.message || 'rate_limited',
+          metadata: { channel: 'email', ab_variant: abVariant, rate_limited: true },
+        })
+        idx += 1
+        continue
+      }
+      sendMeta = await sendFlowOutboundEmail({
+        transport,
+        from: `"${String(fromName).replace(/"/g, '')}" <${fromEmail}>`,
+        to: toEmail,
+        subject,
+        html,
+        text: plain || subject,
+        attachments: attachments.length ? attachments : undefined,
+      })
+      await finalizeFlowExecutionLog(client, idempotencyKey, {
+        status: 'sent',
+        metadata: {
+          channel: 'email',
+          mail_provider: sendMeta.provider,
+          message_id: sendMeta.messageId || null,
+          ab_variant: abVariant,
+        },
+      })
+    } catch (sendErr) {
+      await finalizeFlowExecutionLog(client, idempotencyKey, {
+        status: 'failed',
+        errorMessage: sendErr?.message || String(sendErr || 'send_failed'),
+        metadata: { channel: 'email', ab_variant: abVariant },
+      })
+      console.error(
+        `[flow-automation] send failed trigger=${triggerKey} flow=${flowId} step=${stepOrder}:`,
+        sendErr?.message || sendErr,
+      )
+      idx += 1
+      continue
+    }
     try {
       await client.query(
         `INSERT INTO store_newsletter_email_logs (subscriber_id, recipient_email, subject, provider, delivery_status, flow_trigger_key, sent_at)
-         SELECT s.id, $1, $2, 'smtp', 'sent', $3, now()
+         SELECT s.id, $1, $2, $4, 'sent', $3, now()
          FROM store_newsletter_subscribers s
          WHERE LOWER(s.email) = LOWER($1)
          LIMIT 1`,
-        [String(toEmail || '').trim().toLowerCase(), String(subject || '').trim(), String(triggerKey || '').trim() || null],
+        [
+          String(toEmail || '').trim().toLowerCase(),
+          String(subject || '').trim(),
+          String(triggerKey || '').trim() || null,
+          String(sendMeta.provider || 'smtp'),
+        ],
       )
     } catch (_) {
       // Do not block flow emails when newsletter log insert fails.
@@ -656,10 +824,20 @@ async function runAutomationFlowsForOrder(opts) {
       return
     }
 
-    const transport = await getSmtpTransport(client)
-    if (!transport) {
-      console.warn('[flow-automation] skip: SMTP not configured (store_smtp_settings needs host + username)')
-      return
+    const useResend = resolveFlowMailProvider() === 'resend'
+    let transport = null
+    if (!useResend) {
+      transport = await getSmtpTransport(client)
+      if (!transport) {
+        console.warn('[flow-automation] skip: SMTP not configured (store_smtp_settings needs host + username)')
+        return
+      }
+    } else {
+      const key = String(process.env.RESEND_API_KEY || '').trim()
+      if (!key) {
+        console.warn('[flow-automation] skip: FLOW_MAIL_PROVIDER=resend but RESEND_API_KEY missing')
+        return
+      }
     }
 
     let customerProfile = null
@@ -672,6 +850,7 @@ async function runAutomationFlowsForOrder(opts) {
     }
     const placeholderVars = buildPlaceholderVars(ctx, triggerKey, customerProfile)
     const customerLocale = resolveEmailLocaleFromCountry(ctx.order.country)
+    const rateScopeKey = String(ctx.order.seller_id || 'default').trim() || 'default'
 
     const flowsR = await client.query(
       `SELECT id, audience FROM admin_hub_flows
@@ -729,6 +908,7 @@ async function runAutomationFlowsForOrder(opts) {
       const n = await sendImmediateStepsForFlow({
         client,
         transport,
+        rateScopeKey,
         flowId,
         audience,
         triggerKey,
@@ -737,6 +917,7 @@ async function runAutomationFlowsForOrder(opts) {
         templateLocale,
         placeholderVars,
         orderId,
+        customerId: ctx.order.customer_id ? String(ctx.order.customer_id) : '',
       })
       totalEmails += n
     }
@@ -757,8 +938,118 @@ async function runAutomationFlowsForOrder(opts) {
   }
 }
 
+/**
+ * @param {{ triggerKey: string, customerId?: string, email?: string }} opts
+ */
+async function runAutomationFlowsForCustomerEvent(opts) {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) {
+    console.warn('[flow-automation] skip customer event: DATABASE_URL missing')
+    return
+  }
+  const triggerKey = String(opts.triggerKey || '').trim()
+  const customerId = String(opts.customerId || '').trim()
+  const fallbackEmail = String(opts.email || '').trim().toLowerCase()
+  if (!triggerKey) return
+
+  let client
+  try {
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const useResend = resolveFlowMailProvider() === 'resend'
+    let transport = null
+    if (!useResend) {
+      transport = await getSmtpTransport(client)
+      if (!transport) {
+        console.warn('[flow-automation] skip customer event: SMTP not configured')
+        return
+      }
+    } else if (!String(process.env.RESEND_API_KEY || '').trim()) {
+      console.warn('[flow-automation] skip customer event: RESEND_API_KEY missing')
+      return
+    }
+
+    let cust = null
+    if (customerId) {
+      const c1 = await client.query(
+        `SELECT id, email, first_name, last_name, phone, gender, address_line1, address_line2, zip_code, city, country
+         FROM store_customers WHERE id = $1::uuid LIMIT 1`,
+        [customerId],
+      )
+      cust = c1.rows[0] || null
+    }
+    if (!cust && fallbackEmail) {
+      const c2 = await client.query(
+        `SELECT id, email, first_name, last_name, phone, gender, address_line1, address_line2, zip_code, city, country
+         FROM store_customers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) ORDER BY created_at DESC NULLS LAST LIMIT 1`,
+        [fallbackEmail],
+      )
+      cust = c2.rows[0] || null
+    }
+    if (!cust && fallbackEmail) {
+      cust = { email: fallbackEmail, first_name: '', last_name: '', phone: '', country: '' }
+    }
+    if (!cust) {
+      console.warn(`[flow-automation] skip customer event ${triggerKey}: recipient not found`)
+      return
+    }
+
+    const vars = await placeholderVarsCustomerOnly(client, cust)
+    const locale = resolveEmailLocaleFromCountry(cust.country || '')
+    const toEmail = String(cust.email || fallbackEmail || '').trim()
+    if (!toEmail) return
+
+    const flowsR = await client.query(
+      `SELECT id, audience FROM admin_hub_flows
+       WHERE status = 'active' AND trigger_key = $1
+       ORDER BY updated_at ASC`,
+      [triggerKey],
+    )
+    const flowRows = flowsR.rows || []
+    if (!flowRows.length) return
+
+    let total = 0
+    for (const fr of flowRows) {
+      const audience = String(fr.audience || 'customer').toLowerCase() === 'seller' ? 'seller' : 'customer'
+      if (audience !== 'customer') continue
+      const sr = await client.query(
+        `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
+         FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,
+        [fr.id],
+      )
+      const n = await sendImmediateStepsForFlow({
+        client,
+        transport,
+        rateScopeKey: 'customer_events',
+        flowId: fr.id,
+        audience,
+        triggerKey,
+        steps: sr.rows || [],
+        toEmail,
+        templateLocale: locale,
+        placeholderVars: vars,
+        orderId: '',
+        customerId: cust.id ? String(cust.id) : '',
+      })
+      total += n
+    }
+    if (total > 0) {
+      console.log(`[flow-automation] ${triggerKey} customer=${toEmail}: sent ${total} email(s)`)
+    }
+  } catch (e) {
+    console.error('[flow-automation] customer event failed', triggerKey, customerId || fallbackEmail, e?.message || e)
+  } finally {
+    if (client) {
+      try {
+        await client.end()
+      } catch (_) {}
+    }
+  }
+}
+
 module.exports = {
   runAutomationFlowsForOrder,
+  runAutomationFlowsForCustomerEvent,
   resolveEmailLocaleFromCountry,
   FLOW_EMAIL_LOCALES,
   buildFlowEmailPlaceholderVarsForCustomer,

@@ -16,7 +16,8 @@ try {
 
 const path = require('path')
 const fs = require('fs')
-const { runAutomationFlowsForOrder } = require('./src/flow-automation')
+const { runAutomationFlowsForOrder, runAutomationFlowsForCustomerEvent } = require('./src/flow-automation')
+const { enqueueFlowEvent, startFlowQueueWorker } = require('./src/flow-queue')
 const { resolveSmtpSenderIdentity } = require('./src/smtp-sender-resolve')
 const { renderInvoicePdfDocument } = require('./src/order-pdf-buffers')
 const { resolveOrderPaidTotalCents } = require('./src/order-money')
@@ -279,6 +280,37 @@ async function start() {
     }
 
     const app = express()
+    const dispatchOrderFlowEvent = async (triggerKey, orderId) => {
+      const tk = String(triggerKey || '').trim()
+      const oid = String(orderId || '').trim()
+      if (!tk || !oid) return
+      try {
+        const queued = await enqueueFlowEvent('order-flow-event', { triggerKey: tk, orderId: oid })
+        if (queued) return
+      } catch (qe) {
+        console.warn('[flow-queue] enqueue order event failed, fallback immediate:', qe?.message || qe)
+      }
+      setImmediate(() => {
+        runAutomationFlowsForOrder({ triggerKey: tk, orderId: oid }).catch((fe) => {
+          console.warn(`runAutomationFlowsForOrder ${tk}:`, fe?.message || fe)
+        })
+      })
+    }
+    const dispatchCustomerFlowEvent = async (triggerKey, payload = {}) => {
+      const tk = String(triggerKey || '').trim()
+      if (!tk) return
+      try {
+        const queued = await enqueueFlowEvent('customer-flow-event', { triggerKey: tk, ...payload })
+        if (queued) return
+      } catch (qe) {
+        console.warn('[flow-queue] enqueue customer event failed, fallback immediate:', qe?.message || qe)
+      }
+      setImmediate(() => {
+        runAutomationFlowsForCustomerEvent({ triggerKey: tk, ...payload }).catch((fe) => {
+          console.warn(`runAutomationFlowsForCustomerEvent ${tk}:`, fe?.message || fe)
+        })
+      })
+    }
     const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '10mb'
     // Preserve raw Buffer on req.rawBody for Stripe webhook signature verification.
     // express.json() still parses normally; webhook handler reads req.rawBody instead of req.body.
@@ -1057,6 +1089,20 @@ async function start() {
         ).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_flows ADD COLUMN IF NOT EXISTS audience varchar(20) NOT NULL DEFAULT 'customer'`).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_admin_hub_flow_steps_flow ON admin_hub_flow_steps(flow_id, step_order)`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_flow_snapshots (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            flow_id uuid NOT NULL REFERENCES admin_hub_flows(id) ON DELETE CASCADE,
+            version_num integer NOT NULL,
+            flow_snapshot jsonb NOT NULL DEFAULT '{}',
+            steps_snapshot jsonb NOT NULL DEFAULT '[]',
+            created_at timestamptz NOT NULL DEFAULT now(),
+            UNIQUE(flow_id, version_num)
+          )
+        `).catch(() => {})
+        await client.query(
+          `CREATE INDEX IF NOT EXISTS idx_flow_snapshots_flow_ver ON admin_hub_flow_snapshots(flow_id, version_num DESC)`,
+        ).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS iban text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS payment_account_holder text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS payment_bic text;`).catch(() => {})
@@ -9573,11 +9619,7 @@ async function start() {
         const order = await getOrderWithItems(client, orderId)
         await client.end()
         res.status(201).json({ order })
-        setImmediate(() => {
-          runAutomationFlowsForOrder({ triggerKey: 'order_placed', orderId }).catch((fe) => {
-            console.warn('runAutomationFlowsForOrder order_placed:', fe?.message || fe)
-          })
-        })
+        void dispatchOrderFlowEvent('order_placed', orderId)
       } catch (err) {
         if (client) try { await client.end() } catch (_) {}
         console.error('Store orders POST:', err)
@@ -10915,11 +10957,10 @@ async function start() {
           },
         })
         if (fireOrderShipped) {
-          setImmediate(() => {
-            runAutomationFlowsForOrder({ triggerKey: 'order_shipped', orderId: id }).catch((fe) => {
-              console.warn('runAutomationFlowsForOrder order_shipped:', fe?.message || fe)
-            })
-          })
+          void dispatchOrderFlowEvent('order_shipped', id)
+        }
+        if (deliveryStatusChangedToZugestellt) {
+          void dispatchOrderFlowEvent('order_delivered', id)
         }
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -16458,6 +16499,37 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    const adminHubFlowSnapshotsGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const flowId = String(req.params.id || '').trim()
+      const full = String(req.query.full || '').trim() === '1'
+      const lim = Math.min(80, Math.max(1, parseInt(String(req.query.limit || '24'), 10) || 24))
+      if (!flowId) return res.status(400).json({ message: 'id required' })
+      try {
+        await client.connect()
+        const ex = await client.query(`SELECT id FROM admin_hub_flows WHERE id = $1::uuid`, [flowId])
+        if (!ex.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Flow not found' })
+        }
+        const cols = full
+          ? 'version_num, created_at, flow_snapshot, steps_snapshot'
+          : 'version_num, created_at'
+        const r = await client.query(
+          `SELECT ${cols} FROM admin_hub_flow_snapshots WHERE flow_id = $1::uuid ORDER BY version_num DESC LIMIT $2`,
+          [flowId, lim],
+        )
+        await client.end()
+        res.json({ snapshots: r.rows || [], count: r.rows?.length || 0 })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     const adminHubFlowPATCH = async (req, res) => {
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
@@ -16573,7 +16645,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                   if (!b || typeof b !== 'object') continue
                   const sj = String(b.subject || '').trim()
                   const bd = String(b.body || '').trim()
-                  if (sj && bd) emailI18nObj[loc] = { subject: sj, body: bd }
+                  if (sj && bd) {
+                    const bundle = { subject: sj, body: bd }
+                    const s2 = String(b.subject_b || '').trim()
+                    if (s2) bundle.subject_b = s2
+                    emailI18nObj[loc] = bundle
+                  }
                 }
                 if (!Object.keys(emailI18nObj).length) emailI18nObj = null
               }
@@ -16661,6 +16738,28 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             )
           }
           await client.query('COMMIT')
+          try {
+            const frSnap = await client.query(
+              `SELECT id, name, trigger_key, status, audience, sent_count, created_at, updated_at FROM admin_hub_flows WHERE id = $1::uuid`,
+              [id],
+            )
+            const srSnap = await client.query(
+              `SELECT * FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,
+              [id],
+            )
+            const vq = await client.query(
+              `SELECT COALESCE(MAX(version_num), 0) + 1 AS v FROM admin_hub_flow_snapshots WHERE flow_id = $1::uuid`,
+              [id],
+            )
+            const vn = Math.max(1, parseInt(String(vq.rows[0]?.v || '1'), 10) || 1)
+            await client.query(
+              `INSERT INTO admin_hub_flow_snapshots (flow_id, version_num, flow_snapshot, steps_snapshot)
+               VALUES ($1::uuid, $2, $3::jsonb, $4::jsonb)`,
+              [id, vn, JSON.stringify(frSnap.rows[0] || {}), JSON.stringify(srSnap.rows || [])],
+            )
+          } catch (snapErr) {
+            console.warn('[flow-snapshot]', snapErr?.message || snapErr)
+          }
         }
 
         const fr = await client.query(`SELECT * FROM admin_hub_flows WHERE id = $1`, [id])
@@ -16800,7 +16899,19 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           }
         }
 
-        const transport = await getSmtpTransport(client)
+        const { resolveFlowMailProvider, sendFlowOutboundEmail } = require('./src/email-providers')
+        const useResend = resolveFlowMailProvider() === 'resend'
+        let transport = null
+        if (!useResend) {
+          transport = await getSmtpTransport(client)
+          if (!transport) {
+            await client.end()
+            return res.status(400).json({ message: 'SMTP not configured' })
+          }
+        } else if (!String(process.env.RESEND_API_KEY || '').trim()) {
+          await client.end()
+          return res.status(400).json({ message: 'RESEND_API_KEY required when FLOW_MAIL_PROVIDER=resend' })
+        }
         const bodySenderRaw = body.smtp_sender_id
         const bodySender =
           bodySenderRaw != null && String(bodySenderRaw).trim() !== '' ? String(bodySenderRaw).trim() : null
@@ -16808,7 +16919,6 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, profileForSend)
         await client.end()
 
-        if (!transport) return res.status(400).json({ message: 'SMTP not configured' })
         const fromEmailTrim = String(fromEmail || '').trim()
         if (!fromEmailTrim) return res.status(400).json({ message: 'SMTP From email not set' })
 
@@ -16821,13 +16931,14 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const finalHtml = applyFlowEmailPlaceholders(htmlBody, mergedVars)
         const plain = flowEmailHtmlToPlainText(finalHtml)
 
-        await transport.sendMail({
+        await sendFlowOutboundEmail({
+          transport,
           from: `"${String(fromName).replace(/"/g, '')}" <${fromEmailTrim}>`,
           to: toRaw,
           subject: finalSubject,
           html: finalHtml,
           text: plain || finalSubject,
-          ...(pdfAttachments.length ? { attachments: pdfAttachments } : {}),
+          attachments: pdfAttachments.length ? pdfAttachments : undefined,
         })
         res.json({ success: true, message: 'Test email sent' })
       } catch (e) {
@@ -16926,9 +17037,171 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.post('/admin-hub/v1/flows/translate', requireSellerAuth, requireSuperuser, adminHubFlowTranslatePOST)
     httpApp.post('/admin-hub/v1/flows', requireSellerAuth, requireSuperuser, adminHubFlowsPOST)
     httpApp.post('/admin-hub/v1/flows/:id/test-email', requireSellerAuth, requireSuperuser, adminHubFlowTestEmailPOST)
+    httpApp.get('/admin-hub/v1/flows/:id/snapshots', requireSellerAuth, requireSuperuser, adminHubFlowSnapshotsGET)
     httpApp.get('/admin-hub/v1/flows/:id', requireSellerAuth, requireSuperuser, adminHubFlowGET)
     httpApp.patch('/admin-hub/v1/flows/:id', requireSellerAuth, requireSuperuser, adminHubFlowPATCH)
     httpApp.delete('/admin-hub/v1/flows/:id', requireSellerAuth, requireSuperuser, adminHubFlowDELETE)
+
+    const adminHubFlowExecutionLogsStatsGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const days = Math.min(90, Math.max(1, parseInt(String(req.query.days || '30'), 10) || 30))
+      const params = []
+      const conds = [`l.created_at >= now() - ($${1}::int * interval '1 day')`]
+      params.push(days)
+      let n = 2
+      const isSuperuser = !!(req.sellerUser?.is_superuser === true || req.sellerUser?.is_superuser === 'true')
+      const callerSellerId = String(req.sellerUser?.seller_id || '').trim()
+      if (!isSuperuser) {
+        if (!callerSellerId) return res.status(403).json({ message: 'Seller context required' })
+        conds.push(`EXISTS (SELECT 1 FROM store_orders o WHERE o.id = l.order_id AND o.seller_id = $${n++})`)
+        params.push(callerSellerId)
+      }
+      const where = `WHERE ${conds.join(' AND ')}`
+      try {
+        await client.connect()
+        const [st, tr, tot, prov] = await Promise.all([
+          client.query(
+            `SELECT l.status, COUNT(*)::int AS c FROM store_flow_execution_logs l ${where} GROUP BY l.status ORDER BY c DESC`,
+            params,
+          ),
+          client.query(
+            `SELECT l.trigger_key, COUNT(*)::int AS c FROM store_flow_execution_logs l ${where} GROUP BY l.trigger_key ORDER BY c DESC LIMIT 40`,
+            params,
+          ),
+          client.query(`SELECT COUNT(*)::int AS c FROM store_flow_execution_logs l ${where}`, params),
+          client.query(
+            `SELECT COALESCE(l.metadata->>'mail_provider', 'smtp') AS provider, COUNT(*)::int AS c
+             FROM store_flow_execution_logs l ${where} AND l.status = 'sent'
+             GROUP BY 1 ORDER BY c DESC`,
+            params,
+          ),
+        ])
+        await client.end()
+        res.json({
+          days,
+          total_in_window: tot.rows[0]?.c ?? 0,
+          by_status: st.rows || [],
+          by_trigger: tr.rows || [],
+          by_mail_provider: prov.rows || [],
+        })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubFlowExecutionLogsGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const lim = Math.min(200, Math.max(1, parseInt(String(req.query.limit || '50'), 10) || 50))
+      const off = Math.max(0, parseInt(String(req.query.offset || '0'), 10) || 0)
+      const statusRaw = String(req.query.status || '').trim().toLowerCase()
+      const triggerKey = String(req.query.trigger_key || '').trim().toLowerCase()
+      const flowId = String(req.query.flow_id || '').trim()
+      const allowedStatus = new Set(['pending', 'sent', 'skipped', 'failed'])
+      const params = []
+      const conds = []
+      let n = 1
+      if (statusRaw && allowedStatus.has(statusRaw)) {
+        conds.push(`l.status = $${n++}`)
+        params.push(statusRaw)
+      }
+      if (triggerKey) {
+        conds.push(`LOWER(TRIM(l.trigger_key)) = $${n++}`)
+        params.push(triggerKey)
+      }
+      if (flowId) {
+        conds.push(`l.flow_id = $${n++}::uuid`)
+        params.push(flowId)
+      }
+      const isSuperuser = !!(req.sellerUser?.is_superuser === true || req.sellerUser?.is_superuser === 'true')
+      const callerSellerId = String(req.sellerUser?.seller_id || '').trim()
+      if (!isSuperuser) {
+        if (!callerSellerId) {
+          return res.status(403).json({ message: 'Seller context required' })
+        }
+        conds.push(`EXISTS (SELECT 1 FROM store_orders o WHERE o.id = l.order_id AND o.seller_id = $${n++})`)
+        params.push(callerSellerId)
+      }
+      const where = conds.length ? `WHERE ${conds.join(' AND ')}` : ''
+      try {
+        await client.connect()
+        const countR = await client.query(`SELECT COUNT(*)::int AS c FROM store_flow_execution_logs l ${where}`, params)
+        const total = countR.rows[0]?.c ?? 0
+        const listParams = [...params, lim, off]
+        const limP = n
+        const offP = n + 1
+        const dataR = await client.query(
+          `SELECT l.id, l.trigger_key, l.flow_id, l.step_order, l.audience, l.recipient_email,
+                  l.order_id, l.customer_id, l.status, l.attempts, l.error_message,
+                  l.sent_at, l.created_at, l.updated_at, l.metadata,
+                  f.name AS flow_name
+           FROM store_flow_execution_logs l
+           LEFT JOIN admin_hub_flows f ON f.id = l.flow_id
+           ${where}
+           ORDER BY l.created_at DESC
+           LIMIT $${limP} OFFSET $${offP}`,
+          listParams,
+        )
+        await client.end()
+        res.json({
+          logs: dataR.rows || [],
+          count: dataR.rows?.length || 0,
+          total,
+          limit: lim,
+          offset: off,
+        })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubFlowExecutionLogGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      const isSuperuser = !!(req.sellerUser?.is_superuser === true || req.sellerUser?.is_superuser === 'true')
+      const callerSellerId = String(req.sellerUser?.seller_id || '').trim()
+      if (!isSuperuser && !callerSellerId) return res.status(403).json({ message: 'Seller context required' })
+      try {
+        await client.connect()
+        const r = isSuperuser
+          ? await client.query(
+              `SELECT l.*, f.name AS flow_name
+               FROM store_flow_execution_logs l
+               LEFT JOIN admin_hub_flows f ON f.id = l.flow_id
+               WHERE l.id = $1::uuid`,
+              [id],
+            )
+          : await client.query(
+              `SELECT l.*, f.name AS flow_name
+               FROM store_flow_execution_logs l
+               LEFT JOIN admin_hub_flows f ON f.id = l.flow_id
+               INNER JOIN store_orders o ON o.id = l.order_id
+               WHERE l.id = $1::uuid AND o.seller_id = $2`,
+              [id, callerSellerId],
+            )
+        await client.end()
+        if (!r.rows[0]) return res.status(404).json({ message: 'Log not found' })
+        res.json({ log: r.rows[0] })
+      } catch (e) {
+        try {
+          await client.end()
+        } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    httpApp.get('/admin-hub/v1/flow-execution-logs/stats', requireSellerAuth, adminHubFlowExecutionLogsStatsGET)
+    httpApp.get('/admin-hub/v1/flow-execution-logs', requireSellerAuth, adminHubFlowExecutionLogsGET)
+    httpApp.get('/admin-hub/v1/flow-execution-logs/:id', requireSellerAuth, adminHubFlowExecutionLogGET)
 
     // ── Coupons ────────────────────────────────────────────────────────────────
     const adminHubCouponsGET = async (req, res) => {
@@ -20705,6 +20978,28 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       sent_at timestamptz DEFAULT now()
     )`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_newsletter_logs_subscriber ON store_newsletter_email_logs(subscriber_id, sent_at DESC)`).catch(() => {})
+    // Flow execution log: idempotency + status tracking (incremental, backwards-compatible)
+    await dbQ(`CREATE TABLE IF NOT EXISTS store_flow_execution_logs (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      trigger_key text NOT NULL,
+      flow_id uuid REFERENCES admin_hub_flows(id) ON DELETE CASCADE,
+      step_order integer NOT NULL DEFAULT 0,
+      audience text NOT NULL DEFAULT 'customer',
+      recipient_email text,
+      order_id uuid REFERENCES store_orders(id) ON DELETE SET NULL,
+      customer_id uuid REFERENCES store_customers(id) ON DELETE SET NULL,
+      idempotency_key text NOT NULL,
+      status text NOT NULL DEFAULT 'pending',
+      attempts integer NOT NULL DEFAULT 1,
+      error_message text,
+      metadata jsonb,
+      sent_at timestamptz,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now(),
+      UNIQUE(idempotency_key)
+    )`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_flow_exec_trigger_created ON store_flow_execution_logs(trigger_key, created_at DESC)`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_flow_exec_status_created ON store_flow_execution_logs(status, created_at DESC)`).catch(() => {})
     await dbQ(`
       INSERT INTO store_newsletter_subscribers (email, source, status, first_name, last_name, subscribed_at, updated_at)
       SELECT DISTINCT LOWER(TRIM(c.email)) AS email,
@@ -20762,6 +21057,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         ).catch(() => {})
         await c.end()
         res.json({ ok: true })
+        void dispatchCustomerFlowEvent('new_subscriber', {
+          email: String(email).trim().toLowerCase(),
+        })
       } catch (e) {
         try { await c.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -20975,6 +21273,22 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       computeRankingFeatures().catch(() => {})
       setInterval(() => computeRankingFeatures().catch(() => {}), 2 * 60 * 60 * 1000)
     }, 30 * 1000) // 30s delay after startup
+
+    startFlowQueueWorker({
+      onOrderEvent: async (jobData) => {
+        await runAutomationFlowsForOrder({
+          triggerKey: String(jobData?.triggerKey || '').trim(),
+          orderId: String(jobData?.orderId || '').trim(),
+        })
+      },
+      onCustomerEvent: async (jobData) => {
+        await runAutomationFlowsForCustomerEvent({
+          triggerKey: String(jobData?.triggerKey || '').trim(),
+          customerId: String(jobData?.customerId || '').trim(),
+          email: String(jobData?.email || '').trim(),
+        })
+      },
+    })
 
     try {
       const { mountBillbeeMarketplaceApi } = require(path.join(__dirname, 'billbee-marketplace-api'))

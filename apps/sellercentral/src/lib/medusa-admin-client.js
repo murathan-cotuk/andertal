@@ -1121,6 +1121,37 @@ class MedusaAdminClient {
     })
   }
 
+  /** Flow email execution log (store_flow_execution_logs). Superuser: all rows; sellers: rows linked to own orders only. */
+  async getFlowExecutionLogs(params = {}) {
+    const qs = new URLSearchParams()
+    if (params.limit != null && params.limit !== '') qs.set('limit', String(params.limit))
+    if (params.offset != null && params.offset !== '') qs.set('offset', String(params.offset))
+    if (params.status) qs.set('status', String(params.status))
+    if (params.trigger_key) qs.set('trigger_key', String(params.trigger_key))
+    if (params.flow_id) qs.set('flow_id', String(params.flow_id))
+    const q = qs.toString()
+    return this.request(`/admin-hub/v1/flow-execution-logs${q ? `?${q}` : ''}`)
+  }
+
+  async getFlowExecutionLog(id) {
+    return this.request(`/admin-hub/v1/flow-execution-logs/${encodeURIComponent(id)}`)
+  }
+
+  async getFlowExecutionLogStats(params = {}) {
+    const qs = new URLSearchParams()
+    if (params.days != null && params.days !== '') qs.set('days', String(params.days))
+    const q = qs.toString()
+    return this.request(`/admin-hub/v1/flow-execution-logs/stats${q ? `?${q}` : ''}`)
+  }
+
+  async getFlowSnapshots(flowId, params = {}) {
+    const qs = new URLSearchParams()
+    if (params.limit != null) qs.set('limit', String(params.limit))
+    if (params.full) qs.set('full', '1')
+    const q = qs.toString()
+    return this.request(`/admin-hub/v1/flows/${encodeURIComponent(flowId)}/snapshots${q ? `?${q}` : ''}`)
+  }
+
   async getTransactions(params = {}) {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
     return this.request(`/admin-hub/v1/transactions${qs}`)

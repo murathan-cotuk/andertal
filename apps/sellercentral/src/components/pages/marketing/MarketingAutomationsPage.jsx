@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, Fragment } from "react";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 /* ─── Automation definitions ─────────────────────────────────── */
@@ -13,7 +13,7 @@ const AUTOMATION_DEFS = [
     accentBg: "#fef3c7",
     title: "Bewertungsanfrage",
     desc: "Bittet Kunden nach der Lieferung automatisch um eine Produktbewertung — der stärkste Hebel für Social Proof.",
-    trigger: "Lieferstatus „zugestellt"",
+    trigger: "Lieferstatus „zugestellt“",
     fields: [
       { key: "delay_days", label: "Verzögerung nach Lieferung", type: "number", suffix: "Tage", default: 3, min: 1, max: 14 },
       { key: "email_subject", label: "E-Mail-Betreff", type: "text", default: "Wie war Ihre Bestellung? Ihre Meinung zählt!" },
@@ -324,6 +324,294 @@ function AutomationCard({ def, rule, stats, onSave, onToggle, saving }) {
   );
 }
 
+/* ─── Flow execution log (store_flow_execution_logs) — all sellers; scope enforced by API ─── */
+function formatDt(iso) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return String(iso);
+  }
+}
+
+function statusColor(st) {
+  const s = String(st || "").toLowerCase();
+  if (s === "sent") return { bg: "#d1fae5", fg: "#047857", border: "#6ee7b7" };
+  if (s === "failed") return { bg: "#fee2e2", fg: "#b91c1c", border: "#fca5a5" };
+  if (s === "skipped") return { bg: "#f3f4f6", fg: "#4b5563", border: "#d1d5db" };
+  if (s === "pending") return { bg: "#fef3c7", fg: "#b45309", border: "#fcd34d" };
+  return { bg: "#e0e7ff", fg: "#3730a3", border: "#a5b4fc" };
+}
+
+function FlowExecutionLogPanel() {
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  const [execStats, setExecStats] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [expandedId, setExpandedId] = useState(null);
+  const limit = 25;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || localStorage.getItem("sellerIsSuperuser") !== "true") return;
+    getMedusaAdminClient().getFlowExecutionLogStats({ days: 30 }).then(setExecStats).catch(() => setExecStats(null));
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      const client = getMedusaAdminClient();
+      const data = await client.getFlowExecutionLogs({
+        limit,
+        offset,
+        ...(statusFilter ? { status: statusFilter } : {}),
+      });
+      setLogs(Array.isArray(data?.logs) ? data.logs : []);
+      setTotal(typeof data?.total === "number" ? data.total : 0);
+    } catch (e) {
+      setErr(e?.message || "Protokoll konnte nicht geladen werden.");
+      setLogs([]);
+      setTotal(0);
+    }
+    setLoading(false);
+    if (typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true") {
+      getMedusaAdminClient().getFlowExecutionLogStats({ days: 30 }).then(setExecStats).catch(() => {});
+    }
+  }, [offset, statusFilter]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const hasPrev = offset > 0;
+  const hasNext = offset + logs.length < total;
+
+  return (
+    <div style={{
+      marginTop: 28,
+      marginBottom: 24,
+      padding: "20px 22px",
+      borderRadius: 14,
+      background: "#fff",
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+            E-Mail-Flow Aktivität
+          </h2>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#64748b", maxWidth: 620 }}>
+            {isSuperuser ? (
+              <>
+                Protokoll der Flow-Schritte (Versand, übersprungen, fehlgeschlagen) für die gesamte Plattform — inkl. Content → Flows und optionaler Warteschlange.
+              </>
+            ) : (
+              <>
+                Nur Einträge zu{" "}
+                <strong style={{ color: "#475569" }}>Ihren Bestellungen</strong>{" "}
+                (über <code style={{ fontSize: 11 }}>order_id</code> → <code style={{ fontSize: 11 }}>seller_id</code>).
+                Flows ohne Bestellbezug (z. B. reiner Newsletter) erscheinen hier nicht.
+              </>
+            )}
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setOffset(0); setStatusFilter(e.target.value); }}
+            style={{
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid #e2e8f0",
+              fontSize: 13,
+              background: "#fff",
+              color: "#334155",
+            }}
+          >
+            <option value="">Alle Status</option>
+            <option value="pending">pending</option>
+            <option value="sent">sent</option>
+            <option value="skipped">skipped</option>
+            <option value="failed">failed</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => load()}
+            disabled={loading}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: "#f8fafc",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#334155",
+              cursor: loading ? "wait" : "pointer",
+            }}
+          >
+            Aktualisieren
+          </button>
+        </div>
+      </div>
+
+      {err && (
+        <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", fontSize: 13, color: "#b91c1c" }}>
+          {err}
+        </div>
+      )}
+
+      {isSuperuser && execStats != null && typeof execStats.total_in_window === "number" && (
+        <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: 12, color: "#475569" }}>
+          <strong style={{ color: "#334155" }}>{execStats.days || 30}-Tage‑Überblick:</strong>{" "}
+          {execStats.total_in_window.toLocaleString("de-DE")} Ausführungen
+          {Array.isArray(execStats.by_status) && execStats.by_status.length > 0 && (
+            <> · {execStats.by_status.map((r) => `${r.status}: ${r.c}`).join(", ")}</>
+          )}
+        </div>
+      )}
+
+      <div style={{ marginTop: 16, overflowX: "auto" }}>
+        {loading && logs.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Laden…</div>
+        ) : logs.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+            Noch keine Einträge oder Filter passt auf keine Zeilen.
+          </div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
+                <th style={{ padding: "8px 6px", fontWeight: 600 }}>Zeit</th>
+                <th style={{ padding: "8px 6px", fontWeight: 600 }}>Status</th>
+                <th style={{ padding: "8px 6px", fontWeight: 600 }}>Trigger</th>
+                <th style={{ padding: "8px 6px", fontWeight: 600 }}>Flow</th>
+                <th style={{ padding: "8px 6px", fontWeight: 600 }}>Schritt</th>
+                <th style={{ padding: "8px 6px", fontWeight: 600 }}>Empfänger</th>
+                <th style={{ padding: "8px 6px", fontWeight: 600 }}>Versuche</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((row) => {
+                const sc = statusColor(row.status);
+                const id = row.id;
+                const open = expandedId === id;
+                return (
+                  <Fragment key={id}>
+                    <tr
+                      style={{ borderBottom: "1px solid #f1f5f9", cursor: row.error_message ? "pointer" : "default" }}
+                      onClick={() => {
+                        if (!row.error_message && !open) return;
+                        setExpandedId(open ? null : id);
+                      }}
+                    >
+                      <td style={{ padding: "10px 6px", color: "#334155", whiteSpace: "nowrap" }}>{formatDt(row.created_at)}</td>
+                      <td style={{ padding: "10px 6px" }}>
+                        <span style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          fontSize: 11,
+                          background: sc.bg,
+                          color: sc.fg,
+                          border: `1px solid ${sc.border}`,
+                        }}>
+                          {row.status || "—"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 6px", color: "#475569", maxWidth: 120 }} title={row.trigger_key}>
+                        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {row.trigger_key || "—"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 6px", color: "#475569", maxWidth: 160 }} title={row.flow_name || ""}>
+                        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {row.flow_name || "—"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 6px", color: "#64748b" }}>{row.step_order ?? "—"}</td>
+                      <td style={{ padding: "10px 6px", color: "#475569", maxWidth: 200 }} title={row.recipient_email || ""}>
+                        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {row.recipient_email || "—"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 6px", color: "#64748b" }}>{row.attempts ?? "—"}</td>
+                    </tr>
+                    {open && row.error_message ? (
+                      <tr style={{ background: "#fafafa" }}>
+                        <td colSpan={7} style={{ padding: "10px 12px", fontSize: 11, color: "#b91c1c", wordBreak: "break-word", fontFamily: "ui-monospace, monospace" }}>
+                          <strong style={{ color: "#7f1d1d" }}>Fehler: </strong>
+                          {row.error_message}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {total > 0 && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, flexWrap: "wrap", gap: 8 }}>
+          <span style={{ fontSize: 12, color: "#94a3b8" }}>
+            {total.toLocaleString("de-DE")} Einträge gesamt · Anzeige {offset + 1}–{offset + logs.length}
+          </span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              disabled={!hasPrev || loading}
+              onClick={() => setOffset(Math.max(0, offset - limit))}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "1px solid #e2e8f0",
+                background: "#fff",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#334155",
+                cursor: !hasPrev || loading ? "not-allowed" : "pointer",
+                opacity: !hasPrev || loading ? 0.45 : 1,
+              }}
+            >
+              Zurück
+            </button>
+            <button
+              type="button"
+              disabled={!hasNext || loading}
+              onClick={() => setOffset(offset + limit)}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "1px solid #e2e8f0",
+                background: "#fff",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#334155",
+                cursor: !hasNext || loading ? "not-allowed" : "pointer",
+                opacity: !hasNext || loading ? 0.45 : 1,
+              }}
+            >
+              Weiter
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function MarketingAutomationsPage() {
   const [rules, setRules] = useState({}); // type → rule object
@@ -467,6 +755,8 @@ export default function MarketingAutomationsPage() {
             );
           })
         )}
+
+        <FlowExecutionLogPanel />
 
         {/* Info footer */}
         <div style={{ marginTop: 8, padding: "16px 20px", borderRadius: 12, background: "#fff", border: "1px solid #e2e8f0", fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>
