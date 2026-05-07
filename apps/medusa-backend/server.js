@@ -19039,6 +19039,74 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
     // ── End Stripe Connect Routes ────────────────────────────────────────────
 
+    // ── Sendcloud Webhook ────────────────────────────────────────────────────
+    // Maps Sendcloud parcel status IDs to internal delivery statuses
+    function mapSendcloudStatus(statusId) {
+      // https://support.sendcloud.com/hc/en-us/articles/360024967051
+      const id = Number(statusId)
+      if ([11, 12, 22, 26].includes(id)) return 'zugestellt'      // Delivered / at pickup point
+      if ([15, 29].includes(id)) return 'exception'                 // Exception / error
+      if ([31, 32, 33].includes(id)) return 'retour'               // Return
+      if ([8, 24].includes(id)) return 'in_transit'                // Out for delivery
+      if ([1, 2, 3, 4, 5, 6, 7, 13, 21, 23, 25].includes(id)) return 'versendet'
+      return 'in_transit'
+    }
+
+    httpApp.post('/webhook/sendcloud', async (req, res) => {
+      // Sendcloud sends JSON — no raw body signature needed unless SENDCLOUD_WEBHOOK_SECRET is set
+      const secret = process.env.SENDCLOUD_WEBHOOK_SECRET
+      if (secret) {
+        const _c = require('crypto')
+        const given = req.headers['sendcloud-signature'] || req.headers['x-sendcloud-signature'] || ''
+        const expected = _c.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex')
+        if (given !== expected) return res.status(401).json({ message: 'Invalid signature' })
+      }
+      res.json({ received: true }) // ack immediately
+      try {
+        const payload = req.body || {}
+        const action = payload.action || ''
+        if (action !== 'parcel_status_changed') return
+        const parcel = payload.parcel || {}
+        const trackingNumber = String(parcel.tracking_number || parcel.awb_number || '').trim()
+        const statusId = parcel.status?.id ?? parcel.status_id
+        if (!trackingNumber || statusId == null) return
+        const internalStatus = mapSendcloudStatus(statusId)
+        const statusMessage = parcel.status?.message || parcel.status_message || ''
+        const location = parcel.carrier_code ? String(parcel.carrier_code).toUpperCase() : null
+        const ts = parcel.updated_at ? new Date(parcel.updated_at).toISOString() : new Date().toISOString()
+        const client = getDbClient()
+        if (!client) return
+        await client.connect()
+        // Find the order by tracking number
+        const orderRes = await client.query(
+          `SELECT id, delivery_status FROM store_orders WHERE tracking_number = $1 LIMIT 1`,
+          [trackingNumber]
+        )
+        const order = orderRes.rows[0]
+        if (order) {
+          // Upsert shipment event
+          const exists = await client.query(
+            `SELECT id FROM store_shipment_events WHERE order_id=$1::uuid AND status=$2 AND event_time=$3::timestamptz LIMIT 1`,
+            [order.id, internalStatus, ts]
+          )
+          if (!exists.rows.length) {
+            await client.query(
+              `INSERT INTO store_shipment_events (order_id, status, description, location, event_time, source) VALUES ($1::uuid,$2,$3,$4,$5::timestamptz,'sendcloud')`,
+              [order.id, internalStatus, statusMessage || null, location, ts]
+            )
+          }
+          // Update order status
+          if (internalStatus === 'zugestellt' && order.delivery_status !== 'zugestellt') {
+            await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date,now()), updated_at=now() WHERE id=$1::uuid`, [order.id])
+            await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [order.id])
+          } else if (internalStatus === 'versendet' || internalStatus === 'in_transit') {
+            await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [order.id])
+          }
+        }
+        await client.end()
+      } catch (_) {}
+    })
+
     // ── Stripe Webhook ───────────────────────────────────────────────────────
     // req.rawBody is the raw Buffer preserved by the express.json() verify callback above.
     // constructEvent MUST receive the raw bytes — parsing to JSON breaks the signature.

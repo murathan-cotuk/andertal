@@ -85,6 +85,7 @@ const SUPERUSER_NAV_HREF_FRAGMENTS = [
   "/orders/abandoned-checkouts",
   "/sellers-menu",
   "/sellers",
+  "/customers/newsletter",
   "/content/menus",
   "/content/categories",
   "/content/landing-page",
@@ -201,6 +202,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       subNavigationItems: [
         { url: "/customers", label: tx("list", "List") },
         { url: "/customers/reviews", label: tx("reviews", "Reviews") },
+        { url: "/customers/newsletter", label: tx("newsletter", "Newsletter"), superuserOnly: true },
       ],
     },
   ];
@@ -514,6 +516,7 @@ export default function PolarisLayout({ children }) {
     "/content/flows",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
+    "/customers/newsletter",
     "/settings/checkout",
   ]);
 
@@ -914,6 +917,7 @@ export default function PolarisLayout({ children }) {
     "/content/flows",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
+    "/customers/newsletter",
   ]);
 
   const filterNavForRole = (items) => {

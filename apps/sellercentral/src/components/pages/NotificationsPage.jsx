@@ -9,9 +9,20 @@ function itemKey(it) {
   return `${it.source_type}:${it.source_id}`;
 }
 
+function formatDateDmy(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 function NotificationRow({ it, busy, selected, onToggle, onDeleteOne }) {
   const k = itemKey(it);
-  const dt = it.created_at ? new Date(it.created_at).toLocaleString("de-DE") : "—";
+  const dt = formatDateDmy(it.created_at);
   return (
     <div
       style={{
@@ -65,8 +76,13 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
+  const [activeGroupKey, setActiveGroupKey] = useState(null);
 
   const flatItems = useMemo(() => groups.flatMap((g) => g.items || []), [groups]);
+  const activeGroupItems = useMemo(() => {
+    if (!activeGroupKey) return [];
+    return groups.find((g) => g.key === activeGroupKey)?.items || [];
+  }, [groups, activeGroupKey]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,15 +90,23 @@ export default function NotificationsPage() {
       const client = getMedusaAdminClient();
       const data = await client.getNotificationsFeed({ grouped: "1" });
       if (data.grouped && Array.isArray(data.groups)) {
-        setGroups(data.groups);
+        const nextGroups = data.groups;
+        setGroups(nextGroups);
+        setActiveGroupKey((prev) => {
+          if (prev && nextGroups.some((g) => g.key === prev)) return prev;
+          return nextGroups[0]?.key || null;
+        });
         setGrandTotal(typeof data.grand_total === "number" ? data.grand_total : (data.groups || []).reduce((s, g) => s + (g.items?.length || 0), 0));
       } else {
         const legacy = data.items || [];
-        setGroups([{ key: "all", label_de: "Alle", description_de: "", items: legacy, total: legacy.length }]);
+        const nextGroups = [{ key: "all", label_de: "Alle", description_de: "", items: legacy, total: legacy.length }];
+        setGroups(nextGroups);
+        setActiveGroupKey("all");
         setGrandTotal(typeof data.total === "number" ? data.total : legacy.length);
       }
     } catch {
       setGroups([]);
+      setActiveGroupKey(null);
       setGrandTotal(0);
     }
     setLoading(false);
@@ -107,6 +131,7 @@ export default function NotificationsPage() {
   }, [load]);
 
   const allKeys = useMemo(() => flatItems.map(itemKey), [flatItems]);
+  const visibleKeys = useMemo(() => activeGroupItems.map(itemKey), [activeGroupItems]);
 
   const toggleOne = (k) => {
     setSelected((prev) => {
@@ -117,9 +142,14 @@ export default function NotificationsPage() {
     });
   };
 
-  const toggleAll = () => {
-    if (selected.size === allKeys.length) setSelected(new Set());
-    else setSelected(new Set(allKeys));
+  const toggleAllVisible = () => {
+    const allVisibleSelected = visibleKeys.length > 0 && visibleKeys.every((k) => selected.has(k));
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (allVisibleSelected) visibleKeys.forEach((k) => n.delete(k));
+      else visibleKeys.forEach((k) => n.add(k));
+      return n;
+    });
   };
 
   const toggleSectionKeys = (sectionItems) => {
@@ -201,7 +231,7 @@ export default function NotificationsPage() {
   return (
     <Page
       title="Benachrichtigungen"
-      subtitle="Nach Kategorie gruppiert. Einträge werden nicht automatisch gelöscht — nur wenn Sie sie aus dieser Liste entfernen (technisch: Ausblendung für Ihr Konto)."
+      subtitle="Kategorien oben auswählen, darunter erscheinen nur die zugehörigen Benachrichtigungen."
     >
       <BlockStack gap="400">
         <Card>
@@ -239,6 +269,41 @@ export default function NotificationsPage() {
             <div style={{ width: "100%" }}>
               <div
                 style={{
+                  display: "flex",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  padding: "14px 16px",
+                  borderBottom: "1px solid #e5e7eb",
+                  background: "#fff",
+                }}
+              >
+                {groups.map((g) => {
+                  const count = g.items?.length || 0;
+                  const active = g.key === activeGroupKey;
+                  return (
+                    <button
+                      key={g.key}
+                      type="button"
+                      onClick={() => setActiveGroupKey(g.key)}
+                      style={{
+                        border: active ? "1px solid #111827" : "1px solid #d1d5db",
+                        background: active ? "#111827" : "#fff",
+                        color: active ? "#fff" : "#374151",
+                        borderRadius: 999,
+                        padding: "6px 12px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {g.label_de || g.key} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div
+                style={{
                   display: "grid",
                   gridTemplateColumns: "40px 1fr auto auto",
                   gap: 0,
@@ -254,65 +319,41 @@ export default function NotificationsPage() {
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "center" }}>
-                  <Checkbox label="" labelHidden checked={allKeys.length > 0 && selected.size === allKeys.length} onChange={toggleAll} />
+                  <Checkbox
+                    label=""
+                    labelHidden
+                    checked={visibleKeys.length > 0 && visibleKeys.every((k) => selected.has(k))}
+                    onChange={toggleAllVisible}
+                  />
                 </div>
-                <div>Gesamt ({grandTotal})</div>
+                <div>
+                  {groups.find((g) => g.key === activeGroupKey)?.label_de || "Kategorie"} (
+                  {activeGroupItems.length})
+                </div>
                 <div style={{ textAlign: "right" }}>Datum</div>
                 <div />
               </div>
 
-              {groups.map((g) => {
-                const sectionItems = g.items || [];
-                if (sectionItems.length === 0) return null;
-                const sectionKeys = sectionItems.map(itemKey);
-                const allSectionSelected = sectionKeys.length > 0 && sectionKeys.every((k) => selected.has(k));
-                return (
-                  <div key={g.key}>
-                    <div
-                      style={{
-                        padding: "14px 16px 10px",
-                        background: "linear-gradient(to bottom, #f8fafc 0%, #fff 100%)",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      <BlockStack gap="100">
-                        <InlineStack align="space-between" blockAlign="start" gap="400" wrap={false}>
-                          <BlockStack gap="050">
-                            <Text as="h2" variant="headingSm">
-                              {g.label_de}
-                            </Text>
-                            {g.description_de ? (
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {g.description_de}
-                              </Text>
-                            ) : null}
-                          </BlockStack>
-                          <InlineStack gap="200" wrap>
-                            <Text as="span" variant="bodySm" tone="subdued">
-                              {sectionItems.length} Einträge
-                            </Text>
-                            <Button size="slim" variant="plain" onClick={() => toggleSectionKeys(sectionItems)}>
-                              {allSectionSelected ? "Auswahl aufheben" : "Alle in dieser Kategorie"}
-                            </Button>
-                          </InlineStack>
-                        </InlineStack>
-                      </BlockStack>
-                    </div>
-                    <div>
-                      {sectionItems.map((it) => (
-                        <NotificationRow
-                          key={itemKey(it)}
-                          it={it}
-                          busy={busy}
-                          selected={selected}
-                          onToggle={toggleOne}
-                          onDeleteOne={deleteOne}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+              <div>
+                {activeGroupItems.length === 0 ? (
+                  <Box padding="400">
+                    <Text as="p" tone="subdued">
+                      Bu kategoride bildirim yok.
+                    </Text>
+                  </Box>
+                ) : (
+                  activeGroupItems.map((it) => (
+                    <NotificationRow
+                      key={itemKey(it)}
+                      it={it}
+                      busy={busy}
+                      selected={selected}
+                      onToggle={toggleOne}
+                      onDeleteOne={deleteOne}
+                    />
+                  ))
+                )}
+              </div>
             </div>
           )}
           {!loading && flatItems.length > 0 && (
