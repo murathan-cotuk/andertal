@@ -76,6 +76,137 @@ function ScoreBar({ value, max = 1, color = "#4f46e5" }) {
   );
 }
 
+function safeRatio(n, d) {
+  const nn = Number(n || 0);
+  const dd = Number(d || 0);
+  if (!dd || !Number.isFinite(dd)) return 0;
+  return nn / dd;
+}
+
+function RankingInsights({ products }) {
+  const metrics = useMemo(() => {
+    const rows = Array.isArray(products) ? products : [];
+    const totals = rows.reduce(
+      (acc, p) => {
+        acc.gmvCents += Number(p.gmv_30d_cents || 0);
+        acc.sales30 += Number(p.sales_30d || 0);
+        acc.impressions30 += Number(p.impressions_30d || 0);
+        acc.clicks30 += Number(p.clicks_30d || 0);
+        acc.atc30 += Number(p.add_to_cart_30d || 0);
+        acc.returns30 += Number(p.return_count_30d || 0);
+        const disc = Number(p.discount_pct || 0);
+        if (disc > 0) {
+          acc.discountWeighted += disc * Math.max(1, Number(p.sales_30d || 0));
+          acc.discountWeight += Math.max(1, Number(p.sales_30d || 0));
+        }
+        return acc;
+      },
+      {
+        gmvCents: 0,
+        sales30: 0,
+        impressions30: 0,
+        clicks30: 0,
+        atc30: 0,
+        returns30: 0,
+        discountWeighted: 0,
+        discountWeight: 0,
+      }
+    );
+    const gmv = totals.gmvCents / 100;
+    const ctr = safeRatio(totals.clicks30, totals.impressions30);
+    const atcRate = safeRatio(totals.atc30, totals.clicks30);
+    const returnRate = safeRatio(totals.returns30, totals.sales30);
+    const avgDiscount = totals.discountWeight > 0 ? totals.discountWeighted / totals.discountWeight : 0;
+    const aov = safeRatio(gmv, totals.sales30);
+    const revenuePerClick = safeRatio(gmv, totals.clicks30);
+    // ROI proxy (not accounting for ad spend): revenue generated per active discount point.
+    const discountRoiProxy = safeRatio(gmv, Math.max(avgDiscount, 1));
+    return { gmv, ctr, atcRate, returnRate, avgDiscount, aov, revenuePerClick, discountRoiProxy };
+  }, [products]);
+
+  const moneyFmt = useMemo(
+    () =>
+      new Intl.NumberFormat("de-DE", {
+        style: "currency",
+        currency: "EUR",
+        maximumFractionDigits: 2,
+      }),
+    []
+  );
+  const pct = (v) => `${(Number(v || 0) * 100).toFixed(1)}%`;
+
+  const cards = [
+    {
+      title: "GMV (30 Tage)",
+      value: moneyFmt.format(metrics.gmv),
+      hint: "Gesamtumsatz aller Produkte in dieser Strategieansicht.",
+    },
+    {
+      title: "CTR",
+      value: pct(metrics.ctr),
+      hint: "Klicks / Impressionen. Niedrig = Listing/Titel/Bild unattraktiv.",
+    },
+    {
+      title: "Add-to-Cart-Rate",
+      value: pct(metrics.atcRate),
+      hint: "Warenkörbe / Klicks. Misst Angebot-Passung nach dem Produktklick.",
+    },
+    {
+      title: "Retourenquote",
+      value: pct(metrics.returnRate),
+      hint: "Rückgaben / Verkäufe (30d). Hohe Quote drückt den Ranking-Score.",
+    },
+    {
+      title: "Ø Rabatt",
+      value: `${metrics.avgDiscount.toFixed(1)}%`,
+      hint: "Verkaufsgewichtet. Hilft zu sehen, ob Rabatt den Vertrieb wirklich stützt.",
+    },
+    {
+      title: "ROI-Proxy (Rabatt)",
+      value: `${moneyFmt.format(metrics.discountRoiProxy)} / %-Punkt`,
+      hint: "GMV pro aktivem Rabatt-Prozentpunkt. Kein echter Profit-ROI (Ad-Kosten/COGS fehlen).",
+    },
+    {
+      title: "Umsatz je Klick",
+      value: moneyFmt.format(metrics.revenuePerClick),
+      hint: "Monetarisierungseffizienz des eingehenden Traffics.",
+    },
+    {
+      title: "AOV (Ø Bestellwert)",
+      value: moneyFmt.format(metrics.aov),
+      hint: "GMV / Verkäufe. Zeigt Mix aus Preisniveau und Warenkorbgröße.",
+    },
+  ];
+
+  return (
+    <BlockStack gap="300">
+      <Banner tone="info">
+        <p style={{ margin: 0 }}>
+          ROI-Werte sind hier als <strong>Proxy</strong> dargestellt, weil Werbekosten, COGS und Logistikkosten nicht in dieser
+          Ranking-Ansicht enthalten sind.
+        </p>
+      </Banner>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+        {cards.map((c) => (
+          <Card key={c.title}>
+            <BlockStack gap="100">
+              <Text as="p" variant="bodySm" tone="subdued">
+                {c.title}
+              </Text>
+              <Text as="p" variant="headingMd" fontWeight="bold">
+                {c.value}
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {c.hint}
+              </Text>
+            </BlockStack>
+          </Card>
+        ))}
+      </div>
+    </BlockStack>
+  );
+}
+
 function WeightSumBadge({ config }) {
   const sum = WEIGHT_FIELDS.reduce((a, f) => a + parseFloat(config[f.key] || 0), 0);
   const diff = Math.abs(sum - 1.0);
@@ -675,6 +806,8 @@ export default function RankingPage() {
                         </BlockStack>
                       </div>
                     </InlineStack>
+                    <Divider />
+                    <RankingInsights products={products} />
                     <Divider />
                     {loadingProducts ? (
                       <Box padding="600">

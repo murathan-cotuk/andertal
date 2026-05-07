@@ -360,7 +360,7 @@ export default function NotificationsPage() {
             <Box padding="300">
               <Text as="p" tone="subdued">
                 {grandTotal} Einträge gesamt — bis zu 500 je Kategorie (Bestellungen, Rücksendungen
-                {groups.some((x) => x.key === "verification") ? ", Verifizierung, Produktänderungen" : ""}
+                {groups.some((x) => x.key === "verification" || x.key === "change_suggestion") ? ", Verifizierung, Änderungsvorschläge" : ""}
                 ).
               </Text>
             </Box>

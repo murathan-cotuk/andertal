@@ -604,6 +604,18 @@ async function sendImmediateStepsForFlow({
       text: plain || subject,
       ...(attachments.length ? { attachments } : {}),
     })
+    try {
+      await client.query(
+        `INSERT INTO store_newsletter_email_logs (subscriber_id, recipient_email, subject, provider, delivery_status, flow_trigger_key, sent_at)
+         SELECT s.id, $1, $2, 'smtp', 'sent', $3, now()
+         FROM store_newsletter_subscribers s
+         WHERE LOWER(s.email) = LOWER($1)
+         LIMIT 1`,
+        [String(toEmail || '').trim().toLowerCase(), String(subject || '').trim(), String(triggerKey || '').trim() || null],
+      )
+    } catch (_) {
+      // Do not block flow emails when newsletter log insert fails.
+    }
     emailsSent += 1
     idx += 1
   }

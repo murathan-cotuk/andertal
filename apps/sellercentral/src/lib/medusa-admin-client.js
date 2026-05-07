@@ -226,8 +226,11 @@ class MedusaAdminClient {
     });
   }
 
-  async approveMetafieldProposal(id) {
-    return this.request(`/admin-hub/metafield-definitions/pending/${encodeURIComponent(id)}/approve`, { method: 'POST' });
+  async approveMetafieldProposal(id, body = null) {
+    return this.request(`/admin-hub/metafield-definitions/pending/${encodeURIComponent(id)}/approve`, {
+      method: 'POST',
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
   }
 
   async rejectMetafieldProposal(id) {
@@ -966,13 +969,28 @@ class MedusaAdminClient {
   async deleteNotifications(payload) {
     return this.request('/admin-hub/v1/notifications/delete', { method: 'POST', body: JSON.stringify(payload) })
   }
-  async getNewsletterSubscribers() {
-    return this.request('/admin-hub/v1/newsletter-subscribers')
+  async getNewsletterSubscribers(params = {}) {
+    const qs = new URLSearchParams(params).toString()
+    return this.request(`/admin-hub/v1/newsletter-subscribers${qs ? `?${qs}` : ''}`)
+  }
+  async getNewsletterSubscriber(id) {
+    return this.request(`/admin-hub/v1/newsletter-subscribers/${encodeURIComponent(id)}`)
+  }
+  async createNewsletterSubscriber(data = {}) {
+    return this.request('/admin-hub/v1/newsletter-subscribers', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    })
   }
   async updateNewsletterSubscriber(id, data = {}) {
     return this.request(`/admin-hub/v1/newsletter-subscribers/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data || {}),
+    })
+  }
+  async deleteNewsletterSubscriber(id) {
+    return this.request(`/admin-hub/v1/newsletter-subscribers/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
     })
   }
   async getMessages(params = {}) {

@@ -369,10 +369,14 @@ function newContainer(type) {
         title: "Newsletter",
         subtitle: "Exklusive Angebote und Neuigkeiten.",
         button_text: "Anmelden",
+        first_name_placeholder: "Vorname",
+        last_name_placeholder: "Nachname",
         email_placeholder: "E-Mail-Adresse",
         provider: "other",
         form_action: "",
         form_method: "post",
+        first_name_field_name: "FNAME",
+        last_name_field_name: "LNAME",
         email_field_name: "EMAIL",
         hidden_fields: [],
         privacy_note: "",
@@ -2027,6 +2031,24 @@ function NewsletterEditor({ container, onChange, editLang = "de" }) {
       <TextField label="Titel" value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
       <TextField label="Untertitel" value={gi(container, "subtitle", editLang)} onChange={(v) => onChange(si(container, "subtitle", editLang, v))} multiline={2} autoComplete="off" />
       <TextField label="Button-Text" value={gi(container, "button_text", editLang)} onChange={(v) => onChange(si(container, "button_text", editLang, v))} autoComplete="off" />
+      <InlineStack gap="300" wrap={false}>
+        <div style={{ flex: 1 }}>
+          <TextField
+            label="Vorname-Placeholder"
+            value={gi(container, "first_name_placeholder", editLang)}
+            onChange={(v) => onChange(si(container, "first_name_placeholder", editLang, v))}
+            autoComplete="off"
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <TextField
+            label="Nachname-Placeholder"
+            value={gi(container, "last_name_placeholder", editLang)}
+            onChange={(v) => onChange(si(container, "last_name_placeholder", editLang, v))}
+            autoComplete="off"
+          />
+        </div>
+      </InlineStack>
       <TextField label="E-Mail-Placeholder" value={gi(container, "email_placeholder", editLang)} onChange={(v) => onChange(si(container, "email_placeholder", editLang, v))} autoComplete="off" />
       <Select
         label="Anbieter (Hinweis)"
@@ -2051,6 +2073,20 @@ function NewsletterEditor({ container, onChange, editLang = "de" }) {
         options={[{ label: "POST", value: "post" }, { label: "GET", value: "get" }]}
         value={container.form_method || "post"}
         onChange={(v) => onChange({ ...container, form_method: v })}
+      />
+      <TextField
+        label="Name des Vorname-Feldes"
+        value={container.first_name_field_name || "FNAME"}
+        onChange={(v) => onChange({ ...container, first_name_field_name: v })}
+        autoComplete="off"
+        helpText="z. B. FNAME (Mailchimp), first_name"
+      />
+      <TextField
+        label="Name des Nachname-Feldes"
+        value={container.last_name_field_name || "LNAME"}
+        onChange={(v) => onChange({ ...container, last_name_field_name: v })}
+        autoComplete="off"
+        helpText="z. B. LNAME (Mailchimp), last_name"
       />
       <TextField
         label="Name des E-Mail-Feldes"

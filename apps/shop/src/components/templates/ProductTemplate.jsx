@@ -290,6 +290,18 @@ const VarRow = styled.div`
   gap: 8px;
 `;
 
+const VarToggleBtn = styled.button`
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #374151;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+`;
+
 /* Compact text chip — sizes, materials, etc */
 const VarChip = styled.button`
   padding: 8px 14px;
@@ -361,10 +373,52 @@ const BulletList = styled.ul`
 
 const MetaTable = styled.table`
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-  & th, & td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-  & th { color: #6b7280; font-weight: 500; width: 40%; }
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.45;
+
+  & tr:nth-child(odd) {
+    background: #fcfcfd;
+  }
+
+  & th,
+  & td {
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid #f1f3f5;
+  }
+
+  & tr:last-child th,
+  & tr:last-child td {
+    border-bottom: none;
+  }
+
+  & th {
+    color: #6b7280;
+    font-weight: 600;
+    width: 38%;
+    letter-spacing: 0.01em;
+  }
+
+  & td {
+    color: #111827;
+    font-weight: 450;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 0.8125rem;
+    & th,
+    & td {
+      padding: 9px 10px;
+    }
+  }
 `;
 
 const RightCol = styled.div`
@@ -949,6 +1003,7 @@ function findAncestors(nodes, slug, path = []) {
 }
 
 export default function ProductTemplate() {
+  const VISIBLE_VARIATION_COUNT = 3;
   const params = useParams();
   const locale = useLocale();
   const marketPrefixVal = useMarketPrefix();
@@ -972,6 +1027,7 @@ export default function ProductTemplate() {
   const [multiOffer, setMultiOffer] = useState(null);
   const [selectedSellerId, setSelectedSellerId] = useState(null);
   const [otherSellersOpen, setOtherSellersOpen] = useState(false);
+  const [expandedVariantGroups, setExpandedVariantGroups] = useState({});
   const [categoryAncestors, setCategoryAncestors] = useState([]);
   const [categoryCurrentNode, setCategoryCurrentNode] = useState(null);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
@@ -1445,7 +1501,7 @@ export default function ProductTemplate() {
               {selectedLabel && <VarLabelSelected>: {selectedLabel}</VarLabelSelected>}
             </VarLabel>
             <VarRow>
-              {(group.options || []).map((opt, oIdx) => {
+              {(expandedVariantGroups[groupName] ? (group.options || []) : (group.options || []).slice(0, VISIBLE_VARIATION_COUNT)).map((opt, oIdx) => {
                 const valueStr = optionCanonicalValue(opt);
                 const displayStr = optionDisplayLabel(opt, locale) || `Option ${oIdx + 1}`;
                 const swatchUrl = typeof opt === "object" && opt.swatch_image
@@ -1492,6 +1548,19 @@ export default function ProductTemplate() {
                 );
               })}
             </VarRow>
+            {(group.options || []).length > VISIBLE_VARIATION_COUNT && (
+              <VarToggleBtn
+                type="button"
+                onClick={() =>
+                  setExpandedVariantGroups((prev) => ({
+                    ...prev,
+                    [groupName]: !prev[groupName],
+                  }))
+                }
+              >
+                {expandedVariantGroups[groupName] ? "Weniger anzeigen" : "Mehr anzeigen"}
+              </VarToggleBtn>
+            )}
           </VarGroup>
         );
       })}
@@ -1505,7 +1574,7 @@ export default function ProductTemplate() {
           <VarGroup key={group.title}>
             <VarLabel>{group.title}</VarLabel>
             <VarRow>
-              {group.options.map(({ variant: v, index: idx }) => {
+              {(expandedVariantGroups[group.title] ? group.options : group.options.slice(0, VISIBLE_VARIATION_COUNT)).map(({ variant: v, index: idx }) => {
                 const qty = v.inventory_quantity ?? v.inventory ?? 0;
                 const oos = Number(qty) <= 0;
                 return (
@@ -1522,6 +1591,19 @@ export default function ProductTemplate() {
                 );
               })}
             </VarRow>
+            {group.options.length > VISIBLE_VARIATION_COUNT && (
+              <VarToggleBtn
+                type="button"
+                onClick={() =>
+                  setExpandedVariantGroups((prev) => ({
+                    ...prev,
+                    [group.title]: !prev[group.title],
+                  }))
+                }
+              >
+                {expandedVariantGroups[group.title] ? "Weniger anzeigen" : "Mehr anzeigen"}
+              </VarToggleBtn>
+            )}
           </VarGroup>
         ))}
       </VariantSection>

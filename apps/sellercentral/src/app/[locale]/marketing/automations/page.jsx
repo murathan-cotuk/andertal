@@ -1,12 +1,12 @@
 "use client";
 
 import DashboardLayout from "@/components/DashboardLayout";
-import MinimalPage from "@/components/MinimalPage";
+import MarketingAutomationsPage from "@/components/pages/marketing/MarketingAutomationsPage";
 
 export default function MarketingAutomations() {
   return (
     <DashboardLayout>
-      <MinimalPage title="Automations" subtitle="Automated marketing flows" />
+      <MarketingAutomationsPage />
     </DashboardLayout>
   );
 }

@@ -215,18 +215,11 @@ const BottomLeft = styled.div`
   min-width: 200px;
 `;
 
-const ShippingPromo = styled(Link)`
+const ShippingPromo = styled.span`
   color: var(--footer-text, #ffffff);
   font-size: 14px;
   line-height: 1.4;
-  text-decoration: underline;
-  text-underline-offset: 3px;
   opacity: 0.95;
-
-  &:hover {
-    opacity: 1;
-    color: var(--footer-text, #ffffff);
-  }
 `;
 
 const Copyright = styled.p`
@@ -340,7 +333,7 @@ export default function Footer() {
         <Bottom style={{ marginTop: 24 }}>
           <BottomLeft>
             {shippingPromoText && (
-              <ShippingPromo href="/shipping">{shippingPromoText}</ShippingPromo>
+              <ShippingPromo>{shippingPromoText}</ShippingPromo>
             )}
             <Copyright style={{ margin: 0 }}>© {new Date().getFullYear()} Andertal. All rights reserved.</Copyright>
           </BottomLeft>

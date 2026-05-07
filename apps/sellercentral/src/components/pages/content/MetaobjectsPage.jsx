@@ -132,6 +132,22 @@ export default function MetaobjectsPage() {
       setPendingActionId("");
     }
   };
+  const editAndApprovePending = async (p) => {
+    const current = Array.isArray(p?.proposed_values) ? p.proposed_values.join(", ") : "";
+    const raw = window.prompt("Werte bearbeiten (Komma getrennt) und freigeben:", current);
+    if (raw == null) return;
+    const values = raw.split(",").map((v) => v.trim()).filter(Boolean);
+    if (!values.length) return;
+    setPendingActionId(p.id);
+    try {
+      await client.approveMetafieldProposal(p.id, { values, label: (p.label || p.key || "").trim() });
+      await load();
+    } catch (e) {
+      setError(e?.message || "Bearbeiten/Freigabe fehlgeschlagen");
+    } finally {
+      setPendingActionId("");
+    }
+  };
 
   const rejectPending = async (id) => {
     setPendingActionId(id);
@@ -208,6 +224,9 @@ export default function MetaobjectsPage() {
                               onClick={() => approvePending(p.id)}
                             >
                               Genehmigen
+                            </Button>
+                            <Button size="slim" onClick={() => editAndApprovePending(p)} disabled={pendingActionId === p.id}>
+                              Bearbeiten + Genehmigen
                             </Button>
                             <Button size="slim" tone="critical" onClick={() => rejectPending(p.id)} disabled={pendingActionId === p.id}>
                               Ablehnen

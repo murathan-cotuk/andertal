@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React from "react";
+import React, { useState } from "react";
 import styled from "styled-components";
 import { Card } from "@andertal/ui";
 
@@ -46,6 +46,42 @@ const StatLabel = styled.div`
 `;
 
 export default function OrdersReportsPage() {
+  const [exporting, setExporting] = useState("");
+
+  const runExport = async (format) => {
+    try {
+      setExporting(format);
+      const token = typeof window !== "undefined" ? localStorage.getItem("sellerToken") : null;
+      if (!token) {
+        alert("Bitte erneut einloggen.");
+        return;
+      }
+      const response = await fetch("/api/import-export/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sellerToken: token,
+          datasets: ["orders"],
+          format,
+        }),
+      });
+      if (!response.ok) throw new Error(`Export failed (${response.status})`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `orders-report.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e?.message || "Export failed");
+    } finally {
+      setExporting("");
+    }
+  };
+
   return (
     <Container>
       <Title>Order Reports</Title>
@@ -83,6 +119,8 @@ export default function OrdersReportsPage() {
         </p>
         <div style={{ display: "flex", gap: "12px" }}>
           <button
+            onClick={() => runExport("xlsx")}
+            disabled={exporting !== ""}
             style={{
               padding: "12px 24px",
               backgroundColor: "#0ea5e9",
@@ -94,9 +132,11 @@ export default function OrdersReportsPage() {
             }}
           >
             <i className="fas fa-file-excel" style={{ marginRight: "8px" }} />
-            Export to Excel
+            {exporting === "xlsx" ? "Exporting..." : "Export to XLSX"}
           </button>
           <button
+            onClick={() => runExport("csv")}
+            disabled={exporting !== ""}
             style={{
               padding: "12px 24px",
               backgroundColor: "white",
@@ -107,8 +147,8 @@ export default function OrdersReportsPage() {
               fontWeight: "600",
             }}
           >
-            <i className="fas fa-file-pdf" style={{ marginRight: "8px" }} />
-            Export to PDF
+            <i className="fas fa-file-csv" style={{ marginRight: "8px" }} />
+            {exporting === "csv" ? "Exporting..." : "Export to CSV"}
           </button>
         </div>
       </Section>

@@ -1455,27 +1455,40 @@ function BlogCarousel({ container, locale = "de" }) {
 function NewsletterSignup({ container, locale = "de" }) {
   const action = (container.form_action || "").trim();
   const method = (container.form_method || "post").toLowerCase() === "get" ? "get" : "post";
+  const firstNameFieldName = (container.first_name_field_name || "FNAME").trim() || "FNAME";
+  const lastNameFieldName = (container.last_name_field_name || "LNAME").trim() || "LNAME";
   const emailName = (container.email_field_name || "EMAIL").trim() || "EMAIL";
   const hiddenFields = Array.isArray(container.hidden_fields) ? container.hidden_fields : [];
   const bg = container.bg_color || "#f3f4f6";
   const textColor = container.text_color || "#111827";
   const btnBg = container.btn_bg || "#111827";
   const btnColor = container.btn_color || "#fff";
+  const [internalFirstName, setInternalFirstName] = React.useState("");
+  const [internalLastName, setInternalLastName] = React.useState("");
   const [internalEmail, setInternalEmail] = React.useState("");
   const [internalState, setInternalState] = React.useState("idle"); // idle | loading | success | error
 
   const handleInternalSubmit = async (e) => {
     e.preventDefault();
-    if (!internalEmail || !internalEmail.includes("@")) return;
+    if (!internalFirstName.trim() || !internalLastName.trim() || !internalEmail || !internalEmail.includes("@")) return;
     setInternalState("loading");
     try {
       const backendUrl = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000");
       const r = await fetch(`${backendUrl}/store/newsletter-subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: internalEmail.trim().toLowerCase() }),
+        body: JSON.stringify({
+          first_name: internalFirstName.trim(),
+          last_name: internalLastName.trim(),
+          email: internalEmail.trim().toLowerCase(),
+          source: "landing_page",
+          preferred_locale: locale || "de",
+        }),
       });
       if (!r.ok) throw new Error("error");
+      setInternalFirstName("");
+      setInternalLastName("");
+      setInternalEmail("");
       setInternalState("success");
     } catch {
       setInternalState("error");
@@ -1519,6 +1532,8 @@ function NewsletterSignup({ container, locale = "de" }) {
             {hiddenFields.map((f, i) => (
               f && f.name ? <input key={i} type="hidden" name={String(f.name)} value={String(f.value ?? "")} /> : null
             ))}
+            <input type="text" name={firstNameFieldName} required placeholder={lt(container, "first_name_placeholder", locale) || "Vorname"} autoComplete="given-name" style={sharedInputStyle} />
+            <input type="text" name={lastNameFieldName} required placeholder={lt(container, "last_name_placeholder", locale) || "Nachname"} autoComplete="family-name" style={sharedInputStyle} />
             <input type="email" name={emailName} required placeholder={lt(container, "email_placeholder", locale) || "E-Mail"} autoComplete="email" style={sharedInputStyle} />
             <button type="submit" style={sharedBtnStyle}>{lt(container, "button_text", locale) || "Abonnieren"}</button>
           </form>
@@ -1528,6 +1543,24 @@ function NewsletterSignup({ container, locale = "de" }) {
           </p>
         ) : (
           <form onSubmit={handleInternalSubmit} style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "stretch" }}>
+            <input
+              type="text"
+              required
+              value={internalFirstName}
+              onChange={(e) => setInternalFirstName(e.target.value)}
+              placeholder={lt(container, "first_name_placeholder", locale) || "Vorname"}
+              autoComplete="given-name"
+              style={sharedInputStyle}
+            />
+            <input
+              type="text"
+              required
+              value={internalLastName}
+              onChange={(e) => setInternalLastName(e.target.value)}
+              placeholder={lt(container, "last_name_placeholder", locale) || "Nachname"}
+              autoComplete="family-name"
+              style={sharedInputStyle}
+            />
             <input
               type="email"
               required

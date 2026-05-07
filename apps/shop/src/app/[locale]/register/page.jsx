@@ -309,6 +309,9 @@ export default function RegisterPage() {
             body: JSON.stringify({
               email: formData.email.trim().toLowerCase(),
               source: "register",
+              first_name: formData.firstName || "",
+              last_name: formData.lastName || "",
+              preferred_locale: locale || "de",
             }),
           });
         } catch {

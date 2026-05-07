@@ -92,6 +92,48 @@ function generatePayoutPeriods(count = 12) {
 
 const PAYOUT_PERIODS = generatePayoutPeriods(12);
 
+function isPeriodSelectable(period, now = new Date()) {
+  if (!period?.start) return true;
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const day = now.getDate();
+  const pYear = period.start.getFullYear();
+  const pMonth = period.start.getMonth();
+  const isCurrentMonth = pYear === year && pMonth === month;
+  const isSecondHalf = period.start.getDate() === 16;
+  // Current month second-half period opens only on/after day 16.
+  if (isCurrentMonth && isSecondHalf && day < 16) return false;
+  return true;
+}
+
+function getDefaultPayoutPeriodKey(periods, now = new Date()) {
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentHalfStartDay = now.getDate() >= 16 ? 16 : 1;
+  const exactCurrent = periods.find(
+    (p) =>
+      p.start.getFullYear() === currentYear &&
+      p.start.getMonth() === currentMonth &&
+      p.start.getDate() === currentHalfStartDay &&
+      isPeriodSelectable(p, now),
+  );
+  if (exactCurrent) return exactCurrent.key;
+  const firstSelectable = periods.find((p) => isPeriodSelectable(p, now));
+  return firstSelectable?.key || periods[0]?.key || "";
+}
+
+function getPeriodYear(period) {
+  return period?.start?.getFullYear?.() ?? null;
+}
+
+function getPeriodMonth(period) {
+  return period?.start?.getMonth?.() ?? null;
+}
+
+function monthLabelDe(monthIdx) {
+  return new Date(2026, Number(monthIdx) || 0, 1).toLocaleDateString("de-DE", { month: "long" });
+}
+
 // ── Stat card ─────────────────────────────────────────────────────────────
 function Stat({ label, value, sub, tone }) {
   return (
@@ -178,7 +220,7 @@ export default function SellerDetailPage({ sellerId }) {
   const [payoutModal, setPayoutModal] = useState(false);
   const [payoutForm, setPayoutForm] = useState({ period_start: "", period_end: "", total_cents: "", commission_cents: "", payout_cents: "", notes: "" });
   const [savingPayout, setSavingPayout] = useState(false);
-  const [periodKey, setPeriodKey] = useState(PAYOUT_PERIODS[0]?.key || "");
+  const [periodKey, setPeriodKey] = useState(() => getDefaultPayoutPeriodKey(PAYOUT_PERIODS));
   const [periodTransactions, setPeriodTransactions] = useState([]);
   const [periodTransactionsLoading, setPeriodTransactionsLoading] = useState(false);
 
@@ -200,6 +242,12 @@ export default function SellerDetailPage({ sellerId }) {
   }, [sellerId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const selected = PAYOUT_PERIODS.find((p) => p.key === periodKey);
+    if (selected && isPeriodSelectable(selected)) return;
+    setPeriodKey(getDefaultPayoutPeriodKey(PAYOUT_PERIODS));
+  }, [periodKey]);
 
   useEffect(() => {
     if (!seller?.seller_id) return;
@@ -350,6 +398,18 @@ ${"=".repeat(50)}
     { id: "company", content: "Firmendaten" },
   ];
   const selectedPeriod = PAYOUT_PERIODS.find((p) => p.key === periodKey) || PAYOUT_PERIODS[0];
+  const selectedYear = getPeriodYear(selectedPeriod);
+  const selectedMonth = getPeriodMonth(selectedPeriod);
+  const periodYears = [...new Set(PAYOUT_PERIODS.map(getPeriodYear).filter((y) => y != null))].sort((a, b) => b - a);
+  const monthsInSelectedYear = [...new Set(
+    PAYOUT_PERIODS
+      .filter((p) => getPeriodYear(p) === selectedYear)
+      .map(getPeriodMonth)
+      .filter((m) => m != null),
+  )].sort((a, b) => b - a);
+  const periodsInSelectedMonth = PAYOUT_PERIODS
+    .filter((p) => getPeriodYear(p) === selectedYear && getPeriodMonth(p) === selectedMonth)
+    .sort((a, b) => a.start - b.start);
   const periodTotalCents = periodTransactions.reduce((sum, t) => sum + (t.total_cents || 0), 0);
   const periodCommissionCents = periodTransactions.reduce((sum, t) => sum + (t.commission_cents || 0), 0);
   const periodPayoutCents = periodTransactions.reduce((sum, t) => sum + (t.payout_cents || 0), 0);
@@ -448,14 +508,96 @@ ${"=".repeat(50)}
                   <InlineStack gap="300" blockAlign="center" align="space-between">
                     <Text as="h3" variant="headingSm">Auszahlungshistorie & Abrechnungsdetails</Text>
                     <InlineStack gap="200" blockAlign="center">
-                      <div style={{ minWidth: 320 }}>
-                        <Select
-                          label=""
-                          labelHidden
-                          options={PAYOUT_PERIODS.map((p) => ({ label: p.label, value: p.key }))}
-                          value={periodKey}
-                          onChange={setPeriodKey}
-                        />
+                      <div style={{ minWidth: 560 }}>
+                        <BlockStack gap="100">
+                          <InlineStack gap="100" wrap>
+                            {periodYears.map((y) => {
+                              const active = y === selectedYear;
+                              return (
+                                <button
+                                  key={`year-${y}`}
+                                  type="button"
+                                  onClick={() => {
+                                    const candidate =
+                                      PAYOUT_PERIODS.find((p) => getPeriodYear(p) === y && isPeriodSelectable(p)) ||
+                                      PAYOUT_PERIODS.find((p) => getPeriodYear(p) === y);
+                                    if (candidate) setPeriodKey(candidate.key);
+                                  }}
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderRadius: 8,
+                                    border: active ? "1px solid #111827" : "1px solid #d1d5db",
+                                    background: active ? "#111827" : "#fff",
+                                    color: active ? "#fff" : "#374151",
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  {y}
+                                </button>
+                              );
+                            })}
+                          </InlineStack>
+                          <InlineStack gap="100" wrap>
+                            {monthsInSelectedYear.map((m) => {
+                              const active = m === selectedMonth;
+                              return (
+                                <button
+                                  key={`month-${selectedYear}-${m}`}
+                                  type="button"
+                                  onClick={() => {
+                                    const candidate =
+                                      PAYOUT_PERIODS.find(
+                                        (p) => getPeriodYear(p) === selectedYear && getPeriodMonth(p) === m && isPeriodSelectable(p),
+                                      ) ||
+                                      PAYOUT_PERIODS.find((p) => getPeriodYear(p) === selectedYear && getPeriodMonth(p) === m);
+                                    if (candidate) setPeriodKey(candidate.key);
+                                  }}
+                                  style={{
+                                    padding: "5px 9px",
+                                    borderRadius: 8,
+                                    border: active ? "1px solid #0f766e" : "1px solid #d1d5db",
+                                    background: active ? "#ecfeff" : "#fff",
+                                    color: active ? "#0f766e" : "#4b5563",
+                                    fontSize: 12,
+                                    textTransform: "capitalize",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  {monthLabelDe(m)}
+                                </button>
+                              );
+                            })}
+                          </InlineStack>
+                          <InlineStack gap="100" wrap>
+                            {periodsInSelectedMonth.map((p) => {
+                              const active = p.key === periodKey;
+                              const selectable = isPeriodSelectable(p);
+                              return (
+                                <button
+                                  key={p.key}
+                                  type="button"
+                                  disabled={!selectable}
+                                  onClick={() => setPeriodKey(p.key)}
+                                  title={selectable ? p.label : "Ab dem 16. des Monats verfügbar"}
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderRadius: 8,
+                                    border: active ? "1px solid #0284c7" : "1px solid #d1d5db",
+                                    background: active ? "#e0f2fe" : "#fff",
+                                    color: active ? "#0369a1" : "#374151",
+                                    fontSize: 12,
+                                    cursor: selectable ? "pointer" : "not-allowed",
+                                    opacity: selectable ? 1 : 0.45,
+                                  }}
+                                >
+                                  {p.label}
+                                </button>
+                              );
+                            })}
+                          </InlineStack>
+                        </BlockStack>
                       </div>
                       <Button
                         size="slim"

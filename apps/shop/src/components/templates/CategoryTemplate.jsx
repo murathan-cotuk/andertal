@@ -477,6 +477,19 @@ const CheckRow = styled.label`
     flex-shrink: 0;
   }
 
+  svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 767px) {
+    svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+
   &:hover { color: #111; }
 `;
 

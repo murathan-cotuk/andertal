@@ -44,9 +44,6 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
               <Badge tone="success">Sponsored aktiv</Badge>
             )}
           </InlineStack>
-          <Text tone="subdued" as="span" variant="bodySm">
-            ID: {campaign.id}
-          </Text>
           {campaign.description && (
             <Text tone="subdued" as="span" variant="bodySm">{campaign.description}</Text>
           )}

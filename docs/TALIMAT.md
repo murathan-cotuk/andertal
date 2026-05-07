@@ -1,5 +1,8 @@
 07.05.
 
+-landing page sayfasi altinda popup template i olustur hem desktop hem mobil hem tablet icin ayri ayri hepsinin kendine uygun ölcülerinde. detayli popuplar ayarlayabilelim. her seyi tek tek yazdirma ne gibi modern popuplar yapilmasi gerektigini biliyorsun onlara göre ayarla iste.
+- smtp eklemistik flowlarda email calisiyor. sellercentraldeki bildirimler email olarak da gitsin. müsteriden mesaj var, saticidan mesaj var, sellerdan mesaj var, adminden mesaj var, yeni siparis geldi, iade talebi geldi, ürünün listelendi, hesabin onaylandi gibi mailler hazirlayabilelim flow sayfasindan. tüm bildirimler email olarak da gitsin ilgili kisilere
+
 - saticilarin olusturdugu kampanyalari kontrol edip bagladigimiz marketing hesabinda tek tik ile yayinlayalim. saticilar zaten bütcelerini belirlemis olacak. belirlenen bütceleri sectigimiz platformlarda dagitilmis sekilde kampanyalarini olusturalim. mesela müsteri günlük 5 euro bütce ile reklam olusturdu. shoptaki algoritmada o sekilde islemeye devam etsin. müsteriden alinan bu 5 euro müsteriden tahsile edilecek ve stripe imiza düsecek. bu 5 farkli secilen google ads, meta gibi yerlerde 1er euro seklinde paylasilacak. ya da kac platform secildiyse reklam vermek icin ona bölünecek gibi. anladin mi?
 - cms
 - bir sistem ile entegre oldugunda hangi verilere get ve post yapilmasi gerektigi cok asikar. sen de gayet iyi biliyorsun. bildigini uygula.

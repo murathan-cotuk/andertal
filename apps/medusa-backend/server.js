@@ -3151,12 +3151,15 @@ async function start() {
         const pending = pr.rows[0]
         if (!pending) return res.status(404).json({ message: 'Proposal not found' })
         const key = pending.key
-        const proposed = Array.isArray(pending.proposed_values) ? pending.proposed_values.map(String) : []
+        const overrideValues = Array.isArray(req.body?.values) ? req.body.values.map((v) => String(v || '').trim()).filter(Boolean) : null
+        const proposed = (overrideValues && overrideValues.length)
+          ? metafieldProposalNormalizeValues(overrideValues)
+          : (Array.isArray(pending.proposed_values) ? pending.proposed_values.map(String) : [])
         const exist = await dbQ('SELECT label, values FROM admin_hub_metafield_definitions WHERE key = $1', [key])
         const prev = exist.rows[0]
         const prevVals = Array.isArray(prev?.values) ? prev.values.map(String) : []
         const mergedVals = [...new Set([...prevVals, ...proposed])].sort()
-        const safeLabel = (pending.label && String(pending.label).trim()) || prev?.label || key
+        const safeLabel = (req.body?.label && String(req.body.label).trim()) || (pending.label && String(pending.label).trim()) || prev?.label || key
         await dbQ(
           `INSERT INTO admin_hub_metafield_definitions (key, label, values, updated_at)
            VALUES ($1, $2, $3, NOW())
@@ -3164,6 +3167,18 @@ async function start() {
           [key, safeLabel, JSON.stringify(mergedVals)]
         )
         await dbQ(`DELETE FROM admin_hub_metafield_pending WHERE id = $1::uuid`, [id])
+        if (pending.seller_id) {
+          await dbQ(
+            `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+             VALUES ('metafield_proposal_reviewed', $1, $2, $3, $4)`,
+            [
+              'Metafield-Vorschlag genehmigt',
+              `Ihr Vorschlag für "${safeLabel}" wurde genehmigt: ${mergedVals.join(', ')}`,
+              pending.seller_id,
+              pending.id,
+            ],
+          ).catch(() => {})
+        }
         res.json({ ok: true, key, label: safeLabel, values: mergedVals })
       } catch (err) {
         console.error('metafield pending approve:', err)
@@ -3181,8 +3196,22 @@ async function start() {
         }
         const id = String(req.params.id || '').trim()
         if (!id) return res.status(400).json({ message: 'id required' })
+        const pr = await dbQ(`SELECT id, key, label, seller_id FROM admin_hub_metafield_pending WHERE id = $1::uuid AND status = 'pending'`, [id])
+        const pending = pr.rows?.[0]
         const del = await dbQ(`DELETE FROM admin_hub_metafield_pending WHERE id = $1::uuid AND status = 'pending'`, [id])
         if (!del.rowCount) return res.status(404).json({ message: 'Proposal not found' })
+        if (pending?.seller_id) {
+          await dbQ(
+            `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+             VALUES ('metafield_proposal_reviewed', $1, $2, $3, $4)`,
+            [
+              'Metafield-Vorschlag abgelehnt',
+              `Ihr Vorschlag für "${pending.label || pending.key}" wurde abgelehnt.`,
+              pending.seller_id,
+              pending.id,
+            ],
+          ).catch(() => {})
+        }
         res.json({ ok: true })
       } catch (err) {
         console.error('metafield pending reject:', err)
@@ -3700,6 +3729,85 @@ async function start() {
       }
       return out
     }
+    const normalizeCatalogMetaKey = (raw) => (
+      String(raw || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+    )
+    const queueMetafieldSuggestionsAndSanitizePayload = async (body, sellerId) => {
+      const result = {
+        body: body && typeof body === 'object' ? { ...body } : {},
+        queued: 0,
+      }
+      const sid = String(sellerId || '').trim()
+      if (!sid) return result
+      const meta = result.body.metadata && typeof result.body.metadata === 'object' ? { ...result.body.metadata } : {}
+      const variants = Array.isArray(result.body.variants) ? result.body.variants.map((v) => ({ ...(v || {}) })) : null
+      const definitionRows = await dbQ('SELECT key, values FROM admin_hub_metafield_definitions')
+      const allowedByKey = new Map()
+      for (const row of (definitionRows.rows || [])) {
+        const key = normalizeCatalogMetaKey(row?.key)
+        if (!key) continue
+        const vals = new Set((Array.isArray(row?.values) ? row.values : []).map((v) => String(v || '').trim().toLowerCase()).filter(Boolean))
+        allowedByKey.set(key, vals)
+      }
+      const proposalsByKey = new Map()
+      const sanitizeMfArray = (arr) => {
+        const out = []
+        for (const pair of (Array.isArray(arr) ? arr : [])) {
+          const key = normalizeCatalogMetaKey(pair?.key)
+          const val = String(pair?.value || '').trim()
+          if (!key || !val) continue
+          const allowedVals = allowedByKey.get(key)
+          if (allowedVals && allowedVals.has(val.toLowerCase())) {
+            out.push({ key, value: val })
+            continue
+          }
+          if (!proposalsByKey.has(key)) proposalsByKey.set(key, new Set())
+          proposalsByKey.get(key).add(val)
+        }
+        return out
+      }
+      if (Array.isArray(meta.metafields)) meta.metafields = sanitizeMfArray(meta.metafields)
+      if (Array.isArray(variants)) {
+        for (let i = 0; i < variants.length; i++) {
+          const v = variants[i] && typeof variants[i] === 'object' ? { ...variants[i] } : {}
+          const vm = v.metadata && typeof v.metadata === 'object' ? { ...v.metadata } : {}
+          if (Array.isArray(vm.metafields)) vm.metafields = sanitizeMfArray(vm.metafields)
+          v.metadata = vm
+          variants[i] = v
+        }
+      }
+      for (const [key, valsSet] of proposalsByKey.entries()) {
+        const vals = [...valsSet]
+        if (!vals.length) continue
+        const existingPending = await dbQ(
+          `SELECT id, proposed_values FROM admin_hub_metafield_pending
+           WHERE key = $1 AND seller_id = $2 AND status = 'pending'
+           ORDER BY created_at DESC LIMIT 1`,
+          [key, sid],
+        )
+        const row = existingPending.rows?.[0]
+        if (row?.id) {
+          const prev = Array.isArray(row.proposed_values) ? row.proposed_values.map((v) => String(v || '').trim()).filter(Boolean) : []
+          const merged = [...new Set([...prev, ...vals])]
+          await dbQ(`UPDATE admin_hub_metafield_pending SET proposed_values = $1, created_at = now() WHERE id = $2::uuid`, [JSON.stringify(merged), row.id])
+        } else {
+          await dbQ(
+            `INSERT INTO admin_hub_metafield_pending (key, label, proposed_values, seller_id, status)
+             VALUES ($1, $2, $3, $4, 'pending')`,
+            [key, key, JSON.stringify(vals), sid],
+          )
+        }
+        result.queued += vals.length
+      }
+      result.body.metadata = meta
+      if (Array.isArray(variants)) result.body.variants = variants
+      return result
+    }
     const validateRequiredGpsrMetadata = (meta) => {
       const m = meta && typeof meta === 'object' ? meta : {}
       const hasManufacturer = String(m.hersteller || '').trim().length > 0
@@ -3798,7 +3906,7 @@ async function start() {
     }
     const adminHubProductsPOST = async (req, res) => {
       try {
-        const body = { ...(req.body || {}) }
+        let body = { ...(req.body || {}) }
         const auth = req.headers['authorization'] || ''
         const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
         const payload = token ? verifySellerToken(token) : null
@@ -3809,6 +3917,12 @@ async function start() {
           body.seller = callerSellerId
           body.metadata = body.metadata && typeof body.metadata === 'object' ? { ...body.metadata } : {}
           body.metadata.seller_id = callerSellerId
+        }
+        let queuedMetaSuggestionCount = 0
+        if (callerSellerId && !isSuperuserCaller) {
+          const sanitized = await queueMetafieldSuggestionsAndSanitizePayload(body, callerSellerId)
+          body = sanitized.body
+          queuedMetaSuggestionCount = sanitized.queued
         }
 
         // EAN deduplication: check if a master product with this EAN already exists
@@ -3886,7 +4000,7 @@ async function start() {
                 }))
               : [],
           }
-          return res.status(200).json({ product: sellerViewProduct, listing, deduplicated: true, is_new_master: false })
+          return res.status(200).json({ product: sellerViewProduct, listing, deduplicated: true, is_new_master: false, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
         }
 
         // New product — create master (seller_id = null → superuser-owned)
@@ -3912,7 +4026,7 @@ async function start() {
             await lc.end()
           } catch (_) { try { await lc.end() } catch (__) {} }
         }
-        res.status(201).json({ product: row, listing, deduplicated: false, is_new_master: true })
+        res.status(201).json({ product: row, listing, deduplicated: false, is_new_master: true, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
       } catch (err) {
         console.error('Admin Hub products POST error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -4037,12 +4151,18 @@ async function start() {
     }
     const adminHubProductByIdPUT = async (req, res) => {
       try {
-        const body = req.body || {}
+        let body = req.body || {}
         const auth = req.headers['authorization'] || ''
         const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
         const sellerPayload = token ? verifySellerToken(token) : null
         const isSuperuserCaller = sellerPayload?.is_superuser || false
         const callerSellerId = (!isSuperuserCaller && sellerPayload?.seller_id) ? String(sellerPayload.seller_id).trim() : null
+        let queuedMetaSuggestionCount = 0
+        if (callerSellerId && !isSuperuserCaller) {
+          const sanitized = await queueMetafieldSuggestionsAndSanitizePayload(body, callerSellerId)
+          body = sanitized.body
+          queuedMetaSuggestionCount = sanitized.queued
+        }
         const existing = await getAdminHubProductByIdOrHandleDb(req.params.id)
 
         // EAN immutability: once created, EANs can never be changed by anyone.
@@ -4172,7 +4292,13 @@ async function start() {
             } finally {
               try { await qc.end() } catch (_) {}
             }
-            return res.status(202).json({ message: 'Change proposal submitted. A superuser will review it.', suggestion_submitted: true })
+            return res.status(202).json({
+              message: queuedMetaSuggestionCount > 0
+                ? 'Change proposal submitted. Metafield suggestions were also queued for superuser approval.'
+                : 'Change proposal submitted. A superuser will review it.',
+              suggestion_submitted: true,
+              metafield_suggestions_submitted: queuedMetaSuggestionCount > 0,
+            })
           }
 
           // Shared content change yoksa: sadece satıcıya özel listing alanlarını güncelle.
@@ -4277,7 +4403,13 @@ async function start() {
             } catch (_) {
               try { await qc.end() } catch (__) {}
             }
-            res.status(202).json({ message: 'Degisiklik oneriniz superuser onayina gonderildi.', suggestion_submitted: true })
+            res.status(202).json({
+              message: queuedMetaSuggestionCount > 0
+                ? 'Degisiklik oneriniz superuser onayina gonderildi. Metafield onerileri de siraya alindi.'
+                : 'Degisiklik oneriniz superuser onayina gonderildi.',
+              suggestion_submitted: true,
+              metafield_suggestions_submitted: queuedMetaSuggestionCount > 0,
+            })
             return
           }
           const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -4339,7 +4471,7 @@ async function start() {
               ...(listing?.publish_date ? { publish_date: listing.publish_date } : {}),
             },
           }
-          res.json({ product: productWithListingData, listing, listing_saved: true, shared_change_blocked: false })
+          res.json({ product: productWithListingData, listing, listing_saved: true, shared_change_blocked: false, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
           return
         }
         const product = await updateAdminHubProductDb(req.params.id, body)
@@ -4351,7 +4483,7 @@ async function start() {
           res.status(404).json({ message: 'Product not found' })
           return
         }
-        res.json({ product })
+        res.json({ product, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
       } catch (err) {
         console.error('Admin Hub product PUT error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -10920,7 +11052,15 @@ async function start() {
                  COALESCE(s.order_count,0) AS order_count,
                  COALESCE(s.total_spent,0) AS total_spent,
                  s.first_order, s.last_order,
-                 COALESCE(s.newsletter_opted_in, false) AS newsletter_opted_in,
+                 (
+                   COALESCE(s.newsletter_opted_in, false)
+                   OR EXISTS (
+                     SELECT 1
+                     FROM store_newsletter_subscribers ns
+                     WHERE LOWER(TRIM(ns.email)) = LOWER(TRIM(c.email))
+                       AND ns.status = 'active'
+                   )
+                 ) AS newsletter_opted_in,
                  (SELECT seller_id FROM store_orders WHERE LOWER(email) = LOWER(c.email) AND seller_id IS NOT NULL AND seller_id != 'default' ORDER BY created_at DESC LIMIT 1) AS main_seller_id
           FROM store_customers c
           LEFT JOIN (
@@ -11300,7 +11440,15 @@ async function start() {
         ordersQ += ' ORDER BY created_at DESC'
         const ordersR = await client.query(ordersQ, ordersParams)
         const orders = (ordersR.rows || []).map(r => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null }))
-        const newsletterOptedIn = orders.some(o => o.newsletter_opted_in)
+        const subR = await client.query(
+          `SELECT 1
+           FROM store_newsletter_subscribers
+           WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+             AND status = 'active'
+           LIMIT 1`,
+          [row.email]
+        )
+        const newsletterOptedIn = orders.some(o => o.newsletter_opted_in) || !!subR.rows?.[0]
         const discountsR = await client.query(
           `SELECT id, code, type, value, min_order_cents, max_uses, used_count, expires_at, notes, created_at
            FROM store_customer_discounts WHERE customer_id = $1 ORDER BY created_at DESC`,
@@ -11967,6 +12115,194 @@ async function start() {
         res.status(500).json({ message: e?.message || 'Error' })
       }
     }
+
+    // ── Marketing Automations ─────────────────────────────────────────────────
+
+    const adminHubAutomationsGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const sellerId = req.sellerUser?.seller_id || null
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const rRules = await client.query(
+          `SELECT type, is_active, config, triggered_count, updated_at FROM store_automation_rules WHERE seller_id=$1 ORDER BY type`,
+          [sellerId || 'default']
+        )
+        const rStats = await client.query(
+          `SELECT rule_type AS type, COUNT(*) AS count FROM store_automation_logs WHERE seller_id=$1 AND status='sent' GROUP BY rule_type`,
+          [sellerId || 'default']
+        )
+        await client.end()
+        const rules = (rRules.rows || []).map(r => ({
+          type: r.type, is_active: r.is_active,
+          config: typeof r.config === 'string' ? JSON.parse(r.config || '{}') : (r.config || {}),
+          triggered_count: Number(r.triggered_count || 0),
+          updated_at: r.updated_at,
+        }))
+        const stats = (rStats.rows || []).map(s => ({ type: s.type, count: Number(s.count) }))
+        res.json({ rules, stats })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.json({ rules: [], stats: [] })
+      }
+    }
+
+    const adminHubAutomationPUT = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const type = (req.params.type || '').trim()
+      const sellerId = req.sellerUser?.seller_id || 'default'
+      const { is_active = false, config = {} } = req.body || {}
+      if (!type) return res.status(400).json({ message: 'type required' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const configStr = JSON.stringify(config)
+        await client.query(
+          `INSERT INTO store_automation_rules (seller_id, type, is_active, config, triggered_count, created_at, updated_at)
+           VALUES ($1,$2,$3,$4::jsonb,0,now(),now())
+           ON CONFLICT (seller_id, type) DO UPDATE SET is_active=$3, config=$4::jsonb, updated_at=now()`,
+          [sellerId, type, is_active, configStr]
+        ).catch(async () => {
+          // Fallback if jsonb cast fails — store as text
+          const exists = await client.query(`SELECT id FROM store_automation_rules WHERE seller_id=$1 AND type=$2`, [sellerId, type])
+          if (exists.rows[0]) {
+            await client.query(`UPDATE store_automation_rules SET is_active=$3, config=$4, updated_at=now() WHERE seller_id=$1 AND type=$2`, [sellerId, type, is_active, configStr])
+          } else {
+            await client.query(`INSERT INTO store_automation_rules (seller_id, type, is_active, config, triggered_count) VALUES ($1,$2,$3,$4,0)`, [sellerId, type, is_active, configStr])
+          }
+        })
+        await client.end()
+        res.json({ ok: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // Background automation runner (every 60 min)
+    const runAutomations = async () => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl) return
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const transport = await getSmtpTransport(client)
+        if (!transport) { await client.end(); return }
+        const fromAddr = process.env.SMTP_FROM || '"Andertal" <noreply@andertal.de>'
+
+        // Fetch all active rules
+        const rulesR = await client.query(`SELECT seller_id, type, config FROM store_automation_rules WHERE is_active=true`)
+        for (const rule of (rulesR.rows || [])) {
+          const cfg = typeof rule.config === 'string' ? JSON.parse(rule.config || '{}') : (rule.config || {})
+          try {
+            if (rule.type === 'low_stock_alert') {
+              const threshold = Number(cfg.threshold) || 5
+              const alertEmail = (cfg.alert_email || '').trim()
+              if (!alertEmail) continue
+              const products = await client.query(
+                `SELECT id, title, inventory FROM admin_hub_products WHERE seller_id=$1 AND inventory <= $2 AND inventory IS NOT NULL AND status='published'`,
+                [rule.seller_id, threshold]
+              )
+              for (const p of (products.rows || [])) {
+                // Check not already alerted today
+                const already = await client.query(
+                  `SELECT id FROM store_automation_logs WHERE seller_id=$1 AND rule_type='low_stock_alert' AND target_id=$2 AND triggered_at > now()-interval '24 hours'`,
+                  [rule.seller_id, p.id]
+                )
+                if (already.rows[0]) continue
+                await transport.sendMail({
+                  from: fromAddr, to: alertEmail,
+                  subject: `⚠ Lagerbestand niedrig: ${p.title}`,
+                  html: `<p>Das Produkt <strong>${p.title}</strong> hat nur noch <strong>${p.inventory}</strong> Einheiten auf Lager (Schwellenwert: ${threshold}).</p><p>Bitte bestand aufstocken.</p>`,
+                })
+                await client.query(
+                  `INSERT INTO store_automation_logs (seller_id, rule_type, target_id, status, triggered_at) VALUES ($1,'low_stock_alert',$2,'sent',now())`,
+                  [rule.seller_id, p.id]
+                ).catch(() => {})
+                await client.query(`UPDATE store_automation_rules SET triggered_count=triggered_count+1 WHERE seller_id=$1 AND type='low_stock_alert'`, [rule.seller_id]).catch(() => {})
+              }
+            }
+
+            if (rule.type === 'review_request') {
+              const delayDays = Number(cfg.delay_days) || 3
+              const subject = cfg.email_subject || 'Wie war Ihre Bestellung? Ihre Meinung zählt!'
+              const orders = await client.query(
+                `SELECT id, email, first_name, last_name, order_number FROM store_orders
+                 WHERE delivery_status='zugestellt' AND email IS NOT NULL
+                 AND delivery_date <= now() - interval '${delayDays} days'
+                 AND (seller_id=$1 OR seller_id='default')
+                 LIMIT 50`,
+                [rule.seller_id]
+              )
+              for (const o of (orders.rows || [])) {
+                if (!o.email) continue
+                const already = await client.query(
+                  `SELECT id FROM store_automation_logs WHERE seller_id=$1 AND rule_type='review_request' AND target_id=$2`,
+                  [rule.seller_id, o.id]
+                )
+                if (already.rows[0]) continue
+                const name = [o.first_name, o.last_name].filter(Boolean).join(' ') || 'Kunde'
+                await transport.sendMail({
+                  from: fromAddr, to: o.email,
+                  subject,
+                  html: `<p>Hallo ${name},</p><p>wir hoffen, Ihre Bestellung #${o.order_number || ''} ist gut bei Ihnen angekommen. Wir würden uns sehr über Ihre Bewertung freuen!</p><p>Vielen Dank für Ihr Vertrauen.</p>`,
+                })
+                await client.query(
+                  `INSERT INTO store_automation_logs (seller_id, rule_type, target_id, status, triggered_at) VALUES ($1,'review_request',$2,'sent',now())`,
+                  [rule.seller_id, o.id]
+                ).catch(() => {})
+                await client.query(`UPDATE store_automation_rules SET triggered_count=triggered_count+1 WHERE seller_id=$1 AND type='review_request'`, [rule.seller_id]).catch(() => {})
+              }
+            }
+
+            if (rule.type === 'welcome_email') {
+              const subject = cfg.email_subject || 'Willkommen — danke für Ihr Vertrauen!'
+              const orders = await client.query(
+                `SELECT o.id, o.email, o.first_name, o.last_name, o.order_number
+                 FROM store_orders o
+                 WHERE (o.seller_id=$1 OR o.seller_id='default') AND o.email IS NOT NULL
+                 AND NOT EXISTS (
+                   SELECT 1 FROM store_orders o2 WHERE LOWER(o2.email)=LOWER(o.email) AND o2.id != o.id AND o2.created_at < o.created_at
+                 )
+                 AND NOT EXISTS (
+                   SELECT 1 FROM store_automation_logs l WHERE l.seller_id=$1 AND l.rule_type='welcome_email' AND l.target_id=o.id
+                 )
+                 AND o.payment_status='bezahlt'
+                 LIMIT 30`,
+                [rule.seller_id]
+              )
+              for (const o of (orders.rows || [])) {
+                if (!o.email) continue
+                const name = [o.first_name, o.last_name].filter(Boolean).join(' ') || 'Kunde'
+                await transport.sendMail({
+                  from: fromAddr, to: o.email,
+                  subject,
+                  html: `<p>Hallo ${name},</p><p>herzlich willkommen! Wir freuen uns, Sie als neuen Kunden begrüßen zu dürfen. Ihre Bestellung #${o.order_number || ''} wird schnellstmöglich bearbeitet.</p>`,
+                })
+                await client.query(
+                  `INSERT INTO store_automation_logs (seller_id, rule_type, target_id, status, triggered_at) VALUES ($1,'welcome_email',$2,'sent',now())`,
+                  [rule.seller_id, o.id]
+                ).catch(() => {})
+                await client.query(`UPDATE store_automation_rules SET triggered_count=triggered_count+1 WHERE seller_id=$1 AND type='welcome_email'`, [rule.seller_id]).catch(() => {})
+              }
+            }
+          } catch (ruleErr) {
+            // Per-rule errors don't abort other rules
+          }
+        }
+        await client.end()
+      } catch (_) {
+        if (client) try { await client.end() } catch (__) {}
+      }
+    }
+    setTimeout(() => runAutomations().catch(() => {}), 5 * 60 * 1000)
+    setInterval(() => runAutomations().catch(() => {}), 60 * 60 * 1000)
 
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -13759,6 +14095,15 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
            DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
           [recipientKey],
         )
+        await client.query(
+          `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+           SELECT $1::varchar, 'metafield_pending', mp.id, now()
+           FROM admin_hub_metafield_pending mp
+           WHERE mp.status = 'pending'
+           ON CONFLICT (recipient_key, source_type, source_id)
+           DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+          [recipientKey],
+        ).catch(() => {})
       }
     }
 
@@ -13838,12 +14183,29 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           WHERE cr.status = 'pending'
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
+        const metafieldUnreadQ = `
+          SELECT COUNT(*)::int AS c FROM admin_hub_metafield_pending mp
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'metafield_pending' AND s.source_id = mp.id
+          WHERE mp.status = 'pending'
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
+        const sellerNoticeUnreadQ = `
+          SELECT COUNT(*)::int AS c FROM admin_hub_notifications n
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'seller_notice' AND s.source_id = n.id
+          WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed')
+            AND n.seller_id = $2
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
 
-        const [ordersR, returnsR, verificationsR, changeReqR] = await Promise.all([
+        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR] = await Promise.all([
           client.query(ordersUnreadQ, [rk, sup, sid]),
           client.query(returnsUnreadQ, [rk, sup, sid]),
           sup ? client.query(verificationsUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           sup ? client.query(crUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
+          sup ? client.query(metafieldUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
+          !sup && sid ? client.query(sellerNoticeUnreadQ, [rk, sid]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
         ])
 
         const recentOrders = await client.query(
@@ -13898,23 +14260,55 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             [rk],
           ).catch(() => ({ rows: [] }))
         }
+        let recentMetafieldPending = { rows: [] }
+        if (sup) {
+          recentMetafieldPending = await client.query(
+            `SELECT mp.id, mp.key, mp.label, mp.proposed_values, mp.seller_id, mp.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_metafield_pending mp
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'metafield_pending' AND s.source_id = mp.id
+             WHERE mp.status = 'pending'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY mp.created_at DESC LIMIT 8`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        let recentSellerNotices = { rows: [] }
+        if (!sup && sid) {
+          recentSellerNotices = await client.query(
+            `SELECT n.id, n.title, n.body, n.reference_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'seller_notice' AND s.source_id = n.id
+             WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed')
+               AND n.seller_id = $2
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 8`,
+            [rk, sid],
+          ).catch(() => ({ rows: [] }))
+        }
 
         await client.end()
         const verCount = verificationsR.rows[0]?.c || 0
         const crCount = changeReqR.rows[0]?.c || 0
+        const mfCount = metafieldR.rows[0]?.c || 0
+        const sellerNoticeCount = sellerNoticeR.rows[0]?.c || 0
         const ordCount = ordersR.rows[0]?.c || 0
         const retCount = returnsR.rows[0]?.c || 0
         res.json({
-          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount,
+          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount,
           orders: ordCount,
           returns: retCount,
           messages: messagesR.rows[0]?.c || 0,
           verifications: verCount,
-          change_requests: crCount,
+          change_requests: crCount + mfCount,
           recent_orders: recentOrders.rows.map((r) => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_returns: recentReturns.rows.map((r) => ({ ...r, return_number: r.return_number ? Number(r.return_number) : null, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_verifications: recentVerifications.rows,
-          recent_product_change_requests: recentChangeRequests.rows || [],
+          recent_product_change_requests: [...(recentChangeRequests.rows || []), ...(recentMetafieldPending.rows || [])],
+          recent_seller_notices: recentSellerNotices.rows || [],
         })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -14004,6 +14398,35 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             [rk],
           ).catch(() => ({ rows: [] }))
         }
+        let metaPendingQ = { rows: [] }
+        if (sup) {
+          metaPendingQ = await client.query(
+            `SELECT mp.id, mp.key, mp.label, mp.proposed_values, mp.seller_id, mp.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_metafield_pending mp
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'metafield_pending' AND s.source_id = mp.id
+             WHERE mp.status = 'pending'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY mp.created_at DESC LIMIT 500`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        let sellerNoticeQ = { rows: [] }
+        if (!sup && sid) {
+          sellerNoticeQ = await client.query(
+            `SELECT n.id, n.title, n.body, n.reference_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'seller_notice' AND s.source_id = n.id
+             WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed')
+               AND n.seller_id = $2
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 500`,
+            [rk, sid],
+          ).catch(() => ({ rows: [] }))
+        }
         await client.end()
 
         const crShortVal = (val) => {
@@ -14082,6 +14505,31 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             new_value: r.new_value,
           })
         }
+        const metafieldSuggestionFeedItems = []
+        for (const r of metaPendingQ.rows || []) {
+          metafieldSuggestionFeedItems.push({
+            source_type: 'metafield_pending',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: 'Metafield-Änderungsvorschlag',
+            subtitle: `${r.label || r.key} · Vorschläge: ${(Array.isArray(r.proposed_values) ? r.proposed_values : []).join(', ')}`,
+            href: '/content/metaobjects',
+          })
+        }
+        const sellerNoticeFeedItems = []
+        for (const r of sellerNoticeQ.rows || []) {
+          const ref = r.reference_id ? String(r.reference_id) : ''
+          sellerNoticeFeedItems.push({
+            source_type: 'seller_notice',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: r.title || 'Hinweis',
+            subtitle: r.body || '',
+            href: ref ? `/products/${ref}` : '/products/inventory',
+          })
+        }
 
         const groupedMode = req.query.grouped === '1' || req.query.grouped === 'true'
         if (groupedMode) {
@@ -14108,12 +14556,20 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 items: verificationFeedItems,
               },
               {
-                key: 'product_change_request',
-                label_de: 'Produktänderungen',
-                description_de: 'Ausstehende Freigaben für Verkäufer-Änderungen',
-                items: productChangeFeedItems,
+                key: 'change_suggestion',
+                label_de: 'Änderungsvorschläge',
+                description_de: 'Ausstehende Freigaben für Produkt- und Metafield-Änderungen',
+                items: [...productChangeFeedItems, ...metafieldSuggestionFeedItems].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
               },
             )
+          }
+          if (!sup) {
+            groups.push({
+              key: 'seller_notice',
+              label_de: 'Freigabe-Ergebnisse',
+              description_de: 'Ergebnisse zu Ihren Vorschlägen mit Produkt-Link',
+              items: sellerNoticeFeedItems,
+            })
           }
           const grand_total = groups.reduce((s, g) => s + g.items.length, 0)
           return res.json({
@@ -14123,7 +14579,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           })
         }
 
-        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems]
+        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems, ...metafieldSuggestionFeedItems, ...sellerNoticeFeedItems]
         items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         const total = items.length
         const paged = items.slice(off, off + lim)
@@ -14190,13 +14646,31 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
               [rk],
             )
+            await client.query(
+              `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+               SELECT $1::varchar, 'metafield_pending', mp.id, now()
+               FROM admin_hub_metafield_pending mp
+               WHERE mp.status = 'pending'
+               ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+              [rk],
+            ).catch(() => {})
+          } else if (sid) {
+            await client.query(
+              `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+               SELECT $1::varchar, 'seller_notice', n.id, now()
+               FROM admin_hub_notifications n
+               WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed')
+                 AND n.seller_id = $2
+               ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+              [rk, sid],
+            ).catch(() => {})
           }
         } else {
           for (const it of items) {
             const st = String(it.source_type || '').trim()
             const id = it.source_id
             if (!st || !id) continue
-            if (!sup && st === 'product_change_request') continue
+            if (!sup && (st === 'product_change_request' || st === 'metafield_pending' || st === 'verification')) continue
             await markDeleted(st, id)
           }
         }
@@ -18448,7 +18922,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.post('/admin-hub/v1/product-change-requests/:id/approve', requireSellerAuth, async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser only' })
       const { id } = req.params
-      const { reviewer_note } = req.body || {}
+      const { reviewer_note, new_value } = req.body || {}
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { Client } = require('pg')
       const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
@@ -18457,21 +18931,37 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const cr = await c.query(`SELECT * FROM admin_hub_product_change_requests WHERE id = $1::uuid AND status = 'pending'`, [id])
         if (!cr.rows[0]) { await c.end(); return res.status(404).json({ message: 'Pending request not found' }) }
         const req_row = cr.rows[0]
+        const appliedValue = (new_value != null) ? String(new_value) : req_row.new_value
         // Apply change to product
         if (req_row.field_name === 'title') {
-          await c.query('UPDATE admin_hub_products SET title = $1, updated_at = now() WHERE id = $2::uuid', [req_row.new_value, req_row.product_id])
+          await c.query('UPDATE admin_hub_products SET title = $1, updated_at = now() WHERE id = $2::uuid', [appliedValue, req_row.product_id])
         } else if (req_row.field_name === 'description') {
-          await c.query('UPDATE admin_hub_products SET description = $1, updated_at = now() WHERE id = $2::uuid', [req_row.new_value, req_row.product_id])
+          await c.query('UPDATE admin_hub_products SET description = $1, updated_at = now() WHERE id = $2::uuid', [appliedValue, req_row.product_id])
         } else if (req_row.field_name.startsWith('metadata.')) {
           const metaKey = req_row.field_name.replace('metadata.', '')
           let parsedVal
-          try { parsedVal = JSON.parse(req_row.new_value) } catch (_) { parsedVal = req_row.new_value }
+          try { parsedVal = JSON.parse(appliedValue) } catch (_) { parsedVal = appliedValue }
           await c.query(
             `UPDATE admin_hub_products SET metadata = jsonb_set(COALESCE(metadata,'{}'), $1, $2::jsonb, true), updated_at = now() WHERE id = $3::uuid`,
             ['{' + metaKey + '}', JSON.stringify(parsedVal), req_row.product_id]
           )
         }
-        await c.query(`UPDATE admin_hub_product_change_requests SET status = 'approved', reviewer_note = $1, updated_at = now() WHERE id = $2::uuid`, [reviewer_note || null, id])
+        const p = await c.query(`SELECT id, handle FROM admin_hub_products WHERE id = $1::uuid`, [req_row.product_id]).catch(() => ({ rows: [] }))
+        const productHandle = p.rows?.[0]?.handle ? String(p.rows[0].handle) : ''
+        const productLink = productHandle ? `/produkt/${productHandle}` : `/products/${req_row.product_id}`
+        await c.query(`UPDATE admin_hub_product_change_requests SET status = 'approved', reviewer_note = $1, new_value = $2, updated_at = now() WHERE id = $3::uuid`, [reviewer_note || null, appliedValue, id])
+        if (req_row.seller_id) {
+          await c.query(
+            `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+             VALUES ('product_change_request_reviewed', $1, $2, $3, $4)`,
+            [
+              'Produkt wurde freigegeben',
+              `Ihr Änderungsvorschlag wurde freigegeben. Produkt-Link: ${productLink}`,
+              req_row.seller_id,
+              req_row.product_id,
+            ],
+          ).catch(() => {})
+        }
         await c.end()
         res.json({ success: true })
       } catch (e) {
@@ -18488,7 +18978,21 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
       try {
         await c.connect()
+        const cr = await c.query(`SELECT * FROM admin_hub_product_change_requests WHERE id = $1::uuid AND status = 'pending'`, [id])
+        const req_row = cr.rows?.[0]
         await c.query(`UPDATE admin_hub_product_change_requests SET status = 'rejected', reviewer_note = $1, updated_at = now() WHERE id = $2::uuid AND status = 'pending'`, [reviewer_note || null, id])
+        if (req_row?.seller_id) {
+          await c.query(
+            `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+             VALUES ('product_change_request_reviewed', $1, $2, $3, $4)`,
+            [
+              'Produktänderung abgelehnt',
+              `Ihr Änderungsvorschlag wurde abgelehnt.${reviewer_note ? ` Not: ${reviewer_note}` : ''}`,
+              req_row.seller_id,
+              req_row.product_id,
+            ],
+          ).catch(() => {})
+        }
         await c.end()
         res.json({ success: true })
       } catch (e) {
@@ -20201,6 +20705,29 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       sent_at timestamptz DEFAULT now()
     )`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_newsletter_logs_subscriber ON store_newsletter_email_logs(subscriber_id, sent_at DESC)`).catch(() => {})
+    await dbQ(`
+      INSERT INTO store_newsletter_subscribers (email, source, status, first_name, last_name, subscribed_at, updated_at)
+      SELECT DISTINCT LOWER(TRIM(c.email)) AS email,
+             'legacy_customer' AS source,
+             'active' AS status,
+             NULLIF(TRIM(c.first_name), ''),
+             NULLIF(TRIM(c.last_name), ''),
+             now(),
+             now()
+      FROM store_customers c
+      WHERE c.email IS NOT NULL
+        AND TRIM(c.email) <> ''
+        AND (
+          COALESCE(c.email_marketing_consent, false) = true
+          OR EXISTS (
+            SELECT 1
+            FROM store_orders o
+            WHERE LOWER(TRIM(o.email)) = LOWER(TRIM(c.email))
+              AND COALESCE(o.newsletter_opted_in, false) = true
+          )
+        )
+      ON CONFLICT (email) DO NOTHING
+    `).catch(() => {})
     httpApp.post('/store/newsletter-subscribe', async (req, res) => {
       const { email, source, first_name, last_name, preferred_locale } = req.body || {}
       if (!email || !String(email).includes('@')) return res.status(400).json({ message: 'Valid email required' })
@@ -20227,6 +20754,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                updated_at = now()`,
           [String(email).trim().toLowerCase(), sourceValue, first_name ? String(first_name).trim() : null, last_name ? String(last_name).trim() : null, localeValue]
         )
+        await c.query(
+          `UPDATE store_customers
+           SET email_marketing_consent = true, updated_at = now()
+           WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+          [String(email).trim().toLowerCase()]
+        ).catch(() => {})
         await c.end()
         res.json({ ok: true })
       } catch (e) {
@@ -20248,6 +20781,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
            WHERE email = $1`,
           [String(email).trim().toLowerCase()]
         )
+        await c.query(
+          `UPDATE store_customers
+           SET email_marketing_consent = false, updated_at = now()
+           WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+          [String(email).trim().toLowerCase()]
+        ).catch(() => {})
         await c.end()
         res.json({ ok: true })
       } catch (e) {
@@ -20402,7 +20941,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     })
-    httpApp.get('/admin-hub/v1/newsletter-subscribers/active', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/newsletter-subscribers-active', requireSellerAuth, async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { Client } = require('pg')
       const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })

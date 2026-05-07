@@ -418,6 +418,36 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setChangeRequestActionId("");
     }
   }, [client, product?.id, locale, onReload, refetchPendingChangeRequests, mergeLocaleFields]);
+  const editAndApproveChangeRequest = useCallback(async (cr) => {
+    if (!cr?.id || !product?.id) return;
+    const edited = window.prompt(
+      locale === "tr" ? "Yeni değeri düzenleyin ve onaylayın:" : locale === "de" ? "Neuen Wert bearbeiten und freigeben:" : "Edit new value and approve:",
+      String(cr?.new_value || ""),
+    );
+    if (edited == null) return;
+    try {
+      setChangeRequestActionId(String(cr.id));
+      await client.request(`/admin-hub/v1/product-change-requests/${encodeURIComponent(cr.id)}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ reviewer_note: "Edited + approved via product page", new_value: edited }),
+      });
+      const fresh = await client.getAdminHubProduct(product.id);
+      const localized = mergeLocaleFields(fresh);
+      if (localized) {
+        setProduct(localized);
+        initialSnapshotRef.current = JSON.stringify(normalizeForCompare(localized));
+        unsavedRef.current?.setDirty(false);
+      }
+      await refetchPendingChangeRequests(product.id);
+      setMessage({ type: "success", text: locale === "tr" ? "Değişiklik düzenlenip onaylandı." : locale === "de" ? "Änderung bearbeitet und freigegeben." : "Change edited and approved." });
+      onReload?.();
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("andertal-notifications-refresh"));
+    } catch (err) {
+      setMessage({ type: "error", text: err?.message || (locale === "tr" ? "Düzenleme/onaylama başarısız." : locale === "de" ? "Bearbeiten/Freigabe fehlgeschlagen." : "Edit/approve failed.") });
+    } finally {
+      setChangeRequestActionId("");
+    }
+  }, [client, locale, mergeLocaleFields, onReload, product?.id, refetchPendingChangeRequests]);
 
   const rejectChangeRequest = useCallback(async (requestId) => {
     if (!requestId || !product?.id) return;
@@ -1670,6 +1700,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                         <InlineStack gap="200">
                           <Button size="slim" tone="success" onClick={() => approveChangeRequest(cr.id)} loading={busy} disabled={busy}>
                             {locale === "tr" ? "Onayla" : locale === "de" ? "Freigeben" : "Approve"}
+                          </Button>
+                          <Button size="slim" onClick={() => editAndApproveChangeRequest(cr)} disabled={busy}>
+                            {locale === "tr" ? "Düzelt + Onayla" : locale === "de" ? "Bearbeiten + Freigeben" : "Edit + Approve"}
                           </Button>
                           <Button size="slim" tone="critical" variant="secondary" onClick={() => rejectChangeRequest(cr.id)} loading={busy} disabled={busy}>
                             {locale === "tr" ? "Reddet" : locale === "de" ? "Ablehnen" : "Reject"}

@@ -197,7 +197,7 @@ export default function MarketingAttributionPage() {
           id: c.id,
           name: c.name,
           ad_status: c.ad_status,
-          spend_cents: c.budget_daily_cents || 0,
+          spend_cents: 0,
           impressions: null,
           clicks: null,
           orders: null,
@@ -306,7 +306,7 @@ export default function MarketingAttributionPage() {
 
             {/* KPI Summary */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-              <KpiCard label="Ausgaben" value={fmtEur(totals.spend)} sub={`${DATE_PRESETS.find(d => d.value === datePreset)?.label}`} />
+              <KpiCard label="Ausgaben" value={hasRealData ? fmtEur(totals.spend) : "—"} sub={`${DATE_PRESETS.find(d => d.value === datePreset)?.label}`} />
               <KpiCard label="Einblendungen" value={hasRealData ? fmt(totals.impressions) : "—"} />
               <KpiCard label="Klicks" value={hasRealData ? fmt(totals.clicks) : "—"} sub={totalCtr ? `CTR ${totalCtr} %` : undefined} />
               <KpiCard label="Bestellungen" value={hasRealData ? fmt(totals.orders) : "—"} />
