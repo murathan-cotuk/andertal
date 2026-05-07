@@ -8,6 +8,7 @@ import { Button, InlineStack } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
+import ShipLabelModal from "@/components/orders/ShipLabelModal";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -727,6 +728,8 @@ export default function OrdersPage() {
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [versendModal, setVersendModal] = useState(null); // null | array of order objects
+  const [labelModal, setLabelModal] = useState(null); // null | order object
+  const [labelFulfillResult, setLabelFulfillResult] = useState(null); // { label_url, tracking_number }
   const [allReviews, setAllReviews] = useState([]); // all product reviews
   const [reviewPopupOrderId, setReviewPopupOrderId] = useState(null);
   const [returnsMap, setReturnsMap] = useState({}); // order_id → has active return
@@ -793,6 +796,25 @@ export default function OrdersPage() {
   }, [search, filterOrderStatus, filterPayStatus, filterDelivery, sort]);
 
   useEffect(() => { fetchOrders(); fetchReviews(); fetchReturns(); }, [fetchOrders, fetchReviews, fetchReturns]);
+
+  // Handle return from Stripe Checkout for label purchase
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const sessionId = sp.get("label_session_id");
+    if (!sessionId) return;
+    // Remove param from URL immediately
+    const clean = window.location.pathname;
+    window.history.replaceState({}, "", clean);
+    getMedusaAdminClient().fulfillLabel(sessionId)
+      .then(data => {
+        setLabelFulfillResult(data);
+        fetchOrders();
+      })
+      .catch(e => {
+        setLabelFulfillResult({ error: e?.message || "Etikett konnte nicht erstellt werden." });
+      });
+  }, []);
 
   const toggleExpand = async (order) => {
     const id = order.id;
@@ -1016,6 +1038,13 @@ export default function OrdersPage() {
                   </Button>
                 </div>
               )}
+              {order.delivery_status !== "zugestellt" && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Button size="slim" onClick={() => setLabelModal(order)}>
+                    Etikett kaufen
+                  </Button>
+                </div>
+              )}
               <ActionMenu order={order} onUpdate={handleUpdate} onDelete={handleDelete} onVersenden={() => setVersendModal([order])} />
             </div>
           </td>
@@ -1038,6 +1067,43 @@ export default function OrdersPage() {
           onClose={() => setVersendModal(null)}
           onDone={() => { fetchOrders(); setSelected(new Set()); }}
         />
+      )}
+      {labelModal && (
+        <ShipLabelModal
+          order={labelModal}
+          locale={locale}
+          onClose={() => setLabelModal(null)}
+        />
+      )}
+      {labelFulfillResult && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 480, padding: 32, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            {labelFulfillResult.error ? (
+              <>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#b91c1c", marginBottom: 12 }}>Fehler beim Etikett erstellen</div>
+                <div style={{ fontSize: 13, color: "#374151", marginBottom: 20 }}>{labelFulfillResult.error}</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#15803d", marginBottom: 8 }}>Etikett erfolgreich erstellt!</div>
+                {labelFulfillResult.tracking_number && (
+                  <div style={{ fontSize: 13, color: "#374151", marginBottom: 8 }}>
+                    Trackingnummer: <strong style={{ fontFamily: "monospace" }}>{labelFulfillResult.tracking_number}</strong>
+                  </div>
+                )}
+                {labelFulfillResult.label_url && (
+                  <div style={{ marginBottom: 20 }}>
+                    <a href={labelFulfillResult.label_url} target="_blank" rel="noopener noreferrer"
+                      style={{ display: "inline-block", padding: "10px 20px", background: "#2563eb", color: "#fff", borderRadius: 8, fontWeight: 600, fontSize: 13, textDecoration: "none" }}>
+                      Etikett drucken (PDF)
+                    </a>
+                  </div>
+                )}
+              </>
+            )}
+            <Button onClick={() => setLabelFulfillResult(null)}>Schließen</Button>
+          </div>
+        </div>
       )}
       {reviewPopupOrderId && (
         <ReviewPopup

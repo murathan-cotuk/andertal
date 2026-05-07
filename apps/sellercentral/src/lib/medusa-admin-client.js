@@ -868,6 +868,16 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/integrations/sendcloud/test', { method: 'POST', body: JSON.stringify(data) })
   }
 
+  async getLabelRates(orderId, body) {
+    return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/label/rates`, { method: 'POST', body: JSON.stringify(body) })
+  }
+  async createLabelCheckout(orderId, body) {
+    return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/label/checkout`, { method: 'POST', body: JSON.stringify(body) })
+  }
+  async fulfillLabel(session_id) {
+    return this.request('/admin-hub/v1/label/fulfill', { method: 'POST', body: JSON.stringify({ session_id }) })
+  }
+
   async testBillbeeIntegration(data) {
     return this.request('/admin-hub/v1/integrations/billbee/test', {
       method: 'POST',
@@ -955,6 +965,9 @@ class MedusaAdminClient {
   }
   async deleteNotifications(payload) {
     return this.request('/admin-hub/v1/notifications/delete', { method: 'POST', body: JSON.stringify(payload) })
+  }
+  async getNewsletterSubscribers() {
+    return this.request('/admin-hub/v1/newsletter-subscribers')
   }
   async getMessages(params = {}) {
     const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';

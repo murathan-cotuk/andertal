@@ -760,6 +760,7 @@ async function start() {
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS tracking_number varchar(200);`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS carrier_name varchar(100);`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS shipped_at timestamp;`).catch(() => {})
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS sendcloud_label_url text;`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS notes text;`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivery_date timestamp;`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS stripe_transfer_status varchar(50) NOT NULL DEFAULT 'legacy_skipped';`).catch(() => {})
@@ -11757,6 +11758,201 @@ async function start() {
       }
     }
 
+    // ── Sendcloud label purchase flow ─────────────────────────────────────────
+
+    const getSendcloudCredentials = async (pgClient) => {
+      const r = await pgClient.query(
+        `SELECT config_json FROM store_integrations WHERE slug='sendcloud' AND seller_scope_key='platform' LIMIT 1`
+      )
+      const cfg = r.rows[0]?.config_json || {}
+      return { public_key: cfg.public_key || '', secret_key: cfg.secret_key || '', markup_pct: cfg.markup_pct ?? 5 }
+    }
+
+    const sendcloudRequest = async (path, { public_key, secret_key }, opts = {}) => {
+      const https = require('https')
+      const creds = Buffer.from(`${public_key}:${secret_key}`).toString('base64')
+      const url = new URL('https://panel.sendcloud.sc' + path)
+      return new Promise((resolve, reject) => {
+        const req = https.request({ hostname: url.hostname, path: url.pathname + url.search, method: opts.method || 'GET',
+          headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/json', 'Accept': 'application/json' }
+        }, (resp) => {
+          let body = ''
+          resp.on('data', d => { body += d })
+          resp.on('end', () => {
+            try { resolve({ status: resp.statusCode, data: JSON.parse(body || '{}') }) }
+            catch { resolve({ status: resp.statusCode, data: {} }) }
+          })
+        })
+        req.on('error', reject)
+        if (opts.body) req.write(opts.body)
+        req.end()
+      })
+    }
+
+    const adminHubLabelRatesPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const id = (req.params.id || '').trim()
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = req.sellerUser?.seller_id || null
+      if (!id) return res.status(400).json({ message: 'id required' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const ownerCheck = await client.query(
+          'SELECT id, country, postal_code FROM store_orders WHERE id=$1::uuid' + sellerOrderAccessSQL(isSuperuser),
+          isSuperuser ? [id] : [id, callerSellerId]
+        )
+        if (!ownerCheck.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const order = ownerCheck.rows[0]
+        const sc = await getSendcloudCredentials(client)
+        await client.end()
+        if (!sc.public_key || !sc.secret_key) return res.status(400).json({ message: 'Sendcloud nicht konfiguriert' })
+        const { weight_kg = 1, length_cm = 30, width_cm = 20, height_cm = 15 } = req.body || {}
+        const weightG = Math.round(Number(weight_kg) * 1000) || 1000
+        const toCountry = (order.country || 'DE').trim().toUpperCase().slice(0, 2)
+        const qs = `?from_country=DE&to_country=${toCountry}&weight=${weightG}&length=${Math.round(Number(length_cm)||30)}&width=${Math.round(Number(width_cm)||20)}&height=${Math.round(Number(height_cm)||15)}`
+        const resp = await sendcloudRequest('/api/v2/shipping_products' + qs, sc)
+        const products = resp.data?.shipping_products || []
+        const markup = 1 + (Number(sc.markup_pct) || 5) / 100
+        const rates = []
+        for (const prod of products) {
+          for (const method of (prod.methods || [])) {
+            const price = method.price?.total_price ?? null
+            if (price == null) continue
+            rates.push({
+              service_id: method.id,
+              name: `${prod.name} — ${method.name}`,
+              carrier: prod.carrier?.code || prod.name,
+              price_eur: Math.round(Number(price) * markup * 100) / 100,
+              min_weight: method.min_weight,
+              max_weight: method.max_weight,
+            })
+          }
+        }
+        rates.sort((a, b) => a.price_eur - b.price_eur)
+        res.json({ rates, to_country: toCountry })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubLabelCheckoutPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const id = (req.params.id || '').trim()
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const callerSellerId = req.sellerUser?.seller_id || null
+      if (!id) return res.status(400).json({ message: 'id required' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const ownerCheck = await client.query(
+          'SELECT id, first_name, last_name, email, country, postal_code, city, address_line1, address_line2 FROM store_orders WHERE id=$1::uuid' + sellerOrderAccessSQL(isSuperuser),
+          isSuperuser ? [id] : [id, callerSellerId]
+        )
+        if (!ownerCheck.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const checkoutRow = await loadPlatformCheckoutRow(client)
+        const secretKey = resolveStripeSecretKeyFromPlatform(checkoutRow)
+        await client.end()
+        if (!secretKey) return res.status(400).json({ message: 'Stripe nicht konfiguriert' })
+        const { service_id, service_name, carrier, price_eur, weight_kg, length_cm, width_cm, height_cm, locale = 'de' } = req.body || {}
+        if (!service_id || !price_eur) return res.status(400).json({ message: 'service_id und price_eur erforderlich' })
+        const stripe = new (require('stripe'))(secretKey)
+        const SELLERCENTRAL_URL = (process.env.SELLERCENTRAL_URL || 'http://localhost:3002').replace(/\/$/, '')
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          mode: 'payment',
+          line_items: [{
+            price_data: {
+              currency: 'eur',
+              product_data: { name: `Versandetikett — ${service_name || carrier || 'Sendcloud'}`, description: `Bestellung #${ownerCheck.rows[0].id.slice(0,8)}` },
+              unit_amount: Math.round(Number(price_eur) * 100),
+            },
+            quantity: 1,
+          }],
+          metadata: { order_id: id, service_id: String(service_id), service_name: service_name || '', carrier: carrier || '', weight_kg: String(weight_kg||1), length_cm: String(length_cm||30), width_cm: String(width_cm||20), height_cm: String(height_cm||15), seller_id: callerSellerId || 'platform' },
+          success_url: `${SELLERCENTRAL_URL}/${locale}/orders?label_session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${SELLERCENTRAL_URL}/${locale}/orders?label_cancel=1`,
+        })
+        res.json({ checkout_url: session.url })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubLabelFulfillPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const { session_id } = req.body || {}
+      if (!session_id) return res.status(400).json({ message: 'session_id required' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const checkoutRow = await loadPlatformCheckoutRow(client)
+        const secretKey = resolveStripeSecretKeyFromPlatform(checkoutRow)
+        if (!secretKey) { await client.end(); return res.status(400).json({ message: 'Stripe nicht konfiguriert' }) }
+        const stripe = new (require('stripe'))(secretKey)
+        const session = await stripe.checkout.sessions.retrieve(session_id)
+        if (session.payment_status !== 'paid') { await client.end(); return res.status(400).json({ message: 'Zahlung nicht abgeschlossen' }) }
+        const meta = session.metadata || {}
+        const orderId = meta.order_id
+        if (!orderId) { await client.end(); return res.status(400).json({ message: 'Keine Bestell-ID in Session' }) }
+        // Check if already fulfilled (tracking already set via this session)
+        const labelCheckR = await client.query(`SELECT sendcloud_label_url, tracking_number FROM store_orders WHERE id=$1::uuid`, [orderId])
+        const existing = labelCheckR.rows[0]
+        if (existing?.sendcloud_label_url) {
+          await client.end()
+          return res.json({ label_url: existing.sendcloud_label_url, tracking_number: existing.tracking_number, already_fulfilled: true })
+        }
+        const orderR = await client.query(`SELECT id, first_name, last_name, email, phone, country, postal_code, city, address_line1, address_line2 FROM store_orders WHERE id=$1::uuid`, [orderId])
+        const order = orderR.rows[0]
+        if (!order) { await client.end(); return res.status(404).json({ message: 'Bestellung nicht gefunden' }) }
+        const sc = await getSendcloudCredentials(client)
+        if (!sc.public_key || !sc.secret_key) { await client.end(); return res.status(400).json({ message: 'Sendcloud nicht konfiguriert' }) }
+        const parcelBody = JSON.stringify({ parcel: {
+          name: [order.first_name, order.last_name].filter(Boolean).join(' ') || order.email || 'Kunde',
+          address: order.address_line1 || '',
+          address_2: order.address_line2 || '',
+          city: order.city || '',
+          postal_code: order.postal_code || '',
+          country: { iso_2: (order.country || 'DE').toUpperCase() },
+          telephone: order.phone || '',
+          email: order.email || '',
+          weight: String(Number(meta.weight_kg) || 1),
+          length: meta.length_cm || '30',
+          width: meta.width_cm || '20',
+          height: meta.height_cm || '15',
+          shipment: { id: Number(meta.service_id) },
+          request_label: true,
+          order_number: orderId.slice(0, 8),
+        }})
+        const scResp = await sendcloudRequest('/api/v2/parcels', sc, { method: 'POST', body: parcelBody })
+        if (scResp.status >= 400) {
+          await client.end()
+          return res.status(500).json({ message: `Sendcloud Fehler: ${JSON.stringify(scResp.data?.error || scResp.data)}` })
+        }
+        const parcel = scResp.data?.parcel || {}
+        const trackingNumber = parcel.tracking_number || ''
+        const labelUrl = parcel.label?.label_printer || parcel.label?.normal_printer || ''
+        const carrierName = meta.carrier || meta.service_name || 'Sendcloud'
+        await client.query(
+          `UPDATE store_orders SET tracking_number=$1, carrier_name=$2, sendcloud_label_url=$3, delivery_status='versendet', shipped_at=COALESCE(shipped_at,now()), updated_at=now() WHERE id=$4::uuid`,
+          [trackingNumber, carrierName, labelUrl, orderId]
+        )
+        await client.end()
+        res.json({ label_url: labelUrl, tracking_number: trackingNumber, carrier_name: carrierName })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
 
     /** Row key in admin_hub_seller_settings for Billbee: real seller_id, or billbee_user_<seller_users.id> if missing. Never "default". */
@@ -12791,6 +12987,9 @@ async function start() {
     httpApp.post('/admin-hub/v1/orders/:id/shipment-events', requireSellerAuth, adminHubShipmentEventPOST)
     httpApp.delete('/admin-hub/v1/shipment-events/:eventId', requireSellerAuth, adminHubShipmentEventDELETE)
     httpApp.post('/admin-hub/v1/orders/:id/refresh-tracking', requireSellerAuth, adminHubOrderRefreshTrackingPOST)
+    httpApp.post('/admin-hub/v1/orders/:id/label/rates', requireSellerAuth, adminHubLabelRatesPOST)
+    httpApp.post('/admin-hub/v1/orders/:id/label/checkout', requireSellerAuth, adminHubLabelCheckoutPOST)
+    httpApp.post('/admin-hub/v1/label/fulfill', requireSellerAuth, adminHubLabelFulfillPOST)
     httpApp.get('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomersGET)
     httpApp.post('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomerPOST)
     httpApp.patch('/admin-hub/v1/customers/:id', requireSellerAuth, adminHubCustomerPATCH)
@@ -19963,16 +20162,19 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       UNIQUE(email)
     )`).catch(() => {})
     httpApp.post('/store/newsletter-subscribe', async (req, res) => {
-      const { email } = req.body || {}
+      const { email, source } = req.body || {}
       if (!email || !String(email).includes('@')) return res.status(400).json({ message: 'Valid email required' })
+      const allowedSources = new Set(['landing_page', 'register', 'checkout', 'manual'])
+      const sourceValue = allowedSources.has(String(source || '').trim()) ? String(source).trim() : 'landing_page'
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { Client } = require('pg')
       const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
       try {
         await c.connect()
         await c.query(
-          `INSERT INTO store_newsletter_subscribers (email, source) VALUES ($1, 'landing_page') ON CONFLICT (email) DO NOTHING`,
-          [String(email).trim().toLowerCase()]
+          `INSERT INTO store_newsletter_subscribers (email, source) VALUES ($1, $2)
+           ON CONFLICT (email) DO UPDATE SET source = EXCLUDED.source, subscribed_at = now()`,
+          [String(email).trim().toLowerCase(), sourceValue]
         )
         await c.end()
         res.json({ ok: true })
