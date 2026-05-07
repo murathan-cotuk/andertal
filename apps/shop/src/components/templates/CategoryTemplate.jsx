@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import styled, { keyframes } from "styled-components";
+import styled, { keyframes, css } from "styled-components";
 import { CategoryProductListing } from "@/components/CategoryProductListing";
 import { Link } from "@/i18n/navigation";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
@@ -258,7 +258,7 @@ const Sidebar = styled.aside`
     position: fixed;
     top: 0;
     left: 0;
-    width: min(360px, 90vw);
+    width: min(380px, 92vw);
     height: 100dvh;
     max-height: 100dvh;
     z-index: ${CATALOG_FILTER_SIDEBAR_Z};
@@ -266,11 +266,11 @@ const Sidebar = styled.aside`
     box-shadow: 4px 0 32px rgba(0,0,0,0.2);
     transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
     transition: transform var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
-    padding: ${(p) => (p.$filterMode ? "0" : "14px 16px 16px")};
+    padding: 0;
     box-sizing: border-box;
-    display: ${(p) => (p.$filterMode ? "flex" : "block")};
+    display: flex;
     flex-direction: column;
-    overflow: ${(p) => (p.$filterMode ? "hidden" : "auto")};
+    overflow: hidden;
 
     @media (prefers-reduced-motion: reduce) {
       transition: none;
@@ -290,6 +290,117 @@ const DesktopSidebarContent = styled.div`
   }
 `;
 
+/** Mobile drawer: fixed header/tabs + scroll/split region */
+const MobileDrawerChrome = styled.div`
+  display: none;
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+`;
+
+const MobileDrawerSegments = styled.div`
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e7e5e4;
+  background: linear-gradient(to bottom, #fafaf9, #f4f4f2);
+`;
+
+const MobileDrawerSegmentBtn = styled.button`
+  flex: 1;
+  padding: 10px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid ${(p) => (p.$active ? "#0d9488" : "#d6d3d1")};
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  background: ${(p) => (p.$active ? "#0f766e" : "#ffffff")};
+  color: ${(p) => (p.$active ? "#ffffff" : "#57534e")};
+  box-shadow: ${(p) => (p.$active ? "0 2px 8px rgba(15,118,110,0.25)" : "0 1px 2px rgba(0,0,0,0.04)")};
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+`;
+
+const MobileCategoriesScroll = styled.div`
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 14px 20px;
+`;
+
+const MobileCategoryBlockTitle = styled.div`
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #78716c;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e7e5e4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: "";
+    width: 4px;
+    height: 14px;
+    background: #0f766e;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+`;
+
+/** Category rows in drawer — visually distinct from filter rails */
+const MobileCatRow = styled(Link)`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: ${(p) => (p.$variant === "muted" ? "9px 12px" : "12px 14px")};
+  margin-bottom: ${(p) => (p.$variant === "muted" ? "10px" : "8px")};
+  font-size: ${(p) => (p.$variant === "muted" ? 12 : 14)}px;
+  font-weight: ${(p) => (p.$active ? 600 : p.$variant === "muted" ? 500 : 500)};
+  line-height: 1.35;
+  color: ${(p) => {
+    if (p.$variant === "muted") return "#78716c";
+    return p.$active ? "#115e59" : "#292524";
+  }};
+  text-decoration: none;
+  background: ${(p) =>
+    p.$variant === "muted" ? "#f5f5f4" : p.$active ? "#ccfbf1" : "#ffffff"};
+  border: 1px solid ${(p) =>
+    p.$variant === "muted" ? "#e7e5e4" : p.$active ? "#5eead4" : "#e7e5e4"};
+  border-radius: ${(p) => (p.$variant === "muted" ? 8 : 12)}px;
+  box-sizing: border-box;
+  transition: background 0.12s, border-color 0.12s;
+
+  &:active {
+    background: ${(p) => (p.$variant === "muted" ? "#e7e5e4" : "#f0fdfa")};
+  }
+
+  ${(p) =>
+    p.$variant !== "muted" &&
+    css`
+      &::after {
+        content: "›";
+        opacity: 0.32;
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+    `}
+`;
+
 const MobileFilterSplit = styled.div`
   display: none;
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
@@ -301,75 +412,114 @@ const MobileFilterSplit = styled.div`
   }
 `;
 
-const MobileFilterLeft = styled.div`
-  width: 92px;
+const MobileFilterRailHeader = styled.div`
   flex-shrink: 0;
+  padding: 11px 10px 9px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #78716c;
+  background: #e7e5e4;
+  border-bottom: 1px solid #d6d3d1;
+`;
+
+const MobileFilterLeft = styled.div`
+  width: min(118px, 34vw);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #f5f5f4;
+  border-right: 1px solid #d6d3d1;
+`;
+
+const MobileFilterLeftScroll = styled.div`
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  background: #f7f7f6;
-  border-right: 1px solid #e8e8e6;
+  -webkit-overflow-scrolling: touch;
 `;
 
 const MobileFilterLeftBtn = styled.button`
   display: block;
   width: 100%;
-  padding: 13px 8px 13px 11px;
+  padding: 12px 10px;
   font-size: 11px;
-  font-weight: ${(p) => (p.$active ? 700 : 400)};
+  font-weight: ${(p) => (p.$active ? 700 : 500)};
   text-align: left;
-  background: ${(p) => (p.$active ? "#fff" : "transparent")};
+  background: ${(p) => (p.$active ? "#ffffff" : "transparent")};
   border: none;
-  border-left: 3px solid ${(p) => (p.$active ? "#111" : "transparent")};
-  color: ${(p) => (p.$active ? "#111" : "#555")};
+  border-left: 4px solid ${(p) => (p.$active ? "#0f766e" : "transparent")};
+  color: ${(p) => (p.$active ? "#134e4a" : "#44403c")};
   cursor: pointer;
-  line-height: 1.3;
+  line-height: 1.35;
   letter-spacing: 0.02em;
   font-family: inherit;
-`;
-
-const MobileNavLink = styled(Link)`
-  display: block;
-  width: 100%;
-  padding: 12px 8px 12px 11px;
-  font-size: 11px;
-  font-weight: ${(p) => (p.$active ? 700 : 400)};
-  text-align: left;
-  background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
-  border-left: 3px solid ${(p) => (p.$active ? "#111" : "transparent")};
-  color: ${(p) => (p.$active ? "#111" : "#555")};
-  cursor: pointer;
-  line-height: 1.3;
-  letter-spacing: 0.02em;
-  text-decoration: none;
-  box-sizing: border-box;
+  border-bottom: 1px solid #e7e5e4;
+  &:last-child {
+    border-bottom: none;
+  }
 `;
 
 const MobileFilterRight = styled.div`
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #fafaf9;
+`;
+
+const MobileFilterRightScroll = styled.div`
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 12px 10px;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 12px 20px;
+`;
+
+const MobileFilterRightHead = styled.h3`
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0c0a09;
+  line-height: 1.25;
+`;
+
+const MobileFilterRightHint = styled.p`
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #78716c;
 `;
 
 const MobileFilterPillGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 7px;
+  gap: 8px;
 `;
 
 const MobileFilterPill = styled.button`
-  padding: 9px 6px;
-  font-size: 11.5px;
-  font-weight: ${(p) => (p.$on ? 700 : 400)};
-  background: ${(p) => (p.$on ? "#111" : "#fff")};
-  color: ${(p) => (p.$on ? "#fff" : "#444")};
-  border: 1.5px solid ${(p) => (p.$on ? "#111" : "#d1d5db")};
-  border-radius: 8px;
+  padding: 10px 8px;
+  font-size: 12px;
+  font-weight: ${(p) => (p.$on ? 700 : 500)};
+  background: ${(p) => (p.$on ? "#134e4a" : "#ffffff")};
+  color: ${(p) => (p.$on ? "#ecfdf5" : "#44403c")};
+  border: 1.5px solid ${(p) => (p.$on ? "#134e4a" : "#d6d3d1")};
+  border-radius: 10px;
   cursor: pointer;
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.35;
   font-family: inherit;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
-  &:hover { border-color: #111; }
+  &:hover {
+    border-color: #0f766e;
+  }
+  &:active {
+    transform: scale(0.98);
+  }
   word-break: break-word;
 `;
 
@@ -405,8 +555,8 @@ const SidebarHead = styled.div`
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  margin-bottom: ${(p) => (p.$filterMode ? "0" : "20px")};
-  padding: ${(p) => (p.$filterMode ? "12px 14px" : "0 0 12px")};
+  margin-bottom: 0;
+  padding: 14px 16px;
   border-bottom: 1px solid #e8e8e6;
 
   @media (min-width: 1024px) {
@@ -742,6 +892,7 @@ export default function CategoryTemplate() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
   const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
+  const [mobileDrawerTab, setMobileDrawerTab] = useState("categories");
 
   const bodyRef = useRef(null);
 
@@ -916,6 +1067,12 @@ export default function CategoryTemplate() {
   const hasFacets = Object.keys(facets).length > 0;
   const hasSubcategories = subcategories.length > 0;
   const showCatalogSidebar = hasFacets || hasSubcategories || !!parentCategory;
+  const showMobileCatNav = hasSubcategories || !!parentCategory;
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    setMobileDrawerTab(showMobileCatNav ? "categories" : "filters");
+  }, [panelOpen, showMobileCatNav]);
 
   /* Mobile: sidebar stays closed on load — user opens manually via filter button */
 
@@ -1076,18 +1233,22 @@ export default function CategoryTemplate() {
           <CatalogDrawerPortal>
             <>
               <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />
-              <Sidebar $open={panelOpen} $width={sidebarWidth} $filterMode={hasFacets}>
-            <SidebarHead $filterMode={hasFacets}>
-              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                Filter{activeCount > 0 ? ` (${activeCount})` : ""}
+              <Sidebar $open={panelOpen} $width={sidebarWidth}>
+            <SidebarHead>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#1c1917" }}>
+                {showMobileCatNav && hasFacets
+                  ? (mobileDrawerTab === "categories" ? "Kategorien" : `Filter${activeCount > 0 ? ` (${activeCount})` : ""}`)
+                  : hasFacets
+                    ? `Filter${activeCount > 0 ? ` (${activeCount})` : ""}`
+                    : "Kategorien"}
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {activeCount > 0 && (
-                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ padding: "2px 8px", fontSize: 10 }}>
+                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ padding: "4px 10px", fontSize: 10 }}>
                     Löschen
                   </ClearAllBtn>
                 )}
-                <button type="button" aria-label="Filter schließen" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#555", lineHeight: 1, padding: 0 }}>×</button>
+                <button type="button" aria-label="Navigation schließen" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#57534e", lineHeight: 1, padding: 4 }}>×</button>
               </div>
             </SidebarHead>
 
@@ -1193,89 +1354,177 @@ export default function CategoryTemplate() {
             </SidebarSplit>
             </DesktopSidebarContent>
 
-            {/* Mobile only: two-panel filter layout */}
-            {hasFacets && (
-              <MobileFilterSplit>
-                <MobileFilterLeft>
-                  {(hasSubcategories || parentCategory) && (
-                    <div>
-                      <div style={{ padding: "8px 8px 4px 11px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#999" }}>Kategorien</div>
-                      {hasSubcategories ? (
-                        <>
-                          {parentCategory && (
-                            <MobileNavLink
-                              href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
-                              $active={false}
-                              onClick={() => { setFilters({}); setPage(1); sessionStorage.setItem("cat_nav_open", "1"); setPanelOpen(false); }}
-                              style={{ fontSize: 10, color: "#9ca3af", borderBottom: "1px solid #e8e8e6" }}
-                            >
-                              ← {parentCategory.name || parentCategory.slug}
-                            </MobileNavLink>
-                          )}
-                          <MobileNavLink href={slug ? `/${slug}` : "#"} $active={false} onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
-                            Alle
-                          </MobileNavLink>
-                          {subcategories.map((sub) => {
-                            const subSlug = String(sub.slug || "").replace(/^\//, "");
-                            return (
-                              <MobileNavLink key={sub.id} href={subSlug ? `/${subSlug}` : "#"} $active={false} onClick={() => { setFilters({}); setPage(1); sessionStorage.setItem("cat_nav_open", "1"); setPanelOpen(false); }}>
-                                {sub.name || sub.slug}
-                              </MobileNavLink>
-                            );
-                          })}
-                        </>
-                      ) : parentCategory && (
-                        <>
-                          <MobileNavLink
-                            href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
-                            $active={false}
-                            onClick={() => { setFilters({}); setPage(1); sessionStorage.setItem("cat_nav_open", "1"); setPanelOpen(false); }}
-                            style={{ fontSize: 10, color: "#9ca3af", borderBottom: "1px solid #e8e8e6" }}
-                          >
-                            ← {parentCategory.name || parentCategory.slug}
-                          </MobileNavLink>
-                          {visibleSubcats(parentCategory.children || []).map((sibling) => {
-                            const sibSlug = String(sibling.slug || "").replace(/^\//, "");
-                            const isCurrent = sibSlug === slug;
-                            return (
-                              <MobileNavLink key={sibling.id} href={sibSlug ? `/${sibSlug}` : "#"} $active={isCurrent} onClick={() => { setFilters({}); setPage(1); if (!isCurrent) sessionStorage.setItem("cat_nav_open", "1"); setPanelOpen(false); }}>
-                                {sibling.name || sibling.slug}
-                              </MobileNavLink>
-                            );
-                          })}
-                        </>
-                      )}
-                      <div style={{ height: 1, background: "#e8e8e6", margin: "4px 0" }} />
-                    </div>
-                  )}
-                  {Object.entries(facets).map(([key]) => {
-                    const cnt = (filters[key] || []).length;
-                    return (
-                      <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
-                        {getFacetGroupTitle(key)}
-                        {cnt > 0 && <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>{cnt} ausgewählt</span>}
-                      </MobileFilterLeftBtn>
-                    );
-                  })}
-                </MobileFilterLeft>
-                <MobileFilterRight>
-                  {activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
-                    <MobileFilterPillGrid>
-                      {facets[activeMobileFilterGroup].map((val) => {
-                        const on = (filters[activeMobileFilterGroup] || []).includes(val);
+            {/* Mobile: tabs separate categories vs. product filters */}
+            <MobileDrawerChrome>
+              {showMobileCatNav && hasFacets ? (
+                <MobileDrawerSegments role="tablist" aria-label="Katalog Navigation">
+                  <MobileDrawerSegmentBtn
+                    type="button"
+                    role="tab"
+                    aria-selected={mobileDrawerTab === "categories"}
+                    $active={mobileDrawerTab === "categories"}
+                    onClick={() => setMobileDrawerTab("categories")}
+                  >
+                    Kategorien
+                  </MobileDrawerSegmentBtn>
+                  <MobileDrawerSegmentBtn
+                    type="button"
+                    role="tab"
+                    aria-selected={mobileDrawerTab === "filters"}
+                    $active={mobileDrawerTab === "filters"}
+                    onClick={() => setMobileDrawerTab("filters")}
+                  >
+                    Filter{activeCount > 0 ? ` · ${activeCount}` : ""}
+                  </MobileDrawerSegmentBtn>
+                </MobileDrawerSegments>
+              ) : null}
+
+              {showMobileCatNav && (!hasFacets || mobileDrawerTab === "categories") ? (
+                <MobileCategoriesScroll>
+                  <MobileCategoryBlockTitle>Kategorienavigation</MobileCategoryBlockTitle>
+                  {hasSubcategories ? (
+                    <>
+                      {parentCategory ? (
+                        <MobileCatRow
+                          href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                          $variant="muted"
+                          onClick={() => {
+                            setFilters({});
+                            setPage(1);
+                            sessionStorage.setItem("cat_nav_open", "1");
+                            setPanelOpen(false);
+                          }}
+                        >
+                          ← {parentCategory.name || parentCategory.slug}
+                        </MobileCatRow>
+                      ) : null}
+                      <MobileCatRow
+                        href={slug ? `/${String(slug).replace(/^\//, "")}` : "#"}
+                        $active
+                        onClick={() => {
+                          setFilters({});
+                          setPage(1);
+                          setPanelOpen(false);
+                        }}
+                      >
+                        Alle in „{displayTitle}“
+                      </MobileCatRow>
+                      {subcategories.map((sub) => {
+                        const subSlug = String(sub.slug || "").replace(/^\//, "");
                         return (
-                          <MobileFilterPill key={val} type="button" $on={on} onClick={() => toggle(activeMobileFilterGroup, val)}>
-                            {val}
-                          </MobileFilterPill>
+                          <MobileCatRow
+                            key={sub.id}
+                            href={subSlug ? `/${subSlug}` : "#"}
+                            onClick={() => {
+                              setFilters({});
+                              setPage(1);
+                              sessionStorage.setItem("cat_nav_open", "1");
+                              setPanelOpen(false);
+                            }}
+                          >
+                            {sub.name || sub.slug}
+                          </MobileCatRow>
                         );
                       })}
-                    </MobileFilterPillGrid>
+                    </>
                   ) : (
-                    <div style={{ color: "#aaa", fontSize: 12 }}>Wähle einen Filter</div>
+                    parentCategory ? (
+                      <>
+                        <MobileCatRow
+                          href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                          $variant="muted"
+                          onClick={() => {
+                            setFilters({});
+                            setPage(1);
+                            sessionStorage.setItem("cat_nav_open", "1");
+                            setPanelOpen(false);
+                          }}
+                        >
+                          ← {parentCategory.name || parentCategory.slug}
+                        </MobileCatRow>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#78716c", margin: "12px 0 8px" }}>
+                          Weitere Unterkategorien
+                        </div>
+                        <MobileCatRow
+                          href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                          onClick={() => {
+                            setFilters({});
+                            setPage(1);
+                            setPanelOpen(false);
+                          }}
+                        >
+                          Alle in „{parentCategory.name || parentCategory.slug}“
+                        </MobileCatRow>
+                        {visibleSubcats(parentCategory.children || []).map((sibling) => {
+                          const sibSlug = String(sibling.slug || "").replace(/^\//, "");
+                          const isCurrent = sibSlug === slug;
+                          return (
+                            <MobileCatRow
+                              key={sibling.id}
+                              href={sibSlug ? `/${sibSlug}` : "#"}
+                              $active={isCurrent}
+                              onClick={() => {
+                                setFilters({});
+                                setPage(1);
+                                if (!isCurrent) sessionStorage.setItem("cat_nav_open", "1");
+                                setPanelOpen(false);
+                              }}
+                            >
+                              {sibling.name || sibling.slug}
+                            </MobileCatRow>
+                          );
+                        })}
+                      </>
+                    ) : null
                   )}
-                </MobileFilterRight>
-              </MobileFilterSplit>
-            )}
+                </MobileCategoriesScroll>
+              ) : null}
+
+              {hasFacets && (!showMobileCatNav || mobileDrawerTab === "filters") ? (
+                <MobileFilterSplit>
+                  <MobileFilterLeft>
+                    <MobileFilterRailHeader>Produkteigenschaften</MobileFilterRailHeader>
+                    <MobileFilterLeftScroll>
+                      {Object.entries(facets).map(([key]) => {
+                        const cnt = (filters[key] || []).length;
+                        return (
+                          <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
+                            {getFacetGroupTitle(key)}
+                            {cnt > 0 ? (
+                              <span style={{ display: "block", fontSize: 10, color: "#0f766e", fontWeight: 800, marginTop: 4 }}>{cnt} aktiv</span>
+                            ) : null}
+                          </MobileFilterLeftBtn>
+                        );
+                      })}
+                    </MobileFilterLeftScroll>
+                  </MobileFilterLeft>
+                  <MobileFilterRight>
+                    <MobileFilterRightScroll>
+                      {activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
+                        <>
+                          <MobileFilterRightHead>{getFacetGroupTitle(activeMobileFilterGroup)}</MobileFilterRightHead>
+                          <MobileFilterRightHint>Wählen Sie einen oder mehrere Werte. Tippen Sie erneut, um abzuwählen.</MobileFilterRightHint>
+                          <MobileFilterPillGrid>
+                            {facets[activeMobileFilterGroup].map((val) => {
+                              const on = (filters[activeMobileFilterGroup] || []).includes(val);
+                              return (
+                                <MobileFilterPill key={val} type="button" $on={on} onClick={() => toggle(activeMobileFilterGroup, val)}>
+                                  {val}
+                                </MobileFilterPill>
+                              );
+                            })}
+                          </MobileFilterPillGrid>
+                        </>
+                      ) : (
+                        <div style={{ color: "#a8a29e", fontSize: 13, lineHeight: 1.45, paddingTop: 8 }}>
+                          Wählen Sie links eine Produkteigenschaft.
+                        </div>
+                      )}
+                    </MobileFilterRightScroll>
+                  </MobileFilterRight>
+                </MobileFilterSplit>
+              ) : null}
+            </MobileDrawerChrome>
           </Sidebar>
             </>
           </CatalogDrawerPortal>

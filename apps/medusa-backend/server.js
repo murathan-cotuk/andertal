@@ -190,10 +190,16 @@ const zUrl      = z.string().url('Invalid URL').or(z.literal('')).optional()
 
 // ── TOTP secret encryption (AES-256-GCM) ─────────────────────────────────────
 // Env: TOTP_ENCRYPTION_KEY — exactly 64 hex chars (32 bytes).
-// REQUIRED in all environments — no fallback. Generate with:
+// Production: REQUIRED. Generate with:
 //   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 if (!process.env.TOTP_ENCRYPTION_KEY) {
-  throw new Error('TOTP_ENCRYPTION_KEY is required. Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('TOTP_ENCRYPTION_KEY is required in production. Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
+  }
+  // Development / fresh clone: allow `npm run dev` without configuring TOTP immediately.
+  // Fixed weak key — only for localhost; NEVER deploy without a real rotation key.
+  process.env.TOTP_ENCRYPTION_KEY = '0'.repeat(64)
+  log.warn('[dev] TOTP_ENCRYPTION_KEY unset — using local-only placeholder. Add TOTP_ENCRYPTION_KEY to .env before real 2FA / shared DB.')
 }
 if (process.env.TOTP_ENCRYPTION_KEY.length !== 64) {
   throw new Error('TOTP_ENCRYPTION_KEY must be exactly 64 hex chars (32 bytes)')

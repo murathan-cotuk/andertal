@@ -1,4 +1,5 @@
 ﻿import "./globals.css";
+import Script from "next/script";
 import TrustpilotInviteBootstrap from "@/components/TrustpilotInviteBootstrap";
 import UnhandledRejectionGuard from "@/components/UnhandledRejectionGuard";
 
@@ -74,6 +75,13 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body suppressHydrationWarning>
+        {/*
+          Register before React / Next overlay: noisy Promise rejects with raw DOM Events
+          stringify as "[object Event]". Duplicate logic documented in lib/unhandled-rejection-suppress.js
+        */}
+        <Script id="suppress-dom-event-unhandledreject" strategy="beforeInteractive">
+          {`(function(){var K=['[object Event]','[object ErrorEvent]','[object ProgressEvent]','[object AnimationEvent]','[object UIEvent]'];function ign(r){if(!r)return false;try{var t=Object.prototype.toString.call(r);if(K.indexOf(t)!==-1)return true}catch(e){}if(typeof Event!=='undefined'&&r instanceof Event)return true;if(typeof ErrorEvent!=='undefined'&&r instanceof ErrorEvent)return true;var n=r&&r.constructor&&r.constructor.name;return n==='Event'||n==='ProgressEvent'||n==='ErrorEvent'}window.addEventListener('unhandledrejection',function(e){if(ign(e.reason)){e.preventDefault()}},true)})();`}
+        </Script>
         <UnhandledRejectionGuard />
         <TrustpilotInviteBootstrap />
         {children}

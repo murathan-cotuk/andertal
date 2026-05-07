@@ -18,7 +18,14 @@ export async function GET() {
       headers: { "Content-Type": "application/json" },
       ...(skipCache ? { cache: "no-store" } : { next: { revalidate: 60 } }),
     });
-    if (!res.ok) return NextResponse.json({ menus: [], count: 0 }, { status: 200 });
+    if (!res.ok) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          `[shop/api/store-menus] ${res.status} from ${base}/store/menus — sidebar menü boş kalabilir.`,
+        );
+      }
+      return NextResponse.json({ menus: [], count: 0 }, { status: 200 });
+    }
     const data = await res.json();
     if (!skipCache) {
       menusCache.data = data;
@@ -26,6 +33,9 @@ export async function GET() {
     }
     return NextResponse.json(data);
   } catch (e) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`[shop/api/store-menus] ${e?.message || e} — backend: ${getBackendUrl()}`);
+    }
     return NextResponse.json({ menus: [], count: 0 }, { status: 200 });
   }
 }

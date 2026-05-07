@@ -22,11 +22,17 @@ const devHost = process.env.NEXT_PUBLIC_SITE_URL
     })()
   : null;
 
+const extraAllowedDevOrigins = (process.env.SHOP_ALLOWED_DEV_ORIGINS || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 const allowedDevOrigins = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://192.168.1.240:3000",
   devHost,
+  ...extraAllowedDevOrigins,
 ].filter(Boolean);
 
 /** @type {import('next').NextConfig} */

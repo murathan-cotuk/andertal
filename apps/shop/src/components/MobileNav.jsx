@@ -338,7 +338,6 @@ export default function MobileNav({ layout = "fixed" }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTarget, setDrawerTarget] = useState("menu"); // "menu" | "account"
   const [categories, setCategories] = useState([]);
-  const [activeMobileCategory, setActiveMobileCategory] = useState(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [isMobileNavViewport, setIsMobileNavViewport] = useState(false);
   const drawerRef = useRef(null);
@@ -373,21 +372,11 @@ export default function MobileNav({ layout = "fixed" }) {
           .filter((n) => n && !n.parent_id && n.has_products !== false && n.slug)
           .map((n) => {
             const imageRaw = categoryListImageUrl(n);
-            const children = Array.isArray(n.children)
-              ? n.children
-                  .filter((c) => c && c.has_products !== false && c.slug)
-                  .map((c) => ({
-                    id: c.id,
-                    label: c.name || c.slug,
-                    href: `/${String(c.slug).replace(/^\//, "")}`,
-                  }))
-              : [];
             return {
               id: n.id,
               label: n.name || n.slug,
               href: `/${String(n.slug).replace(/^\//, "")}`,
               imageUrl: imageRaw ? resolveImageUrl(imageRaw) : "",
-              children,
             };
           })
           .sort((a, b) => a.label.localeCompare(b.label));
@@ -399,7 +388,6 @@ export default function MobileNav({ layout = "fixed" }) {
   /* Close drawer on route change */
   useEffect(() => {
     setDrawerOpen(false);
-    setActiveMobileCategory(null);
     setDrawerTarget("menu");
   }, [pathname]);
 
@@ -421,10 +409,6 @@ export default function MobileNav({ layout = "fixed" }) {
   }, []);
 
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
-
-  const activeCategoryNode = activeMobileCategory
-    ? categories.find((c) => String(c.id) === String(activeMobileCategory))
-    : null;
 
   useEffect(() => {
     if (!drawerOpen || drawerTarget !== "account") return;
@@ -502,72 +486,19 @@ export default function MobileNav({ layout = "fixed" }) {
           {categories.length > 0 && (
             <>
               <div style={css.sectionLabel}>Kategorien</div>
-              <div style={{ overflow: "hidden" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    width: "200%",
-                    transform: activeCategoryNode ? "translateX(-50%)" : "translateX(0)",
-                    transition: reducedMotion ? "none" : "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
-                  }}
-                >
-                  <div style={{ width: "50%" }}>
-                    {categories.slice(0, 18).map((cat) => (
-                      cat.children?.length ? (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => setActiveMobileCategory(cat.id)}
-                          style={css.categoryRowBtn}
-                        >
-                          {cat.imageUrl ? <img src={cat.imageUrl} alt="" style={css.categoryThumb} /> : <div style={css.categoryThumbPlaceholder} aria-hidden />}
-                          <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
-                          <IcoChevron />
-                        </button>
-                      ) : (
-                        <Link
-                          key={cat.id}
-                          href={cat.href}
-                          onClick={closeDrawer}
-                          style={{ ...css.categoryRowBtn, textDecoration: "none", display: "flex" }}
-                        >
-                          {cat.imageUrl ? <img src={cat.imageUrl} alt="" style={css.categoryThumb} /> : <div style={css.categoryThumbPlaceholder} aria-hidden />}
-                          <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
-                          <IcoChevron />
-                        </Link>
-                      )
-                    ))}
-                  </div>
-                  <div style={{ width: "50%" }}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveMobileCategory(null)}
-                      style={{
-                        ...css.drawerBtn,
-                        fontWeight: 700,
-                        color: TEAL,
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ transform: "rotate(180deg)", display: "inline-flex" }}><IcoChevron /></span>
-                        Zurück
-                      </span>
-                    </button>
-                    {activeCategoryNode && (
-                      <>
-                        <HoverLink href={activeCategoryNode.href} onClick={closeDrawer} style={{ ...css.subCategoryLink, fontWeight: 700, color: TEAL, paddingLeft: 16 }}>
-                          Alle anzeigen
-                        </HoverLink>
-                        {(activeCategoryNode.children || []).map((sub) => (
-                          <HoverLink key={sub.id} href={sub.href} onClick={closeDrawer} style={{ ...css.subCategoryLink, paddingLeft: 16 }}>
-                            {sub.label}
-                          </HoverLink>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                </div>
+              <div>
+                {categories.slice(0, 18).map((cat) => (
+                  <Link
+                    key={cat.id}
+                    href={cat.href}
+                    onClick={closeDrawer}
+                    style={{ ...css.categoryRowBtn, textDecoration: "none", display: "flex" }}
+                  >
+                    {cat.imageUrl ? <img src={cat.imageUrl} alt="" style={css.categoryThumb} /> : <div style={css.categoryThumbPlaceholder} aria-hidden />}
+                    <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{cat.label}</span>
+                    <IcoChevron />
+                  </Link>
+                ))}
               </div>
             </>
           )}
