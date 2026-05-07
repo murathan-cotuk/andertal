@@ -11489,7 +11489,7 @@ async function start() {
     // Returns order row if the caller has access (direct seller_id match OR via seller listings)
     const sellerOrderAccessSQL = (isSuperuser) => isSuperuser
       ? ''
-      : ` AND (seller_id=$2 OR EXISTS (SELECT 1 FROM store_order_items oi WHERE oi.order_id=store_orders.id AND (EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id=oi.product_id AND sl.seller_id=$2) OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text=oi.product_id AND ap.seller_id=$2))))`
+      : ` AND (seller_id=$2 OR EXISTS (SELECT 1 FROM store_order_items oi WHERE oi.order_id=store_orders.id AND (EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text=oi.product_id::text AND sl.seller_id=$2) OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text=oi.product_id::text AND ap.seller_id=$2))))`
 
     const adminHubShipmentEventsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -11568,7 +11568,7 @@ async function start() {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const sellerEventAccessSQL = isSuperuser ? '' : ` AND (o.seller_id=$2 OR EXISTS (SELECT 1 FROM store_order_items oi WHERE oi.order_id=o.id AND (EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id=oi.product_id AND sl.seller_id=$2) OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text=oi.product_id AND ap.seller_id=$2))))`
+        const sellerEventAccessSQL = isSuperuser ? '' : ` AND (o.seller_id=$2 OR EXISTS (SELECT 1 FROM store_order_items oi WHERE oi.order_id=o.id AND (EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text=oi.product_id::text AND sl.seller_id=$2) OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text=oi.product_id::text AND ap.seller_id=$2))))`
         const ownerCheck = await client.query(
           `SELECT e.id FROM store_shipment_events e JOIN store_orders o ON o.id=e.order_id WHERE e.id=$1::uuid` + sellerEventAccessSQL,
           isSuperuser ? [eventId] : [eventId, callerSellerId]
@@ -16426,8 +16426,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             o.seller_id = $${sellerParamNum}
             OR EXISTS (
               SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id = oi.product_id AND sl.seller_id = $${sellerParamNum})
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id AND ap.seller_id = $${sellerParamNum})
+                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${sellerParamNum})
+                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${sellerParamNum})
               )
             )
           )`)
@@ -16466,8 +16466,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             o.seller_id = $${returnSellerParamNum}
             OR EXISTS (
               SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id = oi.product_id AND sl.seller_id = $${returnSellerParamNum})
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id AND ap.seller_id = $${returnSellerParamNum})
+                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${returnSellerParamNum})
+                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${returnSellerParamNum})
               )
             )
           )`)
@@ -16738,8 +16738,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
              o.seller_id = $1
              OR EXISTS (
                SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                 EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id = oi.product_id AND sl.seller_id = $1)
-                 OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id AND ap.seller_id = $1)
+                 EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $1)
+                 OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $1)
                )
              )
            ) AND o.payment_status = 'bezahlt' ${dateFilter}`,
