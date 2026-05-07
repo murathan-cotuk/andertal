@@ -91,9 +91,20 @@ function startFlowQueueWorker({ onOrderEvent, onCustomerEvent }) {
   return workerSingleton
 }
 
+function getFlowQueueStatus() {
+  const redisUrl = !!String(process.env.REDIS_URL || process.env.NOTIFICATION_REDIS_URL || '').trim()
+  const enabled = isQueueEnabled()
+  return {
+    notification_queue_enabled: enabled,
+    redis_url_set: redisUrl,
+    worker_would_run: enabled && redisUrl,
+  }
+}
+
 module.exports = {
   isQueueEnabled,
   enqueueFlowEvent,
   startFlowQueueWorker,
+  getFlowQueueStatus,
 }
 

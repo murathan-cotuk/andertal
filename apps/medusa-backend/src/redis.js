@@ -62,4 +62,35 @@ async function invalidatePattern(pattern) {
   } catch { /* silent */ }
 }
 
-module.exports = { get, set, del, invalidatePattern, client: () => client };
+/** One-shot ping (avoids relying on lazy background connect). Does not log the URL. */
+async function pingForHealth() {
+  const url = String(process.env.REDIS_URL || process.env.NOTIFICATION_REDIS_URL || "").trim();
+  if (!url) {
+    return { url_configured: false, ping_ok: false };
+  }
+  let r;
+  try {
+    const IORedis = require("ioredis");
+    r = new IORedis(url, {
+      maxRetriesPerRequest: 2,
+      connectTimeout: 5000,
+      lazyConnect: true,
+      enableOfflineQueue: false,
+    });
+    await r.connect();
+    const pong = await r.ping();
+    await r.quit();
+    return { url_configured: true, ping_ok: pong === "PONG" };
+  } catch (e) {
+    try {
+      if (r) await r.quit();
+    } catch (_) {}
+    return {
+      url_configured: true,
+      ping_ok: false,
+      error: String(e?.message || e || "ping failed").slice(0, 200),
+    };
+  }
+}
+
+module.exports = { get, set, del, invalidatePattern, client: () => client, pingForHealth };

@@ -17,7 +17,8 @@ try {
 const path = require('path')
 const fs = require('fs')
 const { runAutomationFlowsForOrder, runAutomationFlowsForCustomerEvent } = require('./src/flow-automation')
-const { enqueueFlowEvent, startFlowQueueWorker } = require('./src/flow-queue')
+const { enqueueFlowEvent, startFlowQueueWorker, getFlowQueueStatus } = require('./src/flow-queue')
+const { pingForHealth } = require('./src/redis')
 const { resolveSmtpSenderIdentity } = require('./src/smtp-sender-resolve')
 const { renderInvoicePdfDocument } = require('./src/order-pdf-buffers')
 const { resolveOrderPaidTotalCents } = require('./src/order-money')
@@ -476,8 +477,19 @@ async function start() {
     app.get('/', (req, res) => {
       res.json({ ok: true, service: 'medusa-backend', timestamp: new Date().toISOString() })
     })
-    app.get('/health', (req, res) => {
-      res.json({ status: 'ok', timestamp: new Date().toISOString() })
+    app.get('/health', async (req, res) => {
+      const redisPing = await pingForHealth()
+      const notificationQueue = getFlowQueueStatus()
+      res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        redis: {
+          url_configured: redisPing.url_configured,
+          ping_ok: redisPing.ping_ok,
+          ...(redisPing.error ? { error: redisPing.error } : {}),
+        },
+        notification_queue: notificationQueue,
+      })
     })
     // Uploads: use UPLOAD_DIR for a persistent volume path, or S3 when S3_UPLOAD_* env is set.
     // Otherwise __dirname/uploads (ephemeral on many hosts). See docs/UPLOADS.md.
