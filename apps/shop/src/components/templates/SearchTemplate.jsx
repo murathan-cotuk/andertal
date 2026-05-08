@@ -367,6 +367,74 @@ const MobileFilterPill = styled.button`
   word-break: break-word;
 `;
 
+/** Mobile two-tab drawer chrome */
+const MobileDrawerChrome = styled.div`
+  display: none;
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+`;
+
+const MobileDrawerSegments = styled.div`
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e7e5e4;
+  background: linear-gradient(to bottom, #fafaf9, #f4f4f2);
+`;
+
+const MobileDrawerSegmentBtn = styled.button`
+  flex: 1;
+  padding: 10px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid ${(p) => (p.$active ? "#0d9488" : "#d6d3d1")};
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  background: ${(p) => (p.$active ? "#0f766e" : "#ffffff")};
+  color: ${(p) => (p.$active ? "#ffffff" : "#57534e")};
+  box-shadow: ${(p) => (p.$active ? "0 2px 8px rgba(15,118,110,0.25)" : "0 1px 2px rgba(0,0,0,0.04)")};
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+`;
+
+const MobileCategoriesScroll = styled.div`
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 14px 20px;
+`;
+
+const MobileCategoryBlockTitle = styled.div`
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #78716c;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e7e5e4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  &::before {
+    content: "";
+    width: 4px;
+    height: 14px;
+    background: #0f766e;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+`;
+
 const SidebarPane = styled.section`
   padding: 0 0 16px;
   & + & {
@@ -639,6 +707,7 @@ export default function SearchTemplate() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
   const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
+  const [mobileDrawerTab, setMobileDrawerTab] = useState("categories");
   const bodyRef = useRef(null);
 
   useEffect(() => {
@@ -777,7 +846,10 @@ export default function SearchTemplate() {
     return filterProductsByCategorySubtree(catNodeForFilter, textHits);
   }, [q, textHits, catNodeForFilter]);
 
-  const facets = useMemo(() => buildFacetsFromProducts(baseAfterCat), [baseAfterCat]);
+  const facets = useMemo(() => {
+    const raw = buildFacetsFromProducts(baseAfterCat);
+    return Object.fromEntries(Object.entries(raw).filter(([k]) => k !== "category" && k !== "category_slug"));
+  }, [baseAfterCat]);
   const hasFacets = Object.keys(facets).length > 0;
 
   useEffect(() => {
@@ -830,6 +902,11 @@ export default function SearchTemplate() {
       && (hasSubcategories
         || (!hasSubcategories && parentCategory && (subcategories || []).length > 0)),
   );
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    setMobileDrawerTab(hasNavPane ? "categories" : "filters");
+  }, [panelOpen, hasNavPane]);
 
   const showCatalogSidebar =
     Boolean(q)
@@ -1134,116 +1211,152 @@ export default function SearchTemplate() {
                 </SidebarSplit>
               </DesktopSidebarContent>
 
-              {/* Mobile: two-panel layout (when facets exist) */}
-              {hasFacets && (
-                <MobileFilterSplit>
-                  <MobileFilterLeft>
-                    {renderMobileNavSection(() => setPanelOpen(false))}
-                    {Object.entries(facets).map(([key]) => {
-                      const cnt = (filters[key] || []).length;
-                      return (
-                        <MobileFilterLeftBtn
-                          key={key}
-                          type="button"
-                          $active={activeMobileFilterGroup === key}
-                          onClick={() => setActiveMobileFilterGroup(key)}
+              {/* Mobile: two-tab drawer (Kategorien / Filter) */}
+              <MobileDrawerChrome>
+                {hasNavPane && hasFacets && (
+                  <MobileDrawerSegments role="tablist" aria-label="Navigation">
+                    <MobileDrawerSegmentBtn
+                      type="button"
+                      role="tab"
+                      aria-selected={mobileDrawerTab === "categories"}
+                      $active={mobileDrawerTab === "categories"}
+                      onClick={() => setMobileDrawerTab("categories")}
+                    >
+                      Kategorien
+                    </MobileDrawerSegmentBtn>
+                    <MobileDrawerSegmentBtn
+                      type="button"
+                      role="tab"
+                      aria-selected={mobileDrawerTab === "filters"}
+                      $active={mobileDrawerTab === "filters"}
+                      onClick={() => setMobileDrawerTab("filters")}
+                    >
+                      Filter{activeCount > 0 ? ` · ${activeCount}` : ""}
+                    </MobileDrawerSegmentBtn>
+                  </MobileDrawerSegments>
+                )}
+
+                {/* Category navigation tab */}
+                {hasNavPane && (!hasFacets || mobileDrawerTab === "categories") && (
+                  <MobileCategoriesScroll>
+                    <MobileCategoryBlockTitle>Kategorienavigation</MobileCategoryBlockTitle>
+                    {branchNav && hasSubcategories ? (
+                      <>
+                        {parentCategory && (
+                          <MobileNavLink
+                            href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
+                            $active={false}
+                            onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
+                            style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}
+                          >
+                            ← {parentCategory.name || parentCategory.slug}
+                          </MobileNavLink>
+                        )}
+                        <MobileNavLink
+                          href={searchHrefForSub("")}
+                          $active={!effectiveCat}
+                          onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
                         >
-                          {getFacetGroupTitle(key)}
-                          {cnt > 0 && (
-                            <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>
-                              {cnt} ausgewählt
-                            </span>
-                          )}
-                        </MobileFilterLeftBtn>
-                      );
-                    })}
-                  </MobileFilterLeft>
-                  <MobileFilterRight>
-                    {activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
-                      <MobileFilterPillGrid>
-                        {facets[activeMobileFilterGroup].map((val) => {
-                          const on = (filters[activeMobileFilterGroup] || []).includes(val);
+                          Alle
+                        </MobileNavLink>
+                        {subcategories.map((sub) => {
+                          const subSlug = String(sub.slug || "").replace(/^\//, "");
                           return (
-                            <MobileFilterPill
-                              key={val}
-                              type="button"
-                              $on={on}
-                              onClick={() => toggle(activeMobileFilterGroup, val)}
+                            <MobileNavLink
+                              key={sub.id}
+                              href={searchHrefForSub(subSlug)}
+                              $active={effectiveCat === subSlug}
+                              onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
                             >
-                              {formatFacetOptionLabel(activeMobileFilterGroup, val, categorySlugToName)}
-                            </MobileFilterPill>
+                              {sub.name || sub.slug}
+                            </MobileNavLink>
                           );
                         })}
-                      </MobileFilterPillGrid>
-                    ) : (
-                      <div style={{ color: "#aaa", fontSize: 12 }}>Wähle einen Filter</div>
-                    )}
-                  </MobileFilterRight>
-                </MobileFilterSplit>
-              )}
-
-              {/* Mobile: simple nav (when no facets) */}
-              {!hasFacets && hasNavPane && (
-                <div style={{ overflowY: "auto", flex: 1, padding: "0 16px 16px" }}>
-                  {branchNav && hasSubcategories ? (
-                    <SubcategoryGroup style={{ marginTop: 0 }}>
-                      {parentCategory && (
-                        <SubcategoryLink
+                      </>
+                    ) : parentCategory && (
+                      <>
+                        <MobileNavLink
                           href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
                           $active={false}
-                          onClick={() => setPanelOpen(false)}
-                          style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+                          onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
+                          style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}
                         >
                           ← {parentCategory.name || parentCategory.slug}
-                        </SubcategoryLink>
+                        </MobileNavLink>
+                        <MobileNavLink
+                          href={searchHrefForSub(String(parentCategory.slug || "").replace(/^\//, ""))}
+                          $active={effectiveCat === String(parentCategory.slug || "").replace(/^\//, "")}
+                          onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
+                        >
+                          Alle
+                        </MobileNavLink>
+                        {subcategories.map((sibling) => {
+                          const sibSlug = String(sibling.slug || "").replace(/^\//, "");
+                          return (
+                            <MobileNavLink
+                              key={sibling.id}
+                              href={searchHrefForSub(sibSlug)}
+                              $active={effectiveCat === sibSlug}
+                              onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
+                            >
+                              {sibling.name || sibling.slug}
+                            </MobileNavLink>
+                          );
+                        })}
+                      </>
+                    )}
+                  </MobileCategoriesScroll>
+                )}
+
+                {/* Filter tab */}
+                {hasFacets && (!hasNavPane || mobileDrawerTab === "filters") && (
+                  <MobileFilterSplit>
+                    <MobileFilterLeft>
+                      {Object.entries(facets).map(([key]) => {
+                        const cnt = (filters[key] || []).length;
+                        return (
+                          <MobileFilterLeftBtn
+                            key={key}
+                            type="button"
+                            $active={activeMobileFilterGroup === key}
+                            onClick={() => setActiveMobileFilterGroup(key)}
+                          >
+                            {getFacetGroupTitle(key)}
+                            {cnt > 0 && (
+                              <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>
+                                {cnt} ausgewählt
+                              </span>
+                            )}
+                          </MobileFilterLeftBtn>
+                        );
+                      })}
+                    </MobileFilterLeft>
+                    <MobileFilterRight>
+                      {activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
+                        <MobileFilterPillGrid>
+                          {facets[activeMobileFilterGroup].map((val) => {
+                            const on = (filters[activeMobileFilterGroup] || []).includes(val);
+                            return (
+                              <MobileFilterPill
+                                key={val}
+                                type="button"
+                                $on={on}
+                                onClick={() => toggle(activeMobileFilterGroup, val)}
+                              >
+                                {formatFacetOptionLabel(activeMobileFilterGroup, val, categorySlugToName)}
+                              </MobileFilterPill>
+                            );
+                          })}
+                        </MobileFilterPillGrid>
+                      ) : (
+                        <div style={{ color: "#a8a29e", fontSize: 13, lineHeight: 1.45, paddingTop: 8 }}>
+                          Wählen Sie links eine Produkteigenschaft.
+                        </div>
                       )}
-                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
-                        {displayTitle}
-                      </div>
-                      <SubcategoryLink href={searchHrefForSub("")} $active={!effectiveCat} onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
-                        Alle
-                      </SubcategoryLink>
-                      {subcategories.map((sub) => {
-                        const subSlug = String(sub.slug || "").replace(/^\//, "");
-                        return (
-                          <SubcategoryLink key={sub.id} href={searchHrefForSub(subSlug)} $active={effectiveCat === subSlug} onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
-                            {sub.name || sub.slug}
-                          </SubcategoryLink>
-                        );
-                      })}
-                    </SubcategoryGroup>
-                  ) : parentCategory && (
-                    <SubcategoryGroup style={{ marginTop: 0 }}>
-                      <SubcategoryLink
-                        href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
-                        $active={false}
-                        onClick={() => setPanelOpen(false)}
-                        style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
-                      >
-                        ← {parentCategory.name || parentCategory.slug}
-                      </SubcategoryLink>
-                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: 4 }}>
-                        {parentCategory.name || parentCategory.slug}
-                      </div>
-                      <SubcategoryLink
-                        href={searchHrefForSub(String(parentCategory.slug || "").replace(/^\//, ""))}
-                        $active={effectiveCat === String(parentCategory.slug || "").replace(/^\//, "")}
-                        onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}
-                      >
-                        Alle
-                      </SubcategoryLink>
-                      {subcategories.map((sibling) => {
-                        const sibSlug = String(sibling.slug || "").replace(/^\//, "");
-                        return (
-                          <SubcategoryLink key={sibling.id} href={searchHrefForSub(sibSlug)} $active={effectiveCat === sibSlug} onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
-                            {sibling.name || sibling.slug}
-                          </SubcategoryLink>
-                        );
-                      })}
-                    </SubcategoryGroup>
-                  )}
-                </div>
-              )}
+                    </MobileFilterRight>
+                  </MobileFilterSplit>
+                )}
+              </MobileDrawerChrome>
             </Sidebar>
               </>
             </CatalogDrawerPortal>

@@ -1,4 +1,4 @@
-07.05.
+08.05.
 
 -landing page sayfasi altinda popup template i olustur hem desktop hem mobil hem tablet icin ayri ayri hepsinin kendine uygun ölcülerinde. detayli popuplar ayarlayabilelim. her seyi tek tek yazdirma ne gibi modern popuplar yapilmasi gerektigini biliyorsun onlara göre ayarla iste.
 - smtp eklemistik flowlarda email calisiyor. sellercentraldeki bildirimler email olarak da gitsin. müsteriden mesaj var, saticidan mesaj var, sellerdan mesaj var, adminden mesaj var, yeni siparis geldi, iade talebi geldi, ürünün listelendi, hesabin onaylandi gibi mailler hazirlayabilelim flow sayfasindan. tüm bildirimler email olarak da gitsin ilgili kisilere

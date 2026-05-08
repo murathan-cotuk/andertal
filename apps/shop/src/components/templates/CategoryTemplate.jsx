@@ -414,18 +414,20 @@ const MobileFilterSplit = styled.div`
 
 const MobileFilterRailHeader = styled.div`
   flex-shrink: 0;
-  padding: 11px 10px 9px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  padding: 10px 10px 8px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #78716c;
+  color: #1c1917;
   background: #e7e5e4;
   border-bottom: 1px solid #d6d3d1;
+  line-height: 1.3;
+  word-break: break-word;
 `;
 
 const MobileFilterLeft = styled.div`
-  width: min(118px, 34vw);
+  width: min(140px, 40vw);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -1398,17 +1400,6 @@ export default function CategoryTemplate() {
                           ← {parentCategory.name || parentCategory.slug}
                         </MobileCatRow>
                       ) : null}
-                      <MobileCatRow
-                        href={slug ? `/${String(slug).replace(/^\//, "")}` : "#"}
-                        $active
-                        onClick={() => {
-                          setFilters({});
-                          setPage(1);
-                          setPanelOpen(false);
-                        }}
-                      >
-                        Alle in „{displayTitle}“
-                      </MobileCatRow>
                       {subcategories.map((sub) => {
                         const subSlug = String(sub.slug || "").replace(/^\//, "");
                         return (
