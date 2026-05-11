@@ -194,7 +194,6 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
 
   return (
     <div ref={wrapRef} className="andertal-search-wrap">
-      <span className="andertal-search-icon" aria-hidden>🔍</span>
       <input
         type="search"
         autoComplete="off"

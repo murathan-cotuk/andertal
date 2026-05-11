@@ -300,6 +300,8 @@ class MedusaAdminClient {
       shop_logo_height: res?.shop_logo_height != null ? Number(res.shop_logo_height) : 34,
       sellercentral_logo_height: res?.sellercentral_logo_height != null ? Number(res.sellercentral_logo_height) : 30,
       storefront_url: res?.storefront_url ?? '',
+      announcement_bar_items: Array.isArray(res?.announcement_bar_items) ? res.announcement_bar_items : [],
+      logo_config: res?.logo_config && typeof res.logo_config === 'object' ? res.logo_config : null,
     };
   }
 

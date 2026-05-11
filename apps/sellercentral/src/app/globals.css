@@ -235,31 +235,49 @@ body[data-pathname*="/settings"] .andertal-page-content .Polaris-Page-Header__Ti
   width: 100%;
   max-width: 600px;
 }
-.andertal-search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #a0a0a0;
-  pointer-events: none;
-}
 .andertal-search-input {
   width: 100%;
-  padding: 6px 12px 6px 40px;
-  border: 1px solid #404040;
+  padding: 6px 12px;
+  border: 1px solid #4d4d52;
   border-radius: 6px;
   font-size: 14px;
   color: #fff;
-  background: #1a1a1a;
-  transition: border-color 0.2s ease;
+  /* Top bar (#1a1a1a) üzerinde hafif yükselmiş yüzey — düz siyah değil */
+  background: linear-gradient(180deg, #36363a 0%, #2c2c2f 100%);
+  /* Kabartma: üstte ince highlight, altta inset gölge + hafif dış derinlik */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 .andertal-search-input:focus {
   outline: none !important;
-  box-shadow: none !important;
-  border-color: #505050;
+  border-color: #75757d;
+  background: linear-gradient(180deg, #3e3e43 0%, #343438 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.35);
 }
 .andertal-search-input::placeholder {
   color: #a0a0a0;
+}
+/* Tarayıcının yerleşik arama «temizle» (×) düğmesi koyu zeminde görünmezdi — beyaz çarpı */
+.andertal-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  margin-inline-start: 4px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' d='M3 3l8 8M11 3l-8 8'/%3E%3C/svg%3E")
+    center/14px 14px no-repeat;
+}
+.andertal-search-input::-ms-clear {
+  filter: invert(1);
 }
 .andertal-search-dropdown {
   position: absolute;

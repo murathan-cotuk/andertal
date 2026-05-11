@@ -4870,7 +4870,13 @@ async function start() {
       try {
         await client.connect()
         try {
-          const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, storefront_url FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+          const r = await client.query(
+            `SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url,
+                    shop_logo_height, sellercentral_logo_height, platform_name, support_email, storefront_url,
+                    announcement_bar_items, logo_config
+             FROM admin_hub_seller_settings WHERE seller_id = $1`,
+            [sellerId],
+          )
           const row = r.rows && r.rows[0]
           const store_name = row && row.store_name != null ? String(row.store_name) : ''
           let free_shipping_thresholds = (row && row.free_shipping_thresholds) || null
@@ -4886,14 +4892,58 @@ async function start() {
           const platform_name = row && row.platform_name ? String(row.platform_name) : ''
           const support_email = row && row.support_email ? String(row.support_email) : ''
           const storefront_url = row && row.storefront_url ? String(row.storefront_url) : ''
-          const logo_config = row && row.logo_config ? (typeof row.logo_config === 'string' ? JSON.parse(row.logo_config) : row.logo_config) : null
-          res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, storefront_url, logo_config })
+          let announcement_bar_items = row && row.announcement_bar_items != null ? row.announcement_bar_items : []
+          if (typeof announcement_bar_items === 'string') {
+            try {
+              announcement_bar_items = JSON.parse(announcement_bar_items)
+            } catch (_) {
+              announcement_bar_items = []
+            }
+          }
+          if (!Array.isArray(announcement_bar_items)) announcement_bar_items = []
+          let logo_config = null
+          if (row && row.logo_config != null) {
+            if (typeof row.logo_config === 'string') {
+              try {
+                logo_config = JSON.parse(row.logo_config)
+              } catch (_) {
+                logo_config = null
+              }
+            } else if (typeof row.logo_config === 'object') {
+              logo_config = row.logo_config
+            }
+          }
+          res.json({
+            store_name,
+            free_shipping_thresholds,
+            shop_logo_url,
+            shop_favicon_url,
+            sellercentral_logo_url,
+            sellercentral_favicon_url,
+            shop_logo_height,
+            sellercentral_logo_height,
+            platform_name,
+            support_email,
+            storefront_url,
+            announcement_bar_items,
+            logo_config,
+          })
         } finally {
           await client.end().catch(() => {})
         }
       } catch (err) {
         console.error('sellerSettingsGET:', err)
-        res.json({ store_name: '', shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30 })
+        res.json({
+          store_name: '',
+          shop_logo_url: '',
+          shop_favicon_url: '',
+          sellercentral_logo_url: '',
+          sellercentral_favicon_url: '',
+          shop_logo_height: 34,
+          sellercentral_logo_height: 30,
+          announcement_bar_items: [],
+          logo_config: null,
+        })
       }
     }
     const sellerSettingsPATCH = async (req, res) => {
