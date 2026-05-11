@@ -168,6 +168,10 @@ const HeaderWrap = styled.header`
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     background: var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}));
+    /* Push header content below the OS status bar so it doesn't overlap the clock/battery row.
+       The ::before pseudo-element (top: -env(safe-area-inset-top)) fills the status bar area
+       behind it with the same header color, giving a seamless bleed. */
+    padding-top: env(safe-area-inset-top, 0px);
   }
 `;
 

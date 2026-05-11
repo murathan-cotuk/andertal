@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-const MOBILE_MAX = 767;
+const MOBILE_MAX = 1023;
 
 /**
  * Distance from the bottom of the layout viewport to the bottom of the visual viewport.

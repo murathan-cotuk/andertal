@@ -4,6 +4,7 @@ import React from "react";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import LandingContainers from "@/components/landing/LandingContainers";
+import LandingPopup from "@/components/landing/LandingPopup";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -20,6 +21,9 @@ export default function Home() {
         </div>
       </main>
       <Footer />
+      <SectionErrorBoundary>
+        <LandingPopup />
+      </SectionErrorBoundary>
     </div>
   );
 }

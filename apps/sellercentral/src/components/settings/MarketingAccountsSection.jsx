@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const PLATFORMS = [
@@ -152,25 +153,15 @@ function PlatformPanel({ platform, accountData, onSave, saving }) {
               Hesap aktif
             </label>
           </Field>
-          <button
-            type="button"
-            onClick={() => onSave(platform.value, creds, isActive)}
-            disabled={saving}
-            style={{
-              marginTop: 8,
-              padding: "9px 20px",
-              background: "#ff971c",
-              color: "#fff",
-              border: "2px solid #000",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: saving ? "not-allowed" : "pointer",
-              boxShadow: "0 2px 0 2px #000",
-            }}
-          >
-            {saving ? "Speichere…" : "Speichern"}
-          </button>
+          <div style={{ marginTop: 8 }}>
+            <Button
+              variant="primary"
+              onClick={() => onSave(platform.value, creds, isActive)}
+              loading={saving}
+            >
+              Speichern
+            </Button>
+          </div>
         </div>
       )}
     </div>

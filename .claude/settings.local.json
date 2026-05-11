@@ -121,7 +121,10 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\medusa-backend\\\\src\" -Depth 2 | Where-Object { $_.PSIsContainer } | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\medusa-backend\\\\src\\\\\", \"\"\\) })",
       "PowerShell(Select-First *)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\medusa-backend\\\\api\\\\admin\\\\products\" -Recurse | ForEach-Object { $_.FullName })",
-      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\" -Depth 2 | Where-Object { $_.PSIsContainer } | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\\", \"\"\\) } | Select-Object -First 40)"
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\" -Depth 2 | Where-Object { $_.PSIsContainer } | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\\", \"\"\\) } | Select-Object -First 40)",
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\components\\\\pages\\\\content\\\\LandingPageEditor.jsx\" | Measure-Object -Line\\).Lines)",
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\landing\\\\LandingContainers.jsx\" | Measure-Object -Line\\).Lines)",
+      "PowerShell(head *)"
     ]
   }
 }

@@ -243,6 +243,45 @@ function flattenCategoriesForSelect(nodes, depth = 0, acc = []) {
 }
 
 /** Normalisiert gespeicherte Landing-Settings inkl. Shop-Subnav / Filterleiste. */
+const POPUP_DEVICE_DEFAULTS = {
+  enabled: false,
+  trigger: "delay",
+  delay: 3,
+  scroll_pct: 40,
+  frequency: "session",
+  position: "center",
+  animation: "fade",
+  overlay: 0.5,
+  show_close: true,
+  width: "600px",
+  max_height: "80vh",
+  bg_color: "#ffffff",
+  text_color: "#111827",
+  border_radius: 16,
+  title: "",
+  body: "",
+  image: "",
+  btn_text: "",
+  btn_url: "",
+  btn_bg: "#111827",
+  btn_color: "#ffffff",
+  btn_radius: 8,
+};
+
+function normalizePopupDevice(raw) {
+  if (!raw || typeof raw !== "object") return { ...POPUP_DEVICE_DEFAULTS };
+  return { ...POPUP_DEVICE_DEFAULTS, ...raw };
+}
+
+function normalizePopupConfig(raw) {
+  const p = (raw && typeof raw === "object") ? raw : {};
+  return {
+    desktop: normalizePopupDevice(p.desktop),
+    tablet: normalizePopupDevice(p.tablet),
+    mobile: normalizePopupDevice(p.mobile),
+  };
+}
+
 function normalizeLandingPageSettings(raw) {
   const s = raw && typeof raw === "object" ? raw : {};
   return {
@@ -251,6 +290,7 @@ function normalizeLandingPageSettings(raw) {
     show_filter_bar: s.show_filter_bar !== false,
     second_nav_desktop_classic: s.second_nav_desktop_classic === true,
     page_padding_top: s.page_padding_top || "",
+    popup: normalizePopupConfig(s.popup),
   };
 }
 
@@ -2663,6 +2703,239 @@ const TEMPLATE_DEFAULTS = {
   },
 };
 
+// ── Popup Editor ─────────────────────────────────────────────────────────────
+const POPUP_TRIGGER_OPTIONS = [
+  { label: "Nach Verzögerung (Timer)", value: "delay" },
+  { label: "Nach Scroll-Tiefe (%)", value: "scroll" },
+  { label: "Exit Intent (Maus verlässt Seite)", value: "exit_intent" },
+];
+
+const POPUP_FREQUENCY_OPTIONS = [
+  { label: "Immer (jeder Seitenaufruf)", value: "always" },
+  { label: "Einmal pro Sitzung", value: "session" },
+  { label: "Einmal pro Tag", value: "day" },
+  { label: "Einmal pro Woche", value: "week" },
+  { label: "Einmalig (nie wieder zeigen)", value: "once" },
+];
+
+const POPUP_POSITION_OPTIONS = [
+  { label: "Mitte (zentriert)", value: "center" },
+  { label: "Unten Mitte (Bar-Stil)", value: "bottom-center" },
+  { label: "Unten Links", value: "bottom-left" },
+  { label: "Unten Rechts", value: "bottom-right" },
+  { label: "Oben Mitte", value: "top-center" },
+  { label: "Oben Links", value: "top-left" },
+  { label: "Oben Rechts", value: "top-right" },
+];
+
+const POPUP_ANIMATION_OPTIONS = [
+  { label: "Einblenden (Fade)", value: "fade" },
+  { label: "Von unten hochschieben", value: "slide-up" },
+  { label: "Von oben herunterfallen", value: "slide-down" },
+  { label: "Zoom / Skalierung", value: "zoom" },
+];
+
+function PopupDeviceEditor({ config, onChange }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const upd = (key, val) => onChange({ ...config, [key]: val });
+
+  return (
+    <BlockStack gap="400">
+      <Checkbox
+        label="Popup auf diesem Gerät aktivieren"
+        checked={config.enabled === true}
+        onChange={(v) => upd("enabled", v)}
+      />
+
+      {config.enabled && (
+        <>
+          {pickerOpen && (
+            <MediaPickerModal
+              open
+              multiple={false}
+              onClose={() => setPickerOpen(false)}
+              onSelect={(urls) => { if (urls[0]) upd("image", urls[0]); setPickerOpen(false); }}
+            />
+          )}
+
+          {/* ── Trigger ── */}
+          <Divider />
+          <Text as="h3" variant="headingSm">Auslöser</Text>
+          <div style={EDITOR_FIELD_GRID}>
+            <Select
+              label="Trigger-Typ"
+              options={POPUP_TRIGGER_OPTIONS}
+              value={config.trigger || "delay"}
+              onChange={(v) => upd("trigger", v)}
+            />
+            {(config.trigger === "delay" || !config.trigger) && (
+              <TextField
+                label="Verzögerung (Sekunden)"
+                type="number"
+                value={String(config.delay ?? 3)}
+                onChange={(v) => upd("delay", Number(v) || 0)}
+                autoComplete="off"
+                min={0}
+              />
+            )}
+            {config.trigger === "scroll" && (
+              <TextField
+                label="Scroll-Tiefe (%)"
+                type="number"
+                value={String(config.scroll_pct ?? 40)}
+                onChange={(v) => upd("scroll_pct", Math.min(100, Math.max(0, Number(v) || 0)))}
+                autoComplete="off"
+                min={0}
+                max={100}
+              />
+            )}
+            <Select
+              label="Anzeigehäufigkeit"
+              options={POPUP_FREQUENCY_OPTIONS}
+              value={config.frequency || "session"}
+              onChange={(v) => upd("frequency", v)}
+            />
+          </div>
+
+          {/* ── Content ── */}
+          <Divider />
+          <Text as="h3" variant="headingSm">Inhalt</Text>
+          <TextField
+            label="Überschrift"
+            value={config.title || ""}
+            onChange={(v) => upd("title", v)}
+            autoComplete="off"
+          />
+          <RichTextEditor
+            label="Text / Body"
+            value={config.body || ""}
+            onChange={(v) => upd("body", v)}
+            placeholder="Popup-Inhalt eingeben…"
+            minHeight="100px"
+          />
+          <ImageField
+            label="Bild (optional)"
+            value={config.image || ""}
+            onPick={() => setPickerOpen(true)}
+            onClear={() => upd("image", "")}
+          />
+          <div style={EDITOR_FIELD_GRID}>
+            <TextField
+              label="Button-Text"
+              value={config.btn_text || ""}
+              onChange={(v) => upd("btn_text", v)}
+              autoComplete="off"
+            />
+            <TextField
+              label="Button-URL"
+              value={config.btn_url || ""}
+              onChange={(v) => upd("btn_url", v)}
+              autoComplete="off"
+            />
+          </div>
+          <div style={EDITOR_FIELD_GRID}>
+            <ColorField label="Button-Hintergrund" value={config.btn_bg || "#111827"} onChange={(v) => upd("btn_bg", v)} />
+            <ColorField label="Button-Textfarbe" value={config.btn_color || "#ffffff"} onChange={(v) => upd("btn_color", v)} />
+            <TextField label="Button-Radius (px)" value={String(config.btn_radius ?? 8)} onChange={(v) => upd("btn_radius", Number(v) || 0)} autoComplete="off" />
+          </div>
+
+          {/* ── Design ── */}
+          <Divider />
+          <Text as="h3" variant="headingSm">Design &amp; Positionierung</Text>
+          <div style={EDITOR_FIELD_GRID}>
+            <Select
+              label="Position"
+              options={POPUP_POSITION_OPTIONS}
+              value={config.position || "center"}
+              onChange={(v) => upd("position", v)}
+            />
+            <Select
+              label="Animation"
+              options={POPUP_ANIMATION_OPTIONS}
+              value={config.animation || "fade"}
+              onChange={(v) => upd("animation", v)}
+            />
+            <TextField
+              label="Breite (z. B. 600px, 90%)"
+              value={config.width || "600px"}
+              onChange={(v) => upd("width", v)}
+              autoComplete="off"
+            />
+            <TextField
+              label="Max. Höhe (z. B. 80vh, 600px)"
+              value={config.max_height || "80vh"}
+              onChange={(v) => upd("max_height", v)}
+              autoComplete="off"
+            />
+          </div>
+          <div style={EDITOR_FIELD_GRID}>
+            <ColorField label="Hintergrundfarbe" value={config.bg_color || "#ffffff"} onChange={(v) => upd("bg_color", v)} />
+            <ColorField label="Textfarbe" value={config.text_color || "#111827"} onChange={(v) => upd("text_color", v)} />
+            <TextField
+              label="Ecken-Radius (px)"
+              type="number"
+              value={String(config.border_radius ?? 16)}
+              onChange={(v) => upd("border_radius", Number(v) || 0)}
+              autoComplete="off"
+            />
+            <TextField
+              label="Overlay-Deckkraft (0–1)"
+              type="number"
+              value={String(config.overlay ?? 0.5)}
+              onChange={(v) => upd("overlay", Math.min(1, Math.max(0, parseFloat(v) || 0)))}
+              autoComplete="off"
+            />
+          </div>
+          <Checkbox
+            label="Schließen-Button anzeigen (×)"
+            checked={config.show_close !== false}
+            onChange={(v) => upd("show_close", v)}
+          />
+        </>
+      )}
+    </BlockStack>
+  );
+}
+
+function PopupEditor({ settings, onChange }) {
+  const [deviceTab, setDeviceTab] = useState(0);
+  const popup = settings?.popup || {};
+
+  const deviceKeys = ["desktop", "tablet", "mobile"];
+  const currentKey = deviceKeys[deviceTab] || "desktop";
+  const currentConfig = { ...POPUP_DEVICE_DEFAULTS, ...(popup[currentKey] || {}) };
+
+  const handleDeviceChange = (updated) => {
+    onChange({ popup: { ...popup, [currentKey]: updated } });
+  };
+
+  return (
+    <BlockStack gap="400">
+      <Banner tone="info">
+        <p>
+          Popup-Konfiguration pro Gerät. Desktop ≥ 1024 px, Tablet 600–1023 px, Mobil ≤ 599 px.
+          Änderungen werden beim nächsten Klick auf <strong>Speichern</strong> übernommen.
+        </p>
+      </Banner>
+      <Card>
+        <PolarisTabs
+          tabs={[
+            { id: "popup-d", content: "Desktop" },
+            { id: "popup-t", content: "Tablet" },
+            { id: "popup-m", content: "Mobil" },
+          ]}
+          selected={deviceTab}
+          onSelect={setDeviceTab}
+        >
+          <Box paddingBlockStart="400">
+            <PopupDeviceEditor key={currentKey} config={currentConfig} onChange={handleDeviceChange} />
+          </Box>
+        </PolarisTabs>
+      </Card>
+    </BlockStack>
+  );
+}
+
 export default function LandingPageEditor() {
   const params = useParams();
   const locale = String(params?.locale || "").toLowerCase();
@@ -2966,6 +3239,7 @@ export default function LandingPageEditor() {
   const editorTabs = [
     { id: "containers", content: "Container" },
     { id: "category", content: "Kategorie" },
+    { id: "popup", content: "Popup" },
   ];
 
   const mainTabs = [
@@ -3075,6 +3349,16 @@ export default function LandingPageEditor() {
                         placeholder="0px"
                       />
                     </BlockStack>
+                  )}
+
+                  {activeTab === 2 && (
+                    <PopupEditor
+                      settings={categorySettings}
+                      onChange={(partial) => {
+                        setCategorySettings((prev) => ({ ...prev, ...partial }));
+                        setIsDirty(true);
+                      }}
+                    />
                   )}
 
                   {activeTab === 0 && (

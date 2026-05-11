@@ -488,7 +488,7 @@ function KybReviewModal({ user, onClose, onApproved }) {
                       {doc.name && <Text variant="bodySm" tone="subdued">{doc.name}</Text>}
                     </div>
                     {doc.url && (
-                      <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ color: "#ff971c", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                      <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ color: "#0070f3", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
                         Öffnen ↗
                       </a>
                     )}

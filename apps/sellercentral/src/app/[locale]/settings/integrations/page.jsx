@@ -7,6 +7,7 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import MarketingAccountsSection from "@/components/settings/MarketingAccountsSection";
+import BillbeeSettingsPage from "@/components/pages/settings/BillbeeSettingsPage";
 
 const client = getMedusaAdminClient();
 
@@ -684,6 +685,20 @@ export default function IntegrationsSettingsPage() {
             </BlockStack>
           </Card>
         )}
+
+        {/* ── Billbee (alle Verkäufer) ───────────────────────────── */}
+        <Card>
+          <BlockStack gap="400">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">Billbee</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Auftragsabwicklung und Versand: Verbindungsdaten für Billbee als Shop-Kanal (Marketplace-API).
+              </Text>
+            </BlockStack>
+            <Divider />
+            <BillbeeSettingsPage embedded />
+          </BlockStack>
+        </Card>
 
         {/* ── API Integrationen ──────────────────────────────────── */}
         <Card>

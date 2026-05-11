@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
+import { useVisualViewportBottomInset } from "@/hooks/useVisualViewportBottomInset";
 
 const DEFAULT_ACCENT = "#1b8880";
 
@@ -28,6 +29,11 @@ export default function ModernMobileBottomNav({
     const valid = Array.isArray(items) && items.length >= 2 && items.length <= 5;
     return valid ? items : [];
   }, [items]);
+
+  /* Visual viewport bottom inset: height of the browser's own bottom toolbar (Samsung Internet,
+     Chrome on Android, Safari). Positioning the bar at `bottom: visualInset` keeps it above
+     the browser chrome on every device without needing hardcoded pixel values. */
+  const visualInset = useVisualViewportBottomInset();
 
   const [activeIndex, setActiveIndex] = useState(0);
   const textRefs = useRef([]);
@@ -76,7 +82,10 @@ export default function ModernMobileBottomNav({
         display: "grid",
         gridTemplateColumns: `repeat(${finalItems.length}, minmax(0, 1fr))`,
         position: isFixed ? "fixed" : "relative",
-        bottom: isFixed ? 0 : undefined,
+        /* visualInset tracks the browser's own bottom toolbar height (Samsung Internet, Chrome,
+           Safari). Setting bottom to this value keeps the bar above the browser chrome on every
+           mobile device without any hardcoded pixel values. */
+        bottom: isFixed ? visualInset : undefined,
         left: isFixed ? 0 : undefined,
         right: isFixed ? 0 : undefined,
         width: "100%",
@@ -90,7 +99,8 @@ export default function ModernMobileBottomNav({
         boxShadow: boxShadow ?? "0 -2px 12px rgba(0,0,0,0.07)",
         zIndex: isFixed ? 2147483640 : 100,
         transition: isFixed ? "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
-        transform: isFixed && recessed ? "translateY(calc(100% + env(safe-area-inset-bottom, 0px)))" : undefined,
+        /* Slide off-screen by the full height + safe-area + any visual inset already applied */
+        transform: isFixed && recessed ? `translateY(calc(100% + ${visualInset}px + env(safe-area-inset-bottom, 0px)))` : undefined,
         pointerEvents: isFixed && recessed ? "none" : "auto",
       }}
     >

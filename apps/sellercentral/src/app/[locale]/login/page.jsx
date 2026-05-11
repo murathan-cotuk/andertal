@@ -235,13 +235,13 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  style={{ padding: "12px", background: loading ? "#9ca3af" : "#ff971c", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}
+                  style={{ padding: "12px", background: loading ? "#9ca3af" : "#1f2937", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}
                 >
                   {loading ? t("submitting") : t("submit")}
                 </button>
               </form>
               <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "#6b7280" }}>
-                <Link href="/register" style={{ color: "#ff971c", fontWeight: 600, textDecoration: "none" }}>{t("noAccount")}</Link>
+                <Link href="/register" style={{ color: "#1f2937", fontWeight: 600, textDecoration: "none" }}>{t("noAccount")}</Link>
               </p>
             </>
           ) : (
@@ -274,7 +274,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading || totpCode.length !== 6}
-                  style={{ padding: "12px", background: loading || totpCode.length !== 6 ? "#9ca3af" : "#ff971c", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: loading || totpCode.length !== 6 ? "not-allowed" : "pointer" }}
+                  style={{ padding: "12px", background: loading || totpCode.length !== 6 ? "#9ca3af" : "#1f2937", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: loading || totpCode.length !== 6 ? "not-allowed" : "pointer" }}
                 >
                   {loading ? t("totpVerifying") : t("totpConfirm")}
                 </button>

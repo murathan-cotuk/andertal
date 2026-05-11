@@ -241,10 +241,10 @@ function RegisterForm() {
               <span>
                 {t.rich("agreeText", {
                   terms: (chunks) => (
-                    <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#ff971c", textDecoration: "underline" }}>{chunks}</a>
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#1f2937", textDecoration: "underline" }}>{chunks}</a>
                   ),
                   privacy: (chunks) => (
-                    <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "#ff971c", textDecoration: "underline" }}>{chunks}</a>
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "#1f2937", textDecoration: "underline" }}>{chunks}</a>
                   ),
                 })} *
               </span>
@@ -256,12 +256,12 @@ function RegisterForm() {
               <div style={{ background: "#d1fae5", border: "1px solid #10b981", borderRadius: 8, padding: "12px 14px", color: "#065f46", fontSize: 14 }}>{success}</div>
             )}
             <button type="submit" disabled={loading}
-              style={{ padding: "12px", background: loading ? "#9ca3af" : "#ff971c", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
+              style={{ padding: "12px", background: loading ? "#9ca3af" : "#1f2937", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
               {loading ? t("submitting") : (isInvited ? t("submitInvited") : t("submit"))}
             </button>
           </form>
           <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "#6b7280" }}>
-            <Link href="/login" style={{ color: "#ff971c", fontWeight: 600, textDecoration: "none" }}>{t("alreadyHaveAccount")}</Link>
+            <Link href="/login" style={{ color: "#1f2937", fontWeight: 600, textDecoration: "none" }}>{t("alreadyHaveAccount")}</Link>
           </p>
         </div>
       </div>

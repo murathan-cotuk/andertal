@@ -36,7 +36,7 @@ export default function SellerError({ error, reset }) {
           onClick={reset}
           style={{
             padding: "10px 24px",
-            background: "#ff971c",
+            background: "#1f2937",
             color: "#fff",
             border: "none",
             borderRadius: 8,

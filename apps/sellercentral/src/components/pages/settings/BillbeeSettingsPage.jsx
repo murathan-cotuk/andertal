@@ -40,7 +40,8 @@ function CopyField({ label, value, helpText, multiline }) {
   );
 }
 
-export default function BillbeeSettingsPage() {
+/** Marketplace-Verbindung für Billbee. Mit embedded=true in Apps & Integrationen eingebettet (ohne eigene Route). */
+export default function BillbeeSettingsPage({ embedded = false }) {
   const client = getMedusaAdminClient();
   const [loading, setLoading] = useState(true);
   const [rotating, setRotating] = useState(false);
@@ -90,17 +91,83 @@ export default function BillbeeSettingsPage() {
     setRotating(false);
   };
 
+  const formInner = (
+    <BlockStack gap="400">
+      <Banner tone="info">
+        <Text as="p" variant="bodySm">
+          In Billbee (<strong>Einstellungen → Kanäle → Shopverbindung</strong>):{" "}
+          <strong>Name</strong> z. B. „{name}“, <strong>URL</strong> = Basis-URL unten (oder einzelne Endpunkte wie …/orders).{" "}
+          <strong>Schlüssel</strong> = API-Schlüssel. <strong>Basic Auth</strong> = E-Mail + Passwort. Optional Header{" "}
+          <code>X-Andertal-Api-Key</code> mit demselben Schlüssel mitsenden.
+        </Text>
+      </Banner>
+
+      <TextField label="Name (Vorschlag)" value={loading ? "…" : name} readOnly autoComplete="off" />
+
+      <CopyField
+        label="URL (API-Basis)"
+        value={loading ? "" : apiBaseUrl}
+        helpText="Oft als Shop-URL in Billbee; Endpunkte: /orders, /products, /stock"
+        multiline
+      />
+
+      <CopyField
+        label="Schlüssel (API-Key)"
+        value={loading ? "" : apiKey}
+        helpText="Format andertal_seller_… — zusätzlich optional als X-Andertal-Api-Key Header"
+        multiline={false}
+      />
+
+      <CopyField
+        label="Basic Auth Benutzername"
+        value={loading ? "" : basicUser}
+        helpText="Deine Seller-Central E-Mail-Adresse"
+      />
+
+      <BlockStack gap="200">
+        <TextField
+          label="Basic Auth Passwort"
+          type="password"
+          value={loading ? "" : basicPass}
+          readOnly
+          autoComplete="off"
+        />
+        <Button onClick={handleRotateSecret} loading={rotating} disabled={loading}>
+          Neues Passwort erzeugen
+        </Button>
+      </BlockStack>
+
+      {hint ? (
+        <Text as="p" variant="bodySm" tone="subdued">
+          {hint}
+        </Text>
+      ) : null}
+
+      <InlineStack gap="200">
+        <Button onClick={load} disabled={loading}>
+          Aktualisieren
+        </Button>
+      </InlineStack>
+    </BlockStack>
+  );
+
   return (
     <BlockStack gap="400">
-      <BlockStack gap="100">
-        <Text as="h1" variant="headingLg">
-          Billbee ↔ Andertal
+      {!embedded ? (
+        <BlockStack gap="100">
+          <Text as="h1" variant="headingLg">
+            Billbee ↔ Andertal
+          </Text>
+          <Text as="p" variant="bodyMd" tone="subdued">
+            Andertal stellt die API unter <Text as="span" fontWeight="semibold">/api/billbee</Text> bereit. Billbee ruft{" "}
+            <strong>deinen Shop</strong> mit den unten angezeigten Zugangsdaten ab — getrennt pro Verkäuferkonto.
+          </Text>
+        </BlockStack>
+      ) : (
+        <Text as="p" variant="bodySm" tone="subdued">
+          Andertal stellt die API unter <Text as="span" fontWeight="semibold">/api/billbee</Text> bereit — Zugang nur für dein Verkäuferkonto.
         </Text>
-        <Text as="p" variant="bodyMd" tone="subdued">
-          Andertal stellt die API unter <Text as="span" fontWeight="semibold">/api/billbee</Text> bereit. Billbee ruft{" "}
-          <strong>deinen Shop</strong> mit den unten angezeigten Zugangsdaten ab — getrennt pro Verkäuferkonto.
-        </Text>
-      </BlockStack>
+      )}
 
       {okBanner ? (
         <Banner tone="success" onDismiss={() => setOkBanner("")}>
@@ -113,65 +180,7 @@ export default function BillbeeSettingsPage() {
         </Banner>
       ) : null}
 
-      <Card>
-        <BlockStack gap="400">
-          <Banner tone="info">
-            <Text as="p" variant="bodySm">
-              In Billbee (<strong>Einstellungen → Kanäle → Shopverbindung</strong>):{" "}
-              <strong>Name</strong> z. B. „{name}“, <strong>URL</strong> = Basis-URL unten (oder einzelne Endpunkte wie …/orders).{" "}
-              <strong>Schlüssel</strong> = API-Schlüssel. <strong>Basic Auth</strong> = E-Mail + Passwort. Optional Header{" "}
-              <code>X-Andertal-Api-Key</code> mit demselben Schlüssel mitsenden.
-            </Text>
-          </Banner>
-
-          <TextField label="Name (Vorschlag)" value={loading ? "…" : name} readOnly autoComplete="off" />
-
-          <CopyField
-            label="URL (API-Basis)"
-            value={loading ? "" : apiBaseUrl}
-            helpText="Oft als Shop-URL in Billbee; Endpunkte: /orders, /products, /stock"
-            multiline
-          />
-
-          <CopyField
-            label="Schlüssel (API-Key)"
-            value={loading ? "" : apiKey}
-            helpText="Format andertal_seller_… — zusätzlich optional als X-Andertal-Api-Key Header"
-            multiline={false}
-          />
-
-          <CopyField
-            label="Basic Auth Benutzername"
-            value={loading ? "" : basicUser}
-            helpText="Deine Seller-Central E-Mail-Adresse"
-          />
-
-          <BlockStack gap="200">
-            <TextField
-              label="Basic Auth Passwort"
-              type="password"
-              value={loading ? "" : basicPass}
-              readOnly
-              autoComplete="off"
-            />
-            <Button onClick={handleRotateSecret} loading={rotating} disabled={loading}>
-              Neues Passwort erzeugen
-            </Button>
-          </BlockStack>
-
-          {hint ? (
-            <Text as="p" variant="bodySm" tone="subdued">
-              {hint}
-            </Text>
-          ) : null}
-
-          <InlineStack gap="200">
-            <Button onClick={load} disabled={loading}>
-              Aktualisieren
-            </Button>
-          </InlineStack>
-        </BlockStack>
-      </Card>
+      {embedded ? formInner : <Card>{formInner}</Card>}
     </BlockStack>
   );
 }

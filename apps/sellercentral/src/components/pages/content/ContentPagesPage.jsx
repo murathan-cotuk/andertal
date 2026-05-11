@@ -34,9 +34,14 @@ function slugFromTitle(title) {
   if (!title || typeof title !== "string") return "";
   return title
     .toLowerCase()
+    .replace(/ü/g, "ue").replace(/ö/g, "oe").replace(/ä/g, "ae").replace(/ß/g, "ss")
+    .replace(/[àáâã]/g, "a").replace(/[èéêë]/g, "e").replace(/[ìíîï]/g, "i")
+    .replace(/[òóôõ]/g, "o").replace(/[ùúû]/g, "u").replace(/ç/g, "c").replace(/ñ/g, "n")
     .trim()
     .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 // Backward-compatible alias used in older handlers.
@@ -100,7 +105,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
       title: "",
       slug: "",
       body: "",
-      status: "draft",
+      status: "published",
       page_type: blogOnly ? "blog" : "page",
       featured_image: "",
       excerpt: "",
@@ -385,25 +390,14 @@ export default function ContentPagesPage({ blogOnly = false }) {
                 </BlockStack>
               </>
             )}
-            {blogOnly ? (
-              <RichTextEditor
-                label="Beitragstext"
-                value={form.body}
-                onChange={(html) => setForm((prev) => ({ ...prev, body: html }))}
-                minHeight="260px"
-                placeholder="Text eingeben…"
-                helpText="Visuell bearbeiten oder über „HTML“-Ansicht direkt HTML einfügen. Im Shop wird der Inhalt formatiert angezeigt."
-              />
-            ) : (
-              <TextField
-                label="Body (HTML)"
-                value={form.body}
-                onChange={(value) => setForm((prev) => ({ ...prev, body: value }))}
-                multiline={6}
-                autoComplete="off"
-                placeholder="Page content (plain text or HTML)"
-              />
-            )}
+            <RichTextEditor
+              label={blogOnly ? “Beitragstext” : “Seiteninhalt”}
+              value={form.body}
+              onChange={(html) => setForm((prev) => ({ ...prev, body: html }))}
+              minHeight=”260px”
+              placeholder=”Text eingeben…”
+              helpText=”Visuell bearbeiten oder über „HTML”-Ansicht direkt HTML einfügen. Im Shop wird der Inhalt formatiert angezeigt.”
+            />
             {blogOnly && (
               <BlockStack gap="300">
                 <Text as="h3" variant="headingSm">SEO</Text>
