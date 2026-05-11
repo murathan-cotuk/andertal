@@ -10,10 +10,13 @@ import {
   Text,
   TextField,
 } from "@shopify/polaris";
+import { DuplicateIcon, HideIcon, ViewIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
-function CopyField({ label, value, helpText, multiline }) {
+/** Festes Feld mit kleinem Kopieren-Icon oben rechts neben dem Label (übliches UI-Muster). */
+function CopyField({ label, value, helpText, multiline, masked = false }) {
   const [copied, setCopied] = useState(false);
+  const [visible, setVisible] = useState(false);
   const copy = useCallback(() => {
     const v = String(value || "");
     if (!v) return;
@@ -23,19 +26,55 @@ function CopyField({ label, value, helpText, multiline }) {
     });
   }, [value]);
 
+  const hidden = masked && !visible;
+
   return (
-    <BlockStack gap="200">
+    <BlockStack gap="100">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <Text as="span" variant="bodyMd" fontWeight="semibold">
+          {label}
+        </Text>
+        <InlineStack gap="100" blockAlign="center" wrap={false}>
+          {masked ? (
+            <Button
+              icon={hidden ? ViewIcon : HideIcon}
+              variant="plain"
+              size="slim"
+              disabled={!value}
+              accessibilityLabel={hidden ? "Anzeigen" : "Ausblenden"}
+              title={hidden ? "Anzeigen" : "Ausblenden"}
+              onClick={() => setVisible((v) => !v)}
+            />
+          ) : null}
+          <Button
+            icon={DuplicateIcon}
+            variant="plain"
+            size="slim"
+            disabled={!value}
+            accessibilityLabel={copied ? "Kopiert" : "Kopieren"}
+            title={copied ? "Kopiert" : "Kopieren"}
+            onClick={copy}
+          />
+        </InlineStack>
+      </div>
       <TextField
         label={label}
+        labelHidden
         helpText={helpText}
         value={value}
         readOnly
+        type={hidden ? "password" : "text"}
         multiline={multiline ? 3 : undefined}
         autoComplete="off"
       />
-      <Button onClick={copy} disabled={!value}>
-        {copied ? "Kopiert" : "Kopieren"}
-      </Button>
     </BlockStack>
   );
 }
@@ -125,12 +164,11 @@ export default function BillbeeSettingsPage({ embedded = false }) {
       />
 
       <BlockStack gap="200">
-        <TextField
+        <CopyField
           label="Basic Auth Passwort"
-          type="password"
           value={loading ? "" : basicPass}
-          readOnly
-          autoComplete="off"
+          helpText="Auge-Symbol: ein-/ausblenden. Doppelblatt-Symbol: kopieren."
+          masked
         />
         <Button onClick={handleRotateSecret} loading={rotating} disabled={loading}>
           Neues Passwort erzeugen

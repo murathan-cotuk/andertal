@@ -12860,7 +12860,8 @@ async function start() {
     }
 
     const getBillbeePublicBaseUrl = () =>
-      (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '').replace(/\/$/, '') || 'https://andertal-medusa-backend.onrender.com'
+      (process.env.PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '').replace(/\/$/, '') ||
+      'https://api.andertal.com'
 
     const adminHubBillbeeCredentialsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -13506,7 +13507,7 @@ async function start() {
 
     const publicAndertalBillbeeApiBase = () =>
       (process.env.PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || '').replace(/\/$/, '') ||
-      'https://andertal-medusa-backend.onrender.com'
+      'https://api.andertal.com'
 
     const adminHubBillbeeMarketplaceConnectionGET = async (req, res) => {
       const userId = req.sellerUser?.id

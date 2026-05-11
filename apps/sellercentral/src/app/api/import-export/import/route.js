@@ -2,7 +2,7 @@
 
 const LANGS = ["de", "en", "tr", "fr", "it", "es"];
 const COUNTRIES = ["DE", "FR", "IT", "ES", "TR"];
-const DEFAULT_BACKEND = "https://andertal-medusa-backend.onrender.com";
+const DEFAULT_BACKEND = "https://api.andertal.com";
 
 function computeUnitReference(unitTypeRaw) {
   const unitType = String(unitTypeRaw || "").trim().toLowerCase();

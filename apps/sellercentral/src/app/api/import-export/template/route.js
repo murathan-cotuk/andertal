@@ -8,7 +8,7 @@ const COUNTRY_LABELS = {
   DE: "Germany (EUR)", FR: "France (EUR)", IT: "Italy (EUR)", ES: "Spain (EUR)", TR: "Turkey (TRY)",
 };
 
-const DEFAULT_BACKEND = "https://andertal-medusa-backend.onrender.com";
+const DEFAULT_BACKEND = "https://api.andertal.com";
 
 const METAFIELD_PAIRS = 15; // template shows 15; import accepts any metafield_N_key/value columns
 

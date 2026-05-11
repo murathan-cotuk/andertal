@@ -1,6 +1,6 @@
 ﻿import ExcelJS from "exceljs";
 
-const DEFAULT_BACKEND = "https://andertal-medusa-backend.onrender.com";
+const DEFAULT_BACKEND = "https://api.andertal.com";
 
 function getBackendBase() {
   return (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || DEFAULT_BACKEND).replace(/\/$/, "");

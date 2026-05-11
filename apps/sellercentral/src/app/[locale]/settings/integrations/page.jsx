@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Page, Card, Text, BlockStack, InlineStack, TextField,
+  Page, Text, BlockStack, InlineStack, TextField,
   Button, Banner, Badge, Modal, EmptyState, Divider, Box,
 } from "@shopify/polaris";
+import { ChevronDownIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import MarketingAccountsSection from "@/components/settings/MarketingAccountsSection";
 import BillbeeSettingsPage from "@/components/pages/settings/BillbeeSettingsPage";
@@ -493,6 +494,170 @@ function maskKey(val) {
   return `${s.slice(0, 4)}${"•".repeat(Math.min(20, s.length - 8))}${s.slice(-4)}`;
 }
 
+/** Einheitliche Akkordeon-Zeile: Logo | Titel (+ Untertitel) · rechts Chevron */
+function IntegrationsAccordion({
+  sectionId,
+  open,
+  onToggle,
+  logo,
+  title,
+  subtitle,
+  headerExtra,
+  children,
+}) {
+  return (
+    <div
+      style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: 10,
+        overflow: "hidden",
+        background: "#fff",
+        marginBottom: 10,
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={`integrations-panel-${sectionId}`}
+        id={`integrations-trigger-${sectionId}`}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "12px 14px",
+          background: open ? "#f9fafb" : "#fff",
+          border: "none",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
+          {logo}
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "#111827", lineHeight: 1.25 }}>
+              {title}
+            </span>
+            {subtitle ? (
+              <span style={{ display: "block", fontSize: 12, color: "#6b7280", marginTop: 3, lineHeight: 1.35 }}>
+                {subtitle}
+              </span>
+            ) : null}
+          </span>
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          {headerExtra}
+          <span
+            style={{
+              display: "inline-flex",
+              color: "#6b7280",
+              transition: "transform 0.2s ease",
+              transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          >
+            <ChevronDownIcon width={20} height={20} />
+          </span>
+        </span>
+      </button>
+      {open ? (
+        <div
+          id={`integrations-panel-${sectionId}`}
+          role="region"
+          aria-labelledby={`integrations-trigger-${sectionId}`}
+          style={{
+            borderTop: "1px solid #e5e7eb",
+            padding: "16px 18px 20px",
+            background: "#fff",
+          }}
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AccordionLogoWrap({ bg, children }) {
+  return (
+    <span
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        background: bg,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function LogoMail() {
+  return (
+    <AccordionLogoWrap bg="#eff6ff">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M4 6h16v12H4V6zm0 0 8 6 8-6"
+          stroke="#2563eb"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </AccordionLogoWrap>
+  );
+}
+
+function LogoTrustpilot() {
+  return (
+    <AccordionLogoWrap bg="#ecfdf5">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
+        <path fill="#00b67a" d="M12 4l2.09 6.26H21l-5.18 3.76 1.98 6.1L12 16.36 6.19 20.12l1.98-6.1L3 10.26h6.91z" />
+      </svg>
+    </AccordionLogoWrap>
+  );
+}
+
+function LogoMarketing() {
+  return (
+    <AccordionLogoWrap bg="#faf5ff">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M5 19V5l7-2v16l-7-2zm7 0V3l7 2v14l-7 2z" stroke="#7c3aed" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    </AccordionLogoWrap>
+  );
+}
+
+function LogoBillbee() {
+  return (
+    <AccordionLogoWrap bg="#fff7ed">
+      <span style={{ fontSize: 13, fontWeight: 800, color: "#ea580c", letterSpacing: "-0.02em" }}>Bb</span>
+    </AccordionLogoWrap>
+  );
+}
+
+function LogoApi() {
+  return (
+    <AccordionLogoWrap bg="#f3f4f6">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M8 16l-4-4 4-4M16 8l4 4-4 4M13 7l-2 10"
+          stroke="#374151"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </AccordionLogoWrap>
+  );
+}
+
 function IntegrationCard({ integration, onEdit, onToggle, onDelete, onRotateSecret }) {
   const initials = (integration.name || "?").split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   return (
@@ -546,6 +711,11 @@ function IntegrationCard({ integration, onEdit, onToggle, onDelete, onRotateSecr
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function IntegrationsSettingsPage() {
+  const [openSection, setOpenSection] = useState(null);
+  const toggleSection = (key) => {
+    setOpenSection((prev) => (prev === key ? null : key));
+  };
+
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [integrations, setIntegrations] = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -634,118 +804,111 @@ export default function IntegrationsSettingsPage() {
 
   return (
     <Page title="Apps & Integrationen" primaryAction={{ content: "Integration anlegen", onAction: openCreate }}>
-      <BlockStack gap="500">
+      <BlockStack gap="400">
         {msg && <Banner tone={msg.tone} onDismiss={() => setMsg(null)}>{msg.text}</Banner>}
 
-        {/* ── E-Mail / SMTP (superuser only) ───────────────────────── */}
         {isSuperuser && (
-          <Card>
+          <IntegrationsAccordion
+            sectionId="email"
+            open={openSection === "email"}
+            onToggle={() => toggleSection("email")}
+            logo={<LogoMail />}
+            title="E-Posta"
+            subtitle="SMTP ve gönderen adresleri — otomatik e-postalar ve Flow"
+          >
             <BlockStack gap="400">
-              <BlockStack gap="100">
-                <Text as="h2" variant="headingMd">E-posta / SMTP</Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Otomatik e-postalar ve Flow kampanyaları bu ayarlar üzerinden gönderilir.
-                </Text>
-              </BlockStack>
-              <Divider />
               <SmtpSection />
               <Divider />
               <SmtpSendersSection onToast={setMsg} />
             </BlockStack>
-          </Card>
+          </IntegrationsAccordion>
         )}
 
         {isSuperuser && (
-          <Card>
-            <BlockStack gap="400">
-              <BlockStack gap="100">
-                <Text as="h2" variant="headingMd">Trustpilot (Shop-Bewertungen)</Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Nur Superuser. Verknüpft den öffentlichen Sterne-/TrustBox-Bereich auf dem Shop mit eurem Trustpilot Business Profil.
-                </Text>
-              </BlockStack>
-              <Divider />
-              <TrustpilotSuperuserSection onToast={setMsg} />
-            </BlockStack>
-          </Card>
+          <IntegrationsAccordion
+            sectionId="trustpilot"
+            open={openSection === "trustpilot"}
+            onToggle={() => toggleSection("trustpilot")}
+            logo={<LogoTrustpilot />}
+            title="Trustpilot"
+            subtitle="Shop TrustBox — Trustpilot Business (nur Superuser)"
+          >
+            <TrustpilotSuperuserSection onToast={setMsg} />
+          </IntegrationsAccordion>
         )}
 
         {isSuperuser && (
-          <Card>
-            <BlockStack gap="400">
-              <BlockStack gap="100">
-                <Text as="h2" variant="headingMd">Marketing-Konten</Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Werbekonten verbinden, um Kampagnen automatisch auf Meta, Google Ads, TikTok und Snapchat zu schalten.
-                  Budgets werden gleichmäßig auf die ausgewählten Plattformen verteilt.
-                </Text>
-              </BlockStack>
-              <Divider />
-              <MarketingAccountsSection />
-            </BlockStack>
-          </Card>
+          <IntegrationsAccordion
+            sectionId="marketing"
+            open={openSection === "marketing"}
+            onToggle={() => toggleSection("marketing")}
+            logo={<LogoMarketing />}
+            title="Marketing-Konten"
+            subtitle="Meta · Google Ads · TikTok · Snapchat"
+          >
+            <MarketingAccountsSection hideFooterHint />
+          </IntegrationsAccordion>
         )}
 
-        {/* ── Billbee (alle Verkäufer) ───────────────────────────── */}
-        <Card>
-          <BlockStack gap="400">
-            <BlockStack gap="100">
-              <Text as="h2" variant="headingMd">Billbee</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Auftragsabwicklung und Versand: Verbindungsdaten für Billbee als Shop-Kanal (Marketplace-API).
-              </Text>
-            </BlockStack>
-            <Divider />
-            <BillbeeSettingsPage embedded />
-          </BlockStack>
-        </Card>
+        <IntegrationsAccordion
+          sectionId="billbee"
+          open={openSection === "billbee"}
+          onToggle={() => toggleSection("billbee")}
+          logo={<LogoBillbee />}
+          title="Billbee"
+          subtitle="Auftragsabwicklung und Versand — Shop-Kanal (Marketplace-API)"
+        >
+          <BillbeeSettingsPage embedded />
+        </IntegrationsAccordion>
 
-        {/* ── API Integrationen ──────────────────────────────────── */}
-        <Card>
-          <BlockStack gap="400">
-            <BlockStack gap="100">
-              <Text as="h2" variant="headingMd">API-Integrationen</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Andertal erzeugt automatisch eine <strong>Zugangs-ID</strong> und einen <strong>Sicherheitsschlüssel</strong> — keine vorgefertigte App-Liste.
-              </Text>
+        <IntegrationsAccordion
+          sectionId="api"
+          open={openSection === "api"}
+          onToggle={() => toggleSection("api")}
+          logo={<LogoApi />}
+          title="API-Integrationen"
+          subtitle="Zugangs-ID und Sicherheitsschlüssel — eigene Tools und Schnittstellen"
+          headerExtra={
+            !loading && integrations.length > 0 ? (
+              <Badge tone="info">{integrations.length}</Badge>
+            ) : null
+          }
+        >
+          {loading ? (
+            <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
+          ) : integrations.length === 0 ? (
+            <EmptyState heading="Noch keine Integrationen">
+              <p>Eine Integration anlegen: nur den Namen eingeben — Zugangsdaten werden automatisch generiert.</p>
+              <Button variant="primary" onClick={openCreate}>Integration anlegen</Button>
+            </EmptyState>
+          ) : (
+            <BlockStack gap="400">
+              {active.length > 0 && (
+                <BlockStack gap="300">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="h3" variant="headingSm">Aktiv ({active.length})</Text>
+                    <Button size="slim" onClick={load} loading={loading}>Aktualisieren</Button>
+                  </InlineStack>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {active.map((i) => (
+                      <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} />
+                    ))}
+                  </div>
+                </BlockStack>
+              )}
+              {inactive.length > 0 && (
+                <BlockStack gap="300">
+                  <Text as="h3" variant="headingSm">Inaktiv ({inactive.length})</Text>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {inactive.map((i) => (
+                      <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} />
+                    ))}
+                  </div>
+                </BlockStack>
+              )}
             </BlockStack>
-            <Divider />
-            {loading ? (
-              <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
-            ) : integrations.length === 0 ? (
-              <EmptyState heading="Noch keine Integrationen">
-                <p>Eine Integration anlegen: nur den Namen eingeben — Zugangsdaten werden automatisch generiert.</p>
-                <Button variant="primary" onClick={openCreate}>Integration anlegen</Button>
-              </EmptyState>
-            ) : (
-              <BlockStack gap="400">
-                {active.length > 0 && (
-                  <BlockStack gap="300">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text as="h3" variant="headingSm">Aktiv ({active.length})</Text>
-                      <Button size="slim" onClick={load} loading={loading}>Aktualisieren</Button>
-                    </InlineStack>
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {active.map((i) => (
-                        <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} />
-                      ))}
-                    </div>
-                  </BlockStack>
-                )}
-                {inactive.length > 0 && (
-                  <BlockStack gap="300">
-                    <Text as="h3" variant="headingSm">Inaktiv ({inactive.length})</Text>
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {inactive.map((i) => (
-                        <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} />
-                      ))}
-                    </div>
-                  </BlockStack>
-                )}
-              </BlockStack>
-            )}
-          </BlockStack>
-        </Card>
+          )}
+        </IntegrationsAccordion>
       </BlockStack>
 
       <Modal

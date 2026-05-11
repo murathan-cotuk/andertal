@@ -170,7 +170,7 @@ function PlatformPanel({ platform, accountData, onSave, saving }) {
 }
 
 /** Werbekonten (Meta, Google Ads, TikTok, Snapchat) — nur Superuser */
-export default function MarketingAccountsSection() {
+export default function MarketingAccountsSection({ hideFooterHint = false }) {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingPlatform, setSavingPlatform] = useState(null);
@@ -245,9 +245,11 @@ export default function MarketingAccountsSection() {
           saving={savingPlatform === platform.value}
         />
       ))}
-      <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>
-        Die gespeicherten Zugangsdaten werden für die automatische Kampagnenerstellung in den verbundenen Werbenetzwerken verwendet.
-      </div>
+      {!hideFooterHint && (
+        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>
+          Die gespeicherten Zugangsdaten werden für die automatische Kampagnenerstellung in den verbundenen Werbenetzwerken verwendet.
+        </div>
+      )}
     </div>
   );
 }
