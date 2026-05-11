@@ -743,17 +743,46 @@ export default function StylesPage() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [errMsg, setErrMsg] = useState("");
+
+  const mkDeviceLogo = (h = 34) => ({ url: "", height: h, pt: 0, pr: 0, pb: 0, pl: 0 });
+  const defaultLogoConfig = () => ({
+    shop: { desktop: mkDeviceLogo(34), tablet: mkDeviceLogo(30), mobile: mkDeviceLogo(28) },
+    sellercentral: { desktop: mkDeviceLogo(30), tablet: mkDeviceLogo(28), mobile: mkDeviceLogo(26) },
+  });
+  const mergeLogoConfig = (saved) => {
+    const def = defaultLogoConfig();
+    if (!saved || typeof saved !== "object") return def;
+    const merge = (defDev, savedDev) => ({
+      url: savedDev?.url ?? defDev.url,
+      height: savedDev?.height != null ? Number(savedDev.height) : defDev.height,
+      pt: savedDev?.pt != null ? Number(savedDev.pt) : defDev.pt,
+      pr: savedDev?.pr != null ? Number(savedDev.pr) : defDev.pr,
+      pb: savedDev?.pb != null ? Number(savedDev.pb) : defDev.pb,
+      pl: savedDev?.pl != null ? Number(savedDev.pl) : defDev.pl,
+    });
+    return {
+      shop: {
+        desktop: merge(def.shop.desktop, saved?.shop?.desktop),
+        tablet: merge(def.shop.tablet, saved?.shop?.tablet),
+        mobile: merge(def.shop.mobile, saved?.shop?.mobile),
+      },
+      sellercentral: {
+        desktop: merge(def.sellercentral.desktop, saved?.sellercentral?.desktop),
+        tablet: merge(def.sellercentral.tablet, saved?.sellercentral?.tablet),
+        mobile: merge(def.sellercentral.mobile, saved?.sellercentral?.mobile),
+      },
+    };
+  };
+
   const [branding, setBranding] = useState({
-    shop_logo_url: "",
     shop_favicon_url: "",
-    sellercentral_logo_url: "",
     sellercentral_favicon_url: "",
-    shop_logo_height: 34,
-    sellercentral_logo_height: 30,
     announcement_bar_items: [],
+    logo_config: defaultLogoConfig(),
   });
   const [brandingSnapshot, setBrandingSnapshot] = useState(null);
-  const [brandingPickerTarget, setBrandingPickerTarget] = useState(null);
+  const [brandingPickerTarget, setBrandingPickerTarget] = useState(null); // e.g. "logo_shop_desktop"
+  const [logoActiveDevice, setLogoActiveDevice] = useState("desktop");
   const [headerEditScope, setHeaderEditScope] = useState("standard");
   const [headerBgPickerScope, setHeaderBgPickerScope] = useState(null);
   const [catalogNavOpen, setCatalogNavOpen] = useState(false);
@@ -772,14 +801,27 @@ export default function StylesPage() {
       const settings = await client.getSellerSettings('default').catch(() => ({}));
       setStyles(merged);
       setSavedSnapshot(JSON.stringify(merged));
+      // Backward compat: if no logo_config yet, seed from old flat fields
+      let savedLogoConfig = settings?.logo_config || null;
+      if (!savedLogoConfig && (settings?.shop_logo_url || settings?.sellercentral_logo_url)) {
+        savedLogoConfig = {
+          shop: {
+            desktop: { url: settings.shop_logo_url || "", height: Number(settings.shop_logo_height) || 34, pt: 0, pr: 0, pb: 0, pl: 0 },
+            tablet: { url: settings.shop_logo_url || "", height: Number(settings.shop_logo_height) || 34, pt: 0, pr: 0, pb: 0, pl: 0 },
+            mobile: { url: settings.shop_logo_url || "", height: Number(settings.shop_logo_height) || 34, pt: 0, pr: 0, pb: 0, pl: 0 },
+          },
+          sellercentral: {
+            desktop: { url: settings.sellercentral_logo_url || "", height: Number(settings.sellercentral_logo_height) || 30, pt: 0, pr: 0, pb: 0, pl: 0 },
+            tablet: { url: settings.sellercentral_logo_url || "", height: Number(settings.sellercentral_logo_height) || 30, pt: 0, pr: 0, pb: 0, pl: 0 },
+            mobile: { url: settings.sellercentral_logo_url || "", height: Number(settings.sellercentral_logo_height) || 30, pt: 0, pr: 0, pb: 0, pl: 0 },
+          },
+        };
+      }
       const loadedBranding = {
-        shop_logo_url: settings?.shop_logo_url || "",
         shop_favicon_url: settings?.shop_favicon_url || "",
-        sellercentral_logo_url: settings?.sellercentral_logo_url || "",
         sellercentral_favicon_url: settings?.sellercentral_favicon_url || "",
-        shop_logo_height: settings?.shop_logo_height != null ? Number(settings.shop_logo_height) : 34,
-        sellercentral_logo_height: settings?.sellercentral_logo_height != null ? Number(settings.sellercentral_logo_height) : 30,
         announcement_bar_items: Array.isArray(settings?.announcement_bar_items) ? settings.announcement_bar_items : [],
+        logo_config: mergeLogoConfig(savedLogoConfig),
       };
       setBranding(loadedBranding);
       setBrandingSnapshot(JSON.stringify(loadedBranding));
@@ -787,7 +829,7 @@ export default function StylesPage() {
       const merged = mergeLoadedShopStyles({});
       setStyles(merged);
       setSavedSnapshot(JSON.stringify(merged));
-      const emptyBranding = { shop_logo_url: "", shop_favicon_url: "", sellercentral_logo_url: "", sellercentral_favicon_url: "", shop_logo_height: 34, sellercentral_logo_height: 30, announcement_bar_items: [] };
+      const emptyBranding = { shop_favicon_url: "", sellercentral_favicon_url: "", announcement_bar_items: [], logo_config: defaultLogoConfig() };
       setBranding(emptyBranding);
       setBrandingSnapshot(JSON.stringify(emptyBranding));
     }
@@ -991,15 +1033,141 @@ export default function StylesPage() {
         )}
         <Layout.Section>
           <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Branding (Shop & Sellercentral)</Text>
-              <Text as="p" tone="subdued">
-                Hier kannst du unterschiedliche Logos und Favicons fuer Shop und Sellercentral setzen.
-              </Text>
+            <BlockStack gap="500">
+              <div>
+                <Text as="h2" variant="headingMd">Branding (Shop &amp; Sellercentral)</Text>
+                <Text as="p" tone="subdued">Logos, Favicons, Groesse und Abstände — getrennt fuer Desktop, Tablet und Mobil.</Text>
+              </div>
+
+              {/* Device tabs */}
+              <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e5e7eb" }}>
+                {["desktop", "tablet", "mobile"].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setLogoActiveDevice(d)}
+                    style={{
+                      padding: "8px 20px", border: "none", background: "transparent", cursor: "pointer",
+                      fontSize: 13, fontWeight: logoActiveDevice === d ? 700 : 500,
+                      color: logoActiveDevice === d ? "#111827" : "#6b7280",
+                      borderBottom: logoActiveDevice === d ? "2px solid #1f2937" : "2px solid transparent",
+                      marginBottom: -1,
+                    }}
+                  >
+                    {d === "desktop" ? "Desktop" : d === "tablet" ? "Tablet" : "Mobil"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Per-logo sections */}
               {[
-                { key: "shop_logo_url", label: "Shop Logo" },
+                { section: "shop", label: "Shop Logo" },
+                { section: "sellercentral", label: "Sellercentral Logo" },
+              ].map(({ section, label }) => {
+                const dev = branding.logo_config?.[section]?.[logoActiveDevice] || {};
+                const updateDev = (patch) =>
+                  setBranding((p) => ({
+                    ...p,
+                    logo_config: {
+                      ...p.logo_config,
+                      [section]: {
+                        ...p.logo_config?.[section],
+                        [logoActiveDevice]: { ...(p.logo_config?.[section]?.[logoActiveDevice] || {}), ...patch },
+                      },
+                    },
+                  }));
+                const pickerKey = `logo_${section}_${logoActiveDevice}`;
+                return (
+                  <div key={section} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
+                    <Text as="h3" variant="headingSm">{label} — {logoActiveDevice === "desktop" ? "Desktop" : logoActiveDevice === "tablet" ? "Tablet" : "Mobil"}</Text>
+                    <div style={{ marginTop: 12 }}>
+                      <InlineStack gap="200" blockAlign="end" wrap>
+                        <div style={{ flex: 1, minWidth: 260 }}>
+                          <TextField
+                            label="URL"
+                            value={dev.url || ""}
+                            onChange={(v) => updateDev({ url: v })}
+                            placeholder="https://... veya /uploads/..."
+                            autoComplete="off"
+                          />
+                        </div>
+                        <Button size="slim" onClick={() => setBrandingPickerTarget(pickerKey)}>Aus Medien</Button>
+                        {(dev.url || "").trim() ? (
+                          <Button size="slim" tone="critical" variant="plain" onClick={() => updateDev({ url: "" })}>Entfernen</Button>
+                        ) : null}
+                      </InlineStack>
+                    </div>
+
+                    {(dev.url || "").trim() && (
+                      <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "start" }}>
+                        <div>
+                          {/* Height */}
+                          <Text as="span" variant="bodySm" fontWeight="medium">Hoehe</Text>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, marginBottom: 14 }}>
+                            <input
+                              type="range" min={16} max={120} step={1}
+                              value={dev.height || 34}
+                              onChange={(e) => updateDev({ height: Number(e.target.value) })}
+                              style={{ flex: 1, accentColor: "#008060" }}
+                            />
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", minWidth: 38, textAlign: "right" }}>{dev.height || 34}px</span>
+                          </div>
+
+                          {/* Padding */}
+                          <Text as="span" variant="bodySm" fontWeight="medium">Padding (px)</Text>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 6 }}>
+                            {[
+                              { k: "pt", label: "Oben" },
+                              { k: "pr", label: "Rechts" },
+                              { k: "pb", label: "Unten" },
+                              { k: "pl", label: "Links" },
+                            ].map(({ k, label: pl }) => (
+                              <div key={k}>
+                                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 3 }}>{pl}</div>
+                                <input
+                                  type="number" min={0} max={80} step={1}
+                                  value={dev[k] ?? 0}
+                                  onChange={(e) => updateDev({ [k]: Math.max(0, Math.min(80, Number(e.target.value) || 0)) })}
+                                  style={{ width: "100%", padding: "6px 8px", border: "1.5px solid #d1d5db", borderRadius: 6, fontSize: 13, textAlign: "center", boxSizing: "border-box" }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Live preview */}
+                        <div style={{
+                          background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 8,
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          minWidth: 80,
+                        }}>
+                          <img
+                            src={dev.url}
+                            alt="preview"
+                            style={{
+                              height: Math.min(dev.height || 34, 60),
+                              width: "auto",
+                              maxWidth: 160,
+                              objectFit: "contain",
+                              display: "block",
+                              paddingTop: dev.pt || 0,
+                              paddingRight: dev.pr || 0,
+                              paddingBottom: dev.pb || 0,
+                              paddingLeft: dev.pl || 0,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Favicons (device-independent) */}
+              <Divider />
+              <Text as="h3" variant="headingSm">Favicons</Text>
+              {[
                 { key: "shop_favicon_url", label: "Shop Favicon" },
-                { key: "sellercentral_logo_url", label: "Sellercentral Logo" },
                 { key: "sellercentral_favicon_url", label: "Sellercentral Favicon" },
               ].map((row) => (
                 <div key={row.key}>
@@ -1009,63 +1177,15 @@ export default function StylesPage() {
                         label={row.label}
                         value={branding[row.key] || ""}
                         onChange={(v) => setBranding((p) => ({ ...p, [row.key]: v }))}
-                        placeholder="https://... veya /uploads/..."
+                        placeholder="https://... oder /uploads/..."
                         autoComplete="off"
                       />
                     </div>
-                    <Button size="slim" onClick={() => setBrandingPickerTarget(row.key)}>Aus Medien waehlen</Button>
+                    <Button size="slim" onClick={() => setBrandingPickerTarget(row.key)}>Aus Medien</Button>
                     {(branding[row.key] || "").trim() ? (
-                      <Button
-                        size="slim"
-                        tone="critical"
-                        variant="plain"
-                        onClick={() => setBranding((p) => ({ ...p, [row.key]: "" }))}
-                      >
-                        Entfernen
-                      </Button>
+                      <Button size="slim" tone="critical" variant="plain" onClick={() => setBranding((p) => ({ ...p, [row.key]: "" }))}>Entfernen</Button>
                     ) : null}
                   </InlineStack>
-                  {(row.key === "shop_logo_url" || row.key === "sellercentral_logo_url") && (branding[row.key] || "").trim() && (
-                    <div style={{ marginTop: 12 }}>
-                      <InlineStack gap="400" blockAlign="center" wrap={false}>
-                        <div style={{ flex: 1 }}>
-                          <Text as="span" variant="bodySm" fontWeight="medium">Logo-Höhe im Header</Text>
-                          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6 }}>
-                            <input
-                              type="range"
-                              min={20}
-                              max={120}
-                              step={1}
-                              value={row.key === "shop_logo_url" ? (branding.shop_logo_height || 34) : (branding.sellercentral_logo_height || 30)}
-                              onChange={(e) =>
-                                setBranding((p) => ({
-                                  ...p,
-                                  [row.key === "shop_logo_url" ? "shop_logo_height" : "sellercentral_logo_height"]: Number(e.target.value),
-                                }))
-                              }
-                              style={{ flex: 1, accentColor: "#008060" }}
-                            />
-                            <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", minWidth: 42, textAlign: "right" }}>
-                              {row.key === "shop_logo_url" ? (branding.shop_logo_height || 34) : (branding.sellercentral_logo_height || 30)}px
-                            </span>
-                          </div>
-                        </div>
-                        <div style={{ flexShrink: 0, padding: "8px 12px", background: "#f3f4f6", borderRadius: 8, border: "1px solid #e5e7eb", height: 56, display: "flex", alignItems: "center" }}>
-                          <img
-                            src={branding[row.key]}
-                            alt="Logo preview"
-                            style={{
-                              height: 36,
-                              width: "auto",
-                              maxWidth: 180,
-                              objectFit: "contain",
-                              display: "block",
-                            }}
-                          />
-                        </div>
-                      </InlineStack>
-                    </div>
-                  )}
                 </div>
               ))}
             </BlockStack>
@@ -2004,7 +2124,23 @@ export default function StylesPage() {
         onSelect={(urls) => {
           const first = Array.isArray(urls) ? urls[0] : null;
           if (!first || !brandingPickerTarget) return;
-          setBranding((p) => ({ ...p, [brandingPickerTarget]: first }));
+          // "logo_shop_desktop" or "logo_sellercentral_tablet" → device logo config
+          const logoMatch = brandingPickerTarget.match(/^logo_(shop|sellercentral)_(desktop|tablet|mobile)$/);
+          if (logoMatch) {
+            const [, section, device] = logoMatch;
+            setBranding((p) => ({
+              ...p,
+              logo_config: {
+                ...p.logo_config,
+                [section]: {
+                  ...p.logo_config?.[section],
+                  [device]: { ...(p.logo_config?.[section]?.[device] || {}), url: first },
+                },
+              },
+            }));
+          } else {
+            setBranding((p) => ({ ...p, [brandingPickerTarget]: first }));
+          }
           setBrandingPickerTarget(null);
         }}
         multiple={false}

@@ -894,6 +894,7 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS platform_name text`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS support_email text`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS announcement_bar_items jsonb`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS logo_config jsonb`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_banners (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -4885,7 +4886,8 @@ async function start() {
           const platform_name = row && row.platform_name ? String(row.platform_name) : ''
           const support_email = row && row.support_email ? String(row.support_email) : ''
           const storefront_url = row && row.storefront_url ? String(row.storefront_url) : ''
-          res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, storefront_url })
+          const logo_config = row && row.logo_config ? (typeof row.logo_config === 'string' ? JSON.parse(row.logo_config) : row.logo_config) : null
+          res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, storefront_url, logo_config })
         } finally {
           await client.end().catch(() => {})
         }
@@ -4917,6 +4919,9 @@ async function start() {
         const announcement_bar_items = body.announcement_bar_items !== undefined
           ? (Array.isArray(body.announcement_bar_items) ? body.announcement_bar_items : null)
           : undefined
+        const logo_config = body.logo_config !== undefined
+          ? (body.logo_config && typeof body.logo_config === 'object' ? body.logo_config : null)
+          : undefined
         if (free_shipping_thresholds) {
           free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
         }
@@ -4926,10 +4931,11 @@ async function start() {
         const thresholdsJson = free_shipping_thresholds ? JSON.stringify(free_shipping_thresholds) : null
         log.info('[sellerSettingsPATCH] saving free_shipping_thresholds:', thresholdsJson)
         const announcementJson = announcement_bar_items !== undefined ? JSON.stringify(announcement_bar_items) : undefined
+        const logoConfigJson = logo_config !== undefined ? JSON.stringify(logo_config) : undefined
         await client.query(
           `INSERT INTO admin_hub_seller_settings (
-             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, storefront_url, updated_at
-           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, now())
+             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, storefront_url, logo_config, updated_at
+           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14::jsonb, now())
            ON CONFLICT (seller_id) DO UPDATE SET
              store_name = COALESCE($2, admin_hub_seller_settings.store_name),
              free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds),
@@ -4943,8 +4949,9 @@ async function start() {
              support_email = COALESCE($11, admin_hub_seller_settings.support_email),
              announcement_bar_items = COALESCE($12::jsonb, admin_hub_seller_settings.announcement_bar_items),
              storefront_url = COALESCE($13, admin_hub_seller_settings.storefront_url),
+             logo_config = COALESCE($14::jsonb, admin_hub_seller_settings.logo_config),
              updated_at = now()`,
-          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null, storefront_url]
+          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null, storefront_url, logoConfigJson !== undefined ? logoConfigJson : null]
         )
         await client.end()
         log.info('[sellerSettingsPATCH] saved OK')
