@@ -7,6 +7,7 @@ import {
 } from "@shopify/polaris";
 import { useRouter } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import SellerImpersonationPanel from "@/components/SellerImpersonationPanel";
 
 const STATUS_META = {
   registered:           { label: "Kayıt Oldu",        tone: "info" },
@@ -52,7 +53,7 @@ function StatCard({ label, value, sub }) {
 
 const TABLE_HEADERS = ["Shop-Name", "E-Mail", "Firma", "Status", "Produkte", "Umsatz", "Provision", "IBAN", "Beigetreten", ""];
 
-function SellerTable({ rows, router }) {
+function SellerTable({ rows, router, onImpersonate }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -86,13 +87,21 @@ function SellerTable({ rows, router }) {
               </td>
               <td style={{ padding: "10px 12px", color: "#9ca3af", whiteSpace: "nowrap" }}>{fmtDate(seller.created_at)}</td>
               <td style={{ padding: "10px 12px" }}>
-                <Button
-                  size="slim"
-                  variant="secondary"
-                  onClick={(e) => { e.stopPropagation(); router.push(`/sellers/${seller.id}`); }}
-                >
-                  Details
-                </Button>
+                <InlineStack gap="200">
+                  <Button
+                    size="slim"
+                    variant="secondary"
+                    onClick={(e) => { e.stopPropagation(); router.push(`/sellers/${seller.id}`); }}
+                  >
+                    Details
+                  </Button>
+                  <Button
+                    size="slim"
+                    onClick={(e) => { e.stopPropagation(); onImpersonate(seller); }}
+                  >
+                    Als Seller anmelden
+                  </Button>
+                </InlineStack>
               </td>
             </tr>
           ))}
@@ -112,6 +121,20 @@ export default function SellersPage() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [impersonating, setImpersonating] = useState(null); // { seller, token }
+  const [impersonateLoading, setImpersonateLoading] = useState(null);
+
+  const handleImpersonate = async (seller) => {
+    setImpersonateLoading(seller.id);
+    try {
+      const r = await client.impersonateSeller(seller.id);
+      setImpersonating({ seller, token: r.token });
+    } catch (e) {
+      setError(e?.message || "Impersonation fehlgeschlagen");
+    } finally {
+      setImpersonateLoading(null);
+    }
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -150,6 +173,7 @@ export default function SellersPage() {
   const sellersFiltered = filtered.filter((s) => !isSellerSuperuser(s));
 
   return (
+    <>
     <Page
       title="Verkäufer"
       subtitle="Alle registrierten Verkäufer verwalten und freischalten"
@@ -220,7 +244,7 @@ export default function SellersPage() {
                         <Text as="p" tone="subdued" alignment="center">Keine Superuser für diese Filter.</Text>
                       </Box>
                     ) : (
-                      <SellerTable rows={superusersFiltered} router={router} />
+                      <SellerTable rows={superusersFiltered} router={router} onImpersonate={handleImpersonate} />
                     )}
                   </Box>
                 </div>
@@ -237,7 +261,7 @@ export default function SellersPage() {
                         <Text as="p" tone="subdued" alignment="center">Keine Verkäufer für diese Filter.</Text>
                       </Box>
                     ) : (
-                      <SellerTable rows={sellersFiltered} router={router} />
+                      <SellerTable rows={sellersFiltered} router={router} onImpersonate={handleImpersonate} />
                     )}
                   </Box>
                 </div>
@@ -247,5 +271,14 @@ export default function SellersPage() {
         </Card>
       </BlockStack>
     </Page>
+
+    {impersonating && (
+      <SellerImpersonationPanel
+        seller={impersonating.seller}
+        token={impersonating.token}
+        onClose={() => setImpersonating(null)}
+      />
+    )}
+    </>
   );
 }

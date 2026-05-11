@@ -1513,6 +1513,16 @@ function NewsletterSignup({ container, locale = "de" }) {
     fontSize: 15,
     cursor: "pointer",
   };
+  const nameRowStyle = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 12,
+  };
+  const nameInputStyle = {
+    flex: "1 1 160px",
+    minWidth: 0,
+    width: "auto",
+  };
 
   return (
     <div style={{ ...getContainerPadding(container, "48px 24px"), background: bg }}>
@@ -1532,8 +1542,10 @@ function NewsletterSignup({ container, locale = "de" }) {
             {hiddenFields.map((f, i) => (
               f && f.name ? <input key={i} type="hidden" name={String(f.name)} value={String(f.value ?? "")} /> : null
             ))}
-            <input type="text" name={firstNameFieldName} required placeholder={lt(container, "first_name_placeholder", locale) || "Vorname"} autoComplete="given-name" style={sharedInputStyle} />
-            <input type="text" name={lastNameFieldName} required placeholder={lt(container, "last_name_placeholder", locale) || "Nachname"} autoComplete="family-name" style={sharedInputStyle} />
+            <div style={nameRowStyle}>
+              <input type="text" name={firstNameFieldName} required placeholder={lt(container, "first_name_placeholder", locale) || "Vorname"} autoComplete="given-name" style={{ ...sharedInputStyle, ...nameInputStyle }} />
+              <input type="text" name={lastNameFieldName} required placeholder={lt(container, "last_name_placeholder", locale) || "Nachname"} autoComplete="family-name" style={{ ...sharedInputStyle, ...nameInputStyle }} />
+            </div>
             <input type="email" name={emailName} required placeholder={lt(container, "email_placeholder", locale) || "E-Mail"} autoComplete="email" style={sharedInputStyle} />
             <button type="submit" style={sharedBtnStyle}>{lt(container, "button_text", locale) || "Abonnieren"}</button>
           </form>
@@ -1543,24 +1555,26 @@ function NewsletterSignup({ container, locale = "de" }) {
           </p>
         ) : (
           <form onSubmit={handleInternalSubmit} style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "stretch" }}>
-            <input
-              type="text"
-              required
-              value={internalFirstName}
-              onChange={(e) => setInternalFirstName(e.target.value)}
-              placeholder={lt(container, "first_name_placeholder", locale) || "Vorname"}
-              autoComplete="given-name"
-              style={sharedInputStyle}
-            />
-            <input
-              type="text"
-              required
-              value={internalLastName}
-              onChange={(e) => setInternalLastName(e.target.value)}
-              placeholder={lt(container, "last_name_placeholder", locale) || "Nachname"}
-              autoComplete="family-name"
-              style={sharedInputStyle}
-            />
+            <div style={nameRowStyle}>
+              <input
+                type="text"
+                required
+                value={internalFirstName}
+                onChange={(e) => setInternalFirstName(e.target.value)}
+                placeholder={lt(container, "first_name_placeholder", locale) || "Vorname"}
+                autoComplete="given-name"
+                style={{ ...sharedInputStyle, ...nameInputStyle }}
+              />
+              <input
+                type="text"
+                required
+                value={internalLastName}
+                onChange={(e) => setInternalLastName(e.target.value)}
+                placeholder={lt(container, "last_name_placeholder", locale) || "Nachname"}
+                autoComplete="family-name"
+                style={{ ...sharedInputStyle, ...nameInputStyle }}
+              />
+            </div>
             <input
               type="email"
               required

@@ -16,8 +16,11 @@
   --background-end-rgb: 255, 255, 255;
   /* Top bar yüksekliği (Polaris varsayılanı 3.5rem) – istersen 48px, 56px vb. yapabilirsin */
   --pg-top-bar-height: 3.5rem;
+  --sellercentral-polaris-topbar-bg: #1a1a1a;
 }
-
+#AppFrameTopBar {
+  --p-color-bg-inverse: var(--sellercentral-polaris-topbar-bg);
+}
 /* Top bar arama: odakta mavi çerçeve olmasın */
 #AppFrameTopBar input[type="search"]:focus,
 #AppFrameTopBar .Polaris-TopBar-SearchField input:focus {

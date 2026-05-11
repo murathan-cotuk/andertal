@@ -17,8 +17,9 @@ const getDefaultBaseUrl = () => {
 const MEDUSA_BACKEND_URL = getDefaultBaseUrl();
 
 class MedusaAdminClient {
-  constructor(baseURL = MEDUSA_BACKEND_URL) {
+  constructor(baseURL = MEDUSA_BACKEND_URL, overrideToken = null) {
     this.baseURL = (baseURL || MEDUSA_BACKEND_URL).replace(/\/$/, '');
+    this.overrideToken = overrideToken || null;
   }
 
   /**
@@ -34,8 +35,8 @@ class MedusaAdminClient {
       throw err;
     }
 
-    // Attach seller auth token if available
-    const token = typeof window !== 'undefined' ? localStorage.getItem('sellerToken') : null;
+    // Use override token (impersonation) or fall back to localStorage
+    const token = this.overrideToken || (typeof window !== 'undefined' ? localStorage.getItem('sellerToken') : null);
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -1335,6 +1336,10 @@ class MedusaAdminClient {
     })
   }
 
+  async impersonateSeller(id) {
+    return this.request(`/admin-hub/v1/sellers/${id}/impersonate`, { method: 'POST' })
+  }
+
   async updateSellerCompanyInfo(data) {
     return this.request('/admin-hub/v1/seller/company-info', { method: 'PATCH', body: JSON.stringify(data) })
   }
@@ -1491,6 +1496,10 @@ export function getMedusaAdminClient() {
     medusaAdminClient = new MedusaAdminClient()
   }
   return medusaAdminClient
+}
+
+export function createImpersonationClient(token) {
+  return new MedusaAdminClient(undefined, token)
 }
 
 export default MedusaAdminClient

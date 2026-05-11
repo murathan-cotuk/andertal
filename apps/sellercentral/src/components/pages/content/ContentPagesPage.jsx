@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -391,12 +391,12 @@ export default function ContentPagesPage({ blogOnly = false }) {
               </>
             )}
             <RichTextEditor
-              label={blogOnly ? “Beitragstext” : “Seiteninhalt”}
+              label={blogOnly ? "Beitragstext" : "Seiteninhalt"}
               value={form.body}
               onChange={(html) => setForm((prev) => ({ ...prev, body: html }))}
-              minHeight=”260px”
-              placeholder=”Text eingeben…”
-              helpText=”Visuell bearbeiten oder über „HTML”-Ansicht direkt HTML einfügen. Im Shop wird der Inhalt formatiert angezeigt.”
+              minHeight="260px"
+              placeholder="Text eingeben…"
+              helpText={`Visuell bearbeiten oder über "HTML"-Ansicht direkt HTML einfügen. Im Shop wird der Inhalt formatiert angezeigt.`}
             />
             {blogOnly && (
               <BlockStack gap="300">

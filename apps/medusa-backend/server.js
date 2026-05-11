@@ -479,6 +479,48 @@ async function start() {
       log.info(`[notify] Seller registration email sent to ${superuserEmails.join(', ')}`)
     }
 
+    // Sends an email to every SUPERUSER_EMAILS address when a seller creates a new PPC campaign.
+    async function notifySuperusersNewCampaign({ campaignId, campaignName, sellerDisplayName, sellerId, budgetCents }) {
+      if (!process.env.SMTP_HOST) return
+      const superuserEmails = (process.env.SUPERUSER_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)
+      if (!superuserEmails.length) return
+      const nodemailer = require('nodemailer')
+      const transport = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+      })
+      const sellerCentralUrl = process.env.SELLER_CENTRAL_URL || 'https://andertal-sellercentral.vercel.app'
+      const budgetEuro = ((parseInt(budgetCents, 10) || 0) / 100).toFixed(2)
+      const subject = `Neue Werbekampagne von ${sellerDisplayName}: ${campaignName}`
+      const html = `
+<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#1f2937">
+  <div style="font-size:22px;font-weight:900;letter-spacing:0.14em;color:#111;margin-bottom:24px">ANDERTAL</div>
+  <h2 style="font-size:17px;font-weight:700;margin:0 0 16px">Neue Werbekampagne eingereicht</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
+    <tr><td style="padding:7px 0;color:#6b7280;width:140px">Verkäufer</td><td style="padding:7px 0;font-weight:500">${sellerDisplayName}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">Kampagne</td><td style="padding:7px 0">${campaignName}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">Tagesbudget</td><td style="padding:7px 0">${budgetEuro} €</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">Seller ID</td><td style="padding:7px 0;font-family:monospace;font-size:12px">${sellerId}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">Eingegangen</td><td style="padding:7px 0">${new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}</td></tr>
+  </table>
+  <a href="${sellerCentralUrl}/de/marketing/campaigns/${campaignId}"
+     style="display:inline-block;padding:11px 22px;background:#ff971c;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">
+    Kampagne öffnen →
+  </a>
+  <p style="margin-top:24px;font-size:12px;color:#9ca3af">Diese E-Mail wurde automatisch generiert.</p>
+</div>`
+      await transport.sendMail({
+        from: process.env.SMTP_FROM || '"Andertal Sellercentral" <noreply@andertal.de>',
+        to: superuserEmails.join(', '),
+        subject,
+        html,
+        text: `Neue Werbekampagne eingereicht\n\nVerkäufer: ${sellerDisplayName}\nKampagne: ${campaignName}\nTagesbudget: ${budgetEuro} €\nSeller ID: ${sellerId}\n\nÖffnen: ${sellerCentralUrl}/de/marketing/campaigns/${campaignId}`,
+      })
+      log.info(`[notify] New campaign email sent to ${superuserEmails.join(', ')}`)
+    }
+
     // Root ve health: "Cannot GET /" yerine JSON döner
     app.get('/', (req, res) => {
       res.json({ ok: true, service: 'medusa-backend', timestamp: new Date().toISOString() })
@@ -14167,6 +14209,14 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
            DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
           [recipientKey],
         ).catch(() => {})
+        await client.query(
+          `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+           SELECT $1::varchar, 'campaign_submitted', n.id, now()
+           FROM admin_hub_notifications n WHERE n.type = 'campaign_submitted'
+           ON CONFLICT (recipient_key, source_type, source_id)
+           DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+          [recipientKey],
+        ).catch(() => {})
       }
     }
 
@@ -14239,6 +14289,15 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
           : `SELECT 0::int AS c`
+        const campaignsUnreadQ = sup
+          ? `
+          SELECT COUNT(*)::int AS c FROM admin_hub_notifications n
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'campaign_submitted' AND s.source_id = n.id
+          WHERE n.type = 'campaign_submitted'
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
+          : `SELECT 0::int AS c`
         const crUnreadQ = `
           SELECT COUNT(*)::int AS c FROM admin_hub_product_change_requests cr
           LEFT JOIN seller_hub_notification_state s
@@ -14262,13 +14321,14 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
 
-        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR] = await Promise.all([
+        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR, campaignsR] = await Promise.all([
           client.query(ordersUnreadQ, [rk, sup, sid]),
           client.query(returnsUnreadQ, [rk, sup, sid]),
           sup ? client.query(verificationsUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           sup ? client.query(crUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           sup ? client.query(metafieldUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           !sup && sid ? client.query(sellerNoticeUnreadQ, [rk, sid]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
+          sup ? client.query(campaignsUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
         ])
 
         const recentOrders = await client.query(
@@ -14303,6 +14363,20 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
              LEFT JOIN seller_hub_notification_state s
                ON s.recipient_key = $1 AND s.source_type = 'verification' AND s.source_id = n.id
              WHERE n.type = 'verification_submitted'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 8`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        let recentCampaignSubmitted = { rows: [] }
+        if (sup) {
+          recentCampaignSubmitted = await client.query(
+            `SELECT n.id, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'campaign_submitted' AND s.source_id = n.id
+             WHERE n.type = 'campaign_submitted'
                AND (s.id IS NULL OR s.deleted_at IS NULL)
              ORDER BY n.created_at DESC LIMIT 8`,
             [rk],
@@ -14358,20 +14432,23 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const crCount = changeReqR.rows[0]?.c || 0
         const mfCount = metafieldR.rows[0]?.c || 0
         const sellerNoticeCount = sellerNoticeR.rows[0]?.c || 0
+        const campaignCount = campaignsR.rows[0]?.c || 0
         const ordCount = ordersR.rows[0]?.c || 0
         const retCount = returnsR.rows[0]?.c || 0
         res.json({
-          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount,
+          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount + campaignCount,
           orders: ordCount,
           returns: retCount,
           messages: messagesR.rows[0]?.c || 0,
           verifications: verCount,
           change_requests: crCount + mfCount,
+          campaigns: campaignCount,
           recent_orders: recentOrders.rows.map((r) => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_returns: recentReturns.rows.map((r) => ({ ...r, return_number: r.return_number ? Number(r.return_number) : null, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_verifications: recentVerifications.rows,
           recent_product_change_requests: [...(recentChangeRequests.rows || []), ...(recentMetafieldPending.rows || [])],
           recent_seller_notices: recentSellerNotices.rows || [],
+          recent_campaigns_submitted: recentCampaignSubmitted.rows || [],
         })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -14441,6 +14518,20 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
              LEFT JOIN seller_hub_notification_state s
                ON s.recipient_key = $1 AND s.source_type = 'verification' AND s.source_id = n.id
              WHERE n.type = 'verification_submitted'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 500`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        let campaignSubmittedQ = { rows: [] }
+        if (sup) {
+          campaignSubmittedQ = await client.query(
+            `SELECT n.id, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'campaign_submitted' AND s.source_id = n.id
+             WHERE n.type = 'campaign_submitted'
                AND (s.id IS NULL OR s.deleted_at IS NULL)
              ORDER BY n.created_at DESC LIMIT 500`,
             [rk],
@@ -14550,6 +14641,19 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             href: r.seller_id ? `/sellers/${r.seller_id}` : '/sellers',
           })
         }
+        const campaignSubmittedFeedItems = []
+        for (const r of campaignSubmittedQ.rows || []) {
+          const campId = r.reference_id ? String(r.reference_id) : ''
+          campaignSubmittedFeedItems.push({
+            source_type: 'campaign_submitted',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: r.title || 'Neue Werbekampagne',
+            subtitle: r.body || '',
+            href: campId ? `/marketing/campaigns/${campId}` : '/marketing/campaigns',
+          })
+        }
         const productChangeFeedItems = []
         for (const r of crQ.rows || []) {
           const pid = r.product_id ? String(r.product_id) : ''
@@ -14624,6 +14728,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 description_de: 'Ausstehende Freigaben für Produkt- und Metafield-Änderungen',
                 items: [...productChangeFeedItems, ...metafieldSuggestionFeedItems].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
               },
+              {
+                key: 'campaign_submitted',
+                label_de: 'Werbekampagnen',
+                description_de: 'Neue PPC-Kampagnen von Verkäufern',
+                items: campaignSubmittedFeedItems,
+              },
             )
           }
           if (!sup) {
@@ -14642,7 +14752,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           })
         }
 
-        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems, ...metafieldSuggestionFeedItems, ...sellerNoticeFeedItems]
+        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems, ...metafieldSuggestionFeedItems, ...sellerNoticeFeedItems, ...campaignSubmittedFeedItems]
         items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         const total = items.length
         const paged = items.slice(off, off + lim)
@@ -14717,6 +14827,13 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
               [rk],
             ).catch(() => {})
+            await client.query(
+              `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+               SELECT $1::varchar, 'campaign_submitted', n.id, now()
+               FROM admin_hub_notifications n WHERE n.type = 'campaign_submitted'
+               ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+              [rk],
+            ).catch(() => {})
           } else if (sid) {
             await client.query(
               `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
@@ -14733,7 +14850,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             const st = String(it.source_type || '').trim()
             const id = it.source_id
             if (!st || !id) continue
-            if (!sup && (st === 'product_change_request' || st === 'metafield_pending' || st === 'verification')) continue
+            if (!sup && (st === 'product_change_request' || st === 'metafield_pending' || st === 'verification' || st === 'campaign_submitted')) continue
             await markDeleted(st, id)
           }
         }
@@ -18792,13 +18909,58 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const dVal = parseFloat(discount_value) || 0
       if (dVal < 0) return res.status(400).json({ message: 'discount_value must be >= 0' })
       if (dType === 'percentage' && dVal > 100) return res.status(400).json({ message: 'percentage discount must be 0–100' })
+      const finalCampaignType = campaign_type || 'internal'
+      const isPpc = finalCampaignType === 'ppc'
       const c = pgDbClient(); try {
         await c.connect()
         const r = await c.query(
-          `INSERT INTO seller_campaigns (seller_id, name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, variant_ids, settings, campaign_type, budget_daily_cents, bid_strategy, ad_platforms) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
-          [sellerId, name.trim(), description || '', status || 'draft', start_at || null, end_at || null, discount_type || 'percentage', dVal, target_type || 'products', JSON.stringify(Array.isArray(product_ids) ? product_ids : []), JSON.stringify(Array.isArray(group_ids) ? group_ids : []), JSON.stringify(Array.isArray(variant_ids) ? variant_ids : []), JSON.stringify(settings || {}), campaign_type || 'internal', parseInt(budget_daily_cents) || 0, bid_strategy || 'cpc', JSON.stringify(Array.isArray(ad_platforms) ? ad_platforms : [])]
+          `INSERT INTO seller_campaigns (seller_id, name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, variant_ids, settings, campaign_type, budget_daily_cents, bid_strategy, ad_platforms, ad_status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+          [sellerId, name.trim(), description || '', status || 'draft', start_at || null, end_at || null, discount_type || 'percentage', dVal, target_type || 'products', JSON.stringify(Array.isArray(product_ids) ? product_ids : []), JSON.stringify(Array.isArray(group_ids) ? group_ids : []), JSON.stringify(Array.isArray(variant_ids) ? variant_ids : []), JSON.stringify(settings || {}), finalCampaignType, parseInt(budget_daily_cents) || 0, bid_strategy || 'cpc', JSON.stringify(Array.isArray(ad_platforms) ? ad_platforms : []), isPpc ? 'pending' : 'draft']
         )
-        await c.end(); res.status(201).json({ campaign: r.rows[0] })
+        const created = r.rows[0]
+        // For PPC campaigns: notify all superusers (in-app + email)
+        if (isPpc) {
+          try {
+            const sellerNameR = await c.query(
+              `SELECT s.store_name AS settings_store_name, u.store_name AS user_store_name,
+                      u.company_name, u.first_name, u.last_name, u.email
+               FROM seller_users u
+               LEFT JOIN admin_hub_seller_settings s ON s.seller_id = u.seller_id
+               WHERE u.seller_id = $1 AND u.sub_of_seller_id IS NULL
+               LIMIT 1`,
+              [sellerId],
+            )
+            const sRow = sellerNameR.rows[0] || {}
+            const sellerDisplayName =
+              (sRow.settings_store_name && String(sRow.settings_store_name).trim()) ||
+              (sRow.user_store_name && String(sRow.user_store_name).trim()) ||
+              (sRow.company_name && String(sRow.company_name).trim()) ||
+              [sRow.first_name, sRow.last_name].filter(Boolean).join(' ').trim() ||
+              sRow.email ||
+              sellerId
+            await c.query(
+              `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+               VALUES ('campaign_submitted', $1, $2, $3, $4)`,
+              [
+                `Neue Werbekampagne: ${created.name}`,
+                `${sellerDisplayName} hat eine neue PPC-Kampagne erstellt. Budget: ${((parseInt(created.budget_daily_cents, 10) || 0) / 100).toFixed(2)} €/Tag.`,
+                sellerId,
+                created.id,
+              ],
+            ).catch(() => {})
+            // Fire-and-forget email
+            notifySuperusersNewCampaign({
+              campaignId: created.id,
+              campaignName: created.name,
+              sellerDisplayName,
+              sellerId,
+              budgetCents: parseInt(created.budget_daily_cents, 10) || 0,
+            }).catch((e) => log.error('notifySuperusersNewCampaign:', e?.message))
+          } catch (notifErr) {
+            log.error('campaign_submitted notification failed:', notifErr?.message)
+          }
+        }
+        await c.end(); res.status(201).json({ campaign: created })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
@@ -18867,6 +19029,133 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
+    // ── Google Ads API helpers ────────────────────────────────────────────────
+    const GADS_API_VER = 'v17'
+
+    async function gadsRefreshToken (creds) {
+      const params = new URLSearchParams({
+        client_id: creds.oauth_client_id || '',
+        client_secret: creds.oauth_client_secret || '',
+        refresh_token: creds.refresh_token || '',
+        grant_type: 'refresh_token',
+      })
+      const r = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      })
+      const d = await r.json()
+      if (!r.ok) throw new Error(`Google OAuth token refresh fehlgeschlagen: ${d.error_description || d.error || r.status}`)
+      return d.access_token
+    }
+
+    async function gadsCall (resource, body, creds, accessToken) {
+      const cid = String(creds.customer_id || '').replace(/-/g, '')
+      const url = `https://googleads.googleapis.com/${GADS_API_VER}/customers/${cid}/${resource}:mutate`
+      const headers = {
+        'Authorization': `Bearer ${accessToken}`,
+        'developer-token': String(creds.developer_token || ''),
+        'Content-Type': 'application/json',
+      }
+      const mcc = String(creds.login_customer_id || '').replace(/-/g, '')
+      if (mcc) headers['login-customer-id'] = mcc
+      const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })
+      const d = await r.json()
+      if (!r.ok) {
+        const msg = d?.error?.message
+          || d?.error?.details?.[0]?.errors?.[0]?.message
+          || JSON.stringify(d).slice(0, 300)
+        throw new Error(`Google Ads API [${resource}]: ${msg}`)
+      }
+      return d
+    }
+
+    async function publishToGoogleAds (account, camp, budgetDailyCents) {
+      const creds = account.credentials || {}
+      const cid = String(creds.customer_id || '').replace(/-/g, '')
+      if (!cid || !creds.developer_token || !creds.refresh_token)
+        throw new Error('Google Ads Zugangsdaten unvollständig (customer_id, developer_token, refresh_token erforderlich)')
+      if (!creds.oauth_client_id || !creds.oauth_client_secret)
+        throw new Error('Google Ads OAuth Client ID/Secret fehlen')
+
+      const token = await gadsRefreshToken(creds)
+      const micros = str => String(Math.max(Number(str) || 0, 0))
+      const yyyymmdd = d => d ? new Date(d).toISOString().slice(0, 10).replace(/-/g, '') : null
+
+      // 1 ── Campaign Budget (min 1 EUR = 1 000 000 micros)
+      const budgetMicros = micros(Math.max(budgetDailyCents, 100) * 10000)
+      const budgetRes = await gadsCall('campaignBudgets', {
+        operations: [{ create: {
+          name: `Andertal — ${camp.name} — ${Date.now()}`,
+          amountMicros: budgetMicros,
+          deliveryMethod: 'STANDARD',
+          explicitlyShared: false,
+        }}]
+      }, creds, token)
+      const budgetResourceName = budgetRes.results?.[0]?.resourceName
+      if (!budgetResourceName) throw new Error('Google Ads: Budget wurde erstellt aber kein resourceName zurückgegeben')
+      const budgetId = budgetResourceName.split('/').pop()
+
+      // 2 ── Campaign
+      const startDate = yyyymmdd(camp.start_at) || yyyymmdd(new Date())
+      const campCreate = {
+        name: `${camp.name} — Andertal`,
+        advertisingChannelType: 'SEARCH',
+        status: 'ENABLED',
+        campaignBudget: `customers/${cid}/campaignBudgets/${budgetId}`,
+        targetSpend: {},
+        networkSettings: { targetGoogleSearch: true, targetSearchNetwork: true, targetContentNetwork: false },
+        startDate,
+      }
+      const endDate = yyyymmdd(camp.end_at)
+      if (endDate) campCreate.endDate = endDate
+      const campRes = await gadsCall('campaigns', { operations: [{ create: campCreate }] }, creds, token)
+      const campaignResourceName = campRes.results?.[0]?.resourceName
+      if (!campaignResourceName) throw new Error('Google Ads: Kampagne erstellt aber kein resourceName zurückgegeben')
+      const campaignId = campaignResourceName.split('/').pop()
+
+      // 3 ── Ad Group
+      const agRes = await gadsCall('adGroups', {
+        operations: [{ create: {
+          name: `${camp.name} — Gruppe`,
+          campaign: `customers/${cid}/campaigns/${campaignId}`,
+          status: 'ENABLED',
+          type: 'SEARCH_STANDARD',
+          cpcBidMicros: '500000', // 0,50 € Standard-CPC
+        }}]
+      }, creds, token)
+      const adGroupResourceName = agRes.results?.[0]?.resourceName
+      if (!adGroupResourceName) throw new Error('Google Ads: Ad Group erstellt aber kein resourceName zurückgegeben')
+      const adGroupId = adGroupResourceName.split('/').pop()
+
+      // 4 ── Responsive Search Ad
+      const headline = (camp.name || 'Entdecke Angebote').slice(0, 30)
+      const description = (camp.description || 'Jetzt bestellen und sparen').slice(0, 90)
+      const shopUrl = process.env.SHOP_URL || process.env.NEXT_PUBLIC_SHOP_URL || 'https://andertal.de'
+      await gadsCall('adGroupAds', {
+        operations: [{ create: {
+          adGroup: `customers/${cid}/adGroups/${adGroupId}`,
+          status: 'ENABLED',
+          ad: {
+            responsiveSearchAd: {
+              headlines: [
+                { text: headline },
+                { text: 'Jetzt entdecken' },
+                { text: 'Qualität online' },
+              ],
+              descriptions: [
+                { text: description },
+                { text: 'Schnelle Lieferung · Sichere Zahlung' },
+              ],
+            },
+            finalUrls: [shopUrl],
+          },
+        }}]
+      }, creds, token)
+
+      return { campaignId, budgetId, adGroupId }
+    }
+
     // Publish PPC campaign to ad platforms (superuser only)
     httpApp.post('/admin-hub/v1/campaigns/:id/publish', requireSellerAuth, requireSuperuser, async (req, res) => {
       const c = pgDbClient(); try {
@@ -18879,17 +19168,52 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const maRows = await c.query(`SELECT * FROM platform_marketing_accounts WHERE platform = ANY($1) AND is_active = true`, [platforms])
         const accounts = maRows.rows
         if (!accounts.length) { await c.end(); return res.status(400).json({ message: 'Seçilen platformlar için bağlı pazarlama hesabı bulunamadı' }) }
+        await c.end()
+
         const budgetPerPlatform = Math.floor((camp.budget_daily_cents || 0) / accounts.length)
         const externalIds = {}
+        const publishErrors = []
+
         for (const account of accounts) {
-          externalIds[account.platform] = `sim_${account.platform}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+          try {
+            if (account.platform === 'google_ads') {
+              const ids = await publishToGoogleAds(account, camp, budgetPerPlatform)
+              externalIds['google_ads'] = `gads_${ids.campaignId}`
+              externalIds['google_ads_budget_id'] = ids.budgetId
+              externalIds['google_ads_adgroup_id'] = ids.adGroupId
+            } else {
+              // Other platforms: simulation placeholder until implemented
+              externalIds[account.platform] = `sim_${account.platform}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+            }
+          } catch (err) {
+            console.error(`[publish] ${account.platform} error:`, err?.message)
+            publishErrors.push({ platform: account.platform, error: err?.message || String(err) })
+          }
         }
-        const r = await c.query(
-          `UPDATE seller_campaigns SET ad_status='published', external_campaign_ids=$1, status='active', updated_at=now() WHERE id=$2 RETURNING *`,
-          [JSON.stringify(externalIds), req.params.id]
+
+        // If every platform failed — return error without updating DB
+        const allFailed = accounts.every(a => publishErrors.some(e => e.platform === a.platform))
+        if (allFailed) {
+          return res.status(502).json({
+            message: publishErrors[0]?.error || 'Alle Plattformen fehlgeschlagen',
+            errors: publishErrors,
+          })
+        }
+
+        const adStatus = publishErrors.length > 0 ? 'partial' : 'published'
+        const c2 = pgDbClient()
+        await c2.connect()
+        const r = await c2.query(
+          `UPDATE seller_campaigns SET ad_status=$1, external_campaign_ids=$2, status='active', updated_at=now() WHERE id=$3 RETURNING *`,
+          [adStatus, JSON.stringify(externalIds), req.params.id]
         )
-        await c.end()
-        res.json({ campaign: r.rows[0], budget_per_platform_cents: budgetPerPlatform, platforms_published: accounts.map(a => a.platform) })
+        await c2.end()
+        res.json({
+          campaign: r.rows[0],
+          budget_per_platform_cents: budgetPerPlatform,
+          platforms_published: accounts.filter(a => !publishErrors.some(e => e.platform === a.platform)).map(a => a.platform),
+          errors: publishErrors.length ? publishErrors : undefined,
+        })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
@@ -19597,10 +19921,36 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    // POST /admin-hub/v1/sellers/:id/impersonate — generate a token for a seller (superuser only)
+    const adminHubSellerImpersonatePOST = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const { id } = req.params
+      try {
+        const c = getSellerDbClient()
+        await c.connect()
+        const r = await c.query(
+          `SELECT su.id, su.email, su.seller_id, su.is_superuser, ss.store_name
+           FROM seller_users su
+           LEFT JOIN seller_settings ss ON ss.seller_id = su.seller_id
+           WHERE su.id = $1 OR su.seller_id = $1
+           LIMIT 1`,
+          [id]
+        )
+        await c.end()
+        if (!r.rows.length) return res.status(404).json({ message: 'Seller not found' })
+        const u = r.rows[0]
+        const token = signSellerToken({ id: u.id, email: u.email, seller_id: u.seller_id, is_superuser: u.is_superuser, store_name: u.store_name || '' })
+        res.json({ token, seller: { id: u.id, email: u.email, seller_id: u.seller_id, store_name: u.store_name || '', is_superuser: u.is_superuser } })
+      } catch (e) {
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     httpApp.get('/admin-hub/v1/sellers', requireSellerAuth, adminHubSellersGET)
     httpApp.get('/admin-hub/v1/sellers/:id', requireSellerAuth, adminHubSellerByIdGET)
     httpApp.patch('/admin-hub/v1/sellers/:id', requireSellerAuth, adminHubSellerPATCH)
     httpApp.patch('/admin-hub/v1/sellers/:id/approve', requireSellerAuth, adminHubSellerApprovePATCH)
+    httpApp.post('/admin-hub/v1/sellers/:id/impersonate', requireSellerAuth, adminHubSellerImpersonatePOST)
     httpApp.patch('/admin-hub/v1/seller/company-info', requireSellerAuth, adminHubSellerCompanyInfoPATCH)
 
     // ── Verification Pipeline Routes ─────────────────────────────────────────

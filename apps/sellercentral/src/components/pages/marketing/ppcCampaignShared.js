@@ -65,21 +65,58 @@ export function toInputDate(iso) {
 
 export const AD_STATUS_TONE = {
   draft: "info",
+  pending: "warning",
   pending_review: "warning",
   approved: "attention",
   published: "success",
+  partial: "attention",
   paused: "warning",
   rejected: "critical",
 };
 
 export const AD_STATUS_LABEL = {
   draft: "Entwurf",
+  pending: "Ausstehend",
   pending_review: "Prüfung",
   approved: "Genehmigt",
   published: "Live",
+  partial: "Teilweise live",
   paused: "Pausiert",
   rejected: "Abgelehnt",
 };
+
+/** Customer-facing campaign status (visible to seller & superuser). */
+export const CAMPAIGN_STATUS_TONE = {
+  draft: "info",
+  active: "success",
+  paused: "warning",
+  archived: "subdued",
+};
+
+export const CAMPAIGN_STATUS_LABEL = {
+  draft: "Entwurf",
+  active: "Aktiv",
+  paused: "Pausiert",
+  archived: "Archiviert",
+};
+
+const PLATFORM_KEY_SET = new Set(PLATFORM_OPTIONS.map((p) => p.value));
+
+/** Returns labels of platforms that the campaign is currently published on. */
+export function getActivePlatformLabels(externalIdsRaw) {
+  let ids = externalIdsRaw;
+  if (typeof ids === "string") {
+    try {
+      ids = JSON.parse(ids);
+    } catch {
+      ids = {};
+    }
+  }
+  if (!ids || typeof ids !== "object") return [];
+  return Object.keys(ids)
+    .filter((k) => PLATFORM_KEY_SET.has(k))
+    .map((k) => PLATFORM_OPTIONS.find((o) => o.value === k)?.label || k);
+}
 
 export function parseJsonIdArray(raw) {
   if (raw == null) return [];

@@ -20,11 +20,12 @@ const PLATFORMS = [
     value: "google_ads",
     label: "Google Ads",
     fields: [
-      { key: "customer_id", label: "Customer ID", placeholder: "123-456-7890" },
-      { key: "developer_token", label: "Developer Token", type: "password", placeholder: "DevToken..." },
-      { key: "oauth_client_id", label: "OAuth Client ID", placeholder: "123.apps.googleusercontent.com" },
+      { key: "customer_id", label: "Customer ID (Ads-Konto)", placeholder: "123-456-7890", helpText: "Ihre Google Ads Kundennummer (10-stellig, z.B. 123-456-7890)." },
+      { key: "login_customer_id", label: "Manager Account ID (MCC)", placeholder: "987-654-3210", helpText: "Nur ausfüllen wenn Sie ein Manager-Konto (MCC) verwenden. Leer lassen wenn Sie direkt mit dem Ads-Konto arbeiten." },
+      { key: "developer_token", label: "Developer Token", type: "password", placeholder: "DevToken...", helpText: "Zu finden unter: Google Ads → Tools & Einstellungen → API-Center. Für den Produktiveinsatz benötigen Sie Basic Access." },
+      { key: "oauth_client_id", label: "OAuth Client ID", placeholder: "123.apps.googleusercontent.com", helpText: "Aus der Google Cloud Console (APIs & Dienste → Anmeldedaten)." },
       { key: "oauth_client_secret", label: "OAuth Client Secret", type: "password", placeholder: "GOCSPX-..." },
-      { key: "refresh_token", label: "Refresh Token", type: "password", placeholder: "1//0g..." },
+      { key: "refresh_token", label: "Refresh Token", type: "password", placeholder: "1//0g...", helpText: "Generieren Sie diesen Token mit dem OAuth Playground (oauth2.googleapis.com/playground) oder einem lokalen OAuth-Flow mit Ihren Zugangsdaten." },
     ],
   },
   {
@@ -138,7 +139,7 @@ function PlatformPanel({ platform, accountData, onSave, saving }) {
       {open && (
         <div style={{ padding: "16px 16px 20px", borderTop: "1px solid #f3f4f6", background: "#fafafa" }}>
           {platform.fields.map((f) => (
-            <Field key={f.key} label={f.label}>
+            <Field key={f.key} label={f.label} hint={f.helpText}>
               <MInput
                 type={f.type || "text"}
                 value={creds[f.key] || ""}

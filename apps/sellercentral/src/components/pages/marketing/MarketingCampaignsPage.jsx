@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Page,
   Card,
@@ -12,6 +12,7 @@ import {
   Badge,
   Spinner,
   EmptyState,
+  Select,
 } from "@shopify/polaris";
 import { useRouter } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
@@ -21,17 +22,43 @@ import {
   fmtDate,
   AD_STATUS_TONE,
   AD_STATUS_LABEL,
+  CAMPAIGN_STATUS_TONE,
+  CAMPAIGN_STATUS_LABEL,
+  getActivePlatformLabels,
   parseJsonIdArray,
 } from "@/components/pages/marketing/ppcCampaignShared";
 
-function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPause, onResume, actionLoading }) {
+function buildGoogleAdsUrl(customerId, externalIds) {
+  const base = "https://ads.google.com/aw/campaigns";
+  const cid = (customerId || "").replace(/-/g, "");
+  const ids = externalIds || {};
+  const gadsKey = Object.keys(ids).find((k) => k.startsWith("gads_"));
+  const campaignId = gadsKey ? gadsKey.replace("gads_", "") : null;
+  if (cid && campaignId) return `${base}?__c=${cid}&campaignId=${campaignId}`;
+  if (cid) return `${base}?__c=${cid}`;
+  return base;
+}
+
+function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPause, onResume, actionLoading, googleAdsCustomerId }) {
   const adStatus = campaign.ad_status || "draft";
+  const customerStatus = campaign.status || "draft";
   const platforms = parseJsonIdArray(campaign.ad_platforms);
   const budget = fmtBudget(campaign.budget_daily_cents);
-  const platformLabels = platforms.map((p) => PLATFORM_OPTIONS.find((o) => o.value === p)?.label || p).join(", ");
-  const shopLine = isSuperuser
-    ? (platformLabels ? ` · Ausspielung: ${platformLabels}` : "")
-    : " · Fokus: Sichtbarkeit & Sponsored im Shop";
+
+  const hasGoogleAds = platforms.includes("google_ads");
+  const externalIds = (() => { try { return typeof campaign.external_campaign_ids === "string" ? JSON.parse(campaign.external_campaign_ids) : (campaign.external_campaign_ids || {}); } catch { return {}; } })();
+  const activePlatformLabels = getActivePlatformLabels(externalIds);
+
+  // Superuser-only "my action status" badge text:
+  //   - pending (campaign just arrived, not yet published)
+  //   - "Aktiv auf: Meta, Google Ads, ..." (after publish)
+  //   - "Pausiert" (after pause)
+  let myStatusLabel = AD_STATUS_LABEL[adStatus] || adStatus;
+  let myStatusTone = AD_STATUS_TONE[adStatus] || "info";
+  if ((adStatus === "published" || adStatus === "partial") && activePlatformLabels.length > 0) {
+    myStatusLabel = `Aktiv auf: ${activePlatformLabels.join(", ")}`;
+    myStatusTone = adStatus === "partial" ? "attention" : "success";
+  }
 
   return (
     <div style={{ borderTop: "1px solid #f1f2f4", padding: "14px 0" }}>
@@ -39,9 +66,11 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
         <BlockStack gap="100" inlineSize="grow">
           <InlineStack gap="200" blockAlign="center" wrap>
             <Text as="span" fontWeight="semibold">{campaign.name}</Text>
-            <Badge tone={AD_STATUS_TONE[adStatus] || "info"}>{AD_STATUS_LABEL[adStatus] || adStatus}</Badge>
-            {campaign.status === "active" && adStatus === "published" && (
-              <Badge tone="success">Sponsored aktiv</Badge>
+            <Badge tone={CAMPAIGN_STATUS_TONE[customerStatus] || "info"}>
+              {CAMPAIGN_STATUS_LABEL[customerStatus] || customerStatus}
+            </Badge>
+            {isSuperuser && (
+              <Badge tone={myStatusTone}>{myStatusLabel}</Badge>
             )}
           </InlineStack>
           {campaign.description && (
@@ -49,7 +78,8 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
           )}
           <Text tone="subdued" as="span" variant="bodySm">
             Budget: {budget}
-            {shopLine}
+            {campaign.created_at ? ` · Erstellt: ${fmtDate(campaign.created_at)}` : ""}
+            {!isSuperuser ? " · Fokus: Sichtbarkeit & Sponsored im Shop" : ""}
             {campaign.start_at || campaign.end_at ? ` · ${fmtDate(campaign.start_at)} – ${fmtDate(campaign.end_at)}` : ""}
           </Text>
         </BlockStack>
@@ -69,6 +99,15 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
               Fortsetzen
             </Button>
           )}
+          {isSuperuser && hasGoogleAds && (
+            <Button
+              size="slim"
+              url={buildGoogleAdsUrl(googleAdsCustomerId, externalIds)}
+              external
+            >
+              Google Ads
+            </Button>
+          )}
           <Button size="slim" onClick={() => onEdit(campaign)}>Bearbeiten</Button>
           <Button size="slim" tone="critical" variant="plain" onClick={() => onDelete(campaign.id)}>Löschen</Button>
         </InlineStack>
@@ -85,6 +124,8 @@ export default function MarketingCampaignsPage() {
   const [msg, setMsg] = useState(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [sellerId, setSellerId] = useState(null);
+  const [sellersMap, setSellersMap] = useState({});
+  const [sortBy, setSortBy] = useState("created_desc");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -109,6 +150,63 @@ export default function MarketingCampaignsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Superuser: load sellers to map seller_id → display name
+  useEffect(() => {
+    if (!isSuperuser) return;
+    (async () => {
+      try {
+        const d = await getMedusaAdminClient().getSellers();
+        const list = Array.isArray(d?.sellers) ? d.sellers : [];
+        const map = {};
+        for (const s of list) {
+          if (!s?.seller_id) continue;
+          const displayName =
+            (s.store_name && String(s.store_name).trim()) ||
+            (s.company_name && String(s.company_name).trim()) ||
+            [s.first_name, s.last_name].filter(Boolean).join(" ").trim() ||
+            s.email ||
+            s.seller_id;
+          map[s.seller_id] = displayName;
+        }
+        setSellersMap(map);
+      } catch {
+        setSellersMap({});
+      }
+    })();
+  }, [isSuperuser]);
+
+  const sellerDisplayName = useCallback(
+    (sid) => sellersMap[sid] || sid || "—",
+    [sellersMap],
+  );
+
+  const sortCampaigns = useCallback(
+    (arr) => {
+      const list = [...arr];
+      switch (sortBy) {
+        case "created_asc":
+          list.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+          break;
+        case "name_asc":
+          list.sort((a, b) => (a.name || "").localeCompare(b.name || "", "de"));
+          break;
+        case "name_desc":
+          list.sort((a, b) => (b.name || "").localeCompare(a.name || "", "de"));
+          break;
+        case "seller_asc":
+          list.sort((a, b) =>
+            sellerDisplayName(a.seller_id).localeCompare(sellerDisplayName(b.seller_id), "de"),
+          );
+          break;
+        case "created_desc":
+        default:
+          list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      }
+      return list;
+    },
+    [sortBy, sellerDisplayName],
+  );
 
   const goEdit = (c) => {
     router.push(`/marketing/campaigns/${c.id}`);
@@ -167,12 +265,35 @@ export default function MarketingCampaignsPage() {
     }
   };
 
-  const ownCampaigns = campaigns.filter((c) => c.seller_id === sellerId);
-  const otherSellers = isSuperuser
-    ? [...new Set(campaigns.filter((c) => c.seller_id !== sellerId).map((c) => c.seller_id))]
-    : [];
+  const ownCampaigns = useMemo(
+    () => sortCampaigns(campaigns.filter((c) => c.seller_id === sellerId)),
+    [campaigns, sellerId, sortCampaigns],
+  );
+
+  const otherSellers = useMemo(() => {
+    if (!isSuperuser) return [];
+    const ids = [...new Set(campaigns.filter((c) => c.seller_id !== sellerId).map((c) => c.seller_id))];
+    if (sortBy === "seller_asc" || sortBy === "name_asc" || sortBy === "name_desc") {
+      ids.sort((a, b) => sellerDisplayName(a).localeCompare(sellerDisplayName(b), "de"));
+    } else if (sortBy === "created_asc" || sortBy === "created_desc") {
+      // Sort seller groups by the most recent (or oldest) campaign in each group
+      const newestPerSeller = new Map();
+      for (const c of campaigns) {
+        if (c.seller_id === sellerId) continue;
+        const ts = new Date(c.created_at || 0).getTime();
+        const cur = newestPerSeller.get(c.seller_id);
+        if (cur == null || ts > cur) newestPerSeller.set(c.seller_id, ts);
+      }
+      ids.sort((a, b) => {
+        const diff = (newestPerSeller.get(b) || 0) - (newestPerSeller.get(a) || 0);
+        return sortBy === "created_asc" ? -diff : diff;
+      });
+    }
+    return ids;
+  }, [isSuperuser, campaigns, sellerId, sortBy, sellerDisplayName]);
 
   const [connectedPlatforms, setConnectedPlatforms] = useState([]);
+  const [googleAdsCustomerId, setGoogleAdsCustomerId] = useState("");
 
   useEffect(() => {
     if (!isSuperuser) return;
@@ -181,6 +302,8 @@ export default function MarketingCampaignsPage() {
         const d = await getMedusaAdminClient().getMarketingAccounts();
         const active = (d?.accounts || []).filter((a) => a.is_active && Object.keys(a.credentials || {}).some((k) => a.credentials[k]));
         setConnectedPlatforms(active.map((a) => a.platform));
+        const gads = (d?.accounts || []).find((a) => a.platform === "google_ads");
+        if (gads?.credentials?.customer_id) setGoogleAdsCustomerId(gads.credentials.customer_id);
       } catch {
         setConnectedPlatforms([]);
       }
@@ -209,6 +332,29 @@ export default function MarketingCampaignsPage() {
             Keine Marketing-Konten verbunden. Gehe zu{" "}
             <strong>Apps & Integrationen</strong> um Werbekonten (Meta, Google Ads, etc.) zu verbinden.
           </Banner>
+        )}
+
+        {!loading && campaigns.length > 0 && (
+          <Card>
+            <InlineStack gap="200" blockAlign="center" wrap>
+              <Text as="span" variant="bodySm" tone="subdued">Sortieren:</Text>
+              <div style={{ minWidth: 220 }}>
+                <Select
+                  label=""
+                  labelHidden
+                  options={[
+                    { value: "created_desc", label: "Neueste zuerst" },
+                    { value: "created_asc", label: "Älteste zuerst" },
+                    { value: "name_asc", label: "Name A → Z" },
+                    { value: "name_desc", label: "Name Z → A" },
+                    ...(isSuperuser ? [{ value: "seller_asc", label: "Verkäufer A → Z" }] : []),
+                  ]}
+                  value={sortBy}
+                  onChange={setSortBy}
+                />
+              </div>
+            </InlineStack>
+          </Card>
         )}
 
         {loading ? (
@@ -248,6 +394,7 @@ export default function MarketingCampaignsPage() {
                       onPause={handlePause}
                       onResume={handleResume}
                       actionLoading={actionLoading}
+                      googleAdsCustomerId={googleAdsCustomerId}
                     />
                   ))}
                 </BlockStack>
@@ -256,13 +403,13 @@ export default function MarketingCampaignsPage() {
 
             {isSuperuser &&
               otherSellers.map((sid) => {
-                const sellerCamps = campaigns.filter((c) => c.seller_id === sid);
+                const sellerCamps = sortCampaigns(campaigns.filter((c) => c.seller_id === sid));
                 if (!sellerCamps.length) return null;
                 return (
                   <Card key={sid}>
                     <BlockStack gap="0">
                       <Text as="h2" variant="headingMd" tone="subdued">
-                        Verkäufer: {sid} ({sellerCamps.length})
+                        Verkäufer: {sellerDisplayName(sid)} ({sellerCamps.length})
                       </Text>
                       {sellerCamps.map((c) => (
                         <CampaignRow
@@ -275,6 +422,7 @@ export default function MarketingCampaignsPage() {
                           onPause={handlePause}
                           onResume={handleResume}
                           actionLoading={actionLoading}
+                          googleAdsCustomerId={googleAdsCustomerId}
                         />
                       ))}
                     </BlockStack>
