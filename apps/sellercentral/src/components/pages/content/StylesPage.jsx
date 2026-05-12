@@ -1209,7 +1209,6 @@ export default function StylesPage() {
                 </div>
               ))}
             </BlockStack>
-            </BlockStack>
         </AccordionCard>
 
         <AccordionCard title="Website-Farben">
