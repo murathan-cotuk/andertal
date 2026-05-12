@@ -406,6 +406,10 @@ export default function PolarisLayout({ children }) {
     sellercentral_logo_url: "",
     sellercentral_favicon_url: "",
     sellercentral_logo_height: 30,
+    logo_pt: 0,
+    logo_pr: 0,
+    logo_pb: 0,
+    logo_pl: 0,
   });
 
   useEffect(() => {
@@ -419,10 +423,15 @@ export default function PolarisLayout({ children }) {
     })
       .then((r) => r.json())
       .then((d) => {
+        const lcDt = d?.logo_config?.sellercentral?.desktop || {};
         setPlatformBranding({
-          sellercentral_logo_url: normalizeSellerCentralLogoUrl(d?.sellercentral_logo_url) ?? "",
+          sellercentral_logo_url: normalizeSellerCentralLogoUrl(lcDt.url || d?.sellercentral_logo_url) ?? "",
           sellercentral_favicon_url: (d?.sellercentral_favicon_url || "").trim(),
-          sellercentral_logo_height: d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 30,
+          sellercentral_logo_height: lcDt.height != null ? Number(lcDt.height) : (d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 30),
+          logo_pt: Number(lcDt.pt || 0),
+          logo_pr: Number(lcDt.pr || 0),
+          logo_pb: Number(lcDt.pb || 0),
+          logo_pl: Number(lcDt.pl || 0),
         });
       })
       .catch(() => {});
@@ -681,15 +690,22 @@ export default function PolarisLayout({ children }) {
 
   /** Polaris Frame `logo` makes TopBar + Navigation render Image with `topBarSource || ''` (empty src warning). Use contextControl on both instead. */
   const polarisLogoContextControl = frameLogoUrl ? (
-    <div style={{ display: "flex", alignItems: "center" }}>
-      <UnstyledLink url="/dashboard" style={{ display: "block", width: 140, lineHeight: 0 }}>
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      paddingTop: platformBranding.logo_pt || undefined,
+      paddingRight: platformBranding.logo_pr || undefined,
+      paddingBottom: platformBranding.logo_pb || undefined,
+      paddingLeft: platformBranding.logo_pl || undefined,
+    }}>
+      <UnstyledLink url="/dashboard" style={{ display: "block", lineHeight: 0 }}>
         <img
           src={frameLogoUrl}
           alt="Sellercentral"
           style={{
             display: "block",
             width: "auto",
-            maxWidth: 140,
+            maxWidth: 200,
             height: topBarLogoMaxH,
             objectFit: "contain",
           }}

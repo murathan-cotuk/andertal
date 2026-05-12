@@ -185,7 +185,7 @@ const FilterSelect = styled.select`
 const TableCard = styled(Card)`
   padding: 0;
   margin-bottom: 16px;
-  overflow: hidden;
+  overflow: clip;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
 `;
@@ -253,7 +253,7 @@ function buildCarrierTrackingUrl(carrierName, trackingNumber) {
   return `https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?lang=de&idc=${tn}`;
 }
 
-function ExpandedRow({ order, locale = "de", onSaveFields }) {
+function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13 }) {
   const items = order._items || [];
   const subtotal = items.reduce((s, it) => s + (Number(it.unit_price_cents || 0) * Number(it.quantity || 1)), 0);
   const total = subtotal || order.subtotal_cents || order.total_cents || 0;
@@ -271,7 +271,7 @@ function ExpandedRow({ order, locale = "de", onSaveFields }) {
 
   return (
     <tr>
-      <td colSpan={13} style={{ padding: 0, background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+      <td colSpan={colCount} style={{ padding: 0, background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
         <div style={{ padding: "16px 24px 20px" }}>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             <Button url={getOrderPdfDownloadUrl(order.id, "invoice")} external variant="secondary" size="slim">
@@ -710,6 +710,22 @@ function ManualOrderModal({ onClose, onCreated }) {
   );
 }
 
+const COL_DEFS = [
+  { key: "sel",             label: "",               hideable: false, sortKey: null,           defaultWidth: 32,  align: "left"   },
+  { key: "exp",             label: "",               hideable: false, sortKey: null,           defaultWidth: 32,  align: "left"   },
+  { key: "order_number",    label: "Bestellnummer",  hideable: true,  sortKey: "order_number", defaultWidth: 120, align: "left"   },
+  { key: "customer",        label: "Kunde",          hideable: true,  sortKey: "name",         defaultWidth: 240, align: "left"   },
+  { key: "address",         label: "Adresse",        hideable: true,  sortKey: null,           defaultWidth: 180, align: "left"   },
+  { key: "amount",          label: "Betrag",         hideable: true,  sortKey: "total",        defaultWidth: 120, align: "right"  },
+  { key: "order_status",    label: "Bestellstatus",  hideable: true,  sortKey: "status",       defaultWidth: 140, align: "center" },
+  { key: "payment_status",  label: "Zahlungsstatus", hideable: true,  sortKey: null,           defaultWidth: 140, align: "center" },
+  { key: "delivery_status", label: "Lieferstatus",   hideable: true,  sortKey: null,           defaultWidth: 130, align: "center" },
+  { key: "date",            label: "Datum",          hideable: true,  sortKey: "created_at",   defaultWidth: 145, align: "left"   },
+  { key: "country",         label: "Land",           hideable: true,  sortKey: "country",      defaultWidth: 70,  align: "center" },
+  { key: "review",          label: "Bewertung",      hideable: true,  sortKey: null,           defaultWidth: 100, align: "center" },
+  { key: "actions",         label: "",               hideable: false, sortKey: null,           defaultWidth: 210, align: "right"  },
+];
+
 export default function OrdersPage() {
   const router = useRouter();
   const params = useParams();
@@ -738,6 +754,11 @@ export default function OrdersPage() {
   const [sellerSearchFilter, setSellerSearchFilter] = useState("");
   const [sellerSectionOpen, setSellerSectionOpen] = useState({});
   const [sellerGroupSort, setSellerGroupSort] = useState("created_at_desc");
+  const [colWidths, setColWidths] = useState(() => COL_DEFS.map(c => c.defaultWidth));
+  const [hiddenCols, setHiddenCols] = useState(new Set());
+  const [showColMenu, setShowColMenu] = useState(false);
+  const colMenuRef = useRef(null);
+  const resizingRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !isSuperuser) return;
@@ -816,6 +837,28 @@ export default function OrdersPage() {
       });
   }, []);
 
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!resizingRef.current) return;
+      const { colIdx, startX, startWidth } = resizingRef.current;
+      const delta = e.clientX - startX;
+      setColWidths(prev => { const n = [...prev]; n[colIdx] = Math.max(40, startWidth + delta); return n; });
+    };
+    const onUp = () => { resizingRef.current = null; };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+  }, []);
+
+  useEffect(() => {
+    if (!showColMenu) return;
+    const handler = (e) => { if (colMenuRef.current && !colMenuRef.current.contains(e.target)) setShowColMenu(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showColMenu]);
+
+  const toggleColVisibility = (key) => setHiddenCols(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+
   const toggleExpand = async (order) => {
     const id = order.id;
     if (expanded[id]) { setExpanded(e => ({ ...e, [id]: false })); return; }
@@ -860,32 +903,21 @@ export default function OrdersPage() {
     } catch { }
   };
 
-  // col key → sort param base (without _asc/_desc)
-  const COL_SORT_KEY = {
-    2: "order_number",
-    3: "name",
-    5: "total",
-    6: "status",
-    9: "created_at",
-    10: "country",
-  };
-
-  const handleColSort = (colIdx) => {
-    const key = COL_SORT_KEY[colIdx];
-    if (!key) return;
-    const isCurrentCol = sort.startsWith(key + "_");
+  const handleColSort = (sortKey) => {
+    if (!sortKey) return;
+    const isCurrentCol = sort.startsWith(sortKey + "_");
     const newDir = isCurrentCol && sort.endsWith("_asc") ? "desc" : "asc";
-    setSort(`${key}_${newDir}`);
+    setSort(`${sortKey}_${newDir}`);
   };
 
-  const sortIcon = (colIdx) => {
-    const key = COL_SORT_KEY[colIdx];
-    if (!key) return null;
-    if (sort.startsWith(key + "_")) return sort.endsWith("_asc") ? " ↑" : " ↓";
+  const sortIcon = (sortKey) => {
+    if (!sortKey) return null;
+    if (sort.startsWith(sortKey + "_")) return sort.endsWith("_asc") ? " ↑" : " ↓";
     return " ⇅";
   };
 
-  const COLS = ["☐", "", "Bestellnummer", "Kunde", "Adresse", "Betrag", "Bestellstatus", "Zahlungsstatus", "Lieferstatus", "Datum", "Land", "Bewertung", ""];
+  const visibleCols = COL_DEFS.filter(c => !c.hideable || !hiddenCols.has(c.key));
+  const visibleColCount = visibleCols.length;
 
   const visibleOrders = useMemo(
     () => orders.filter((o) => filterOrderStatus !== "retoure" || returnsMap[o.id]),
@@ -935,6 +967,7 @@ export default function OrdersPage() {
   const toggleOne = (id) => setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const selectedOrders = orders.filter(o => selected.has(o.id));
 
+  const hc = hiddenCols;
   const renderOrderRows = (list) =>
     sortOrdersClient(list).map((order) => (
       <React.Fragment key={order.id}>
@@ -950,85 +983,105 @@ export default function OrdersPage() {
               {loadingItems[order.id] ? "…" : expanded[order.id] ? "▼" : "▶"}
             </button>
           </td>
-          <td style={{ padding: "10px 12px", fontWeight: 600, fontSize: 13 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <button
-                onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/${order.id}`); }}
-                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#111827", textDecoration: "underline" }}
-              >
-                #{order.order_number || "—"}
-              </button>
-            </div>
-          </td>
-          <td style={{ padding: "10px 10px", minWidth: 220, maxWidth: 280 }}>
-            <CustomerCell order={order} locale={locale} router={router} isSuperuser={isSuperuser} />
-          </td>
-          <td style={{ padding: "10px 10px", color: "#6b7280", fontSize: 12, lineHeight: 1.45, minWidth: 180 }}>
-            {order.address_line1 ? (
-              <>
-                <div>{order.address_line1}</div>
-                <div>{[order.postal_code, order.city].filter(Boolean).join(" ")}</div>
-                {order.country && <div>{order.country}</div>}
-              </>
-            ) : "—"}
-          </td>
-          <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
-            {(() => {
-              const vat = getVatInfo(order.country);
-              const brutto = order.total_cents || 0;
-              const netto = vat.rate > 0 ? Math.round(brutto / (1 + vat.rate / 100)) : brutto;
-              return (
-                <>
-                  <div>{fmtCents(brutto)}</div>
-                  {vat.rate > 0 && (
-                    <div style={{ fontSize: 10, fontWeight: 400, color: "#9ca3af", lineHeight: 1.3 }}>
-                      {fmtCents(netto)} netto<br />
-                      +{vat.rate}% {vat.label}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </td>
-          <td style={{ padding: "10px 12px", textAlign: "center" }}>
-            {returnsMap[order.id] ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
-                Retoure
-              </span>
-            ) : (
-              <StatusBadge value={order.order_status} />
-            )}
-          </td>
-          <td style={{ padding: "10px 12px", textAlign: "center" }}>
-            <StatusBadge value={order.payment_status} />
-          </td>
-          <td style={{ padding: "10px 12px", textAlign: "center" }}>
-            <StatusBadge value={order.delivery_status} />
-          </td>
-          <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
-            {fmtDate(order.created_at)}
-          </td>
-          <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 500 }}>
-            {order.country || "—"}
-          </td>
-          <td style={{ padding: "10px 12px", textAlign: "center" }}>
-            {(() => {
-              const orderReviews = allReviews.filter((r) => r.order_id === order.id);
-              if (orderReviews.length === 0) return <span style={{ color: "#d1d5db", fontSize: 14 }}>★★★★★</span>;
-              const avg = orderReviews.reduce((s, r) => s + Number(r.rating || 0), 0) / orderReviews.length;
-              return (
+          {!hc.has("order_number") && (
+            <td style={{ padding: "10px 12px", fontWeight: 600, fontSize: 13 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setReviewPopupOrderId(order.id); }}
-                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                  title={`${orderReviews.length} Bewertung${orderReviews.length !== 1 ? "en" : ""}`}
+                  onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/${order.id}`); }}
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#111827", textDecoration: "underline" }}
                 >
-                  <MiniStars rating={avg} />
+                  #{order.order_number || "—"}
                 </button>
-              );
-            })()}
-          </td>
+              </div>
+            </td>
+          )}
+          {!hc.has("customer") && (
+            <td style={{ padding: "10px 10px", minWidth: 180 }}>
+              <CustomerCell order={order} locale={locale} router={router} isSuperuser={isSuperuser} />
+            </td>
+          )}
+          {!hc.has("address") && (
+            <td style={{ padding: "10px 10px", color: "#6b7280", fontSize: 12, lineHeight: 1.45 }}>
+              {order.address_line1 ? (
+                <>
+                  <div>{order.address_line1}</div>
+                  <div>{[order.postal_code, order.city].filter(Boolean).join(" ")}</div>
+                  {order.country && <div>{order.country}</div>}
+                </>
+              ) : "—"}
+            </td>
+          )}
+          {!hc.has("amount") && (
+            <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
+              {(() => {
+                const vat = getVatInfo(order.country);
+                const brutto = order.total_cents || 0;
+                const netto = vat.rate > 0 ? Math.round(brutto / (1 + vat.rate / 100)) : brutto;
+                return (
+                  <>
+                    <div>{fmtCents(brutto)}</div>
+                    {vat.rate > 0 && (
+                      <div style={{ fontSize: 10, fontWeight: 400, color: "#9ca3af", lineHeight: 1.3 }}>
+                        {fmtCents(netto)} netto<br />
+                        +{vat.rate}% {vat.label}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </td>
+          )}
+          {!hc.has("order_status") && (
+            <td style={{ padding: "10px 12px", textAlign: "center" }}>
+              {returnsMap[order.id] ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
+                  Retoure
+                </span>
+              ) : (
+                <StatusBadge value={order.order_status} />
+              )}
+            </td>
+          )}
+          {!hc.has("payment_status") && (
+            <td style={{ padding: "10px 12px", textAlign: "center" }}>
+              <StatusBadge value={order.payment_status} />
+            </td>
+          )}
+          {!hc.has("delivery_status") && (
+            <td style={{ padding: "10px 12px", textAlign: "center" }}>
+              <StatusBadge value={order.delivery_status} />
+            </td>
+          )}
+          {!hc.has("date") && (
+            <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+              {fmtDate(order.created_at)}
+            </td>
+          )}
+          {!hc.has("country") && (
+            <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 500 }}>
+              {order.country || "—"}
+            </td>
+          )}
+          {!hc.has("review") && (
+            <td style={{ padding: "10px 12px", textAlign: "center" }}>
+              {(() => {
+                const orderReviews = allReviews.filter((r) => r.order_id === order.id);
+                if (orderReviews.length === 0) return <span style={{ color: "#d1d5db", fontSize: 14 }}>★★★★★</span>;
+                const avg = orderReviews.reduce((s, r) => s + Number(r.rating || 0), 0) / orderReviews.length;
+                return (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setReviewPopupOrderId(order.id); }}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                    title={`${orderReviews.length} Bewertung${orderReviews.length !== 1 ? "en" : ""}`}
+                  >
+                    <MiniStars rating={avg} />
+                  </button>
+                );
+              })()}
+            </td>
+          )}
           <td style={{ padding: "10px 8px", textAlign: "right" }}>
             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
               {order.delivery_status !== "versendet" && order.delivery_status !== "zugestellt" && (
@@ -1049,7 +1102,7 @@ export default function OrdersPage() {
             </div>
           </td>
         </tr>
-        {expanded[order.id] && <ExpandedRow order={order} locale={locale} onSaveFields={handleUpdate} />}
+        {expanded[order.id] && <ExpandedRow order={order} locale={locale} onSaveFields={handleUpdate} colCount={visibleColCount} />}
       </React.Fragment>
     ));
 
@@ -1115,6 +1168,29 @@ export default function OrdersPage() {
         <PageTitle>Bestellungen</PageTitle>
         <HeaderMeta>
           <span style={{ fontSize: 14, color: "#6b7280" }}>{orders.length} Bestellungen</span>
+          <div ref={colMenuRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowColMenu(v => !v)}
+              style={{ padding: "8px 13px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#374151", lineHeight: 1 }}
+            >
+              Spalten {hiddenCols.size > 0 ? `(${COL_DEFS.filter(c => c.hideable).length - hiddenCols.size}/${COL_DEFS.filter(c => c.hideable).length})` : ""}
+            </button>
+            {showColMenu && (
+              <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.1)", zIndex: 9999, minWidth: 190, padding: "6px 0" }}>
+                {COL_DEFS.filter(c => c.hideable).map(col => (
+                  <label
+                    key={col.key}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", cursor: "pointer", fontSize: 13, color: "#111827", userSelect: "none" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <input type="checkbox" checked={!hiddenCols.has(col.key)} onChange={() => toggleColVisibility(col.key)} style={{ accentColor: "#2563eb", width: 15, height: 15, cursor: "pointer" }} />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
           <Button variant="primary" onClick={() => setShowNewOrder(true)}>
             Bestellung hinzufügen
           </Button>
@@ -1215,29 +1291,62 @@ export default function OrdersPage() {
 
       <TableCard>
         <div style={{ overflowX: "auto", width: "100%" }}>
-        <table style={{ width: "100%", minWidth: 1160, borderCollapse: "collapse", fontSize: 13, tableLayout: "auto" }}>
+        <table style={{ width: "100%", minWidth: visibleCols.reduce((s, c) => s + colWidths[COL_DEFS.indexOf(c)], 0), borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
+          <colgroup>
+            {visibleCols.map(col => (
+              <col key={col.key} style={{ width: colWidths[COL_DEFS.indexOf(col)] }} />
+            ))}
+          </colgroup>
           <thead>
             <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-              {COLS.map((c, i) => {
-                const isSortable = !!COL_SORT_KEY[i];
+              {visibleCols.map((col) => {
+                const colIdx = COL_DEFS.indexOf(col);
+                const isSortable = !!col.sortKey;
                 return (
                   <th
-                    key={i}
-                    onClick={isSortable ? () => handleColSort(i) : undefined}
-                    style={{ padding: "10px 10px", textAlign: i >= 5 && i <= 10 ? "center" : "left", fontWeight: 600, fontSize: 11, color: isSortable ? "#374151" : "#6b7280", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", cursor: isSortable ? "pointer" : "default", userSelect: "none", position: "sticky", top: 0, zIndex: 2, background: "#f9fafb" }}
+                    key={col.key}
+                    onClick={isSortable ? () => handleColSort(col.sortKey) : undefined}
+                    style={{
+                      padding: "10px 10px",
+                      textAlign: col.align,
+                      fontWeight: 600,
+                      fontSize: 11,
+                      color: isSortable ? "#374151" : "#6b7280",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
+                      whiteSpace: "nowrap",
+                      cursor: isSortable ? "pointer" : "default",
+                      userSelect: "none",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 2,
+                      background: "#f9fafb",
+                      overflow: "hidden",
+                      boxSizing: "border-box",
+                    }}
                   >
-                    {i === 0 ? (
-                      <CustomCheckbox checked={allSelected} onChange={toggleAll} size={18} />
-                    ) : (
-                      <span>
-                        {c}
-                        {isSortable && (
-                          <span style={{ fontSize: 10, marginLeft: 3, opacity: sort.startsWith(COL_SORT_KEY[i] + "_") ? 1 : 0.35 }}>
-                            {sortIcon(i)}
-                          </span>
-                        )}
-                      </span>
-                    )}
+                    <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 2 }}>
+                      {col.key === "sel" ? (
+                        <CustomCheckbox checked={allSelected} onChange={toggleAll} size={18} />
+                      ) : (
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {col.label}
+                          {isSortable && (
+                            <span style={{ fontSize: 10, marginLeft: 3, opacity: sort.startsWith(col.sortKey + "_") ? 1 : 0.35 }}>
+                              {sortIcon(col.sortKey)}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      {col.hideable && (
+                        <div
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); resizingRef.current = { colIdx, startX: e.clientX, startWidth: colWidths[colIdx] }; }}
+                          style={{ position: "absolute", right: -5, top: -10, bottom: -10, width: 8, cursor: "col-resize", zIndex: 1, borderRadius: 2 }}
+                          onMouseEnter={e => e.currentTarget.style.background = "rgba(148,163,184,0.55)"}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                        />
+                      )}
+                    </div>
                   </th>
                 );
               })}
@@ -1245,22 +1354,22 @@ export default function OrdersPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={13} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Laden…</td></tr>
+              <tr><td colSpan={visibleColCount} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Laden…</td></tr>
             )}
             {!loading && orders.length === 0 && (
-              <tr><td colSpan={13} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Keine Bestellungen gefunden</td></tr>
+              <tr><td colSpan={visibleColCount} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Keine Bestellungen gefunden</td></tr>
             )}
             {!loading && orders.length > 0 && !isSuperuser && renderOrderRows(visibleOrders)}
             {!loading && orders.length > 0 && isSuperuser && (
               <>
                 <tr>
-                  <SuperuserSectionLabel colSpan={13}>
+                  <SuperuserSectionLabel colSpan={visibleColCount}>
                     Ihr Superuser-Bereich — eigene Konto-Bestellungen und ohne Verkäufer-Zuordnung ({ownOrdersList.length})
                   </SuperuserSectionLabel>
                 </tr>
                 {ownOrdersList.length === 0 ? (
                   <tr>
-                    <td colSpan={13} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
+                    <td colSpan={visibleColCount} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
                       Keine Bestellungen in diesem Bereich.
                     </td>
                   </tr>
@@ -1268,13 +1377,13 @@ export default function OrdersPage() {
                   renderOrderRows(ownOrdersList)
                 )}
                 <tr>
-                  <SellerOrdersSectionLabel colSpan={13}>
+                  <SellerOrdersSectionLabel colSpan={visibleColCount}>
                     Verkäufer-Bestellungen
                   </SellerOrdersSectionLabel>
                 </tr>
                 {filteredSellerOrderGroups.length === 0 ? (
                   <tr>
-                    <td colSpan={13} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
+                    <td colSpan={visibleColCount} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
                       Keine weiteren Verkäufer-Bestellungen{sellerSearchFilter.trim() ? " (Filter)" : ""}.
                     </td>
                   </tr>
@@ -1284,7 +1393,7 @@ export default function OrdersPage() {
                     const open = sellerSectionOpen[sellerId] !== false;
                     const headerRow = (
                       <tr key={`h-${sellerId}`}>
-                        <SellerGroupHeader colSpan={13}>
+                        <SellerGroupHeader colSpan={visibleColCount}>
                           <button
                             type="button"
                             onClick={() => setSellerSectionOpen((prev) => ({ ...prev, [sellerId]: !open }))}
