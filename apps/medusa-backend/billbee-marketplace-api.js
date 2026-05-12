@@ -74,11 +74,17 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
     const basic = parseBasicAuth(req)
 
     // Collect api_key from all possible sources Billbee might use
+    // Billbee old format sends Key=<base64(schluessel)> — decode it
+    const rawQueryKey = (req.query.Key || req.query.key || '').trim()
+    let decodedQueryKey = rawQueryKey
+    if (rawQueryKey && !rawQueryKey.startsWith('andertal_')) {
+      try { decodedQueryKey = Buffer.from(rawQueryKey, 'base64').toString('utf8').trim() } catch (_) {}
+    }
     const apiKey = String(
       (basic?.username?.startsWith('andertal_zug_') ? basic.username : '') ||
       req.headers['x-api-key'] || req.headers['x-billbee-api-key'] ||
       req.headers['x-andertal-api-key'] ||
-      req.query.api_key || req.query.apiKey || req.query.billbee_api_key || req.query.key || '',
+      req.query.api_key || req.query.apiKey || req.query.billbee_api_key || decodedQueryKey || '',
     ).trim()
 
     // The secret can come from Basic Auth password or query param
@@ -209,6 +215,38 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       } catch (e) {
         if (bclient) try { await bclient.end() } catch (_) {}
         logEvent('api.auth.failed', { reason: 'billbee_key_exception', message: e?.message })
+        return res.status(500).json({ error: 'Internal Server Error' })
+      }
+    }
+
+    // ── Path A''': Reverse secret lookup (Billbee old format — user entered api_secret as Schlüssel) ──
+    if (apiKey && !apiKey.includes('@') && !apiKey.startsWith('andertal_')) {
+      let bclient
+      try {
+        bclient = getSellerDbClient()
+        if (!bclient) return res.status(503).json({ error: 'Service unavailable' })
+        await bclient.connect()
+        const br = await bclient.query(
+          `SELECT id, email, seller_id, sub_of_seller_id, approval_status
+           FROM seller_users WHERE TRIM(andertal_billbee_api_secret) = TRIM($1) LIMIT 2`,
+          [apiKey],
+        )
+        await bclient.end(); bclient = null
+        if (br.rows?.length === 1) {
+          const brow = br.rows[0]
+          const bst = String(brow.approval_status || '').toLowerCase()
+          if (bst === 'rejected' || bst === 'suspended') return res.status(403).json({ error: 'Forbidden', message: 'Account inactive' })
+          const bsellerId = brow.sub_of_seller_id ? String(brow.sub_of_seller_id).trim() : String(brow.seller_id).trim()
+          if (!bsellerId) return res.status(403).json({ error: 'Forbidden', message: 'No seller scope' })
+          if (!checkRateLimit(bsellerId)) return res.status(429).json({ error: 'Too Many Requests' })
+          req.apiSeller = { user_id: brow.id, email: brow.email, seller_id: bsellerId }
+          logEvent('api.auth.success', { seller_id: bsellerId, via: 'secret_reverse' })
+          return next()
+        }
+        // No match — fall through to Path B
+      } catch (e) {
+        if (bclient) try { await bclient.end() } catch (_) {}
+        logEvent('api.auth.failed', { reason: 'secret_reverse_exception', message: e?.message })
         return res.status(500).json({ error: 'Internal Server Error' })
       }
     }
@@ -437,7 +475,30 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
   httpApp.post('/api/v1/webhook/order-update', authenticate, (req, res) => res.status(204).end())
 
   // ── /api/billbee/ — Billbee alias ─────────────────────────────────────────
-  httpApp.get('/api/billbee', ping)
+  // Root handles old Billbee "Eigener Webshop" format: ?Action=GetOrders&Key=<base64>
+  httpApp.get('/api/billbee', (req, res) => {
+    const action = req.query.Action || req.query.action
+    if (!action) return ping(req, res)
+    // Map old-format params to internal names
+    if (req.query.Page) req.query.page = req.query.Page
+    if (req.query.PageSize) req.query.pageSize = req.query.PageSize
+    if (req.query.StartDate) req.query.minDate = req.query.StartDate
+    authenticate(req, res, () => {
+      const act = action.toLowerCase()
+      if (act === 'getorders') {
+        const orig = res.json.bind(res)
+        res.json = (d) => orig(d?.Data !== undefined ? { Paging: d.Paging, Orders: d.Data } : d)
+        return handleOrders(req, res)
+      }
+      if (act === 'getproducts') {
+        const orig = res.json.bind(res)
+        res.json = (d) => orig(d?.Data !== undefined ? { Paging: d.Paging, Products: d.Data } : d)
+        return handleProducts(req, res)
+      }
+      if (act === 'getstock') return handleStock(req, res)
+      return res.status(400).json({ error: 'Unknown action', action })
+    })
+  })
   httpApp.get('/api/billbee/orders', authenticate, handleOrders)
   httpApp.get('/api/billbee/products', authenticate, handleProducts)
   httpApp.get('/api/billbee/stock', authenticate, handleStock)
