@@ -33,6 +33,7 @@ export async function GET(req) {
       shop_logo_height: data?.shop_logo_height != null ? Number(data.shop_logo_height) : 34,
       sellercentral_logo_height: data?.sellercentral_logo_height != null ? Number(data.sellercentral_logo_height) : 30,
       announcement_bar_items: Array.isArray(data?.announcement_bar_items) ? data.announcement_bar_items : [],
+      logo_config: data?.logo_config || null,
     };
     settingsCache.set(sellerId, { data: result, expiresAt: now + SETTINGS_TTL });
     return NextResponse.json(result, { status: r.ok ? 200 : r.status });

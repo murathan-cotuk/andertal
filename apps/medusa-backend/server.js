@@ -13585,7 +13585,7 @@ async function start() {
           basic_auth_password: row.andertal_billbee_api_secret,
           billbee_integration_enabled: true,
           hint:
-            'Billbee Shopverbindung: URL oft die Basis-URL (api_base_url). Schlüssel = api_key. Basic Auth Benutzername = E-Mail, Passwort = gespeichertes Secret. Empfohlen: zusätzlich HTTP-Header X-Andertal-Api-Key mit demselben api_key.',
+            'Billbee: Einstellungen → Kanäle → Shop hinzufügen → „Eigener Webshop (Billbee API)“. Shop-URL = api_base_url. Basic-Benutzername entweder den Schlüssel (andertal_seller_…) ODER die angezeigte E-Mail; Basic-Passwort = das angezeigte Secret (beides aus Sellercentral kopieren). Kein separates Billbee.io API-Token nötig — Andertal ist der aufgerufene Server.',
         })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -19989,7 +19989,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const r = await c.query(
           `SELECT su.id, su.email, su.seller_id, su.is_superuser, ss.store_name
            FROM seller_users su
-           LEFT JOIN seller_settings ss ON ss.seller_id = su.seller_id
+           LEFT JOIN admin_hub_seller_settings ss ON ss.seller_id = su.seller_id
            WHERE su.id = $1 OR su.seller_id = $1
            LIMIT 1`,
           [id]

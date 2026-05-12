@@ -133,12 +133,25 @@ export default function BillbeeSettingsPage({ embedded = false }) {
   const formInner = (
     <BlockStack gap="400">
       <Banner tone="info">
-        <Text as="p" variant="bodySm">
-          In Billbee (<strong>Einstellungen → Kanäle → Shopverbindung</strong>):{" "}
-          <strong>Name</strong> z. B. „{name}“, <strong>URL</strong> = Basis-URL unten (oder einzelne Endpunkte wie …/orders).{" "}
-          <strong>Schlüssel</strong> = API-Schlüssel. <strong>Basic Auth</strong> = E-Mail + Passwort. Optional Header{" "}
-          <code>X-Andertal-Api-Key</code> mit demselben Schlüssel mitsenden.
-        </Text>
+        <BlockStack gap="200">
+          <Text as="p" variant="bodySm">
+            <strong>Billbee:</strong>{" "}
+            <strong>Einstellungen → Kanäle → Shop hinzufügen → „Eigener Webshop (Billbee API)“</strong> (nicht die alte „Shopverbindung“ mit anderen Feldern).
+          </Text>
+          <Text as="p" variant="bodySm">
+            <strong>Shop-URL / API-Basis:</strong> exakt die „URL (API-Basis)“ von unten kopieren (endet auf{" "}
+            <Text as="span" fontWeight="semibold">/api/billbee</Text>). Billbee ruft darunter{" "}
+            <code>/orders</code>, <code>/products</code>, <code>/stock</code> auf.
+          </Text>
+          <Text as="p" variant="bodySm">
+            <strong>Anmeldung (HTTP Basic):</strong> Billbee setzt oft den <strong>Schlüssel</strong> (<code>andertal_seller_…</code>) als{" "}
+            <strong>Benutzername</strong> und das <strong>Basic-Auth-Passwort</strong> aus Sellercentral als Passwort — dann das Feld „Schlüssel“ in Billbee ggf. leer lassen oder denselben Wert, je nach Maske.
+            Alternativ funktioniert <strong>Benutzername = E-Mail</strong> (wie unten) und <strong>Passwort = Basic-Auth-Passwort</strong>.
+          </Text>
+          <Text as="p" variant="bodySm" tone="subdued">
+            Du brauchst <strong>kein</strong> Billbee.io Developer-API-Token in .env für diese Verbindung — Andertal ist der Server, Billbee ist der Client.
+          </Text>
+        </BlockStack>
       </Banner>
 
       <TextField label="Name (Vorschlag)" value={loading ? "…" : name} readOnly autoComplete="off" />

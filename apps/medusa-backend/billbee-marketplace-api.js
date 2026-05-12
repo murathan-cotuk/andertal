@@ -8,7 +8,9 @@
  *   username = andertal_zug_...  (api_key)   → store_integrations lookup
  *   password = andertal_ssk_...  (api_secret)
  *
- *   Fallback: username = seller email veya seller_id → seller_users lookup
+ *   username = andertal_seller_... + password = marketplace secret → seller_users (Billbee „Eigener Webshop“)
+ *
+ *   Fallback: username = seller email veya seller_id → seller_users lookup (password = marketplace secret)
  */
 
 const crypto = require('crypto')
@@ -117,6 +119,50 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       } catch (e) {
         if (c) try { await c.end() } catch (_) {}
         logEvent('api.auth.failed', { reason: 'exception', message: e?.message })
+        return res.status(500).json({ error: 'Internal Server Error' })
+      }
+    }
+
+    // ── Path A': Billbee marketplace — Basic username = Schlüssel (andertal_seller_…) ──
+    // Viele Shop-Connectoren senden den API-Key als Basic-Benutzername, nicht als E-Mail.
+    if (basic && basic.username && String(basic.username).trim().startsWith('andertal_seller_')) {
+      let bclient
+      try {
+        bclient = getSellerDbClient()
+        if (!bclient) return res.status(503).json({ error: 'Service unavailable' })
+        await bclient.connect()
+        const br = await bclient.query(
+          `SELECT id, email, seller_id, sub_of_seller_id, approval_status, andertal_billbee_api_key, andertal_billbee_api_secret
+           FROM seller_users
+           WHERE TRIM(andertal_billbee_api_key) = TRIM($1) LIMIT 2`,
+          [basic.username.trim()],
+        )
+        await bclient.end(); bclient = null
+
+        if (!br.rows || br.rows.length !== 1) {
+          res.setHeader('WWW-Authenticate', 'Basic realm="Andertal API"')
+          logEvent('api.auth.failed', { reason: 'billbee_key_no_user', keyPrefix: String(basic.username).slice(0, 24) })
+          return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials' })
+        }
+        const brow = br.rows[0]
+        const bst = String(brow.approval_status || '').toLowerCase()
+        if (bst === 'rejected' || bst === 'suspended') return res.status(403).json({ error: 'Forbidden', message: 'Account inactive' })
+
+        if (!brow.andertal_billbee_api_secret || !safeEqual(basic.password, brow.andertal_billbee_api_secret)) {
+          res.setHeader('WWW-Authenticate', 'Basic realm="Andertal API"')
+          logEvent('api.auth.failed', { reason: 'billbee_key_bad_secret' })
+          return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials' })
+        }
+
+        const bsellerId = brow.sub_of_seller_id ? String(brow.sub_of_seller_id).trim() : String(brow.seller_id).trim()
+        if (!bsellerId) return res.status(403).json({ error: 'Forbidden', message: 'No seller scope' })
+        if (!checkRateLimit(bsellerId)) return res.status(429).json({ error: 'Too Many Requests' })
+        req.apiSeller = { user_id: brow.id, email: brow.email, seller_id: bsellerId }
+        logEvent('api.auth.success', { seller_id: bsellerId, via: 'andertal_seller_basic' })
+        return next()
+      } catch (e) {
+        if (bclient) try { await bclient.end() } catch (_) {}
+        logEvent('api.auth.failed', { reason: 'billbee_key_exception', message: e?.message })
         return res.status(500).json({ error: 'Internal Server Error' })
       }
     }

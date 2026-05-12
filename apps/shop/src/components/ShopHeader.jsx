@@ -1064,7 +1064,8 @@ export default function ShopHeader() {
   const [categoryPanelPortalReady, setCategoryPanelPortalReady] = useState(false);
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [hoveredMenuItemId, setHoveredMenuItemId] = useState(null);
-  const [shopBranding, setShopBranding] = useState({ shop_logo_url: "", shop_favicon_url: "", shop_logo_height: 34 });
+  const [shopBranding, setShopBranding] = useState({ shop_logo_url: "", shop_favicon_url: "", shop_logo_height: 34, logo_config: null });
+  const [logoDeviceKey, setLogoDeviceKey] = useState("desktop");
   // userMenuOpen state removed — now managed by Radix DropdownMenu in UserDropdownPanel
   const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
   const [mainMenuAllItems, setMainMenuAllItems] = useState([]);
@@ -1117,10 +1118,20 @@ export default function ShopHeader() {
           shop_logo_url: d?.shop_logo_url || "",
           shop_favicon_url: d?.shop_favicon_url || "",
           shop_logo_height: d?.shop_logo_height != null ? Number(d.shop_logo_height) : 34,
+          logo_config: d?.logo_config || null,
         });
       })
       .catch(() => {});
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const getKey = () => window.innerWidth >= 1024 ? "desktop" : window.innerWidth >= 600 ? "tablet" : "mobile";
+    setLogoDeviceKey(getKey());
+    const handler = () => setLogoDeviceKey(getKey());
+    window.addEventListener("resize", handler, { passive: true });
+    return () => window.removeEventListener("resize", handler);
   }, []);
 
   useEffect(() => {
@@ -1582,15 +1593,22 @@ export default function ShopHeader() {
             <NarrowHeaderChrome $hide={isMobileSearchCompact}>
               <MiddleBarLeft>
                 <MiddleBarLogo href="/">
-                  {shopBranding.shop_logo_url ? (
-                    <img
-                      src={shopBranding.shop_logo_url}
-                      alt="Shop logo"
-                      style={{ height: Math.min(shopBranding.shop_logo_height || 34, 56), maxHeight: 56, width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
-                    />
-                  ) : (
-                    "Andertal"
-                  )}
+                  {(() => {
+                    const devCfg = shopBranding.logo_config?.shop?.[logoDeviceKey];
+                    const url = devCfg?.url || shopBranding.shop_logo_url || "";
+                    const height = Math.min(devCfg?.height ?? shopBranding.shop_logo_height ?? 34, 56);
+                    const pt = devCfg?.pt ?? 0;
+                    const pr = devCfg?.pr ?? 0;
+                    const pb = devCfg?.pb ?? 0;
+                    const pl = devCfg?.pl ?? 0;
+                    return url ? (
+                      <img
+                        src={url}
+                        alt="Shop logo"
+                        style={{ height, maxHeight: 56, width: "auto", maxWidth: 220, objectFit: "contain", display: "block", paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl }}
+                      />
+                    ) : "Andertal";
+                  })()}
                 </MiddleBarLogo>
               </MiddleBarLeft>
             </NarrowHeaderChrome>

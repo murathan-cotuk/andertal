@@ -675,6 +675,34 @@ function ButtonColorFields({ typeKey, colors, onChangeColor }) {
 }
 
 // ── Button type section ───────────────────────────────────────────────────────
+function AccordionCard({ title, subtitle, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Layout.Section>
+      <div style={{ border: "1px solid #e1e3e5", borderRadius: 12, overflow: "hidden", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", background: open ? "#fafbfc" : "#fff", border: "none", cursor: "pointer", textAlign: "left", gap: 12, transition: "background 0.15s" }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{title}</div>
+            {subtitle && <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{subtitle}</div>}
+          </div>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth="2.5" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", flexShrink: 0 }}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+        {open && (
+          <div style={{ borderTop: "1px solid #f1f3f5", padding: "20px 20px 24px" }}>
+            {children}
+          </div>
+        )}
+      </div>
+    </Layout.Section>
+  );
+}
+
 function ButtonTypeSection({ typeKey, typeData, onChange }) {
   const variants = typeData.variants || [];
 
@@ -1005,10 +1033,8 @@ export default function StylesPage() {
           </Layout.Section>
         )}
         {isSuperuser && (
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">Homepage SEO (Meta)</Text>
+          <AccordionCard title="Homepage SEO (Meta)" subtitle="Browser-Titel und Meta-Beschreibung der Startseite">
+            <BlockStack gap="300">
                 <Text as="p" tone="subdued">
                   Hier kannst du den Browser-Titel und die Meta-Beschreibung der Startseite setzen.
                 </Text>
@@ -1028,16 +1054,10 @@ export default function StylesPage() {
                   placeholder="Kurze Beschreibung fuer Suchergebnisse und Social Preview"
                 />
               </BlockStack>
-            </Card>
-          </Layout.Section>
+          </AccordionCard>
         )}
-        <Layout.Section>
-          <Card>
+        <AccordionCard title="Branding (Shop &amp; Sellercentral)" subtitle="Logos, Favicons, Größe und Abstände — getrennt für Desktop, Tablet und Mobil">
             <BlockStack gap="500">
-              <div>
-                <Text as="h2" variant="headingMd">Branding (Shop &amp; Sellercentral)</Text>
-                <Text as="p" tone="subdued">Logos, Favicons, Groesse und Abstände — getrennt fuer Desktop, Tablet und Mobil.</Text>
-              </div>
 
               {/* Device tabs */}
               <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e5e7eb" }}>
@@ -1189,15 +1209,11 @@ export default function StylesPage() {
                 </div>
               ))}
             </BlockStack>
-          </Card>
-        </Layout.Section>
+            </BlockStack>
+        </AccordionCard>
 
-        {/* Colors */}
-        <Layout.Section>
-          <Card>
+        <AccordionCard title="Website-Farben">
             <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Website-Farben</Text>
-              <Divider />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 <ColorField label="Primärfarbe" value={styles.colors.primary} onChange={(v) => updateColor("primary", v)} />
                 <ColorField label="Sekundärfarbe" value={styles.colors.secondary} onChange={(v) => updateColor("secondary", v)} />
@@ -1216,16 +1232,10 @@ export default function StylesPage() {
                 ))}
               </InlineStack>
             </BlockStack>
-          </Card>
-        </Layout.Section>
+        </AccordionCard>
 
-        {/* Typography */}
-        <Layout.Section>
-          <Card>
+        <AccordionCard title="Typografie" subtitle="Schriftarten, Größen und Gewichte">
             <BlockStack gap="500">
-              <Text as="h2" variant="headingMd">
-                Typografie
-              </Text>
               <Banner tone="info">
                 <p>
                   Die Liste enthält Schriften aus <strong>Google Fonts</strong>. Schriften wie Arial, Calibri
@@ -1359,16 +1369,12 @@ export default function StylesPage() {
                   />
                 </BlockStack>
               )}
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+          </BlockStack>
+        </AccordionCard>
 
         {/* Top Bar */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Layout: Top Bar</Text>
-              <Divider />
+        <AccordionCard title="Layout: Top Bar">
+          <BlockStack gap="400">
               <Checkbox
                 label="Top Bar im Shop anzeigen"
                 checked={!!styles.topbar.enabled}
@@ -1534,16 +1540,13 @@ export default function StylesPage() {
                   autoComplete="off"
                 />
               </div>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+          </BlockStack>
+        </AccordionCard>
 
         {/* Header / Navbar */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Layout: Header / Navbar</Text>
-              <Banner tone="info">
+        <AccordionCard title="Layout: Header / Navbar">
+          <BlockStack gap="400">
+            <Banner tone="info">
                 <p>
                   Zuerst <strong>Überall</strong> einstellen (Shop-Standard). Über „Anwendungsbereich“ können Sie für
                   Kategorie- oder Kollektions-Seiten nur abweichende Farben, Verlauf oder Hintergrundbild setzen —
@@ -1681,16 +1684,13 @@ export default function StylesPage() {
                   autoComplete="off"
                 />
               </div>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+          </BlockStack>
+        </AccordionCard>
 
         {/* Second Nav */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Layout: Second Nav</Text>
-              <Banner tone="info">
+        <AccordionCard title="Layout: Second Nav">
+          <BlockStack gap="400">
+            <Banner tone="info">
                 <p>
                   Der gemeinsame Header-Chrome (Farbe/Verlauf) steuern Sie unter <strong>Header</strong>.
                   Die <strong>Second-Nav-Zeile</strong> darunter kann zusätzlich einen eigenen Hintergrund, Rahmen sowie Text-
@@ -1925,47 +1925,34 @@ export default function StylesPage() {
                   autoComplete="off"
                 />
               </div>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+          </BlockStack>
+        </AccordionCard>
 
         {/* Footer */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Layout: Footer</Text>
-              <Divider />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-                <ColorField
-                  label="Hintergrundfarbe"
-                  value={styles.footer.bg_color}
-                  onChange={(v) => updateSection("footer", "bg_color", v)}
-                />
-                <ColorField
-                  label="Textfarbe"
-                  value={styles.footer.text_color}
-                  onChange={(v) => updateSection("footer", "text_color", v)}
-                />
-                <TextField
-                  label="Oberer Rand (border-top)"
-                  value={styles.footer.border_top}
-                  onChange={(v) => updateSection("footer", "border_top", v)}
-                  autoComplete="off"
-                />
-              </div>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+        <AccordionCard title="Layout: Footer">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+            <ColorField
+              label="Hintergrundfarbe"
+              value={styles.footer.bg_color}
+              onChange={(v) => updateSection("footer", "bg_color", v)}
+            />
+            <ColorField
+              label="Textfarbe"
+              value={styles.footer.text_color}
+              onChange={(v) => updateSection("footer", "text_color", v)}
+            />
+            <TextField
+              label="Oberer Rand (border-top)"
+              value={styles.footer.border_top}
+              onChange={(v) => updateSection("footer", "border_top", v)}
+              autoComplete="off"
+            />
+          </div>
+        </AccordionCard>
 
         {/* Mobil kaydırma + alt menü (≤1023px) */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Mobil: Kaydırma &amp; untere Leiste</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Gilt für schmale/tablet Ansicht (≤1023px). Header beim Scrollen; untere Tab-Leiste (fest oder am Seitenende).
-              </Text>
-              <Divider />
+        <AccordionCard title="Mobil: Kaydırma & untere Leiste" subtitle="Gilt für schmale/tablet Ansicht (≤1023px). Header beim Scrollen; untere Tab-Leiste (fest oder am Seitenende).">
+          <BlockStack gap="400">
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
                 <Select
                   label="Header nach dem Hochscrollen"
@@ -2029,16 +2016,12 @@ export default function StylesPage() {
                   autoComplete="off"
                 />
               </div>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+          </BlockStack>
+        </AccordionCard>
 
         {/* Scroll-up Button */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Scroll-up Button</Text>
-              <Divider />
+        <AccordionCard title="Scroll-up Button">
+          <BlockStack gap="400">
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 <Select
                   label="Stil-Vorlage"
@@ -2099,24 +2082,20 @@ export default function StylesPage() {
                   </svg>
                 </div>
               </div>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+          </BlockStack>
+        </AccordionCard>
 
         {/* Button styles */}
-        <Layout.Section>
-          <BlockStack gap="400">
-            <Text as="h2" variant="headingMd">Button-Stile</Text>
-            {Object.entries(styles.buttons).map(([key, typeData]) => (
-              <ButtonTypeSection
-                key={key}
-                typeKey={key}
-                typeData={typeData}
-                onChange={(updated) => updateButtonType(key, updated)}
-              />
-            ))}
-          </BlockStack>
-        </Layout.Section>
+        <AccordionCard title="Button-Stile">
+          {Object.entries(styles.buttons).map(([key, typeData]) => (
+            <ButtonTypeSection
+              key={key}
+              typeKey={key}
+              typeData={typeData}
+              onChange={(updated) => updateButtonType(key, updated)}
+            />
+          ))}
+        </AccordionCard>
       </Layout>
       <MediaPickerModal
         open={Boolean(brandingPickerTarget)}
