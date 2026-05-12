@@ -132,28 +132,28 @@ export default function BillbeeSettingsPage({ embedded = false }) {
 
   const formInner = (
     <BlockStack gap="400">
-      <Banner tone=”info”>
-        <BlockStack gap=”200”>
-          <Text as=”p” variant=”bodySm”>
-            <strong>Billbee:</strong>{“ “}
-            <strong>Einstellungen → Kanäle → Shop hinzufügen → „Eigener Webshop (Billbee API)”</strong>
+      <Banner tone="info">
+        <BlockStack gap="200">
+          <Text as="p" variant="bodySm">
+            <strong>Billbee:</strong>{" "}
+            <strong>Einstellungen → Kanäle → Shop hinzufügen → „Eigener Webshop (Billbee API)"</strong>
           </Text>
-          <Text as=”p” variant=”bodySm”>
+          <Text as="p" variant="bodySm">
             Felder in Billbee ausfüllen:
           </Text>
-          <Text as=”p” variant=”bodySm”>
-            • <strong>Shop-URL</strong> → „URL (API-Basis)” unten kopieren (endet auf <code>/api/billbee</code>)
+          <Text as="p" variant="bodySm">
+            • <strong>Shop-URL</strong> → „URL (API-Basis)" unten kopieren (endet auf <code>/api/billbee</code>)
           </Text>
-          <Text as=”p” variant=”bodySm”>
-            • <strong>Schlüssel / API-Key</strong> → „Schlüssel (API-Key)” unten kopieren (<code>andertal_seller_…</code>)
+          <Text as="p" variant="bodySm">
+            • <strong>Schlüssel / API-Key</strong> → „Schlüssel (API-Key)" unten kopieren (<code>andertal_seller_…</code>)
           </Text>
-          <Text as=”p” variant=”bodySm”>
-            • <strong>Benutzername</strong> → „Basic Auth Benutzername” (deine E-Mail) <em>oder</em> den Schlüssel nochmal eintragen
+          <Text as="p" variant="bodySm">
+            • <strong>Benutzername</strong> → „Basic Auth Benutzername" (deine E-Mail) <em>oder</em> den Schlüssel nochmal eintragen
           </Text>
-          <Text as=”p” variant=”bodySm”>
-            • <strong>Passwort</strong> → „Basic Auth Passwort” unten kopieren
+          <Text as="p" variant="bodySm">
+            • <strong>Passwort</strong> → „Basic Auth Passwort" unten kopieren
           </Text>
-          <Text as=”p” variant=”bodySm” tone=”subdued”>
+          <Text as="p" variant="bodySm" tone="subdued">
             Tipp: Wenn Billbee nur das Schlüssel-Feld verwendet (kein Benutzername/Passwort), reicht der Schlüssel allein für die Verbindung.
           </Text>
         </BlockStack>
