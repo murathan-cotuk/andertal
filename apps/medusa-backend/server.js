@@ -5826,7 +5826,7 @@ async function start() {
         const { Client } = require('pg')
         const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+        const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items, logo_config FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
         await client.end()
         const row = r.rows && r.rows[0]
         const store_name = row && row.store_name != null ? String(row.store_name) : ''
@@ -5841,11 +5841,15 @@ async function start() {
         const shop_logo_height = row && row.shop_logo_height != null ? Number(row.shop_logo_height) : 34
         const sellercentral_logo_height = row && row.sellercentral_logo_height != null ? Number(row.sellercentral_logo_height) : 30
         const announcement_bar_items = Array.isArray(row && row.announcement_bar_items) ? row.announcement_bar_items : []
+        let logo_config = null
+        if (row && row.logo_config != null) {
+          logo_config = typeof row.logo_config === 'string' ? JSON.parse(row.logo_config) : row.logo_config
+        }
         log.info('[storeSellerSettingsGET] free_shipping_thresholds:', JSON.stringify(free_shipping_thresholds))
-        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items })
+        res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items, logo_config })
       } catch (err) {
         console.error('[storeSellerSettingsGET] error:', err && err.message)
-        res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30 })
+        res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30, logo_config: null })
       }
     }
     httpApp.get('/store/seller-settings', storeSellerSettingsGET)

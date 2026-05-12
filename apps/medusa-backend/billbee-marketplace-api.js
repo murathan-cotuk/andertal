@@ -406,12 +406,17 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
   // ── Products ──────────────────────────────────────────────────────────────
   async function handleProducts(req, res) {
     const sid = req.apiSeller.seller_id
+    logEvent('api.products.query', { seller_id: sid, seller_id_len: String(sid || '').length, page: req.query.page, pageSize: req.query.pageSize })
+    if (!sid) return res.status(403).json({ error: 'Forbidden', message: 'No seller scope' })
     const page = Math.max(1, parseInt(req.query.page || '1', 10))
     const pageSize = Math.min(250, Math.max(1, parseInt(req.query.pageSize || '50', 10)))
     let client
     try {
       client = getProductsDbClient()
       await client.connect()
+      // Debug: log distinct seller_ids in table so we can spot mismatches
+      const debugRes = await client.query(`SELECT DISTINCT seller_id FROM admin_hub_products LIMIT 10`).catch(() => ({ rows: [] }))
+      logEvent('api.products.debug_seller_ids', { existing_ids: (debugRes.rows || []).map(r => r.seller_id) })
       const countRes = await client.query(`SELECT COUNT(*) FROM admin_hub_products WHERE seller_id = $1`, [sid])
       const totalRows = parseInt(countRes.rows[0]?.count || '0', 10)
       const totalPages = Math.ceil(totalRows / pageSize) || 1
@@ -478,6 +483,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
   // Root handles old Billbee "Eigener Webshop" format: ?Action=GetOrders&Key=<base64>
   httpApp.get('/api/billbee', (req, res) => {
     const action = req.query.Action || req.query.action
+    logEvent('api.billbee.root', { action: action || 'ping', hasKey: !!(req.query.Key || req.query.key) })
     if (!action) return ping(req, res)
     // Map old-format params to internal names
     if (req.query.Page) req.query.page = req.query.Page
