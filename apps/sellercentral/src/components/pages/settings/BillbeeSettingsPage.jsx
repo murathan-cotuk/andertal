@@ -132,24 +132,29 @@ export default function BillbeeSettingsPage({ embedded = false }) {
 
   const formInner = (
     <BlockStack gap="400">
-      <Banner tone="info">
-        <BlockStack gap="200">
-          <Text as="p" variant="bodySm">
-            <strong>Billbee:</strong>{" "}
-            <strong>Einstellungen → Kanäle → Shop hinzufügen → „Eigener Webshop (Billbee API)“</strong> (nicht die alte „Shopverbindung“ mit anderen Feldern).
+      <Banner tone=”info”>
+        <BlockStack gap=”200”>
+          <Text as=”p” variant=”bodySm”>
+            <strong>Billbee:</strong>{“ “}
+            <strong>Einstellungen → Kanäle → Shop hinzufügen → „Eigener Webshop (Billbee API)”</strong>
           </Text>
-          <Text as="p" variant="bodySm">
-            <strong>Shop-URL / API-Basis:</strong> exakt die „URL (API-Basis)“ von unten kopieren (endet auf{" "}
-            <Text as="span" fontWeight="semibold">/api/billbee</Text>). Billbee ruft darunter{" "}
-            <code>/orders</code>, <code>/products</code>, <code>/stock</code> auf.
+          <Text as=”p” variant=”bodySm”>
+            Felder in Billbee ausfüllen:
           </Text>
-          <Text as="p" variant="bodySm">
-            <strong>Anmeldung (HTTP Basic):</strong> Billbee setzt oft den <strong>Schlüssel</strong> (<code>andertal_seller_…</code>) als{" "}
-            <strong>Benutzername</strong> und das <strong>Basic-Auth-Passwort</strong> aus Sellercentral als Passwort — dann das Feld „Schlüssel“ in Billbee ggf. leer lassen oder denselben Wert, je nach Maske.
-            Alternativ funktioniert <strong>Benutzername = E-Mail</strong> (wie unten) und <strong>Passwort = Basic-Auth-Passwort</strong>.
+          <Text as=”p” variant=”bodySm”>
+            • <strong>Shop-URL</strong> → „URL (API-Basis)” unten kopieren (endet auf <code>/api/billbee</code>)
           </Text>
-          <Text as="p" variant="bodySm" tone="subdued">
-            Du brauchst <strong>kein</strong> Billbee.io Developer-API-Token in .env für diese Verbindung — Andertal ist der Server, Billbee ist der Client.
+          <Text as=”p” variant=”bodySm”>
+            • <strong>Schlüssel / API-Key</strong> → „Schlüssel (API-Key)” unten kopieren (<code>andertal_seller_…</code>)
+          </Text>
+          <Text as=”p” variant=”bodySm”>
+            • <strong>Benutzername</strong> → „Basic Auth Benutzername” (deine E-Mail) <em>oder</em> den Schlüssel nochmal eintragen
+          </Text>
+          <Text as=”p” variant=”bodySm”>
+            • <strong>Passwort</strong> → „Basic Auth Passwort” unten kopieren
+          </Text>
+          <Text as=”p” variant=”bodySm” tone=”subdued”>
+            Tipp: Wenn Billbee nur das Schlüssel-Feld verwendet (kein Benutzername/Passwort), reicht der Schlüssel allein für die Verbindung.
           </Text>
         </BlockStack>
       </Banner>
