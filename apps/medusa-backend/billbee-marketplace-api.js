@@ -328,11 +328,24 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       client = getProductsDbClient()
       await client.connect()
 
-      const where = ['seller_id = $1']
+      // Match orders directly by seller_id OR via order items linked to this seller's listings/products
+      const sellerFilter = `(
+        seller_id = $1
+        OR EXISTS (
+          SELECT 1 FROM store_order_items oi
+          WHERE oi.order_id = store_orders.id
+          AND (
+            EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $1)
+            OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $1)
+          )
+        )
+      )`
       const params = [sid]
-      if (minDate) { params.push(minDate); where.push(`created_at >= $${params.length}`) }
+      const extraWhere = []
+      if (minDate) { params.push(minDate); extraWhere.push(`created_at >= $${params.length}`) }
+      const fullWhere = [sellerFilter, ...extraWhere].join(' AND ')
 
-      const countRes = await client.query(`SELECT COUNT(*) FROM store_orders WHERE ${where.join(' AND ')}`, params)
+      const countRes = await client.query(`SELECT COUNT(*) FROM store_orders WHERE ${fullWhere}`, params)
       const totalRows = parseInt(countRes.rows[0]?.count || '0', 10)
       const totalPages = Math.ceil(totalRows / pageSize) || 1
 
@@ -343,7 +356,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
                 total_cents, currency, subtotal_cents, shipping_cents, discount_cents,
                 created_at, updated_at
          FROM store_orders
-         WHERE ${where.join(' AND ')}
+         WHERE ${fullWhere}
          ORDER BY created_at DESC
          LIMIT $${params.length - 1} OFFSET $${params.length}`,
         params,
@@ -414,16 +427,23 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
     try {
       client = getProductsDbClient()
       await client.connect()
-      // Debug: log distinct seller_ids in table so we can spot mismatches
-      const debugRes = await client.query(`SELECT DISTINCT seller_id FROM admin_hub_products LIMIT 10`).catch(() => ({ rows: [] }))
-      logEvent('api.products.debug_seller_ids', { existing_ids: (debugRes.rows || []).map(r => r.seller_id) })
-      const countRes = await client.query(`SELECT COUNT(*) FROM admin_hub_products WHERE seller_id = $1`, [sid])
+      // Products are stored with seller_id = null (platform-owned master catalog).
+      // Seller association is tracked in admin_hub_seller_listings.
+      const countRes = await client.query(
+        `SELECT COUNT(*) FROM admin_hub_seller_listings sl
+         JOIN admin_hub_products p ON p.id = sl.product_id
+         WHERE sl.seller_id = $1`,
+        [sid],
+      )
       const totalRows = parseInt(countRes.rows[0]?.count || '0', 10)
       const totalPages = Math.ceil(totalRows / pageSize) || 1
       const r = await client.query(
-        `SELECT id, title, handle, sku, description, status, price_cents, inventory, metadata, created_at, updated_at
-         FROM admin_hub_products WHERE seller_id = $1
-         ORDER BY updated_at DESC LIMIT $2 OFFSET $3`,
+        `SELECT p.id, p.title, p.handle, p.description, p.metadata, p.created_at, p.updated_at,
+                sl.price_cents, sl.inventory, sl.status, sl.sku
+         FROM admin_hub_seller_listings sl
+         JOIN admin_hub_products p ON p.id = sl.product_id
+         WHERE sl.seller_id = $1
+         ORDER BY p.updated_at DESC LIMIT $2 OFFSET $3`,
         [sid, pageSize, (page - 1) * pageSize],
       )
       await client.end(); client = null
@@ -433,7 +453,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         Id: String(p.id),
         Title: p.title || '',
         SKU: p.sku || '',
-        EAN: null,
+        EAN: p.metadata?.ean || null,
         ShortDescription: p.description || '',
         Price: p.price_cents != null ? Math.round(Number(p.price_cents)) / 100 : 0,
         Quantity: Number(p.inventory) || 0,
@@ -460,8 +480,11 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       client = getProductsDbClient()
       await client.connect()
       const r = await client.query(
-        `SELECT id::text AS product_id, COALESCE(inventory, 0)::integer AS stock_quantity
-         FROM admin_hub_products WHERE seller_id = $1`, [sid])
+        `SELECT sl.product_id::text AS product_id, COALESCE(sl.inventory, 0)::integer AS stock_quantity
+         FROM admin_hub_seller_listings sl
+         WHERE sl.seller_id = $1`,
+        [sid],
+      )
       await client.end(); client = null
       res.json({ stock: (r.rows || []).map((row) => ({ product_id: row.product_id, stock_quantity: row.stock_quantity })) })
     } catch (e) {
