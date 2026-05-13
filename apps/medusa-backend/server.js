@@ -10698,14 +10698,17 @@ async function start() {
 
     // Batch-register image URLs from Excel import into seller's media folder
     const mediaImportUrlsPOST = async (req, res) => {
-      const { urls, folder_name } = req.body || {}
+      const { urls, folder_name, target_seller_id } = req.body || {}
       if (!Array.isArray(urls) || urls.length === 0) return res.status(400).json({ message: 'urls array required' })
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
         const u = req.sellerUser
-        const sellerId = u?.is_superuser ? null : (u?.seller_id || null)
+        // Superuser can pass target_seller_id to register images under a specific seller
+        const sellerId = u?.is_superuser
+          ? (target_seller_id ? String(target_seller_id).trim() : null)
+          : (u?.seller_id || null)
         // Resolve folder: get or create "Excel Import" folder for this seller
         let folderName = (folder_name || '').trim()
         if (!folderName) {

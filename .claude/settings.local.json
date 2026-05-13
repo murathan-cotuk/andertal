@@ -125,7 +125,8 @@
       "PowerShell(\\(Get-Content \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\components\\\\pages\\\\content\\\\LandingPageEditor.jsx\" | Measure-Object -Line\\).Lines)",
       "PowerShell(\\(Get-Content \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\landing\\\\LandingContainers.jsx\" | Measure-Object -Line\\).Lines)",
       "PowerShell(head *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\" -Name -Recurse -Include \"server.js\"#)"
     ]
   }
 }

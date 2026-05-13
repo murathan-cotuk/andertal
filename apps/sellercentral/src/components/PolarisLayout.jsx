@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, forwardRef, useMemo } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import {
@@ -54,6 +54,46 @@ function normalizeSellerCentralLogoUrl(raw) {
   if (/^\/\/[^/]/i.test(s)) return s;
   if (s.startsWith("/") && s.length > 1) return s;
   return null;
+}
+
+/** logo_config.sellercentral.{desktop,tablet,mobile} + legacy flat fields */
+function buildSellercentralLogoSlotsFromSettings(d) {
+  const legUrl = String(d?.sellercentral_logo_url ?? "").trim();
+  const legH = d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 30;
+  const pad = (b) => ({
+    pt: Number(b?.pt || 0),
+    pr: Number(b?.pr || 0),
+    pb: Number(b?.pb || 0),
+    pl: Number(b?.pl || 0),
+  });
+  const sc = d?.logo_config?.sellercentral;
+  if (!sc || typeof sc !== "object") {
+    const u = normalizeSellerCentralLogoUrl(legUrl) ?? "";
+    const slot = (height) => ({ url: u || "", height, ...pad({}) });
+    return { desktop: slot(legH), tablet: slot(28), mobile: slot(26) };
+  }
+  const deskBlock = sc.desktop || {};
+  const deskUrlStr = String(deskBlock.url ?? "").trim() || legUrl;
+  const desktop = {
+    url: normalizeSellerCentralLogoUrl(deskUrlStr) ?? "",
+    height: deskBlock.height != null ? Number(deskBlock.height) : legH,
+    ...pad(deskBlock),
+  };
+  const tabBlock = sc.tablet || {};
+  const tabUrlStr = String(tabBlock.url ?? "").trim() || deskUrlStr;
+  const tablet = {
+    url: normalizeSellerCentralLogoUrl(tabUrlStr) ?? "",
+    height: tabBlock.height != null ? Number(tabBlock.height) : 28,
+    ...pad(tabBlock),
+  };
+  const mobBlock = sc.mobile || {};
+  const mobUrlStr = String(mobBlock.url ?? "").trim() || deskUrlStr;
+  const mobile = {
+    url: normalizeSellerCentralLogoUrl(mobUrlStr) ?? "",
+    height: mobBlock.height != null ? Number(mobBlock.height) : 26,
+    ...pad(mobBlock),
+  };
+  return { desktop, tablet, mobile };
 }
 
 const GroupedDropdownSearch = dynamic(
@@ -402,17 +442,15 @@ export default function PolarisLayout({ children }) {
   const [approvalStatus, setApprovalStatus] = useState(
     typeof window !== "undefined" ? String(localStorage.getItem("sellerApprovalStatus") || "").toLowerCase() : ""
   );
-  const [platformBranding, setPlatformBranding] = useState({
-    sellercentral_logo_url: "",
-    sellercentral_favicon_url: "",
-    sellercentral_logo_height: 30,
-    logo_pt: 0,
-    logo_pr: 0,
-    logo_pb: 0,
-    logo_pl: 0,
+  const [scLogoByDevice, setScLogoByDevice] = useState({
+    desktop: { url: "", height: 30, pt: 0, pr: 0, pb: 0, pl: 0 },
+    tablet: { url: "", height: 28, pt: 0, pr: 0, pb: 0, pl: 0 },
+    mobile: { url: "", height: 26, pt: 0, pr: 0, pb: 0, pl: 0 },
   });
+  const [sellercentralFavicon, setSellercentralFavicon] = useState("");
+  const [logoViewportTier, setLogoViewportTier] = useState("desktop");
 
-  useEffect(() => {
+  const loadSellercentralShellBranding = useCallback(() => {
     if (typeof window === "undefined") return;
     const token = localStorage.getItem("sellerToken");
     const base = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "");
@@ -423,19 +461,49 @@ export default function PolarisLayout({ children }) {
     })
       .then((r) => r.json())
       .then((d) => {
-        const lcDt = d?.logo_config?.sellercentral?.desktop || {};
-        setPlatformBranding({
-          sellercentral_logo_url: normalizeSellerCentralLogoUrl(lcDt.url || d?.sellercentral_logo_url) ?? "",
-          sellercentral_favicon_url: (d?.sellercentral_favicon_url || "").trim(),
-          sellercentral_logo_height: lcDt.height != null ? Number(lcDt.height) : (d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 30),
-          logo_pt: Number(lcDt.pt || 0),
-          logo_pr: Number(lcDt.pr || 0),
-          logo_pb: Number(lcDt.pb || 0),
-          logo_pl: Number(lcDt.pl || 0),
-        });
+        setScLogoByDevice(buildSellercentralLogoSlotsFromSettings(d || {}));
+        setSellercentralFavicon(String(d?.sellercentral_favicon_url ?? "").trim());
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    loadSellercentralShellBranding();
+  }, [loadSellercentralShellBranding]);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const readTier = () => {
+      const w = window.innerWidth;
+      if (w < 768) return "mobile";
+      if (w < 1024) return "tablet";
+      return "desktop";
+    };
+    setLogoViewportTier(readTier());
+    const onResize = () => setLogoViewportTier(readTier());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onRefresh = () => loadSellercentralShellBranding();
+    window.addEventListener("andertal-sellercentral-branding-refresh", onRefresh);
+    return () => window.removeEventListener("andertal-sellercentral-branding-refresh", onRefresh);
+  }, [loadSellercentralShellBranding]);
+
+  const platformBranding = useMemo(() => {
+    const slot = scLogoByDevice[logoViewportTier] || scLogoByDevice.desktop;
+    return {
+      sellercentral_logo_url: slot?.url || "",
+      sellercentral_favicon_url: sellercentralFavicon,
+      sellercentral_logo_height: slot?.height ?? 30,
+      logo_pt: slot?.pt ?? 0,
+      logo_pr: slot?.pr ?? 0,
+      logo_pb: slot?.pb ?? 0,
+      logo_pl: slot?.pl ?? 0,
+    };
+  }, [scLogoByDevice, logoViewportTier, sellercentralFavicon]);
 
   useEffect(() => {
     const fav = (platformBranding.sellercentral_favicon_url || "").trim();

@@ -304,7 +304,7 @@ export default function MediaPage() {
     const own = [];
     const g = new Map();
     for (const m of media) {
-      if (isOwnMediaItem(m, mySellerId)) own.push(m);
+      if (isSuperuserPlatformOrSelfItem(m, mySellerId)) own.push(m);
       else {
         const sid = String(m.seller_id || "unknown");
         if (!g.has(sid)) g.set(sid, []);

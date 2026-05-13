@@ -427,22 +427,29 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
     try {
       client = getProductsDbClient()
       await client.connect()
-      // Products are stored with seller_id = null (platform-owned master catalog).
-      // Seller association is tracked in admin_hub_seller_listings.
+      // Products come from two sources:
+      // 1. admin_hub_seller_listings — seller has an explicit listing (price/inventory override)
+      // 2. admin_hub_products.seller_id — product was created directly by/for this seller
       const countRes = await client.query(
-        `SELECT COUNT(*) FROM admin_hub_seller_listings sl
-         JOIN admin_hub_products p ON p.id = sl.product_id
-         WHERE sl.seller_id = $1`,
+        `SELECT COUNT(*) FROM (
+           SELECT p.id
+           FROM admin_hub_products p
+           LEFT JOIN admin_hub_seller_listings sl ON sl.product_id = p.id AND sl.seller_id = $1
+           WHERE p.seller_id = $1 OR sl.seller_id = $1
+         ) sub`,
         [sid],
       )
       const totalRows = parseInt(countRes.rows[0]?.count || '0', 10)
       const totalPages = Math.ceil(totalRows / pageSize) || 1
       const r = await client.query(
         `SELECT p.id, p.title, p.handle, p.description, p.metadata, p.created_at, p.updated_at,
-                sl.price_cents, sl.inventory, sl.status, sl.sku
-         FROM admin_hub_seller_listings sl
-         JOIN admin_hub_products p ON p.id = sl.product_id
-         WHERE sl.seller_id = $1
+                COALESCE(sl.price_cents, p.price_cents) AS price_cents,
+                COALESCE(sl.inventory, p.inventory) AS inventory,
+                COALESCE(sl.status, p.status) AS status,
+                COALESCE(sl.sku, p.sku) AS sku
+         FROM admin_hub_products p
+         LEFT JOIN admin_hub_seller_listings sl ON sl.product_id = p.id AND sl.seller_id = $1
+         WHERE p.seller_id = $1 OR sl.seller_id = $1
          ORDER BY p.updated_at DESC LIMIT $2 OFFSET $3`,
         [sid, pageSize, (page - 1) * pageSize],
       )

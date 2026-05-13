@@ -71,7 +71,7 @@ async function fetchJson(url, init = {}) {
   return res.json();
 }
 
-async function registerImportedMediaUrls(backendUrl, authHeaders, urls) {
+async function registerImportedMediaUrls(backendUrl, authHeaders, urls, targetSellerId = null) {
   const cleaned = [...new Set((urls || []).map((u) => String(u || "").trim()).filter((u) => /^https?:\/\//i.test(u)))];
   if (!cleaned.length) return null;
 
@@ -88,7 +88,7 @@ async function registerImportedMediaUrls(backendUrl, authHeaders, urls) {
       const mr = await fetch(`${backendUrl}/admin-hub/v1/media/import-urls`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ urls: chunk }),
+        body: JSON.stringify({ urls: chunk, ...(targetSellerId ? { target_seller_id: targetSellerId } : {}) }),
       });
       if (mr.ok) {
         const data = await mr.json().catch(() => ({}));
@@ -1151,6 +1151,7 @@ export async function POST(request) {
     const results = { created: 0, updated: 0, failed: 0, errors: [] };
     const authHeaders = sellerToken ? { Authorization: `Bearer ${sellerToken}` } : {};
     const collectedImageUrls = new Set(); // all image URLs from this import batch
+    let detectedSellerIdFromResponse = null; // captured from first successful product creation
 
     for (const [sku, parentRow] of parents) {
       const childRows = children.get(sku) || [];
@@ -1251,6 +1252,11 @@ export async function POST(request) {
           results.errors.push({ sku, error: err?.message || `HTTP ${res.status}` });
         } else {
           results.created++;
+          if (!detectedSellerIdFromResponse) {
+            const created = await res.clone().json().catch(() => null);
+            const sid = created?.product?.seller_id || created?.seller_id || null;
+            if (sid) detectedSellerIdFromResponse = String(sid).trim();
+          }
         }
       } catch (e) {
         results.failed++;
@@ -1262,7 +1268,7 @@ export async function POST(request) {
     // Robust mode: chunked batch endpoint + fallback to add-url (older backend deployments).
     let mediaResult = null;
     if (collectedImageUrls.size > 0 && sellerToken) {
-      mediaResult = await registerImportedMediaUrls(backendUrl, authHeaders, [...collectedImageUrls]);
+      mediaResult = await registerImportedMediaUrls(backendUrl, authHeaders, [...collectedImageUrls], detectedSellerIdFromResponse);
     }
 
     return Response.json({

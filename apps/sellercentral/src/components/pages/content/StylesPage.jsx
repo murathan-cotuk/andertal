@@ -884,6 +884,9 @@ export default function StylesPage() {
       await client.updateSellerSettings({ seller_id: "default", ...branding });
       setSavedSnapshot(JSON.stringify(styles));
       setBrandingSnapshot(JSON.stringify(branding));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("andertal-sellercentral-branding-refresh"));
+      }
       setSavedMsg("Stile gespeichert.");
       setTimeout(() => setSavedMsg(""), 4000);
     } catch (e) {
