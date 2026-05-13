@@ -37,3 +37,4 @@
 
 
 -- sellercentralde sellerlar verification sayfasinda bu islemi tamamlamak icin basladiginda söyle bir secici var: "Ich habe die rechtlichen Vereinbarungen zwischen Verkäufer und Plattform gelesen und akzeptiere sie." ancak okunabilecek bir metin, bir belge yok. bunu nasil ayarlamak gerekiyor?
+

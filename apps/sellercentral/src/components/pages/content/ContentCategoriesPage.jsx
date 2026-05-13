@@ -100,7 +100,7 @@ function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect }) {
           alignItems: "center",
           paddingTop: 10,
           paddingBottom: 10,
-          paddingLeft: 16 + depth * 24,
+          paddingLeft: 16 + depth * 8,
           paddingRight: 16,
           borderBottom: "1px solid #f1f1f1",
           background: depth === 0 ? "#fafafa" : "#fff",
@@ -163,7 +163,7 @@ function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect }) {
       </div>
 
       {hasKids && open && (
-        <div style={{ borderLeft: "3px solid #e5e7eb", marginLeft: 16 + depth * 24 + 20 }}>
+        <div style={{ borderLeft: "3px solid #e5e7eb", marginLeft: 16 + depth * 8 + 20 }}>
           {node.children.map(child => (
             <TreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} selectedIds={selectedIds} onToggleSelect={onToggleSelect} />
           ))}
