@@ -18,7 +18,7 @@ import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { useStoreCampaignDiscount } from "@/hooks/useStoreCampaignDiscount";
-import { getBruttoCentsFromPricesMap } from "@/lib/product-price";
+import { getBruttoCentsFromPricesMap, getUvpCentsFromPricesMap } from "@/lib/product-price";
 import { findShippingGroup, resolveShippingQuoteCents, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import Carousel from "@/components/Carousel";
 import { StarRating } from "@/components/ProductCard";
@@ -42,7 +42,6 @@ import MadeInEuropeOverlay from "@/components/MadeInEuropeOverlay";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 import { isEuOriginVerified } from "@andertal/shop-theme";
 import { useShopStyles } from "@/context/ShopStylesContext";
-import { getBruttoCentsFromPricesMap, getUvpCentsFromPricesMap } from "@/lib/product-price";
 
 const Container = styled.div`
   max-width: 100%;
