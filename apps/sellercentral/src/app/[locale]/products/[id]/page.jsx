@@ -13,6 +13,7 @@ export default function ProductDetailRoute() {
   const router = useRouter();
   const idOrHandle = params?.id;
   const [product, setProduct] = useState(null);
+  const [sellerListings, setSellerListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const client = getMedusaAdminClient();
@@ -24,12 +25,14 @@ export default function ProductDetailRoute() {
     try {
       setLoading(true);
       setError(null);
-      const data = await client.getAdminHubProduct(idOrHandle);
+      const { product: data, seller_listings } = await client.getAdminHubProductFull(idOrHandle);
       setProduct(data || null);
+      setSellerListings(seller_listings || []);
       if (!data) setError("Product not found");
     } catch (err) {
       setError(err?.message || "Failed to load product");
       setProduct(null);
+      setSellerListings([]);
     } finally {
       setLoading(false);
     }
@@ -91,6 +94,7 @@ export default function ProductDetailRoute() {
         idOrHandle={idOrHandle}
         isNew={isNewProduct}
         onReload={fetchProduct}
+        sellerListings={sellerListings}
       />
     </DashboardLayout>
   );

@@ -269,7 +269,7 @@ function changeRequestSellerLabel(cr) {
   );
 }
 
-export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload }) {
+export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, sellerListings = [] }) {
   const router = useRouter();
   const locale = useLocale();
   const client = getMedusaAdminClient();
@@ -1741,6 +1741,38 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               )}
             </BlockStack>
           </Banner>
+        </Box>
+      )}
+
+      {!isNew && isSuperuser && sellerListings.length > 0 && (
+        <Box paddingBlockEnd="200">
+          <Card>
+            <BlockStack gap="200">
+              <Text as="h2" variant="bodyMd" fontWeight="semibold">
+                {locale === "tr" ? "Bu ürünü listeleyen satıcılar" : locale === "de" ? "Anbieter die dieses Produkt listen" : "Sellers listing this product"}
+              </Text>
+              <Divider />
+              {sellerListings.map((sl) => (
+                <InlineStack key={sl.id} gap="400" blockAlign="center" wrap>
+                  <Text as="span" variant="bodySm" fontWeight="semibold">
+                    {sl.shop_name || sl.email || sl.seller_id}
+                  </Text>
+                  {sl.email && sl.shop_name && (
+                    <Text as="span" variant="bodyXs" tone="subdued">{sl.email}</Text>
+                  )}
+                  <Text as="span" variant="bodyXs" tone="subdued">
+                    {sl.price_cents != null ? `${(sl.price_cents / 100).toFixed(2)} €` : "—"}
+                  </Text>
+                  <Text as="span" variant="bodyXs" tone="subdued">
+                    {locale === "tr" ? `Stok: ${sl.inventory ?? 0}` : locale === "de" ? `Bestand: ${sl.inventory ?? 0}` : `Stock: ${sl.inventory ?? 0}`}
+                  </Text>
+                  <Text as="span" variant="bodyXs" tone={sl.status === "active" ? "success" : "subdued"}>
+                    {sl.status ?? "—"}
+                  </Text>
+                </InlineStack>
+              ))}
+            </BlockStack>
+          </Card>
         </Box>
       )}
 

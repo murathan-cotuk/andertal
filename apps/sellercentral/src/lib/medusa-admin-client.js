@@ -173,6 +173,12 @@ class MedusaAdminClient {
     return res?.product ?? res;
   }
 
+  /** GET /admin-hub/products/:id – returns { product, seller_listings } */
+  async getAdminHubProductFull(idOrHandle) {
+    const res = await this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}`);
+    return { product: res?.product ?? null, seller_listings: res?.seller_listings ?? [] };
+  }
+
   /** PUT /admin-hub/products/:id – ürün güncelle (id veya handle) */
   async updateAdminHubProduct(idOrHandle, data) {
     const res = await this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}`, {

@@ -4053,10 +4053,18 @@ async function start() {
 
         if (incomingEan) {
           const allProds = await listAdminHubProductsDb({ limit: 5000 })
-          // Prefer true master products (seller_id = null) — they are the canonical catalog entry
-          // Fall back to any product with this EAN (legacy mode where sellers own their rows)
-          const truemaster = allProds.find((p) => extractEanFromHubProductRow(p) === incomingEan && !p.seller_id)
-          masterProduct = truemaster || allProds.find((p) => extractEanFromHubProductRow(p) === incomingEan) || null
+          // Match by normalizeStoreEan (strips non-digits). Also accept stored EANs whose
+          // raw trimmed value normalizes to the same digits (belt-and-suspenders for EANs
+          // that were stored with hyphens/spaces via normalizeEanValue).
+          const eanMatchesProd = (p) => {
+            const e = extractEanFromHubProductRow(p)
+            if (e && e === incomingEan) return true
+            const rawMeta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+            const rawEan = String(rawMeta.ean ?? '').trim()
+            return rawEan && normalizeStoreEan(rawEan) === incomingEan
+          }
+          const truemaster = allProds.find((p) => eanMatchesProd(p) && !p.seller_id)
+          masterProduct = truemaster || allProds.find((p) => eanMatchesProd(p)) || null
         }
 
         if (masterProduct) {
@@ -4086,6 +4094,45 @@ async function start() {
             }
           }
           await lc.end()
+
+          // Queue change requests for shared fields that differ from the master.
+          // The seller is linked regardless — change requests are for superuser review only.
+          if (callerSellerId) {
+            const masterMeta = masterProduct.metadata && typeof masterProduct.metadata === 'object' ? masterProduct.metadata : {}
+            const LISTING_ONLY_META = ['shipping_group_id', 'brand_id', 'publish_date', 'seller_name', 'shop_name', 'seller_id', 'seller']
+            const crFields = []
+            if (body.title && String(body.title || '').trim() !== String(masterProduct.title || '').trim()) {
+              crFields.push({ field: 'title', old: masterProduct.title || null, val: body.title || '' })
+            }
+            if (body.description && String(body.description || '') !== String(masterProduct.description || '')) {
+              crFields.push({ field: 'description', old: masterProduct.description || null, val: body.description || '' })
+            }
+            for (const mk of Object.keys(incomingMeta).filter((k) => !LISTING_ONLY_META.includes(k))) {
+              const oldStr = JSON.stringify(masterMeta[mk] ?? null)
+              const newStr = JSON.stringify(incomingMeta[mk] ?? null)
+              if (oldStr !== newStr) {
+                crFields.push({ field: `metadata.${mk}`, old: masterMeta[mk] == null ? null : JSON.stringify(masterMeta[mk]), val: incomingMeta[mk] == null ? '' : JSON.stringify(incomingMeta[mk]) })
+              }
+            }
+            if (crFields.length > 0) {
+              const dbUrlCr = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+              const { Client: ClientCr } = require('pg')
+              const qcr = new ClientCr({ connectionString: dbUrlCr, ssl: dbUrlCr.includes('render.com') ? { rejectUnauthorized: false } : false })
+              try {
+                await qcr.connect()
+                for (const { field, old: oldVal, val: newVal } of crFields) {
+                  await qcr.query(
+                    `INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value) VALUES ($1,$2,'pending',$3,$4,$5)`,
+                    [masterProduct.id, callerSellerId, field, oldVal, newVal],
+                  )
+                }
+              } finally {
+                try { await qcr.end() } catch (_) {}
+              }
+              queuedMetaSuggestionCount += crFields.length
+            }
+          }
+
           // Seller onboarding copy: keep shared catalog data, but clear seller-owned fields.
           const sellerViewProduct = {
             ...masterProduct,
@@ -4127,7 +4174,52 @@ async function start() {
         const masterBody = { ...body, seller_id: null, seller: null }
         if (masterBody.metadata) masterBody.metadata.seller_id = undefined
         const row = await createAdminHubProductDb(masterBody)
-        if (row && row.__error) return res.status(400).json({ message: row.__error })
+        if (row && row.__error) {
+          // Safety net: if EAN conflict slipped past the dedup (e.g. listAdminHubProductsDb
+          // returned [] due to a transient DB error, or EAN format differs), find the
+          // existing master and link the seller instead of surfacing an error.
+          if (callerSellerId && typeof row.__error === 'string' && row.__error.startsWith('EAN already exists:')) {
+            const eanFromErr = row.__error.replace('EAN already exists:', '').trim()
+            let fallbackMaster = null
+            try {
+              const fallbackProds = await listAdminHubProductsDb({ limit: 5000 })
+              const eanMatch = (p) => {
+                const e = extractEanFromHubProductRow(p)
+                return e && (e === eanFromErr || e === normalizeStoreEan(eanFromErr))
+              }
+              fallbackMaster = fallbackProds.find((p) => eanMatch(p) && !p.seller_id)
+                || fallbackProds.find((p) => eanMatch(p))
+                || null
+            } catch (_) {}
+            if (fallbackMaster) {
+              const dbUrl2 = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+              const { Client: Client2 } = require('pg')
+              const lc2 = new Client2({ connectionString: dbUrl2, ssl: dbUrl2.includes('render.com') ? { rejectUnauthorized: false } : false })
+              try {
+                await lc2.connect()
+                const existL = await lc2.query(
+                  'SELECT id FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2',
+                  [fallbackMaster.id, callerSellerId],
+                )
+                let fallbackListing = existL.rows[0] || null
+                if (!fallbackListing) {
+                  const priceCentsFb = typeof body.price === 'number' ? Math.round(body.price * 100) : parseInt(body.price, 10) || 0
+                  const inventoryFb = parseInt(body.inventory, 10) || 0
+                  const lrFb = await lc2.query(
+                    'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+                    [fallbackMaster.id, callerSellerId, priceCentsFb || fallbackMaster.price_cents || 0, inventoryFb, 'active'],
+                  )
+                  fallbackListing = lrFb.rows[0] || null
+                }
+                await lc2.end()
+                return res.status(200).json({ product: fallbackMaster, listing: fallbackListing, deduplicated: true, is_new_master: false, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
+              } catch (_fb) {
+                try { await lc2.end() } catch (__) {}
+              }
+            }
+          }
+          return res.status(400).json({ message: row.__error })
+        }
         if (!row) return res.status(503).json({ message: 'Database not configured or insert failed' })
 
         // Create listing for the seller who submitted
@@ -4211,7 +4303,26 @@ async function start() {
           res.status(404).json({ message: 'Product not found' })
           return
         }
-        res.json({ product })
+        // Attach all seller listings so superuser can see who has listed this product
+        let seller_listings = []
+        try {
+          const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+          const { Client } = require('pg')
+          const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await lc.connect()
+          const lr = await lc.query(
+            `SELECT sl.id, sl.seller_id, sl.price_cents, sl.inventory, sl.status, sl.sku, sl.created_at,
+                    su.first_name, su.last_name, su.email, su.shop_name
+             FROM admin_hub_seller_listings sl
+             LEFT JOIN seller_users su ON TRIM(su.seller_id) = TRIM(sl.seller_id)
+             WHERE sl.product_id = $1
+             ORDER BY sl.created_at ASC`,
+            [product.id],
+          )
+          seller_listings = lr.rows || []
+          await lc.end()
+        } catch (_) {}
+        res.json({ product, seller_listings })
       } catch (err) {
         console.error('Admin Hub product GET error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })

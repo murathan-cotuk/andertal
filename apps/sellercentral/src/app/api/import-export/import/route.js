@@ -1233,7 +1233,11 @@ export async function POST(request) {
           results.created++;
           if (!detectedSellerIdFromResponse) {
             const created = await res.clone().json().catch(() => null);
-            const sid = created?.product?.seller_id || created?.seller_id || null;
+            const sid =
+              created?.listing?.seller_id ||
+              created?.product?.seller_id ||
+              created?.seller_id ||
+              null;
             if (sid) detectedSellerIdFromResponse = String(sid).trim();
           }
         }
