@@ -3025,7 +3025,39 @@ async function start() {
       try { const r = await client.query(sql, params); return r } finally { await client.end() }
     }
 
-    // Ensure table exists
+    // Ensure tables exist
+    dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_seller_listings (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      product_id UUID NOT NULL,
+      seller_id VARCHAR(255) NOT NULL,
+      price_cents INTEGER NOT NULL DEFAULT 0,
+      inventory INTEGER NOT NULL DEFAULT 0,
+      status VARCHAR(50) NOT NULL DEFAULT 'active',
+      sku VARCHAR(255),
+      shipping_group_id VARCHAR(255),
+      brand_id VARCHAR(255),
+      publish_date TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(product_id, seller_id)
+    )`).catch(() => {})
+    dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_seller ON admin_hub_seller_listings(seller_id)`).catch(() => {})
+    dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_product ON admin_hub_seller_listings(product_id)`).catch(() => {})
+    dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_product_change_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      product_id UUID NOT NULL,
+      seller_id VARCHAR(255) NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'pending',
+      field_name VARCHAR(255) NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      reviewer_note TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`).catch(() => {})
+    dbQ(`CREATE INDEX IF NOT EXISTS idx_pcr_product ON admin_hub_product_change_requests(product_id)`).catch(() => {})
+    dbQ(`CREATE INDEX IF NOT EXISTS idx_pcr_status ON admin_hub_product_change_requests(status)`).catch(() => {})
+
     dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_metafield_definitions (
       key varchar(120) PRIMARY KEY,
       label varchar(255),
@@ -3711,12 +3743,16 @@ async function start() {
         const where = []
         if (sellerId) {
           const p = params.length + 1
+          // Use a safe EXISTS that only runs if the table exists (prevents crash on fresh deployments)
           where.push(
             '(' +
               'seller_id = $' + p +
               ' OR COALESCE(NULLIF(TRIM(metadata->>\'seller_id\'), \'\'), NULL) = $' + p +
               ' OR COALESCE(NULLIF(TRIM(metadata->>\'seller\'), \'\'), NULL) = $' + p +
-              ' OR EXISTS (SELECT 1 FROM admin_hub_seller_listings _sl WHERE _sl.product_id = id AND TRIM(_sl.seller_id) = $' + p + ')' +
+              ' OR EXISTS (' +
+                'SELECT 1 FROM admin_hub_seller_listings _sl' +
+                ' WHERE _sl.product_id = admin_hub_products.id AND TRIM(_sl.seller_id) = $' + p +
+              ')' +
             ')'
           )
           params.push(sellerId)
@@ -4095,25 +4131,79 @@ async function start() {
           }
           await lc.end()
 
-          // Queue change requests for shared fields that differ from the master.
-          // The seller is linked regardless — change requests are for superuser review only.
+          // If master has empty title/description, fill them from the seller's import data
+          // (no approval needed for filling blank catalog fields).
+          // If master already has a value AND seller provides a different one → queue change request.
           if (callerSellerId) {
             const masterMeta = masterProduct.metadata && typeof masterProduct.metadata === 'object' ? masterProduct.metadata : {}
             const LISTING_ONLY_META = ['shipping_group_id', 'brand_id', 'publish_date', 'seller_name', 'shop_name', 'seller_id', 'seller']
             const crFields = []
-            if (body.title && String(body.title || '').trim() !== String(masterProduct.title || '').trim()) {
-              crFields.push({ field: 'title', old: masterProduct.title || null, val: body.title || '' })
+            const fillFields = {} // fields to fill directly into master (master was empty)
+
+            const masterTitle = (masterProduct.title || '').trim()
+            const incomingTitle = (body.title || '').trim()
+            if (incomingTitle && !masterTitle) {
+              fillFields.title = incomingTitle
+            } else if (incomingTitle && masterTitle && incomingTitle !== masterTitle) {
+              crFields.push({ field: 'title', old: masterTitle, val: incomingTitle })
             }
-            if (body.description && String(body.description || '') !== String(masterProduct.description || '')) {
-              crFields.push({ field: 'description', old: masterProduct.description || null, val: body.description || '' })
+
+            const masterDesc = (masterProduct.description || '').trim()
+            const incomingDesc = (body.description || '').trim()
+            if (incomingDesc && !masterDesc) {
+              fillFields.description = incomingDesc
+            } else if (incomingDesc && masterDesc && incomingDesc !== masterDesc) {
+              crFields.push({ field: 'description', old: masterDesc, val: incomingDesc })
             }
+
             for (const mk of Object.keys(incomingMeta).filter((k) => !LISTING_ONLY_META.includes(k))) {
-              const oldStr = JSON.stringify(masterMeta[mk] ?? null)
-              const newStr = JSON.stringify(incomingMeta[mk] ?? null)
-              if (oldStr !== newStr) {
-                crFields.push({ field: `metadata.${mk}`, old: masterMeta[mk] == null ? null : JSON.stringify(masterMeta[mk]), val: incomingMeta[mk] == null ? '' : JSON.stringify(incomingMeta[mk]) })
+              const masterVal = masterMeta[mk]
+              const incomingVal = incomingMeta[mk]
+              const masterEmpty = masterVal == null || (typeof masterVal === 'string' && masterVal.trim() === '')
+              const incomingStr = JSON.stringify(incomingVal ?? null)
+              const masterStr = JSON.stringify(masterVal ?? null)
+              if (masterEmpty && incomingVal != null) {
+                fillFields[`metadata.${mk}`] = incomingVal
+              } else if (!masterEmpty && incomingStr !== masterStr) {
+                crFields.push({ field: `metadata.${mk}`, old: masterVal == null ? null : JSON.stringify(masterVal), val: incomingVal == null ? '' : JSON.stringify(incomingVal) })
               }
             }
+
+            // Apply fill-in updates to master (fill empty fields only, no approval needed)
+            if (Object.keys(fillFields).length > 0) {
+              const dbUrlFill = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+              const { Client: ClientFill } = require('pg')
+              const lcFill = new ClientFill({ connectionString: dbUrlFill, ssl: dbUrlFill.includes('render.com') ? { rejectUnauthorized: false } : false })
+              try {
+                await lcFill.connect()
+                const setClause = []
+                const fillParams = []
+                if (fillFields.title) { setClause.push(`title = $${fillParams.length + 1}`); fillParams.push(fillFields.title) }
+                if (fillFields.description) { setClause.push(`description = $${fillParams.length + 1}`); fillParams.push(fillFields.description) }
+                const metaFillKeys = Object.keys(fillFields).filter((k) => k.startsWith('metadata.'))
+                if (metaFillKeys.length > 0) {
+                  let metaPatch = {}
+                  for (const k of metaFillKeys) metaPatch[k.replace('metadata.', '')] = fillFields[k]
+                  setClause.push(`metadata = metadata || $${fillParams.length + 1}::jsonb`)
+                  fillParams.push(JSON.stringify(metaPatch))
+                }
+                if (setClause.length > 0) {
+                  setClause.push(`updated_at = now()`)
+                  fillParams.push(masterProduct.id)
+                  const upRes = await lcFill.query(
+                    `UPDATE admin_hub_products SET ${setClause.join(', ')} WHERE id = $${fillParams.length} RETURNING title, description, metadata`,
+                    fillParams,
+                  )
+                  if (upRes.rows[0]) {
+                    masterProduct = { ...masterProduct, title: upRes.rows[0].title, description: upRes.rows[0].description, metadata: upRes.rows[0].metadata }
+                  }
+                }
+              } finally {
+                try { await lcFill.end() } catch (_) {}
+              }
+            }
+
+            // Queue change requests for non-empty master fields that the seller wants to change
             if (crFields.length > 0) {
               const dbUrlCr = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
               const { Client: ClientCr } = require('pg')
@@ -4170,10 +4260,9 @@ async function start() {
           return res.status(200).json({ product: sellerViewProduct, listing, deduplicated: true, is_new_master: false, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
         }
 
-        // New product — create master (seller_id = null → superuser-owned)
-        const masterBody = { ...body, seller_id: null, seller: null }
-        if (masterBody.metadata) masterBody.metadata.seller_id = undefined
-        const row = await createAdminHubProductDb(masterBody)
+        // New product — create with seller's ID so it appears in their inventory.
+        // (Listing is also created below for the shared-catalog architecture.)
+        const row = await createAdminHubProductDb(body)
         if (row && row.__error) {
           // Safety net: if EAN conflict slipped past the dedup (e.g. listAdminHubProductsDb
           // returned [] due to a transient DB error, or EAN format differs), find the

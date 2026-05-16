@@ -1,7 +1,9 @@
 /**
- * Resolve image URL for display. Ensures uploads and backend-hosted images
- * always use the shop's configured backend URL (NEXT_PUBLIC_MEDUSA_BACKEND_URL),
- * so images work when backend returns localhost or a different origin.
+ * Resolve image URL for display.
+ *
+ * /uploads/ paths (relative or absolute) are returned as relative paths so the
+ * shop's own rewrite rule proxies them — users see andertal.com URLs, never the
+ * raw api.andertal.com backend.  All other absolute URLs are returned as-is.
  */
 const BACKEND_URL = (typeof process !== "undefined" && process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL) || "http://localhost:9000";
 const BASE = (BACKEND_URL || "").replace(/\/$/, "");
@@ -20,14 +22,18 @@ function getPathname(fullUrl) {
 export function resolveImageUrl(url) {
   if (!url || typeof url !== "string") return "";
   const u = url.trim();
-  // Relative path: prepend backend base
+  if (!u) return "";
+
   if (!u.startsWith("http") && !u.startsWith("//")) {
+    // Relative path: /uploads/... stays relative so shop rewrite proxy serves it
+    if (u.startsWith("/uploads/")) return u;
     return `${BASE}${u.startsWith("/") ? "" : "/"}${u}`;
   }
-  // Absolute URL: if path is /uploads/..., normalize to our backend so it always loads (fixes wrong host e.g. localhost in production)
+
+  // Absolute URL: if path is /uploads/..., strip the host so shop rewrite handles it
   const pathname = getPathname(u);
   if (pathname && pathname.startsWith("/uploads/")) {
-    return `${BASE}${pathname}`;
+    return pathname;
   }
   return u;
 }

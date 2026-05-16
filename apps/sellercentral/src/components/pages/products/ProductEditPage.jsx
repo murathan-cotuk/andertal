@@ -2213,33 +2213,52 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <Text as="h3" variant="bodySm" fontWeight="semibold">Produktdateien</Text>
               {productFiles.length > 0 && (
                 <BlockStack gap="150">
-                  {productFiles.map((file, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
-                      <span style={{ fontSize: 15, flexShrink: 0 }}>
-                        {(String(file.url || "")).toLowerCase().includes(".pdf") ? "📄" : "📎"}
-                      </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <input
-                          type="text"
-                          value={file.name || ""}
-                          onChange={(e) => updateProductFileName(i, e.target.value)}
-                          placeholder="Anzeigename im Shop"
-                          style={{
-                            width: "100%", border: "1px solid #d1d5db", borderRadius: 6,
-                            padding: "4px 8px", fontSize: 13, background: "#fff",
-                            outline: "none", boxSizing: "border-box",
-                          }}
-                        />
-                        <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.url}</div>
+                  {productFiles.map((file, i) => {
+                    const rawUrl = file?.url;
+                    const fileUrl = typeof rawUrl === "string" ? rawUrl : (rawUrl?.url || rawUrl?.href || rawUrl?.src || "");
+                    const resolvedFileUrl = fileUrl
+                      ? (fileUrl.startsWith("http") ? fileUrl : `${getDefaultBaseUrl()}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`)
+                      : "";
+                    const isPdf = fileUrl.toLowerCase().includes(".pdf");
+                    return (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                        <span style={{ fontSize: 15, flexShrink: 0 }}>
+                          {isPdf ? "📄" : "📎"}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <input
+                            type="text"
+                            value={file.name || ""}
+                            onChange={(e) => updateProductFileName(i, e.target.value)}
+                            placeholder="Anzeigename im Shop"
+                            style={{
+                              width: "100%", border: "1px solid #d1d5db", borderRadius: 6,
+                              padding: "4px 8px", fontSize: 13, background: "#fff",
+                              outline: "none", boxSizing: "border-box",
+                            }}
+                          />
+                          {resolvedFileUrl ? (
+                            <a
+                              href={resolvedFileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: 11, color: "#6366f1", marginTop: 2, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                            >
+                              {resolvedFileUrl}
+                            </a>
+                          ) : (
+                            <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>—</div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeProductFile(i)}
+                          style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 16, lineHeight: 1, padding: "2px 4px" }}
+                          title="Entfernen"
+                        >✕</button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeProductFile(i)}
-                        style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 16, lineHeight: 1, padding: "2px 4px" }}
-                        title="Entfernen"
-                      >✕</button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </BlockStack>
               )}
               {addingFile && (

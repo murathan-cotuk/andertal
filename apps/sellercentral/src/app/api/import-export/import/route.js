@@ -65,6 +65,17 @@ function parseNum(val) {
 
 function str(val) {
   if (val == null) return "";
+  if (typeof val === "object") {
+    if (val instanceof Date) return val.toISOString();
+    // ExcelJS hyperlink cell: { text: "...", hyperlink: "..." }
+    if (typeof val.hyperlink === "string" && val.hyperlink) return val.hyperlink.trim();
+    if (typeof val.text === "string" && val.text) return val.text.trim();
+    // ExcelJS formula result
+    if (val.result != null) return String(val.result).trim();
+    // ExcelJS rich text: { richText: [{ text: "..." }, ...] }
+    if (Array.isArray(val.richText)) return val.richText.map((rt) => String(rt.text || "")).join("").trim();
+    return "";
+  }
   return String(val).trim();
 }
 

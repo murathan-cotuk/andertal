@@ -68,6 +68,16 @@ const nextConfig = {
       '@andertal/ui': '../../packages/ui',
     },
   },
+  async rewrites() {
+    const backendBase = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
+    return [
+      {
+        source: "/uploads/:path*",
+        destination: `${backendBase}/uploads/:path*`,
+      },
+    ];
+  },
+
   async headers() {
     // Content-Security-Policy — split across named directives for readability.
     // 'unsafe-inline' + 'unsafe-eval' are required by Next.js inline scripts and

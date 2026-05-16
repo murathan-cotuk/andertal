@@ -2206,8 +2206,10 @@ export default function ProductTemplateMobile() {
           </h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {meta.product_files.map((file, i) => {
-              const url = String(file?.url || "");
+              const rawUrl = file?.url;
+              const url = typeof rawUrl === "string" ? rawUrl : (rawUrl?.url || rawUrl?.href || rawUrl?.src || "");
               const resolvedUrl = resolveImageUrl(url);
+              if (!resolvedUrl || resolvedUrl.includes("[object")) return null;
               const name = String(file?.name || url.split("/").pop().split("?")[0] || "Datei");
               const isPdf = url.toLowerCase().includes(".pdf") || String(file?.type || "").toLowerCase().includes("pdf");
               return (
