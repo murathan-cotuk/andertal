@@ -1214,6 +1214,96 @@ export default function StylesPage() {
             </BlockStack>
         </AccordionCard>
 
+        {isSuperuser && (
+          <AccordionCard
+            title="Made in Europe Badge (Shop)"
+            subtitle="Overlay auf der Produkt-Hauptbildfläche — nur bei verifiziertem EU-Ursprung"
+          >
+            <BlockStack gap="300">
+              <Text as="p" tone="subdued">
+                Bild-URL, Größe und Abstand von links/unten auf der PDP-Galerie (Desktop &amp; Mobil).
+              </Text>
+              <InlineStack gap="200" blockAlign="center">
+                <Button size="slim" onClick={() => setBrandingPickerTarget("made_in_europe_badge_image")}>
+                  Badge-Bild aus Medien
+                </Button>
+                {(styles?.made_in_europe_badge?.image_url || "").trim() ? (
+                  <Button
+                    size="slim"
+                    tone="critical"
+                    variant="plain"
+                    onClick={() =>
+                      setStyles((prev) => ({
+                        ...prev,
+                        made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), image_url: "" },
+                      }))
+                    }
+                  >
+                    Entfernen
+                  </Button>
+                ) : null}
+              </InlineStack>
+              {(styles?.made_in_europe_badge?.image_url || "").trim() ? (
+                <img
+                  src={styles.made_in_europe_badge.image_url}
+                  alt=""
+                  style={{ maxWidth: 200, maxHeight: 80, objectFit: "contain" }}
+                />
+              ) : null}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+                <TextField
+                  label="Breite (px)"
+                  type="number"
+                  value={String(styles?.made_in_europe_badge?.width ?? 88)}
+                  onChange={(v) =>
+                    setStyles((prev) => ({
+                      ...prev,
+                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), width: Number(v) || 88 },
+                    }))
+                  }
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Höhe (px)"
+                  type="number"
+                  value={String(styles?.made_in_europe_badge?.height ?? 32)}
+                  onChange={(v) =>
+                    setStyles((prev) => ({
+                      ...prev,
+                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), height: Number(v) || 32 },
+                    }))
+                  }
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Abstand links (px)"
+                  type="number"
+                  value={String(styles?.made_in_europe_badge?.offset_left ?? 10)}
+                  onChange={(v) =>
+                    setStyles((prev) => ({
+                      ...prev,
+                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), offset_left: Number(v) || 0 },
+                    }))
+                  }
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Abstand unten (px)"
+                  type="number"
+                  value={String(styles?.made_in_europe_badge?.offset_bottom ?? 10)}
+                  onChange={(v) =>
+                    setStyles((prev) => ({
+                      ...prev,
+                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), offset_bottom: Number(v) || 0 },
+                    }))
+                  }
+                  autoComplete="off"
+                />
+              </div>
+            </BlockStack>
+          </AccordionCard>
+        )}
+
         <AccordionCard title="Website-Farben">
             <BlockStack gap="400">
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
@@ -2118,6 +2208,11 @@ export default function StylesPage() {
                   [device]: { ...(p.logo_config?.[section]?.[device] || {}), url: first },
                 },
               },
+            }));
+          } else if (brandingPickerTarget === "made_in_europe_badge_image") {
+            setStyles((prev) => ({
+              ...prev,
+              made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), image_url: first },
             }));
           } else {
             setBranding((p) => ({ ...p, [brandingPickerTarget]: first }));

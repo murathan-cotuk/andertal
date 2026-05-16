@@ -25,6 +25,7 @@ import {
   DropZone,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { appendMediaFileToFormData } from "@/lib/media-upload";
 
 const BACKEND_URL = (
   typeof process !== "undefined"
@@ -170,7 +171,7 @@ export default function MediaPickerModal({
             }
           }
           const fd = new FormData();
-          fd.append("file", file);
+          appendMediaFileToFormData(fd, file);
           return client.uploadMedia(fd, uploadOpts).then((r) => r.url || null);
         })
       )

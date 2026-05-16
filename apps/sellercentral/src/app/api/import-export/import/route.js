@@ -1,8 +1,39 @@
 ﻿import ExcelJS from "exceljs";
 
 const LANGS = ["de", "en", "tr", "fr", "it", "es"];
-const COUNTRIES = ["DE", "FR", "IT", "ES", "TR"];
+/** Legacy per-country Excel columns — still read on import for old templates */
+const LEGACY_PRICE_COUNTRIES = ["DE", "FR", "IT", "ES", "TR"];
+const EUR_PRICE_KEY = "EUR";
 const DEFAULT_BACKEND = "https://api.andertal.com";
+
+/** Build metadata.prices block: single EUR list price (shop reads EUR / DE fallback). */
+function collectEurPriceBlock(get) {
+  let brutto =
+    parseCents(get("price")) ??
+    parseCents(get("price_brutto"));
+  let uvp = parseCents(get("price_uvp"));
+  let sale = parseCents(get("price_sale"));
+  if (brutto == null && uvp == null && sale == null) {
+    for (const c of LEGACY_PRICE_COUNTRIES) {
+      if (brutto == null) brutto = parseCents(get(`price_brutto_${c}`));
+      if (uvp == null) uvp = parseCents(get(`price_uvp_${c}`));
+      if (sale == null) sale = parseCents(get(`price_sale_${c}`));
+    }
+  }
+  if (brutto == null && uvp == null && sale == null) return {};
+  const block = {};
+  if (brutto != null) block.brutto_cents = brutto;
+  if (uvp != null) block.uvp_cents = uvp;
+  if (sale != null) block.sale_cents = sale;
+  return { [EUR_PRICE_KEY]: block, DE: { ...block } };
+}
+
+function eurPriceColumnsTouched(kp) {
+  if (kp("price") || kp("price_uvp") || kp("price_sale") || kp("price_brutto")) return true;
+  return LEGACY_PRICE_COUNTRIES.some(
+    (c) => kp(`price_brutto_${c}`) || kp(`price_uvp_${c}`) || kp(`price_sale_${c}`),
+  );
+}
 
 function computeUnitReference(unitTypeRaw) {
   const unitType = String(unitTypeRaw || "").trim().toLowerCase();
@@ -288,20 +319,25 @@ function buildVariationGroups(parentRow, childRows, get, optCount) {
   return groups;
 }
 
-function collectMetafields(parentRow, headers, idx) {
+/** metafield_N_* on any row; legacy variant_metafield_N_* still accepted (metafield_* wins same N). */
+function collectRowMetafields(row, headers, idx) {
   const byN = new Map();
-  for (const h of headers) {
-    const key = str(h);
-    const m = key.match(/^metafield_(\d+)_(key|value)$/i);
-    if (!m) continue;
-    const n = parseInt(m[1], 10);
-    if (!byN.has(n)) byN.set(n, {});
-    const col = idx[key];
-    if (col === undefined) continue;
-    const raw = parentRow[col];
-    const val = raw == null ? "" : String(raw).trim();
-    byN.get(n)[m[2]] = val;
-  }
+  const ingest = (headerPattern) => {
+    for (const h of headers) {
+      const colKey = str(h);
+      const m = colKey.match(headerPattern);
+      if (!m) continue;
+      const n = parseInt(m[1], 10);
+      if (!byN.has(n)) byN.set(n, {});
+      const col = idx[colKey];
+      if (col === undefined) continue;
+      const raw = row[col];
+      const val = raw == null ? "" : String(raw).trim();
+      byN.get(n)[m[2]] = val;
+    }
+  };
+  ingest(/^variant_metafield_(\d+)_(key|value)$/i);
+  ingest(/^metafield_(\d+)_(key|value)$/i);
   const out = [];
   const nums = [...byN.keys()].sort((a, b) => a - b);
   for (const n of nums) {
@@ -311,6 +347,15 @@ function collectMetafields(parentRow, headers, idx) {
     if (k) out.push({ key: k, value: v });
   }
   return out.length ? out : undefined;
+}
+
+function rowHasMetafieldColumnsTouched(row, idx) {
+  for (const h of Object.keys(idx)) {
+    if (!keyPresent(row, h, idx)) continue;
+    if (/^metafield_\d+_(key|value)$/i.test(h)) return true;
+    if (/^variant_metafield_\d+_(key|value)$/i.test(h)) return true;
+  }
+  return false;
 }
 
 function computeParentPresent(parentRow, idx) {
@@ -333,10 +378,6 @@ function computeParentPresent(parentRow, idx) {
       seo_keywords: kp(`seo_keywords_${lang}`),
     };
   }
-  const prices = {};
-  for (const c of COUNTRIES) {
-    prices[c] = kp(`price_brutto_${c}`) || kp(`price_uvp_${c}`) || kp(`price_sale_${c}`);
-  }
   const imageSlot = {};
   for (let n = 1; n <= 5; n++) imageSlot[n] = kp(`image_url_${n}`);
   let hasOptionNames = false;
@@ -346,18 +387,12 @@ function computeParentPresent(parentRow, idx) {
       break;
     }
   }
-  let metafieldTouched = false;
-  for (const h of Object.keys(idx)) {
-    if (/^metafield_\d+_(key|value)$/i.test(h) && keyPresent(parentRow, h, idx)) {
-      metafieldTouched = true;
-      break;
-    }
-  }
+  const metafieldTouched = rowHasMetafieldColumnsTouched(parentRow, idx);
   return {
     anyTitle: LANGS.some((l) => translations[l].title),
     anyDesc: LANGS.some((l) => translations[l].description),
     translations,
-    prices,
+    eurPriceTouched: eurPriceColumnsTouched(kp),
     imageSlot,
     status: kp("status"),
     brand: kp("brand"),
@@ -412,13 +447,7 @@ function computeChildPresent(childRow, idx) {
       keywords: kp(`seo_keywords_${lang}`),
     };
   }
-  let variantMetafieldTouched = false;
-  for (const h of Object.keys(idx)) {
-    if (/^variant_metafield_\d+_(key|value)$/i.test(h) && keyPresent(childRow, h, idx)) {
-      variantMetafieldTouched = true;
-      break;
-    }
-  }
+  const variantMetafieldTouched = rowHasMetafieldColumnsTouched(childRow, idx);
   return {
     ean: kp("ean"),
     inventory: kp("inventory"),
@@ -435,36 +464,11 @@ function computeChildPresent(childRow, idx) {
     unit_type: kp("unit_type"),
     unit_value: kp("unit_value"),
     unit_reference: kp("unit_reference"),
-    prices: Object.fromEntries(COUNTRIES.map((c) => [c, kp(`price_brutto_${c}`) || kp(`price_uvp_${c}`) || kp(`price_sale_${c}`)])),
+    eurPriceTouched: eurPriceColumnsTouched(kp),
     seo,
     variantMetafieldTouched,
     opts,
   };
-}
-
-function collectVariantMetafields(row, headers, idx) {
-  const byN = new Map();
-  for (const h of headers) {
-    const key = str(h);
-    const m = key.match(/^variant_metafield_(\d+)_(key|value)$/i);
-    if (!m) continue;
-    const n = parseInt(m[1], 10);
-    if (!byN.has(n)) byN.set(n, {});
-    const col = idx[key];
-    if (col === undefined) continue;
-    const raw = row[col];
-    const val = raw == null ? "" : String(raw).trim();
-    byN.get(n)[m[2]] = val;
-  }
-  const out = [];
-  const nums = [...byN.keys()].sort((a, b) => a - b);
-  for (const n of nums) {
-    const p = byN.get(n);
-    const k = (p.key || "").trim();
-    const v = (p.value || "").trim();
-    if (k) out.push({ key: k, value: v });
-  }
-  return out.length ? out : undefined;
 }
 
 function collectProductFiles(row, idx) {
@@ -551,7 +555,7 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
     const commonTouched =
       pres.brand || pres.category_slug || pres.shipping_group || pres.type ||
       pres.weight_grams || pres.dim_length || pres.dim_width || pres.dim_height ||
-      pres.unit_type || pres.unit_value || pres.unit_reference || Object.values(pres.prices || {}).some(Boolean);
+      pres.unit_type || pres.unit_value || pres.unit_reference || pres.eurPriceTouched;
     if (commonTouched) {
       const md = out.metadata && typeof out.metadata === "object" ? { ...out.metadata } : {};
       const invMd = inv.metadata && typeof inv.metadata === "object" ? inv.metadata : {};
@@ -567,12 +571,8 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
       if (pres.unit_type && invMd.unit_type) md.unit_type = invMd.unit_type;
       if (pres.unit_value && invMd.unit_value != null) md.unit_value = invMd.unit_value;
       if (pres.unit_reference && invMd.unit_reference != null) md.unit_reference = invMd.unit_reference;
-      if (invMd.prices && typeof invMd.prices === "object") {
-        md.prices = md.prices && typeof md.prices === "object" ? { ...md.prices } : {};
-        for (const c of COUNTRIES) {
-          if (!pres.prices?.[c]) continue;
-          md.prices[c] = { ...(md.prices[c] || {}), ...(invMd.prices[c] || {}) };
-        }
+      if (pres.eurPriceTouched && invMd.prices && typeof invMd.prices === "object") {
+        md.prices = { ...(md.prices && typeof md.prices === "object" ? md.prices : {}), ...invMd.prices };
       }
       out.metadata = md;
     }
@@ -662,7 +662,7 @@ function mergeVariantArrays(existingVariants, incomingVariants, childRows, idx, 
     // If any price column is touched in Excel, update whatever price fields exist
     // in the incoming variant. This allows UVP-only updates where `price_cents`
     // is null but `compare_at_price_cents` is present.
-    if (Object.values(pres.prices || {}).some(Boolean)) {
+    if (pres.eurPriceTouched) {
       if (inv.price_cents != null) out.price_cents = inv.price_cents;
       if (inv.compare_at_price_cents != null) out.compare_at_price_cents = inv.compare_at_price_cents;
     }
@@ -744,12 +744,10 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
   if (deTr?.seo_description) m.seo_meta_description = deTr.seo_description;
   if (deTr?.seo_keywords) m.seo_keywords = deTr.seo_keywords;
 
-  m.prices = m.prices && typeof m.prices === "object" ? { ...m.prices } : {};
-  for (const c of COUNTRIES) {
-    if (!parentPresent.prices[c]) continue;
-    m.prices[c] = { ...(m.prices[c] || {}), ...(pm.prices?.[c] || {}) };
+  if (parentPresent.eurPriceTouched && pm.prices && typeof pm.prices === "object") {
+    m.prices = { ...(m.prices && typeof m.prices === "object" ? m.prices : {}), ...pm.prices };
   }
-  if (!Object.keys(m.prices).length) delete m.prices;
+  if (m.prices && !Object.keys(m.prices).length) delete m.prices;
 
   const anyImgSlot = Object.values(parentPresent.imageSlot).some(Boolean);
   if (anyImgSlot) {
@@ -858,17 +856,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     if (seoKeywordsLang) translations[lang].seo_keywords = seoKeywordsLang;
   }
 
-  const prices = {};
-  for (const country of COUNTRIES) {
-    const brutto = parseCents(G(`price_brutto_${country}`));
-    const uvp = parseCents(G(`price_uvp_${country}`));
-    const sale = parseCents(G(`price_sale_${country}`));
-    if (brutto == null && uvp == null && sale == null) continue;
-    prices[country] = {};
-    if (brutto != null) prices[country].brutto_cents = brutto;
-    if (uvp != null) prices[country].uvp_cents = uvp;
-    if (sale != null) prices[country].sale_cents = sale;
-  }
+  const prices = collectEurPriceBlock(G);
 
   const media = [1, 2, 3, 4, 5].map((n) => G(`image_url_${n}`)).filter(Boolean);
 
@@ -905,7 +893,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
       if (seoDescription) variantTranslations[lang].seo_description = seoDescription;
       if (seoKeywords) variantTranslations[lang].seo_keywords = seoKeywords;
     }
-    const variantMetafields = collectVariantMetafields(cRow, headers, idx);
+    const variantMetafields = collectRowMetafields(cRow, headers, idx);
     const variantMeta = {};
     if (Object.keys(variantTranslations).length) variantMeta.translations = variantTranslations;
     if (variantMetafields?.length) variantMeta.metafields = variantMetafields;
@@ -936,17 +924,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     if (cShip && !cShipRef) {
       return { error: `Unbekannte Versandgruppe (child row): "${cShip}"` };
     }
-    const cPrices = {};
-    for (const country of COUNTRIES) {
-      const brutto = parseCents(cGet(`price_brutto_${country}`));
-      const uvp = parseCents(cGet(`price_uvp_${country}`));
-      const sale = parseCents(cGet(`price_sale_${country}`));
-      if (brutto == null && uvp == null && sale == null) continue;
-      cPrices[country] = {};
-      if (brutto != null) cPrices[country].brutto_cents = brutto;
-      if (uvp != null) cPrices[country].uvp_cents = uvp;
-      if (sale != null) cPrices[country].sale_cents = sale;
-    }
+    const cPrices = collectEurPriceBlock(cGet);
     if (cBrandRef?.id) variantMeta.brand_id = cBrandRef.id;
     if (cCatId) variantMeta.category_id = cCatId;
     if (cCatSlug) variantMeta.category_slug = cCatSlug;
@@ -969,8 +947,9 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     if (Object.keys(cPrices).length) variantMeta.prices = cPrices;
     const cGallery = Object.values(cImageSlots).filter(Boolean);
     if (cGallery.length) variantMeta.media = cGallery;
-    const deBrutto = parseCents(cGet("price_brutto_DE"));
-    const deUvp = parseCents(cGet("price_uvp_DE"));
+    const eurBlock = cPrices[EUR_PRICE_KEY] || cPrices.DE || {};
+    const eurBrutto = eurBlock.brutto_cents != null ? Number(eurBlock.brutto_cents) : null;
+    const eurUvp = eurBlock.uvp_cents != null ? Number(eurBlock.uvp_cents) : null;
     variants.push({
       sku: cGet("sku") || undefined,
       ean: cGet("ean") || undefined,
@@ -980,13 +959,13 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
       option_values: option_values.length ? option_values : undefined,
       image_url: cImage || undefined,
       image_urls: cImage ? Object.fromEntries(LANGS.map((l) => [l, cImage])) : undefined,
-      ...(deBrutto != null ? { price_cents: deBrutto, price: Number((deBrutto / 100).toFixed(2)) } : {}),
-      ...(deUvp != null ? { compare_at_price_cents: deUvp } : {}),
+      ...(eurBrutto != null ? { price_cents: eurBrutto, price: Number((eurBrutto / 100).toFixed(2)) } : {}),
+      ...(eurUvp != null ? { compare_at_price_cents: eurUvp } : {}),
       metadata: Object.keys(variantMeta).length ? variantMeta : undefined,
     });
   }
 
-  const metafields = collectMetafields(parentRow, headers, idx);
+  const metafields = collectRowMetafields(parentRow, headers, idx);
 
   const meta = {
     translations: Object.keys(translations).length ? translations : undefined,

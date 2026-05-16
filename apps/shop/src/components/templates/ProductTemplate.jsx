@@ -36,9 +36,13 @@ const TrustpilotWordmark  = dynamic(
 import ToCartButton from "@/components/ui/To Cart Button";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import BestsellerBadge from "@/components/BestsellerBadge";
+import MadeInEuropeOverlay from "@/components/MadeInEuropeOverlay";
 import { isBestsellerMetadata } from "@/lib/bestseller";
+import { isEuOriginVerified } from "@andertal/shop-theme";
+import { useShopStyles } from "@/context/ShopStylesContext";
 import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { useStoreCampaignDiscount } from "@/hooks/useStoreCampaignDiscount";
+import { getBruttoCentsFromPricesMap, getUvpCentsFromPricesMap } from "@/lib/product-price";
 
 const Container = styled.div`
   max-width: 100%;
@@ -783,6 +787,8 @@ const META_HIDDEN_KEYS = [
   "dimensions", "dimension_width", "dimension_height", "dimension_depth", "dimension_length", "dimension_weight",
   "dimensions_length", "dimensions_width", "dimensions_height",
   "weight", "width", "height", "depth", "length",
+  "eu_origin_provider", "eu_origin_registry_id", "eu_origin_document_url",
+  "eu_origin_status", "eu_origin_verified_at", "eu_origin_country",
 ];
 
 const DEFAULT_VARIANT_TITLES = new Set(["default title", "default", "standard"]);
@@ -1036,6 +1042,9 @@ export default function ProductTemplate() {
   const addToCart = cartState?.addToCart ?? (async () => null);
   const openCartSidebar = cartState?.openCartSidebar ?? (() => {});
   const shippingGroups = cartState?.shippingGroups ?? [];
+  const shopStyles = useShopStyles();
+  const showMadeInEurope = isEuOriginVerified(product?.metadata);
+  const madeInEuropeBadge = shopStyles?.made_in_europe_badge;
 
   useEffect(() => {
     let cancelled = false;
@@ -1256,13 +1265,11 @@ export default function ProductTemplate() {
   const variantCountryPrice = (() => {
     const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
     const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
-    const direct = prices[countryCode] || prices[marketCountry];
-    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+    return getBruttoCentsFromPricesMap(prices, countryCode, marketCountry);
   })();
   const parentCountryPrice = (() => {
     const prices = meta.prices && typeof meta.prices === "object" ? meta.prices : {};
-    const direct = prices[countryCode] || prices[marketCountry];
-    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+    return getBruttoCentsFromPricesMap(prices, countryCode, marketCountry);
   })();
   const priceCents =
     variantCountryPrice != null
@@ -1275,8 +1282,7 @@ export default function ProductTemplate() {
   const uvpCountryCents = (() => {
     const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
     const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
-    const direct = prices[countryCode] || prices[marketCountry];
-    return direct && direct.uvp_cents != null ? Number(direct.uvp_cents) : null;
+    return getUvpCentsFromPricesMap(prices, countryCode, marketCountry);
   })();
   const uvpCents = uvpCountryCents != null
     ? uvpCountryCents
@@ -1657,6 +1663,7 @@ export default function ProductTemplate() {
           <div style={{ position: "relative", width: "100%" }}>
             <MainImageWrap onClick={() => displayImages.length > 0 && setLightboxOpen(true)}>
               <MainImage src={mainImage} alt={displayTitle} />
+              {showMadeInEurope && <MadeInEuropeOverlay badgeConfig={madeInEuropeBadge} />}
             </MainImageWrap>
             {product?.id && (
               <GalleryActionRow

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { appendMediaFileToFormData } from "@/lib/media-upload";
 
 /* ───────── helpers ───────── */
 function fmtSize(bytes) {
@@ -373,7 +374,7 @@ export default function MediaPage() {
     for (const file of Array.from(files)) {
       try {
         const fd = new FormData();
-        fd.append("file", file);
+        appendMediaFileToFormData(fd, file);
         if (activeFolder !== "all" && activeFolder !== "none") fd.append("folder_id", activeFolder);
         const res = await client.uploadMedia(fd);
         if (res?.id) results.push(res);

@@ -15,6 +15,7 @@ import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-pr
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
+import { getBruttoCentsFromPricesMap } from "@/lib/product-price";
 import styled, { css } from "styled-components";
 
 /* ─────────────────────────────────────────────────────────── *
@@ -497,18 +498,16 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false })
     (localeMedia[1] ? localeMedia[1] : null);
   const imgSrc2 = resolveImg(rawImg2);
 
-  /* Price */
+  /* Price — single EUR list price; VAT/shipping vary by market */
   const variantCountryPrice = (() => {
     const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
     const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
-    const direct = prices[countryCode] || prices[marketCountry];
-    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+    return getBruttoCentsFromPricesMap(prices, countryCode, marketCountry);
   })();
   const parentCountryPrice = (() => {
     const pm = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
     const prices = pm.prices && typeof pm.prices === "object" ? pm.prices : {};
-    const direct = prices[countryCode] || prices[marketCountry];
-    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+    return getBruttoCentsFromPricesMap(prices, countryCode, marketCountry);
   })();
   const priceCents =
     variantCountryPrice != null
@@ -936,14 +935,12 @@ export function ProductListItem({ product, activeFilters = {} }) {
   const variantCountryPrice = (() => {
     const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
     const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
-    const direct = prices[countryCode] || prices[marketCountry];
-    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+    return getBruttoCentsFromPricesMap(prices, countryCode, marketCountry);
   })();
   const parentCountryPrice = (() => {
     const pm = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
     const prices = pm.prices && typeof pm.prices === "object" ? pm.prices : {};
-    const direct = prices[countryCode] || prices[marketCountry];
-    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+    return getBruttoCentsFromPricesMap(prices, countryCode, marketCountry);
   })();
   const priceCents = variantCountryPrice != null ? variantCountryPrice
     : (variant?.prices?.[0]?.amount != null ? Number(variant.prices[0].amount)

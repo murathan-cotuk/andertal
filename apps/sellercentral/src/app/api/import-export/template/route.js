@@ -1,12 +1,8 @@
 ﻿import ExcelJS from "exceljs";
 
 const LANGS = ["de", "en", "tr", "fr", "it", "es"];
-const COUNTRIES = ["DE", "FR", "IT", "ES", "TR"];
 
 const LANG_LABELS = { de: "German", en: "English", tr: "Turkish", fr: "French", it: "Italian", es: "Spanish" };
-const COUNTRY_LABELS = {
-  DE: "Germany (EUR)", FR: "France (EUR)", IT: "Italy (EUR)", ES: "Spain (EUR)", TR: "Turkey (TRY)",
-};
 
 const DEFAULT_BACKEND = "https://api.andertal.com";
 
@@ -133,6 +129,9 @@ function buildColumns() {
     { key: "unit_type", label: "unit_type", note: "Dropdown: kg | g | L | ml | piece", width: 12, group: "core" },
     { key: "unit_value", label: "unit_value", note: "e.g. 200", width: 12, group: "core" },
     { key: "per_unit", label: "per_unit", note: "Reference quantity for price per unit (g/ml => 1000, kg/l/piece => 1)", width: 12, group: "core" },
+    { key: "price", label: "price", note: "Verkaufspreis brutto in EUR (ein Preis für alle Märkte)", width: 14, group: "price_eur" },
+    { key: "price_uvp", label: "price_uvp", note: "UVP / Streichpreis in EUR (optional)", width: 14, group: "price_eur" },
+    { key: "price_sale", label: "price_sale", note: "Aktionspreis in EUR (optional)", width: 14, group: "price_eur" },
     { key: "weee_number", label: "weee_number", note: "WEEE-Reg.-Nr. (Elektroaltgeräte-Registrierung)", width: 22, group: "core" },
     { key: "eprel_number", label: "eprel_number", note: "EPREL-Reg.-Nr. (EU-Energielabel)", width: 22, group: "core" },
   ];
@@ -148,14 +147,22 @@ function buildColumns() {
 
   for (let i = 1; i <= METAFIELD_PAIRS; i++) {
     cols.push(
-      { key: `metafield_${i}_key`, label: `metafield_${i}_key`, note: `Metafield ${i} - key`, width: 22, group: "metafields", outline: 1 },
-      { key: `metafield_${i}_value`, label: `metafield_${i}_value`, note: `Metafield ${i} - value (text)`, width: 34, group: "metafields", outline: 1 }
-    );
-  }
-  for (let i = 1; i <= METAFIELD_PAIRS; i++) {
-    cols.push(
-      { key: `variant_metafield_${i}_key`, label: `variant_metafield_${i}_key`, note: `Child variant metafield ${i} - key`, width: 24, group: "metafields", outline: 1 },
-      { key: `variant_metafield_${i}_value`, label: `variant_metafield_${i}_value`, note: `Child variant metafield ${i} - value`, width: 34, group: "metafields", outline: 1 }
+      {
+        key: `metafield_${i}_key`,
+        label: `metafield_${i}_key`,
+        note: `Metafield ${i} key — parent row → product; child row → that variant`,
+        width: 22,
+        group: "metafields",
+        outline: 1,
+      },
+      {
+        key: `metafield_${i}_value`,
+        label: `metafield_${i}_value`,
+        note: `Metafield ${i} value — same row as SKU (parent or child)`,
+        width: 34,
+        group: "metafields",
+        outline: 1,
+      }
     );
   }
 
@@ -174,14 +181,6 @@ function buildColumns() {
     );
   }
 
-  for (const country of COUNTRIES) {
-    cols.push(
-      { key: `price_brutto_${country}`, label: `price_brutto_${country}`, note: `Brutto (${COUNTRY_LABELS[country]})`, width: 20, group: `price_${country}`, outline: 1 },
-      { key: `price_uvp_${country}`, label: `price_uvp_${country}`, note: `UVP`, width: 18, group: `price_${country}`, outline: 1 },
-      { key: `price_sale_${country}`, label: `price_sale_${country}`, note: `Aktionspreis`, width: 18, group: `price_${country}`, outline: 1 },
-    );
-  }
-
   return cols;
 }
 
@@ -189,12 +188,14 @@ const COLORS = {
   core: { argb: "FF1E3A5F" },
   lang: { argb: "FF1D6F42" },
   price: { argb: "FF7B3F00" },
+  price_eur: { argb: "FF7B3F00" },
   seo: { argb: "FF4A235A" },
   meta: { argb: "FF5F4B0B" },
   files: { argb: "FF1A5276" },
   coreBg: { argb: "FFCCE5FF" },
   langBg: { argb: "FFD5F5E3" },
   priceBg: { argb: "FFFDEBD0" },
+  price_eurBg: { argb: "FFFDEBD0" },
   seoBg: { argb: "FFF3E5F5" },
   metaBg: { argb: "FFF9E79F" },
   filesBg: { argb: "FFD6EAF8" },
@@ -226,9 +227,9 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       rowStructure: "Zeilen 1–3: Gruppenkopf, Spaltenname, Kurzhinweis — nicht löschen.",
       parentChild: "Parent-Zeilen: gemeinsame Texte, Bilder, Preise, Kategorie, Marke, Versandgruppe, optionN_name (Optionstitel). Child-Zeilen: gleiche product_type-Spalte „child“, parent_sku, varianten-spezifisch optionN_value, SKU, EAN, Lager, optionale Bilder/Swatch. Titel/Beschreibung/Bullets werden zentral über title, description, bullet1..bullet5 gepflegt.",
       options: "Varianten: Mindestens zwei Optionen (option1/option2) sind im Beispiel; Sie können option3_name … option6_name (und passende *_value in Child-Zeilen) nutzen. Weitere Optionen können Sie analog ergänzen (option7_name …), sofern Sie die Spalten in Excel hinzufügen — der Import liest alle fortlaufenden optionN_*-Spalten.",
-      metafields: `Metafelder: Paare metafield_N_key / metafield_N_value (hier N=1…${METAFIELD_PAIRS}). Sie können weitere Paare mit N=16,17,… als neue Spalten anfügen — der Import übernimmt alle solchen Spalten.`,
+      metafields: `Metafelder: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}, weitere N möglich). Parent-Zeile → Produkt-Metafelder; Child-Zeile → Metafelder der Variante in derselben Zeile. Keine separaten variant_metafield_*-Spalten nötig.`,
       noCollection: "Kollektionen werden bei diesem Import nicht per Excel gesetzt — bitte im Anschluss in der Oberfläche zuordnen, falls nötig.",
-      prices: "Preise mit Komma als Dezimaltrenner (z.B. 29,99). HTML in description_* ist erlaubt.",
+      prices: "Preise nur in EUR: price (Verkaufspreis brutto), price_uvp, price_sale — keine länderbezogenen Preisspalten. MwSt. und Versand je Markt separat. Komma als Dezimaltrenner (z. B. 29,99).",
       comments: "Leere Datenzeilen werden übersprungen. Zeilen mit SKU beginnend mit # sind Kommentare.",
       skuUpdate:
         "Bestehende Produkte: Stimmt die Parent-SKU mit einer SKU im System überein, wird das Produkt aktualisiert — es wird nur überschrieben, was in der Excel-Zelle gefüllt ist; leere Zellen lassen die bisherigen Werte unverändert.",
@@ -245,9 +246,9 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       rowStructure: "Rows 1–3: group header, column key, short hint — do not delete.",
       parentChild: 'Parent rows: shared copy, images, prices, category, brand, shipping group, optionN_names. Child rows: product_type = child, parent_sku, per-variant optionN_value, SKU, EAN, stock, optional images/swatch. Use title, description and bullet1..bullet5 as single shared content fields.',
       options: "Variants: the sample uses two options; you may use option3…option6 (add option7_name / option7_value columns in Excel if needed — import reads consecutive optionN_* columns).",
-      metafields: `Metafields: pairs metafield_N_key / metafield_N_value (here N=1…${METAFIELD_PAIRS}). Add columns for N=16,17,… as needed — all pairs are imported.`,
+      metafields: `Metafields: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}; more N allowed). Parent row → product; child row → that variant. No separate variant_metafield_* columns.`,
       noCollection: "Collections are not set via this Excel import — assign in the UI afterward if needed.",
-      prices: "Use a comma for decimals (e.g. 29,99). HTML is allowed in description_*.",
+      prices: "Prices in EUR only: price, price_uvp, price_sale — no per-country price columns. VAT and shipping vary by market. Use comma decimals (e.g. 29,99).",
       comments: "Empty rows are skipped. Rows with SKU starting with # are comments.",
       skuUpdate:
         "Existing products: If the parent row SKU matches a product SKU in the system, that product is updated — only cells you fill in Excel overwrite data; empty cells keep the previous values.",
@@ -264,9 +265,9 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       rowStructure: "1–3. satırlar: grup başlığı, sütun adı, kısa not — silmeyin.",
       parentChild: "Parent satırlar: ortak metin, görseller, fiyat, kategori, marka, kargo grubu, optionN_name. Child: product_type = child, parent_sku, varyant için optionN_value, SKU, stok vb.",
       options: "Örnekte iki seçenek vardır; option3…option6 kullanılabilir; daha fazlası için Excel’de option7_name / option7_value sütunları eklenebilir.",
-      metafields: `Metafield çiftleri: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). N=16 ve sonrası sütun eklenebilir — içe aktarma hepsini okur.`,
+      metafields: `Metafield: metafield_N_key / metafield_N_value. Parent satır → ürün; child satır → o varyant. Ayrı variant_metafield sütunları gerekmez.`,
       noCollection: "Koleksiyonlar bu Excel ile atanmaz — gerekirse arayüzden ekleyin.",
-      prices: "Ondalık ayırıcı virgül (örn. 29,99). description_* alanında HTML kullanılabilir.",
+      prices: "Fiyatlar yalnızca EUR: price, price_uvp, price_sale. Ülkeye göre fiyat sütunu yok. Virgül ondalık (örn. 29,99).",
       comments: "Boş satırlar atlanır. SKU # ile başlayan satırlar yorum sayılır.",
     },
   };
@@ -391,13 +392,11 @@ async function buildWorkbook({
     variations: { label: "Variations", bg: COLORS.coreBg, fg: COLORS.core },
     seo: { label: "SEO", bg: COLORS.seoBg, fg: COLORS.seo },
     metafields: { label: "Metafields (optional +)", bg: COLORS.metaBg, fg: COLORS.meta },
+    price_eur: { label: "💰 Preise (EUR)", bg: COLORS.price_eurBg, fg: COLORS.price_eur },
     files: { label: "📁 Dateien (optional)", bg: COLORS.filesBg, fg: COLORS.files },
   };
   LANGS.forEach((l) => {
     groupMeta[`lang_${l}`] = { label: `🌐 ${LANG_LABELS[l]}`, bg: COLORS.langBg, fg: COLORS.lang };
-  });
-  COUNTRIES.forEach((c) => {
-    groupMeta[`price_${c}`] = { label: `💰 ${COUNTRY_LABELS[c]}`, bg: COLORS.priceBg, fg: COLORS.price };
   });
 
   const row1 = ws.getRow(1);
@@ -420,15 +419,15 @@ async function buildWorkbook({
     const cell = row2.getCell(i + 1);
     cell.value = col.label;
     const isLang = col.group.startsWith("lang_");
-    const isPri = col.group.startsWith("price_");
+    const isPri = col.group === "price_eur" || col.group.startsWith("price_");
     const isMeta = col.group === "metafields";
     const isFiles = col.group === "files";
     cell.fill = headerFill(
-      isLang ? COLORS.langBg : isPri ? COLORS.priceBg : col.group === "seo" ? COLORS.seoBg : isMeta ? COLORS.metaBg : isFiles ? COLORS.filesBg : COLORS.coreBg
+      isLang ? COLORS.langBg : isPri ? COLORS.price_eurBg : col.group === "seo" ? COLORS.seoBg : isMeta ? COLORS.metaBg : isFiles ? COLORS.filesBg : COLORS.coreBg
     );
     cell.font = {
       bold: true,
-      color: isLang ? COLORS.lang : isPri ? COLORS.price : col.group === "seo" ? COLORS.seo : isMeta ? COLORS.meta : isFiles ? COLORS.files : COLORS.core,
+      color: isLang ? COLORS.lang : isPri ? COLORS.price_eur : col.group === "seo" ? COLORS.seo : isMeta ? COLORS.meta : isFiles ? COLORS.files : COLORS.core,
       size: 9,
     };
     cell.alignment = { horizontal: "left", vertical: "middle" };
@@ -500,8 +499,8 @@ async function buildWorkbook({
     bullet1_de: "100% Baumwolle",
     bullet2_de: "Maschinenwaschbar",
     bullet3_de: "Regular Fit",
-    price_brutto_DE: "29,99",
-    price_uvp_DE: "39,99",
+    price: "29,99",
+    price_uvp: "39,99",
   }, "FFFAFAFA");
 
   setRow(5, {

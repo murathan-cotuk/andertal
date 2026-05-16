@@ -1,5 +1,7 @@
 /** Single source of truth for shop theme defaults (sellercentral + shop injector). */
 
+import { DEFAULT_MADE_IN_EUROPE_BADGE } from "./eu-origin.js";
+
 import {
   DEFAULT_ATC_CODE,
   DEFAULT_GHOST_BUTTON_CODE,
@@ -231,4 +233,5 @@ export const DEFAULT_SHOP_STYLES = {
       variants: [{ name: "Outline Accent", code: DEFAULT_OUTLINE_BUTTON_CODE, active: true }],
     },
   },
+  made_in_europe_badge: { ...DEFAULT_MADE_IN_EUROPE_BADGE },
 };

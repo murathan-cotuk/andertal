@@ -17,6 +17,16 @@ try {
 const path = require('path')
 const fs = require('fs')
 const { runAutomationFlowsForOrder, runAutomationFlowsForCustomerEvent } = require('./src/flow-automation')
+const {
+  applyEuOriginMetadataPolicy,
+  registerEuOriginRoutes,
+  ensureEuOriginPendingTable,
+} = require('./src/eu-origin')
+const {
+  decodeMultipartFilename,
+  resolveUploadDisplayFilename,
+  storageFilenameWithPrefix,
+} = require('./src/media-filename')
 const { enqueueFlowEvent, startFlowQueueWorker, getFlowQueueStatus } = require('./src/flow-queue')
 const { pingForHealth } = require('./src/redis')
 const { resolveSmtpSenderIdentity } = require('./src/smtp-sender-resolve')
@@ -3055,7 +3065,9 @@ async function start() {
           'dimensions','dimensions_length','dimensions_width','dimensions_height','weight','weight_grams',
           'unit_type','unit_value','unit_reference','shipping_info','versand','rabattpreis_cents',
           'uvp_cents','price_cents','compare_at_price_cents','sale_price_cents','review_count',
-          'review_avg','sold_last_month','is_new','badge','sale'])
+          'review_avg','sold_last_month','is_new','badge','sale',
+          'eu_origin_provider','eu_origin_registry_id','eu_origin_document_url','eu_origin_status',
+          'eu_origin_verified_at','eu_origin_country'])
 
         const fromProducts = {} // key → Set of values
         for (const row of prodRes.rows) {
@@ -4581,6 +4593,11 @@ async function start() {
           res.json({ product: productWithListingData, listing, listing_saved: true, shared_change_blocked: false, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
           return
         }
+        if (body.metadata && typeof body.metadata === 'object' && existing) {
+          const existingMeta = existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}
+          const merged = normalizeProductMetadata({ ...existingMeta, ...body.metadata })
+          body.metadata = applyEuOriginMetadataPolicy(merged, existingMeta, { isSuperuser: isSuperuserCaller })
+        }
         const product = await updateAdminHubProductDb(req.params.id, body)
         if (product && product.__error) {
           res.status(400).json({ message: product.__error })
@@ -4668,6 +4685,15 @@ async function start() {
     httpApp.get('/admin-hub/products/:id', adminHubProductByIdGET)
     httpApp.put('/admin-hub/products/:id', adminHubProductByIdPUT)
     httpApp.delete('/admin-hub/products/:id', adminHubProductByIdDELETE)
+
+    registerEuOriginRoutes(httpApp, {
+      requireSellerAuth,
+      requireSuperuser,
+      verifySellerToken,
+      getAdminHubProductByIdOrHandleDb,
+      updateAdminHubProductDb,
+      getDbQ: () => dbQ,
+    })
 
     // POST /admin-hub/v1/products/bulk-import — batch create products from CSV rows
     httpApp.post('/admin-hub/v1/products/bulk-import', requireSellerAuth, async (req, res) => {
@@ -10282,8 +10308,7 @@ async function start() {
             }
           },
           filename: (req, file, cb) => {
-            const safe = (file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_')
-            cb(null, `${Date.now()}-${safe}`)
+            cb(null, storageFilenameWithPrefix(file.originalname || 'file'))
           },
         })
     const upload = multer({ storage: uploadStorage })
@@ -10300,7 +10325,7 @@ async function start() {
           [limit, offset]
         )
         const countRes = await client.query('SELECT COUNT(*)::int AS c FROM admin_hub_media')
-        res.json({ media: r.rows, count: countRes.rows[0].c })
+        res.json({ media: r.rows.map(mapMediaRowForApi), count: countRes.rows[0].c })
       } catch (err) {
         console.error('Media list error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -10314,6 +10339,10 @@ async function start() {
       const sid = row?.seller_id
       if (sid == null || String(sid).trim() === '') return false
       return String(sid) === String(u.seller_id)
+    }
+    const mapMediaRowForApi = (row) => {
+      if (!row) return row
+      return { ...row, filename: decodeMultipartFilename(row.filename) }
     }
 
     /** Product gallery / variant images: min 1000px edge, center square crop, store as WebP (JPEG/PNG in). */
@@ -10448,7 +10477,7 @@ async function start() {
           const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
           const bucket = process.env.S3_UPLOAD_BUCKET
           const region = process.env.S3_UPLOAD_REGION || 'eu-central-1'
-          const key = `media/${mediaSeg}/${Date.now()}-${(req.file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_')}`
+          const key = `media/${mediaSeg}/${storageFilenameWithPrefix(req.file.originalname || 'file')}`
           const s3 = new S3Client({
             region,
             ...(process.env.S3_UPLOAD_ENDPOINT && { endpoint: process.env.S3_UPLOAD_ENDPOINT }),
@@ -10476,7 +10505,7 @@ async function start() {
       const alt = (req.body && req.body.alt) || null
       const folderId = (req.body && req.body.folder_id) || null
       const uploadSellerId = req.sellerUser?.is_superuser ? null : (req.sellerUser?.seller_id || null)
-      const dbFilename = isProductImage ? outFilename : (req.file.originalname || req.file.filename)
+      const dbFilename = isProductImage ? outFilename : resolveUploadDisplayFilename(req)
       try {
         await client.connect()
         const r = await client.query(
@@ -10484,7 +10513,7 @@ async function start() {
            RETURNING id, filename, url, mime_type, size, alt, folder_id, seller_id, created_at`,
           [dbFilename, fileUrl, outMime, outSize, alt, folderId, uploadSellerId]
         )
-        const row = r.rows[0]
+        const row = mapMediaRowForApi(r.rows[0])
         res.status(201).json({ id: row.id, url: row.url, filename: row.filename, mime_type: row.mime_type, size: row.size, folder_id: row.folder_id, created_at: row.created_at })
       } catch (err) {
         if (diskPathWritten && fs.existsSync(diskPathWritten)) {
@@ -10507,7 +10536,7 @@ async function start() {
         )
         if (r.rows.length === 0) return res.status(404).json({ message: 'Media not found' })
         if (!mediaRowVisibleToUser(r.rows[0], req.sellerUser)) return res.status(403).json({ message: 'Forbidden' })
-        res.json(r.rows[0])
+        res.json(mapMediaRowForApi(r.rows[0]))
       } catch (err) {
         console.error('Media get error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -10631,7 +10660,7 @@ async function start() {
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const name = filename || url.split('/').pop()?.split('?')[0] || 'image'
+        const name = decodeMultipartFilename(filename || url.split('/').pop()?.split('?')[0] || 'image')
         const urlSellerId = req.sellerUser?.is_superuser ? null : (req.sellerUser?.seller_id || null)
         const r = await client.query(
           `INSERT INTO admin_hub_media (filename, url, source_url, mime_type, size, alt, folder_id, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
@@ -10687,7 +10716,7 @@ async function start() {
            ${whereClause}`,
           params
         )
-        res.json({ media: r.rows, count: countRes.rows[0].c })
+        res.json({ media: r.rows.map(mapMediaRowForApi), count: countRes.rows[0].c })
       } catch (err) {
         console.error('Media list error:', err)
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -10744,7 +10773,7 @@ async function start() {
             ? await client.query('SELECT id FROM admin_hub_media WHERE url = $1 AND seller_id = $2 LIMIT 1', [url, sellerId])
             : await client.query('SELECT id FROM admin_hub_media WHERE url = $1 AND seller_id IS NULL LIMIT 1', [url])
           if (dupCheck.rows[0]) { skipped++; continue }
-          const filename = url.split('/').pop()?.split('?')[0] || 'image'
+          const filename = decodeMultipartFilename(url.split('/').pop()?.split('?')[0] || 'image')
           // Detect image mime type from extension
           const ext = (filename.split('.').pop() || '').toLowerCase()
           const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', avif: 'image/avif' }
@@ -21380,6 +21409,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       updated_at    timestamptz DEFAULT now()
     )`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_change_requests_status ON admin_hub_product_change_requests(status)`).catch(() => {})
+    await ensureEuOriginPendingTable(dbQ).catch(() => {})
     await dbQ(`ALTER TABLE store_cart_items ADD COLUMN IF NOT EXISTS seller_id varchar(255)`).catch(() => {})
 
     // Newsletter subscriber endpoint

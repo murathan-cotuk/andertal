@@ -90,6 +90,8 @@ export const FACET_SKIP = new Set([
   "dimensions", "dimensions_length", "dimensions_width", "dimensions_height",
   "weight", "weight_grams", "unit_type", "unit_value", "unit_reference",
   "shipping_info", "versand",
+  "eu_origin_provider", "eu_origin_registry_id", "eu_origin_document_url",
+  "eu_origin_status", "eu_origin_verified_at", "eu_origin_country",
 ]);
 
 export function normalizeFacetKey(key) {

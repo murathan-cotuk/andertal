@@ -30,17 +30,26 @@ function mapProductRow(p) {
   const legacyImg = str(meta.image_url || meta.image || meta.thumbnail || p.thumbnail || "");
   const allImages = mediaArr.length > 0 ? mediaArr : (legacyImg ? [legacyImg] : []);
 
-  // Prices
-  const priceCents = p.price_cents ?? (p.price != null ? Math.round(Number(p.price) * 100) : 0);
+  // Prices — single EUR block in metadata.prices (EUR / DE / first entry)
+  const pricesMap = meta.prices && typeof meta.prices === "object" ? meta.prices : {};
+  const eurEntry =
+    (pricesMap.EUR && typeof pricesMap.EUR === "object" ? pricesMap.EUR : null) ||
+    (pricesMap.DE && typeof pricesMap.DE === "object" ? pricesMap.DE : null) ||
+    Object.values(pricesMap).find((v) => v && typeof v === "object" && v.brutto_cents != null) ||
+    null;
+  const priceCents =
+    eurEntry?.brutto_cents ??
+    p.price_cents ??
+    (p.price != null ? Math.round(Number(p.price) * 100) : 0);
   const price = priceCents ? (priceCents / 100).toFixed(2) : "";
-  const compareAtCents = meta.uvp_cents ?? meta.compare_at_price_cents ?? meta.rabattpreis_cents ?? null;
+  const compareAtCents =
+    eurEntry?.uvp_cents ??
+    meta.uvp_cents ??
+    meta.compare_at_price_cents ??
+    null;
   const compareAt = compareAtCents ? (compareAtCents / 100).toFixed(2) : "";
-
-  // Region prices (prices object: { de: "XX", at: "XX", ... })
-  const prices = meta.prices && typeof meta.prices === "object" ? meta.prices : {};
-  const priceDE = str(prices.de || "");
-  const priceAT = str(prices.at || "");
-  const priceCH = str(prices.ch || "");
+  const saleCents = eurEntry?.sale_cents ?? meta.rabattpreis_cents ?? null;
+  const salePrice = saleCents ? (saleCents / 100).toFixed(2) : "";
 
   // Bullet points
   const bullets = Array.isArray(meta.bullet_points) ? meta.bullet_points : [];
@@ -102,10 +111,8 @@ function mapProductRow(p) {
     "Status":              str(p.status),
     "Beschreibung":        str(trDE.description || p.description),
     "Preis (EUR)":         price,
-    "Vergleichspreis (EUR)": compareAt,
-    "Preis DE":            priceDE,
-    "Preis AT":            priceAT,
-    "Preis CH":            priceCH,
+    "UVP (EUR)":           compareAt,
+    "Aktionspreis (EUR)":  salePrice,
     "Bestand":             p.inventory != null ? String(p.inventory) : "",
     "Foto URL 1":          str(allImages[0] || ""),
     "Foto URL 2":          str(allImages[1] || ""),
@@ -145,7 +152,7 @@ function mapProductRow(p) {
 
 const PRODUCT_COLUMNS = [
   "SKU", "Name", "EAN", "Status", "Beschreibung",
-  "Preis (EUR)", "Vergleichspreis (EUR)", "Preis DE", "Preis AT", "Preis CH", "Bestand",
+  "Preis (EUR)", "UVP (EUR)", "Aktionspreis (EUR)", "Bestand",
   "Foto URL 1", "Foto URL 2", "Foto URL 3", "Foto URL 4", "Foto URL 5",
   "Bullet Point 1", "Bullet Point 2", "Bullet Point 3", "Bullet Point 4", "Bullet Point 5",
   "Metafelder", "Eigene Attribute", "Varianten",

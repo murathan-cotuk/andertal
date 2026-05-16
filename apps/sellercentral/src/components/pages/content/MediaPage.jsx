@@ -17,6 +17,7 @@ import {
   Select,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { appendMediaFileToFormData } from "@/lib/media-upload";
 
 const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "");
 
@@ -440,7 +441,7 @@ export default function MediaPage() {
       await Promise.all(
         arr.map(async (file) => {
           const fd = new FormData();
-          fd.append("file", file);
+          appendMediaFileToFormData(fd, file);
           const result = await client.uploadMedia(fd);
           // Two-step: PATCH with folder_id after upload (reliable regardless of multipart field order)
           if (folderId && result?.id) {
@@ -521,7 +522,7 @@ export default function MediaPage() {
       await Promise.all(
         arr.map(async (file) => {
           const fd = new FormData();
-          fd.append("file", file);
+          appendMediaFileToFormData(fd, file);
           const result = await client.uploadMedia(fd);
           if (folderId && result?.id) {
             await client.updateMedia(result.id, { folder_id: folderId }).catch(() => {});

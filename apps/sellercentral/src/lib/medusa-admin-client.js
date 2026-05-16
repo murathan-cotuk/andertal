@@ -196,6 +196,28 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}`, { method: 'DELETE' });
   }
 
+  /** POST /admin-hub/products/:id/eu-origin/verify — Phase 1: manual superuser or stub provider queue */
+  async verifyEuOrigin(productId, { manual = false, provider = null, pendingQueueId = null } = {}) {
+    return this.request(`/admin-hub/products/${encodeURIComponent(productId)}/eu-origin/verify`, {
+      method: 'POST',
+      body: JSON.stringify({
+        manual,
+        provider,
+        pending_queue_id: pendingQueueId,
+      }),
+    });
+  }
+
+  /** GET /admin-hub/eu-origin/pending — superuser document review queue */
+  async listEuOriginPending(status = 'pending') {
+    return this.request(`/admin-hub/eu-origin/pending?status=${encodeURIComponent(status)}`);
+  }
+
+  /** GET /admin-hub/eu-origin/providers */
+  async listEuOriginProviders() {
+    return this.request('/admin-hub/eu-origin/providers');
+  }
+
   /** GET /admin-hub/metafield-definitions */
   async getMetafieldDefinitions() {
     return this.request('/admin-hub/metafield-definitions');

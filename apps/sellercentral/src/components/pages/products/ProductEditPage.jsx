@@ -38,6 +38,7 @@ import {
   fieldNameDisplayLabel,
   formatChangeRequestValuePreview,
 } from "@/lib/product-change-request-format";
+import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -293,6 +294,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionPopoverOpen, setCollectionPopoverOpen] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
+  const [euOriginVerifying, setEuOriginVerifying] = useState(false);
+  const [euOriginNotice, setEuOriginNotice] = useState("");
   const [relatedProductsList, setRelatedProductsList] = useState([]);
   const [relatedProductSearch, setRelatedProductSearch] = useState("");
   const [relatedProductPopoverOpen, setRelatedProductPopoverOpen] = useState(false);
@@ -805,6 +808,29 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       return { ...prev, metadata: m };
     });
   }, []);
+
+  const handleVerifyEuOrigin = useCallback(async (manual) => {
+    if (!product?.id) return;
+    setEuOriginVerifying(true);
+    setEuOriginNotice("");
+    try {
+      const res = await getMedusaAdminClient().verifyEuOrigin(product.id, {
+        manual: Boolean(manual),
+        provider: meta.eu_origin_provider || "stub",
+      });
+      if (res?.product) setProduct(res.product);
+      const st = res?.eu_origin?.eu_origin_status || res?.status;
+      if (st === EU_ORIGIN_STATUS.VERIFIED) {
+        setEuOriginNotice("EU-Herkunft verifiziert — Badge erscheint im Shop nach Speichern der Stile.");
+      } else {
+        setEuOriginNotice(res?.message || "Prüfung ausstehend (Warteschlange / Superuser).");
+      }
+    } catch (e) {
+      setEuOriginNotice(e?.message || "Verifizierung fehlgeschlagen");
+    } finally {
+      setEuOriginVerifying(false);
+    }
+  }, [product?.id, meta.eu_origin_provider]);
 
   const updateCategoryWithParents = useCallback((categoryId) => {
     const selected = String(categoryId || "").trim();
@@ -3005,6 +3031,90 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 placeholder="Verantwortliche Person Information"
                 multiline={2}
               />
+
+              <Divider />
+              <Text as="h2" variant="bodyMd" fontWeight="regular">Made in Europe (optional)</Text>
+              <Text as="p" tone="subdued">
+                Registry-ID und Nachweisdokument optional. Nach Speichern mit geänderten Angaben: Status „pending“.
+                Im Shop erscheint das Badge nur bei Status „verified“ (Superuser oder spätere Registry-Prüfung).
+              </Text>
+              {euOriginNotice ? (
+                <Banner tone="info" onDismiss={() => setEuOriginNotice("")}>{euOriginNotice}</Banner>
+              ) : null}
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Herkunftsland (EU)</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.eu_origin_country" />
+                  </InlineStack>
+                }
+                value={meta.eu_origin_country ?? ""}
+                onChange={(v) => updateMeta("eu_origin_country", v || undefined)}
+                placeholder="z. B. DE, FR, IT"
+                autoComplete="off"
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Registry-ID</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.eu_origin_registry_id" />
+                  </InlineStack>
+                }
+                value={meta.eu_origin_registry_id ?? ""}
+                onChange={(v) => updateMeta("eu_origin_registry_id", v || undefined)}
+                placeholder="EU-Registry / Zertifikatsnummer"
+                autoComplete="off"
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Nachweisdokument (URL)</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.eu_origin_document_url" />
+                  </InlineStack>
+                }
+                value={meta.eu_origin_document_url ?? ""}
+                onChange={(v) => updateMeta("eu_origin_document_url", v || undefined)}
+                placeholder="https://…"
+                autoComplete="off"
+              />
+              <Select
+                label="Registry-Provider"
+                options={[
+                  { label: "Stub (manuelle Prüfung)", value: "stub" },
+                ]}
+                value={meta.eu_origin_provider || "stub"}
+                onChange={(v) => updateMeta("eu_origin_provider", v || "stub")}
+              />
+              <TextField
+                label="Status"
+                value={meta.eu_origin_status || "—"}
+                readOnly
+                autoComplete="off"
+                helpText={
+                  meta.eu_origin_verified_at
+                    ? `Verifiziert am: ${meta.eu_origin_verified_at}`
+                    : "Nur Backend/Superuser setzt „verified“."
+                }
+              />
+              <InlineStack gap="200">
+                <Button
+                  onClick={() => handleVerifyEuOrigin(false)}
+                  loading={euOriginVerifying}
+                  disabled={!product?.id || euOriginVerifying}
+                >
+                  Registry prüfen (Stub)
+                </Button>
+                {isSuperuser ? (
+                  <Button
+                    variant="primary"
+                    onClick={() => handleVerifyEuOrigin(true)}
+                    loading={euOriginVerifying}
+                    disabled={!product?.id || euOriginVerifying}
+                  >
+                    Manuell verifizieren
+                  </Button>
+                ) : null}
+              </InlineStack>
 
               <Divider />
               <Text as="h2" variant="bodyMd" fontWeight="regular">SEO</Text>

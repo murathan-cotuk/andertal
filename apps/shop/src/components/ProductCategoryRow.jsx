@@ -14,6 +14,7 @@ import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes
 import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import { isBestsellerMetadata } from "@/lib/bestseller";
+import { getBruttoCentsFromPricesMap } from "@/lib/product-price";
 import { StarRating } from "@/components/ProductCard";
 import styled from "styled-components";
 
@@ -282,14 +283,12 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
   const variantCountryPrice = (() => {
     const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
     const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
-    const direct = prices[countryCode] || prices[marketCountry];
-    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+    return getBruttoCentsFromPricesMap(prices, countryCode, marketCountry);
   })();
   const parentCountryPrice = (() => {
     const pm = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
     const prices = pm.prices && typeof pm.prices === "object" ? pm.prices : {};
-    const direct = prices[countryCode] || prices[marketCountry];
-    return direct && direct.brutto_cents != null ? Number(direct.brutto_cents) : null;
+    return getBruttoCentsFromPricesMap(prices, countryCode, marketCountry);
   })();
   const priceCents =
     variantCountryPrice != null

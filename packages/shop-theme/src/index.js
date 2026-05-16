@@ -31,5 +31,13 @@ export {
   SECOND_NAV_LINK_STYLE_OPTIONS,
   SCROLL_UP_PRESET_LABELS,
 } from "./layout-presets.js";
+export {
+  EU_ORIGIN_META_KEYS,
+  EU_ORIGIN_STATUS,
+  DEFAULT_MADE_IN_EUROPE_BADGE,
+  pickEuOriginFromMetadata,
+  isEuOriginVerified,
+  mergeMadeInEuropeBadge,
+} from "./eu-origin.js";
 export { ensureActiveVariant, mergeButtonCatalog, normalizeButtonType } from "./button-merge.js";
 export { DEFAULT_BUTTON_COLORS, buildButtonColorVarLines, BUTTON_COLOR_VAR_PREFIX } from "./button-type-colors.js";

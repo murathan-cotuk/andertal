@@ -19,7 +19,9 @@
     "db:media": "node scripts/list-media-in-db.js",
     "db:pages": "node scripts/list-pages-in-db.js",
     "postinstall": "node scripts/patch-link-modules.js",
-    "patch": "node scripts/patch-link-modules.js"
+    "patch": "node scripts/patch-link-modules.js",
+    "test:eu-origin": "node --test src/eu-origin/metadata.test.js",
+    "test:media-filename": "node --test src/media-filename.test.js"
   },
   "keywords": [
     "medusa",
