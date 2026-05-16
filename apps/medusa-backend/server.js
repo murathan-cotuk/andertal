@@ -3716,6 +3716,7 @@ async function start() {
               'seller_id = $' + p +
               ' OR COALESCE(NULLIF(TRIM(metadata->>\'seller_id\'), \'\'), NULL) = $' + p +
               ' OR COALESCE(NULLIF(TRIM(metadata->>\'seller\'), \'\'), NULL) = $' + p +
+              ' OR EXISTS (SELECT 1 FROM admin_hub_seller_listings _sl WHERE _sl.product_id = id AND TRIM(_sl.seller_id) = $' + p + ')' +
             ')'
           )
           params.push(sellerId)
