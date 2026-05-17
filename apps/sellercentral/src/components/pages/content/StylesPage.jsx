@@ -884,6 +884,11 @@ export default function StylesPage() {
       await client.updateSellerSettings({ seller_id: "default", ...branding });
       setSavedSnapshot(JSON.stringify(styles));
       setBrandingSnapshot(JSON.stringify(branding));
+      // Bust the shop's settings cache so logo changes appear immediately on reload
+      const shopUrl = (process.env.NEXT_PUBLIC_SHOP_URL || "").replace(/\/$/, "");
+      if (shopUrl) {
+        fetch(`${shopUrl}/api/store-seller-settings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seller_id: "default" }) }).catch(() => {});
+      }
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("andertal-sellercentral-branding-refresh"));
       }
@@ -1124,16 +1129,25 @@ export default function StylesPage() {
                     {(dev.url || "").trim() && (
                       <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "start" }}>
                         <div>
-                          {/* Height */}
-                          <Text as="span" variant="bodySm" fontWeight="medium">Hoehe</Text>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, marginBottom: 14 }}>
+                          {/* Height — direct px input */}
+                          <Text as="span" variant="bodySm" fontWeight="medium">Höhe (px)</Text>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, marginBottom: 14 }}>
                             <input
-                              type="range" min={16} max={120} step={1}
+                              type="number" min={8} max={200} step={1}
                               value={dev.height || 34}
-                              onChange={(e) => updateDev({ height: Number(e.target.value) })}
-                              style={{ flex: 1, accentColor: "#008060" }}
+                              onChange={(e) => updateDev({ height: Math.max(8, Math.min(200, Number(e.target.value) || 34)) })}
+                              style={{ width: 80, padding: "6px 8px", border: "1.5px solid #d1d5db", borderRadius: 6, fontSize: 14, fontWeight: 600, textAlign: "center", boxSizing: "border-box" }}
                             />
-                            <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", minWidth: 38, textAlign: "right" }}>{dev.height || 34}px</span>
+                            <span style={{ fontSize: 13, color: "#6b7280" }}>px</span>
+                            <button
+                              type="button"
+                              style={{ fontSize: 12, color: "#008060", background: "none", border: "1px solid #008060", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}
+                              onClick={() => {
+                                const img = new Image();
+                                img.onload = () => updateDev({ height: Math.round(img.naturalHeight) });
+                                img.src = dev.url;
+                              }}
+                            >Originalgröße</button>
                           </div>
 
                           {/* Padding */}
@@ -1168,7 +1182,7 @@ export default function StylesPage() {
                             src={dev.url}
                             alt="preview"
                             style={{
-                              height: Math.min(dev.height || 34, 60),
+                              height: Math.min(dev.height || 34, 80),
                               width: "auto",
                               maxWidth: 160,
                               objectFit: "contain",

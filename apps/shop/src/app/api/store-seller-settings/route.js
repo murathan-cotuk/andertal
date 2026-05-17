@@ -42,3 +42,16 @@ export async function GET(req) {
   }
 }
 
+// Called by sellercentral after saving branding to bust the cache
+export async function POST(req) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    const sellerId = body?.seller_id || "default";
+    settingsCache.delete(sellerId);
+    settingsCache.delete("default");
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ ok: true });
+  }
+}
+

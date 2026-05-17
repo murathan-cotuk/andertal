@@ -3803,7 +3803,14 @@ async function start() {
         return (res.rows || []).map((r) => {
           const meta = r.metadata || {};
           const mediaArr = Array.isArray(meta.media) ? meta.media : (meta.media ? [meta.media] : []);
-          const thumbnail = meta.thumbnail || (mediaArr[0] ? (typeof mediaArr[0] === 'string' ? mediaArr[0] : (mediaArr[0]?.url || null)) : null);
+          let thumbnail = meta.thumbnail || (mediaArr[0] ? (typeof mediaArr[0] === 'string' ? mediaArr[0] : (mediaArr[0]?.url || null)) : null);
+          if (!thumbnail && Array.isArray(r.variants) && r.variants.length > 0) {
+            for (const v of r.variants) {
+              const vMeta = v && v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
+              const vImg = (Array.isArray(vMeta.media) && vMeta.media.length > 0 ? vMeta.media[0] : null) || v.image_url || v.image || null
+              if (vImg) { thumbnail = typeof vImg === 'string' ? vImg : (vImg?.url || null); break }
+            }
+          }
           return {
             id: r.id,
             title: r.title,
@@ -6167,6 +6174,15 @@ async function start() {
       const media = meta.media
       let rawMediaList = Array.isArray(media) ? media : (typeof media === 'string' && media ? [media] : [])
       if (rawMediaList.length === 0 && (meta.image_url || meta.image)) rawMediaList = [meta.image_url || meta.image]
+      // Fallback: if no parent media, use first variant's image so thumbnail is never blank
+      if (rawMediaList.length === 0 && Array.isArray(p.variants) && p.variants.length > 0) {
+        for (const v of p.variants) {
+          const vMeta = v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
+          const firstVMedia = Array.isArray(vMeta.media) && vMeta.media.length > 0 ? vMeta.media[0] : null
+          const vImg = firstVMedia || v.image_url || v.image || null
+          if (vImg) { rawMediaList = [vImg]; break }
+        }
+      }
       const thumb = resolveUploadUrl(rawMediaList[0] || null)
       const imagesResolved = rawMediaList.map((m) => resolveUploadUrl(typeof m === 'string' ? m : (m && m.url) || null)).filter(Boolean)
       const country = String(marketCountry || 'DE').toUpperCase()

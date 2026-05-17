@@ -1112,19 +1112,25 @@ export default function ShopHeader() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/store-seller-settings?seller_id=default", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        setShopBranding({
-          shop_logo_url: d?.shop_logo_url || "",
-          shop_favicon_url: d?.shop_favicon_url || "",
-          shop_logo_height: d?.shop_logo_height != null ? Number(d.shop_logo_height) : 34,
-          logo_config: d?.logo_config || null,
-        });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    const fetchBranding = () => {
+      fetch("/api/store-seller-settings?seller_id=default", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (cancelled) return;
+          setShopBranding({
+            shop_logo_url: d?.shop_logo_url || "",
+            shop_favicon_url: d?.shop_favicon_url || "",
+            shop_logo_height: d?.shop_logo_height != null ? Number(d.shop_logo_height) : 34,
+            logo_config: d?.logo_config || null,
+          });
+        })
+        .catch(() => {});
+    };
+    fetchBranding();
+    // Re-fetch when tab regains focus so logo changes from sellercentral appear immediately
+    const onVisible = () => { if (document.visibilityState === "visible") fetchBranding(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
   useEffect(() => {
