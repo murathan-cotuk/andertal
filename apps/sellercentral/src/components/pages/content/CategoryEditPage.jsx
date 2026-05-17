@@ -142,6 +142,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     keywords: meta.keywords ?? "",
     image_url: safeStoredUrl(meta.image_url ?? initialCategory?.image_url ?? ""),
     banner_image_url: safeStoredUrl(meta.banner_image_url ?? initialCategory?.banner_image_url ?? ""),
+    banner_video_url: safeStoredUrl(meta.banner_video_url ?? ""),
   });
 
   const initialFormRef = useRef(JSON.parse(JSON.stringify({
@@ -156,6 +157,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     keywords: meta.keywords ?? "",
     image_url: safeStoredUrl(meta.image_url ?? initialCategory?.image_url ?? ""),
     banner_image_url: safeStoredUrl(meta.banner_image_url ?? initialCategory?.banner_image_url ?? ""),
+    banner_video_url: safeStoredUrl(meta.banner_video_url ?? ""),
   })));
 
   const [categoryProducts, setCategoryProducts] = useState([]);
@@ -237,6 +239,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
           keywords: form.keywords || null,
           image_url: form.image_url || null,
           banner_image_url: form.banner_image_url || null,
+          banner_video_url: form.banner_video_url || null,
         },
       });
       initialFormRef.current = JSON.parse(JSON.stringify(form));
@@ -614,10 +617,10 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
               </BlockStack>
             </Card>
 
-            {/* Banner image */}
+            {/* Banner image / video */}
             <Card>
               <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">Banner image</Text>
+                <Text as="h2" variant="headingMd">Banner</Text>
                 {form.banner_image_url ? (
                   <div>
                     <img
@@ -636,8 +639,34 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                   </div>
                 ) : null}
                 <Button onClick={() => setBannerImgPickerOpen(true)}>
-                  {form.banner_image_url ? "Change banner" : "Add banner"}
+                  {form.banner_image_url ? "Change banner image" : "Add banner image"}
                 </Button>
+                <TextField
+                  label="Banner-Video URL (optional)"
+                  value={form.banner_video_url || ""}
+                  onChange={(v) => setForm((p) => ({ ...p, banner_video_url: v }))}
+                  autoComplete="off"
+                  placeholder="https://…/banner.mp4"
+                  helpText="MP4/WebM Video — ersetzt das Bannerbild wenn gesetzt"
+                />
+                {form.banner_video_url ? (
+                  <div>
+                    <video
+                      src={resolveImageUrl(form.banner_video_url)}
+                      style={{ width: "100%", borderRadius: 8, objectFit: "cover", maxHeight: 120 }}
+                      muted
+                      playsInline
+                    />
+                    <Button
+                      size="slim"
+                      variant="plain"
+                      tone="critical"
+                      onClick={() => setForm((p) => ({ ...p, banner_video_url: "" }))}
+                    >
+                      Remove video
+                    </Button>
+                  </div>
+                ) : null}
               </BlockStack>
             </Card>
           </BlockStack>

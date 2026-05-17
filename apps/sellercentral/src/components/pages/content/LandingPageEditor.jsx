@@ -547,6 +547,7 @@ function ColorField({ label, value, onChange }) {
 // ── Hero Banner editor ──────────────────────────────────────────────────────
 function HeroBannerEditor({ container, onChange, editLang = "de" }) {
   const [pickerIdx, setPickerIdx] = useState(null);
+  const [videoPickerIdx, setVideoPickerIdx] = useState(null);
 
   const updateSlide = (idx, key, val) => {
     const slides = [...(container.slides || [])];
@@ -576,6 +577,9 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
     <BlockStack gap="400">
       {pickerIdx !== null && (
         <MediaPickerModal open multiple={false} onClose={() => setPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateSlideI18n(pickerIdx, "image", urls[0]); setPickerIdx(null); }} />
+      )}
+      {videoPickerIdx !== null && (
+        <MediaPickerModal open multiple={false} title="Video auswählen" onClose={() => setVideoPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateSlide(videoPickerIdx, "video_url", urls[0]); setVideoPickerIdx(null); }} />
       )}
 
       <Card>
@@ -617,16 +621,30 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
             </InlineStack>
 
             <ImageField
-              label="Bild"
-              helpText="3000×1000 px empfohlen · Das Bild ist klickbar über btn_url · pro gewählter „Sprache bearbeiten“"
-              value={gi(slide, "image", editLang)}
+              label=”Bild”
+              helpText=”3000×1000 px empfohlen · Das Bild ist klickbar über btn_url · pro gewählter „Sprache bearbeiten””
+              value={gi(slide, “image”, editLang)}
               onPick={() => setPickerIdx(idx)}
-              onClear={() => updateSlideI18n(idx, "image", "")}
+              onClear={() => updateSlideI18n(idx, “image”, “”)}
             />
 
-            <InlineStack gap="400" wrap={false}>
+            <BlockStack gap=”150”>
+              <Text as=”p” variant=”bodySm” fontWeight=”medium”>Video (optional — ersetzt Bild)</Text>
+              <InlineStack gap=”200” blockAlign=”end” wrap={false}>
+                <div style={{ flex: 1 }}>
+                  <TextField label=”” labelHidden value={slide.video_url || “”} onChange={(v) => updateSlide(idx, “video_url”, v)} placeholder=”https://…/video.mp4” autoComplete=”off” />
+                </div>
+                <Button size=”slim” onClick={() => setVideoPickerIdx(idx)}>Mediathek</Button>
+                {slide.video_url && <Button size=”slim” tone=”critical” onClick={() => updateSlide(idx, “video_url”, “”)}>×</Button>}
+              </InlineStack>
+              {slide.video_url && (
+                <video src={resolveUrl(slide.video_url)} style={{ width: “100%”, maxHeight: 100, objectFit: “cover”, borderRadius: 8, border: “1px solid var(--p-color-border)” }} muted playsInline />
+              )}
+            </BlockStack>
+
+            <InlineStack gap=”400” wrap={false}>
               <div style={{ flex: 1 }}>
-                <TextField label="Titel" value={gi(slide, "title", editLang)} onChange={(v) => updateSlideI18n(idx, "title", v)} placeholder="Überschrift…" autoComplete="off" />
+                <TextField label=”Titel” value={gi(slide, “title”, editLang)} onChange={(v) => updateSlideI18n(idx, "title", v)} placeholder="Überschrift…" autoComplete="off" />
               </div>
               <div style={{ flex: 1 }}>
                 <TextField label="Untertitel" value={gi(slide, "subtitle", editLang)} onChange={(v) => updateSlideI18n(idx, "subtitle", v)} placeholder="Untertitel…" autoComplete="off" />
@@ -735,6 +753,7 @@ function TextBlockEditor({ container, onChange, editLang = "de" }) {
 // ── Image + Text editor ─────────────────────────────────────────────────────
 function ImageTextEditor({ container, onChange, editLang = "de" }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [videoPickerOpen, setVideoPickerOpen] = useState(false);
   return (
     <BlockStack gap="400">
       {pickerOpen && (
@@ -748,7 +767,23 @@ function ImageTextEditor({ container, onChange, editLang = "de" }) {
           }}
         />
       )}
+      {videoPickerOpen && (
+        <MediaPickerModal open multiple={false} title="Video auswählen" onClose={() => setVideoPickerOpen(false)} onSelect={(urls) => { if (urls[0]) onChange({ ...container, video_url: urls[0] }); setVideoPickerOpen(false); }} />
+      )}
       <ImageField label="Bild" value={gi(container, "image", editLang)} onPick={() => setPickerOpen(true)} onClear={() => onChange(si(container, "image", editLang, ""))} />
+      <BlockStack gap="150">
+        <Text as="p" variant="bodySm" fontWeight="medium">Video (optional — ersetzt Bild)</Text>
+        <InlineStack gap="200" blockAlign="end" wrap={false}>
+          <div style={{ flex: 1 }}>
+            <TextField label="" labelHidden value={container.video_url || ""} onChange={(v) => onChange({ ...container, video_url: v })} placeholder="https://…/video.mp4" autoComplete="off" />
+          </div>
+          <Button size="slim" onClick={() => setVideoPickerOpen(true)}>Mediathek</Button>
+          {container.video_url && <Button size="slim" tone="critical" onClick={() => onChange({ ...container, video_url: "" })}>×</Button>}
+        </InlineStack>
+        {container.video_url && (
+          <video src={resolveUrl(container.video_url)} style={{ width: "100%", maxHeight: 100, objectFit: "cover", borderRadius: 8, border: "1px solid var(--p-color-border)" }} muted playsInline />
+        )}
+      </BlockStack>
       <Select label="Bildposition" options={[{ label: "Links", value: "left" }, { label: "Rechts", value: "right" }]} value={container.image_side || "left"} onChange={(v) => onChange({ ...container, image_side: v })} />
       <TextField label="Überschrift" value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
       <RichTextEditor label="Text" value={gi(container, "body", editLang)} onChange={(v) => onChange(si(container, "body", editLang, v))} placeholder="Text eingeben…" minHeight="130px" />

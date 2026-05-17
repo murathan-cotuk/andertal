@@ -88,7 +88,7 @@ const HeroBanner = styled.div`
   position: relative;
   background: #f4f4f2;
 
-  img {
+  img, video {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -905,11 +905,13 @@ export default function CollectionPage() {
   const title     = collection?.display_title || collection?.title || handle || "";
   const rawBanner = collection?.banner || collection?.banner_image_url || collection?.image_url || "";
   const bannerUrl = rawBanner ? resolveImageUrl(rawBanner) : "";
+  const rawBannerVideo = collection?.banner_video_url || collection?.metadata?.banner_video_url || "";
+  const bannerVideoUrl = rawBannerVideo ? resolveImageUrl(rawBannerVideo) : "";
 
   /* ── Template settings (from StylesPage) ── */
   const bannerStyle   = tmpl.banner_style || "strip";
   const bannerPreset  = BANNER_PRESETS[bannerStyle] || BANNER_PRESETS.strip;
-  const showBanner    = bannerStyle !== "none" && !!bannerUrl;
+  const showBanner    = bannerStyle !== "none" && (!!bannerUrl || !!bannerVideoUrl);
   const showSidebar   = tmpl.show_sidebar !== false;
   const sidebarWidth  = tmpl.sidebar_width || "220px";
   const colsPerRow    = Number(tmpl.products_per_row) || 4;
@@ -995,7 +997,11 @@ export default function CollectionPage() {
         {/* ── Banner / header ── */}
         {showBanner ? (
           <HeroBanner $aspect={bannerPreset.aspectRatio} $minH={bannerPreset.minHeight} $maxH={bannerPreset.maxHeight}>
-            <img src={bannerUrl} alt={title} />
+            {bannerVideoUrl ? (
+              <video autoPlay muted loop playsInline src={bannerVideoUrl} />
+            ) : (
+              <img src={bannerUrl} alt={title} />
+            )}
             <HeroText>
               <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">{title}</h1>
             </HeroText>

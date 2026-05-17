@@ -59,7 +59,7 @@ const HeroBanner = styled.div`
     max-height: 160px !important;
   }
 
-  img {
+  img, video {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -992,6 +992,8 @@ export default function CategoryTemplate() {
     "Category";
   const rawBanner = safeUrl(category?.banner_image_url);
   const bannerUrl = rawBanner ? resolveImageUrl(rawBanner) : "";
+  const rawBannerVideo = safeUrl(category?.metadata?.banner_video_url);
+  const bannerVideoUrl = rawBannerVideo ? resolveImageUrl(rawBannerVideo) : "";
   const richtextHtml = category?.long_content
     ? sanitizeHtml(rewriteImageUrlsInHtml(category.long_content))
     : "";
@@ -999,7 +1001,7 @@ export default function CategoryTemplate() {
   /* ── Category template settings ── */
   const catBannerStyle  = tmpl.banner_style || "strip";
   const catBannerPreset = CAT_BANNER_PRESETS[catBannerStyle] || CAT_BANNER_PRESETS.strip;
-  const showCatBanner   = catBannerStyle !== "none" && !!bannerUrl;
+  const showCatBanner   = catBannerStyle !== "none" && (!!bannerUrl || !!bannerVideoUrl);
   const showSidebar     = tmpl.show_sidebar !== false;
   const sidebarWidth    = tmpl.sidebar_width || "280px";
   const colsPerRow      = Number(tmpl.products_per_row) || 4;
@@ -1167,7 +1169,11 @@ export default function CategoryTemplate() {
     <>
       {showCatBanner ? (
         <HeroBanner $aspect={catBannerPreset.aspectRatio} $minH={catBannerPreset.minHeight} $maxH={catBannerPreset.maxHeight}>
-          <img src={bannerUrl} alt={displayTitle} />
+          {bannerVideoUrl ? (
+            <video autoPlay muted loop playsInline src={bannerVideoUrl} />
+          ) : (
+            <img src={bannerUrl} alt={displayTitle} />
+          )}
           <HeroText>
             <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">{displayTitle}</h1>
           </HeroText>

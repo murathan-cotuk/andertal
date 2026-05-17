@@ -82,6 +82,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
     richtext: "",
     image_url: "",
     banner_image_url: "",
+    banner_video_url: "",
     recommended_product_ids: [],
   });
   const [collectionProducts, setCollectionProducts] = useState([]);
@@ -110,12 +111,13 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
         richtext: initialCollection.richtext ?? initialCollection.description_html ?? "",
         image_url: initialCollection.image_url ?? "",
         banner_image_url: initialCollection.banner_image_url ?? "",
+        banner_video_url: initialCollection.banner_video_url ?? (initialCollection.metadata?.banner_video_url ?? ""),
         recommended_product_ids: Array.isArray(initialCollection.recommended_product_ids) ? initialCollection.recommended_product_ids : [],
       };
       setForm((prev) => ({ ...prev, ...nextForm }));
       initialFormRef.current = nextForm;
     } else if (isNew) {
-      const empty = { title: "", handle: "", category_id: "", display_title: "", meta_title: "", meta_description: "", keywords: "", richtext: "", image_url: "", banner_image_url: "", recommended_product_ids: [] };
+      const empty = { title: "", handle: "", category_id: "", display_title: "", meta_title: "", meta_description: "", keywords: "", richtext: "", image_url: "", banner_image_url: "", banner_video_url: "", recommended_product_ids: [] };
       initialFormRef.current = empty;
     }
   }, [initialCollection, isNew]);
@@ -249,6 +251,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
             richtext: form.richtext,
             image_url: form.image_url,
             banner_image_url: form.banner_image_url,
+            banner_video_url: form.banner_video_url || null,
             recommended_product_ids: form.recommended_product_ids || [],
           });
           router.replace(`/products/collections/${created.id}`);
@@ -267,6 +270,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
           richtext: form.richtext,
           image_url: form.image_url,
           banner_image_url: form.banner_image_url,
+          banner_video_url: form.banner_video_url || null,
           recommended_product_ids: form.recommended_product_ids,
         });
         const updated = await client.getCollection(collection.id);
@@ -283,6 +287,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
             richtext: updated.richtext ?? updated.description_html ?? form.richtext,
             image_url: updated.image_url ?? form.image_url,
             banner_image_url: updated.banner_image_url ?? form.banner_image_url,
+            banner_video_url: updated.banner_video_url ?? updated.metadata?.banner_video_url ?? form.banner_video_url,
             recommended_product_ids: Array.isArray(updated.recommended_product_ids) ? updated.recommended_product_ids : form.recommended_product_ids,
           };
           setForm((prev) => ({ ...prev, ...nextForm }));
@@ -546,6 +551,21 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                   <span style={{ fontSize: 18, color: "var(--p-color-icon)" }}>+ Banner</span>
                 </div>
               </div>
+              <Text as="p" variant="bodySm" fontWeight="medium">Banner-Video (optional, ersetzt Bild)</Text>
+              {form.banner_video_url ? (
+                <div style={{ maxWidth: 320, borderRadius: 8, overflow: "hidden", background: "var(--p-color-bg-fill-secondary)", position: "relative" }}>
+                  <video src={form.banner_video_url.startsWith("http") ? form.banner_video_url : `${baseUrl}${form.banner_video_url}`} style={{ width: "100%", maxHeight: 80, objectFit: "cover", display: "block" }} muted playsInline />
+                  <button type="button" onClick={() => setForm((prev) => ({ ...prev, banner_video_url: "" }))} style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, border: "none", borderRadius: "50%", background: "rgba(0,0,0,0.5)", color: "#fff", cursor: "pointer", fontSize: 14 }} aria-label="Remove">×</button>
+                </div>
+              ) : null}
+              <TextField
+                label=""
+                labelHidden
+                value={form.banner_video_url || ""}
+                onChange={(v) => setForm((prev) => ({ ...prev, banner_video_url: v }))}
+                autoComplete="off"
+                placeholder="https://…/banner.mp4 (MP4/WebM)"
+              />
               <MediaPickerModal
                 open={mainImgPickerOpen}
                 onClose={() => setMainImgPickerOpen(false)}

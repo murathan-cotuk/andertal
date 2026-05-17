@@ -40,6 +40,10 @@ function resolveUrl(url) {
   return `${BACKEND_URL}${u.startsWith("/") ? "" : "/"}${u}`;
 }
 
+function isVideoUrl(url) {
+  return /\.(mp4|webm|mov|avi|ogv)(\?.*)?$/i.test(String(url || ""));
+}
+
 async function readImageBitmap(file) {
   const objectUrl = URL.createObjectURL(file);
   try {
@@ -310,8 +314,8 @@ export default function MediaPickerModal({
         >
           {/* Upload tile */}
           <DropZone
-            accept={uploadPurpose === "product" ? "image/jpeg,image/png" : "image/*"}
-            type="image"
+            accept={uploadPurpose === "product" ? "image/jpeg,image/png" : "image/*,video/mp4,video/webm,video/quicktime,video/ogg"}
+            type={uploadPurpose === "product" ? "image" : "file"}
             onDropAccepted={handleUpload}
             allowMultiple={multiple}
           >
@@ -367,11 +371,21 @@ export default function MediaPickerModal({
                       outline: "none",
                     }}
                   >
-                    <img
-                      src={url}
-                      alt={item.alt || item.filename || ""}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
+                    {isVideoUrl(url) ? (
+                      <video
+                        src={url}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        preload="metadata"
+                        muted
+                        playsInline
+                      />
+                    ) : (
+                      <img
+                        src={url}
+                        alt={item.alt || item.filename || ""}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      />
+                    )}
                     {isSelected && (
                       <span
                         aria-hidden

@@ -919,6 +919,7 @@ async function start() {
             updated_at timestamptz NOT NULL DEFAULT now()
           )
         `).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_banners ADD COLUMN IF NOT EXISTS video_url text`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS bonus_points_redeemed integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS checkout_payment_kind varchar(32) NOT NULL DEFAULT 'stripe'`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS seller_net_after_commission_cents integer NOT NULL DEFAULT 0`).catch(() => {})
@@ -2626,6 +2627,7 @@ async function start() {
         if (b.richtext !== undefined) metadata.richtext = b.richtext
         if (b.image_url !== undefined) metadata.image_url = b.image_url
         if (b.banner_image_url !== undefined) metadata.banner_image_url = b.banner_image_url
+        if (b.banner_video_url !== undefined) metadata.banner_video_url = b.banner_video_url
         if (b.recommended_product_ids !== undefined) metadata.recommended_product_ids = Array.isArray(b.recommended_product_ids) ? b.recommended_product_ids : []
         const metaObj = Object.keys(metadata).length ? metadata : undefined
         let collectionId = id
@@ -2964,7 +2966,7 @@ async function start() {
       if (!client) return []
       try {
         await client.connect()
-        const r = await client.query('SELECT id, title, subtitle, image_url, link_url, button_text, is_active, position, created_at FROM admin_hub_banners ORDER BY position ASC, created_at ASC')
+        const r = await client.query('SELECT id, title, subtitle, image_url, video_url, link_url, button_text, is_active, position, created_at FROM admin_hub_banners ORDER BY position ASC, created_at ASC')
         await client.end()
         return r.rows || []
       } catch (e) { try { await client.end() } catch (_) {}; return [] }
@@ -2981,9 +2983,9 @@ async function start() {
       try {
         await client.connect()
         const r = await client.query(
-          `INSERT INTO admin_hub_banners (title, subtitle, image_url, link_url, button_text, is_active, position)
-           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-          [title, b.subtitle || null, b.image_url || null, b.link_url || null, b.button_text || null, b.is_active !== false, Number(b.position) || 0]
+          `INSERT INTO admin_hub_banners (title, subtitle, image_url, video_url, link_url, button_text, is_active, position)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+          [title, b.subtitle || null, b.image_url || null, b.video_url || null, b.link_url || null, b.button_text || null, b.is_active !== false, Number(b.position) || 0]
         )
         await client.end()
         res.status(201).json({ banner: r.rows[0] })
@@ -2997,8 +2999,8 @@ async function start() {
       try {
         await client.connect()
         const r = await client.query(
-          `UPDATE admin_hub_banners SET title=$1, subtitle=$2, image_url=$3, link_url=$4, button_text=$5, is_active=$6, position=$7, updated_at=now() WHERE id=$8 RETURNING *`,
-          [(b.title || '').trim() || null, b.subtitle || null, b.image_url || null, b.link_url || null, b.button_text || null, b.is_active !== false, Number(b.position) || 0, id]
+          `UPDATE admin_hub_banners SET title=$1, subtitle=$2, image_url=$3, video_url=$4, link_url=$5, button_text=$6, is_active=$7, position=$8, updated_at=now() WHERE id=$9 RETURNING *`,
+          [(b.title || '').trim() || null, b.subtitle || null, b.image_url || null, b.video_url || null, b.link_url || null, b.button_text || null, b.is_active !== false, Number(b.position) || 0, id]
         )
         await client.end()
         if (!r.rows[0]) return res.status(404).json({ message: 'Not found' })

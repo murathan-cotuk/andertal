@@ -24,6 +24,7 @@ const EMPTY_FORM = {
   title: "",
   subtitle: "",
   image_url: "",
+  video_url: "",
   link_url: "",
   button_text: "",
   is_active: true,
@@ -75,6 +76,7 @@ export default function BannersPage() {
       title: banner.title || "",
       subtitle: banner.subtitle || "",
       image_url: banner.image_url || "",
+      video_url: banner.video_url || "",
       link_url: banner.link_url || "",
       button_text: banner.button_text || "",
       is_active: banner.is_active !== false,
@@ -100,6 +102,7 @@ export default function BannersPage() {
         title: form.title.trim(),
         subtitle: form.subtitle.trim() || null,
         image_url: form.image_url.trim() || null,
+        video_url: form.video_url.trim() || null,
         link_url: form.link_url.trim() || null,
         button_text: form.button_text.trim() || null,
         position: Number(form.position) || 0,
@@ -266,6 +269,23 @@ export default function BannersPage() {
                 src={form.image_url}
                 alt="Vorschau"
                 style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 6, border: "1px solid #e5e7eb" }}
+                onError={(e) => { e.target.style.display = "none"; }}
+              />
+            )}
+            <TextField
+              label="Video-URL (optional)"
+              value={form.video_url}
+              onChange={(v) => setForm((f) => ({ ...f, video_url: v }))}
+              autoComplete="off"
+              placeholder="https://…/banner.mp4"
+              helpText="MP4/WebM Video — ersetzt das Bild, wenn gesetzt"
+            />
+            {form.video_url && (
+              <video
+                src={form.video_url}
+                style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 6, border: "1px solid #e5e7eb" }}
+                muted
+                playsInline
                 onError={(e) => { e.target.style.display = "none"; }}
               />
             )}

@@ -277,7 +277,7 @@ function HeroBanner({ container, locale = "de" }) {
   const scrollRef = useRef(null);
   const userScrolling = useRef(false);
 
-  const slides = (container.slides || []).filter((s) => localizedAsset(s, "image", locale));
+  const slides = (container.slides || []).filter((s) => localizedAsset(s, "image", locale) || (s.video_url && String(s.video_url).trim()));
   const height = container.height || "500px";
   const mobileHeight = container.mobile_height || "200px";
   const mobilePadding = container.mobile_padding || "0px";
@@ -376,9 +376,14 @@ function HeroBanner({ container, locale = "de" }) {
             }}
           >
             {slides.map((s, i) => {
+              const videoSrc = s.video_url ? resolveUrl(s.video_url) : "";
               const inner = (
                 <>
-                  <img src={resolveUrl(lt(s, "image", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }} draggable="false" />
+                  {videoSrc ? (
+                    <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
+                  ) : (
+                    <img src={resolveUrl(lt(s, "image", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }} draggable="false" />
+                  )}
                   <Overlay s={s} mobile />
                 </>
               );
@@ -406,11 +411,14 @@ function HeroBanner({ container, locale = "de" }) {
       <div style={getContentInnerStyle(container, 1600)}>
         <div style={{ position: "relative", width: "100%", height, overflow: "hidden" }}>
           {slides.map((s, i) => {
-            const imgEl = <img src={resolveUrl(lt(s, "image", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
+            const videoSrc = s.video_url ? resolveUrl(s.video_url) : "";
+            const mediaEl = videoSrc
+              ? <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
+              : <img src={resolveUrl(lt(s, "image", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
             const wrapStyle = { position: "absolute", inset: 0, opacity: i === current ? 1 : 0, transition: "opacity 0.7s ease", pointerEvents: i === current ? "auto" : "none" };
             return s.btn_url
-              ? <a key={i} href={s.btn_url} style={{ ...wrapStyle, display: "block" }}>{imgEl}</a>
-              : <div key={i} style={wrapStyle}>{imgEl}</div>;
+              ? <a key={i} href={s.btn_url} style={{ ...wrapStyle, display: "block" }}>{mediaEl}</a>
+              : <div key={i} style={wrapStyle}>{mediaEl}</div>;
           })}
           <Overlay s={slide} mobile={false} />
           <Dots mobile={false} />
@@ -595,6 +603,7 @@ function VideoBlock({ container, locale = "de" }) {
 function ImageText({ container, locale = "de" }) {
   const imageLeft = container.image_side !== "right";
   const imgSrc = resolveUrl(lt(container, "image", locale));
+  const videoSrc = container.video_url ? resolveUrl(container.video_url) : "";
   const textAlign = container.text_align || "left";
   const title = lt(container, "title", locale);
   const body = lt(container, "body", locale);
@@ -602,9 +611,13 @@ function ImageText({ container, locale = "de" }) {
   return (
     <div style={{ background: container.bg_color || "#fff", ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ ...getContentInnerStyle(container, 1100), display: "flex", flexDirection: imageLeft ? "row" : "row-reverse", gap: 40, alignItems: "center", flexWrap: "wrap" }}>
-        {imgSrc && (
+        {(videoSrc || imgSrc) && (
           <div style={{ flex: "0 0 auto", width: "min(45%, 480px)" }}>
-            <img src={imgSrc} alt={title || ""} style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} />
+            {videoSrc ? (
+              <video src={videoSrc} style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} autoPlay muted loop playsInline />
+            ) : (
+              <img src={imgSrc} alt={title || ""} style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} />
+            )}
           </div>
         )}
         <div style={{ flex: 1, minWidth: 240, textAlign }}>
