@@ -251,7 +251,7 @@ const MiddleBarLogo = styled(Link)`
   transition: opacity 0.2s ease;
   display: flex;
   align-items: center;
-  max-height: 56px;
+  max-height: 80px;
   overflow: hidden;
 
   &:hover {
@@ -1052,11 +1052,12 @@ export default function ShopHeader() {
   const marketParsed =
     parseMarketPath(pathname) || (ctxPrefix ? parseMarketPath(ctxPrefix) : null);
   const nextRouter = useNextRouter();
-  const [scrollY, setScrollY] = useState(0);
+  const [scrollPastThreshold, setScrollPastThreshold] = useState(false);
   const [scrollingDown, setScrollingDown] = useState(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const lastScrollYRef = useRef(0);
   const scrollingDownRef = useRef(false);
+  const scrollPastThresholdRef = useRef(false);
   const headerRef = useRef(null);
   const middleBarRef = useRef(null);
   const megaMenuTimerRef = useRef(null);
@@ -1097,7 +1098,8 @@ export default function ShopHeader() {
     const suffix = tail === "/" ? "" : tail;
     const cur = String(curLower || DEFAULT_CURRENCY).toLowerCase();
     writeCurrencyCookie(cur);
-    nextRouter.push(`${marketPrefix(countryLower, langLower)}${suffix}`);
+    // Full reload ensures middleware, prices and shipping re-initialize for the new market
+    window.location.href = `${marketPrefix(countryLower, langLower)}${suffix}`;
   };
 
   const handleSelectCountry = (countryCode) => {
@@ -1175,7 +1177,7 @@ export default function ShopHeader() {
         const mcLocal = shopStyles?.mobileChrome || {};
         const frostedScrollTint =
           isNarrowViewport &&
-          scrollY > SCROLL_THRESHOLD &&
+          scrollPastThreshold &&
           String(mcLocal.header_on_scroll || "") !== "inherit";
         if (frostedScrollTint) {
           themeMeta.setAttribute(
@@ -1196,7 +1198,7 @@ export default function ShopHeader() {
     return () => {
       window.removeEventListener(SHOP_THEME_CSS_UPDATED, onThemeInjected);
     };
-  }, [pathname, shopStyles, headerScopeCssVars, landingHeaderBg, scrollY, isNarrowViewport]);
+  }, [pathname, shopStyles, headerScopeCssVars, landingHeaderBg, scrollPastThreshold, isNarrowViewport]);
 
   useEffect(() => {
     const norm = (s) => String(s || "").toLowerCase().trim();
@@ -1301,7 +1303,11 @@ export default function ShopHeader() {
           scrollingDown: nextScrollingDown,
         });
         lastScrollYRef.current = current;
-        setScrollY(current);
+        const nextPast = current > SCROLL_THRESHOLD;
+        if (nextPast !== scrollPastThresholdRef.current) {
+          scrollPastThresholdRef.current = nextPast;
+          setScrollPastThreshold(nextPast);
+        }
 
         ticking = false;
       });
@@ -1331,6 +1337,9 @@ export default function ShopHeader() {
     if (typeof window !== "undefined") {
       const y = window.scrollY ?? window.pageYOffset ?? 0;
       lastScrollYRef.current = y;
+      const nextPast = y > SCROLL_THRESHOLD;
+      scrollPastThresholdRef.current = nextPast;
+      setScrollPastThreshold(nextPast);
       publishMobileBottomNavScroll({ scrollY: y, scrollingDown: false });
     }
   }, [pathname, publishMobileBottomNavScroll]);
@@ -1381,11 +1390,11 @@ export default function ShopHeader() {
   const showHeader = !scrollingDown;
   /** Mobile/tablet: thin search-only row while scrolling down (not on wide desktop) */
   const isMobileSearchCompact =
-    isNarrowViewport && scrollingDown && scrollY > SCROLL_THRESHOLD;
+    isNarrowViewport && scrollingDown && scrollPastThreshold;
   /** Kaydırınca buzlu beyaz üst yüzey (tema / landing rengine bakmadan) */
   const mobileFrostedScrollActive =
     isNarrowViewport &&
-    scrollY > SCROLL_THRESHOLD &&
+    scrollPastThreshold &&
     String(mc.header_on_scroll || "") !== "inherit";
 
   /** Theme JSON link_style_* per breakpoint; Landing kann Desktop auf klassisch erzwingen */
@@ -1596,7 +1605,7 @@ export default function ShopHeader() {
                   {(() => {
                     const devCfg = shopBranding.logo_config?.shop?.[logoDeviceKey];
                     const url = devCfg?.url || shopBranding.shop_logo_url || "";
-                    const height = Math.min(devCfg?.height ?? shopBranding.shop_logo_height ?? 34, 56);
+                    const height = Math.min(devCfg?.height ?? shopBranding.shop_logo_height ?? 34, 80);
                     const pt = devCfg?.pt ?? 0;
                     const pr = devCfg?.pr ?? 0;
                     const pb = devCfg?.pb ?? 0;
@@ -1605,7 +1614,7 @@ export default function ShopHeader() {
                       <img
                         src={url}
                         alt="Shop logo"
-                        style={{ height, maxHeight: 56, width: "auto", maxWidth: 220, objectFit: "contain", display: "block", paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl }}
+                        style={{ height, maxHeight: 80, width: "auto", maxWidth: 220, objectFit: "contain", display: "block", paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl }}
                       />
                     ) : "Andertal";
                   })()}

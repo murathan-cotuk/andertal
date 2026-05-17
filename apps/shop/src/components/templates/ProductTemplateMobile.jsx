@@ -13,6 +13,7 @@ import { resolveImageUrl } from "@/lib/image-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
+import { localizeMetaKey, localizeSectionLabel } from "@/lib/prop-labels";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
@@ -750,6 +751,7 @@ const MobileGalleryOuter = styled.div`
   margin: 10px -12px 0;
   background: #fff;
   position: relative;
+  contain: layout style;
 `;
 
 const MobileGalleryTrack = styled.div`
@@ -757,7 +759,10 @@ const MobileGalleryTrack = styled.div`
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
   scrollbar-width: none;
+  touch-action: pan-x pan-y;
+  will-change: scroll-position;
   &::-webkit-scrollbar { display: none; }
 `;
 
@@ -879,7 +884,7 @@ function hasStockForOption(variants, variationGroups, groupName, optionValue, se
   });
 }
 
-function buildMetaRows(meta) {
+function buildMetaRows(meta, locale) {
   if (!meta || typeof meta !== "object") return [];
   const keyLower = (k) => String(k).toLowerCase();
   const hidden = new Set(META_HIDDEN_KEYS.map((h) => keyLower(h)));
@@ -889,7 +894,7 @@ function buildMetaRows(meta) {
       if (hidden.has(key)) return false;
       return META_ATTR_KEYS.some((m) => key.includes(m)) || (typeof v === "string" && v && !k.startsWith("_"));
     })
-    .map(([k, v]) => ({ key: k, value: String(v) }));
+    .map(([k, v]) => ({ key: k, label: localizeMetaKey(k, locale || "de"), value: String(v) }));
 }
 
 function slugify(str) {
@@ -1069,10 +1074,22 @@ export default function ProductTemplateMobile() {
       .catch(() => {
         if (!cancelled) setSellerStoreName("");
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
+
+  // After product loads, fetch the seller's actual store name using their seller_id
+  useEffect(() => {
+    const sellerId = product?.metadata?.seller_id;
+    if (!sellerId) return;
+    let cancelled = false;
+    fetch(`/api/store-seller-settings?seller_id=${encodeURIComponent(sellerId)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && d?.store_name) setSellerStoreName(d.store_name.toString());
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [product?.metadata?.seller_id]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -1230,7 +1247,7 @@ export default function ProductTemplateMobile() {
     const track = galleryTrackRef.current;
     const targetLeft = track.clientWidth * selectedImage;
     if (Math.abs(track.scrollLeft - targetLeft) > 5) {
-      track.scrollLeft = targetLeft;
+      track.scrollTo({ left: targetLeft, behavior: "smooth" });
     }
   }, [selectedImage]);
 
@@ -1338,7 +1355,7 @@ export default function ProductTemplateMobile() {
   const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
   const variantMetafields = Array.isArray(variant?.metadata?.metafields) ? variant.metadata.metafields.filter((f) => f?.key && f?.value) : [];
-  const metaRows = buildMetaRows(meta);
+  const metaRows = buildMetaRows(meta, locale);
 
   // Grundpreis (unit price) — e.g. "1 kg = 50,00 €"
   const grundpreis = (() => {
@@ -1370,12 +1387,7 @@ export default function ProductTemplateMobile() {
     return parts.join(" × ") + " cm";
   })();
 
-  const storeName =
-    (sellerStoreName || "").trim() ||
-    product?.metadata?.shop_name ||
-    product?.metadata?.store_name ||
-    product?.metadata?.seller_name ||
-    "Shop";
+  const storeName = (sellerStoreName || "").trim() || "Shop";
 
   const selectedSellerOffer = selectedSellerId
     ? (multiOffer?.other_sellers || []).find((o) => o.seller_id === selectedSellerId) || null
@@ -1412,13 +1424,18 @@ export default function ProductTemplateMobile() {
     } catch (_) {}
   };
 
+  const galleryScrollRafRef = useRef(null);
   const handleMobileGalleryScroll = (e) => {
     const track = e.currentTarget;
-    const idx = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
-    if (idx !== mobileGalleryIdx) {
-      setMobileGalleryIdx(idx);
-      setSelectedImage(idx);
-    }
+    if (galleryScrollRafRef.current) return;
+    galleryScrollRafRef.current = requestAnimationFrame(() => {
+      galleryScrollRafRef.current = null;
+      const idx = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+      if (idx !== mobileGalleryIdx) {
+        setMobileGalleryIdx(idx);
+        setSelectedImage(idx);
+      }
+    });
   };
 
   const handleAddToCart = async () => {
@@ -1838,13 +1855,13 @@ export default function ProductTemplateMobile() {
           <MobileSection>
             <MetaTable>
               <tbody>
-                {metaRows.map(({ key, value }) => <tr key={key}><th>{key}</th><td>{value}</td></tr>)}
-                {dimensionsDisplay && <tr><th>Abmessungen</th><td>{dimensionsDisplay}</td></tr>}
+                {metaRows.map(({ key, label, value }) => <tr key={key}><th>{label}</th><td>{value}</td></tr>)}
+                {dimensionsDisplay && <tr><th>{localizeSectionLabel("abmessungen", locale)}</th><td>{dimensionsDisplay}</td></tr>}
                 {Array.isArray(meta.metafields) && meta.metafields.filter((f) => f?.key && f?.value).map((f, i) => (
-                  <tr key={`mf-${i}`}><th>{f.key}</th><td>{f.value}</td></tr>
+                  <tr key={`mf-${i}`}><th>{localizeMetaKey(f.key, locale)}</th><td>{f.value}</td></tr>
                 ))}
                 {variantMetafields.map((f, i) => (
-                  <tr key={`vmf-${i}`}><th>{f.key}</th><td>{f.value}</td></tr>
+                  <tr key={`vmf-${i}`}><th>{localizeMetaKey(f.key, locale)}</th><td>{f.value}</td></tr>
                 ))}
               </tbody>
             </MetaTable>
@@ -1951,27 +1968,27 @@ export default function ProductTemplateMobile() {
           {(metaRows.length > 0 || dimensionsDisplay || (Array.isArray(meta.metafields) && meta.metafields.some((f) => f?.key && f?.value)) || variantMetafields.length > 0) && (
             <MetaTable>
               <tbody>
-                {metaRows.map(({ key, value }) => (
+                {metaRows.map(({ key, label, value }) => (
                   <tr key={key}>
-                    <th>{key}</th>
+                    <th>{label}</th>
                     <td>{value}</td>
                   </tr>
                 ))}
                 {dimensionsDisplay && (
                   <tr>
-                    <th>Abmessungen</th>
+                    <th>{localizeSectionLabel("abmessungen", locale)}</th>
                     <td>{dimensionsDisplay}</td>
                   </tr>
                 )}
                 {Array.isArray(meta.metafields) && meta.metafields.filter((f) => f?.key && f?.value).map((f, i) => (
                   <tr key={`mf-${i}`}>
-                    <th>{f.key}</th>
+                    <th>{localizeMetaKey(f.key, locale)}</th>
                     <td>{f.value}</td>
                   </tr>
                 ))}
                 {variantMetafields.map((f, i) => (
                   <tr key={`vmf-${i}`}>
-                    <th>{f.key}</th>
+                    <th>{localizeMetaKey(f.key, locale)}</th>
                     <td>{f.value}</td>
                   </tr>
                 ))}
@@ -2068,11 +2085,11 @@ export default function ProductTemplateMobile() {
 
               <InfoList>
                 {[
-                  { label: "Versand", value: shippingDisplay },
-                  { label: "Rückgabe", value: `${returnDays} Tage, ${returnCost}` },
-                  { label: "Verkäufer", value: effectiveStoreName },
+                  { label: { de: "Versand", tr: "Kargo", fr: "Livraison", it: "Spedizione", es: "Envío", en: "Shipping" }[locale] ?? "Versand", value: shippingDisplay },
+                  { label: { de: "Rückgabe", tr: "İade", fr: "Retour", it: "Reso", es: "Devolución", en: "Returns" }[locale] ?? "Rückgabe", value: `${returnDays} ${{ de: "Tage", tr: "gün", fr: "jours", it: "giorni", es: "días", en: "days" }[locale] ?? "Tage"}, ${returnCost}` },
+                  { label: { de: "Verkäufer", tr: "Satıcı", fr: "Vendeur", it: "Venditore", es: "Vendedor", en: "Seller" }[locale] ?? "Verkäufer", value: effectiveStoreName },
                   ...((variant?.ean || meta.ean) ? [{ label: "EAN", value: variant?.ean || meta.ean }] : []),
-                  ...(meta.weee_number ? [{ label: "WEEE-Reg.", value: String(meta.weee_number) }] : []),
+                  ...(meta.weee_number ? [{ label: localizeMetaKey("weee_number", locale), value: String(meta.weee_number) }] : []),
                 ].map(({ label, value }) => (
                   <InfoRow key={label}>
                     <InfoLabel>{label}</InfoLabel>
@@ -2081,7 +2098,7 @@ export default function ProductTemplateMobile() {
                 ))}
                 {meta.eprel_number && (
                   <InfoRow>
-                    <InfoLabel>EPREL</InfoLabel>
+                    <InfoLabel>{localizeMetaKey("eprel_number", locale)}</InfoLabel>
                     <InfoValue>{String(meta.eprel_number)}</InfoValue>
                   </InfoRow>
                 )}

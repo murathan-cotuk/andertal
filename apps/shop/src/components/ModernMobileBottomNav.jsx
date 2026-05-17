@@ -98,6 +98,7 @@ export default function ModernMobileBottomNav({
         WebkitBackdropFilter: recessed ? undefined : blurCss,
         boxShadow: boxShadow ?? "0 -2px 12px rgba(0,0,0,0.07)",
         zIndex: isFixed ? 2147483640 : 100,
+        willChange: isFixed ? "transform" : undefined,
         transition: isFixed ? "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
         /* Slide off-screen by the full height + safe-area + any visual inset already applied */
         transform: isFixed && recessed ? `translateY(calc(100% + ${visualInset}px + env(safe-area-inset-bottom, 0px)))` : undefined,

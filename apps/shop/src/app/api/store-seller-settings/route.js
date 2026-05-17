@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-// Cache branding per seller — changes rarely (logo, store name)
+// Cache branding per seller — short TTL so logo/branding changes appear quickly
 const settingsCache = new Map();
-const SETTINGS_TTL = 5 * 60 * 1000; // 5 minutes
+const SETTINGS_TTL = 30 * 1000; // 30 seconds
 
 const getBackendUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
@@ -19,7 +19,7 @@ export async function GET(req) {
     const base = getBackendUrl();
     const r = await fetch(
       `${base}/store/seller-settings?seller_id=${encodeURIComponent(sellerId)}`,
-      { next: { revalidate: 300 } }
+      { cache: "no-store" }
     );
     const data = await r.json().catch(() => ({}));
     const result = {

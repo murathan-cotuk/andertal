@@ -4047,11 +4047,9 @@ async function start() {
     const adminHubProductsGET = async (req, res) => {
       try {
         const q = { ...(req.query || {}) }
-        const auth = req.headers['authorization'] || ''
-        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
-        const payload = token ? verifySellerToken(token) : null
-        if (payload && !payload.is_superuser && payload.seller_id) {
-          q.seller_id = String(payload.seller_id).trim()
+        // requireSellerAuth sets req.sellerUser; non-superusers can only see their own products
+        if (!req.sellerUser.is_superuser && req.sellerUser.seller_id) {
+          q.seller_id = String(req.sellerUser.seller_id).trim()
         }
         const products = await listAdminHubProductsDb(q)
         res.json({ products, count: products.length })
@@ -4063,11 +4061,8 @@ async function start() {
     const adminHubProductsPOST = async (req, res) => {
       try {
         let body = { ...(req.body || {}) }
-        const auth = req.headers['authorization'] || ''
-        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
-        const payload = token ? verifySellerToken(token) : null
-        const isSuperuserCaller = payload?.is_superuser || false
-        const callerSellerId = (!isSuperuserCaller && payload?.seller_id) ? String(payload.seller_id).trim() : null
+        const isSuperuserCaller = req.sellerUser?.is_superuser || false
+        const callerSellerId = (!isSuperuserCaller && req.sellerUser?.seller_id) ? String(req.sellerUser.seller_id).trim() : null
         if (callerSellerId) {
           body.seller_id = callerSellerId
           body.seller = callerSellerId
@@ -4472,11 +4467,8 @@ async function start() {
     const adminHubProductByIdPUT = async (req, res) => {
       try {
         let body = req.body || {}
-        const auth = req.headers['authorization'] || ''
-        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
-        const sellerPayload = token ? verifySellerToken(token) : null
-        const isSuperuserCaller = sellerPayload?.is_superuser || false
-        const callerSellerId = (!isSuperuserCaller && sellerPayload?.seller_id) ? String(sellerPayload.seller_id).trim() : null
+        const isSuperuserCaller = req.sellerUser?.is_superuser || false
+        const callerSellerId = (!isSuperuserCaller && req.sellerUser?.seller_id) ? String(req.sellerUser.seller_id).trim() : null
         let queuedMetaSuggestionCount = 0
         if (callerSellerId && !isSuperuserCaller) {
           const sanitized = await queueMetafieldSuggestionsAndSanitizePayload(body, callerSellerId)
@@ -4854,8 +4846,8 @@ async function start() {
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
       }
     }
-    httpApp.get('/admin-hub/products', adminHubProductsGET)
-    httpApp.post('/admin-hub/products', adminHubProductsPOST)
+    httpApp.get('/admin-hub/products', requireSellerAuth, adminHubProductsGET)
+    httpApp.post('/admin-hub/products', requireSellerAuth, adminHubProductsPOST)
     // EAN lookup — returns master product by EAN without seller filter (read-only, catalog fields only)
     httpApp.get('/admin-hub/products/ean-lookup', requireSellerAuth, async (req, res) => {
       try {
@@ -4883,9 +4875,9 @@ async function start() {
         res.status(500).json({ message: err?.message || 'Lookup failed' })
       }
     })
-    httpApp.get('/admin-hub/products/:id', adminHubProductByIdGET)
-    httpApp.put('/admin-hub/products/:id', adminHubProductByIdPUT)
-    httpApp.delete('/admin-hub/products/:id', adminHubProductByIdDELETE)
+    httpApp.get('/admin-hub/products/:id', requireSellerAuth, adminHubProductByIdGET)
+    httpApp.put('/admin-hub/products/:id', requireSellerAuth, adminHubProductByIdPUT)
+    httpApp.delete('/admin-hub/products/:id', requireSellerAuth, adminHubProductByIdDELETE)
 
     registerEuOriginRoutes(httpApp, {
       requireSellerAuth,

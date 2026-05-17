@@ -705,7 +705,7 @@ export default function InventoryPage() {
   const [inventoryMax, setInventoryMax] = useState("");
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
-  const [inventorySort, setInventorySort] = useState("title_asc");
+  const [inventorySort, setInventorySort] = useState("created_desc");
   const [sellerSectionsOpen, setSellerSectionsOpen] = useState({});
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
