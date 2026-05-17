@@ -622,7 +622,7 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
 
             <ImageField
               label=”Bild”
-              helpText=”3000×1000 px empfohlen · Das Bild ist klickbar über btn_url · pro gewählter „Sprache bearbeiten””
+              helpText=”3000x1000 px empfohlen - klickbar über btn_url - pro Sprache bearbeiten”
               value={gi(slide, “image”, editLang)}
               onPick={() => setPickerIdx(idx)}
               onClear={() => updateSlideI18n(idx, “image”, “”)}
