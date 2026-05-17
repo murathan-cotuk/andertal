@@ -621,30 +621,30 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
             </InlineStack>
 
             <ImageField
-              label=”Bild”
-              helpText=”3000x1000 px empfohlen - klickbar über btn_url - pro Sprache bearbeiten”
-              value={gi(slide, “image”, editLang)}
+              label="Bild"
+              helpText="3000x1000 px empfohlen - klickbar über btn_url - pro Sprache bearbeiten"
+              value={gi(slide, "image", editLang)}
               onPick={() => setPickerIdx(idx)}
-              onClear={() => updateSlideI18n(idx, “image”, “”)}
+              onClear={() => updateSlideI18n(idx, "image", "")}
             />
 
-            <BlockStack gap=”150”>
-              <Text as=”p” variant=”bodySm” fontWeight=”medium”>Video (optional — ersetzt Bild)</Text>
-              <InlineStack gap=”200” blockAlign=”end” wrap={false}>
+            <BlockStack gap="150">
+              <Text as="p" variant="bodySm" fontWeight="medium">Video (optional — ersetzt Bild)</Text>
+              <InlineStack gap="200" blockAlign="end" wrap={false}>
                 <div style={{ flex: 1 }}>
-                  <TextField label=”” labelHidden value={slide.video_url || “”} onChange={(v) => updateSlide(idx, “video_url”, v)} placeholder=”https://…/video.mp4” autoComplete=”off” />
+                  <TextField label="" labelHidden value={slide.video_url || ""} onChange={(v) => updateSlide(idx, "video_url", v)} placeholder="https://…/video.mp4" autoComplete="off" />
                 </div>
-                <Button size=”slim” onClick={() => setVideoPickerIdx(idx)}>Mediathek</Button>
-                {slide.video_url && <Button size=”slim” tone=”critical” onClick={() => updateSlide(idx, “video_url”, “”)}>×</Button>}
+                <Button size="slim" onClick={() => setVideoPickerIdx(idx)}>Mediathek</Button>
+                {slide.video_url && <Button size="slim" tone="critical" onClick={() => updateSlide(idx, "video_url", "")}>×</Button>}
               </InlineStack>
               {slide.video_url && (
-                <video src={resolveUrl(slide.video_url)} style={{ width: “100%”, maxHeight: 100, objectFit: “cover”, borderRadius: 8, border: “1px solid var(--p-color-border)” }} muted playsInline />
+                <video src={resolveUrl(slide.video_url)} style={{ width: "100%", maxHeight: 100, objectFit: "cover", borderRadius: 8, border: "1px solid var(--p-color-border)" }} muted playsInline />
               )}
             </BlockStack>
 
-            <InlineStack gap=”400” wrap={false}>
+            <InlineStack gap="400" wrap={false}>
               <div style={{ flex: 1 }}>
-                <TextField label=”Titel” value={gi(slide, “title”, editLang)} onChange={(v) => updateSlideI18n(idx, "title", v)} placeholder="Überschrift…" autoComplete="off" />
+                <TextField label="Titel" value={gi(slide, "title", editLang)} onChange={(v) => updateSlideI18n(idx, "title", v)} placeholder="Überschrift…" autoComplete="off" />
               </div>
               <div style={{ flex: 1 }}>
                 <TextField label="Untertitel" value={gi(slide, "subtitle", editLang)} onChange={(v) => updateSlideI18n(idx, "subtitle", v)} placeholder="Untertitel…" autoComplete="off" />
