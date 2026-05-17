@@ -1286,6 +1286,13 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
     const next = (container.images || []).filter((_, i) => i !== idx);
     onChange({ ...container, images: next });
   };
+  const moveImg = (idx, dir) => {
+    const next = [...(container.images || [])];
+    const target = idx + dir;
+    if (target < 0 || target >= next.length) return;
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange({ ...container, images: next });
+  };
 
   return (
     <BlockStack gap="400">
@@ -1387,9 +1394,13 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
                   <BlockStack gap="300">
                     <InlineStack align="space-between" blockAlign="center">
                       <Text as="h3" variant="headingSm">Bild {idx + 1}</Text>
-                      {n > 1 && (
-                        <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
-                      )}
+                      <InlineStack gap="200">
+                        <Button size="slim" disabled={idx === 0} onClick={() => moveImg(idx, -1)}>↑</Button>
+                        <Button size="slim" disabled={idx === n - 1} onClick={() => moveImg(idx, 1)}>↓</Button>
+                        {n > 1 && (
+                          <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
+                        )}
+                      </InlineStack>
                     </InlineStack>
                     <ImageField value={gi(img, "url", editLang)} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
                     <TextField
