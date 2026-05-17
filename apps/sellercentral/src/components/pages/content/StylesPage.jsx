@@ -881,7 +881,13 @@ export default function StylesPage() {
     setSavedMsg("");
     try {
       await client.saveStyles(styles);
-      await client.updateSellerSettings({ seller_id: "default", ...branding });
+      // Also sync flat shop_logo_url/height from desktop config for backward compatibility
+      const desktopShopLogo = branding.logo_config?.shop?.desktop;
+      await client.updateSellerSettings({
+        seller_id: "default",
+        ...branding,
+        ...(desktopShopLogo?.url ? { shop_logo_url: desktopShopLogo.url, shop_logo_height: desktopShopLogo.height || 34 } : {}),
+      });
       setSavedSnapshot(JSON.stringify(styles));
       setBrandingSnapshot(JSON.stringify(branding));
       // Bust the shop's settings cache so logo changes appear immediately on reload

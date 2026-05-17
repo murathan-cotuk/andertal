@@ -846,6 +846,13 @@ function ImageGridEditor({ container, onChange, editLang = "de" }) {
   };
   const addImg = () => onChange({ ...container, images: [...(container.images || []), { url: "", link: "", aspect_ratio: "1/1", title: "", text: "" }] });
   const removeImg = (idx) => onChange({ ...container, images: (container.images || []).filter((_, i) => i !== idx) });
+  const moveImg = (idx, dir) => {
+    const images = [...(container.images || [])];
+    const next = idx + dir;
+    if (next < 0 || next >= images.length) return;
+    [images[idx], images[next]] = [images[next], images[idx]];
+    onChange({ ...container, images });
+  };
 
   return (
     <BlockStack gap="400">
@@ -866,9 +873,13 @@ function ImageGridEditor({ container, onChange, editLang = "de" }) {
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center">
               <Text as="h3" variant="headingSm">Bild {idx + 1}</Text>
-              {(container.images || []).length > 1 && (
-                <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
-              )}
+              <InlineStack gap="200">
+                <Button size="slim" disabled={idx === 0} onClick={() => moveImg(idx, -1)}>↑</Button>
+                <Button size="slim" disabled={idx === (container.images || []).length - 1} onClick={() => moveImg(idx, 1)}>↓</Button>
+                {(container.images || []).length > 1 && (
+                  <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>Entfernen</Button>
+                )}
+              </InlineStack>
             </InlineStack>
             <ImageField value={gi(img, "url", editLang)} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
             <InlineStack gap="400" wrap={false}>

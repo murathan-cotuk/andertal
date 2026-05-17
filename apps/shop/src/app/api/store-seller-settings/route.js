@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 // Cache branding per seller — short TTL so logo/branding changes appear quickly
 const settingsCache = new Map();
-const SETTINGS_TTL = 30 * 1000; // 30 seconds
+const SETTINGS_TTL = 8 * 1000; // 8 seconds
 
 const getBackendUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
@@ -42,6 +42,18 @@ export async function GET(req) {
   }
 }
 
+// Preflight for cross-origin cache-bust from sellercentral
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
+
 // Called by sellercentral after saving branding to bust the cache
 export async function POST(req) {
   try {
@@ -49,9 +61,13 @@ export async function POST(req) {
     const sellerId = body?.seller_id || "default";
     settingsCache.delete(sellerId);
     settingsCache.delete("default");
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, {
+      headers: { "Access-Control-Allow-Origin": "*" },
+    });
   } catch {
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, {
+      headers: { "Access-Control-Allow-Origin": "*" },
+    });
   }
 }
 
