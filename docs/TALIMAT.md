@@ -1,4 +1,4 @@
-17.05.
+20.05.
 
 -- sellercentralde import-export sayfasindan ürün import etmek icin excel hazirladim. seller olarak yükledim ve su uyariyi verdi:
 

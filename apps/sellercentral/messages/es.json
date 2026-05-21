@@ -181,7 +181,15 @@
       "submitting": "Iniciando sesión…",
       "noAccount": "¿No tienes cuenta? Regístrate aquí",
       "errorRequired": "El correo y la contraseña son obligatorios",
-      "errorFailed": "Inicio de sesión fallido. Verifica tu correo y contraseña."
+      "errorFailed": "Inicio de sesión fallido. Verifica tu correo y contraseña.",
+      "twoFactorTitle": "Introduce tu código de seguridad",
+      "twoFactorSubtitle": "Abre tu aplicación de autenticación (p. ej. Google Authenticator) e introduce el código de 6 dígitos actual.",
+      "totpCode": "Código de 6 dígitos",
+      "totpCodeRequired": "Introduce el código de 6 dígitos.",
+      "totpVerifying": "Verificando código…",
+      "totpConfirm": "Iniciar sesión",
+      "totpBack": "← Volver al inicio de sesión",
+      "totpInvalid": "Código no válido o caducado. Inténtalo de nuevo."
     },
     "register": {
       "title": "Conviértete en vendedor",

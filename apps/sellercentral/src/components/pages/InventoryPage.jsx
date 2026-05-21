@@ -1517,10 +1517,10 @@ export default function InventoryPage() {
           <BlockStack gap="300">
             <Text as="p" variant="bodySm" tone="subdued">
               {l === "tr"
-                ? "Mevcut filtrelenmiş ürün görünümü dışa aktarılır."
+                ? "Filtrelenmiş ürünler dışa aktarılır: her ürün için bir parent satırı, her varyant için bir child satırı (ilk sütun: product_type)."
                 : l === "de"
-                ? "Die aktuell gefilterte Produktansicht wird exportiert."
-                : "Current filtered product view will be exported."}
+                ? "Gefilterte Produkte werden exportiert: pro Artikel eine Parent-Zeile, pro Variante eine Child-Zeile (erste Spalte: product_type)."
+                : "Filtered products are exported: one parent row per product, one child row per variant (first column: product_type)."}
             </Text>
             <Select
               label={l === "tr" ? "Format" : "Format"}

@@ -60,14 +60,14 @@
       "submit": "Anmelden",
       "submitting": "Wird angemeldet…",
       "noAccount": "Kein Konto? Registrieren",
-      "twoFactorTitle": "Zwei-Faktor-Authentifizierung",
-      "twoFactorSubtitle": "Gib den 6-stelligen Code aus deiner Authenticator-App ein.",
-      "totpCode": "Authenticator-Code",
-      "totpCodeRequired": "Bitte Code eingeben.",
-      "totpVerifying": "Überprüfen…",
-      "totpConfirm": "Bestätigen",
-      "totpBack": "Zurück zur Anmeldung",
-      "totpInvalid": "Ungültiger Code. Bitte erneut versuchen."
+      "twoFactorTitle": "Sicherheitscode eingeben",
+      "twoFactorSubtitle": "Öffne deine Authenticator-App (z. B. Google Authenticator) und gib den aktuellen 6-stelligen Code ein.",
+      "totpCode": "6-stelliger Code",
+      "totpCodeRequired": "Bitte den 6-stelligen Code eingeben.",
+      "totpVerifying": "Code wird geprüft…",
+      "totpConfirm": "Anmelden",
+      "totpBack": "← Zurück zur Anmeldung",
+      "totpInvalid": "Der Code ist ungültig oder abgelaufen. Bitte erneut versuchen."
     },
     "register": {
       "title": "Konto erstellen",

@@ -181,7 +181,15 @@
       "submitting": "Giriş yapılıyor…",
       "noAccount": "Hesabınız yok mu? Buradan kayıt olun",
       "errorRequired": "E-posta ve şifre zorunludur",
-      "errorFailed": "Giriş başarısız. E-posta ve şifrenizi kontrol edin."
+      "errorFailed": "Giriş başarısız. E-posta ve şifrenizi kontrol edin.",
+      "twoFactorTitle": "Güvenlik kodunu girin",
+      "twoFactorSubtitle": "Authenticator uygulamanızı (ör. Google Authenticator) açın ve güncel 6 haneli kodu girin.",
+      "totpCode": "6 haneli kod",
+      "totpCodeRequired": "Lütfen 6 haneli kodu girin.",
+      "totpVerifying": "Kod doğrulanıyor…",
+      "totpConfirm": "Giriş yap",
+      "totpBack": "← Girişe dön",
+      "totpInvalid": "Kod geçersiz veya süresi dolmuş. Lütfen tekrar deneyin."
     },
     "register": {
       "title": "Satıcı Ol",

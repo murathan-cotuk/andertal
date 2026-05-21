@@ -20,148 +20,260 @@ async function fetchJson(url, init = {}) {
   return res.json();
 }
 
-// ── Product row mapper ────────────────────────────────────────────────────────
-function mapProductRow(p) {
-  const meta = (p.metadata && typeof p.metadata === "object") ? p.metadata : {};
-  const variants = Array.isArray(p.variants) ? p.variants : [];
+// ── Product export (import-compatible: parent + child rows per variant) ───────
+const LANGS = ["de", "en", "tr", "fr", "it", "es"];
+const METAFIELD_PAIRS = 15;
 
-  // Images
-  const mediaArr = Array.isArray(meta.media) ? meta.media : [];
-  const legacyImg = str(meta.image_url || meta.image || meta.thumbnail || p.thumbnail || "");
-  const allImages = mediaArr.length > 0 ? mediaArr : (legacyImg ? [legacyImg] : []);
+function centsToExcelPrice(cents) {
+  if (cents == null || cents === "") return "";
+  const n = Number(cents);
+  if (Number.isNaN(n)) return "";
+  return (n / 100).toFixed(2).replace(".", ",");
+}
 
-  // Prices — single EUR block in metadata.prices (EUR / DE / first entry)
-  const pricesMap = meta.prices && typeof meta.prices === "object" ? meta.prices : {};
-  const eurEntry =
+function getEurPriceBlock(meta, p) {
+  const pricesMap = meta?.prices && typeof meta.prices === "object" ? meta.prices : {};
+  return (
     (pricesMap.EUR && typeof pricesMap.EUR === "object" ? pricesMap.EUR : null) ||
     (pricesMap.DE && typeof pricesMap.DE === "object" ? pricesMap.DE : null) ||
     Object.values(pricesMap).find((v) => v && typeof v === "object" && v.brutto_cents != null) ||
-    null;
-  const priceCents =
-    eurEntry?.brutto_cents ??
-    p.price_cents ??
-    (p.price != null ? Math.round(Number(p.price) * 100) : 0);
-  const price = priceCents ? (priceCents / 100).toFixed(2) : "";
-  const compareAtCents =
-    eurEntry?.uvp_cents ??
-    meta.uvp_cents ??
-    meta.compare_at_price_cents ??
-    null;
-  const compareAt = compareAtCents ? (compareAtCents / 100).toFixed(2) : "";
-  const saleCents = eurEntry?.sale_cents ?? meta.rabattpreis_cents ?? null;
-  const salePrice = saleCents ? (saleCents / 100).toFixed(2) : "";
-
-  // Bullet points
-  const bullets = Array.isArray(meta.bullet_points) ? meta.bullet_points : [];
-
-  // Translations (DE is canonical)
-  const translations = meta.translations && typeof meta.translations === "object" ? meta.translations : {};
-  const trDE = translations.de && typeof translations.de === "object" ? translations.de : {};
-  const trTR = translations.tr && typeof translations.tr === "object" ? translations.tr : {};
-  const trEN = translations.en && typeof translations.en === "object" ? translations.en : {};
-  const trFR = translations.fr && typeof translations.fr === "object" ? translations.fr : {};
-
-  // Metafields
-  const metafields = Array.isArray(meta.metafields) ? meta.metafields : [];
-  const metafieldsStr = metafields.map((mf) => `${str(mf.key)}:${str(mf.value)}`).join(" | ");
-
-  // Custom attributes (non-system metadata keys)
-  const SYSTEM_KEYS = new Set([
-    "media", "image_url", "image", "thumbnail", "ean", "sku", "bullet_points",
-    "translations", "variation_groups", "metafields", "shipping_group_id",
-    "collection_id", "collection_ids", "admin_category_id", "category_id",
-    "seller_id", "product_id", "brand_id", "brand_logo", "brand_handle",
-    "brand", "brand_name", "shop_name", "store_name", "seller_name",
-    "hersteller", "hersteller_information", "verantwortliche_person_information",
-    "seo_keywords", "seo_meta_title", "seo_meta_description",
-    "publish_date", "return_days", "return_cost", "return_kostenlos",
-    "related_product_ids", "dimensions", "dimensions_length", "dimensions_width",
-    "dimensions_height", "weight", "weight_grams", "unit_type", "unit_value",
-    "unit_reference", "shipping_info", "versand", "rabattpreis_cents",
-    "uvp_cents", "price_cents", "compare_at_price_cents", "sale_price_cents",
-    "review_count", "review_avg", "sold_last_month", "is_new", "badge", "sale",
-    "prices",
-  ]);
-  const customAttrs = Object.entries(meta)
-    .filter(([k, v]) => !SYSTEM_KEYS.has(k) && !k.startsWith("_") && v != null && v !== "")
-    .map(([k, v]) => `${k}:${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
-    .join(" | ");
-
-  // Variants summary
-  const variantsSummary = variants
-    .map((v) => {
-      const opts = Array.isArray(v.option_values) ? v.option_values.map((o) => str(o.value)).filter(Boolean).join("/") : str(v.value || v.name || "");
-      return [opts, str(v.sku), str(v.ean), v.inventory != null ? String(v.inventory) : ""].filter(Boolean).join(" | ");
-    })
-    .filter(Boolean)
-    .join("  //  ");
-
-  // Dimensions & weight
-  const dims = meta.dimensions || {};
-  const weightG = meta.weight_grams ?? (meta.weight ? Math.round(Number(meta.weight) * 1000) : "");
-
-  // SEO
-  const seoTitle = str(meta.seo_meta_title || trDE.seo_title || "");
-  const seoDesc = str(meta.seo_meta_description || trDE.seo_description || "");
-
-  return {
-    "SKU":                 str(p.sku),
-    "Name":                str(trDE.title || p.title),
-    "EAN":                 str(meta.ean),
-    "Status":              str(p.status),
-    "Beschreibung":        str(trDE.description || p.description),
-    "Preis (EUR)":         price,
-    "UVP (EUR)":           compareAt,
-    "Aktionspreis (EUR)":  salePrice,
-    "Bestand":             p.inventory != null ? String(p.inventory) : "",
-    "Foto URL 1":          str(allImages[0] || ""),
-    "Foto URL 2":          str(allImages[1] || ""),
-    "Foto URL 3":          str(allImages[2] || ""),
-    "Foto URL 4":          str(allImages[3] || ""),
-    "Foto URL 5":          str(allImages[4] || ""),
-    "Bullet Point 1":      str(bullets[0] || ""),
-    "Bullet Point 2":      str(bullets[1] || ""),
-    "Bullet Point 3":      str(bullets[2] || ""),
-    "Bullet Point 4":      str(bullets[3] || ""),
-    "Bullet Point 5":      str(bullets[4] || ""),
-    "Metafelder":          metafieldsStr,
-    "Eigene Attribute":    customAttrs,
-    "Varianten":           variantsSummary,
-    "Name (TR)":           str(trTR.title || ""),
-    "Name (EN)":           str(trEN.title || ""),
-    "Name (FR)":           str(trFR.title || ""),
-    "Beschreibung (TR)":   str(trTR.description || ""),
-    "Beschreibung (EN)":   str(trEN.description || ""),
-    "Beschreibung (FR)":   str(trFR.description || ""),
-    "Marke":               str(meta.brand_name || meta.brand || ""),
-    "Hersteller":          str(meta.hersteller || ""),
-    "Gewicht (g)":         weightG != null ? String(weightG) : "",
-    "Länge (cm)":          str(dims.length ?? meta.dimensions_length ?? ""),
-    "Breite (cm)":         str(dims.width ?? meta.dimensions_width ?? ""),
-    "Höhe (cm)":           str(dims.height ?? meta.dimensions_height ?? ""),
-    "SEO Titel":           seoTitle,
-    "SEO Beschreibung":    seoDesc,
-    "Kategorie":           str(meta.admin_category_id || meta.category_id || p.collection_id || ""),
-    "Handle":              str(p.handle),
-    "Verkäufer":           str(p.seller_id || meta.seller_id || ""),
-    "Erstellt":            str(p.created_at || ""),
-    "Aktualisiert":        str(p.updated_at || ""),
-    "ID":                  str(p.id),
-  };
+    null
+  );
 }
 
-const PRODUCT_COLUMNS = [
-  "SKU", "Name", "EAN", "Status", "Beschreibung",
-  "Preis (EUR)", "UVP (EUR)", "Aktionspreis (EUR)", "Bestand",
-  "Foto URL 1", "Foto URL 2", "Foto URL 3", "Foto URL 4", "Foto URL 5",
-  "Bullet Point 1", "Bullet Point 2", "Bullet Point 3", "Bullet Point 4", "Bullet Point 5",
-  "Metafelder", "Eigene Attribute", "Varianten",
-  "Name (TR)", "Name (EN)", "Name (FR)",
-  "Beschreibung (TR)", "Beschreibung (EN)", "Beschreibung (FR)",
-  "Marke", "Hersteller", "Gewicht (g)", "Länge (cm)", "Breite (cm)", "Höhe (cm)",
-  "SEO Titel", "SEO Beschreibung", "Kategorie", "Handle", "Verkäufer",
-  "Erstellt", "Aktualisiert", "ID",
-];
+function getVariantEurPriceBlock(vMeta, parentBlock) {
+  const pricesMap = vMeta?.prices && typeof vMeta.prices === "object" ? vMeta.prices : {};
+  const block =
+    (pricesMap.EUR && typeof pricesMap.EUR === "object" ? pricesMap.EUR : null) ||
+    (pricesMap.DE && typeof pricesMap.DE === "object" ? pricesMap.DE : null) ||
+    null;
+  return block || parentBlock;
+}
+
+function productImages(meta, p) {
+  const mediaArr = Array.isArray(meta.media) ? meta.media : [];
+  const legacyImg = str(meta.image_url || meta.image || meta.thumbnail || p.thumbnail || "");
+  return mediaArr.length > 0 ? mediaArr.map((u) => str(u)).filter(Boolean) : (legacyImg ? [legacyImg] : []);
+}
+
+function variantImage(v, vMeta) {
+  const url = str(v.image_url || v.image || vMeta?.image_url || "");
+  if (url) return url;
+  const media = Array.isArray(vMeta?.media) ? vMeta.media : [];
+  return media.length ? str(media[0]) : "";
+}
+
+function optionValueAt(v, index) {
+  const opts = Array.isArray(v?.option_values) ? v.option_values : [];
+  const o = opts[index];
+  if (o == null) return "";
+  if (typeof o === "string" || typeof o === "number") return String(o).trim();
+  return str(o.value || o.label || "");
+}
+
+function matrixVariantsOf(p) {
+  const variants = Array.isArray(p.variants) ? p.variants : [];
+  return variants.filter((v) => Array.isArray(v.option_values) && v.option_values.length > 0);
+}
+
+function applyLangFields(row, translations, lang) {
+  const tr = translations[lang] && typeof translations[lang] === "object" ? translations[lang] : {};
+  const bullets = Array.isArray(tr.bullet_points) ? tr.bullet_points : [];
+  if (tr.title) row[`title_${lang}`] = str(tr.title);
+  if (tr.description) row[`description_${lang}`] = str(tr.description);
+  for (let i = 0; i < 5; i++) {
+    if (bullets[i]) row[`bullet${i + 1}_${lang}`] = str(bullets[i]);
+  }
+  if (tr.seo_title) row[`seo_title_${lang}`] = str(tr.seo_title);
+  if (tr.seo_description) row[`seo_description_${lang}`] = str(tr.seo_description);
+  if (tr.seo_keywords) row[`seo_keywords_${lang}`] = str(tr.seo_keywords);
+}
+
+function applyMetafieldsToRow(row, metafields) {
+  const list = Array.isArray(metafields) ? metafields : [];
+  for (let i = 0; i < METAFIELD_PAIRS; i++) {
+    const mf = list[i];
+    if (!mf) continue;
+    row[`metafield_${i + 1}_key`] = str(mf.key);
+    row[`metafield_${i + 1}_value`] = str(mf.value);
+  }
+}
+
+function findSwatchForOptionValue(variationGroups, optionIndex, value) {
+  const groups = Array.isArray(variationGroups) ? variationGroups : [];
+  const g = groups[optionIndex];
+  if (!g || !Array.isArray(g.options)) return "";
+  const val = str(value).toLowerCase();
+  const opt = g.options.find((o) => str(o.value).toLowerCase() === val);
+  return str(opt?.swatch_image || opt?.swatch_image_url || "");
+}
+
+function buildParentImportRow(p, meta, hasChildren) {
+  const tr = meta.translations && typeof meta.translations === "object" ? meta.translations : {};
+  const trDE = tr.de && typeof tr.de === "object" ? tr.de : {};
+  const bullets = Array.isArray(meta.bullet_points) ? meta.bullet_points : Array.isArray(trDE.bullet_points) ? trDE.bullet_points : [];
+  const eur = getEurPriceBlock(meta, p);
+  const images = productImages(meta, p);
+  const variationGroups = Array.isArray(meta.variation_groups) ? meta.variation_groups : [];
+  const parentSku = str(p.sku) || str(meta.ean) || str(p.id);
+
+  const row = {
+    product_type: "parent",
+    sku: parentSku,
+    parent_sku: "",
+    status: str(p.status),
+    ean: str(meta.ean),
+    inventory: hasChildren ? "" : (p.inventory != null ? String(p.inventory) : ""),
+    brand: str(meta.brand_name || meta.brand || ""),
+    type: str(meta.type || ""),
+    category_slug: str(meta.category_slug || meta.category_handle || ""),
+    shipping_group: str(meta.shipping_group_name || meta.shipping_group || ""),
+    manufacturer: str(meta.hersteller || meta.manufacturer || ""),
+    manufacturer_information: str(meta.hersteller_information || meta.manufacturer_information || ""),
+    responsible_person_information: str(meta.verantwortliche_person_information || meta.responsible_person_information || ""),
+    weight_grams: meta.weight_grams != null ? String(meta.weight_grams) : "",
+    dim_length_cm: str(meta.dimensions_length ?? meta.dimensions?.length ?? ""),
+    dim_width_cm: str(meta.dimensions_width ?? meta.dimensions?.width ?? ""),
+    dim_height_cm: str(meta.dimensions_height ?? meta.dimensions?.height ?? ""),
+    unit_type: str(meta.unit_type || ""),
+    unit_value: meta.unit_value != null ? String(meta.unit_value) : "",
+    per_unit: meta.unit_reference != null ? String(meta.unit_reference) : "",
+    price: centsToExcelPrice(eur?.brutto_cents ?? p.price_cents ?? (p.price != null ? Math.round(Number(p.price) * 100) : null)),
+    price_uvp: centsToExcelPrice(eur?.uvp_cents ?? meta.uvp_cents ?? meta.compare_at_price_cents),
+    price_sale: centsToExcelPrice(eur?.sale_cents ?? meta.rabattpreis_cents),
+    weee_number: str(meta.weee_number || ""),
+    eprel_number: str(meta.eprel_number || ""),
+    Verkäufer: str(p.seller_id || meta.seller_id || ""),
+    _product_id: str(p.id),
+  };
+
+  for (let n = 0; n < variationGroups.length && n < 6; n++) {
+    row[`option${n + 1}_name`] = str(variationGroups[n]?.name);
+  }
+
+  for (let i = 0; i < 5; i++) {
+    row[`image_url_${i + 1}`] = str(images[i] || "");
+  }
+
+  for (const lang of LANGS) {
+    applyLangFields(row, tr, lang);
+  }
+  if (!row.title_de) row.title_de = str(trDE.title || p.title);
+  if (!row.description_de) row.description_de = str(trDE.description || p.description);
+  if (!row.seo_title_de) row.seo_title_de = str(meta.seo_meta_title || trDE.seo_title);
+  if (!row.seo_description_de) row.seo_description_de = str(meta.seo_meta_description || trDE.seo_description);
+  for (let i = 0; i < 5; i++) {
+    if (!row[`bullet${i + 1}_de`] && bullets[i]) row[`bullet${i + 1}_de`] = str(bullets[i]);
+  }
+
+  applyMetafieldsToRow(row, meta.metafields);
+  return row;
+}
+
+function buildChildImportRow(p, v, parentSku, variationGroups) {
+  const vMeta = v.metadata && typeof v.metadata === "object" ? v.metadata : {};
+  const meta = (p.metadata && typeof p.metadata === "object") ? p.metadata : {};
+  const parentEur = getEurPriceBlock(meta, p);
+  const vEur = getVariantEurPriceBlock(vMeta, parentEur);
+  const optCount = Math.max(
+    Array.isArray(variationGroups) ? variationGroups.length : 0,
+    Array.isArray(v.option_values) ? v.option_values.length : 0,
+  );
+
+  const row = {
+    product_type: "child",
+    sku: str(v.sku) || "",
+    parent_sku: parentSku,
+    status: "",
+    ean: str(v.ean || vMeta.ean || ""),
+    inventory: v.inventory != null ? String(v.inventory) : (v.inventory_quantity != null ? String(v.inventory_quantity) : ""),
+    brand: "",
+    type: "",
+    category_slug: "",
+    shipping_group: "",
+    manufacturer: "",
+    manufacturer_information: "",
+    responsible_person_information: "",
+    weight_grams: vMeta.weight_grams != null ? String(vMeta.weight_grams) : "",
+    dim_length_cm: "",
+    dim_width_cm: "",
+    dim_height_cm: "",
+    unit_type: vMeta.unit_type != null ? str(vMeta.unit_type) : "",
+    unit_value: vMeta.unit_value != null ? String(vMeta.unit_value) : "",
+    per_unit: vMeta.unit_reference != null ? String(vMeta.unit_reference) : "",
+    price: centsToExcelPrice(vEur?.brutto_cents ?? v.price_cents ?? (v.price != null ? Math.round(Number(v.price) * 100) : null)),
+    price_uvp: centsToExcelPrice(vEur?.uvp_cents ?? v.compare_at_price_cents),
+    price_sale: centsToExcelPrice(vEur?.sale_cents),
+    swatch_image_url: str(v.swatch_image_url || v.swatch_image || ""),
+    Verkäufer: str(p.seller_id || meta.seller_id || ""),
+    _product_id: str(p.id),
+  };
+
+  const img = variantImage(v, vMeta);
+  if (img) row.image_url_1 = img;
+
+  for (let n = 0; n < optCount && n < 6; n++) {
+    const val = optionValueAt(v, n);
+    row[`option${n + 1}_value`] = val;
+    if (n === 0 && !row.swatch_image_url) {
+      const sw = findSwatchForOptionValue(variationGroups, n, val);
+      if (sw) row.swatch_image_url = sw;
+    }
+  }
+
+  const vTr = vMeta.translations && typeof vMeta.translations === "object" ? vMeta.translations : {};
+  for (const lang of LANGS) {
+    applyLangFields(row, vTr, lang);
+  }
+
+  applyMetafieldsToRow(row, vMeta.metafields);
+  return row;
+}
+
+/** One product → parent row + one row per variant (child). Simple products: parent only. */
+function expandProductToImportRows(p) {
+  const meta = (p.metadata && typeof p.metadata === "object") ? p.metadata : {};
+  const matrix = matrixVariantsOf(p);
+  const parentSku = str(p.sku) || str(meta.ean) || str(p.id);
+  const variationGroups = Array.isArray(meta.variation_groups) ? meta.variation_groups : [];
+  const rows = [buildParentImportRow(p, meta, matrix.length > 0)];
+  for (const v of matrix) {
+    rows.push(buildChildImportRow(p, v, parentSku, variationGroups));
+  }
+  return rows;
+}
+
+function buildImportExportColumns() {
+  const cols = [
+    "product_type", "sku", "parent_sku", "status", "ean", "inventory",
+    "brand", "type", "category_slug", "shipping_group",
+    "manufacturer", "manufacturer_information", "responsible_person_information",
+    "weight_grams", "dim_length_cm", "dim_width_cm", "dim_height_cm",
+    "image_url_1", "image_url_2", "image_url_3", "image_url_4", "image_url_5",
+    "swatch_image_url",
+  ];
+  for (let i = 1; i <= 6; i++) {
+    cols.push(`option${i}_name`, `option${i}_value`);
+  }
+  cols.push("unit_type", "unit_value", "per_unit", "price", "price_uvp", "price_sale", "weee_number", "eprel_number");
+  for (let i = 1; i <= 5; i++) {
+    cols.push(`file_${i}_url`, `file_${i}_name`);
+  }
+  for (let i = 1; i <= METAFIELD_PAIRS; i++) {
+    cols.push(`metafield_${i}_key`, `metafield_${i}_value`);
+  }
+  for (const lang of LANGS) {
+    cols.push(
+      `title_${lang}`, `description_${lang}`,
+      `bullet1_${lang}`, `bullet2_${lang}`, `bullet3_${lang}`, `bullet4_${lang}`, `bullet5_${lang}`,
+      `seo_title_${lang}`, `seo_description_${lang}`, `seo_keywords_${lang}`,
+    );
+  }
+  cols.push("Verkäufer", "_product_id");
+  return cols;
+}
+
+const PRODUCT_COLUMNS = buildImportExportColumns();
 
 // ── Generic row flattener for non-product datasets ────────────────────────────
 function flattenObject(obj, prefix = "", out = {}) {
@@ -195,15 +307,17 @@ async function fetchDataset(backendUrl, token, key) {
   const data = await fetchJson(conf.url, { headers });
   const arr = Array.isArray(data?.[conf.root]) ? data[conf.root] : [];
   if (conf.structured) {
-    return { rows: arr.map(mapProductRow), columns: PRODUCT_COLUMNS };
+    const rows = [];
+    for (const p of arr) {
+      rows.push(...expandProductToImportRows(p));
+    }
+    return { rows, columns: PRODUCT_COLUMNS };
   }
   return { rows: arr.map((row) => flattenObject(row)), columns: null };
 }
 
 function normalizeSellerKey(flat) {
-  return (
-    str(flat["Verkäufer"] || flat.seller_id || flat["metadata.seller_id"] || "platform_admin")
-  );
+  return str(flat.Verkäufer || flat.seller_id || flat["metadata.seller_id"] || "platform_admin");
 }
 
 function normalizeDateKey(flat) {

@@ -181,7 +181,15 @@
       "submitting": "Connexion…",
       "noAccount": "Pas de compte ? Inscrivez-vous ici",
       "errorRequired": "L'e-mail et le mot de passe sont requis",
-      "errorFailed": "Connexion échouée. Vérifiez votre e-mail et mot de passe."
+      "errorFailed": "Connexion échouée. Vérifiez votre e-mail et mot de passe.",
+      "twoFactorTitle": "Saisissez votre code de sécurité",
+      "twoFactorSubtitle": "Ouvrez votre application d'authentification (ex. Google Authenticator) et entrez le code à 6 chiffres actuel.",
+      "totpCode": "Code à 6 chiffres",
+      "totpCodeRequired": "Veuillez saisir le code à 6 chiffres.",
+      "totpVerifying": "Vérification du code…",
+      "totpConfirm": "Se connecter",
+      "totpBack": "← Retour à la connexion",
+      "totpInvalid": "Code invalide ou expiré. Veuillez réessayer."
     },
     "register": {
       "title": "Devenir Vendeur",

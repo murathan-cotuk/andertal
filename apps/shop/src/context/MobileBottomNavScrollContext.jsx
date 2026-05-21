@@ -7,7 +7,7 @@ export const MOBILE_CHROME_SCROLL_THRESHOLD_PX = 60;
 
 const MobileBottomNavScrollContext = createContext({
   publishMobileBottomNavScroll: () => {},
-  mobileBottomNavScroll: { scrollY: 0, scrollingDown: false },
+  mobileBottomNavScroll: { scrollY: 0, scrollingDown: false, chromeHideProgress: 0 },
 });
 
 /** ShopHeader scroll ile senkron — mobil alt bar aşağı kaydırınca saklanır */
@@ -15,12 +15,19 @@ export function MobileBottomNavScrollProvider({ children }) {
   const [mobileBottomNavScroll, setMobileBottomNavScroll] = useState({
     scrollY: 0,
     scrollingDown: false,
+    chromeHideProgress: 0,
   });
 
   const publishMobileBottomNavScroll = useCallback((patch) => {
     setMobileBottomNavScroll((prev) => {
       const next = { ...prev, ...patch };
-      if (next.scrollY === prev.scrollY && next.scrollingDown === prev.scrollingDown) return prev;
+      if (
+        next.scrollY === prev.scrollY &&
+        next.scrollingDown === prev.scrollingDown &&
+        next.chromeHideProgress === prev.chromeHideProgress
+      ) {
+        return prev;
+      }
       return next;
     });
   }, []);

@@ -139,7 +139,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         if (!bclient) return res.status(503).json({ error: 'Service unavailable' })
         await bclient.connect()
         const br = await bclient.query(
-          `SELECT id, email, seller_id, sub_of_seller_id, approval_status, andertal_billbee_api_key, andertal_billbee_api_secret
+          `SELECT id, email, seller_id, sub_of_seller_id, approval_status, is_superuser, andertal_billbee_api_key, andertal_billbee_api_secret
            FROM seller_users
            WHERE TRIM(andertal_billbee_api_key) = TRIM($1) LIMIT 2`,
           [apiKey],
@@ -165,7 +165,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         const bsellerId = brow.sub_of_seller_id ? String(brow.sub_of_seller_id).trim() : String(brow.seller_id).trim()
         if (!bsellerId) return res.status(403).json({ error: 'Forbidden', message: 'No seller scope' })
         if (!checkRateLimit(bsellerId)) return res.status(429).json({ error: 'Too Many Requests' })
-        req.apiSeller = { user_id: brow.id, email: brow.email, seller_id: bsellerId }
+        req.apiSeller = { user_id: brow.id, email: brow.email, seller_id: bsellerId, is_superuser: !!brow.is_superuser }
         logEvent('api.auth.success', { seller_id: bsellerId, via: 'andertal_seller_header' })
         return next()
       } catch (e) {
@@ -184,7 +184,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         if (!bclient) return res.status(503).json({ error: 'Service unavailable' })
         await bclient.connect()
         const br = await bclient.query(
-          `SELECT id, email, seller_id, sub_of_seller_id, approval_status, andertal_billbee_api_key, andertal_billbee_api_secret
+          `SELECT id, email, seller_id, sub_of_seller_id, approval_status, is_superuser, andertal_billbee_api_key, andertal_billbee_api_secret
            FROM seller_users
            WHERE TRIM(andertal_billbee_api_key) = TRIM($1) LIMIT 2`,
           [basic.username.trim()],
@@ -209,7 +209,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         const bsellerId = brow.sub_of_seller_id ? String(brow.sub_of_seller_id).trim() : String(brow.seller_id).trim()
         if (!bsellerId) return res.status(403).json({ error: 'Forbidden', message: 'No seller scope' })
         if (!checkRateLimit(bsellerId)) return res.status(429).json({ error: 'Too Many Requests' })
-        req.apiSeller = { user_id: brow.id, email: brow.email, seller_id: bsellerId }
+        req.apiSeller = { user_id: brow.id, email: brow.email, seller_id: bsellerId, is_superuser: !!brow.is_superuser }
         logEvent('api.auth.success', { seller_id: bsellerId, via: 'andertal_seller_basic' })
         return next()
       } catch (e) {
@@ -227,7 +227,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
         if (!bclient) return res.status(503).json({ error: 'Service unavailable' })
         await bclient.connect()
         const br = await bclient.query(
-          `SELECT id, email, seller_id, sub_of_seller_id, approval_status
+          `SELECT id, email, seller_id, sub_of_seller_id, approval_status, is_superuser
            FROM seller_users WHERE TRIM(andertal_billbee_api_secret) = TRIM($1) LIMIT 2`,
           [apiKey],
         )
@@ -239,7 +239,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
           const bsellerId = brow.sub_of_seller_id ? String(brow.sub_of_seller_id).trim() : String(brow.seller_id).trim()
           if (!bsellerId) return res.status(403).json({ error: 'Forbidden', message: 'No seller scope' })
           if (!checkRateLimit(bsellerId)) return res.status(429).json({ error: 'Too Many Requests' })
-          req.apiSeller = { user_id: brow.id, email: brow.email, seller_id: bsellerId }
+          req.apiSeller = { user_id: brow.id, email: brow.email, seller_id: bsellerId, is_superuser: !!brow.is_superuser }
           logEvent('api.auth.success', { seller_id: bsellerId, via: 'secret_reverse' })
           return next()
         }
@@ -263,7 +263,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       if (!client) return res.status(503).json({ error: 'Service unavailable' })
       await client.connect()
       const r = await client.query(
-        `SELECT id, email, seller_id, sub_of_seller_id, approval_status, andertal_billbee_api_key, andertal_billbee_api_secret
+        `SELECT id, email, seller_id, sub_of_seller_id, approval_status, is_superuser, andertal_billbee_api_key, andertal_billbee_api_secret
          FROM seller_users
          WHERE (LOWER(TRIM(email)) = LOWER(TRIM($1)) OR TRIM(seller_id) = TRIM($1)) LIMIT 2`,
         [basic.username],
@@ -308,7 +308,7 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       const sellerId = row.sub_of_seller_id ? String(row.sub_of_seller_id).trim() : String(row.seller_id).trim()
       if (!sellerId) return res.status(403).json({ error: 'Forbidden', message: 'No seller scope' })
       if (!checkRateLimit(sellerId)) return res.status(429).json({ error: 'Too Many Requests' })
-      req.apiSeller = { user_id: row.id, email: row.email, seller_id: sellerId }
+      req.apiSeller = { user_id: row.id, email: row.email, seller_id: sellerId, is_superuser: !!row.is_superuser }
       logEvent('api.auth.success', { seller_id: sellerId, via: 'email' })
       next()
     } catch (e) {
@@ -430,28 +430,36 @@ function mountBillbeeMarketplaceApi(httpApp, deps) {
       // Products come from two sources:
       // 1. admin_hub_seller_listings — seller has an explicit listing (price/inventory override)
       // 2. admin_hub_products.seller_id — product was created directly by/for this seller
+      const isSuperuser = !!req.apiSeller.is_superuser
       const countRes = await client.query(
-        `SELECT COUNT(*) FROM (
-           SELECT p.id
-           FROM admin_hub_products p
-           LEFT JOIN admin_hub_seller_listings sl ON sl.product_id = p.id AND sl.seller_id = $1
-           WHERE p.seller_id = $1 OR sl.seller_id = $1
-         ) sub`,
-        [sid],
+        isSuperuser
+          ? `SELECT COUNT(*) FROM admin_hub_products`
+          : `SELECT COUNT(*) FROM (
+               SELECT p.id
+               FROM admin_hub_products p
+               LEFT JOIN admin_hub_seller_listings sl ON sl.product_id = p.id AND sl.seller_id = $1
+               WHERE p.seller_id = $1 OR sl.seller_id = $1
+             ) sub`,
+        isSuperuser ? [] : [sid],
       )
       const totalRows = parseInt(countRes.rows[0]?.count || '0', 10)
       const totalPages = Math.ceil(totalRows / pageSize) || 1
       const r = await client.query(
-        `SELECT p.id, p.title, p.handle, p.description, p.metadata, p.created_at, p.updated_at,
-                COALESCE(sl.price_cents, p.price_cents) AS price_cents,
-                COALESCE(sl.inventory, p.inventory) AS inventory,
-                COALESCE(sl.status, p.status) AS status,
-                COALESCE(sl.sku, p.sku) AS sku
-         FROM admin_hub_products p
-         LEFT JOIN admin_hub_seller_listings sl ON sl.product_id = p.id AND sl.seller_id = $1
-         WHERE p.seller_id = $1 OR sl.seller_id = $1
-         ORDER BY p.updated_at DESC LIMIT $2 OFFSET $3`,
-        [sid, pageSize, (page - 1) * pageSize],
+        isSuperuser
+          ? `SELECT p.id, p.title, p.handle, p.description, p.metadata, p.created_at, p.updated_at,
+                    p.price_cents, p.inventory, p.status, p.sku
+             FROM admin_hub_products p
+             ORDER BY p.updated_at DESC LIMIT $1 OFFSET $2`
+          : `SELECT p.id, p.title, p.handle, p.description, p.metadata, p.created_at, p.updated_at,
+                    COALESCE(sl.price_cents, p.price_cents) AS price_cents,
+                    COALESCE(sl.inventory, p.inventory) AS inventory,
+                    COALESCE(sl.status, p.status) AS status,
+                    COALESCE(sl.sku, p.sku) AS sku
+             FROM admin_hub_products p
+             LEFT JOIN admin_hub_seller_listings sl ON sl.product_id = p.id AND sl.seller_id = $1
+             WHERE p.seller_id = $1 OR sl.seller_id = $1
+             ORDER BY p.updated_at DESC LIMIT $2 OFFSET $3`,
+        isSuperuser ? [pageSize, (page - 1) * pageSize] : [sid, pageSize, (page - 1) * pageSize],
       )
       await client.end(); client = null
 

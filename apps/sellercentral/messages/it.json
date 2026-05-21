@@ -181,7 +181,15 @@
       "submitting": "Accesso in corso…",
       "noAccount": "Non hai un account? Registrati qui",
       "errorRequired": "E-mail e password sono obbligatori",
-      "errorFailed": "Accesso non riuscito. Controlla e-mail e password."
+      "errorFailed": "Accesso non riuscito. Controlla e-mail e password.",
+      "twoFactorTitle": "Inserisci il codice di sicurezza",
+      "twoFactorSubtitle": "Apri l'app di autenticazione (es. Google Authenticator) e inserisci il codice a 6 cifre attuale.",
+      "totpCode": "Codice a 6 cifre",
+      "totpCodeRequired": "Inserisci il codice a 6 cifre.",
+      "totpVerifying": "Verifica del codice…",
+      "totpConfirm": "Accedi",
+      "totpBack": "← Torna al login",
+      "totpInvalid": "Codice non valido o scaduto. Riprova."
     },
     "register": {
       "title": "Diventa Venditore",

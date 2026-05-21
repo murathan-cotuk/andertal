@@ -181,7 +181,15 @@
       "submitting": "Signing in…",
       "noAccount": "Don't have an account? Register here",
       "errorRequired": "Email and password are required",
-      "errorFailed": "Login failed. Check your email and password."
+      "errorFailed": "Login failed. Check your email and password.",
+      "twoFactorTitle": "Enter your security code",
+      "twoFactorSubtitle": "Open your authenticator app (e.g. Google Authenticator) and enter the current 6-digit code.",
+      "totpCode": "6-digit code",
+      "totpCodeRequired": "Please enter the 6-digit code.",
+      "totpVerifying": "Verifying code…",
+      "totpConfirm": "Sign in",
+      "totpBack": "← Back to login",
+      "totpInvalid": "Invalid or expired code. Please try again."
     },
     "register": {
       "title": "Become a Seller",

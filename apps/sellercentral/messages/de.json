@@ -181,7 +181,15 @@
       "submitting": "Wird angemeldet…",
       "noAccount": "Noch kein Konto? Hier registrieren",
       "errorRequired": "E-Mail und Passwort sind Pflichtfelder",
-      "errorFailed": "Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen."
+      "errorFailed": "Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen.",
+      "twoFactorTitle": "Sicherheitscode eingeben",
+      "twoFactorSubtitle": "Öffne deine Authenticator-App (z. B. Google Authenticator) und gib den aktuellen 6-stelligen Code ein.",
+      "totpCode": "6-stelliger Code",
+      "totpCodeRequired": "Bitte den 6-stelligen Code eingeben.",
+      "totpVerifying": "Code wird geprüft…",
+      "totpConfirm": "Anmelden",
+      "totpBack": "← Zurück zur Anmeldung",
+      "totpInvalid": "Der Code ist ungültig oder abgelaufen. Bitte erneut versuchen."
     },
     "register": {
       "title": "Verkäufer werden",

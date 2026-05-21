@@ -246,10 +246,9 @@ export default function Login() {
             </>
           ) : (
             <>
-              <div style={{ textAlign: "center", marginBottom: 28 }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
-                <h1 style={{ fontSize: 22, fontWeight: 700, color: "#111827", margin: "0 0 6px" }}>{t("twoFactorTitle")}</h1>
-                <p style={{ color: "#6b7280", fontSize: 14, margin: 0 }}>{t("twoFactorSubtitle")}</p>
+              <div style={{ textAlign: "center", marginBottom: 24 }}>
+                <h1 style={{ fontSize: 24, fontWeight: 700, color: "#111827", margin: "0 0 8px" }}>{t("twoFactorTitle")}</h1>
+                <p style={{ color: "#6b7280", fontSize: 14, margin: 0, lineHeight: 1.5 }}>{t("twoFactorSubtitle")}</p>
               </div>
               <form onSubmit={handleTotpSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                 <div>
@@ -257,14 +256,19 @@ export default function Login() {
                   <input
                     type="text"
                     inputMode="numeric"
+                    autoComplete="one-time-code"
                     value={totpCode}
                     onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     required
                     autoFocus
                     maxLength={6}
+                    aria-label={t("totpCode")}
                     style={{ width: "100%", padding: "12px 14px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 22, fontWeight: 700, textAlign: "center", letterSpacing: "0.25em", outline: "none", boxSizing: "border-box" }}
                     placeholder="000000"
                   />
+                  <p style={{ margin: "8px 0 0", fontSize: 12, color: "#9ca3af", textAlign: "center" }}>
+                    {email}
+                  </p>
                 </div>
                 {error && (
                   <div style={{ background: "#fee2e2", border: "1px solid #ef4444", borderRadius: 8, padding: "12px 14px", color: "#991b1b", fontSize: 14 }}>
