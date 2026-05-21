@@ -5,6 +5,9 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 /** ShopHeader ile aynı eşik (dar görünümde ikinci şerit + mobil alt bar) */
 export const MOBILE_CHROME_SCROLL_THRESHOLD_PX = 60;
 
+/** Bu kadar px kaydırınca üst/alt chrome tamamen gizlenir (progress 0→1) */
+export const CHROME_HIDE_SCROLL_PX = 100;
+
 const MobileBottomNavScrollContext = createContext({
   publishMobileBottomNavScroll: () => {},
   mobileBottomNavScroll: { scrollY: 0, scrollingDown: false, chromeHideProgress: 0 },

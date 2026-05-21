@@ -432,14 +432,15 @@ export default function MobileNav({ layout = "fixed" }) {
       ["/orders", "/addresses", "/payment-methods", "/nachrichten", "/reviews", "/bonus", "/invoices"].some(
         (h) => appPath === h || appPath.startsWith(`${h}/`),
       ));
-  /** Yalnızca temada açıkça true — varsayılan her zaman görünür sabit alt çubuk */
-  const recessBottomBar =
+  /** Kaydırma ile kademeli gizleme — tema: bottom_nav_recess_on_scroll */
+  const bottomNavRecessProgress =
     layout === "fixed" &&
     !!mc.bottom_nav_recess_on_scroll &&
     isMobileNavViewport &&
     !drawerOpen &&
-    mobileBottomNavScroll.scrollingDown &&
-    mobileBottomNavScroll.scrollY > MOBILE_CHROME_SCROLL_THRESHOLD_PX;
+    mobileBottomNavScroll.scrollY > MOBILE_CHROME_SCROLL_THRESHOLD_PX
+      ? Math.min(1, Math.max(0, mobileBottomNavScroll.chromeHideProgress ?? 0))
+      : 0;
 
   const hideOnAuthPages =
     appPath === "/login" ||
@@ -544,7 +545,7 @@ export default function MobileNav({ layout = "fixed" }) {
         <ModernMobileBottomNav
           layout={layout}
           accentColor={TEAL}
-          recessed={recessBottomBar}
+          recessProgress={bottomNavRecessProgress}
           surfaceBg={mc.bottom_nav_bg}
           borderTop={mc.bottom_nav_border_top}
           blur={mc.bottom_nav_blur}
@@ -598,12 +599,14 @@ export default function MobileNav({ layout = "fixed" }) {
       <nav
         style={{
           ...css.bar(),
-          transition: reducedMotion ? "none" : "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)",
-          transform: recessBottomBar ? "translateY(calc(100% + env(safe-area-inset-bottom, 0px)))" : "translateY(0)",
-          pointerEvents: recessBottomBar ? "none" : "auto",
+          transition: reducedMotion ? "none" : undefined,
+          transform: bottomNavRecessProgress > 0
+            ? `translateY(calc(${bottomNavRecessProgress} * (100% + env(safe-area-inset-bottom, 0px))))`
+            : "translateY(0)",
+          pointerEvents: bottomNavRecessProgress >= 0.95 ? "none" : "auto",
         }}
         aria-label="Mobile Navigation"
-        aria-hidden={recessBottomBar ? true : undefined}
+        aria-hidden={bottomNavRecessProgress >= 0.98 ? true : undefined}
       >
         {/* Home */}
         <Link href="/" style={css.barBtn(isHome)} aria-label="Startseite">

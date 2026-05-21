@@ -16,8 +16,10 @@ function backdropBlurFromToken(raw) {
 export default function ModernMobileBottomNav({
   items = [],
   accentColor = DEFAULT_ACCENT,
-  /** Aşağı kaydırırken çubuğu ekran dışına kaydır (yalnızca layout=fixed) */
+  /** Aşağı kaydırırken çubuğu ekran dışına kaydır (yalnızca layout=fixed) — geriye uyumluluk */
   recessed = false,
+  /** 0–1: kaydırma ile kademeli gizleme (recessed yerine tercih edilir) */
+  recessProgress = recessed ? 1 : 0,
   /** fixed = viewport altı; inline = sayfa akışı (MobileShell flex sonu) */
   layout = "fixed",
   surfaceBg,
@@ -72,11 +74,13 @@ export default function ModernMobileBottomNav({
 
   const isFixed = layout !== "inline";
   const blurCss = backdropBlurFromToken(blur ?? "12px");
+  const hideT = Math.min(1, Math.max(0, recessProgress ?? (recessed ? 1 : 0)));
+  const slideExpr = `calc(${hideT} * (100% + ${visualInset}px + env(safe-area-inset-bottom, 0px)))`;
 
   return (
     <nav
       aria-label="Mobile Navigation"
-      aria-hidden={isFixed && recessed ? true : undefined}
+      aria-hidden={isFixed && hideT >= 0.98 ? true : undefined}
       style={{
         "--component-active-color": accentColor,
         display: "grid",
@@ -94,15 +98,13 @@ export default function ModernMobileBottomNav({
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
         background: surfaceBg ?? "#fff",
         borderTop: borderTop ?? "1px solid rgba(229,231,235,0.9)",
-        backdropFilter: recessed ? undefined : blurCss,
-        WebkitBackdropFilter: recessed ? undefined : blurCss,
+        backdropFilter: hideT > 0.02 ? undefined : blurCss,
+        WebkitBackdropFilter: hideT > 0.02 ? undefined : blurCss,
         boxShadow: boxShadow ?? "0 -2px 12px rgba(0,0,0,0.07)",
         zIndex: isFixed ? 2147483640 : 100,
         willChange: isFixed ? "transform" : undefined,
-        transition: isFixed ? "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
-        /* Slide off-screen by the full height + safe-area + any visual inset already applied */
-        transform: isFixed && recessed ? `translateY(calc(100% + ${visualInset}px + env(safe-area-inset-bottom, 0px)))` : undefined,
-        pointerEvents: isFixed && recessed ? "none" : "auto",
+        transform: isFixed && hideT > 0 ? `translateY(${slideExpr})` : undefined,
+        pointerEvents: isFixed && hideT >= 0.95 ? "none" : "auto",
       }}
     >
       {finalItems.map((item, index) => {

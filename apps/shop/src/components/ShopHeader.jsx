@@ -1,11 +1,9 @@
 ﻿"use client";
 
 /**
- * Navbar — Desktop: scroll down → header slides away; scroll up → shows.
- * Mobile/tablet (≤1023px): header stays fixed; scroll down past threshold → only thin
- * search bar (site color + slight transparency). Scroll up / near top → full bar again.
- * Second nav (SubNav): on narrow viewports the bar is hidden on scroll-down and stays hidden
- * until a clear scroll-up or until the user returns to the top (avoids flicker from touch decel).
+ * Navbar — scroll-linked chrome (0→1): desktop header + second nav slide up gradually;
+ * mobile/tablet (≤1023px): scroll down → logo + search bar side by side (scaled); other chrome hides.
+ * Alt bar (MobileNav) uses the same progress when theme enables recess on scroll.
  */
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
@@ -35,6 +33,7 @@ import {
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useLandingChrome } from "@/context/LandingChromeContext";
 import {
+  CHROME_HIDE_SCROLL_PX,
   MOBILE_CHROME_SCROLL_THRESHOLD_PX as SCROLL_THRESHOLD,
   useMobileBottomNavScroll,
 } from "@/context/MobileBottomNavScrollContext";
@@ -139,7 +138,6 @@ const HeaderWrap = styled.header`
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   will-change: transform;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: visible;
 
   /*
@@ -185,12 +183,12 @@ const HeaderChrome = styled.div`
   z-index: ${HEADER_MIDDLE_Z};
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) =>
-      p.$mobileSearchCompact
-        ? `
-      box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-    `
-        : ""}
+    ${(p) => {
+      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+      return t > 0.02
+        ? `box-shadow: 0 2px 8px rgba(0,0,0,${0.1 * t});`
+        : "";
+    }}
   }
 `;
 
@@ -204,12 +202,10 @@ const MiddleBarWrap = styled.div`
   z-index: ${HEADER_MIDDLE_Z};
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) =>
-      p.$mobileSearchCompact
-        ? `
-      min-height: 0;
-    `
-        : ""}
+    min-height: ${(p) => {
+      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+      return `${64 - t * 64}px`;
+    }};
   }
 `;
 
@@ -222,15 +218,20 @@ const MiddleBarInner = styled.div`
   align-items: center;
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) =>
-      p.$mobileSearchCompact
-        ? `
-      min-height: 60px;
-      padding: 11px 18px;
-      align-items: center;
-      justify-content: center;
-    `
-        : ""}
+    min-height: ${(p) => {
+      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+      return `${72 - t * 12}px`;
+    }};
+    padding: ${(p) => {
+      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+      return t > 0.02 ? "10px 14px" : "0 24px";
+    }};
+    align-items: center;
+    justify-content: flex-start;
+    gap: ${(p) => {
+      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+      return t > 0.02 ? "10px" : "0";
+    }};
   }
 `;
 
@@ -238,6 +239,7 @@ const MiddleBarLeft = styled.div`
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 `;
 
 const MiddleBarLogo = styled(Link)`
@@ -270,27 +272,48 @@ const MiddleBarCenter = styled.div`
   gap: 0;
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) =>
-      p.$mobileSearchCompact
-        ? `
+    ${(p) => {
+      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+      if (t <= 0.02) return "";
+      return `
       margin-left: 0 !important;
       margin-right: 0 !important;
-      flex: 0 1 640px;
-      width: 100%;
-      max-width: 100%;
-      justify-content: center;
-    `
-        : ""}
+      flex: 1 1 0;
+      min-width: 0;
+      width: auto;
+      max-width: none;
+      justify-content: flex-start;
+    `;
+    }}
   }
 `;
 
-/* Logo, hamburger row, locale/user/cart — hidden in mobile “search-only” compact bar */
+/* Dar görünüm: $keepOnCompact = logo+arama kalır; yoksa kaydırınca gizlenir */
 const NarrowHeaderChrome = styled.div`
   display: flex;
   align-items: center;
   flex-shrink: 0;
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) => (p.$hide ? `display: none !important;` : "")}
+    ${(p) => {
+      if (p.$keepOnCompact) {
+        return `
+      flex-shrink: 0;
+      opacity: 1;
+      transform: none;
+      max-height: none;
+      overflow: visible;
+      pointer-events: auto;
+    `;
+      }
+      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+      return `
+      overflow: hidden;
+      opacity: ${1 - t};
+      transform: translateY(${-10 * t}px);
+      max-height: ${Math.max(0, 88 * (1 - t))}px;
+      pointer-events: ${t >= 0.92 ? "none" : "auto"};
+    `;
+    }}
   }
 `;
 
@@ -443,22 +466,33 @@ const SearchBarForm = styled.div`
   }
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) =>
-      p.$mobileCompact
-        ? `
-      height: 46px;
-      min-height: 46px;
-      max-width: min(560px, 100%);
-      margin-left: auto;
-      margin-right: auto;
-      padding: 0 6px 0 14px;
-      & > button[aria-label="Suchen"] svg {
-        width: 22px;
-        height: 22px;
-        min-width: 22px;
-      }
-    `
-        : ""}
+    height: ${(p) => {
+      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+      return `${37 + t * 9}px`;
+    }};
+    min-height: ${(p) => {
+      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+      return `${37 + t * 9}px`;
+    }};
+    width: ${(p) => ((p.$compactProgress ?? 0) > 0.02 ? "100%" : "auto")};
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    padding: ${(p) => ((p.$compactProgress ?? 0) > 0.02 ? "0 6px 0 14px" : "0 4px 0 12px")};
+    & > button[aria-label="Suchen"] svg {
+      width: ${(p) => {
+        const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+        return t > 0.02 ? "22px" : "20px";
+      }};
+      height: ${(p) => {
+        const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+        return t > 0.02 ? "22px" : "20px";
+      }};
+      min-width: ${(p) => {
+        const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+        return t > 0.02 ? "22px" : "20px";
+      }};
+    }
   }
 `;
 
@@ -497,14 +531,16 @@ const MiddleBarSearch = styled.div`
   align-items: center;
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) =>
-      p.$mobileCompact
-        ? `
-      flex: 1 1 auto;
+    ${(p) => {
+      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+      if (t <= 0.02) return "";
+      return `
+      flex: 1 1 0;
+      min-width: 0;
       width: 100%;
-      justify-content: center;
-    `
-        : ""}
+      justify-content: stretch;
+    `;
+    }}
   }
 `;
 
@@ -863,11 +899,14 @@ const UserBtn = styled.button`
 
 const SubNavWrap = styled.div`
   width: 100%;
-  max-height: ${(p) => (p.$hide ? "0" : "var(--second-nav-h, 50px)")};
+  max-height: ${(p) => {
+    const t = Math.min(1, Math.max(0, p.$hideProgress ?? 0));
+    return `calc(var(--second-nav-h, 50px) * ${1 - t})`;
+  }};
   background: var(--second-nav-bg, transparent);
   overflow: hidden;
-  opacity: ${(p) => (p.$hide ? 0 : 1)};
-  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+  opacity: ${(p) => 1 - Math.min(1, Math.max(0, p.$hideProgress ?? 0))};
+  transform: translateY(${(p) => -100 * Math.min(1, Math.max(0, p.$hideProgress ?? 0))}%);
   display: flex;
   align-items: center;
   color: var(--second-nav-text, #374151);
@@ -875,29 +914,10 @@ const SubNavWrap = styled.div`
   font-weight: var(--second-nav-fw, 500);
   position: relative;
   z-index: 0;
+  pointer-events: ${(p) => ((p.$hideProgress ?? 0) >= 0.95 ? "none" : "auto")};
 
-  /*
-   * Mobil + tablet (≤1023): kaydırmayla gizlenince tamamen çıksın — max-height:0 bazı durumlarda
-   * satırı süzdürüp dokunmatikte seçilebilir bırakabiliyor.
-   */
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     font-size: 13px;
-    ${(p) =>
-      p.$hide
-        ? `
-      display: none !important;
-      max-height: 0 !important;
-      min-height: 0 !important;
-      opacity: 0 !important;
-      overflow: hidden !important;
-      pointer-events: none !important;
-    `
-        : `
-      display: flex;
-      opacity: 1;
-      max-height: var(--second-nav-h, 44px);
-      pointer-events: auto;
-    `}
   }
 `;
 
@@ -1054,9 +1074,11 @@ export default function ShopHeader() {
   const nextRouter = useNextRouter();
   const [scrollPastThreshold, setScrollPastThreshold] = useState(false);
   const [scrollingDown, setScrollingDown] = useState(false);
+  const [chromeHideProgress, setChromeHideProgress] = useState(0);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const lastScrollYRef = useRef(0);
   const scrollingDownRef = useRef(false);
+  const chromeHideProgressRef = useRef(0);
   const scrollPastThresholdRef = useRef(false);
   const headerRef = useRef(null);
   const middleBarRef = useRef(null);
@@ -1293,20 +1315,24 @@ export default function ShopHeader() {
         const maxScroll = Math.max(0, (el && el.scrollHeight) - window.innerHeight);
         const nearDocumentBottom =
           maxScroll > SCROLL_THRESHOLD * 2 && current >= maxScroll - BOTTOM_IGNORE_SCROLL_UP_PX;
-        /*
-         * Aşağı: parmakla / trackpad ile küçük adımlar da sıklıkla <8px; bu yüzden eşikten sonra
-         * her pozitif delta ikinci şeridi gizler (önceki SCROLL_DELTA ile çoğu mobil kaydırmada hiç tetiklenmiyordu).
-         * Yukarı: küçük negatif deltalarda da menü gelsin; titreşim için |delta| minimum.
-         */
-        let nextScrollingDown = scrollingDownRef.current;
-        if (current <= SCROLL_THRESHOLD) nextScrollingDown = false;
-        else if (delta > 0 && current > SCROLL_THRESHOLD) nextScrollingDown = true;
-        else if (delta < -SCROLL_UP_DELTA && !nearDocumentBottom) nextScrollingDown = false;
+        /* Kaydırma ile 0→1: üst chrome ve alt bar parmakla birlikte yavaşça gizlenir */
+        let nextProgress = chromeHideProgressRef.current;
+        if (current <= SCROLL_THRESHOLD) {
+          nextProgress = 0;
+        } else if (delta > 0 && current > SCROLL_THRESHOLD) {
+          nextProgress = Math.min(1, nextProgress + delta / CHROME_HIDE_SCROLL_PX);
+        } else if (delta < -SCROLL_UP_DELTA && !nearDocumentBottom) {
+          nextProgress = Math.max(0, nextProgress + delta / CHROME_HIDE_SCROLL_PX);
+        }
+        chromeHideProgressRef.current = nextProgress;
+        const nextScrollingDown = nextProgress > 0.04;
         scrollingDownRef.current = nextScrollingDown;
+        setChromeHideProgress(nextProgress);
         setScrollingDown(nextScrollingDown);
         publishMobileBottomNavScroll({
           scrollY: current,
           scrollingDown: nextScrollingDown,
+          chromeHideProgress: nextProgress,
         });
         lastScrollYRef.current = current;
         const nextPast = current > SCROLL_THRESHOLD;
@@ -1340,13 +1366,16 @@ export default function ShopHeader() {
   useEffect(() => {
     setDrillCategoryId(null);
     setScrollingDown(false);
+    setChromeHideProgress(0);
+    chromeHideProgressRef.current = 0;
+    scrollingDownRef.current = false;
     if (typeof window !== "undefined") {
       const y = window.scrollY ?? window.pageYOffset ?? 0;
       lastScrollYRef.current = y;
       const nextPast = y > SCROLL_THRESHOLD;
       scrollPastThresholdRef.current = nextPast;
       setScrollPastThreshold(nextPast);
-      publishMobileBottomNavScroll({ scrollY: y, scrollingDown: false });
+      publishMobileBottomNavScroll({ scrollY: y, scrollingDown: false, chromeHideProgress: 0 });
     }
   }, [pathname, publishMobileBottomNavScroll]);
 
@@ -1385,18 +1414,20 @@ export default function ShopHeader() {
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
-  /* Second nav: scroll-down gizle, scroll-up veya sayfa üstü göster (mobil + tablet ≤1023 dar chrome; geniş ekranda üst çubuk da aynı scroll bayrağıyla gider) */
-  const showSubNav = !scrollingDown;
-  const secondNavHidden = !showSubNav || !showHeaderFilterBar;
+  const effectiveHideProgress = mainMenuOpen ? 0 : chromeHideProgress;
+  const subNavHideProgress = !showHeaderFilterBar
+    ? 1
+    : scrollPastThreshold
+      ? effectiveHideProgress
+      : 0;
+  const secondNavHidden = subNavHideProgress >= 0.98 || !showHeaderFilterBar;
   const spacerHeight =
     isNarrowViewport && !headerStickyNarrow
       ? 0
       : Math.max(0, headerHeight - (isNarrowViewport && secondNavHidden ? 40 : 0));
-  /* Header only visible when scrolling up (or initial load when scrollingDown is false) */
-  const showHeader = !scrollingDown;
-  /** Mobile/tablet: thin search-only row while scrolling down (not on wide desktop) */
-  const isMobileSearchCompact =
-    isNarrowViewport && scrollingDown && scrollPastThreshold;
+  /** Mobile/tablet: ince arama çubuğu — kaydırma ilerledikçe kademeli */
+  const narrowCompactProgress =
+    isNarrowViewport && scrollPastThreshold ? effectiveHideProgress : 0;
   /** Kaydırınca buzlu beyaz üst yüzey (tema / landing rengine bakmadan) */
   const mobileFrostedScrollActive =
     isNarrowViewport &&
@@ -1420,9 +1451,9 @@ export default function ShopHeader() {
     }
     return mode === "pill";
   }, [shopStyles?.secondNav, secondNavViewportBand, secondNavDesktopClassic]);
-  /** Only desktop hides the whole header on scroll down; narrow keeps a fixed (compact) search bar */
-  const hideHeaderCompletely =
-    !isNarrowViewport && !showHeader && !mainMenuOpen;
+  /** Geniş ekran: tüm header kaydırma ile yukarı kayar; dar görünümde sabit + kompakt arama */
+  const desktopHeaderHideProgress =
+    !isNarrowViewport && !mainMenuOpen ? effectiveHideProgress : 0;
 
   const algoliaAttributes = {
     primaryText: "title",
@@ -1555,22 +1586,22 @@ export default function ShopHeader() {
   const keepMegaMenuOpen = () => clearTimeout(megaMenuTimerRef.current);
 
   useEffect(() => {
-    if (!isMobileSearchCompact) return;
+    if (narrowCompactProgress < 0.15) return;
     setMainMenuOpen(false);
     setLocaleDropdownOpen(false);
     setHoveredMenuItemId(null);
-  }, [isMobileSearchCompact]);
+  }, [narrowCompactProgress]);
 
   return (
     <>
       <HeaderWrap
         ref={headerRef}
-        data-mobile-compact={isMobileSearchCompact ? "true" : "false"}
+        data-mobile-compact={narrowCompactProgress > 0.5 ? "true" : "false"}
         data-landing-header-chrome={
           isNarrowViewport && landingHeaderBg && !mobileFrostedScrollActive ? "true" : undefined
         }
         style={{
-          transform: hideHeaderCompletely ? "translateY(-100%)" : "translateY(0)",
+          transform: `translateY(-${desktopHeaderHideProgress * 100}%)`,
           zIndex: localeDropdownOpen ? 2147483650 : undefined,
           ...(isNarrowViewport && !headerStickyNarrow
             ? { position: "relative", top: "auto", left: "auto", right: "auto" }
@@ -1596,41 +1627,58 @@ export default function ShopHeader() {
           className={`shop-header-chrome${
             isNarrowViewport && landingHeaderBg && !mobileFrostedScrollActive ? " landing-clear" : ""
           }${mobileFrostedScrollActive ? " mobile-frosted-scroll" : ""}`}
-          $mobileSearchCompact={isMobileSearchCompact}
+          $compactProgress={narrowCompactProgress}
           style={localeDropdownOpen ? { zIndex: 12010 } : undefined}
         >
         <MiddleBarWrap
           ref={middleBarRef}
           className="shop-header-main"
-          $mobileSearchCompact={isMobileSearchCompact}
+          $compactProgress={narrowCompactProgress}
         >
-          <MiddleBarInner $mobileSearchCompact={isMobileSearchCompact}>
-            <NarrowHeaderChrome $hide={isMobileSearchCompact}>
-              <MiddleBarLeft>
+          <MiddleBarInner $compactProgress={narrowCompactProgress}>
+            <NarrowHeaderChrome $compactProgress={narrowCompactProgress} $keepOnCompact>
+              <MiddleBarLeft $compactProgress={narrowCompactProgress}>
                 <MiddleBarLogo href="/">
                   {(() => {
                     const devCfg = shopBranding.logo_config?.shop?.[logoDeviceKey];
                     const url = devCfg?.url || shopBranding.shop_logo_url || "";
                     const height = Math.min(devCfg?.height ?? shopBranding.shop_logo_height ?? 34, 80);
+                    const compactH = Math.max(22, Math.round(height * (1 - 0.32 * narrowCompactProgress)));
                     const pt = devCfg?.pt ?? 0;
                     const pr = devCfg?.pr ?? 0;
                     const pb = devCfg?.pb ?? 0;
                     const pl = devCfg?.pl ?? 0;
+                    const imgH = isNarrowViewport && narrowCompactProgress > 0.02 ? compactH : height;
                     return url ? (
                       <img
                         src={url}
                         alt="Shop logo"
-                        style={{ height, maxHeight: 80, width: "auto", maxWidth: 220, objectFit: "contain", display: "block", paddingTop: pt, paddingRight: pr, paddingBottom: pb, paddingLeft: pl }}
+                        style={{
+                          height: imgH,
+                          maxHeight: isNarrowViewport ? Math.max(22, height) : 80,
+                          width: "auto",
+                          maxWidth: isNarrowViewport && narrowCompactProgress > 0.02 ? 120 : 220,
+                          objectFit: "contain",
+                          display: "block",
+                          paddingTop: pt,
+                          paddingRight: pr,
+                          paddingBottom: pb,
+                          paddingLeft: pl,
+                        }}
                       />
-                    ) : "Andertal";
+                    ) : (
+                      <span style={{ fontSize: isNarrowViewport && narrowCompactProgress > 0.02 ? "1rem" : "1.35rem" }}>
+                        Andertal
+                      </span>
+                    );
                   })()}
                 </MiddleBarLogo>
               </MiddleBarLeft>
             </NarrowHeaderChrome>
 
-            <MiddleBarCenter $mobileSearchCompact={isMobileSearchCompact}>
+            <MiddleBarCenter $compactProgress={narrowCompactProgress}>
               <NarrowHeaderChrome
-                $hide={isMobileSearchCompact}
+                $compactProgress={narrowCompactProgress}
                 style={{ gap: 0, minWidth: 0 }}
               >
                 <CategoriesDropdown data-categories-dropdown>
@@ -1689,8 +1737,8 @@ export default function ShopHeader() {
 
               </NarrowHeaderChrome>
 
-              <MiddleBarSearch $mobileCompact={isMobileSearchCompact}>
-                <SearchBarForm $mobileCompact={isMobileSearchCompact} role="search">
+              <MiddleBarSearch $compactProgress={narrowCompactProgress}>
+                <SearchBarForm $compactProgress={narrowCompactProgress} role="search">
                   <SearchBarButton
                     type="button"
                     aria-label="Suchen"
@@ -1714,6 +1762,7 @@ export default function ShopHeader() {
               </MiddleBarSearch>
             </MiddleBarCenter>
 
+            <NarrowHeaderChrome $compactProgress={narrowCompactProgress}>
             <MiddleBarRight>
               <LocaleCurrencyWrap data-locale-dropdown>
                 <MiddleBarLocaleBtn type="button" onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={tLocale("label")} aria-label={tLocale("label")} aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
@@ -1783,13 +1832,14 @@ export default function ShopHeader() {
                 {itemCount > 0 && <MiddleBarCartBadge>{itemCount}</MiddleBarCartBadge>}
               </MiddleBarCartBtn>
             </MiddleBarRight>
+            </NarrowHeaderChrome>
           </MiddleBarInner>
         </MiddleBarWrap>
 
         <SubNavWrap
           id="subnav"
           className="second-nav"
-          $hide={!showSubNav || !showHeaderFilterBar}
+          $hideProgress={subNavHideProgress}
           style={isNarrowViewport && landingHeaderBg ? { borderTop: "none", borderBottom: "none" } : undefined}
         >
           <SecondMenuRowInner>
