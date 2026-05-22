@@ -1425,9 +1425,8 @@ export default function ShopHeader() {
     isNarrowViewport && !headerStickyNarrow
       ? 0
       : Math.max(0, headerHeight - (isNarrowViewport && secondNavHidden ? 40 : 0));
-  /** Mobile/tablet: ince arama çubuğu — kaydırma ilerledikçe kademeli */
-  const narrowCompactProgress =
-    isNarrowViewport && scrollPastThreshold ? effectiveHideProgress : 0;
+  /** Mobile/tablet: üst bar sabit kalır — compact efekti yok */
+  const narrowCompactProgress = 0;
   /** Kaydırınca buzlu beyaz üst yüzey (tema / landing rengine bakmadan) */
   const mobileFrostedScrollActive =
     isNarrowViewport &&
@@ -1451,9 +1450,8 @@ export default function ShopHeader() {
     }
     return mode === "pill";
   }, [shopStyles?.secondNav, secondNavViewportBand, secondNavDesktopClassic]);
-  /** Geniş ekran: tüm header kaydırma ile yukarı kayar; dar görünümde sabit + kompakt arama */
-  const desktopHeaderHideProgress =
-    !isNarrowViewport && !mainMenuOpen ? effectiveHideProgress : 0;
+  /** Geniş ekran: üst header sabit — ikinci nav SubNavWrap kendi hide progress'i ile kaybolur */
+  const desktopHeaderHideProgress = 0;
 
   const algoliaAttributes = {
     primaryText: "title",
@@ -1586,11 +1584,11 @@ export default function ShopHeader() {
   const keepMegaMenuOpen = () => clearTimeout(megaMenuTimerRef.current);
 
   useEffect(() => {
-    if (narrowCompactProgress < 0.15) return;
+    if (effectiveHideProgress < 0.15) return;
     setMainMenuOpen(false);
     setLocaleDropdownOpen(false);
     setHoveredMenuItemId(null);
-  }, [narrowCompactProgress]);
+  }, [effectiveHideProgress]);
 
   return (
     <>
