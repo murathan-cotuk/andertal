@@ -1139,9 +1139,17 @@ export default function StylesPage() {
                           <Text as="span" variant="bodySm" fontWeight="medium">Höhe (px)</Text>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, marginBottom: 14 }}>
                             <input
-                              type="number" min={8} max={200} step={1}
-                              value={dev.height || 34}
-                              onChange={(e) => updateDev({ height: Math.max(8, Math.min(200, Number(e.target.value) || 34)) })}
+                              type="number" min={8} max={400} step={1}
+                              value={dev.height ?? 34}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (v === "") return;
+                                updateDev({ height: Number(v) });
+                              }}
+                              onBlur={(e) => {
+                                const v = Number(e.target.value);
+                                updateDev({ height: Math.max(8, Math.min(400, isNaN(v) || v === 0 ? 34 : v)) });
+                              }}
                               style={{ width: 80, padding: "6px 8px", border: "1.5px solid #d1d5db", borderRadius: 6, fontSize: 14, fontWeight: 600, textAlign: "center", boxSizing: "border-box" }}
                             />
                             <span style={{ fontSize: 13, color: "#6b7280" }}>px</span>
@@ -1150,7 +1158,7 @@ export default function StylesPage() {
                               style={{ fontSize: 12, color: "#008060", background: "none", border: "1px solid #008060", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}
                               onClick={() => {
                                 const img = new Image();
-                                img.onload = () => updateDev({ height: Math.round(img.naturalHeight) });
+                                img.onload = () => updateDev({ height: Math.min(400, Math.round(img.naturalHeight)) });
                                 img.src = dev.url;
                               }}
                             >Originalgröße</button>
@@ -1188,7 +1196,7 @@ export default function StylesPage() {
                             src={dev.url}
                             alt="preview"
                             style={{
-                              height: Math.min(dev.height || 34, 80),
+                              height: Math.min(dev.height || 34, 200),
                               width: "auto",
                               maxWidth: 160,
                               objectFit: "contain",

@@ -220,17 +220,17 @@ const MiddleBarInner = styled.div`
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     min-height: ${(p) => {
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return `${72 - t * 12}px`;
+      return `${72 - t * 32}px`;
     }};
     padding: ${(p) => {
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return t > 0.02 ? "10px 14px" : "0 24px";
+      return t > 0.02 ? "4px 14px" : "0 24px";
     }};
     align-items: center;
     justify-content: flex-start;
     gap: ${(p) => {
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return t > 0.02 ? "10px" : "0";
+      return t > 0.02 ? "8px" : "0";
     }};
   }
 `;
@@ -253,7 +253,7 @@ const MiddleBarLogo = styled(Link)`
   transition: opacity 0.2s ease;
   display: flex;
   align-items: center;
-  max-height: 80px;
+  max-height: 200px;
   overflow: hidden;
 
   &:hover {
@@ -466,33 +466,10 @@ const SearchBarForm = styled.div`
   }
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    height: ${(p) => {
-      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return `${37 + t * 9}px`;
-    }};
-    min-height: ${(p) => {
-      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return `${37 + t * 9}px`;
-    }};
     width: ${(p) => ((p.$compactProgress ?? 0) > 0.02 ? "100%" : "auto")};
     max-width: none;
     margin-left: 0;
     margin-right: 0;
-    padding: ${(p) => ((p.$compactProgress ?? 0) > 0.02 ? "0 6px 0 14px" : "0 4px 0 12px")};
-    & > button[aria-label="Suchen"] svg {
-      width: ${(p) => {
-        const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-        return t > 0.02 ? "22px" : "20px";
-      }};
-      height: ${(p) => {
-        const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-        return t > 0.02 ? "22px" : "20px";
-      }};
-      min-width: ${(p) => {
-        const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-        return t > 0.02 ? "22px" : "20px";
-      }};
-    }
   }
 `;
 
@@ -1084,6 +1061,7 @@ export default function ShopHeader() {
   const middleBarRef = useRef(null);
   const megaMenuTimerRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(72);
+  const [computedHeaderSolidColor, setComputedHeaderSolidColor] = useState(MIDDLE_BAR_BG);
   const [categoryPanelPortalReady, setCategoryPanelPortalReady] = useState(false);
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [hoveredMenuItemId, setHoveredMenuItemId] = useState(null);
@@ -1201,6 +1179,7 @@ export default function ShopHeader() {
         const chrome = cs.getPropertyValue("--header-chrome-bg").trim();
         const headerBg = cs.getPropertyValue("--header-bg").trim() || MIDDLE_BAR_BG;
         const solid = extractSolidTintFromChromeCss(chrome || headerBg, headerBg);
+        setComputedHeaderSolidColor(solid || MIDDLE_BAR_BG);
         const themeMeta = ensureThemeMeta();
         const mcLocal = shopStyles?.mobileChrome || {};
         const frostedScrollTint =
@@ -1610,16 +1589,19 @@ export default function ShopHeader() {
                 background: mc.frosted_bg || "rgba(255,255,255,0.92)",
                 backdropFilter: backdropBlurFromToken(mc.frosted_blur || "16px"),
                 WebkitBackdropFilter: backdropBlurFromToken(mc.frosted_blur || "16px"),
-                "--narrow-header-safe-fill": mc.frosted_bg || "rgba(255,255,255,0.92)",
+                "--narrow-header-safe-fill": mc.frosted_bg || computedHeaderSolidColor,
               }
             : landingHeaderBg
               ? {
                   ...(isNarrowViewport ? { background: landingHeaderBg } : {}),
                   "--narrow-header-safe-fill": landingHeaderBg,
                 }
-              : headerScopeCssVars?.["--header-chrome-bg"] || headerScopeCssVars?.["--header-bg"]
-                ? { "--narrow-header-safe-fill": headerScopeCssVars["--header-chrome-bg"] || headerScopeCssVars["--header-bg"] }
-                : {}),
+              : {
+                  "--narrow-header-safe-fill":
+                    headerScopeCssVars?.["--header-chrome-bg"] ||
+                    headerScopeCssVars?.["--header-bg"] ||
+                    computedHeaderSolidColor,
+                }),
         }}
       >
         <ShopTopBar />
@@ -1642,7 +1624,7 @@ export default function ShopHeader() {
                   {(() => {
                     const devCfg = shopBranding.logo_config?.shop?.[logoDeviceKey];
                     const url = devCfg?.url || shopBranding.shop_logo_url || "";
-                    const height = Math.min(devCfg?.height ?? shopBranding.shop_logo_height ?? 34, 80);
+                    const height = Math.min(devCfg?.height ?? shopBranding.shop_logo_height ?? 34, 200);
                     const compactH = Math.max(22, Math.round(height * (1 - 0.32 * narrowCompactProgress)));
                     const pt = devCfg?.pt ?? 0;
                     const pr = devCfg?.pr ?? 0;
@@ -1655,7 +1637,7 @@ export default function ShopHeader() {
                         alt="Shop logo"
                         style={{
                           height: imgH,
-                          maxHeight: isNarrowViewport ? Math.max(22, height) : 80,
+                          maxHeight: isNarrowViewport ? Math.max(22, height) : 200,
                           width: "auto",
                           maxWidth: isNarrowViewport && narrowCompactProgress > 0.02 ? 120 : 220,
                           objectFit: "contain",
