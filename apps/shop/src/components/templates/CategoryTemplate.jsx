@@ -930,9 +930,10 @@ export default function CategoryTemplate() {
       try {
         setLoading(true);
         setError(null);
-        const [catResBySlug, catResTree] = await Promise.all([
+        const [catResBySlug, catResTree, productRes] = await Promise.all([
           fetch(`/api/store-categories?slug=${encodeURIComponent(slug)}`).then((r) => r.json()).catch(() => ({ categories: [] })),
           fetch(`/api/store-categories?tree=true&is_visible=true`).then((r) => r.json()).catch(() => ({ tree: [] })),
+          fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`).then((r) => r.json()).catch(() => ({ products: [] })),
         ]);
         if (cancelled) return;
         const cat = catResBySlug?.category || (Array.isArray(catResBySlug?.categories) ? catResBySlug.categories[0] : null);
@@ -962,11 +963,6 @@ export default function CategoryTemplate() {
         const subs = visibleSubcats(current?.children).filter((s) => s && normCatId(s.id));
         setSubcategories(subs);
 
-        // Single API call — backend's collectCategorySubtreeIdsBySlug handles all descendants
-        const productRes = await fetch(
-          `/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`
-        ).then((r) => r.json()).catch(() => ({ products: [] }));
-        if (cancelled) return;
         setProducts(productRes?.products ?? []);
 
       } catch (err) {

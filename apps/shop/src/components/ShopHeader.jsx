@@ -1425,8 +1425,8 @@ export default function ShopHeader() {
     isNarrowViewport && !headerStickyNarrow
       ? 0
       : Math.max(0, headerHeight - (isNarrowViewport && secondNavHidden ? 40 : 0));
-  /** Mobile/tablet: üst bar sabit kalır — compact efekti yok */
-  const narrowCompactProgress = 0;
+  /** Mobile/tablet: scroll ile compact moda girer */
+  const narrowCompactProgress = isNarrowViewport ? effectiveHideProgress : 0;
   /** Kaydırınca buzlu beyaz üst yüzey (tema / landing rengine bakmadan) */
   const mobileFrostedScrollActive =
     isNarrowViewport &&
@@ -1612,12 +1612,14 @@ export default function ShopHeader() {
                 WebkitBackdropFilter: backdropBlurFromToken(mc.frosted_blur || "16px"),
                 "--narrow-header-safe-fill": mc.frosted_bg || "rgba(255,255,255,0.92)",
               }
-            : isNarrowViewport && landingHeaderBg
+            : landingHeaderBg
               ? {
-                  background: landingHeaderBg,
+                  ...(isNarrowViewport ? { background: landingHeaderBg } : {}),
                   "--narrow-header-safe-fill": landingHeaderBg,
                 }
-              : {}),
+              : headerScopeCssVars?.["--header-chrome-bg"] || headerScopeCssVars?.["--header-bg"]
+                ? { "--narrow-header-safe-fill": headerScopeCssVars["--header-chrome-bg"] || headerScopeCssVars["--header-bg"] }
+                : {}),
         }}
       >
         <ShopTopBar />
@@ -1760,7 +1762,7 @@ export default function ShopHeader() {
               </MiddleBarSearch>
             </MiddleBarCenter>
 
-            <NarrowHeaderChrome $compactProgress={narrowCompactProgress}>
+            <NarrowHeaderChrome $compactProgress={narrowCompactProgress} $keepOnCompact>
             <MiddleBarRight>
               <LocaleCurrencyWrap data-locale-dropdown>
                 <MiddleBarLocaleBtn type="button" onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={tLocale("label")} aria-label={tLocale("label")} aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>

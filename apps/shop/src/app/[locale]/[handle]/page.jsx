@@ -726,25 +726,25 @@ export default function CollectionPage() {
         setLoading(true);
         setError(null);
 
-        // Lightweight category resolution first (cheap query by slug).
-        const categoryBySlugRes = await fetch(`/api/store-categories?slug=${encodeURIComponent(handle)}`).catch(() => null);
-        if (categoryBySlugRes?.ok) {
-          const categoryBySlugData = await categoryBySlugRes.json().catch(() => null);
-          if (categoryBySlugData?.category?.id || (categoryBySlugData?.categories?.length)) {
-            setIsCategorySlug(true);
-            setLoading(false);
-            return;
-          }
+        const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
+
+        // Fire all cheap requests in parallel.
+        const [categoryBySlugData, colData, productsData] = await Promise.all([
+          fetch(`/api/store-categories?slug=${encodeURIComponent(handle)}`).then((r) => r.ok ? r.json() : null).catch(() => null),
+          fetch(`/api/store-collections?handle=${encodeURIComponent(handle)}`).then((r) => r.ok ? r.json() : null).catch(() => null),
+          fetch(`/api/store-products?collection_handle=${encodeURIComponent(handle)}&limit=200`).then((r) => r.json()).catch(() => ({ products: [] })),
+        ]);
+
+        // Category slug match → delegate to CategoryTemplate.
+        if (categoryBySlugData?.category?.id || categoryBySlugData?.categories?.length) {
+          setIsCategorySlug(true);
+          setLoading(false);
+          return;
         }
 
-        const colRes = await fetch(`/api/store-collections?handle=${encodeURIComponent(handle)}`);
-        if (!colRes.ok) throw new Error(`HTTP ${colRes.status}`);
-
-        const colData = await colRes.json();
         const col = colData?.collection ?? null;
         if (!col) {
           // Fallback: try CMS page by menu label slug
-          const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
           const pageRes = await fetch(`${backendUrl}/store/page-by-label-slug/${encodeURIComponent(handle)}`).catch(() => null);
           if (pageRes?.ok) {
             const pageData = await pageRes.json().catch(() => null);
@@ -756,8 +756,7 @@ export default function CollectionPage() {
             const pageData2 = await pageRes2.json().catch(() => null);
             if (pageData2?.id) { setCmsPage(pageData2); setLoading(false); return; }
           }
-          // Fallback 3: try as category slug
-          // Final fallback (heavier): full tree lookup only if slug lookup failed.
+          // Fallback 3: full tree lookup
           const catTreeRes = await fetch(`/api/store-categories?tree=true&is_visible=true`).catch(() => null);
           if (catTreeRes?.ok) {
             const catTreeData = await catTreeRes.json().catch(() => null);
@@ -769,13 +768,7 @@ export default function CollectionPage() {
           setNotFoundSt(true); setLoading(false); return;
         }
         setCollection(col);
-
-        const qs = new URLSearchParams({ limit: "200" });
-        if (col.id)     qs.set("collection_id",     String(col.id));
-        if (col.handle) qs.set("collection_handle",  String(col.handle));
-
-        const pr = await fetch(`/api/store-products?${qs}`).then(r => r.json()).catch(() => ({ products: [] }));
-        setProducts(pr?.products ?? []);
+        setProducts(productsData?.products ?? []);
       } catch (e) {
         setError(e?.message ?? "Error");
       } finally {

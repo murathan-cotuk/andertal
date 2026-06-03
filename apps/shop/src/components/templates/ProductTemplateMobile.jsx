@@ -1056,6 +1056,7 @@ export default function ProductTemplateMobile() {
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
   const [mobileGalleryIdx, setMobileGalleryIdx] = useState(0);
   const galleryTrackRef = useRef(null);
+  const galleryScrollRafRef = useRef(null);
   const cartState = useContext(CartContext);
   const addToCart = cartState?.addToCart ?? (async () => null);
   const openCartSidebar = cartState?.openCartSidebar ?? (() => {});
@@ -1424,7 +1425,6 @@ export default function ProductTemplateMobile() {
     } catch (_) {}
   };
 
-  const galleryScrollRafRef = useRef(null);
   const handleMobileGalleryScroll = (e) => {
     const track = e.currentTarget;
     if (galleryScrollRafRef.current) return;

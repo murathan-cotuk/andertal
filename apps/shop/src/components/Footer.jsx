@@ -23,8 +23,8 @@ function menuItemHref(item) {
     try { parsed = JSON.parse(raw); } catch (_) {}
   }
   if (item.link_type === "page") {
-    const labelSlug = itemSlug || parsed?.label_slug || slugify(item.label);
-    return labelSlug ? `/${labelSlug}` : "#";
+    const pageSlug = parsed?.slug || parsed?.label_slug || itemSlug || slugify(item.label);
+    return pageSlug ? `/pages/${pageSlug}` : "#";
   }
   if (item.link_type === "api") {
     const fn = String(parsed?.function || parsed?.api_function || value || "").trim().toLowerCase();
@@ -54,8 +54,8 @@ const FooterContainer = styled.footer`
   margin-top: auto;
 
   @media (max-width: 767px) {
-    /* On short mobile pages, avoid bottom-anchoring so accordion expands downward */
     margin-top: 0;
+    padding: 0 0 calc(2px + env(safe-area-inset-bottom, 0px));
   }
 `;
 
@@ -199,12 +199,19 @@ const LogoPlaceholder = styled(Link)`
 
 const Bottom = styled.div`
   border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin-top: 24px;
   padding-top: 24px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 16px;
+
+  @media (max-width: 767px) {
+    margin-top: 8px;
+    padding-top: 10px;
+    justify-content: center;
+  }
 `;
 
 const BottomLeft = styled.div`
@@ -225,6 +232,11 @@ const ShippingPromo = styled.span`
 const Copyright = styled.p`
   color: var(--footer-text, #ffffff);
   font-size: 14px;
+
+  @media (max-width: 767px) {
+    text-align: center;
+    width: 100%;
+  }
 `;
 
 const FOOTER_LOCATIONS = ["footer1", "footer2", "footer3", "footer4"];
@@ -270,10 +282,8 @@ export default function Footer() {
   }, []);
 
   const thresholdCents = resolveFreeShippingThresholdCents(rawThresholds, marketCountry, envThresholdCents);
-  const shippingPromoText =
-    thresholdCents != null
-      ? `Kostenloser Versand ab ${formatPriceCents(thresholdCents)} €`
-      : null;
+  // eslint-disable-next-line no-unused-vars
+  const shippingPromoText = null; /* temporarily hidden — re-enable when ready */
 
   return (
     <FooterContainer className="site-footer">
@@ -330,7 +340,7 @@ export default function Footer() {
             })}
           </MobileAccordion>
         )}
-        <Bottom style={{ marginTop: 24 }}>
+        <Bottom>
           <BottomLeft>
             {shippingPromoText && (
               <ShippingPromo>{shippingPromoText}</ShippingPromo>

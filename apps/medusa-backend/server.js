@@ -2873,7 +2873,7 @@ async function start() {
       const logo_image = (body.logo_image || body.logo || '').trim() || null
       const banner_image = (body.banner_image || '').trim() || null
       const address = (body.address || '').trim() || null
-      const callerSellerId = req.sellerUser?.is_superuser ? null : (req.sellerUser?.seller_id || null)
+      const callerSellerId = req.sellerUser?.seller_id || null
       const client = getBrandsDbClient()
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {

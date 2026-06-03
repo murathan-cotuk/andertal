@@ -25,8 +25,8 @@ export function menuItemHref(item) {
     }
   }
   if (item.link_type === "page") {
-    const labelSlug = itemSlug || parsed?.label_slug || slugify(item.label);
-    return labelSlug ? `/${labelSlug}` : "#";
+    const pageSlug = parsed?.slug || parsed?.label_slug || itemSlug || slugify(item.label);
+    return pageSlug ? `/pages/${pageSlug}` : "#";
   }
   if (item.link_type === "api") {
     const fn = String(parsed?.function || parsed?.api_function || value || "")
