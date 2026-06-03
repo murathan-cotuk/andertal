@@ -1,5 +1,5 @@
 /**
- * Generate Rechnung / Lieferschein PDF buffers for nodemailer attachments (same layout as HTTP PDF routes).
+ * Generate Rechnung / Lieferschein / Provisionsfaktur PDF buffers for nodemailer attachments.
  */
 
 const { resolveOrderPaidTotalCents, orderBonusDiscountCents, orderCouponDiscountCents } = require('./order-money')
@@ -27,7 +27,32 @@ const pdfFmtDate = (d) => {
 
 const pdfCents = (c) => (Number(c || 0) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' EUR'
 
-function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, shopName }) {
+/** Vendor info block: store_name / company_name / first+last, address, vat_id. */
+function resolveSellerDisplayLines(sellerInfo) {
+  if (!sellerInfo) return []
+  const name =
+    String(sellerInfo.store_name || '').trim() ||
+    String(sellerInfo.company_name || '').trim() ||
+    [sellerInfo.first_name, sellerInfo.last_name].filter(Boolean).join(' ').trim()
+  const addr = sellerInfo.business_address || {}
+  const lines = [name]
+  if (addr.street) lines.push(String(addr.street).trim())
+  if (addr.address_line1) lines.push(String(addr.address_line1).trim())
+  if (addr.zip || addr.postal_code || addr.city) {
+    const zip = String(addr.zip || addr.postal_code || '').trim()
+    const city = String(addr.city || '').trim()
+    if (zip || city) lines.push([zip, city].filter(Boolean).join(' '))
+  }
+  if (addr.country) lines.push(String(addr.country).trim())
+  if (sellerInfo.vat_id) lines.push(`USt-IdNr.: ${String(sellerInfo.vat_id).trim()}`)
+  return lines.filter(Boolean)
+}
+
+/**
+ * Render customer invoice (Rechnung) into an open PDFKit document.
+ * @param {object} sellerInfo - optional, from seller_users row
+ */
+function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, shopName, sellerInfo }) {
   const left = doc.page.margins.left
   const right = doc.page.width - doc.page.margins.right
   const contentWidth = right - left
@@ -142,12 +167,12 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
     itemRows.forEach(drawItemRow)
   }
 
-  if (doc.y + 120 > doc.page.height - doc.page.margins.bottom) doc.addPage()
+  if (doc.y + 180 > doc.page.height - doc.page.margins.bottom) doc.addPage()
   const totalsWidth = 250
   const totalsX = right - totalsWidth
-  const drawTotalLine = (label, value, bold = false) => {
+  const drawTotalLine = (label, value, bold = false, color = '#111827') => {
     const y = doc.y
-    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 11 : 10).fillColor('#111827')
+    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 11 : 10).fillColor(color)
     doc.text(label, totalsX, y, { width: totalsWidth * 0.55, align: 'left' })
     doc.text(value, totalsX + totalsWidth * 0.55, y, { width: totalsWidth * 0.45, align: 'right' })
     doc.y = y + (bold ? 18 : 16)
@@ -163,14 +188,188 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   if (remainder > 0) drawTotalLine('Rabatt', `-${pdfCents(remainder)}`)
   doc.moveTo(totalsX, doc.y).lineTo(right, doc.y).lineWidth(1).strokeColor('#d1d5db').stroke()
   doc.y += 4
-  drawTotalLine('Gesamt', pdfCents(grandTotal), true)
+  drawTotalLine('Gesamt (Brutto)', pdfCents(grandTotal), true)
 
+  // VAT breakdown (extracted from gross price)
+  doc.y += 4
+  const sellerVatId = sellerInfo?.vat_id ? String(sellerInfo.vat_id).trim() : ''
+  if (sellerVatId) {
+    const vatCents = Math.round(grandTotal * 19 / 119)
+    const netCents = grandTotal - vatCents
+    drawTotalLine('darin enthaltene 19% MwSt.', pdfCents(vatCents), false, '#6b7280')
+    drawTotalLine('Nettobetrag', pdfCents(netCents), false, '#6b7280')
+  } else {
+    doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
+    doc.text(
+      pdfDeLatin('Gemaess §19 UStG wird keine Umsatzsteuer ausgewiesen (Kleinunternehmerregelung).'),
+      totalsX,
+      doc.y,
+      { width: totalsWidth, align: 'left' },
+    )
+    doc.y += 14
+  }
+
+  // Seller info block
+  const sellerLines = resolveSellerDisplayLines(sellerInfo)
+  if (sellerLines.length) {
+    doc.y += 10
+    const sellerBlockY = doc.y
+    if (sellerBlockY + sellerLines.length * 13 + 40 > doc.page.height - doc.page.margins.bottom) {
+      doc.addPage()
+    }
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#374151').text('VERKAEUFER', left, doc.y)
+    doc.font('Helvetica').fontSize(9).fillColor('#4b5563')
+    sellerLines.forEach((line) => {
+      doc.text(pdfDeLatin(line), left, doc.y + 2)
+    })
+    doc.y += 6
+    doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
+    doc.text(
+      pdfDeLatin('Der Kaufvertrag wird ausschliesslich zwischen dem Kaeufer und dem oben genannten Verkaeufer geschlossen. Andertal Marktplatz handelt als technischer Vermittler und ist nicht Vertragspartei.'),
+      left,
+      doc.y,
+      { width: contentWidth, align: 'left' },
+    )
+  }
+
+  // Footer
   doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
   doc.text(
-    pdfDeLatin('Hinweis: Dies ist eine vereinfachte Rechnung. Bei Rueckfragen wenden Sie sich bitte an den Verkaeufer.'),
+    pdfDeLatin('Bei Fragen zu Ihrer Bestellung wenden Sie sich bitte direkt an den Verkaeufer. Andertal ist Marktplatzbetreiber und nicht Verkaeufer der Ware.'),
     left,
     doc.page.height - doc.page.margins.bottom - 22,
     { width: contentWidth, align: 'left' },
+  )
+}
+
+/**
+ * Render a commission invoice (Provisionsfaktur) from the platform to the seller.
+ * @param {object} doc - PDFKit document
+ * @param {object} opts
+ * @param {object} opts.order - order row from store_orders
+ * @param {object} opts.sellerInfo - seller_users row
+ * @param {string} opts.shopName - platform display name
+ * @param {number} opts.commissionCents - commission amount in cents (integer)
+ * @param {number} opts.commissionRatePct - commission rate as percentage (e.g. 12 for 12%)
+ * @param {string} [opts.platformAddress] - platform address from env
+ * @param {string} [opts.platformVatId] - platform VAT ID from env
+ * @param {number} [opts.platformVatPercent] - 0 or 19 (default 0 = Kleinunternehmer)
+ */
+function renderProvisionsfakturPdfDocument(doc, { order, sellerInfo, shopName, commissionCents, commissionRatePct, platformAddress, platformVatId, platformVatPercent }) {
+  const left = doc.page.margins.left
+  const right = doc.page.width - doc.page.margins.right
+  const contentWidth = right - left
+  const vatPercent = Number(platformVatPercent || 0)
+  const useVat = vatPercent > 0
+  const vatCents = useVat ? Math.round(commissionCents * vatPercent / 100) : 0
+  const totalCents = commissionCents + vatCents
+  const on = order.order_number != null ? String(order.order_number) : String(order.id || '').slice(0, 8)
+  const invoiceNumber = `PROV-${on}`
+  const rateLabel = Number.isFinite(commissionRatePct) ? `${commissionRatePct}%` : ''
+
+  // Header bar
+  doc.rect(left, 34, contentWidth, 44).fill('#111827')
+  doc
+    .fillColor('#ffffff')
+    .font('Helvetica-Bold')
+    .fontSize(16)
+    .text(pdfDeLatin(shopName || 'Andertal'), left + 14, 49, { width: contentWidth - 28, align: 'left' })
+
+  // Title
+  const invoiceMetaWidth = 220
+  doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(22).text('PROVISIONSFAKTUR', left, 94)
+  doc.font('Helvetica').fontSize(10).fillColor('#4b5563')
+  doc.text(`Rechnungs-Nr.: ${invoiceNumber}`, right - invoiceMetaWidth, 96, { width: invoiceMetaWidth, align: 'right' })
+  doc.text(`Datum: ${pdfFmtDate(order.created_at)}`, right - invoiceMetaWidth, 111, { width: invoiceMetaWidth, align: 'right' })
+  doc.text(`Bezug: Bestellung #${on}`, right - invoiceMetaWidth, 126, { width: invoiceMetaWidth, align: 'right' })
+
+  // Two-column: Empfänger (seller) | Aussteller (platform)
+  const colW = Math.round(contentWidth / 2) - 8
+  const rightColX = left + colW + 16
+
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text('EMPFAENGER (VERKAEUFER)', left, 158)
+  doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
+  resolveSellerDisplayLines(sellerInfo).forEach((line) => {
+    doc.text(pdfDeLatin(line), left, doc.y + 1)
+  })
+
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text('AUSSTELLER', rightColX, 158)
+  doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
+  doc.text(pdfDeLatin(shopName || 'Andertal Marktplatz'), rightColX, doc.y + 1)
+  if (platformAddress) {
+    String(platformAddress).split(/[,\n]/).map(s => s.trim()).filter(Boolean).forEach((line) => {
+      doc.text(pdfDeLatin(line), rightColX, doc.y + 1)
+    })
+  }
+  if (platformVatId) {
+    doc.text(`USt-IdNr.: ${pdfDeLatin(String(platformVatId))}`, rightColX, doc.y + 1)
+  } else if (!useVat) {
+    doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
+    doc.text(pdfDeLatin('Kleinunternehmer gem. §19 UStG'), rightColX, doc.y + 1)
+    doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
+  }
+
+  // Table header
+  const tableTop = Math.max(doc.y + 20, 280)
+  const tableTitleW = Math.round(contentWidth * 0.54)
+  const tableQtyW = 52
+  const tableUnitW = 110
+  const tableTotalW = contentWidth - tableTitleW - tableQtyW - tableUnitW
+  const tableUnitX = right - tableTotalW - tableUnitW
+  const tableTotalX = right - tableTotalW
+
+  doc.rect(left, tableTop, contentWidth, 22).fill('#f3f4f6')
+  doc.fillColor('#111827').font('Helvetica-Bold').fontSize(9)
+  doc.text('LEISTUNGSBESCHREIBUNG', left + 8, tableTop + 7, { width: tableTitleW - 16 })
+  doc.text('MENGE', left + tableTitleW + 4, tableTop + 7, { width: tableQtyW - 8, align: 'right' })
+  doc.text('EINZELPREIS', tableUnitX + 4, tableTop + 7, { width: tableUnitW - 8, align: 'right' })
+  doc.text('BETRAG', tableTotalX + 4, tableTop + 7, { width: tableTotalW - 8, align: 'right' })
+  doc.y = tableTop + 27
+
+  // Commission line item
+  const commDesc = `Marktplatzprovision fuer Bestellung #${on}${rateLabel ? ` (${rateLabel})` : ''}`
+  const rowY = doc.y
+  doc.font('Helvetica').fontSize(10).fillColor('#111827')
+  doc.text(pdfDeLatin(commDesc), left + 8, rowY + 4, { width: tableTitleW - 16 })
+  doc.text('1', left + tableTitleW + 4, rowY + 4, { width: tableQtyW - 8, align: 'right' })
+  doc.text(pdfCents(commissionCents), tableUnitX + 4, rowY + 4, { width: tableUnitW - 8, align: 'right' })
+  doc.text(pdfCents(commissionCents), tableTotalX + 4, rowY + 4, { width: tableTotalW - 8, align: 'right' })
+  const rowH = 28
+  doc.moveTo(left, rowY + rowH).lineTo(right, rowY + rowH).lineWidth(0.5).strokeColor('#e5e7eb').stroke()
+  doc.y = rowY + rowH + 8
+
+  // Totals
+  const totalsWidth = 250
+  const totalsX = right - totalsWidth
+  const drawLine = (label, value, bold = false, color = '#111827') => {
+    const y = doc.y
+    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 11 : 10).fillColor(color)
+    doc.text(label, totalsX, y, { width: totalsWidth * 0.55, align: 'left' })
+    doc.text(value, totalsX + totalsWidth * 0.55, y, { width: totalsWidth * 0.45, align: 'right' })
+    doc.y = y + (bold ? 18 : 16)
+  }
+
+  drawLine('Nettobetrag', pdfCents(commissionCents))
+  if (useVat) {
+    drawLine(`${vatPercent}% MwSt.`, pdfCents(vatCents))
+  }
+  doc.moveTo(totalsX, doc.y).lineTo(right, doc.y).lineWidth(1).strokeColor('#d1d5db').stroke()
+  doc.y += 4
+  drawLine('Rechnungsbetrag', pdfCents(totalCents), true)
+
+  // Legal notices
+  doc.y += 14
+  doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
+  if (!useVat && !platformVatId) {
+    doc.text(
+      pdfDeLatin('Gemaess §19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).'),
+      left, doc.y, { width: contentWidth },
+    )
+    doc.y += 12
+  }
+  doc.text(
+    pdfDeLatin('Diese Provisionsrechnung wird automatisch fuer die erbrachte Vermittlungsleistung des Marktplatzes ausgestellt. Der genannte Betrag wird gemaess den Verkaeufer-AGB verrechnet.'),
+    left, doc.y, { width: contentWidth },
   )
 }
 
@@ -245,6 +444,20 @@ function lieferscheinDocToBuffer(renderFn) {
   })
 }
 
+async function _querySellerInfo(pgClient, sellerId) {
+  if (!sellerId || String(sellerId).trim() === 'default') return null
+  try {
+    const r = await pgClient.query(
+      `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address
+         FROM seller_users WHERE seller_id = $1 LIMIT 1`,
+      [String(sellerId).trim()],
+    )
+    return r.rows?.[0] || null
+  } catch (_) {
+    return null
+  }
+}
+
 async function buildInvoicePdfBuffer(pgClient, orderId) {
   const id = String(orderId || '').trim()
   const oRes = await pgClient.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
@@ -252,6 +465,7 @@ async function buildInvoicePdfBuffer(pgClient, orderId) {
   if (!row) return null
   const iRes = await pgClient.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
   const itemRows = iRes.rows || []
+  const sellerInfo = await _querySellerInfo(pgClient, row.seller_id)
   const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
   const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
   const buf = await pdfDocToBuffer((doc) =>
@@ -261,6 +475,7 @@ async function buildInvoicePdfBuffer(pgClient, orderId) {
       orderId: id,
       invoiceNumber: on,
       shopName,
+      sellerInfo,
     }),
   )
   return { filename: `Rechnung-${on}.pdf`, content: buf }
@@ -279,6 +494,56 @@ async function buildLieferscheinPdfBuffer(pgClient, orderId) {
     renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber: on, shopName }),
   )
   return { filename: `Lieferschein-${on}.pdf`, content: buf }
+}
+
+/**
+ * Build a commission invoice (Provisionsfaktur) PDF buffer for a given order.
+ * Uses SHOP_INVOICE_NAME, PLATFORM_INVOICE_ADDRESS, PLATFORM_VAT_ID, PLATFORM_VAT_PERCENT env vars.
+ */
+async function buildProvisionsfakturPdfBuffer(pgClient, orderId) {
+  const id = String(orderId || '').trim()
+  const oRes = await pgClient.query(
+    `SELECT id, order_number, seller_id, created_at, subtotal_cents, total_cents,
+            stripe_application_fee_cents, seller_net_after_commission_cents
+       FROM store_orders WHERE id = $1::uuid`,
+    [id],
+  )
+  const order = oRes.rows?.[0]
+  if (!order) return null
+  const sellerInfo = await _querySellerInfo(pgClient, order.seller_id)
+
+  // Commission amount: prefer stored stripe_application_fee_cents, fall back to 12% of subtotal
+  const storedFee = Number(order.stripe_application_fee_cents)
+  const subtotal = Number(order.subtotal_cents || order.total_cents || 0)
+  const commissionCents = Number.isFinite(storedFee) && storedFee > 0
+    ? storedFee
+    : Math.round(subtotal * 0.12)
+
+  // Commission rate for display (approximate from stored values)
+  let commissionRatePct = null
+  if (subtotal > 0 && commissionCents > 0) {
+    commissionRatePct = Math.round((commissionCents / subtotal) * 100 * 10) / 10
+  }
+
+  const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal Marktplatz'
+  const platformAddress = process.env.PLATFORM_INVOICE_ADDRESS || ''
+  const platformVatId = process.env.PLATFORM_VAT_ID || ''
+  const platformVatPercent = Number(process.env.PLATFORM_VAT_PERCENT || '0')
+  const on = order.order_number != null ? String(order.order_number) : String(id).slice(0, 8)
+
+  const buf = await pdfDocToBuffer((doc) =>
+    renderProvisionsfakturPdfDocument(doc, {
+      order,
+      sellerInfo,
+      shopName,
+      commissionCents,
+      commissionRatePct,
+      platformAddress,
+      platformVatId,
+      platformVatPercent,
+    }),
+  )
+  return { filename: `Provisionsfaktur-${on}.pdf`, content: buf }
 }
 
 const ALLOWED_ATTACH_KEYS = new Set(['invoice_pdf', 'lieferschein_pdf'])
@@ -308,5 +573,7 @@ module.exports = {
   buildFlowEmailPdfAttachments,
   buildInvoicePdfBuffer,
   buildLieferscheinPdfBuffer,
+  buildProvisionsfakturPdfBuffer,
   renderInvoicePdfDocument,
+  renderProvisionsfakturPdfDocument,
 }

@@ -127,7 +127,8 @@
     "zeroCheckoutExplanation": "Der Gesamtbetrag wird durch Bonuspunkte und/oder einen Coupon vollständig abgedeckt. Es wird keine Kartenzahlung über Stripe ausgelöst.",
     "zeroCheckoutStripeNote": "Stripe: kein PaymentIntent, keine Kartenzahlung. Der Marktplatz verbucht die Bestellung als bezahlt (Treue/Rabatt). Die Auszahlung an den Verkäufer erfolgt später gemäß Marktplatzregeln von der Plattform-Stripe-Balance.",
     "zeroCheckoutPlaceOrder": "Kostenpflichtig bestellen — 0 €",
-    "zeroCheckoutLoginHint": "Für 0 €-Checkout müssen Sie angemeldet sein (keine Kartenzahlung)."
+    "zeroCheckoutLoginHint": "Für 0 €-Checkout müssen Sie angemeldet sein (keine Kartenzahlung).",
+    "marketplaceIntermediaryNotice": "Mit Ihrer Bestellung schließen Sie einen Kaufvertrag direkt mit dem jeweiligen Verkäufer ab. Andertal handelt als technischer Vermittler und ist nicht Vertragspartei. Es gelten die AGB des Verkäufers sowie unsere Nutzungsbedingungen."
   },
   "accountPanel": {
     "hello": "Hallo, {name}",

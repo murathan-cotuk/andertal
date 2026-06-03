@@ -1383,6 +1383,9 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
             {processing ? t("processing") : paymentIntentRefreshing ? t("processing") : `${t("placeOrder")} – ${formatPriceCents(payCentsDisplay)} €`}
           </PayNowButton>
         </CheckoutSubmitWrapFooter>
+        <p style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 12, lineHeight: 1.5 }}>
+          {t("marketplaceIntermediaryNotice")}
+        </p>
       </FormCard>
     </form>
     {processing && <TruckLoader label={t("processing")} />}
@@ -1914,6 +1917,9 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
             {processing ? t("processing") : paymentIntentRefreshing ? t("processing") : t("zeroCheckoutPlaceOrder")}
           </PayNowButton>
         </CheckoutSubmitWrapFooter>
+        <p style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 12, lineHeight: 1.5 }}>
+          {t("marketplaceIntermediaryNotice")}
+        </p>
       </FormCard>
     </form>
     {processing && <TruckLoader label={t("processing")} />}

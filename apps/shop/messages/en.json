@@ -127,7 +127,8 @@
     "zeroCheckoutExplanation": "Your bonus points and/or coupon cover the full amount. No card payment will be processed through Stripe.",
     "zeroCheckoutStripeNote": "Stripe: no PaymentIntent and no card charge. The marketplace records the order as paid (loyalty/discount). Seller payouts are handled later from the platform Stripe balance per marketplace rules.",
     "zeroCheckoutPlaceOrder": "Place order — €0",
-    "zeroCheckoutLoginHint": "You must be signed in for €0 checkout (no card payment)."
+    "zeroCheckoutLoginHint": "You must be signed in for €0 checkout (no card payment).",
+    "marketplaceIntermediaryNotice": "By placing your order you enter into a purchase contract directly with the respective seller. Andertal acts as a technical intermediary and is not a party to the contract. The seller's terms and our terms of use apply."
   },
   "accountPanel": {
     "hello": "Hello, {name}",

@@ -128,7 +128,12 @@
       "Bash(npm run *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\" -Name -Recurse -Include \"server.js\"#)",
       "Bash(ipconfig)",
-      "PowerShell(netsh advfirewall *)"
+      "PowerShell(netsh advfirewall *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\" -Force)",
+      "Bash(Select-Object -Property Name, Mode)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\medusa-backend\\\\src\" -Recurse -File | Select-Object -Property Name | Where-Object { $_.Name -match \"order|seller|stripe|payment|commission|invoice|tax\" } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\sellercentral\\\\src\" -Recurse -File | Select-Object -Property Name | Where-Object { $_.Name -match \"\\\\.\\(jsx|js\\)$\" } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\medusa-backend\" -File -Recurse | Where-Object { $_.Name -match \"config|medusa\" -and $_.Name -notmatch \"node_modules\" } | Select-Object -Property FullName)"
     ]
   }
 }

@@ -30,7 +30,7 @@ const {
 const { enqueueFlowEvent, startFlowQueueWorker, getFlowQueueStatus } = require('./src/flow-queue')
 const { pingForHealth } = require('./src/redis')
 const { resolveSmtpSenderIdentity } = require('./src/smtp-sender-resolve')
-const { renderInvoicePdfDocument } = require('./src/order-pdf-buffers')
+const { renderInvoicePdfDocument, renderProvisionsfakturPdfDocument } = require('./src/order-pdf-buffers')
 const { resolveOrderPaidTotalCents } = require('./src/order-money')
 
 let backendLinkModulesPath
@@ -7791,6 +7791,27 @@ async function start() {
             if (sr.rows?.[0]?.seller_id) cartSellerId = sr.rows[0].seller_id
           }
         } catch (_) {}
+
+        // Stripe Connect: look up seller's connected account for Destination Charges
+        let sellerStripeAccountId = null
+        let sellerConnectCommissionRate = 0.12
+        try {
+          if (cartSellerId && cartSellerId !== 'default') {
+            const scr = await client.query(
+              `SELECT stripe_account_id, stripe_onboarding_complete, commission_rate
+                 FROM seller_users WHERE seller_id = $1 LIMIT 1`,
+              [cartSellerId],
+            )
+            const scRow = scr.rows?.[0]
+            if (scRow?.stripe_onboarding_complete === true && scRow?.stripe_account_id) {
+              sellerStripeAccountId = scRow.stripe_account_id
+            }
+            if (scRow?.commission_rate != null) {
+              sellerConnectCommissionRate = Number(scRow.commission_rate)
+            }
+          }
+        } catch (_) {}
+
         const cartSellerDisplay = await resolveSellerDisplayNameForStripe(client, cartSellerId)
         const cartSellerLabel =
           truncateForStripeDescription(cartSellerDisplay) ||
@@ -7861,6 +7882,17 @@ async function start() {
           },
         }
         if (stripeCustomerId) piBody.customer = stripeCustomerId
+
+        // Destination Charge: route payment directly to seller's connected account.
+        // Platform keeps application_fee_amount (commission). Only applied when seller
+        // has completed Stripe Connect onboarding.
+        if (sellerStripeAccountId) {
+          const commCents = Math.max(0, Math.round(subtotalCents * sellerConnectCommissionRate))
+          piBody.transfer_data = { destination: sellerStripeAccountId }
+          piBody.application_fee_amount = commCents
+          piBody.metadata.commission_cents = String(commCents)
+          piBody.metadata.seller_stripe_account_id = sellerStripeAccountId
+        }
 
         const cancelPiId = (body.cancel_payment_intent_id || '').toString().trim()
         if (cancelPiId && cancelPiId.startsWith('pi_')) {
@@ -8699,6 +8731,17 @@ async function start() {
         if (!row) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [orderId])
         const itemRows = iRes.rows || []
+        let sellerInfo = null
+        try {
+          if (row.seller_id && row.seller_id !== 'default') {
+            const sr = await client.query(
+              `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address
+                 FROM seller_users WHERE seller_id = $1 LIMIT 1`,
+              [row.seller_id],
+            )
+            sellerInfo = sr.rows?.[0] || null
+          }
+        } catch (_) {}
         await client.end(); client = null
         const on = row.order_number != null ? String(row.order_number) : String(orderId).slice(0, 8)
         const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
@@ -8712,6 +8755,7 @@ async function start() {
           orderId,
           invoiceNumber: on,
           shopName,
+          sellerInfo,
         })
         doc.end()
       } catch (e) {
@@ -9853,8 +9897,9 @@ async function start() {
           sellerCommissionRate,
         )
 
-        /** Seller settlements run via IBAN/SEPA batch only — never Stripe Connect transfer-from-platform. */
-        const stripeTransferInit = 'not_applicable'
+        // When piStripeAccountId is set, the payment was routed via Destination Charge.
+        // The commission (application_fee_amount) was already deducted by Stripe.
+        const stripeTransferInit = (piStripeAccountId && !isZeroPayOrder) ? 'destination_charge' : 'not_applicable'
         const checkoutPaymentKind = isZeroPayOrder ? 'platform_loyalty' : 'stripe'
         const sellerNetMerchandiseCents = Math.max(0, subtotalCents - platformFeeMerchandiseBasis)
         const paymentIntentForDb = isZeroPayOrder ? null : paymentIntentId
@@ -9870,7 +9915,7 @@ async function start() {
              checkout_payment_kind, seller_net_after_commission_cents,
              subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency)
            VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt',
-             '${stripeTransferInit}',NULL,$23,'pending',
+             '${stripeTransferInit}',$33,$23,'pending',
              $24,$25,
              $26,$27,$28,$29,$30,$31,$32,'eur')
            RETURNING id, order_number`,
@@ -9881,7 +9926,8 @@ async function start() {
            platformFeeMerchandiseBasis,
            checkoutPaymentKind,
            sellerNetMerchandiseCents,
-           subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents]
+           subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents,
+           piStripeAccountId || null]
         )
 
         const orderId = ins.rows && ins.rows[0] ? ins.rows[0].id : null
@@ -11157,6 +11203,17 @@ async function start() {
         }
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
         const itemRows = iRes.rows || []
+        let sellerInfoHub = null
+        try {
+          if (row.seller_id && row.seller_id !== 'default') {
+            const sr = await client.query(
+              `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address
+                 FROM seller_users WHERE seller_id = $1 LIMIT 1`,
+              [row.seller_id],
+            )
+            sellerInfoHub = sr.rows?.[0] || null
+          }
+        } catch (_) {}
         await client.end()
         client = null
         const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
@@ -11171,6 +11228,7 @@ async function start() {
           orderId: id,
           invoiceNumber: on,
           shopName,
+          sellerInfo: sellerInfoHub,
         })
         doc.end()
       } catch (e) {
@@ -11235,6 +11293,87 @@ async function start() {
         doc.font('Helvetica').fontSize(8).fillColor('#666')
         doc.moveDown(1)
         doc.text(pdfDeLatin('Dieser Lieferschein dient der Zuordnung der Sendung. Keine Rechnung.'), { width: 480 })
+        doc.end()
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        if (!res.headersSent) res.status(500).json({ message: e?.message || 'PDF error' })
+      }
+    }
+
+    /**
+     * GET /admin-hub/v1/orders/:id/pdf/provisionsfaktur
+     * Generates a commission invoice (Provisionsfaktur) from the platform to the seller.
+     * Accessible by the seller who owns the order or by platform admins.
+     */
+    const adminHubOrderPdfProvisionsfakturGET = async (req, res) => {
+      const id = (req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
+      const loggedSellerId = req.sellerUser?.seller_id || null
+      let client
+      try {
+        const PDFDocument = require('pdfkit')
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const oRes = await client.query(
+          `SELECT id, order_number, seller_id, created_at, subtotal_cents, total_cents,
+                  stripe_application_fee_cents, seller_net_after_commission_cents
+             FROM store_orders WHERE id = $1::uuid`,
+          [id],
+        )
+        const order = oRes.rows?.[0]
+        if (!order) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        if (loggedSellerId && order.seller_id !== loggedSellerId) {
+          await client.end()
+          return res.status(403).json({ message: 'Access denied' })
+        }
+
+        let sellerInfo = null
+        try {
+          if (order.seller_id && order.seller_id !== 'default') {
+            const sr = await client.query(
+              `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address
+                 FROM seller_users WHERE seller_id = $1 LIMIT 1`,
+              [order.seller_id],
+            )
+            sellerInfo = sr.rows?.[0] || null
+          }
+        } catch (_) {}
+
+        await client.end(); client = null
+
+        const storedFee = Number(order.stripe_application_fee_cents)
+        const subtotal = Number(order.subtotal_cents || order.total_cents || 0)
+        const commissionCents = Number.isFinite(storedFee) && storedFee > 0
+          ? storedFee
+          : Math.round(subtotal * 0.12)
+        let commissionRatePct = null
+        if (subtotal > 0 && commissionCents > 0) {
+          commissionRatePct = Math.round((commissionCents / subtotal) * 100 * 10) / 10
+        }
+
+        const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal Marktplatz'
+        const platformAddress = process.env.PLATFORM_INVOICE_ADDRESS || ''
+        const platformVatId = process.env.PLATFORM_VAT_ID || ''
+        const platformVatPercent = Number(process.env.PLATFORM_VAT_PERCENT || '0')
+        const on = order.order_number != null ? String(order.order_number) : String(id).slice(0, 8)
+
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', `attachment; filename="Provisionsfaktur-${on}.pdf"`)
+        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
+        doc.pipe(res)
+        renderProvisionsfakturPdfDocument(doc, {
+          order,
+          sellerInfo,
+          shopName,
+          commissionCents,
+          commissionRatePct,
+          platformAddress,
+          platformVatId,
+          platformVatPercent,
+        })
         doc.end()
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -13737,6 +13876,7 @@ async function start() {
     httpApp.post('/admin-hub/v1/orders', adminHubOrderPOST)
     httpApp.get('/admin-hub/v1/orders/:id/pdf/invoice', adminHubOrderPdfInvoiceGET)
     httpApp.get('/admin-hub/v1/orders/:id/pdf/lieferschein', adminHubOrderPdfLieferscheinGET)
+    httpApp.get('/admin-hub/v1/orders/:id/pdf/provisionsfaktur', requireSellerAuth, adminHubOrderPdfProvisionsfakturGET)
     httpApp.get('/admin-hub/v1/orders/:id', adminHubOrderByIdGET)
     httpApp.patch('/admin-hub/v1/orders/:id', adminHubOrderPATCH)
     httpApp.delete('/admin-hub/v1/orders/:id', adminHubOrderDELETE)
