@@ -566,8 +566,7 @@ export default function VerificationSettingsPage() {
       if (!cancelled) setQrLoading(false);
     });
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agreementAccepted]);
+  }, [agreementAccepted]); // intentionally omits client/locale/signed/qrDataUrl to run only on checkbox toggle
 
   // Clear QR code when checkbox is unchecked
   useEffect(() => {
@@ -593,8 +592,7 @@ export default function VerificationSettingsPage() {
       } catch (_) {}
     }, 4000);
     return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qrDataUrl, signed]);
+  }, [qrDataUrl, signed]); // intentionally omits client to avoid polling restart on re-render
 
   const handleDocUpload = async (docType, file) => {
     setUploadingDocType(docType);
