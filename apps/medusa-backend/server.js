@@ -20557,7 +20557,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           `SELECT su.id, su.email, su.seller_id, su.is_superuser, ss.store_name
            FROM seller_users su
            LEFT JOIN admin_hub_seller_settings ss ON ss.seller_id = su.seller_id
-           WHERE su.id = $1 OR su.seller_id = $1
+           WHERE su.id::text = $1 OR su.seller_id = $1
            LIMIT 1`,
           [id]
         )
