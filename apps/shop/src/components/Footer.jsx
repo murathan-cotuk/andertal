@@ -282,7 +282,6 @@ export default function Footer() {
   }, []);
 
   const thresholdCents = resolveFreeShippingThresholdCents(rawThresholds, marketCountry, envThresholdCents);
-  // eslint-disable-next-line no-unused-vars
   const shippingPromoText = null; /* temporarily hidden — re-enable when ready */
 
   return (
