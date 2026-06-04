@@ -1,4 +1,4 @@
-03.06.
+04.06.
 
 -- sellercentralde import-export sayfasindan ürün import etmek icin excel hazirladim. seller olarak yükledim ve su uyariyi verdi:
 
@@ -10,13 +10,12 @@ eco-parent3-160526: EAN already exists: 3234567891
 
 ürünler zaten var diyor ancak seller olarak products/inventory sayfasinda bu ekledigim ürünleri göremiyorum. superuser olarak products/inventory sayfasinda superuser eklemis gibi görüyorum. sanirim database e seller_id eklenmedigi icin bu sellerla bagdastiramadi. ayrica sistemde eklenmek istenen ean mevcut olsa bile o ean eklendiginde hata almamaliyiz. basarili olarak eklenmeli. ancak database de kayitli bilgiler disinda bir sekilde yüklemeye calisirsa sellerlar, superuser a bildirim gidecek ve ilgili üründe degistirilmek istenen kisimlara degisiklik önerisi gelecekti. bu fonksiyon calisiyordu ancak görünüse göre su an problem var gibi. database de kayitli bilgilerin aynisi seklinde ekleyecekse eger sellerlar hicbir uyari olmadan listelenmis olmasi gerekiyor. degisiklik olsa bile hata olmadan eklenmesi lazim seller in envanterine. superuser panelinde baktigimizda o ürün, ürün sahibi seller altinda listelenmeli. ancak ürün icinde, hangi sellerlar tarafindan listelenmis oldugu görünmeli. yani adim adim saydigim bu problemleri halletmeni istiyorum.
 
+-- sellercentralde olusturdugum bir kampanyanin yanindan google ads e bastigimda google ads e      yönlendiriyor. google ads sayfasina gidiyor evet ancak sellercentralde bilgileri girilmis  reklam kampanyasi google ads te olusuturlmuyor otomatik olarak. google ads hesabimizi  baglamistik. bunun otomatik olmasi gerekiyordu. öyle ayarlattirmistim sana. settingsde google   ads hesabimizi da bagladik. acama kampanya olustururken girilen bilgiler eksik mi? daha  fazla mi bilgi girmek lazim? daha profesyonel olmasi icin daha cok bilgi girilmesi lazimsa  ona göre bilgiler girilecek yerler olustur kampanya olusturma ve düzenleme sayfasinda. ayrica   en basta bahsettigim reklam kampanyasinin otomatik olusturulamamasi sorununu incele, sorunu cöz, bana da ne yapacagimi söyle
 
---landing page sayfasi altinda popup template i olustur hem desktop hem mobil hem tablet icin ayri ayri hepsinin kendine uygun ölcülerinde. detayli popuplar ayarlayabilelim. her seyi tek tek yazdirma ne gibi modern popuplar yapilmasi gerektigini biliyorsun onlara göre ayarla iste.
--- smtp eklemistik flowlarda email calisiyor. sellercentraldeki bildirimler email olarak da gitsin. müsteriden mesaj var, saticidan mesaj var, sellerdan mesaj var, adminden mesaj var, yeni siparis geldi, iade talebi geldi, ürünün listelendi, hesabin onaylandi gibi mailler hazirlayabilelim flow sayfasindan. tüm bildirimler email olarak da gitsin ilgili kisilere
+-- sellercentralde marketing/automations sayfasinda bazi otomasyon secenekleri var. bunlari sagdaki butondan aktiflestirmek istedigimde request failed uyarisi aliyorum. ayrica gönderilecek email almanca yaziyorum fakat müsterinin sectigi dil ne ise o dilde gitmesi gerekiyor emaillerin. dillere göre icerik yazalim
 
 -- saticilarin olusturdugu kampanyalari kontrol edip bagladigimiz marketing hesabinda tek tik ile yayinlayalim. saticilar zaten bütcelerini belirlemis olacak. belirlenen bütceleri sectigimiz platformlarda dagitilmis sekilde kampanyalarini olusturalim. mesela müsteri günlük 5 euro bütce ile reklam olusturdu. shoptaki algoritmada o sekilde islemeye devam etsin. müsteriden alinan bu 5 euro müsteriden tahsile edilecek ve stripe imiza düsecek. bu 5 farkli secilen google ads, meta gibi yerlerde 1er euro seklinde paylasilacak. ya da kac platform secildiyse reklam vermek icin ona bölünecek gibi. anladin mi?
 
--- excelle ürün yükledigimde ekledigim url görsellerini media klasörü altinda göremiyorum sellercentralde. exceli kim yüklediyse o saticida gözüksün sadece görseller. superuser icinde o saticinin klasörü icine listelensin
 -- 1 ürünün birden fazla saticisi var ancak shopta diger saticilar gözükmüyor. sadece en son kim eklediyse o gözüküyor satici olarak. buyboxu neden otomatik en son ekleyene verdin?
 -- excel ile ürün eklemede de unit_type ve unit_value degerlerinde hemen sonra per_unit degeri ekleyelim. bu sellercentral ürün sayfasindaki bahsettigimiz 1000 g kismina tekabül etsin.
 -- brand sayfalarinin template ini koleksiyon template i gibi yap. yani filtreler solda görünsün.
@@ -44,5 +43,48 @@ eco-parent3-160526: EAN already exists: 3234567891
 - sellercentralde kategori icinden görsel ekledigimde (category image, banner image) placeholder gözüküyor. yani görsel sanki sistemde yokmus gibi gözüküyor ve shopa da yansimiyor haliyle. bunu düzelt. 
 
 
--- sellercentralde sellerlar verification sayfasinda bu islemi tamamlamak icin basladiginda söyle bir secici var: "Ich habe die rechtlichen Vereinbarungen zwischen Verkäufer und Plattform gelesen und akzeptiere sie." ancak okunabilecek bir metin, bir belge yok. bunu nasil ayarlamak gerekiyor?
+-- sellercentralde kayit olmus bir satici verification sayfasina gidiyor. orada "I have read and agree to the between seller and platform.legal agreements between seller and platform." yaziyor. legal agreements L si büyük olacak, noktadan sonra bosluk olacak. ilgili diller icin ayarlanmis olacak.
+-- ayni yerde legal agreements e basabiliyoruz. burada kurallar falan yaziyor. bunlari her dilde güncelle. ayrica kodlari kontrol et. almanyada yasal kurallar neler ise onlara göre icerikleri genislet. mesela saticilar satislardan sorumludur, komisyon ödemesi, falan. AGB mizde yazanlari da dikkate alarak güncelle. AGB: Allgemeine Geschäftsbedingungen (AGB)
+§ 1 Geltungsbereich und Vertragsparteien
+Diese Allgemeinen Geschäftsbedingungen gelten für die Nutzung des Online-Marktplatzes Andertal (nachfolgend „Plattform"), betrieben von Andertal (nachfolgend „Plattformbetreiber"). Der Plattformbetreiber vermittelt Kaufverträge zwischen unabhängigen Verkäufern (nachfolgend „Verkäufer") und Käufern (nachfolgend „Käufer").
+
+Der Plattformbetreiber ist nicht Vertragspartei des Kaufvertrags. Kaufverträge kommen ausschließlich zwischen dem jeweiligen Käufer und dem jeweiligen Verkäufer zustande.
+
+§ 2 Leistungen der Plattform
+Andertal stellt eine technische Infrastruktur zur Verfügung, über die Verkäufer ihre Produkte anbieten und Käufer diese erwerben können. Die Plattform übernimmt die Zahlungsabwicklung im Namen und auf Rechnung der Verkäufer. Für diese Vermittlungsleistung erhebt der Plattformbetreiber eine Provision von den Verkäufern.
+
+§ 3 Vertragsschluss
+Mit dem Absenden einer Bestellung gibt der Käufer ein verbindliches Angebot zum Kauf ab. Der Kaufvertrag kommt mit der Auftragsbestätigung des Verkäufers zustande. Die Auftragsbestätigung wird per E-Mail übermittelt.
+
+Vertragspartner des Käufers ist ausschließlich der auf der Produktseite und im Checkout ausgewiesene Verkäufer, nicht Andertal als Plattformbetreiber.
+
+§ 4 Preise und Zahlung
+Alle auf der Plattform angezeigten Preise sind Endpreise in Euro inklusive der gesetzlichen Mehrwertsteuer (sofern anwendbar) und zuzüglich etwaiger Versandkosten. Die Preise werden ausschließlich vom jeweiligen Verkäufer festgelegt.
+
+Die Zahlung erfolgt über die von der Plattform bereitgestellten Zahlungsmethoden (u. a. Kreditkarte, SEPA-Lastschrift). Die Zahlungsabwicklung wird von Stripe Inc. als Zahlungsdienstleister verarbeitet.
+
+§ 5 Lieferung
+Lieferung und Versand obliegen dem jeweiligen Verkäufer. Lieferzeiten und -bedingungen werden auf den Produktseiten angegeben. Risiko und Gefahr gehen mit Übergabe der Ware an den Beförderer auf den Käufer über.
+
+§ 6 Widerrufsrecht
+Verbrauchern steht ein gesetzliches Widerrufsrecht von 14 Tagen zu. Widerrufsansprüche sind gegenüber dem jeweiligen Verkäufer, nicht gegenüber Andertal, geltend zu machen. Die Einzelheiten entnehmen Sie bitte der Widerrufsbelehrung des jeweiligen Verkäufers, die auf dessen Produktseiten oder im Bestellprozess zugänglich ist.
+
+§ 7 Gewährleistung und Haftung
+Gewährleistungsansprüche sind ausschließlich gegenüber dem jeweiligen Verkäufer geltend zu machen. Der Plattformbetreiber haftet nicht für die Qualität, Beschaffenheit oder Rechtmäßigkeit der angebotenen Produkte, soweit er nicht selbst als Verkäufer auftritt.
+
+Andertal haftet für Schäden, die durch die Plattformnutzung entstehen, nur bei Vorsatz oder grober Fahrlässigkeit sowie bei der Verletzung wesentlicher Vertragspflichten.
+
+§ 8 Datenschutz
+Die Verarbeitung personenbezogener Daten erfolgt gemäß unserer Datenschutzerklärung und den Vorgaben der Datenschutz-Grundverordnung (DSGVO). Zur Abwicklung von Zahlungen werden erforderliche Daten an Stripe Inc. weitergegeben.
+
+§ 9 Streitbeilegung
+Die Europäische Kommission stellt unter{" "} https://ec.europa.eu/consumers/odr {" "} eine Plattform zur Online-Streitbeilegung (OS) bereit. Wir sind nicht verpflichtet und nicht bereit, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+
+§ 10 Anwendbares Recht und Gerichtsstand
+Es gilt das Recht der Bundesrepublik Deutschland. Gerichtsstand für alle Streitigkeiten aus der Nutzung der Plattform ist, soweit gesetzlich zulässig, der Sitz des Plattformbetreibers.
+
+§ 11 Änderungen der AGB
+Der Plattformbetreiber behält sich vor, diese AGB jederzeit zu ändern. Änderungen werden den registrierten Nutzern per E-Mail mitgeteilt. Die weitere Nutzung der Plattform nach Mitteilung gilt als Zustimmung zu den geänderten AGB.
+
+ayrica bu kutucuk isaretlendiginde imzalamak icin bir bölüm acilsin. qr kod gözüksün. qr kodu mobil cihazla scanledigimizde imza bölümü ciksin. mobilde imza atsin sellerlar. ondan sonra bu dosya pdf olarak verification sayfasinda her zaman dursun. en altta solda tarih, konum, satici adi soyadi, satici sirketi, satici seller adi olsun ve attigi imza orada gözüksün bu pdfte. tüm kurallar orada yazili olsun. Superuser sayfasindan da ilgili seller in icine girdigimizde imzalanmis bu form orada görünsün.
 

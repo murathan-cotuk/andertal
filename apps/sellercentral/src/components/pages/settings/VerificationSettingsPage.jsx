@@ -148,7 +148,7 @@ const tByLocale = (l) => {
     docsSent: "Documents submitted. Your status will be updated here after review.",
     agreementTitle: "Legal confirmation",
     agreementText: "I have read and agree to the {link} between seller and platform.",
-    agreementLink: "legal agreements",
+    agreementLink: "Legal Agreements",
     contractModalTitle: "Seller–Platform Agreement",
     companyTitle: "Company details",
     contactTitle: "Contact & address",
@@ -445,6 +445,12 @@ export default function VerificationSettingsPage() {
   const [uploadingDocType, setUploadingDocType] = useState(null);
   const [initialSnapshot, setInitialSnapshot] = useState(null);
   const [phoneDialCode, setPhoneDialCode] = useState("+49");
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [signed, setSigned] = useState(false);
+  const [signatureAt, setSignatureAt] = useState(null);
+  const [pdfDownloading, setPdfDownloading] = useState(false);
+  const pollRef = useRef(null);
   const [form, setForm] = useState({
     companyName: "",
     authorizedPersonName: "",
@@ -517,8 +523,26 @@ export default function VerificationSettingsPage() {
         };
         setForm((p) => ({ ...p, ...nextForm }));
         const nextAgreement = s !== "registered";
-        setAgreementAccepted(nextAgreement);
-        setInitialSnapshot(snapshotFrom(nextForm, nextAgreement, dialCode));
+
+        // Load signature status BEFORE setting agreementAccepted to avoid QR creation race
+        let alreadySigned = false;
+        let alreadySignedAt = null;
+        try {
+          const signStatus = await client.getSignStatus();
+          if (signStatus?.signed) {
+            alreadySigned = true;
+            alreadySignedAt = signStatus.signature_at || null;
+          }
+        } catch (_) {}
+
+        if (!cancelled) {
+          if (alreadySigned) {
+            setSigned(true);
+            setSignatureAt(alreadySignedAt);
+          }
+          setAgreementAccepted(nextAgreement);
+          setInitialSnapshot(snapshotFrom(nextForm, nextAgreement, dialCode));
+        }
       } catch (e) {
         if (!cancelled) setError(e?.message || "Failed to load verification data.");
       } finally {
@@ -527,6 +551,50 @@ export default function VerificationSettingsPage() {
     })();
     return () => { cancelled = true; };
   }, [client, snapshotFrom]);
+
+  // Create QR code when checkbox is checked and not yet signed
+  useEffect(() => {
+    if (!agreementAccepted || signed || qrDataUrl) return;
+    let cancelled = false;
+    setQrLoading(true);
+    client.createSignToken(locale).then((res) => {
+      if (!cancelled) {
+        setQrDataUrl(res.qr_data_url);
+        setQrLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) setQrLoading(false);
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agreementAccepted]);
+
+  // Clear QR code when checkbox is unchecked
+  useEffect(() => {
+    if (!agreementAccepted && qrDataUrl) {
+      setQrDataUrl(null);
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    }
+  }, [agreementAccepted, qrDataUrl]);
+
+  // Poll for signature completion when QR code is displayed
+  useEffect(() => {
+    if (!qrDataUrl || signed) return;
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await client.getSignStatus();
+        if (res?.signed) {
+          setSigned(true);
+          setSignatureAt(res.signature_at || null);
+          setQrDataUrl(null);
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      } catch (_) {}
+    }, 4000);
+    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrDataUrl, signed]);
 
   const handleDocUpload = async (docType, file) => {
     setUploadingDocType(docType);
@@ -607,6 +675,23 @@ export default function VerificationSettingsPage() {
   const normalizedStatus = String(status || "registered").toLowerCase();
   const isDocsSubmittedOrBeyond = ["documents_submitted", "pending_approval", "pending", "approved", "active", "rejected", "suspended"].includes(normalizedStatus);
   const isDirty = !loading && initialSnapshot !== null && snapshotFrom(form, agreementAccepted, phoneDialCode) !== initialSnapshot;
+
+  const downloadPdf = async () => {
+    setPdfDownloading(true);
+    try {
+      const blob = await client.downloadAgreementPdf();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "andertal-agreement.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e?.message || "PDF download failed.");
+    } finally {
+      setPdfDownloading(false);
+    }
+  };
 
   const discardVerification = useCallback(() => {
     if (!initialSnapshot) return;
@@ -714,7 +799,7 @@ export default function VerificationSettingsPage() {
               <Checkbox
                 label={
                   <span>
-                    {t.agreementText.replace("{link}", "").split("{link}")[0]}
+                    {t.agreementText.split("{link}")[0]}
                     <button
                       type="button"
                       onClick={(e) => { e.preventDefault(); setContractOpen(true); }}
@@ -737,6 +822,60 @@ export default function VerificationSettingsPage() {
                 checked={agreementAccepted}
                 onChange={setAgreementAccepted}
               />
+
+              {/* QR code signing section */}
+              {agreementAccepted && !signed && (
+                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 16, marginTop: 4 }}>
+                  {qrLoading ? (
+                    <InlineStack gap="200" blockAlign="center">
+                      <Spinner size="small" />
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {locale === "de" ? "QR-Code wird generiert..." : locale === "tr" ? "QR kod oluşturuluyor..." : "Generating QR code..."}
+                      </Text>
+                    </InlineStack>
+                  ) : qrDataUrl ? (
+                    <BlockStack gap="200">
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">
+                        {locale === "de"
+                          ? "Bitte scanne den QR-Code mit deinem Mobilgerät, um die Vereinbarung zu unterzeichnen."
+                          : locale === "tr"
+                          ? "Sözleşmeyi imzalamak için lütfen QR kodu mobil cihazınla tara."
+                          : "Please scan the QR code with your mobile device to sign the agreement."}
+                      </Text>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                        <img src={qrDataUrl} alt="QR Code" style={{ width: 180, height: 180, border: "1px solid #e5e7eb", borderRadius: 8 }} />
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 8 }}>
+                          <Spinner size="small" />
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {locale === "de" ? "Warte auf Unterschrift..." : locale === "tr" ? "İmza bekleniyor..." : "Waiting for signature..."}
+                          </Text>
+                        </div>
+                      </div>
+                    </BlockStack>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Signed + PDF section */}
+              {signed && (
+                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 16, marginTop: 4 }}>
+                  <BlockStack gap="200">
+                    <InlineStack gap="200" blockAlign="center">
+                      <span style={{ color: "#10b981", fontSize: 18 }}>✓</span>
+                      <Text as="p" variant="bodyMd" fontWeight="semibold" tone="success">
+                        {locale === "de"
+                          ? `Vereinbarung unterzeichnet${signatureAt ? " am " + new Date(signatureAt).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : ""}`
+                          : locale === "tr"
+                          ? `Sözleşme imzalandı${signatureAt ? " — " + new Date(signatureAt).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : ""}`
+                          : `Agreement signed${signatureAt ? " on " + new Date(signatureAt).toLocaleDateString("en-GB") : ""}`}
+                      </Text>
+                    </InlineStack>
+                    <Button size="slim" onClick={downloadPdf} loading={pdfDownloading}>
+                      {locale === "de" ? "Unterzeichnetes PDF herunterladen" : locale === "tr" ? "İmzalı PDF'i indir" : "Download signed PDF"}
+                    </Button>
+                  </BlockStack>
+                </div>
+              )}
             </BlockStack>
           </Card>
 

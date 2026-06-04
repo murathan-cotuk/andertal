@@ -1226,6 +1226,23 @@ async function start() {
           `CREATE UNIQUE INDEX IF NOT EXISTS idx_seller_users_andertal_billbee_api_key ON seller_users(andertal_billbee_api_key) WHERE andertal_billbee_api_key IS NOT NULL`,
         ).catch(() => {})
 
+        // ── Seller agreement signature ──────────────────────────────────────────
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS signature_data text DEFAULT NULL`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS signature_at timestamptz DEFAULT NULL`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS signature_ip varchar(60) DEFAULT NULL`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS agreement_pdf_url text DEFAULT NULL`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS seller_sign_tokens (
+            token varchar(64) PRIMARY KEY,
+            seller_id varchar(255) NOT NULL,
+            locale varchar(10) NOT NULL DEFAULT 'de',
+            used_at timestamptz DEFAULT NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            expires_at timestamptz NOT NULL DEFAULT (now() + interval '30 minutes'),
+            ip varchar(60) DEFAULT NULL
+          )
+        `).catch(() => {})
+
         // ── Ranking infrastructure ──────────────────────────────────────────────
         await client.query(`
           CREATE TABLE IF NOT EXISTS product_events (
@@ -19475,7 +19492,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     // ── Google Ads API helpers ────────────────────────────────────────────────
-    const GADS_API_VER = 'v17'
+    const GADS_API_VER = 'v19'
 
     async function gadsRefreshToken (creds) {
       const params = new URLSearchParams({
@@ -19519,20 +19536,59 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       const creds = account.credentials || {}
       const cid = String(creds.customer_id || '').replace(/-/g, '')
       if (!cid || !creds.developer_token || !creds.refresh_token)
-        throw new Error('Google Ads Zugangsdaten unvollständig (customer_id, developer_token, refresh_token erforderlich)')
+        throw new Error('Google Ads Zugangsdaten unvollständig (customer_id, developer_token, refresh_token erforderlich). Zugangsdaten unter Apps & Integrationen → Marketing konfigurieren.')
       if (!creds.oauth_client_id || !creds.oauth_client_secret)
-        throw new Error('Google Ads OAuth Client ID/Secret fehlen')
+        throw new Error('Google Ads OAuth Client ID/Secret fehlen. Zugangsdaten unter Apps & Integrationen → Marketing konfigurieren.')
+
+      // Parse campaign settings for ad details
+      let settings = {}
+      try { settings = typeof camp.settings === 'string' ? JSON.parse(camp.settings) : (camp.settings || {}) } catch (_) {}
+
+      const gadsHeadlines = Array.isArray(settings.gads_headlines) ? settings.gads_headlines.filter(h => h && h.trim()) : []
+      const gadsDescriptions = Array.isArray(settings.gads_descriptions) ? settings.gads_descriptions.filter(d => d && d.trim()) : []
+      const gadsKeywords = Array.isArray(settings.gads_keywords) ? settings.gads_keywords.filter(k => k && k.trim()) : []
+      const gadsFinalUrl = settings.gads_final_url || process.env.SHOP_URL || process.env.NEXT_PUBLIC_SHOP_URL || 'https://andertal.de'
+      const gadsGeoTargets = Array.isArray(settings.gads_geo_targets) && settings.gads_geo_targets.length > 0
+        ? settings.gads_geo_targets
+        : ['2276'] // Default: Germany
+      const gadsLanguage = settings.gads_target_language || '1001' // Default: German
+      const gadsCpcBidMicros = String(Math.max((Number(settings.gads_cpc_bid_cents) || 50), 10) * 10000)
+
+      // Build headlines list (min 3, max 15, each max 30 chars)
+      const campNameHeadline = (camp.name || 'Entdecke Angebote').slice(0, 30)
+      const allHeadlines = [
+        campNameHeadline,
+        ...gadsHeadlines.map(h => h.slice(0, 30)),
+      ]
+      const fallbackHeadlines = ['Jetzt entdecken', 'Qualität online', 'Jetzt bestellen', 'Top Angebote', 'Direkt kaufen']
+      for (const fb of fallbackHeadlines) {
+        if (allHeadlines.length >= 5) break
+        if (!allHeadlines.includes(fb)) allHeadlines.push(fb)
+      }
+      const headlines = allHeadlines.slice(0, 15).map(text => ({ text }))
+
+      // Build descriptions list (min 2, max 4, each max 90 chars)
+      const campDesc = (camp.description || '').slice(0, 90)
+      const allDescriptions = [
+        ...(campDesc ? [campDesc] : []),
+        ...gadsDescriptions.map(d => d.slice(0, 90)),
+      ]
+      const fallbackDescs = ['Schnelle Lieferung · Sichere Zahlung', 'Jetzt bestellen und sparen', 'Top Qualität zum besten Preis']
+      for (const fb of fallbackDescs) {
+        if (allDescriptions.length >= 4) break
+        if (!allDescriptions.includes(fb)) allDescriptions.push(fb)
+      }
+      const descriptions = allDescriptions.slice(0, 4).map(text => ({ text }))
 
       const token = await gadsRefreshToken(creds)
-      const micros = str => String(Math.max(Number(str) || 0, 0))
       const yyyymmdd = d => d ? new Date(d).toISOString().slice(0, 10).replace(/-/g, '') : null
 
-      // 1 ── Campaign Budget (min 1 EUR = 1 000 000 micros)
-      const budgetMicros = micros(Math.max(budgetDailyCents, 100) * 10000)
+      // 1 ── Campaign Budget (min 1 EUR = 1 000 000 micros; budgetDailyCents in cents)
+      const budgetAmountMicros = String(Math.max(budgetDailyCents, 100) * 10000)
       const budgetRes = await gadsCall('campaignBudgets', {
         operations: [{ create: {
           name: `Andertal — ${camp.name} — ${Date.now()}`,
-          amountMicros: budgetMicros,
+          amountMicros: budgetAmountMicros,
           deliveryMethod: 'STANDARD',
           explicitlyShared: false,
         }}]
@@ -19541,16 +19597,25 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       if (!budgetResourceName) throw new Error('Google Ads: Budget wurde erstellt aber kein resourceName zurückgegeben')
       const budgetId = budgetResourceName.split('/').pop()
 
-      // 2 ── Campaign
+      // 2 ── Campaign (SEARCH, bid strategy based on settings)
       const startDate = yyyymmdd(camp.start_at) || yyyymmdd(new Date())
+      const bidStrategy = String(camp.bid_strategy || 'cpc').toLowerCase()
       const campCreate = {
         name: `${camp.name} — Andertal`,
         advertisingChannelType: 'SEARCH',
         status: 'ENABLED',
         campaignBudget: `customers/${cid}/campaignBudgets/${budgetId}`,
-        targetSpend: {},
         networkSettings: { targetGoogleSearch: true, targetSearchNetwork: true, targetContentNetwork: false },
         startDate,
+      }
+      // Bid strategy
+      if (bidStrategy === 'target_roas') {
+        campCreate.targetRoas = { targetRoas: 3.0 }
+      } else if (bidStrategy === 'cpm') {
+        campCreate.targetSpend = { cpcBidCeilingMicros: gadsCpcBidMicros }
+      } else {
+        // cpc → Maximize Clicks with CPC ceiling
+        campCreate.targetSpend = { cpcBidCeilingMicros: gadsCpcBidMicros }
       }
       const endDate = yyyymmdd(camp.end_at)
       if (endDate) campCreate.endDate = endDate
@@ -19559,41 +19624,64 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       if (!campaignResourceName) throw new Error('Google Ads: Kampagne erstellt aber kein resourceName zurückgegeben')
       const campaignId = campaignResourceName.split('/').pop()
 
-      // 3 ── Ad Group
+      // 3 ── Geo targeting (campaignCriteria locations)
+      if (gadsGeoTargets.length > 0) {
+        const geoOps = gadsGeoTargets.map(geoId => ({
+          create: {
+            campaign: `customers/${cid}/campaigns/${campaignId}`,
+            location: { geoTargetConstant: `geoTargetConstants/${geoId}` },
+          }
+        }))
+        await gadsCall('campaignCriteria', { operations: geoOps }, creds, token).catch(e => {
+          console.warn('[gads] geo targeting warning:', e?.message)
+        })
+      }
+
+      // 4 ── Language targeting
+      await gadsCall('campaignCriteria', {
+        operations: [{
+          create: {
+            campaign: `customers/${cid}/campaigns/${campaignId}`,
+            language: { languageConstant: `languageConstants/${gadsLanguage}` },
+          }
+        }]
+      }, creds, token).catch(e => {
+        console.warn('[gads] language targeting warning:', e?.message)
+      })
+
+      // 5 ── Ad Group
       const agRes = await gadsCall('adGroups', {
         operations: [{ create: {
           name: `${camp.name} — Gruppe`,
           campaign: `customers/${cid}/campaigns/${campaignId}`,
           status: 'ENABLED',
           type: 'SEARCH_STANDARD',
-          cpcBidMicros: '500000', // 0,50 € Standard-CPC
+          cpcBidMicros: gadsCpcBidMicros,
         }}]
       }, creds, token)
       const adGroupResourceName = agRes.results?.[0]?.resourceName
       if (!adGroupResourceName) throw new Error('Google Ads: Ad Group erstellt aber kein resourceName zurückgegeben')
       const adGroupId = adGroupResourceName.split('/').pop()
 
-      // 4 ── Responsive Search Ad
-      const headline = (camp.name || 'Entdecke Angebote').slice(0, 30)
-      const description = (camp.description || 'Jetzt bestellen und sparen').slice(0, 90)
-      const shopUrl = process.env.SHOP_URL || process.env.NEXT_PUBLIC_SHOP_URL || 'https://andertal.de'
+      // 6 ── Keywords (BROAD match; at least one required for Search to show)
+      const keywordsToAdd = gadsKeywords.length > 0 ? gadsKeywords : ['online kaufen', 'produkte kaufen', camp.name || 'angebote']
+      const kwOps = keywordsToAdd.slice(0, 20).map(kwText => ({
+        create: {
+          adGroup: `customers/${cid}/adGroups/${adGroupId}`,
+          status: 'ENABLED',
+          keyword: { text: kwText.slice(0, 80), matchType: 'BROAD' },
+        }
+      }))
+      await gadsCall('adGroupCriteria', { operations: kwOps }, creds, token)
+
+      // 7 ── Responsive Search Ad
       await gadsCall('adGroupAds', {
         operations: [{ create: {
           adGroup: `customers/${cid}/adGroups/${adGroupId}`,
           status: 'ENABLED',
           ad: {
-            responsiveSearchAd: {
-              headlines: [
-                { text: headline },
-                { text: 'Jetzt entdecken' },
-                { text: 'Qualität online' },
-              ],
-              descriptions: [
-                { text: description },
-                { text: 'Schnelle Lieferung · Sichere Zahlung' },
-              ],
-            },
-            finalUrls: [shopUrl],
+            responsiveSearchAd: { headlines, descriptions },
+            finalUrls: [gadsFinalUrl],
           },
         }}]
       }, creds, token)
@@ -19636,16 +19724,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           }
         }
 
-        // If every platform failed — return error without updating DB
-        const allFailed = accounts.every(a => publishErrors.some(e => e.platform === a.platform))
-        if (allFailed) {
-          return res.status(502).json({
-            message: publishErrors[0]?.error || 'Alle Plattformen fehlgeschlagen',
-            errors: publishErrors,
-          })
-        }
-
-        const adStatus = publishErrors.length > 0 ? 'partial' : 'published'
+        const adStatus = publishErrors.length >= accounts.length ? 'draft' : (publishErrors.length > 0 ? 'partial' : 'published')
         const c2 = pgDbClient()
         await c2.connect()
         const r = await c2.query(
@@ -19653,11 +19732,15 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           [adStatus, JSON.stringify(externalIds), req.params.id]
         )
         await c2.end()
+        const successPlatforms = accounts.filter(a => !publishErrors.some(e => e.platform === a.platform)).map(a => a.platform)
         res.json({
           campaign: r.rows[0],
           budget_per_platform_cents: budgetPerPlatform,
-          platforms_published: accounts.filter(a => !publishErrors.some(e => e.platform === a.platform)).map(a => a.platform),
+          platforms_published: successPlatforms,
           errors: publishErrors.length ? publishErrors : undefined,
+          warning: publishErrors.length >= accounts.length
+            ? 'Externe Plattformen fehlgeschlagen — Kampagne ist intern aktiv. Zugangsdaten unter Apps & Integrationen prüfen.'
+            : undefined,
         })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
@@ -19679,6 +19762,58 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const r = await c.query(`UPDATE seller_campaigns SET ad_status='published', status='active', updated_at=now() WHERE id=$1 RETURNING *`, [req.params.id])
         if (!r.rows[0]) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
         await c.end(); res.json({ campaign: r.rows[0] })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    // ── Automation Rules (superuser only) ────────────────────────────────────────
+    const VALID_AUTOMATION_TYPES = ['review_request', 'welcome_email', 'reorder_reminder', 'abandoned_cart', 'low_stock_alert', 'loyalty_reward', 'price_drop_alert']
+
+    const ensureAutomationTable = async (client) => {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS admin_hub_automation_rules (
+          type TEXT PRIMARY KEY,
+          is_active BOOLEAN NOT NULL DEFAULT false,
+          config JSONB NOT NULL DEFAULT '{}',
+          triggered_count INTEGER NOT NULL DEFAULT 0,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `)
+    }
+
+    httpApp.get('/admin-hub/v1/automations', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const c = pgDbClient(); try {
+        await c.connect()
+        await ensureAutomationTable(c)
+        const r = await c.query(`SELECT * FROM admin_hub_automation_rules ORDER BY type`)
+        let statsRows = []
+        try {
+          const sr = await c.query(
+            `SELECT trigger_key AS type, COUNT(*)::int AS count FROM store_flow_execution_logs WHERE trigger_key = ANY($1) GROUP BY trigger_key`,
+            [VALID_AUTOMATION_TYPES]
+          )
+          statsRows = sr.rows
+        } catch (_) {}
+        await c.end()
+        res.json({ rules: r.rows, stats: statsRows })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
+    httpApp.put('/admin-hub/v1/automations/:type', requireSellerAuth, requireSuperuser, async (req, res) => {
+      const { type } = req.params
+      if (!VALID_AUTOMATION_TYPES.includes(type)) return res.status(400).json({ message: 'Invalid automation type' })
+      const { is_active, config } = req.body || {}
+      const c = pgDbClient(); try {
+        await c.connect()
+        await ensureAutomationTable(c)
+        const r = await c.query(
+          `INSERT INTO admin_hub_automation_rules (type, is_active, config, updated_at)
+           VALUES ($1, $2, $3, now())
+           ON CONFLICT (type) DO UPDATE SET is_active=$2, config=$3, updated_at=now()
+           RETURNING *`,
+          [type, is_active !== undefined ? Boolean(is_active) : false, JSON.stringify(config || {})]
+        )
+        await c.end()
+        res.json({ rule: r.rows[0] })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
@@ -20072,7 +20207,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       approval_status, company_name, authorized_person_name, tax_id, vat_id,
       business_address, warehouse_address, phone, website,
       documents, rejection_reason, approved_at, approved_by,
-      agreement_accepted, agreement_accepted_at, agreement_version, agreement_ip
+      agreement_accepted, agreement_accepted_at, agreement_version, agreement_ip,
+      signature_at, signature_ip, signature_data
     `
 
     // GET /admin-hub/v1/sellers — list all sellers (superuser only)
@@ -20615,6 +20751,302 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     })
     // ── End Verification Pipeline Routes ────────────────────────────────────
+
+    // ── Seller Agreement Signing Routes ─────────────────────────────────────
+    ;(() => {
+      const SIGN_SELLERCENTRAL_URL = (process.env.SELLERCENTRAL_URL || 'http://localhost:3002').replace(/\/$/, '')
+
+      const CONTRACT_SECTIONS_SIGN = {
+        de: [
+          { heading: 'Praeambel', body: 'Diese Vereinbarung regelt die Rechtsbeziehung zwischen dem Betreiber der Plattform Andertal (nachfolgend "Plattform") und dem registrierten Verkaeufer (nachfolgend "Verkaeufer"). Mit Abschluss der Verifizierung erklaert sich der Verkaeufer mit allen nachfolgenden Bedingungen einverstanden. Die Vereinbarung entspricht den Anforderungen der Verordnung (EU) 2022/2065 (Digital Services Act), der Verordnung (EU) 2019/1150 (P2B-Verordnung), der DSGVO sowie dem deutschen Buergerlichen Gesetzbuch (BGB).' },
+          { heading: 'SS 1 - Vertragsgegenstand', body: 'Die Plattform stellt dem Verkaeufer eine technische Infrastruktur zum Anbieten, Verwalten und Verkaufen von Waren gegenueber Endverbrauchern zur Verfuegung. Der Verkaeufer tritt als eigenverantwortlicher Haendler im eigenen Namen und auf eigene Rechnung auf. Die Plattform ist kein Vertragspartner der Kaufvertraege zwischen Verkaeufer und Endkunden.' },
+          { heading: 'SS 2 - Pflichten des Verkaefers', body: 'Der Verkaeufer verpflichtet sich:\n- Ausschliesslich legale Waren anzubieten und geltende Produktsicherheits-, Kennzeichnungs- und Verbraucherschutzvorschriften einzuhalten.\n- Vollstaendige und korrekte Geschaeftsdaten (Impressum, Steuernummer, IBAN) bereitzustellen und aktuell zu halten.\n- Bestellungen innerhalb der angegebenen Lieferfristen zu erfuellen und Kunden bei Verzoegerungen unverzueglich zu benachrichtigen.\n- Gesetzliche Gewaehrleistungsrechte (SS 434 ff. BGB) zu beachten und ein 14-taegiges Widerrufsrecht zu gewaehren.\n- Keine Preisabsprachen, Marktmanipulation oder unlauteren Wettbewerb zu betreiben (UWG).' },
+          { heading: 'SS 3 - Datenschutz (DSGVO)', body: 'Der Verkaeufer verarbeitet personenbezogene Daten von Endkunden (Name, Adresse, Bestelldaten) ausschliesslich zur Vertragserfuellung (Art. 6 Abs. 1 lit. b DSGVO). Eine Weitergabe an Dritte ohne Rechtsgrundlage ist untersagt. Auf Verlangen hat der Verkaeufer Betroffenenanfragen (Auskunft, Loeschung, Berichtigung) innerhalb von 30 Tagen zu beantworten.' },
+          { heading: 'SS 4 - Provisionen und Zahlungsbedingungen', body: 'Die Plattform erhebt eine Transaktionsgebuehr gemaess der zum Zeitpunkt des Verkaufs gueltigen Preisliste. Auszahlungen an den Verkaeufer erfolgen nach Auftragsabschluss und Ablauf einer eventuellen Rueckgabefrist. Die Plattform ist berechtigt, Betraege bei begruendeten Rueckforderungen (Chargebacks, Retouren, Betrug) einzubehalten. Bei Verzug mit Gebuehrenzahlungen werden Verzugszinsen gemaess SS 288 BGB faellig.' },
+          { heading: 'SS 5 - Ranking und Sichtbarkeit (P2B-Verordnung)', body: 'Gemaess Art. 5 der EU-Verordnung 2019/1150 informiert die Plattform ueber die wesentlichen Parameter des Ranking-Algorithmus: Produktqualitaet, Kundenbewertungen, Bestellabwicklungsrate, Preisgestaltung, Aktualitaet des Sortiments und Konto-Compliance. Bezahltes Ranking wird als solches gekennzeichnet.' },
+          { heading: 'SS 6 - Kontosperrung und Kuendigung', body: 'Die Plattform kann das Konto bei schwerwiegenden oder wiederholten Verstoessen gegen diese Vereinbarung, bei rechtlich bedenklichen Inhalten oder auf behoerdliche Anordnung hin sperren oder kuendigen. Vor einer Sperrung wird dem Verkaeufer, sofern moeglich, eine angemessene Frist zur Stellungnahme eingeraeumt. Der Verkaeufer kann das Konto jederzeit mit einer Frist von 30 Tagen kuendigen.' },
+          { heading: 'SS 7 - Haftungsbeschraenkung', body: 'Die Plattform haftet nicht fuer Schaeden, die durch fehlerhafte Produktangaben des Verkaefers, Lieferverzoegerungen, Produktmaengel oder sonstige Pflichtverletzungen des Verkaefers entstehen. Die Haftung der Plattform fuer mittelbare Schaeden und entgangenen Gewinn ist - ausser bei Vorsatz und grober Fahrlaessigkeit - ausgeschlossen.' },
+          { heading: 'SS 8 - Streitbeilegung', body: 'Streitigkeiten zwischen Plattform und Verkaeufer werden zunaechst intern ueber den Support-Kanal behandelt (support@andertal.com). Als externe Streitbeilegungsstelle steht das Online-Streitbeilegungsportal der EU (https://ec.europa.eu/consumers/odr/) zur Verfuegung. Es gilt deutsches Recht, Gerichtsstand ist Berlin.' },
+          { heading: 'SS 9 - Schlussbestimmungen', body: 'Aenderungen dieser Vereinbarung werden dem Verkaeufer mindestens 15 Tage vor Inkrafttreten in schriftlicher Form (E-Mail) mitgeteilt. Sollten einzelne Bestimmungen unwirksam sein, bleiben die uebrigen Bestimmungen wirksam. Letzte Aktualisierung: April 2026.' },
+        ],
+        tr: [
+          { heading: 'Oensoz', body: 'Bu sozlesme, Andertal platformunun isletmecisi ("Platform") ile kayitli satici ("Satici") arasindaki hukuki iliskiyi duzenler. AB Dijital Hizmetler Yasasi (DSA), P2B Tuzugu, GDPR ve Turk Ticaret Kanunu cercevesinde hazirlanmistir.' },
+          { heading: 'Madde 1 - Sozlesmenin Konusu', body: 'Platform, Saticiya son tuketicilere urun sunma, yonetme ve satma amacıyla teknik bir altyapi saglar. Satici, kendi adina ve kendi hesabina bagimsiz bir satici olarak hareket eder. Platform, Satici ile son musteri arasindaki satis sozlesmelerinin tarafi degildir.' },
+          { heading: 'Madde 2 - Saticinin Yukumlulukler', body: 'Satici sunlari taahhut eder:\n- Yalnizca yasal urunler sunmak ve gecerli mevzuata uymak.\n- Eksiksiz ve dogru ticari bilgiler (vergi numarasi, IBAN, adres) saglamak ve guncel tutmak.\n- Belirtilen teslimat surelerinde siparisleri yerine getirmek.\n- Yasal garanti haklarina ve 14 gunluk cayma hakkina uymak.\n- Fiyat anlasmalari veya haksiz rekabet yapmamak.' },
+          { heading: 'Madde 3 - Kisisel Verilerin Korunmasi (KVKK/GDPR)', body: 'Satici, son musterilere ait kisisel verileri yalnizca sozlesmenin ifasi amacıyla isler. Hukuki dayanak olmaksizin ucuncu taraflara veri aktarimi yasaktir. Veri sahibi talepleri 30 gun icinde yanitlanmalidir.' },
+          { heading: 'Madde 4 - Komisyonlar ve Odeme Kosullari', body: 'Platform, satis aninda gecerli fiyat listesine gore islem ucreti alir. Saticiya odemeler, siparis tamamlandiktan ve olasi iade suresi dolduktan sonra yapilir. Iade veya dolandiricilik durumlarinda Platform tutarlari alikoyma hakkini sakli tutar.' },
+          { heading: 'Madde 5 - Siralama ve Gorunurluk (P2B Tuzugu)', body: 'AB P2B Tuzugu Madde 5 uyarinca Platform, siralama algoritmasinin temel parametrelerini aciklar: urun kalitesi, musteri degerlendirmeleri, siparis karsilama orani, fiyatlandirma ve hesap uyumlulugu. Ucretli siralama ayrica belirtilir.' },
+          { heading: 'Madde 6 - Hesap Askiya Alma ve Fesih', body: 'Platform; agir veya tekrarlayan ihlaller, hukuka aykiri icerik veya yetkili makami karari durumunda hesabi askiya alabilir ya da feshedebilir. Satici hesabini 30 gun onceden bildirerek istedigi zaman feshedebilir.' },
+          { heading: 'Madde 7 - Sorumluluk Sinirlamasi', body: 'Platform; Saticinin hatali urun bilgilerinden, teslimat gecikmelerinden veya diger yukumluluk ihlallerinden kaynaklanan zararlardan sorumlu degildir.' },
+          { heading: 'Madde 8 - Uyusmazlik Cozumu', body: 'Uyusmazliklar once support@andertal.com uzerinden cozulmeye calisilir. Cozume kavusturulamazsa AB Cevrimici Uyusmazlik Cozum Platformu kullanilabilir. Yetkili mahkeme Berlindir.' },
+          { heading: 'Madde 9 - Son Hukumler', body: 'Bu sozlesmedeki degisiklikler yururluge girmeden en az 15 gun once Saticiya e-posta ile bildirilir. Son guncelleme: Nisan 2026.' },
+        ],
+        en: [
+          { heading: 'Preamble', body: 'This Agreement governs the legal relationship between the operator of the Andertal platform ("Platform") and the registered seller ("Seller"). It is prepared in compliance with the Digital Services Act (EU) 2022/2065, P2B Regulation (EU) 2019/1150, the GDPR, and applicable national law.' },
+          { heading: 'Article 1 - Subject Matter', body: 'The Platform provides the Seller with technical infrastructure to list, manage, and sell goods to end consumers. The Seller acts as an independent trader in their own name and on their own account. The Platform is not a party to sales contracts concluded between the Seller and end customers.' },
+          { heading: 'Article 2 - Seller Obligations', body: 'The Seller undertakes to:\n- Offer only lawful goods and comply with applicable regulations.\n- Provide complete and accurate business information and keep it up to date.\n- Fulfill orders within stated delivery times.\n- Respect statutory warranty rights and grant a 14-day right of withdrawal.\n- Refrain from price-fixing or unfair competition.' },
+          { heading: 'Article 3 - Data Protection (GDPR)', body: 'The Seller processes personal data of end customers solely for the purpose of contract performance (Art. 6(1)(b) GDPR). Transfer to third parties without a legal basis is prohibited. Data subject requests must be answered within 30 days.' },
+          { heading: 'Article 4 - Fees and Payment Terms', body: 'The Platform charges a transaction fee in accordance with the price list valid at the time of sale. Payouts are made after order completion and expiry of any return period. The Platform reserves the right to withhold amounts in cases of chargebacks, returns, or fraud.' },
+          { heading: 'Article 5 - Ranking and Visibility (P2B Regulation)', body: 'Pursuant to Art. 5 of EU Regulation 2019/1150, the Platform discloses the main parameters of its ranking algorithm: product quality, customer reviews, order fulfillment rate, pricing, and account compliance. Paid ranking is labeled as such.' },
+          { heading: 'Article 6 - Account Suspension and Termination', body: 'The Platform may suspend or terminate the account for serious or repeated violations. The Seller may terminate the account at any time with 30 days\' notice.' },
+          { heading: 'Article 7 - Limitation of Liability', body: 'The Platform is not liable for damages arising from incorrect product information, delivery delays, or other breaches by the Seller. Liability for indirect damages is excluded except in cases of intent or gross negligence.' },
+          { heading: 'Article 8 - Dispute Resolution', body: 'Disputes are first addressed via support@andertal.com. The EU ODR platform is available for unresolved disputes. German law applies; jurisdiction is Berlin.' },
+          { heading: 'Article 9 - Final Provisions', body: 'Changes to this Agreement will be communicated at least 15 days before taking effect. Last updated: April 2026.' },
+        ],
+      }
+
+      const signPdfDeLatin = (s) => {
+        if (s == null) return ''
+        return String(s)
+          .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
+          .replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue')
+          .replace(/ß/g, 'ss')
+          .replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ı/g, 'i').replace(/ç/g, 'c').replace(/İ/g, 'I').replace(/Ş/g, 'S').replace(/Ğ/g, 'G').replace(/Ç/g, 'C')
+          .replace(/é/g, 'e').replace(/è/g, 'e').replace(/ê/g, 'e').replace(/ë/g, 'e')
+          .replace(/à/g, 'a').replace(/â/g, 'a').replace(/á/g, 'a')
+          .replace(/ù/g, 'u').replace(/û/g, 'u').replace(/ú/g, 'u')
+          .replace(/ô/g, 'o').replace(/ò/g, 'o').replace(/ó/g, 'o')
+          .replace(/î/g, 'i').replace(/ï/g, 'i').replace(/í/g, 'i')
+          .replace(/ñ/g, 'n').replace(/ã/g, 'a').replace(/õ/g, 'o')
+      }
+
+      const buildAgreementPdf = async (seller, locale, signatureDataUrl, signedAt, signedIp) => {
+        const PDFDocument = require('pdfkit')
+        const sections = CONTRACT_SECTIONS_SIGN[locale] || CONTRACT_SECTIONS_SIGN.en
+        const signedDate = signedAt ? new Date(signedAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' }) : new Date().toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' })
+
+        return new Promise((resolve, reject) => {
+          try {
+            const doc = new PDFDocument({ margin: 48, size: 'A4', compress: false, pdfVersion: '1.7' })
+            const chunks = []
+            doc.on('data', (c) => chunks.push(c))
+            doc.on('end', () => resolve(Buffer.concat(chunks)))
+            doc.on('error', reject)
+
+            // Header
+            doc.fontSize(18).font('Helvetica-Bold').fillColor('#111').text(
+              locale === 'de' ? 'Haendler-Plattform-Vereinbarung' : locale === 'tr' ? 'Satici-Platform Sozlesmesi' : 'Seller-Platform Agreement',
+              { align: 'center' }
+            )
+            doc.moveDown(0.3)
+            doc.fontSize(9).font('Helvetica').fillColor('#666').text(
+              locale === 'de' ? 'Andertal Marketplace | Unterzeichnetes Exemplar' : locale === 'tr' ? 'Andertal Marketplace | Imzali Kopya' : 'Andertal Marketplace | Signed Copy',
+              { align: 'center' }
+            )
+            doc.moveDown(0.5)
+            doc.moveTo(48, doc.y).lineTo(547, doc.y).strokeColor('#ddd').lineWidth(0.5).stroke()
+            doc.moveDown(0.5)
+
+            // Contract sections
+            for (const sec of sections) {
+              doc.fontSize(10).font('Helvetica-Bold').fillColor('#111').text(signPdfDeLatin(sec.heading))
+              doc.moveDown(0.15)
+              doc.fontSize(9).font('Helvetica').fillColor('#333').text(signPdfDeLatin(sec.body), { lineGap: 2 })
+              doc.moveDown(0.5)
+            }
+
+            doc.moveDown(0.5)
+            doc.moveTo(48, doc.y).lineTo(547, doc.y).strokeColor('#ddd').lineWidth(0.5).stroke()
+            doc.moveDown(0.5)
+
+            // Signature block
+            const sigLabel = locale === 'de' ? 'Unterschrift' : locale === 'tr' ? 'Imza' : 'Signature'
+            const dateLabel = locale === 'de' ? 'Datum & Uhrzeit' : locale === 'tr' ? 'Tarih & Saat' : 'Date & Time'
+            const ipLabel = locale === 'de' ? 'IP-Adresse' : locale === 'tr' ? 'IP Adresi' : 'IP Address'
+            const nameLabel = locale === 'de' ? 'Name / Unternehmen' : locale === 'tr' ? 'Ad / Firma' : 'Name / Company'
+            const usernameLabel = locale === 'de' ? 'Benutzername' : locale === 'tr' ? 'Kullanici Adi' : 'Username'
+
+            doc.fontSize(10).font('Helvetica-Bold').fillColor('#111').text(
+              locale === 'de' ? 'Unterschriftsblock' : locale === 'tr' ? 'Imza Blogu' : 'Signature Block'
+            )
+            doc.moveDown(0.3)
+            doc.fontSize(9).font('Helvetica').fillColor('#333')
+            doc.text(`${dateLabel}: ${signPdfDeLatin(signedDate)}`)
+            doc.text(`${ipLabel}: ${signPdfDeLatin(signedIp || '—')}`)
+            doc.text(`${nameLabel}: ${signPdfDeLatin([seller.authorized_person_name, seller.company_name].filter(Boolean).join(' / ') || '—')}`)
+            doc.text(`${usernameLabel}: ${signPdfDeLatin(seller.seller_name || seller.email || '—')}`)
+            doc.moveDown(0.5)
+            doc.text(`${sigLabel}:`)
+            doc.moveDown(0.3)
+
+            if (signatureDataUrl && signatureDataUrl.startsWith('data:image/png;base64,')) {
+              const imgBuf = Buffer.from(signatureDataUrl.split(',')[1], 'base64')
+              doc.image(imgBuf, { fit: [200, 80], align: 'left' })
+              doc.moveDown(0.3)
+            }
+
+            doc.moveTo(48, doc.y).lineTo(248, doc.y).strokeColor('#999').lineWidth(0.5).stroke()
+            doc.moveDown(0.2)
+            doc.fontSize(8).fillColor('#666').text(signPdfDeLatin(`${seller.authorized_person_name || seller.seller_name || ''}, ${seller.company_name || ''}`), { width: 200 })
+
+            doc.end()
+          } catch (e) {
+            reject(e)
+          }
+        })
+      }
+
+      // POST /admin-hub/v1/seller/sign-token — create a signing session token + QR code
+      httpApp.post('/admin-hub/v1/seller/sign-token', requireSellerAuth, async (req, res) => {
+        const sellerUser = req.sellerUser
+        if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
+        try {
+          const crypto = require('crypto')
+          const QRCode = require('qrcode')
+          const { Client } = require('pg')
+          const token = crypto.randomBytes(32).toString('hex')
+          const locale = String(req.body?.locale || sellerUser.locale || 'de').slice(0, 10)
+          const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await client.connect()
+          await client.query(
+            `INSERT INTO seller_sign_tokens (token, seller_id, locale, ip) VALUES ($1, $2, $3, $4)`,
+            [token, String(sellerUser.id), locale, req.ip || null]
+          )
+          await client.end()
+          const signUrl = `${SIGN_SELLERCENTRAL_URL}/sign/${token}`
+          const qrDataUrl = await QRCode.toDataURL(signUrl, { width: 256, margin: 2 })
+          res.json({ token, sign_url: signUrl, qr_data_url: qrDataUrl })
+        } catch (e) {
+          console.error('sign-token:', e)
+          res.status(500).json({ message: e?.message || 'Error' })
+        }
+      })
+
+      // GET /public/sign/:token — load signing session (no auth, accessed from mobile)
+      httpApp.get('/public/sign/:token', async (req, res) => {
+        const token = String(req.params.token || '').trim()
+        if (!token) return res.status(400).json({ message: 'Token required' })
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
+        try {
+          const { Client } = require('pg')
+          const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await client.connect()
+          const tr = await client.query(
+            `SELECT st.*, su.company_name, su.authorized_person_name, su.store_name, su.email
+             FROM seller_sign_tokens st
+             JOIN seller_users su ON su.id = st.seller_id
+             WHERE st.token = $1 AND st.expires_at > now()`,
+            [token]
+          )
+          await client.end()
+          if (!tr.rows.length) return res.status(404).json({ message: 'Token not found or expired' })
+          const row = tr.rows[0]
+          if (row.used_at) return res.status(410).json({ message: 'Already signed', signed: true })
+          res.json({
+            valid: true,
+            locale: row.locale,
+            seller_name: row.store_name || row.email,
+            company_name: row.company_name,
+            authorized_person_name: row.authorized_person_name,
+          })
+        } catch (e) {
+          console.error('public-sign-get:', e)
+          res.status(500).json({ message: e?.message || 'Error' })
+        }
+      })
+
+      // POST /public/sign/:token — submit signature (no auth, from mobile)
+      httpApp.post('/public/sign/:token', async (req, res) => {
+        const token = String(req.params.token || '').trim()
+        if (!token) return res.status(400).json({ message: 'Token required' })
+        const signatureData = req.body?.signature_data
+        if (!signatureData || typeof signatureData !== 'string' || !signatureData.startsWith('data:image/png;base64,')) {
+          return res.status(400).json({ message: 'Valid signature_data (PNG base64 data URL) required' })
+        }
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
+        try {
+          const { Client } = require('pg')
+          const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await client.connect()
+          const tr = await client.query(
+            `SELECT st.*, su.company_name, su.authorized_person_name, su.store_name, su.email
+             FROM seller_sign_tokens st
+             JOIN seller_users su ON su.id = st.seller_id
+             WHERE st.token = $1 AND st.expires_at > now() AND st.used_at IS NULL`,
+            [token]
+          )
+          if (!tr.rows.length) {
+            await client.end()
+            return res.status(404).json({ message: 'Token not found, expired or already used' })
+          }
+          const row = tr.rows[0]
+          const signedAt = new Date()
+          const signedIp = req.ip || null
+
+          // Build and store PDF as base64 in DB
+          const pdfBuf = await buildAgreementPdf(
+            { company_name: row.company_name, authorized_person_name: row.authorized_person_name, seller_name: row.store_name, email: row.email },
+            row.locale,
+            signatureData,
+            signedAt,
+            signedIp
+          )
+          const pdfBase64 = 'data:application/pdf;base64,' + pdfBuf.toString('base64')
+
+          await client.query(
+            `UPDATE seller_users SET signature_data = $1, signature_at = $2, signature_ip = $3, agreement_pdf_url = $4 WHERE id = $5`,
+            [signatureData, signedAt, signedIp, pdfBase64, row.seller_id]
+          )
+          await client.query(`UPDATE seller_sign_tokens SET used_at = $1, ip = $2 WHERE token = $3`, [signedAt, signedIp, token])
+          await client.end()
+          res.json({ success: true })
+        } catch (e) {
+          console.error('public-sign-post:', e)
+          res.status(500).json({ message: e?.message || 'Error' })
+        }
+      })
+
+      // GET /admin-hub/v1/seller/sign-status — poll for signature completion
+      httpApp.get('/admin-hub/v1/seller/sign-status', requireSellerAuth, async (req, res) => {
+        const sellerUser = req.sellerUser
+        if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
+        try {
+          const { Client } = require('pg')
+          const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await client.connect()
+          const r = await client.query(`SELECT signature_at, agreement_pdf_url FROM seller_users WHERE id = $1`, [String(sellerUser.id)])
+          await client.end()
+          const row = r.rows[0] || {}
+          res.json({ signed: !!row.signature_at, signature_at: row.signature_at || null, has_pdf: !!row.agreement_pdf_url })
+        } catch (e) {
+          res.status(500).json({ message: e?.message || 'Error' })
+        }
+      })
+
+      // GET /admin-hub/v1/seller/agreement-pdf — download signed PDF (seller or superuser)
+      httpApp.get('/admin-hub/v1/seller/agreement-pdf', requireSellerAuth, async (req, res) => {
+        const sellerUser = req.sellerUser
+        if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+        const targetSellerId = req.query.seller_id && sellerUser.is_superuser ? String(req.query.seller_id) : String(sellerUser.id)
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
+        try {
+          const { Client } = require('pg')
+          const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await client.connect()
+          const r = await client.query(`SELECT agreement_pdf_url FROM seller_users WHERE id = $1`, [targetSellerId])
+          await client.end()
+          const pdfData = r.rows[0]?.agreement_pdf_url
+          if (!pdfData) return res.status(404).json({ message: 'No signed agreement found' })
+          if (pdfData.startsWith('data:application/pdf;base64,')) {
+            const buf = Buffer.from(pdfData.split(',')[1], 'base64')
+            res.set('Content-Type', 'application/pdf')
+            res.set('Content-Disposition', 'attachment; filename="andertal-agreement.pdf"')
+            return res.send(buf)
+          }
+          res.status(500).json({ message: 'Invalid PDF data' })
+        } catch (e) {
+          res.status(500).json({ message: e?.message || 'Error' })
+        }
+      })
+    })()
+    // ── End Seller Agreement Signing Routes ──────────────────────────────────
 
     // ── Stripe Connect Routes ────────────────────────────────────────────────
     const SELLERCENTRAL_URL = (process.env.SELLERCENTRAL_URL || 'http://localhost:3002').replace(/\/$/, '')

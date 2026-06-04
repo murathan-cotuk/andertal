@@ -24,6 +24,9 @@ import {
   BID_OPTIONS,
   TARGET_OPTIONS,
   SHOP_GOAL_OPTIONS,
+  CAMPAIGN_LOCALES,
+  GEO_TARGET_OPTIONS,
+  LANGUAGE_TARGET_OPTIONS,
   parseCampaignToForm,
   mergeCampaignSettings,
   fmtBudget,
@@ -32,6 +35,8 @@ import { resolveImageUrl } from "@/lib/image-url";
 
 const VIDEO_ACCEPT = "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov";
 const VIDEO_MAX_BYTES = 120 * 1024 * 1024;
+const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif";
+const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 const AUDIENCE_OPTIONS = [
   "Sommer-Käufer",
@@ -311,6 +316,98 @@ function CampaignVideoSlot({
   );
 }
 
+function CampaignImageSlot({ url, uploading, onSelectFile, onClear }) {
+  const inputRef = useRef(null);
+  const resolved = url ? resolveImageUrl(url) : "";
+
+  return (
+    <div style={{ borderRadius: 18, border: shell.border, padding: 20, background: "linear-gradient(165deg, #fafbff 0%, #ffffff 52%, #f8fafc 100%)", boxShadow: shell.cardShadow }}>
+      <InlineStack align="space-between" blockAlign="start" wrap>
+        <BlockStack gap="100">
+          <Text as="span" variant="headingSm">Kampagnenbild · Banner</Text>
+          <p style={{ margin: 0, fontSize: 13, color: "#475569", lineHeight: 1.5 }}>Wird als Thumbnail oder Banner im Shop und auf externen Kanälen eingesetzt.</p>
+          <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>JPG / PNG / WebP · min. 800 × 600 px · max. 10 MB</p>
+        </BlockStack>
+        <Badge tone="info">Bild</Badge>
+      </InlineStack>
+
+      <div style={{ marginTop: 16, width: "100%", aspectRatio: "16/9", borderRadius: 14, overflow: "hidden", background: "linear-gradient(145deg, #0f172a 0%, #1e293b 55%, #312e81 120%)", border: "1px solid rgba(148,163,184,0.35)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 168 }}>
+        {resolved ? (
+          <img src={resolved} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", maxHeight: 320 }} />
+        ) : (
+          <button type="button" disabled={uploading} onClick={() => inputRef.current?.click()} style={{ width: "100%", height: "100%", minHeight: 168, border: "none", background: "transparent", cursor: uploading ? "wait" : "pointer", color: "rgba(248,250,252,0.92)", fontSize: 14, fontWeight: 650, padding: 16 }}>
+            {uploading ? "Wird hochgeladen …" : "+ Bild hinzufügen"}
+          </button>
+        )}
+      </div>
+
+      <input ref={inputRef} type="file" accept={IMAGE_ACCEPT} style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) onSelectFile(f); e.target.value = ""; }} />
+
+      <InlineStack gap="300" wrap blockAlign="center">
+        <div style={{ marginTop: 14 }}>
+          <Button size="slim" disabled={uploading} onClick={() => inputRef.current?.click()}>
+            {resolved ? "Bild ersetzen" : "Datei wählen"}
+          </Button>
+        </div>
+        {resolved ? (
+          <div style={{ marginTop: 14 }}>
+            <Button size="slim" tone="critical" variant="plain" disabled={uploading} onClick={onClear}>Entfernen</Button>
+          </div>
+        ) : null}
+      </InlineStack>
+    </div>
+  );
+}
+
+function LocaleContentEditor({ localeContent, onChange }) {
+  const [activeLocale, setActiveLocale] = useState("de");
+  const current = localeContent[activeLocale] || { name: "", description: "" };
+
+  const setLocaleField = (field, value) => {
+    onChange({ ...localeContent, [activeLocale]: { ...current, [field]: value } });
+  };
+
+  return (
+    <BlockStack gap="300">
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {CAMPAIGN_LOCALES.map((loc) => {
+          const hasContent = localeContent[loc.code]?.name || localeContent[loc.code]?.description;
+          return (
+            <button
+              key={loc.code}
+              type="button"
+              onClick={() => setActiveLocale(loc.code)}
+              style={{
+                padding: "5px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                border: `1px solid ${activeLocale === loc.code ? shell.accent : "#e2e8f0"}`,
+                background: activeLocale === loc.code ? shell.accentSoft : "#fff",
+                color: activeLocale === loc.code ? "#4338ca" : (hasContent ? "#334155" : "#94a3b8"),
+              }}
+            >
+              {loc.label}{hasContent ? " ✓" : ""}
+            </button>
+          );
+        })}
+      </div>
+      <TextField
+        label={`Kampagnenname (${CAMPAIGN_LOCALES.find(l => l.code === activeLocale)?.label})`}
+        value={current.name}
+        onChange={(v) => setLocaleField("name", v)}
+        placeholder="Kampagnenname in dieser Sprache …"
+        autoComplete="off"
+      />
+      <TextField
+        label={`Beschreibung (${CAMPAIGN_LOCALES.find(l => l.code === activeLocale)?.label})`}
+        value={current.description}
+        onChange={(v) => setLocaleField("description", v)}
+        placeholder="Kurzbeschreibung für diese Sprache …"
+        multiline={3}
+        autoComplete="off"
+      />
+    </BlockStack>
+  );
+}
+
 export default function MarketingPpcCampaignEditorPage({ campaignId }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -324,6 +421,8 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
   const [form, setForm] = useState(() => parseCampaignToForm({}));
   const [productSearch, setProductSearch] = useState("");
   const [videoUploadSlot, setVideoUploadSlot] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [expandedProductId, setExpandedProductId] = useState(null);
   const [keywordInput, setKeywordInput] = useState("");
 
   useEffect(() => {
@@ -402,6 +501,14 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
     });
   };
 
+  const toggleVariant = (variantId) => {
+    setForm((prev) => {
+      const ids = new Set(prev.variant_ids || []);
+      if (ids.has(variantId)) ids.delete(variantId); else ids.add(variantId);
+      return { ...prev, variant_ids: Array.from(ids) };
+    });
+  };
+
   const toggleGroup = (id) => {
     setForm((prev) => {
       const ids = new Set(prev.group_ids);
@@ -469,6 +576,34 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
     }
   };
 
+  const uploadCampaignImage = async (file) => {
+    const okMime = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type || "");
+    const okExt = /\.(jpg|jpeg|png|webp|gif)$/i.test(file.name || "");
+    if (!okMime && !okExt) {
+      setMsg({ tone: "warning", text: "Bitte JPG, PNG oder WebP verwenden." });
+      return;
+    }
+    if (file.size > IMAGE_MAX_BYTES) {
+      setMsg({ tone: "warning", text: "Bild maximal 10 MB." });
+      return;
+    }
+    setImageUploading(true);
+    setMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await getMedusaAdminClient().uploadMedia(fd, { purpose: "campaign_image" });
+      const u = r?.url;
+      if (!u) throw new Error("Keine URL zurückgegeben.");
+      setField("seller_image_url", u);
+      setMsg({ tone: "success", text: "Bild hochgeladen. Änderungen mit Speichern übernehmen." });
+    } catch (e) {
+      setMsg({ tone: "critical", text: e?.message || "Upload fehlgeschlagen." });
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
   const save = async () => {
     if (!form.name.trim()) {
       setMsg({ tone: "warning", text: "Bitte einen Kampagnennamen eingeben." });
@@ -489,6 +624,15 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
         seller_creative_note: form.seller_creative_note,
         seller_video_shop_url: form.seller_video_shop_url || "",
         seller_video_reels_url: form.seller_video_reels_url || "",
+        seller_image_url: form.seller_image_url || "",
+        locale_content: form.locale_content || {},
+        gads_headlines: form.gads_headlines || [],
+        gads_descriptions: form.gads_descriptions || [],
+        gads_keywords: form.gads_keywords || [],
+        gads_final_url: form.gads_final_url || "",
+        gads_geo_targets: form.gads_geo_targets || ["2276"],
+        gads_target_language: form.gads_target_language || "1001",
+        gads_cpc_bid_cents: form.gads_cpc_bid_cents ?? 50,
       });
 
       const basePayload = {
@@ -497,7 +641,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
         target_type: form.target_type,
         product_ids: form.product_ids,
         group_ids: form.group_ids,
-        variant_ids: [],
+        variant_ids: form.variant_ids || [],
         budget_daily_cents: Math.round(budgetEuro * 100),
         start_at: form.start_at ? new Date(form.start_at).toISOString() : null,
         end_at: form.end_at ? new Date(form.end_at).toISOString() : null,
@@ -807,7 +951,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 </BlockStack>
               </div>
 
-              {/* Step 2 — Videos */}
+              {/* Step 2 — Medien */}
               <div
                 style={{
                   borderRadius: shell.cardRadius,
@@ -819,19 +963,19 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
               >
                 <StepHeader
                   step={2}
-                  title="Video-Creative"
+                  title="Medien-Creative"
                   subtitle={
                     sellerExperience
-                      ? "Zwei Formate: eines für maximale Präsenz im Shop, eines für vertikale Social-Werbung."
-                      : "Verkäufer-Assets: Shop-Highlight (16:9) und vertikales Reels-Format."
+                      ? "Bild und Videos für die Kampagne — für maximale Sichtbarkeit im Shop und auf Social Media."
+                      : "Verkäufer-Assets: Bild, Shop-Highlight (16:9) und vertikales Reels-Format."
                   }
                 />
                 {sellerExperience ? (
                   <div style={{ marginBottom: 20 }}>
                     <Banner tone="warning">
                       <p style={{ margin: 0, lineHeight: 1.55 }}>
-                        <strong>Gutes Creative wird zusätzlich ausgespielt:</strong> Wenn deine Videos überzeugen, können wir sie neben dem Shop
-                        auch in bezahlten <strong>Social-Media</strong>-Kampagnen (Reels / Stories) einsetzen.
+                        <strong>Gutes Creative wird zusätzlich ausgespielt:</strong> Wenn deine Medien überzeugen, können wir sie neben dem Shop
+                        auch in bezahlten <strong>Social-Media</strong>-Kampagnen einsetzen.
                       </p>
                     </Banner>
                   </div>
@@ -844,10 +988,18 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 )}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 22 }}>
                   <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+                    <CampaignImageSlot
+                      url={form.seller_image_url}
+                      uploading={imageUploading}
+                      onSelectFile={uploadCampaignImage}
+                      onClear={() => setField("seller_image_url", "")}
+                    />
+                  </div>
+                  <div style={{ flex: "1 1 320px", minWidth: 0 }}>
                     <CampaignVideoSlot
                       title="Shop-Highlight · 16 : 9"
                       badge="Im Shop prominent"
-                      roleLine="Dieses Format wird im Marktplatz groß und bildzentriert ausgespielt — maximale Aufmerksamkeit für deine Kampagne."
+                      roleLine="Dieses Format wird im Marktplatz groß ausgespielt — maximale Aufmerksamkeit für deine Kampagne."
                       specsLine="Empfehlung: 1920 × 1080 px oder höher · MP4 (H.264) · max. 120 MB"
                       aspectMode="169"
                       url={form.seller_video_shop_url}
@@ -872,7 +1024,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 </div>
               </div>
 
-              {/* Step 3 */}
+              {/* Step 2.5 — Dil bazlı içerik */}
               <div
                 style={{
                   borderRadius: shell.cardRadius,
@@ -883,7 +1035,28 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 }}
               >
                 <StepHeader
-                  step={3}
+                  step={sellerExperience ? 3 : 3}
+                  title="Mehrsprachiger Inhalt"
+                  subtitle="Kampagnenname und Beschreibung je Sprache — wird je nach Kundensprache ausgespielt."
+                />
+                <LocaleContentEditor
+                  localeContent={form.locale_content || {}}
+                  onChange={(v) => setField("locale_content", v)}
+                />
+              </div>
+
+              {/* Step 4 */}
+              <div
+                style={{
+                  borderRadius: shell.cardRadius,
+                  border: shell.border,
+                  background: "#fff",
+                  boxShadow: shell.cardShadow,
+                  padding: "26px 26px 28px",
+                }}
+              >
+                <StepHeader
+                  step={4}
                   title="Budget & Laufzeit"
                   subtitle={
                     sellerExperience
@@ -931,7 +1104,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                     padding: "26px 26px 28px",
                   }}
                 >
-                  <StepHeader step={4} title="Externe Ausspielung (Admin)" subtitle="Plattform-Zuweisung nur für Team mit verbundenen Konten." />
+                  <StepHeader step={5} title="Externe Ausspielung (Admin)" subtitle="Plattform-Zuweisung nur für Team mit verbundenen Konten." />
                   <BlockStack gap="300">
                     <Text tone="subdued" as="p" variant="bodySm">
                       Budget {form.budget_daily_cents ? `${form.budget_daily_cents} €/Tag` : "—"} auf {form.ad_platforms.length || "keine"} Kanäle.
@@ -967,7 +1140,193 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 </div>
               )}
 
-              {/* Step 4/5 */}
+              {/* Google Ads Details */}
+              <div
+                style={{
+                  borderRadius: shell.cardRadius,
+                  border: "1px solid #dbeafe",
+                  background: "#f0f7ff",
+                  boxShadow: shell.cardShadow,
+                  padding: "26px 26px 28px",
+                }}
+              >
+                <StepHeader
+                  step={isSuperuser ? 6 : 5}
+                  title="Google Ads Details"
+                  subtitle="Diese Informationen werden direkt für die automatische Google Ads Kampagnenerstellung verwendet. Ohne Keywords und Anzeigentexte werden keine Suchanzeigen ausgespielt."
+                />
+
+                {/* Keywords */}
+                <BlockStack gap="400">
+                  <div>
+                    <Text as="span" variant="bodyMd" fontWeight="semibold">Keywords (Suchwörter) *</Text>
+                    <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#475569" }}>
+                      Wörter, nach denen potenzielle Kunden suchen. Empfehlung: 5–20 relevante Keywords. Trennung per Enter oder Komma.
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8, minHeight: 32 }}>
+                      {(form.gads_keywords || []).map((kw, i) => (
+                        <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 20, background: "#dbeafe", color: "#1d4ed8", fontSize: 12, fontWeight: 600 }}>
+                          {kw}
+                          <button type="button" onClick={() => setField("gads_keywords", (form.gads_keywords || []).filter((_, j) => j !== i))} style={{ border: "none", background: "none", cursor: "pointer", color: "#3b82f6", fontWeight: 700, padding: 0, lineHeight: 1 }}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="Keyword eingeben, Enter drücken …"
+                        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, outline: "none" }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === ",") {
+                            e.preventDefault();
+                            const val = e.target.value.trim().replace(/,$/, "");
+                            if (val && !(form.gads_keywords || []).includes(val)) {
+                              setField("gads_keywords", [...(form.gads_keywords || []), val]);
+                            }
+                            e.target.value = "";
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          if (val && !(form.gads_keywords || []).includes(val)) {
+                            setField("gads_keywords", [...(form.gads_keywords || []), val]);
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                    </div>
+                    {(form.gads_keywords || []).length === 0 && (
+                      <p style={{ margin: "6px 0 0", fontSize: 11, color: "#dc2626" }}>⚠ Ohne Keywords werden Suchanzeigen nicht ausgespielt.</p>
+                    )}
+                  </div>
+
+                  {/* Headlines */}
+                  <div>
+                    <Text as="span" variant="bodyMd" fontWeight="semibold">Anzeigentitel (Headlines) *</Text>
+                    <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#475569" }}>
+                      Mindestens 3 Titel erforderlich, max. 15. Jeder max. <strong>30 Zeichen</strong>. Google wählt die beste Kombination.
+                    </p>
+                    <BlockStack gap="200">
+                      {Array.from({ length: 7 }).map((_, i) => {
+                        const val = (form.gads_headlines || [])[i] || "";
+                        const isRequired = i < 3;
+                        const charCount = val.length;
+                        const overLimit = charCount > 30;
+                        return (
+                          <div key={i} style={{ position: "relative" }}>
+                            <input
+                              type="text"
+                              maxLength={30}
+                              value={val}
+                              placeholder={isRequired ? `Titel ${i + 1} (Pflichtfeld)` : `Titel ${i + 1} (optional)`}
+                              style={{ width: "100%", padding: "8px 52px 8px 12px", borderRadius: 8, border: `1px solid ${overLimit ? "#f87171" : (isRequired && !val ? "#fcd34d" : "#cbd5e1")}`, fontSize: 13, boxSizing: "border-box", outline: "none" }}
+                              onChange={(e) => {
+                                const updated = [...(form.gads_headlines || [])];
+                                updated[i] = e.target.value;
+                                while (updated.length > 0 && !updated[updated.length - 1]) updated.pop();
+                                setField("gads_headlines", updated);
+                              }}
+                            />
+                            <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: overLimit ? "#dc2626" : "#94a3b8", fontWeight: 600 }}>{charCount}/30</span>
+                          </div>
+                        );
+                      })}
+                    </BlockStack>
+                    {(form.gads_headlines || []).filter(h => h?.trim()).length < 3 && (
+                      <p style={{ margin: "6px 0 0", fontSize: 11, color: "#dc2626" }}>⚠ Mindestens 3 Titel erforderlich.</p>
+                    )}
+                  </div>
+
+                  {/* Descriptions */}
+                  <div>
+                    <Text as="span" variant="bodyMd" fontWeight="semibold">Anzeigenbeschreibungen *</Text>
+                    <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#475569" }}>
+                      Mindestens 2 Beschreibungen, max. 4. Jede max. <strong>90 Zeichen</strong>.
+                    </p>
+                    <BlockStack gap="200">
+                      {Array.from({ length: 4 }).map((_, i) => {
+                        const val = (form.gads_descriptions || [])[i] || "";
+                        const isRequired = i < 2;
+                        const charCount = val.length;
+                        const overLimit = charCount > 90;
+                        return (
+                          <div key={i} style={{ position: "relative" }}>
+                            <input
+                              type="text"
+                              maxLength={90}
+                              value={val}
+                              placeholder={isRequired ? `Beschreibung ${i + 1} (Pflichtfeld)` : `Beschreibung ${i + 1} (optional)`}
+                              style={{ width: "100%", padding: "8px 56px 8px 12px", borderRadius: 8, border: `1px solid ${overLimit ? "#f87171" : (isRequired && !val ? "#fcd34d" : "#cbd5e1")}`, fontSize: 13, boxSizing: "border-box", outline: "none" }}
+                              onChange={(e) => {
+                                const updated = [...(form.gads_descriptions || [])];
+                                updated[i] = e.target.value;
+                                while (updated.length > 0 && !updated[updated.length - 1]) updated.pop();
+                                setField("gads_descriptions", updated);
+                              }}
+                            />
+                            <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: overLimit ? "#dc2626" : "#94a3b8", fontWeight: 600 }}>{charCount}/90</span>
+                          </div>
+                        );
+                      })}
+                    </BlockStack>
+                  </div>
+
+                  {/* Final URL */}
+                  <TextField
+                    label="Ziel-URL (Landing Page)"
+                    value={form.gads_final_url || ""}
+                    onChange={(v) => setField("gads_final_url", v)}
+                    placeholder="https://andertal.de/..."
+                    helpText="Leer lassen, um die Shop-Startseite zu verwenden."
+                    autoComplete="off"
+                  />
+
+                  {/* Geo + Language */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div>
+                      <Text as="span" variant="bodyMd" fontWeight="semibold">Zielregionen</Text>
+                      <p style={{ margin: "4px 0 8px", fontSize: 12, color: "#64748b" }}>Mehrfachauswahl möglich.</p>
+                      <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+                        {GEO_TARGET_OPTIONS.map((g) => {
+                          const checked = (form.gads_geo_targets || []).includes(g.value);
+                          return (
+                            <label key={g.value} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", cursor: "pointer", background: checked ? "#eff6ff" : "#fff", borderBottom: "1px solid #f1f5f9" }}>
+                              <CustomCheckbox checked={checked} onChange={() => {
+                                const cur = new Set(form.gads_geo_targets || []);
+                                if (cur.has(g.value)) cur.delete(g.value); else cur.add(g.value);
+                                setField("gads_geo_targets", Array.from(cur));
+                              }} size={16} />
+                              <span style={{ fontSize: 13 }}>{g.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <Select
+                        label="Zielsprache"
+                        options={LANGUAGE_TARGET_OPTIONS}
+                        value={form.gads_target_language || "1001"}
+                        onChange={(v) => setField("gads_target_language", v)}
+                      />
+                      <div style={{ marginTop: 16 }}>
+                        <TextField
+                          label="Max. CPC Gebot (Cent)"
+                          type="number"
+                          min="10"
+                          step="5"
+                          value={String(form.gads_cpc_bid_cents ?? 50)}
+                          onChange={(v) => setField("gads_cpc_bid_cents", Number(v) || 50)}
+                          helpText="z.B. 50 = 0,50 € pro Klick. Empfehlung: 30–200 Cent."
+                          autoComplete="off"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </BlockStack>
+              </div>
+
+              {/* Step 4/5 — Produkte */}
               <div
                 style={{
                   borderRadius: shell.cardRadius,
@@ -978,7 +1337,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 }}
               >
                 <StepHeader
-                  step={isSuperuser ? 5 : 4}
+                  step={isSuperuser ? 7 : 6}
                   title="Produkte im Fokus"
                   subtitle={
                     sellerExperience
@@ -1004,7 +1363,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                     </div>
                     <div
                       style={{
-                        maxHeight: 380,
+                        maxHeight: 460,
                         overflowY: "auto",
                         border: "1px solid #e2e8f0",
                         borderRadius: 14,
@@ -1013,28 +1372,55 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                     >
                       {filteredProducts.map((p) => {
                         const checked = form.product_ids.includes(p.id);
+                        const rawVariants = p.variants;
+                        const variants = Array.isArray(rawVariants)
+                          ? rawVariants
+                          : (typeof rawVariants === "string" ? (() => { try { return JSON.parse(rawVariants); } catch { return []; } })() : []);
+                        const hasVariants = variants.length > 0;
+                        const isExpanded = expandedProductId === p.id;
                         return (
-                          <label
-                            key={p.id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 12,
-                              padding: "11px 14px",
-                              cursor: "pointer",
-                              background: checked ? "#eef2ff" : "#fff",
-                              borderBottom: "1px solid #f1f5f9",
-                              transition: "background 0.12s",
-                            }}
-                          >
-                            <CustomCheckbox checked={checked} onChange={() => toggleProduct(p.id)} size={18} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: checked ? 650 : 500, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {p.title || p.id}
+                          <div key={p.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", background: checked ? "#eef2ff" : "#fff", transition: "background 0.12s" }}>
+                              <CustomCheckbox checked={checked} onChange={() => toggleProduct(p.id)} size={18} />
+                              <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => toggleProduct(p.id)}>
+                                <div style={{ fontSize: 13, fontWeight: checked ? 650 : 500, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {p.title || p.id}
+                                </div>
+                                {p.ean && <div style={{ fontSize: 11, color: "#64748b" }}>EAN {p.ean}</div>}
                               </div>
-                              {p.ean && <div style={{ fontSize: 11, color: "#64748b" }}>EAN {p.ean}</div>}
+                              {hasVariants && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedProductId(isExpanded ? null : p.id)}
+                                  style={{ fontSize: 11, color: "#6366f1", background: "none", border: "1px solid #e0e7ff", borderRadius: 6, padding: "3px 8px", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                                >
+                                  {isExpanded ? "▲" : "▼"} {variants.length} Var.
+                                </button>
+                              )}
                             </div>
-                          </label>
+                            {hasVariants && isExpanded && (
+                              <div style={{ background: "#f8f9ff", borderTop: "1px solid #e0e7ff" }}>
+                                {variants.map((v) => {
+                                  const vid = v.id || v.sku || String(v);
+                                  const vChecked = (form.variant_ids || []).includes(vid);
+                                  const vLabel = [v.title, v.sku, v.ean].filter(Boolean).join(" · ") || vid;
+                                  return (
+                                    <label key={vid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px 8px 36px", cursor: "pointer", background: vChecked ? "#eef2ff" : "transparent", borderBottom: "1px solid #eff0fb" }}>
+                                      <CustomCheckbox checked={vChecked} onChange={() => toggleVariant(vid)} size={16} />
+                                      <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontSize: 12, fontWeight: vChecked ? 650 : 400, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {vLabel}
+                                        </div>
+                                        {v.price_cents != null && (
+                                          <div style={{ fontSize: 11, color: "#64748b" }}>{(v.price_cents / 100).toFixed(2)} €</div>
+                                        )}
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>

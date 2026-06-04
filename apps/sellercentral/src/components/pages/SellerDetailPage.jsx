@@ -204,6 +204,7 @@ export default function SellerDetailPage({ sellerId }) {
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [pdfDownloading, setPdfDownloading] = useState(false);
 
   // Approval modal
   const [approveModal, setApproveModal] = useState(false);
@@ -371,6 +372,23 @@ ${"=".repeat(50)}
     a.download = `provisionsnote-${seller.seller_id}-${payout.period_start}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const downloadSellerPdf = async () => {
+    setPdfDownloading(true);
+    try {
+      const blob = await client.downloadAgreementPdf(sellerId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `andertal-agreement-${sellerId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setMsg({ type: "critical", text: e?.message || "PDF download failed." });
+    } finally {
+      setPdfDownloading(false);
+    }
   };
 
   if (loading) return (
@@ -768,6 +786,31 @@ ${"=".repeat(50)}
                       <InfoRow label="Akzeptiert am" value={fmtDate(seller.agreement_accepted_at)} />
                       <InfoRow label="Version" value={seller.agreement_version} />
                       <InfoRow label="IP" value={seller.agreement_ip} />
+                      <div style={{ marginTop: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+                        <Text as="h4" variant="headingSm">Handschriftliche Unterschrift</Text>
+                        {seller.signature_at ? (
+                          <BlockStack gap="100">
+                            <InfoRow label="Unterzeichnet am" value={new Date(seller.signature_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "medium" })} />
+                            <InfoRow label="Unterschrift-IP" value={seller.signature_ip} />
+                            {seller.signature_data && (
+                              <div style={{ marginTop: 6 }}>
+                                <img
+                                  src={seller.signature_data}
+                                  alt="Unterschrift"
+                                  style={{ border: "1px solid #e5e7eb", borderRadius: 6, maxWidth: 240, maxHeight: 80, display: "block" }}
+                                />
+                              </div>
+                            )}
+                            <div style={{ marginTop: 6 }}>
+                              <Button size="slim" onClick={downloadSellerPdf} loading={pdfDownloading}>
+                                Unterzeichnetes PDF herunterladen
+                              </Button>
+                            </div>
+                          </BlockStack>
+                        ) : (
+                          <Text as="p" variant="bodySm" tone="subdued">Noch keine handschriftliche Unterschrift vorhanden.</Text>
+                        )}
+                      </div>
                     </BlockStack>
                     <BlockStack gap="100">
                       <Text as="h3" variant="headingSm">Geschäftsadresse</Text>

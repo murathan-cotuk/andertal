@@ -230,7 +230,14 @@ export default function MarketingCampaignsPage() {
       const r = await getMedusaAdminClient().publishCampaign(id);
       const count = r?.platforms_published?.length || 0;
       const budgetPerPlatform = r?.budget_per_platform_cents ? `${(r.budget_per_platform_cents / 100).toFixed(2)} €` : "";
-      setMsg({ tone: "success", text: `Kampagne auf ${count} Plattform(en) veröffentlicht.${budgetPerPlatform ? ` Budget je Plattform: ${budgetPerPlatform}/Tag.` : ""}` });
+      const errDetail = r?.errors?.length ? ` Fehler: ${r.errors.map(e => `${e.platform}: ${e.error}`).join(" | ")}` : "";
+      if (r?.warning) {
+        setMsg({ tone: "warning", text: r.warning + errDetail });
+      } else if (count > 0) {
+        setMsg({ tone: "success", text: `Kampagne auf ${count} Plattform(en) veröffentlicht.${budgetPerPlatform ? ` Budget je Plattform: ${budgetPerPlatform}/Tag.` : ""}${errDetail}` });
+      } else {
+        setMsg({ tone: "warning", text: `Kampagne intern aktiviert, externe Plattformen fehlgeschlagen.${errDetail}` });
+      }
       await load();
     } catch (e) {
       setMsg({ tone: "critical", text: e?.message || "Fehler beim Veröffentlichen." });

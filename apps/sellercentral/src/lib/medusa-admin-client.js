@@ -1393,6 +1393,27 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/verification/start', { method: 'POST', body: JSON.stringify({}) })
   }
 
+  /** Create a sign token + QR code for agreement signing */
+  async createSignToken(locale) {
+    return this.request('/admin-hub/v1/seller/sign-token', { method: 'POST', body: JSON.stringify({ locale }) })
+  }
+
+  /** Poll for signature completion */
+  async getSignStatus() {
+    return this.request('/admin-hub/v1/seller/sign-status')
+  }
+
+  /** Fetch the signed agreement PDF as a Blob (for download triggers) */
+  async downloadAgreementPdf(sellerId) {
+    const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
+    const token = typeof window !== 'undefined' ? (localStorage.getItem('sellerToken') || '') : ''
+    const qs = sellerId ? `?seller_id=${encodeURIComponent(sellerId)}` : ''
+    const url = `${base}/admin-hub/v1/seller/agreement-pdf${qs}`
+    const resp = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    if (!resp.ok) throw new Error(`PDF download failed: ${resp.status}`)
+    return resp.blob()
+  }
+
   /** Get verification status (seller: own, superuser: pass seller_id query param) */
   async getVerificationStatus(sellerId) {
     const qs = sellerId ? `?seller_id=${encodeURIComponent(sellerId)}` : ''
