@@ -20928,7 +20928,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             [token, String(sellerUser.id), locale, req.ip || null]
           )
           await client.end()
-          const sellercentralUrl = (process.env.SELLERCENTRAL_URL || 'http://localhost:3002').replace(/\/$/, '')
+          const sellercentralUrl = (process.env.NEXT_PUBLIC_SELLERCENTRAL_URL || process.env.SELLERCENTRAL_PUBLIC_URL || 'https://sellercentral.andertal.com').replace(/\/$/, '')
           const signUrl = `${sellercentralUrl}/sign/${token}`
           const qrDataUrl = await QRCode.toDataURL(signUrl, { width: 256, margin: 2 })
           res.json({ token, sign_url: signUrl, qr_data_url: qrDataUrl })
