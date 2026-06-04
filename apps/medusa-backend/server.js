@@ -18693,7 +18693,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 country: 'DE',
                 email,
                 capabilities: { transfers: { requested: true } },
-                tos_acceptance: { service_agreement: 'recipient', date: Math.floor(Date.now() / 1000), ip: '0.0.0.0' },
+                tos_acceptance: { service_agreement: 'full', date: Math.floor(Date.now() / 1000), ip: '127.0.0.1' },
               })
               customAccountId = acct.id
               const sellerClient = getSellerDbClient()
@@ -18886,7 +18886,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
                 country: 'DE',
                 email: sellerRow?.email || sellerEmail,
                 capabilities: { transfers: { requested: true } },
-                tos_acceptance: { service_agreement: 'recipient', date: Math.floor(Date.now() / 1000), ip: req.ip || '0.0.0.0' },
+                tos_acceptance: { service_agreement: 'full', date: Math.floor(Date.now() / 1000), ip: req.ip || '127.0.0.1' },
               })
               customAccountId = acct.id
               await client.query('UPDATE seller_users SET stripe_custom_account_id = $1 WHERE seller_id = $2', [customAccountId, sellerId])
