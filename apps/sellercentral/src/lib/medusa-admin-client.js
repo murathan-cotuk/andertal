@@ -330,6 +330,15 @@ class MedusaAdminClient {
       storefront_url: res?.storefront_url ?? '',
       announcement_bar_items: Array.isArray(res?.announcement_bar_items) ? res.announcement_bar_items : [],
       logo_config: res?.logo_config && typeof res.logo_config === 'object' ? res.logo_config : null,
+      legal_company_name: res?.legal_company_name ?? '',
+      legal_representative: res?.legal_representative ?? '',
+      legal_street: res?.legal_street ?? '',
+      legal_city: res?.legal_city ?? '',
+      legal_trade_register: res?.legal_trade_register ?? '',
+      legal_register_court: res?.legal_register_court ?? '',
+      legal_vat_id: res?.legal_vat_id ?? '',
+      legal_tax_id: res?.legal_tax_id ?? '',
+      legal_email: res?.legal_email ?? '',
     };
   }
 

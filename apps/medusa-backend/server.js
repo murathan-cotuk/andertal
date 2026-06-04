@@ -1087,6 +1087,16 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_updated_at timestamp;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_connection_name text;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS storefront_url text;`).catch(() => {})
+        // ── Platform legal / company info ────────────────────────────────────
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_company_name varchar(255)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_representative varchar(255)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_street varchar(255)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_city varchar(255)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_trade_register varchar(255)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_register_court varchar(255)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_vat_id varchar(100)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_tax_id varchar(100)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_email varchar(255)`).catch(() => {})
         await client.query(`CREATE TABLE IF NOT EXISTS admin_hub_notifications (
           id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
           type varchar(50) NOT NULL,
@@ -5119,7 +5129,9 @@ async function start() {
           const r = await client.query(
             `SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url,
                     shop_logo_height, sellercentral_logo_height, platform_name, support_email, storefront_url,
-                    announcement_bar_items, logo_config
+                    announcement_bar_items, logo_config,
+                    legal_company_name, legal_representative, legal_street, legal_city,
+                    legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email
              FROM admin_hub_seller_settings WHERE seller_id = $1`,
             [sellerId],
           )
@@ -5173,6 +5185,15 @@ async function start() {
             storefront_url,
             announcement_bar_items,
             logo_config,
+            legal_company_name: row?.legal_company_name || '',
+            legal_representative: row?.legal_representative || '',
+            legal_street: row?.legal_street || '',
+            legal_city: row?.legal_city || '',
+            legal_trade_register: row?.legal_trade_register || '',
+            legal_register_court: row?.legal_register_court || '',
+            legal_vat_id: row?.legal_vat_id || '',
+            legal_tax_id: row?.legal_tax_id || '',
+            legal_email: row?.legal_email || '',
           })
         } finally {
           await client.end().catch(() => {})
@@ -5218,6 +5239,16 @@ async function start() {
         const logo_config = body.logo_config !== undefined
           ? (body.logo_config && typeof body.logo_config === 'object' ? body.logo_config : null)
           : undefined
+        const legalStr = (k) => body[k] !== undefined ? (body[k] ? String(body[k]).trim() : null) : undefined
+        const legal_company_name = legalStr('legal_company_name')
+        const legal_representative = legalStr('legal_representative')
+        const legal_street = legalStr('legal_street')
+        const legal_city = legalStr('legal_city')
+        const legal_trade_register = legalStr('legal_trade_register')
+        const legal_register_court = legalStr('legal_register_court')
+        const legal_vat_id = legalStr('legal_vat_id')
+        const legal_tax_id = legalStr('legal_tax_id')
+        const legal_email = legalStr('legal_email')
         if (free_shipping_thresholds) {
           free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
         }
@@ -5230,8 +5261,10 @@ async function start() {
         const logoConfigJson = logo_config !== undefined ? JSON.stringify(logo_config) : undefined
         await client.query(
           `INSERT INTO admin_hub_seller_settings (
-             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, storefront_url, logo_config, updated_at
-           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14::jsonb, now())
+             seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, storefront_url, logo_config,
+             legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email,
+             updated_at
+           ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14::jsonb, $15, $16, $17, $18, $19, $20, $21, $22, $23, now())
            ON CONFLICT (seller_id) DO UPDATE SET
              store_name = COALESCE($2, admin_hub_seller_settings.store_name),
              free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds),
@@ -5246,8 +5279,18 @@ async function start() {
              announcement_bar_items = COALESCE($12::jsonb, admin_hub_seller_settings.announcement_bar_items),
              storefront_url = COALESCE($13, admin_hub_seller_settings.storefront_url),
              logo_config = COALESCE($14::jsonb, admin_hub_seller_settings.logo_config),
+             legal_company_name = COALESCE($15, admin_hub_seller_settings.legal_company_name),
+             legal_representative = COALESCE($16, admin_hub_seller_settings.legal_representative),
+             legal_street = COALESCE($17, admin_hub_seller_settings.legal_street),
+             legal_city = COALESCE($18, admin_hub_seller_settings.legal_city),
+             legal_trade_register = COALESCE($19, admin_hub_seller_settings.legal_trade_register),
+             legal_register_court = COALESCE($20, admin_hub_seller_settings.legal_register_court),
+             legal_vat_id = COALESCE($21, admin_hub_seller_settings.legal_vat_id),
+             legal_tax_id = COALESCE($22, admin_hub_seller_settings.legal_tax_id),
+             legal_email = COALESCE($23, admin_hub_seller_settings.legal_email),
              updated_at = now()`,
-          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null, storefront_url, logoConfigJson !== undefined ? logoConfigJson : null]
+          [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null, storefront_url, logoConfigJson !== undefined ? logoConfigJson : null,
+           legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email]
         )
         await client.end()
         log.info('[sellerSettingsPATCH] saved OK')
@@ -20765,6 +20808,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           { heading: 'SS 5 - Gewaehrleistung und Retouren', body: 'Der Verkaeufer gewaehrt Endkunden alle gesetzlichen Gewaehrleistungsrechte gemaess SS 434 ff. BGB. Dies umfasst: (a) eine Gewaehrleistungsfrist von 2 Jahren ab Lieferung fuer Neuware und 1 Jahr fuer gebrauchte Ware (bei entsprechender Kennzeichnung); (b) das Recht des Kaeufern auf Nacherfuellung (Reparatur oder Ersatzlieferung), Minderung oder Ruecktritt bei mangelhafter Ware; (c) ein Retourenmanagement, das eine unkomplizierte Ruecksendung gewaehrleistet; Retourenkosten innerhalb der EU traegt der Verkaeufer, sofern keine abweichende gesetzliche Regelung gilt; (d) Gutschriften oder Erstattungen sind innerhalb von 14 Tagen nach Eingang der Retoure abzuwickeln; (e) bei Warenmaengeln, die ein Sicherheitsrisiko darstellen, ist die Plattform unverzueglich zu benachrichtigen und ggf. ein Produktrueckruf einzuleiten.' },
           { heading: 'SS 6 - Datenschutz und Vertraulichkeit (DSGVO)', body: 'Der Verkaeufer verarbeitet personenbezogene Daten von Endkunden (Name, Anschrift, E-Mail, Bestelldaten, Zahlungsdaten) ausschliesslich zum Zweck der Vertragserfuellung (Art. 6 Abs. 1 lit. b DSGVO) und darf diese Daten nicht fuer andere Zwecke, insbesondere nicht fuer Werbung, verwenden, sofern keine gesonderte Einwilligung vorliegt. Folgende Pflichten gelten: (a) Einrichtung und Aufrechterhaltung angemessener technischer und organisatorischer Massnahmen (TOMs) zum Schutz personenbezogener Daten gemaess Art. 32 DSGVO; (b) Meldung von Datenpannen, die Kundendaten betreffen, gegenueber der Plattform innerhalb von 24 Stunden und gegenueber der zust. Aufsichtsbehoerde binnen 72 Stunden gemaess Art. 33 DSGVO; (c) Abschluss eines Auftragsverarbeitungsvertrags (AVV) mit der Plattform gemaess Art. 28 DSGVO, soweit eine Auftragsverarbeitung stattfindet; (d) Beantwortung von Betroffenenanfragen (Auskunft, Loeschung, Berichtigung, Einschraenkung) innerhalb von 30 Kalendertagen; (e) keine Datenuebertragung in Drittlaender ohne angemessenes Schutzniveau gemaess Art. 44 ff. DSGVO.' },
           { heading: 'SS 7 - Provisionen und Abrechnungsmodalitaeten', body: 'Fuer die Nutzung der Plattform erhebt die Plattform eine Transaktionsgebuehr gemaess der zum Zeitpunkt des Vertragsschlusses gueltigen Preisliste, die dem Verkaeufer im Seller-Dashboard zugaenglich ist. Es gelten folgende Regelungen: (a) Provisionen werden automatisch bei Auftragsabschluss (Zahlungseingang) vom Transaktionsbetrag abgezogen; (b) Auszahlungen an den Verkaeufer erfolgen nach einer Sicherheitshaltefrist von 7 bis 14 Werktagen nach Lieferbesraetigung, um Retouren und Chargebacks abzufedern; (c) die Plattform ist berechtigt, Betraege bei begruendeten Rueckforderungen (Chargebacks, Retouren, Betrug, Produktmaengeln) einzubehalten oder zu verrechnen; (d) bei Verzug mit etwaigen Gebuehrenzahlungen werden Verzugszinsen in Hoehe von 9 Prozentpunkten ueber dem Basiszinssatz gemaess SS 288 Abs. 2 BGB faellig; (e) Abrechnungen und Kontoauszuege werden dem Verkaeufer monatlich im Seller-Dashboard bereitgestellt und gelten als anerkannt, wenn keine Beanstandung innerhalb von 30 Tagen erhoben wird.' },
+          { heading: 'SS 7a - Zahlungsermaechtigung und Zahlungsfluss', body: 'Der Verkaeufer bevollmaechtigt die Plattform und deren Zahlungsdienstleister (insbesondere Stripe Connect), Zahlungen von Endkunden in seinem Namen und auf seine Rechnung entgegenzunehmen. Der Zahlungseingang beim Zahlungsdienstleister oder der Plattform gilt als Zahlungseingang beim Verkaeufer. Zahlungen werden ueber Stripe Connect oder gleichwertige zertifizierte Zahlungsdienstleister abgewickelt. Der Verkaeufer nimmt zur Kenntnis, dass Gelder zunaechst auf einem von der Plattform verwalteten Treuhandkonto eingehen, bevor sie nach Ablauf der Sicherheitshaltefrist an den Verkaeufer ausgezahlt werden.' },
+          { heading: 'SS 7b - Provisionserstattung bei Retouren', body: 'Nimmt ein Kaeufer sein Widerrufsrecht wahr oder wird eine Retoure verarbeitet, wird der zugehoerige Bestellbetrag einschliesslich der einbehaltenen Provision storniert. Die Provision wird dem Verkaeufer erstattet, sofern der volle Kaufpreis zurueckgebucht wurde. Bei Teilretouren wird die Provision anteilig erstattet. Chargebacks (Rueckbuchungen durch den Zahlungsdienstleister) fuehren zum vollstaendigen Einbehalt des Transaktionsbetrags; die Plattform leitet das Chargeback-Verfahren ein und informiert den Verkaeufer.' },
           { heading: 'SS 8 - Geistiges Eigentum und Markenrechte', body: 'Der Verkaeufer sichert zu, dass die von ihm eingestellten Inhalte (Texte, Bilder, Logos, Produktbeschreibungen) keine Rechte Dritter verletzen. Im Einzelnen gilt: (a) der Verkaeufer raeumt der Plattform eine nicht-exklusive, weltweite, kostenfreie Lizenz zur Nutzung der eingestellten Inhalte fuer Marketingzwecke der Plattform ein, soweit dies zur Darstellung der Produkte erforderlich ist; (b) der Verkaeufer haftet fuer alle Ansprueche, die aus der Verletzung von Urheber-, Marken-, Patent- oder sonstigen Schutzrechten Dritter entstehen, und stellt die Plattform von derartigen Anspruechen frei; (c) die Plattform behaelt sich das Recht vor, Listings, die Hinweise auf Rechtsverletzungen enthalten, ohne Vorankuendigung zu entfernen; (d) der Verkaeufer darf ohne ausdrueckliche schriftliche Genehmigung der Plattform keine Marken, Logos oder andere Schutzrechte der Plattform verwenden.' },
           { heading: 'SS 9 - Ranking und Sichtbarkeit (P2B-Verordnung)', body: 'Gemaess Art. 5 der EU-Verordnung 2019/1150 legt die Plattform die wesentlichen Parameter ihres Ranking-Algorithmus transparent offen. Die Sichtbarkeit eines Verkaeufers und seiner Produkte wird durch folgende Faktoren beeinflusst: (a) Produktqualitaet und Vollstaendigkeit der Produktdaten (Beschreibung, Bilder, Attribute); (b) Kundenbewertungen und -rezensionen (Durchschnittsnote, Anzahl, Aktualitaet); (c) Bestellabwicklungsrate und durchschnittliche Lieferzeit; (d) Preiswettbewerbsfaehigkeit im Vergleich zu aehnlichen Produkten; (e) Konto-Compliance (keine offenen Vertragsverletzungen, vollstaendige Verifizierung); (f) Konversionsdaten und Klickrate. Bezahlte Rankingfoerderungen werden als "Gesponsert" oder "Werbeanzeige" deutlich gekennzeichnet und beeinflussen das organische Ranking nicht. Die Plattform verpflichtet sich, keine Ungleichbehandlung eigener Angebote gegenueber Drittanbietern vorzunehmen.' },
           { heading: 'SS 10 - Verhaltenskodex und Verbotene Praktiken', body: 'Der Verkaeufer verpflichtet sich zur Einhaltung eines fairen und rechtskonformen Verhaltens. Verboten sind insbesondere: (a) Preisabsprachen oder sonstige wettbewerbswidrige Absprachen mit anderen Verkaeufeern (Kartellrecht); (b) das Einstellen gefaelschter, irrefuehrender oder manipulierter Kundenbewertungen; (c) der Einsatz von Methoden zur kuenstlichen Beeinflussung des Rankings, z.B. durch Klickfarmen oder automatisierte Skripte; (d) das Abwerben von Kunden der Plattform auf andere Verkaufskanaele ausserhalb der Plattform (Direktabschluss); (e) die Nutzung von Kundendaten der Plattform fuer eigene Marketingzwecke ausserhalb der Plattform; (f) jegliche Form von Betrug, Identitaetstaeusching, Geldwaescheverdacht oder Finanzierung illegaler Aktivitaeten; (g) das Einstellen von Produkten, die gegen Exportkontrollvorschriften, Sanktionslisten oder UN-Embargos verstossen.' },
@@ -20785,6 +20830,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           { heading: 'Madde 5 - Garanti ve Iade', body: 'Satici, son musterilere TKHK ve ilgili AB mevzuati kapsamindaki tum yasal garanti haklarini saglar: (a) yeni urunler icin teslimattan itibaren 2 yil, ikinci el urunler icin 1 yil garanti (acikca belirtilmis olmasi sartiyla); (b) kusurlu mallarda alicinin ayni ifaya (tamir veya degisim), bedel indirimine veya sozlesmeden donmeye hakki; (c) kolay iade imkani saglayan bir iade yonetimi; AB icinde iade giderleri aksi yasal zorunluluk olmadikca Satici tarafindan karsilanir; (d) iade alinan urunler icin geri odeme, iadeye girisinden itibaren 14 gun icinde tamamlanmalidir; (e) guvenlik riski olusturan urun kusurlarinda Platform derhal bilgilendirilmeli ve gerekirse urun geri cagrilmalidir.' },
           { heading: 'Madde 6 - Kisisel Verilerin Korunmasi (KVKK / GDPR)', body: 'Satici, son musterilere ait kisisel verileri (ad, adres, e-posta, siparis ve odeme bilgileri) yalnizca sozlesmenin ifasi amaciyla isler (GDPR Madde 6(1)(b)). Su yukumlulukler gecerlidir: (a) GDPR Madde 32 uyarinca kisisel verilerin korunmasi icin uygun teknik ve idari onlemler almak; (b) musteri verilerini etkileyen veri ihlallerini Platforma 24 saat, yetkili denetim otoritesine 72 saat icinde bildirmek (GDPR Madde 33); (c) gerekli hallerde GDPR Madde 28 uyarinca Platform ile veri isleme sozlesmesi imzalamak; (d) ilgili kisi taleplerine (erisim, silme, duzeltme, itiraz) 30 takvim gunu icinde yanit vermek; (e) uygun koruma duzeyi olmaksizin ucuncu ulkelere veri aktarimi yapmamak (GDPR Madde 44 vd).' },
           { heading: 'Madde 7 - Komisyonlar ve Odeme Kosullari', body: 'Platform, Satici Dashboard\'inda yayimlanan gecerli fiyat listesine gore islem komisyonu alir: (a) komisyonlar, odeme alimindan (siparis tamamlanmasindan) itibaren otomatik olarak kesilirir; (b) Saticiya odemeler, iadeleri ve itirazlari karsilamak uzere teslimat onayindan sonra 7-14 is gunluk guvenlik suresinin ardından yapilir; (c) Platform, itiraz, iade, dolandiricilik veya urun kusuru durumlarinda tutarlari askiya alma veya mahsup etme hakkini sakli tutar; (d) vadesi gecmis odemelerde BGB SS 288(2) uyarinca temerrut faizi uygulanir; (e) aylik hesap ozetleri Satici Dashboard\'inda sunulur; 30 gun icerisinde itiraz edilmemesi halinde onaylanmis sayilir.' },
+          { heading: 'Madde 7a - Odeme Yetkisi ve Odeme Akisi', body: 'Satici, Platformu ve odeme servis saglayicilarini (ozellikle Stripe Connect) kendi adina ve hesabina musterilerden odeme tahsil etmek uzere yetkilendirir. Odeme servis saglayicisina veya Platforma yapilan odeme, Saticiya yapilmis odeme olarak kabul edilir. Odemeler Stripe Connect veya esdeger sertifikali odeme servis saglayicilari araciligiyla islenir. Fonlar once Platform tarafindan yonetilen bir emanet hesabina alinir; guvenlik suresinin dolmasinin ardindan Saticiya odenir.' },
+          { heading: 'Madde 7b - Iadelerde Komisyon Iadesi', body: 'Bir alici cayma hakkini kullanir veya iade islenir ise ilgili siparis tutari ve kesilen komisyon iptal edilir. Tam satis fiyati iade edildiyse komisyon Saticiya iade edilir; kismi iadelerde komisyon orantili olarak iade edilir. Platform tarafindan baslatilan chargeback (odeme iptali) islemlerinde islem tutarinin tamami alikoy ulur; Platform Saticiya bildirimde bulunur.' },
           { heading: 'Madde 8 - Fikri Mulkiyet ve Marka Haklari', body: 'Satici, yuklenen iceriklerin (metin, gorsel, logo, urun aciklamalari) ucuncu sahis haklarini ihlal etmedigini beyan ve taahhut eder: (a) Satici, Platforma listelenen icerikleri urunlerin sergilenmesi amaciyla kullanmak uzere dunya genelinde, bedelsiz, ozel olmayan bir lisans tanimlar; (b) Satici, urun kusurlari, hak ihlalleri veya diger sozlesme ihlallerinden kaynaklanan tum ucuncu sahis taleplerinden Platformu tazmin eder ve muaf tutar (avukatlik ucretleri dahil); (c) Platform, hak ihlali icerdigi anlasilan listeleri onceden haber vermeksizin kaldirma hakkini sakli tutar; (d) Satici, Platformun onceden yazili izni olmaksizin Platform markalarini, logolarini veya fikirdi mulkiyet unsurlarini kullanamaz.' },
           { heading: 'Madde 9 - Siralama ve Gorunurluk (P2B Tuzugu)', body: 'AB P2B Tuzugu Madde 5 uyarinca Platform, siralama algoritmasinin temel parametrelerini seffaf bicimde aciklar: (a) urun kalitesi ve veri eksiksizligi (aciklama, gorsel, ozellikler); (b) musteri degerlendirmeleri (ortalama puan, sayi, guncellik); (c) siparis karsilama orani ve ortalama teslimat suresi; (d) benzer urunlerle kiyaslandığında fiyat rekabetciligii; (e) hesap uyumlulugu (acik sozlesme ihlali yok, tam dogrulama); (f) donusum verileri ve tiklanma orani. Odeme karsiligi siralama artirimi "Sponsorlu" veya "Reklam" olarak acikca etiketlenir; organik siralamayı etkilemez. Platform, kendi urunlerini ucuncu taraf saticilardan farkli muameleye tabi tutmamayı taahhut eder.' },
           { heading: 'Madde 10 - Davranis Kurallari ve Yasakli Uygulamalar', body: 'Satici, adil ve hukuka uygun davrananis ilkelerine baglidir. Su uygulamalar kesinlikle yasaktir: (a) rekabet hukukuna aykiri fiyat anlasmalari veya diger kartellesmeler; (b) sahte, yaniltici veya manipule edilmis musteri degerlendirmeleri; (c) tiklanma cerceveleri veya otomatik komut dosyalariyla siralama manipulasyonu; (d) musteri iletisim bilgilerini Platform disinda dogrudan satis icin kullanmak (Platform dis satin alim yonlendirmesi); (e) Platform musteri verilerini Platform disindaki pazarlama amaclarinda kullanmak; (f) dolandiricilik, kimlik sahteciligi, kara para aklama veya yasadisi faaliyetlerin finansmani; (g) ihracat kontrol duzenleme lerine, yaptirimlara veya BM ambargosu kapsamindaki mallari listelemek.' },
@@ -20805,6 +20852,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           { heading: 'Article 5 - Warranty and Returns', body: 'The Seller provides end customers with all statutory warranty rights under applicable law: (a) a warranty period of 2 years from delivery for new goods and 1 year for used goods (provided clearly indicated); (b) the buyer\'s right to remedy (repair or replacement), price reduction, or withdrawal in the event of defective goods; (c) a return management system ensuring easy returns; within the EU, return costs are borne by the Seller unless otherwise required by law; (d) refunds for returned goods must be processed within 14 days of receipt of the return; (e) product defects posing a safety risk must be reported to the Platform immediately and a product recall initiated if necessary.' },
           { heading: 'Article 6 - Data Protection (GDPR)', body: 'The Seller processes personal data of end customers (name, address, email, order and payment data) solely for the purpose of contract performance (Art. 6(1)(b) GDPR). The following obligations apply: (a) implement appropriate technical and organizational measures (TOMs) to protect personal data pursuant to Art. 32 GDPR; (b) report data breaches affecting customer data to the Platform within 24 hours and to the competent supervisory authority within 72 hours per Art. 33 GDPR; (c) conclude a data processing agreement (DPA) with the Platform pursuant to Art. 28 GDPR where applicable; (d) respond to data subject requests (access, erasure, rectification, restriction) within 30 calendar days; (e) refrain from transferring data to third countries without an adequate level of protection pursuant to Art. 44 et seq. GDPR.' },
           { heading: 'Article 7 - Fees and Payment Terms', body: 'The Platform charges a transaction fee pursuant to the price list current at the time of the transaction, accessible in the Seller Dashboard: (a) commissions are automatically deducted at order completion (payment receipt); (b) payouts to the Seller are made after a security holding period of 7-14 business days following delivery confirmation to absorb returns and chargebacks; (c) the Platform reserves the right to withhold or offset amounts in cases of chargebacks, returns, fraud, or product defects; (d) overdue payments attract default interest at 9 percentage points above the base rate per Sec. 288(2) BGB; (e) monthly account statements are provided in the Seller Dashboard and are deemed approved unless disputed within 30 days.' },
+          { heading: 'Article 7a - Payment Authorization and Payment Flow', body: 'The Seller authorizes the Platform and its payment service providers (in particular Stripe Connect) to collect payments from customers on the Seller\'s behalf and for the Seller\'s account. Receipt of payment by the payment service provider or the Platform shall be deemed receipt of payment by the Seller. Payments are processed via Stripe Connect or equivalent certified payment service providers. Funds are first received into an escrow account managed by the Platform and disbursed to the Seller after the applicable security holding period.' },
+          { heading: 'Article 7b - Commission Refund on Returns', body: 'If a buyer exercises their right of withdrawal or a return is processed, the corresponding order amount including the deducted commission is cancelled. The commission is refunded to the Seller if the full purchase price has been reversed; for partial returns, the commission is refunded proportionally. Chargebacks initiated by the payment service provider result in full withholding of the transaction amount; the Platform initiates the chargeback procedure and notifies the Seller.' },
           { heading: 'Article 8 - Intellectual Property and Trademark Rights', body: 'The Seller warrants that uploaded content (texts, images, logos, product descriptions) does not infringe third-party rights: (a) the Seller grants the Platform a non-exclusive, worldwide, royalty-free license to use listed content for the purpose of displaying the products; (b) the Seller fully indemnifies the Platform against all third-party claims arising from product defects, IP infringements, or other breaches, including attorney and court costs; (c) the Platform reserves the right to remove listings containing indications of rights violations without prior notice; (d) the Seller may not use the Platform\'s trademarks, logos, or other IP without prior written authorization.' },
           { heading: 'Article 9 - Ranking and Visibility (P2B Regulation)', body: 'Pursuant to Art. 5 of EU Regulation 2019/1150, the Platform transparently discloses the main parameters of its ranking algorithm: (a) product quality and data completeness (description, images, attributes); (b) customer ratings and reviews (average score, volume, recency); (c) order fulfillment rate and average delivery time; (d) price competitiveness compared to similar products; (e) account compliance (no open contract violations, complete verification); (f) conversion data and click-through rate. Paid ranking promotion is clearly labeled as "Sponsored" or "Advertisement" and does not affect organic ranking. The Platform commits to not treating its own products differently from third-party sellers.' },
           { heading: 'Article 10 - Code of Conduct and Prohibited Practices', body: 'The Seller is committed to fair and lawful conduct. The following practices are strictly prohibited: (a) price-fixing or other anti-competitive agreements with other sellers (competition law); (b) posting fake, misleading, or manipulated customer reviews; (c) manipulating rankings through click farms or automated scripts; (d) using customer contact data to solicit off-platform purchases; (e) using Platform customer data for own marketing purposes outside the Platform; (f) any form of fraud, identity deception, money laundering, or financing of illegal activities; (g) listing products subject to export control regulations, sanctions lists, or UN embargoes.' },
@@ -20833,10 +20882,18 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           .replace(/ñ/g, 'n').replace(/ã/g, 'a').replace(/õ/g, 'o')
       }
 
-      const buildAgreementPdf = async (seller, locale, signatureDataUrl, signedAt, signedIp) => {
+      const buildAgreementPdf = async (seller, locale, signatureDataUrl, signedAt, signedIp, platformInfo) => {
         const PDFDocument = require('pdfkit')
         const sections = CONTRACT_SECTIONS_SIGN[locale] || CONTRACT_SECTIONS_SIGN.en
         const signedDate = signedAt ? new Date(signedAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' }) : new Date().toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' })
+        const pi = platformInfo || {}
+        const platName = pi.legal_company_name || 'Andertal GmbH'
+        const platRep = pi.legal_representative || ''
+        const platAddr = [pi.legal_street, pi.legal_city].filter(Boolean).join(', ')
+        const platReg = [pi.legal_trade_register, pi.legal_register_court ? `(${pi.legal_register_court})` : ''].filter(Boolean).join(' ')
+        const platVat = pi.legal_vat_id || ''
+        const platTax = pi.legal_tax_id || ''
+        const platEmail = pi.legal_email || 'info@andertal.com'
 
         return new Promise((resolve, reject) => {
           try {
@@ -20853,9 +20910,24 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             )
             doc.moveDown(0.3)
             doc.fontSize(9).font('Helvetica').fillColor('#666').text(
-              locale === 'de' ? 'Andertal Marketplace | Unterzeichnetes Exemplar' : locale === 'tr' ? 'Andertal Marketplace | Imzali Kopya' : 'Andertal Marketplace | Signed Copy',
+              `${signPdfDeLatin(platName)} | ` + (locale === 'de' ? 'Unterzeichnetes Exemplar' : locale === 'tr' ? 'Imzali Kopya' : 'Signed Copy'),
               { align: 'center' }
             )
+            doc.moveDown(0.5)
+            doc.moveTo(48, doc.y).lineTo(547, doc.y).strokeColor('#ddd').lineWidth(0.5).stroke()
+            doc.moveDown(0.4)
+
+            // Platform operator block
+            const platOpLabel = locale === 'de' ? 'Plattformbetreiber' : locale === 'tr' ? 'Platform Isletmecisi' : 'Platform Operator'
+            doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text(signPdfDeLatin(platOpLabel) + ':')
+            doc.fontSize(8).font('Helvetica').fillColor('#555')
+            doc.text(signPdfDeLatin(platName))
+            if (platRep) doc.text(signPdfDeLatin((locale === 'de' ? 'Vertreten durch: ' : locale === 'tr' ? 'Temsilen: ' : 'Represented by: ') + platRep))
+            if (platAddr) doc.text(signPdfDeLatin(platAddr))
+            if (platReg) doc.text(signPdfDeLatin((locale === 'de' ? 'Handelsregister: ' : locale === 'tr' ? 'Ticaret Sicil: ' : 'Commercial Register: ') + platReg))
+            if (platVat) doc.text(signPdfDeLatin((locale === 'de' ? 'USt-IdNr.: ' : locale === 'tr' ? 'KDV No: ' : 'VAT ID: ') + platVat))
+            if (platTax) doc.text(signPdfDeLatin((locale === 'de' ? 'Steuernummer: ' : locale === 'tr' ? 'Vergi No: ' : 'Tax ID: ') + platTax))
+            doc.text(signPdfDeLatin((locale === 'de' ? 'E-Mail: ' : 'Email: ') + platEmail))
             doc.moveDown(0.5)
             doc.moveTo(48, doc.y).lineTo(547, doc.y).strokeColor('#ddd').lineWidth(0.5).stroke()
             doc.moveDown(0.5)
@@ -20872,8 +20944,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             doc.moveTo(48, doc.y).lineTo(547, doc.y).strokeColor('#ddd').lineWidth(0.5).stroke()
             doc.moveDown(0.5)
 
-            // Signature block
-            const sigLabel = locale === 'de' ? 'Unterschrift' : locale === 'tr' ? 'Imza' : 'Signature'
+            // Seller signature block (left) + platform block (right)
+            const sigLabel = locale === 'de' ? 'Unterschrift des Verkaeufers' : locale === 'tr' ? 'Satici Imzasi' : 'Seller Signature'
             const dateLabel = locale === 'de' ? 'Datum & Uhrzeit' : locale === 'tr' ? 'Tarih & Saat' : 'Date & Time'
             const ipLabel = locale === 'de' ? 'IP-Adresse' : locale === 'tr' ? 'IP Adresi' : 'IP Address'
             const nameLabel = locale === 'de' ? 'Name / Unternehmen' : locale === 'tr' ? 'Ad / Firma' : 'Name / Company'
@@ -20901,6 +20973,17 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             doc.moveTo(48, doc.y).lineTo(248, doc.y).strokeColor('#999').lineWidth(0.5).stroke()
             doc.moveDown(0.2)
             doc.fontSize(8).fillColor('#666').text(signPdfDeLatin(`${seller.authorized_person_name || seller.seller_name || ''}, ${seller.company_name || ''}`), { width: 200 })
+
+            // Platform representative block below signature
+            doc.moveDown(0.8)
+            const platSigLabel = locale === 'de' ? 'Plattformbetreiber (Andertal)' : locale === 'tr' ? 'Platform Isletmecisi (Andertal)' : 'Platform Operator (Andertal)'
+            doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text(signPdfDeLatin(platSigLabel))
+            doc.fontSize(8).font('Helvetica').fillColor('#555')
+            doc.text(signPdfDeLatin(platName))
+            if (platRep) doc.text(signPdfDeLatin(platRep))
+            if (platAddr) doc.text(signPdfDeLatin(platAddr))
+            if (platReg) doc.text(signPdfDeLatin(platReg))
+            if (platVat) doc.text(signPdfDeLatin(platVat))
 
             doc.end()
           } catch (e) {
@@ -21038,12 +21121,26 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           const row = tr.rows[0]
           const signedAt = new Date()
           const signedIp = req.ip || null
+          // Fetch platform legal info for PDF
+          let platformInfo = {}
+          try {
+            const pc = getProductsDbClient()
+            if (pc) {
+              await pc.connect()
+              const pr = await pc.query(
+                `SELECT legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email FROM admin_hub_seller_settings WHERE seller_id = 'default'`
+              )
+              await pc.end()
+              platformInfo = pr.rows[0] || {}
+            }
+          } catch (_) {}
           const pdfBuf = await buildAgreementPdf(
             { company_name: row.company_name, authorized_person_name: row.authorized_person_name, seller_name: row.store_name, email: row.email },
             row.locale,
             signature_data,
             signedAt,
-            signedIp
+            signedIp,
+            platformInfo
           )
           const pdfBase64 = 'data:application/pdf;base64,' + pdfBuf.toString('base64')
           await client.query(

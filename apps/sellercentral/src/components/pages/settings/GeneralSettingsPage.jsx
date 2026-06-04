@@ -55,6 +55,21 @@ export default function GeneralSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  const [legalInfo, setLegalInfo] = useState({
+    legal_company_name: "",
+    legal_representative: "",
+    legal_street: "",
+    legal_city: "",
+    legal_trade_register: "",
+    legal_register_court: "",
+    legal_vat_id: "",
+    legal_tax_id: "",
+    legal_email: "",
+  });
+  const [legalSaving, setLegalSaving] = useState(false);
+  const [legalSaved, setLegalSaved] = useState(false);
+  const [legalError, setLegalError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -63,8 +78,24 @@ export default function GeneralSettingsPage() {
     }, 8000);
     const load = async () => {
       try {
+        const isSu = typeof window !== "undefined" ? localStorage.getItem("isSuperuser") === "true" : false;
+        if (!cancelled) setIsSuperuser(isSu);
         const data = await client.getSellerSettings();
         if (!cancelled) {
+          if (isSu) {
+            const platData = await client.getSellerSettings("default").catch(() => ({}));
+            setLegalInfo({
+              legal_company_name: platData.legal_company_name || "",
+              legal_representative: platData.legal_representative || "",
+              legal_street: platData.legal_street || "",
+              legal_city: platData.legal_city || "",
+              legal_trade_register: platData.legal_trade_register || "",
+              legal_register_court: platData.legal_register_court || "",
+              legal_vat_id: platData.legal_vat_id || "",
+              legal_tax_id: platData.legal_tax_id || "",
+              legal_email: platData.legal_email || "",
+            });
+          }
           const sellerUser = data?.sellerUser || data?.seller || {};
           const businessAddress = sellerUser.business_address || {};
           const warehouseAddress = sellerUser.warehouse_address || {};
@@ -147,6 +178,20 @@ export default function GeneralSettingsPage() {
       setSaveError(e?.message || "Failed to save settings.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleLegalSave = async () => {
+    setLegalError("");
+    setLegalSaving(true);
+    try {
+      await client.updateSellerSettings({ seller_id: "default", ...legalInfo });
+      setLegalSaved(true);
+      setTimeout(() => setLegalSaved(false), 3000);
+    } catch (e) {
+      setLegalError(e?.message || "Speichern fehlgeschlagen.");
+    } finally {
+      setLegalSaving(false);
     }
   };
 
@@ -397,6 +442,53 @@ export default function GeneralSettingsPage() {
           </BlockStack>
         </Card>
       </form>
+
+      {isSuperuser && (
+        <Card>
+          <BlockStack gap="400">
+            <Text variant="headingMd" as="h2">Admin Informationen (Plattformbetreiber)</Text>
+            <Text variant="bodySm" tone="subdued">
+              Diese Angaben erscheinen als Plattformbetreiber-Block im unterzeichneten Seller Agreement PDF.
+              Nur für Superuser sichtbar.
+            </Text>
+            <Divider />
+            <TextField label="Firmenname" value={legalInfo.legal_company_name}
+              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_company_name: v }))}
+              placeholder="Andertal GmbH" autoComplete="off" />
+            <TextField label="Vertreten durch (Geschäftsführer)" value={legalInfo.legal_representative}
+              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_representative: v }))}
+              placeholder="Vorname Nachname" autoComplete="off" />
+            <TextField label="Straße und Hausnummer" value={legalInfo.legal_street}
+              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_street: v }))}
+              placeholder="Musterstraße 1" autoComplete="off" />
+            <TextField label="PLZ und Stadt" value={legalInfo.legal_city}
+              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_city: v }))}
+              placeholder="41564 Kaarst" autoComplete="off" />
+            <TextField label="Handelsregisternummer" value={legalInfo.legal_trade_register}
+              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_trade_register: v }))}
+              placeholder="HRB XXXXX" autoComplete="off" />
+            <TextField label="Registergericht" value={legalInfo.legal_register_court}
+              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_register_court: v }))}
+              placeholder="Amtsgericht Düsseldorf" autoComplete="off" />
+            <TextField label="USt-IdNr." value={legalInfo.legal_vat_id}
+              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_vat_id: v }))}
+              placeholder="DE123456789" autoComplete="off" />
+            <TextField label="Steuernummer" value={legalInfo.legal_tax_id}
+              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_tax_id: v }))}
+              placeholder="12/345/67890" autoComplete="off" />
+            <TextField label="Rechtliche E-Mail" value={legalInfo.legal_email}
+              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_email: v }))}
+              placeholder="info@andertal.com" autoComplete="off" type="email" />
+            {legalError && <Banner tone="critical"><p>{legalError}</p></Banner>}
+            {legalSaved && <Banner tone="success"><p>Admin-Informationen gespeichert.</p></Banner>}
+            <InlineStack gap="200">
+              <Button variant="primary" loading={legalSaving} onClick={handleLegalSave}>
+                Speichern
+              </Button>
+            </InlineStack>
+          </BlockStack>
+        </Card>
+      )}
     </BlockStack>
   );
 }
