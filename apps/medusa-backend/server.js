@@ -20928,8 +20928,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             [token, String(sellerUser.id), locale, req.ip || null]
           )
           await client.end()
-          const backendPublicUrl = (process.env.BACKEND_PUBLIC_URL || '').replace(/\/$/, '') || (req.protocol + '://' + req.get('host'))
-          const signUrl = `${backendPublicUrl}/seller/sign/${token}`
+          const sellercentralUrl = (process.env.SELLERCENTRAL_URL || 'http://localhost:3002').replace(/\/$/, '')
+          const signUrl = `${sellercentralUrl}/sign/${token}`
           const qrDataUrl = await QRCode.toDataURL(signUrl, { width: 256, margin: 2 })
           res.json({ token, sign_url: signUrl, qr_data_url: qrDataUrl })
         } catch (e) {
@@ -20938,327 +20938,34 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         }
       })
 
-      // GET /seller/sign/:token — serve self-contained HTML sign page (no auth, accessed from mobile)
-      httpApp.get('/seller/sign/:token', async (req, res) => {
+      // GET /public/sign/:token — info endpoint, called from sellercentral sign page (no auth)
+      httpApp.get('/public/sign/:token', async (req, res) => {
         const token = String(req.params.token || '').trim()
-        if (!token) return res.status(400).send('Token required')
+        if (!token) return res.status(400).json({ message: 'Token required' })
         const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-        if (!dbUrl) return res.status(503).send('Service unavailable')
-        let locale = 'de', alreadySigned = false, expired = false
+        if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
         try {
           const { Client } = require('pg')
           const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
           await client.connect()
           const tr = await client.query(
-            `SELECT st.locale, st.used_at, st.expires_at FROM seller_sign_tokens st WHERE st.token = $1`,
+            `SELECT st.locale, st.used_at, st.expires_at, su.store_name, su.company_name, su.authorized_person_name
+             FROM seller_sign_tokens st
+             JOIN seller_users su ON su.id::text = st.seller_id
+             WHERE st.token = $1`,
             [token]
           )
           await client.end()
-          if (!tr.rows.length || new Date(tr.rows[0].expires_at) < new Date()) expired = true
-          else {
-            locale = tr.rows[0].locale || 'de'
-            alreadySigned = !!tr.rows[0].used_at
-          }
-        } catch (_) { expired = true }
-
-        const L = {
-          de: {
-            title: 'Unterzeichnung der Plattformvereinbarung',
-            loginHeading: 'Anmeldung erforderlich',
-            loginSub: 'Bitte melden Sie sich mit Ihren Andertal-Zugangsdaten an, um fortzufahren.',
-            emailPlaceholder: 'E-Mail-Adresse',
-            passwordPlaceholder: 'Passwort',
-            loginBtn: 'Weiter zur Unterzeichnung',
-            signHeading: 'Unterschreiben Sie hier',
-            signSub: 'Bitte unterschreiben Sie in dem gelben Feld mit Ihrem Finger oder der Maus.',
-            clearBtn: 'Loeschen',
-            submitBtn: 'Vereinbarung unterzeichnen',
-            successHeading: 'Vielen Dank!',
-            successMsg: 'Ihre Unterschrift wurde erfolgreich gespeichert. Sie koennen zu Andertal Sellercentral zurueckkehren und dieses Fenster schliessen.',
-            expiredMsg: 'Dieser Link ist abgelaufen oder ungueltig. Bitte fordern Sie einen neuen Link im Sellercentral an.',
-            alreadyMsg: 'Diese Vereinbarung wurde bereits unterzeichnet.',
-            errorLogin: 'E-Mail oder Passwort falsch.',
-            errorGeneral: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
-            signing: 'Wird verarbeitet...',
-          },
-          tr: {
-            title: 'Platform Sozlesmesinin Imzalanmasi',
-            loginHeading: 'Giris Gerekli',
-            loginSub: 'Devam etmek icin Andertal hesap bilgilerinizle giris yapin.',
-            emailPlaceholder: 'E-Posta Adresi',
-            passwordPlaceholder: 'Sifre',
-            loginBtn: 'Imzalamaya Devam Et',
-            signHeading: 'Buraya Imzalayin',
-            signSub: 'Lutfen sari kutucugun icine parmaginiz veya fare ile imzanizi atin.',
-            clearBtn: 'Temizle',
-            submitBtn: 'Sozlesmeyi Imzala',
-            successHeading: 'Tesekkurler!',
-            successMsg: 'Imzaniz basariyla kaydedildi. Andertal Satici Merkezine geri donup bu ekrani kapatabilirsiniz.',
-            expiredMsg: 'Bu baglanti suresi dolmus veya gecersiz. Lutfen Satici Merkezinden yeni bir baglanti talebinde bulunun.',
-            alreadyMsg: 'Bu sozlesme daha once imzalanmistir.',
-            errorLogin: 'E-posta veya sifre hatali.',
-            errorGeneral: 'Bir hata olustu. Lutfen tekrar deneyin.',
-            signing: 'Isleniyor...',
-          },
-          en: {
-            title: 'Platform Agreement Signing',
-            loginHeading: 'Login Required',
-            loginSub: 'Please log in with your Andertal credentials to continue.',
-            emailPlaceholder: 'Email Address',
-            passwordPlaceholder: 'Password',
-            loginBtn: 'Continue to Sign',
-            signHeading: 'Sign Here',
-            signSub: 'Please sign inside the yellow box using your finger or mouse.',
-            clearBtn: 'Clear',
-            submitBtn: 'Sign Agreement',
-            successHeading: 'Thank You!',
-            successMsg: 'Your signature has been saved successfully. You can return to Andertal Sellercentral and close this window.',
-            expiredMsg: 'This link has expired or is invalid. Please request a new link in Sellercentral.',
-            alreadyMsg: 'This agreement has already been signed.',
-            errorLogin: 'Incorrect email or password.',
-            errorGeneral: 'An error occurred. Please try again.',
-            signing: 'Processing...',
-          },
-          fr: {
-            title: 'Signature de l\'accord de plateforme',
-            loginHeading: 'Connexion requise',
-            loginSub: 'Veuillez vous connecter avec vos identifiants Andertal pour continuer.',
-            emailPlaceholder: 'Adresse e-mail',
-            passwordPlaceholder: 'Mot de passe',
-            loginBtn: 'Continuer vers la signature',
-            signHeading: 'Signez ici',
-            signSub: 'Veuillez signer dans le cadre jaune avec votre doigt ou la souris.',
-            clearBtn: 'Effacer',
-            submitBtn: 'Signer l\'accord',
-            successHeading: 'Merci !',
-            successMsg: 'Votre signature a ete enregistree avec succes. Vous pouvez retourner a Andertal Sellercentral et fermer cette fenetre.',
-            expiredMsg: 'Ce lien a expire ou est invalide. Veuillez demander un nouveau lien dans Sellercentral.',
-            alreadyMsg: 'Cet accord a deja ete signe.',
-            errorLogin: 'E-mail ou mot de passe incorrect.',
-            errorGeneral: 'Une erreur est survenue. Veuillez reessayer.',
-            signing: 'Traitement en cours...',
-          },
-          es: {
-            title: 'Firma del acuerdo de plataforma',
-            loginHeading: 'Inicio de sesion requerido',
-            loginSub: 'Inicie sesion con sus credenciales de Andertal para continuar.',
-            emailPlaceholder: 'Direccion de correo',
-            passwordPlaceholder: 'Contrasena',
-            loginBtn: 'Continuar para firmar',
-            signHeading: 'Firme aqui',
-            signSub: 'Por favor firme dentro del cuadro amarillo con su dedo o el raton.',
-            clearBtn: 'Borrar',
-            submitBtn: 'Firmar el acuerdo',
-            successHeading: 'Gracias!',
-            successMsg: 'Su firma se ha guardado correctamente. Puede volver a Andertal Sellercentral y cerrar esta ventana.',
-            expiredMsg: 'Este enlace ha caducado o no es valido. Solicite un nuevo enlace en Sellercentral.',
-            alreadyMsg: 'Este acuerdo ya ha sido firmado.',
-            errorLogin: 'Correo electronico o contrasena incorrectos.',
-            errorGeneral: 'Se ha producido un error. Intentelo de nuevo.',
-            signing: 'Procesando...',
-          },
-          it: {
-            title: 'Firma dell\'accordo di piattaforma',
-            loginHeading: 'Accesso richiesto',
-            loginSub: 'Acceda con le credenziali Andertal per continuare.',
-            emailPlaceholder: 'Indirizzo e-mail',
-            passwordPlaceholder: 'Password',
-            loginBtn: 'Continua per firmare',
-            signHeading: 'Firma qui',
-            signSub: 'Si prega di firmare nel riquadro giallo con il dito o il mouse.',
-            clearBtn: 'Cancella',
-            submitBtn: 'Firma l\'accordo',
-            successHeading: 'Grazie!',
-            successMsg: 'La sua firma e stata salvata con successo. Puo tornare ad Andertal Sellercentral e chiudere questa finestra.',
-            expiredMsg: 'Questo link e scaduto o non e valido. Richieda un nuovo link in Sellercentral.',
-            alreadyMsg: 'Questo accordo e gia stato firmato.',
-            errorLogin: 'E-mail o password errati.',
-            errorGeneral: 'Si e verificato un errore. Riprovi.',
-            signing: 'Elaborazione in corso...',
-          },
+          if (!tr.rows.length || new Date(tr.rows[0].expires_at) < new Date()) return res.status(404).json({ message: 'Token not found or expired' })
+          const row = tr.rows[0]
+          if (row.used_at) return res.status(410).json({ message: 'Already signed', signed: true })
+          res.json({ valid: true, locale: row.locale, seller_name: row.store_name || null, company_name: row.company_name || null, authorized_person_name: row.authorized_person_name || null })
+        } catch (e) {
+          console.error('public-sign-get:', e)
+          res.status(500).json({ message: e?.message || 'Error' })
         }
-        const t = L[locale] || L.en
-
-        if (expired) {
-          return res.status(410).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${t.title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;padding:24px;box-sizing:border-box}.box{background:#fff;border-radius:12px;padding:40px 32px;max-width:400px;width:100%;text-align:center;box-shadow:0 2px 16px rgba(0,0,0,.1)}h2{margin:0 0 12px;font-size:20px;color:#c00}p{color:#555;font-size:15px;line-height:1.5}</style></head><body><div class="box"><h2>${t.expiredMsg.split('.')[0]}</h2><p>${t.expiredMsg}</p></div></body></html>`)
-        }
-        if (alreadySigned) {
-          return res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${t.title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;padding:24px;box-sizing:border-box}.box{background:#fff;border-radius:12px;padding:40px 32px;max-width:400px;width:100%;text-align:center;box-shadow:0 2px 16px rgba(0,0,0,.1)}h2{margin:0 0 12px;font-size:20px;color:#136761}p{color:#555;font-size:15px;line-height:1.5}</style></head><body><div class="box"><h2>${t.alreadyMsg}</h2></div></body></html>`)
-        }
-
-        res.setHeader('Content-Type', 'text/html; charset=utf-8')
-        res.send(`<!DOCTYPE html>
-<html lang="${locale}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>${t.title}</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; background: #f5f5f5; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px 48px; }
-    .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 20px rgba(0,0,0,.10); padding: 36px 28px; width: 100%; max-width: 440px; margin-top: 16px; }
-    .logo { text-align: center; margin-bottom: 24px; font-size: 22px; font-weight: 800; color: #136761; letter-spacing: -0.5px; }
-    h2 { margin: 0 0 6px; font-size: 19px; font-weight: 700; color: #111; }
-    .sub { color: #666; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
-    .field { margin-bottom: 14px; }
-    .field input { width: 100%; padding: 12px 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; outline: none; transition: border-color .2s; -webkit-appearance: none; }
-    .field input:focus { border-color: #136761; }
-    .btn { width: 100%; padding: 13px; background: #136761; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background .2s; -webkit-tap-highlight-color: transparent; }
-    .btn:hover { background: #0f524e; }
-    .btn:disabled { background: #999; cursor: not-allowed; }
-    .error-msg { color: #c00; font-size: 13px; margin-top: 10px; text-align: center; min-height: 18px; }
-    .sign-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-    .canvas-container { position: relative; width: 100%; }
-    canvas { display: block; width: 100%; height: 180px; border: 3px solid #f5c842; border-radius: 6px; background: #fff; touch-action: none; cursor: crosshair; }
-    .canvas-label { position: absolute; top: 6px; left: 10px; font-size: 11px; color: #aaa; pointer-events: none; user-select: none; }
-    .btn-row { display: flex; gap: 10px; width: 100%; }
-    .btn-clear { flex: 0 0 90px; background: #eee; color: #333; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; padding: 12px 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-    .btn-clear:hover { background: #e0e0e0; }
-    .btn-submit { flex: 1; }
-    .step { display: none; }
-    .step.active { display: block; }
-    .success-icon { font-size: 48px; text-align: center; margin-bottom: 12px; }
-    .success-heading { font-size: 22px; font-weight: 700; color: #136761; text-align: center; margin-bottom: 10px; }
-    .success-msg { color: #444; font-size: 15px; line-height: 1.6; text-align: center; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="logo">Andertal</div>
-
-    <div id="step-login" class="step active">
-      <h2>${t.loginHeading}</h2>
-      <p class="sub">${t.loginSub}</p>
-      <div class="field"><input type="email" id="inp-email" autocomplete="username email" placeholder="${t.emailPlaceholder}" /></div>
-      <div class="field"><input type="password" id="inp-password" autocomplete="current-password" placeholder="${t.passwordPlaceholder}" /></div>
-      <button class="btn" id="btn-login">${t.loginBtn}</button>
-      <div class="error-msg" id="err-login"></div>
-    </div>
-
-    <div id="step-sign" class="step">
-      <h2>${t.signHeading}</h2>
-      <p class="sub">${t.signSub}</p>
-      <div class="sign-wrap">
-        <div class="canvas-container">
-          <canvas id="sig-canvas" width="800" height="300"></canvas>
-          <span class="canvas-label">x</span>
-        </div>
-        <div class="btn-row">
-          <button class="btn-clear" id="btn-clear">${t.clearBtn}</button>
-          <button class="btn btn-submit" id="btn-submit">${t.submitBtn}</button>
-        </div>
-      </div>
-      <div class="error-msg" id="err-sign"></div>
-    </div>
-
-    <div id="step-success" class="step">
-      <div class="success-icon">&#10003;</div>
-      <div class="success-heading">${t.successHeading}</div>
-      <div class="success-msg">${t.successMsg}</div>
-    </div>
-  </div>
-
-  <script>
-    var TOKEN = ${JSON.stringify(token)};
-    var BASE = location.protocol + '//' + location.host;
-
-    function showStep(id) {
-      ['step-login','step-sign','step-success'].forEach(function(s){ document.getElementById(s).classList.remove('active'); });
-      document.getElementById(id).classList.add('active');
-    }
-
-    // ── Login step ──────────────────────────────────────────────────────────
-    var signSession = null;
-    document.getElementById('btn-login').addEventListener('click', function() {
-      var email = document.getElementById('inp-email').value.trim();
-      var password = document.getElementById('inp-password').value;
-      var errEl = document.getElementById('err-login');
-      errEl.textContent = '';
-      if (!email || !password) { errEl.textContent = '${t.errorGeneral}'; return; }
-      var btn = document.getElementById('btn-login');
-      btn.disabled = true; btn.textContent = '${t.signing}';
-      fetch(BASE + '/seller/sign/' + TOKEN + '/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, password: password })
       })
-      .then(function(r){ return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
-      .then(function(res){
-        btn.disabled = false; btn.textContent = '${t.loginBtn}';
-        if (!res.ok) { errEl.textContent = res.data.message || '${t.errorLogin}'; return; }
-        signSession = res.data.sign_session;
-        showStep('step-sign');
-        initCanvas();
-      })
-      .catch(function(){ btn.disabled = false; btn.textContent = '${t.loginBtn}'; errEl.textContent = '${t.errorGeneral}'; });
-    });
-    document.getElementById('inp-password').addEventListener('keydown', function(e){ if (e.key === 'Enter') document.getElementById('btn-login').click(); });
 
-    // ── Canvas drawing ───────────────────────────────────────────────────────
-    function initCanvas() {
-      var canvas = document.getElementById('sig-canvas');
-      var ctx = canvas.getContext('2d');
-      var drawing = false;
-      var lastX = 0, lastY = 0;
-
-      function getPos(e, canvas) {
-        var rect = canvas.getBoundingClientRect();
-        var scaleX = canvas.width / rect.width;
-        var scaleY = canvas.height / rect.height;
-        var src = e.touches ? e.touches[0] : e;
-        return { x: (src.clientX - rect.left) * scaleX, y: (src.clientY - rect.top) * scaleY };
-      }
-
-      function startDraw(e) { e.preventDefault(); drawing = true; var p = getPos(e, canvas); lastX = p.x; lastY = p.y; }
-      function moveDraw(e) {
-        if (!drawing) return; e.preventDefault();
-        var p = getPos(e, canvas);
-        ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y);
-        ctx.strokeStyle = '#111'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.stroke();
-        lastX = p.x; lastY = p.y;
-      }
-      function endDraw(e) { drawing = false; }
-
-      canvas.addEventListener('mousedown', startDraw);
-      canvas.addEventListener('mousemove', moveDraw);
-      canvas.addEventListener('mouseup', endDraw);
-      canvas.addEventListener('mouseleave', endDraw);
-      canvas.addEventListener('touchstart', startDraw, { passive: false });
-      canvas.addEventListener('touchmove', moveDraw, { passive: false });
-      canvas.addEventListener('touchend', endDraw);
-
-      document.getElementById('btn-clear').addEventListener('click', function() { ctx.clearRect(0, 0, canvas.width, canvas.height); });
-    }
-
-    // ── Submit signature ─────────────────────────────────────────────────────
-    document.getElementById('btn-submit').addEventListener('click', function() {
-      var canvas = document.getElementById('sig-canvas');
-      var errEl = document.getElementById('err-sign');
-      errEl.textContent = '';
-      var px = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
-      var hasContent = false;
-      for (var i = 3; i < px.length; i += 4) { if (px[i] > 10) { hasContent = true; break; } }
-      if (!hasContent) { errEl.textContent = '${t.signSub}'; return; }
-      var sigData = canvas.toDataURL('image/png');
-      var btn = document.getElementById('btn-submit');
-      btn.disabled = true; btn.textContent = '${t.signing}';
-      fetch(BASE + '/seller/sign/' + TOKEN + '/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sign_session: signSession, signature_data: sigData })
-      })
-      .then(function(r){ return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
-      .then(function(res){
-        btn.disabled = false; btn.textContent = '${t.submitBtn}';
-        if (!res.ok) { errEl.textContent = res.data.message || '${t.errorGeneral}'; return; }
-        showStep('step-success');
-      })
-      .catch(function(){ btn.disabled = false; btn.textContent = '${t.submitBtn}'; errEl.textContent = '${t.errorGeneral}'; });
-    });
-  </script>
-</body>
-</html>`)
-      })
 
       // POST /seller/sign/:token/auth — validate seller credentials, return sign_session
       httpApp.post('/seller/sign/:token/auth', async (req, res) => {
@@ -21286,7 +20993,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           }
           const sellerId = tr.rows[0].seller_id
           const sr = await client.query(
-            `SELECT id, email, password_hash FROM seller_users WHERE id = $1 AND LOWER(TRIM(email)) = LOWER(TRIM($2))`,
+            `SELECT id, email, password_hash FROM seller_users WHERE id::text = $1 AND LOWER(TRIM(email)) = LOWER(TRIM($2))`,
             [sellerId, email]
           )
           if (!sr.rows.length || !verifySellerPassword(password, sr.rows[0].password_hash)) {
@@ -21320,7 +21027,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           const tr = await client.query(
             `SELECT st.*, su.company_name, su.authorized_person_name, su.store_name, su.email
              FROM seller_sign_tokens st
-             JOIN seller_users su ON su.id = st.seller_id
+             JOIN seller_users su ON su.id::text = st.seller_id
              WHERE st.token = $1 AND st.sign_session = $2 AND st.expires_at > now() AND st.used_at IS NULL`,
             [token, sign_session]
           )
@@ -21340,7 +21047,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           )
           const pdfBase64 = 'data:application/pdf;base64,' + pdfBuf.toString('base64')
           await client.query(
-            `UPDATE seller_users SET signature_data = $1, signature_at = $2, signature_ip = $3, agreement_pdf_url = $4 WHERE id = $5`,
+            `UPDATE seller_users SET signature_data = $1, signature_at = $2, signature_ip = $3, agreement_pdf_url = $4 WHERE id::text = $5`,
             [signature_data, signedAt, signedIp, pdfBase64, row.seller_id]
           )
           await client.query(`UPDATE seller_sign_tokens SET used_at = $1, ip = $2 WHERE token = $3`, [signedAt, signedIp, token])
