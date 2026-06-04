@@ -134,7 +134,8 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\medusa-backend\\\\src\" -Recurse -File | Select-Object -Property Name | Where-Object { $_.Name -match \"order|seller|stripe|payment|commission|invoice|tax\" } | Sort-Object)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\sellercentral\\\\src\" -Recurse -File | Select-Object -Property Name | Where-Object { $_.Name -match \"\\\\.\\(jsx|js\\)$\" } | Sort-Object)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\medusa-backend\" -File -Recurse | Where-Object { $_.Name -match \"config|medusa\" -and $_.Name -notmatch \"node_modules\" } | Select-Object -Property FullName)",
-      "Bash(Select-Object -First 30)"
+      "Bash(Select-Object -First 30)",
+      "Bash(dir C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\sellercentral *)"
     ]
   }
 }
