@@ -220,11 +220,12 @@ const MiddleBarInner = styled.div`
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     min-height: ${(p) => {
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return `${72 - t * 32}px`;
+      return `${72 - t * 42}px`;
     }};
     padding: ${(p) => {
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return t > 0.02 ? "4px 14px" : "0 24px";
+      const h = Math.round(24 - t * 10);
+      return `0 ${h}px`;
     }};
     align-items: center;
     justify-content: flex-start;
@@ -296,6 +297,8 @@ const NarrowHeaderChrome = styled.div`
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     ${(p) => {
       if (p.$keepOnCompact) {
+        const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
+        const btnSize = Math.round(46 - t * 10);
         return `
       flex-shrink: 0;
       opacity: 1;
@@ -303,6 +306,7 @@ const NarrowHeaderChrome = styled.div`
       max-height: none;
       overflow: visible;
       pointer-events: auto;
+      button { width: ${btnSize}px !important; height: ${btnSize}px !important; min-width: ${btnSize}px; }
     `;
       }
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
