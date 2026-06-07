@@ -1598,7 +1598,9 @@ export default function ShopHeader() {
             : landingHeaderBg
               ? {
                   ...(isNarrowViewport ? { background: landingHeaderBg } : {}),
-                  "--narrow-header-safe-fill": landingHeaderBg,
+                  // Use the solid start-color for the ::before (status-bar strip) so the
+                  // gradient doesn't re-start inside the 44px safe-area slot — seamless bleed.
+                  "--narrow-header-safe-fill": extractSolidTintFromChromeCss(landingHeaderBg, computedHeaderSolidColor),
                 }
               : {
                   "--narrow-header-safe-fill":

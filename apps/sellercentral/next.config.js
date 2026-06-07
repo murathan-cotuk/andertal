@@ -52,7 +52,7 @@ const nextConfig = {
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
       // XHR/fetch to backend API; wss for any future WebSocket features
-      "connect-src 'self' https: wss:",
+      "connect-src 'self' https: wss: http://localhost:9000 http://192.168.2.127:9000",
       // Admin panel must never be embeddable in any frame
       "frame-src 'none'",
       "frame-ancestors 'none'",
