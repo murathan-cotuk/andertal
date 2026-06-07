@@ -2122,12 +2122,22 @@ export default function StylesPage() {
                   autoComplete="off"
                 />
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <Checkbox
-                    label="Second Nav beim Scrollen ausblenden"
-                    helpText="Ausgeschaltet: Second Nav bleibt immer sichtbar, auch beim Scrollen."
-                    checked={styles.secondNav.hide_on_scroll !== false}
-                    onChange={(v) => updateSection("secondNav", "hide_on_scroll", v)}
-                  />
+                  <BlockStack gap="300">
+                    <Checkbox
+                      label="Second Nav beim Scrollen ausblenden"
+                      helpText="Ausgeschaltet: Second Nav bleibt immer sichtbar, auch beim Scrollen."
+                      checked={styles.secondNav.hide_on_scroll !== false}
+                      onChange={(v) => updateSection("secondNav", "hide_on_scroll", v)}
+                    />
+                    {styles.secondNav.hide_on_scroll !== false && (
+                      <Checkbox
+                        label="Header-Chrome beim Scrollen hinter Second Nav beibehalten"
+                        helpText="Eingeschaltet: Der Header-Hintergrund bleibt hinter dem Second-Nav-Bereich sichtbar, auch wenn der Inhalt ausblendet. Ausgeschaltet (Standard): Hintergrund schrumpft gemeinsam mit dem Second Nav."
+                        checked={styles.secondNav.chrome_covers_on_scroll === true}
+                        onChange={(v) => updateSection("secondNav", "chrome_covers_on_scroll", v)}
+                      />
+                    )}
+                  </BlockStack>
                 </div>
               </div>
               <Divider />

@@ -88,6 +88,7 @@ export const DEFAULT_SHOP_STYLES = {
     height_tablet: "",
     height_mobile: "",
     hide_on_scroll: true,
+    chrome_covers_on_scroll: false,
     font_size: "14px",
     font_weight: "500",
     /** Link-Darstellung je Viewport: classic = Text + Hover-Unterstrich, pill = Frostglas-Kachel */

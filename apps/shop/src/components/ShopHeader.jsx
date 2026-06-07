@@ -808,13 +808,14 @@ const UserBtn = styled.button`
 const SubNavWrap = styled.div`
   width: 100%;
   max-height: ${(p) => {
+    /* chrome_covers: keep full height so header chrome stays visible; only opacity fades */
+    if (p.$chromeCover) return `var(--second-nav-h, 50px)`;
     const t = Math.min(1, Math.max(0, p.$hideProgress ?? 0));
     return `calc(var(--second-nav-h, 50px) * ${1 - t})`;
   }};
   background: var(--second-nav-bg, transparent);
   overflow: hidden;
   opacity: ${(p) => 1 - Math.min(1, Math.max(0, p.$hideProgress ?? 0))};
-  transform: translateY(${(p) => -100 * Math.min(1, Math.max(0, p.$hideProgress ?? 0))}%);
   display: flex;
   align-items: center;
   color: var(--second-nav-text, #374151);
@@ -1326,6 +1327,7 @@ export default function ShopHeader() {
 
   const effectiveHideProgress = mainMenuOpen ? 0 : chromeHideProgress;
   const snHideOnScroll = shopStyles?.secondNav?.hide_on_scroll !== false;
+  const snChromeCover = shopStyles?.secondNav?.chrome_covers_on_scroll === true;
   const subNavHideProgress = !showHeaderFilterBar
     ? 1
     : snHideOnScroll && scrollPastThreshold
@@ -1759,6 +1761,7 @@ export default function ShopHeader() {
           id="subnav"
           className="second-nav"
           $hideProgress={subNavHideProgress}
+          $chromeCover={snChromeCover}
           style={isNarrowViewport && landingHeaderBg ? { borderTop: "none", borderBottom: "none" } : undefined}
         >
           <SecondMenuRowInner>
