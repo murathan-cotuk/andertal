@@ -1372,7 +1372,9 @@ export default function ShopHeader() {
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setHeaderHeight(Math.round(entry.contentRect.height));
+        const h = Math.round(entry.contentRect.height);
+        setHeaderHeight(h);
+        document.documentElement.style.setProperty("--shop-header-h", `${h}px`);
       }
     });
     ro.observe(el);
