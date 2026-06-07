@@ -772,22 +772,35 @@ export default function StylesPage() {
   const [savedMsg, setSavedMsg] = useState("");
   const [errMsg, setErrMsg] = useState("");
 
-  const mkDeviceLogo = (h = 34) => ({ url: "", height: h, pt: 0, pr: 0, pb: 0, pl: 0 });
+  const mkDeviceLogo = (h = 34) => ({ url: "", size: h, height: h, pt: 0, pr: 0, pb: 0, pl: 0 });
   const defaultLogoConfig = () => ({
     shop: { desktop: mkDeviceLogo(34), tablet: mkDeviceLogo(30), mobile: mkDeviceLogo(28) },
     sellercentral: { desktop: mkDeviceLogo(30), tablet: mkDeviceLogo(28), mobile: mkDeviceLogo(26) },
   });
+  const logoSlotSize = (dev, fallback = 34) => {
+    if (dev?.size != null && Number.isFinite(Number(dev.size))) return Number(dev.size);
+    if (dev?.height != null && Number.isFinite(Number(dev.height))) return Number(dev.height);
+    return fallback;
+  };
+  const clampLogoSize = (raw, fallback = 34) => {
+    const n = Number(String(raw ?? "").replace(",", "."));
+    return Math.max(8, Math.min(400, Number.isFinite(n) && n > 0 ? n : fallback));
+  };
   const mergeLogoConfig = (saved) => {
     const def = defaultLogoConfig();
     if (!saved || typeof saved !== "object") return def;
-    const merge = (defDev, savedDev) => ({
-      url: savedDev?.url ?? defDev.url,
-      height: savedDev?.height != null ? Number(savedDev.height) : defDev.height,
-      pt: savedDev?.pt != null ? Number(savedDev.pt) : defDev.pt,
-      pr: savedDev?.pr != null ? Number(savedDev.pr) : defDev.pr,
-      pb: savedDev?.pb != null ? Number(savedDev.pb) : defDev.pb,
-      pl: savedDev?.pl != null ? Number(savedDev.pl) : defDev.pl,
-    });
+    const merge = (defDev, savedDev) => {
+      const size = logoSlotSize(savedDev, defDev.size ?? defDev.height);
+      return {
+        url: savedDev?.url ?? defDev.url,
+        size,
+        height: size,
+        pt: savedDev?.pt != null ? Number(savedDev.pt) : defDev.pt,
+        pr: savedDev?.pr != null ? Number(savedDev.pr) : defDev.pr,
+        pb: savedDev?.pb != null ? Number(savedDev.pb) : defDev.pb,
+        pl: savedDev?.pl != null ? Number(savedDev.pl) : defDev.pl,
+      };
+    };
     return {
       shop: {
         desktop: merge(def.shop.desktop, saved?.shop?.desktop),
@@ -800,6 +813,26 @@ export default function StylesPage() {
         mobile: merge(def.sellercentral.mobile, saved?.sellercentral?.mobile),
       },
     };
+  };
+  const normalizeLogoConfigForSave = (config) => {
+    const merged = mergeLogoConfig(config);
+    for (const section of ["shop", "sellercentral"]) {
+      const desktopUrl = String(merged[section]?.desktop?.url || "").trim();
+      for (const device of ["desktop", "tablet", "mobile"]) {
+        const dev = merged[section][device] || {};
+        const size = clampLogoSize(logoSlotSize(dev, logoSlotSize(merged[section].desktop, 34)), logoSlotSize(merged[section][device], 34));
+        merged[section][device] = {
+          url: String(dev.url || "").trim() || desktopUrl,
+          size,
+          height: size,
+          pt: Math.max(0, Math.min(80, Number(dev.pt) || 0)),
+          pr: Math.max(0, Math.min(80, Number(dev.pr) || 0)),
+          pb: Math.max(0, Math.min(80, Number(dev.pb) || 0)),
+          pl: Math.max(0, Math.min(80, Number(dev.pl) || 0)),
+        };
+      }
+    }
+    return merged;
   };
 
   const [branding, setBranding] = useState({
@@ -834,14 +867,14 @@ export default function StylesPage() {
       if (!savedLogoConfig && (settings?.shop_logo_url || settings?.sellercentral_logo_url)) {
         savedLogoConfig = {
           shop: {
-            desktop: { url: settings.shop_logo_url || "", height: Number(settings.shop_logo_height) || 34, pt: 0, pr: 0, pb: 0, pl: 0 },
-            tablet: { url: settings.shop_logo_url || "", height: Number(settings.shop_logo_height) || 34, pt: 0, pr: 0, pb: 0, pl: 0 },
-            mobile: { url: settings.shop_logo_url || "", height: Number(settings.shop_logo_height) || 34, pt: 0, pr: 0, pb: 0, pl: 0 },
+            desktop: { url: settings.shop_logo_url || "", size: Number(settings.shop_logo_height) || 34, height: Number(settings.shop_logo_height) || 34, pt: 0, pr: 0, pb: 0, pl: 0 },
+            tablet: { url: settings.shop_logo_url || "", size: Number(settings.shop_logo_height) || 34, height: Number(settings.shop_logo_height) || 34, pt: 0, pr: 0, pb: 0, pl: 0 },
+            mobile: { url: settings.shop_logo_url || "", size: Number(settings.shop_logo_height) || 34, height: Number(settings.shop_logo_height) || 34, pt: 0, pr: 0, pb: 0, pl: 0 },
           },
           sellercentral: {
-            desktop: { url: settings.sellercentral_logo_url || "", height: Number(settings.sellercentral_logo_height) || 30, pt: 0, pr: 0, pb: 0, pl: 0 },
-            tablet: { url: settings.sellercentral_logo_url || "", height: Number(settings.sellercentral_logo_height) || 30, pt: 0, pr: 0, pb: 0, pl: 0 },
-            mobile: { url: settings.sellercentral_logo_url || "", height: Number(settings.sellercentral_logo_height) || 30, pt: 0, pr: 0, pb: 0, pl: 0 },
+            desktop: { url: settings.sellercentral_logo_url || "", size: Number(settings.sellercentral_logo_height) || 30, height: Number(settings.sellercentral_logo_height) || 30, pt: 0, pr: 0, pb: 0, pl: 0 },
+            tablet: { url: settings.sellercentral_logo_url || "", size: Number(settings.sellercentral_logo_height) || 30, height: Number(settings.sellercentral_logo_height) || 30, pt: 0, pr: 0, pb: 0, pl: 0 },
+            mobile: { url: settings.sellercentral_logo_url || "", size: Number(settings.sellercentral_logo_height) || 30, height: Number(settings.sellercentral_logo_height) || 30, pt: 0, pr: 0, pb: 0, pl: 0 },
           },
         };
       }
@@ -881,15 +914,38 @@ export default function StylesPage() {
     setSavedMsg("");
     try {
       await client.saveStyles(styles);
-      // Also sync flat shop_logo_url/height from desktop config for backward compatibility
-      const desktopShopLogo = branding.logo_config?.shop?.desktop;
+      const logoConfig = normalizeLogoConfigForSave(branding.logo_config);
+      const desktopShopLogo = logoConfig.shop?.desktop;
+      const desktopScLogo = logoConfig.sellercentral?.desktop;
       await client.updateSellerSettings({
         seller_id: "default",
-        ...branding,
-        ...(desktopShopLogo?.url ? { shop_logo_url: desktopShopLogo.url, shop_logo_height: desktopShopLogo.height || 34 } : {}),
+        shop_favicon_url: branding.shop_favicon_url,
+        sellercentral_favicon_url: branding.sellercentral_favicon_url,
+        announcement_bar_items: branding.announcement_bar_items,
+        logo_config: logoConfig,
+        ...(String(desktopShopLogo?.url || "").trim()
+          ? {
+              shop_logo_url: desktopShopLogo.url,
+              shop_logo_height: logoSlotSize(desktopShopLogo, 34),
+            }
+          : {}),
+        ...(String(desktopScLogo?.url || "").trim()
+          ? {
+              sellercentral_logo_url: desktopScLogo.url,
+              sellercentral_logo_height: logoSlotSize(desktopScLogo, 30),
+            }
+          : {}),
       });
+      const settings = await client.getSellerSettings("default").catch(() => ({}));
+      const reloadedBranding = {
+        shop_favicon_url: settings?.shop_favicon_url || "",
+        sellercentral_favicon_url: settings?.sellercentral_favicon_url || "",
+        announcement_bar_items: Array.isArray(settings?.announcement_bar_items) ? settings.announcement_bar_items : [],
+        logo_config: mergeLogoConfig(settings?.logo_config || logoConfig),
+      };
+      setBranding(reloadedBranding);
       setSavedSnapshot(JSON.stringify(styles));
-      setBrandingSnapshot(JSON.stringify(branding));
+      setBrandingSnapshot(JSON.stringify(reloadedBranding));
       // Bust the shop's settings cache so logo changes appear immediately on reload
       const shopUrl = (process.env.NEXT_PUBLIC_SHOP_URL || "").replace(/\/$/, "");
       if (shopUrl) {
@@ -1135,30 +1191,27 @@ export default function StylesPage() {
                     {(dev.url || "").trim() && (
                       <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "start" }}>
                         <div>
-                          {/* Height — direct px input */}
-                          <Text as="span" variant="bodySm" fontWeight="medium">Höhe (px)</Text>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, marginBottom: 14 }}>
-                            <input
-                              type="number" min={8} max={400} step={1}
-                              value={dev.height ?? 34}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                if (v === "") return;
-                                updateDev({ height: Number(v) });
-                              }}
-                              onBlur={(e) => {
-                                const v = Number(e.target.value);
-                                updateDev({ height: Math.max(8, Math.min(400, isNaN(v) || v === 0 ? 34 : v)) });
-                              }}
-                              style={{ width: 80, padding: "6px 8px", border: "1.5px solid #d1d5db", borderRadius: 6, fontSize: 14, fontWeight: 600, textAlign: "center", boxSizing: "border-box" }}
-                            />
-                            <span style={{ fontSize: 13, color: "#6b7280" }}>px</span>
+                          <TextField
+                            label="Größe (px)"
+                            type="number"
+                            value={String(logoSlotSize(dev, section === "shop" ? 34 : 30))}
+                            onChange={(v) => {
+                              const size = clampLogoSize(v, logoSlotSize(dev, section === "shop" ? 34 : 30));
+                              updateDev({ size, height: size });
+                            }}
+                            helpText="Anzeigegröße des Logos; Breite passt sich proportional an."
+                            autoComplete="off"
+                          />
+                          <div style={{ marginTop: 8, marginBottom: 14 }}>
                             <button
                               type="button"
                               style={{ fontSize: 12, color: "#008060", background: "none", border: "1px solid #008060", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}
                               onClick={() => {
                                 const img = new Image();
-                                img.onload = () => updateDev({ height: Math.min(400, Math.round(img.naturalHeight)) });
+                                img.onload = () => {
+                                  const size = Math.min(400, Math.round(Math.max(img.naturalHeight, img.naturalWidth)));
+                                  updateDev({ size, height: size });
+                                };
                                 img.src = dev.url;
                               }}
                             >Originalgröße</button>
@@ -1196,7 +1249,7 @@ export default function StylesPage() {
                             src={dev.url}
                             alt="preview"
                             style={{
-                              height: Math.min(dev.height || 34, 200),
+                              height: Math.min(logoSlotSize(dev, section === "shop" ? 34 : 30), 200),
                               width: "auto",
                               maxWidth: 160,
                               objectFit: "contain",
@@ -1785,12 +1838,65 @@ export default function StylesPage() {
                   value={headerUi.text_color}
                   onChange={(v) => updateHeaderField("text_color", v)}
                 />
-                <TextField
-                  label="Höhe (height)"
-                  value={headerUi.height}
-                  onChange={(v) => updateHeaderField("height", v)}
-                  autoComplete="off"
-                />
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <BlockStack gap="200">
+                    <Text as="span" variant="bodySm" fontWeight="medium">Normalhöhe</Text>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                      <TextField
+                        label="Desktop (≥1024px)"
+                        value={headerUi.height_desktop || ""}
+                        onChange={(v) => updateHeaderField("height_desktop", v)}
+                        placeholder={headerUi.height || "72px"}
+                        autoComplete="off"
+                      />
+                      <TextField
+                        label="Tablet (768–1023px)"
+                        value={headerUi.height_tablet || ""}
+                        onChange={(v) => updateHeaderField("height_tablet", v)}
+                        placeholder={headerUi.height_desktop || headerUi.height || "72px"}
+                        autoComplete="off"
+                      />
+                      <TextField
+                        label="Mobil (≤767px)"
+                        value={headerUi.height_mobile || ""}
+                        onChange={(v) => updateHeaderField("height_mobile", v)}
+                        placeholder={headerUi.height_desktop || headerUi.height || "72px"}
+                        autoComplete="off"
+                      />
+                    </div>
+                  </BlockStack>
+                </div>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <BlockStack gap="200">
+                    <Text as="span" variant="bodySm" fontWeight="medium">Compact-Höhe (beim Scrollen)</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Höhe nach dem Scrollen. Leer = keine Änderung (Header bleibt gleich groß).
+                    </Text>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                      <TextField
+                        label="Desktop (≥1024px)"
+                        value={headerUi.compact_height_desktop || ""}
+                        onChange={(v) => updateHeaderField("compact_height_desktop", v)}
+                        placeholder="leer = keine Änderung"
+                        autoComplete="off"
+                      />
+                      <TextField
+                        label="Tablet (768–1023px)"
+                        value={headerUi.compact_height_tablet || ""}
+                        onChange={(v) => updateHeaderField("compact_height_tablet", v)}
+                        placeholder="leer = keine Änderung"
+                        autoComplete="off"
+                      />
+                      <TextField
+                        label="Mobil (≤767px)"
+                        value={headerUi.compact_height_mobile || ""}
+                        onChange={(v) => updateHeaderField("compact_height_mobile", v)}
+                        placeholder="leer = keine Änderung"
+                        autoComplete="off"
+                      />
+                    </div>
+                  </BlockStack>
+                </div>
                 <TextField
                   label="Schatten (box-shadow)"
                   value={headerUi.shadow}
@@ -1975,12 +2081,34 @@ export default function StylesPage() {
                   value={styles.secondNav.active_color}
                   onChange={(v) => updateSection("secondNav", "active_color", v)}
                 />
-                <TextField
-                  label="Höhe (height)"
-                  value={styles.secondNav.height}
-                  onChange={(v) => updateSection("secondNav", "height", v)}
-                  autoComplete="off"
-                />
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <BlockStack gap="200">
+                    <Text as="span" variant="bodySm" fontWeight="medium">Höhe (height)</Text>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                      <TextField
+                        label="Desktop (≥1024px)"
+                        value={styles.secondNav.height_desktop || ""}
+                        onChange={(v) => updateSection("secondNav", "height_desktop", v)}
+                        placeholder={styles.secondNav.height || "44px"}
+                        autoComplete="off"
+                      />
+                      <TextField
+                        label="Tablet (768–1023px)"
+                        value={styles.secondNav.height_tablet || ""}
+                        onChange={(v) => updateSection("secondNav", "height_tablet", v)}
+                        placeholder={styles.secondNav.height_desktop || styles.secondNav.height || "44px"}
+                        autoComplete="off"
+                      />
+                      <TextField
+                        label="Mobil (≤767px)"
+                        value={styles.secondNav.height_mobile || ""}
+                        onChange={(v) => updateSection("secondNav", "height_mobile", v)}
+                        placeholder={styles.secondNav.height_desktop || styles.secondNav.height || "44px"}
+                        autoComplete="off"
+                      />
+                    </div>
+                  </BlockStack>
+                </div>
                 <TextField
                   label="Schriftgröße (font-size)"
                   value={styles.secondNav.font_size}
@@ -1993,6 +2121,14 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("secondNav", "font_weight", v)}
                   autoComplete="off"
                 />
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Checkbox
+                    label="Second Nav beim Scrollen ausblenden"
+                    helpText="Ausgeschaltet: Second Nav bleibt immer sichtbar, auch beim Scrollen."
+                    checked={styles.secondNav.hide_on_scroll !== false}
+                    onChange={(v) => updateSection("secondNav", "hide_on_scroll", v)}
+                  />
+                </div>
               </div>
               <Divider />
               <Text as="h3" variant="headingSm">Menü-Kacheln (Second Nav Links)</Text>

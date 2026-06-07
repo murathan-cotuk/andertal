@@ -61,6 +61,12 @@ export const DEFAULT_SHOP_STYLES = {
     bg_gradient_intensity: 75,
     text_color: "#111827",
     height: "72px",
+    height_desktop: "",
+    height_tablet: "",
+    height_mobile: "",
+    compact_height_desktop: "",
+    compact_height_tablet: "",
+    compact_height_mobile: "",
     shadow: "0 2px 8px rgba(0,0,0,0.08)",
     border_bottom: "1px solid #f3f4f6",
     /** Nur auf passenden Routen — leeres Objekt = überall Standard */
@@ -78,6 +84,10 @@ export const DEFAULT_SHOP_STYLES = {
     text_color: "#374151",
     active_color: "#ff971c",
     height: "44px",
+    height_desktop: "",
+    height_tablet: "",
+    height_mobile: "",
+    hide_on_scroll: true,
     font_size: "14px",
     font_weight: "500",
     /** Link-Darstellung je Viewport: classic = Text + Hover-Unterstrich, pill = Frostglas-Kachel */

@@ -34,6 +34,25 @@ function levelFontFamily(typo, levelKey) {
   return `"Inter", system-ui, sans-serif`;
 }
 
+/** Pick per-viewport height; falls back to the legacy `height` field. */
+function resolveVpHeight(section, fallback) {
+  const base = section.height || fallback;
+  return {
+    desktop: section.height_desktop || base,
+    tablet: section.height_tablet || base,
+    mobile: section.height_mobile || base,
+  };
+}
+
+/** Compact (scrolled) height per viewport; falls back to normal height (no compaction). */
+function resolveVpCompactHeight(section, normalVp) {
+  return {
+    desktop: section.compact_height_desktop || normalVp.desktop,
+    tablet: section.compact_height_tablet || normalVp.tablet,
+    mobile: section.compact_height_mobile || normalVp.mobile,
+  };
+}
+
 function getActiveCode(buttons, key) {
   const btn = buttons?.[key];
   if (!btn?.variants?.length) return "";
@@ -67,6 +86,9 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   const secondNav = resolveSectionStrings(styles.secondNav, primary);
   const headerChromeByVp = buildHeaderChromeBackgroundsByViewport(header, primary);
   const secondNavVp = buildSecondNavSurfacesByViewport(secondNav);
+  const headerHVp = resolveVpHeight(header, "72px");
+  const secondNavHVp = resolveVpHeight(secondNav, "44px");
+  const headerCompactVp = resolveVpCompactHeight(header, headerHVp);
   const footer = styles.footer || {};
   const typo = styles.typography || {};
   const scrollUp = resolveSectionStrings(styles.scrollUpButton, primary);
@@ -101,14 +123,15 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --header-bg:       ${header.bg_color};
   --header-chrome-bg: ${headerChromeByVp.desktop};
   --header-text:     ${header.text_color};
-  --header-h:        ${header.height};
+  --header-h:        ${headerHVp.desktop};
+  --header-h-compact: ${headerCompactVp.desktop};
   --header-shadow:   ${header.shadow};
   --header-border:   ${header.border_bottom};
   --second-nav-bg:   ${secondNavVp.desktop.bg};
   --second-nav-border: ${secondNavVp.desktop.border};
   --second-nav-text: ${secondNavVp.desktop.text};
   --second-nav-active: ${secondNavVp.desktop.active};
-  --second-nav-h:    ${secondNav.height};
+  --second-nav-h:    ${secondNavHVp.desktop};
   --second-nav-fs:   ${secondNav.font_size};
   --second-nav-fw:   ${secondNav.font_weight};
   --second-nav-pill-bg:       ${secondNav.pill_background != null && secondNav.pill_background !== "" ? secondNav.pill_background : "rgba(255,255,255,0.32)"};
@@ -193,19 +216,25 @@ ${buttonColorCssVars ? `\n${buttonColorCssVars}` : ""}
 @media (max-width: 1023px) {
   :root {
     --header-chrome-bg: ${headerChromeByVp.tablet};
+    --header-h: ${headerHVp.tablet};
+    --header-h-compact: ${headerCompactVp.tablet};
     --second-nav-bg: ${secondNavVp.tablet.bg};
     --second-nav-border: ${secondNavVp.tablet.border};
     --second-nav-text: ${secondNavVp.tablet.text};
     --second-nav-active: ${secondNavVp.tablet.active};
+    --second-nav-h: ${secondNavHVp.tablet};
   }
 }
 @media (max-width: 767px) {
   :root {
     --header-chrome-bg: ${headerChromeByVp.mobile};
+    --header-h: ${headerHVp.mobile};
+    --header-h-compact: ${headerCompactVp.mobile};
     --second-nav-bg: ${secondNavVp.mobile.bg};
     --second-nav-border: ${secondNavVp.mobile.border};
     --second-nav-text: ${secondNavVp.mobile.text};
     --second-nav-active: ${secondNavVp.mobile.active};
+    --second-nav-h: ${secondNavHVp.mobile};
   }
 }`;
 

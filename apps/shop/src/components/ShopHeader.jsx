@@ -194,7 +194,7 @@ const HeaderChrome = styled.div`
 
 const MiddleBarWrap = styled.div`
   width: 100%;
-  min-height: 64px;
+  min-height: var(--header-h, 72px);
   background-color: transparent;
   color: var(--header-text, #111827);
   transition: color 0.28s ease, backdrop-filter 0.28s ease, min-height 0.28s ease;
@@ -204,7 +204,7 @@ const MiddleBarWrap = styled.div`
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     min-height: ${(p) => {
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return `${64 - t * 64}px`;
+      return `calc(${1 - t} * var(--header-h, 72px) + ${t} * var(--header-h-compact, var(--header-h, 72px)))`;
     }};
   }
 `;
@@ -213,25 +213,14 @@ const MiddleBarInner = styled.div`
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 24px;
-  min-height: 72px;
+  min-height: var(--header-h, 72px);
   display: flex;
   align-items: center;
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     min-height: ${(p) => {
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return `${72 - t * 42}px`;
-    }};
-    padding: ${(p) => {
-      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      const h = Math.round(24 - t * 10);
-      return `0 ${h}px`;
-    }};
-    align-items: center;
-    justify-content: flex-start;
-    gap: ${(p) => {
-      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return t > 0.02 ? "8px" : "0";
+      return `calc(${1 - t} * var(--header-h, 72px) + ${t} * var(--header-h-compact, var(--header-h, 72px)))`;
     }};
   }
 `;
@@ -271,54 +260,12 @@ const MiddleBarCenter = styled.div`
   margin-left: 28px;
   margin-right: 4px;
   gap: 0;
-
-  @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) => {
-      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      if (t <= 0.02) return "";
-      return `
-      margin-left: 0 !important;
-      margin-right: 0 !important;
-      flex: 1 1 0;
-      min-width: 0;
-      width: auto;
-      max-width: none;
-      justify-content: flex-start;
-    `;
-    }}
-  }
 `;
 
-/* Dar görünüm: $keepOnCompact = logo+arama kalır; yoksa kaydırınca gizlenir */
 const NarrowHeaderChrome = styled.div`
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) => {
-      if (p.$keepOnCompact) {
-        const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-        const btnSize = Math.round(46 - t * 10);
-        return `
-      flex-shrink: 0;
-      opacity: 1;
-      transform: none;
-      max-height: none;
-      overflow: visible;
-      pointer-events: auto;
-      button { width: ${btnSize}px !important; height: ${btnSize}px !important; min-width: ${btnSize}px; }
-    `;
-      }
-      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return `
-      overflow: hidden;
-      opacity: ${1 - t};
-      transform: translateY(${-10 * t}px);
-      max-height: ${Math.max(0, 88 * (1 - t))}px;
-      pointer-events: ${t >= 0.92 ? "none" : "auto"};
-    `;
-    }}
-  }
 `;
 
 /* Kategorien dropdown hemen search bar'ın solunda */
@@ -341,7 +288,7 @@ const MegaNav = styled.nav`
     align-items: stretch;
     flex-shrink: 0;
     margin-right: 12px;
-    height: 72px;
+    height: var(--header-h, 72px);
   }
 `;
 
@@ -468,13 +415,6 @@ const SearchBarForm = styled.div`
   &:focus-within {
     box-shadow: 0 2px 14px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
   }
-
-  @media (max-width: ${HEADER_NARROW_MQ}px) {
-    width: ${(p) => ((p.$compactProgress ?? 0) > 0.02 ? "100%" : "auto")};
-    max-width: none;
-    margin-left: 0;
-    margin-right: 0;
-  }
 `;
 
 const SearchBarButton = styled.button`
@@ -510,19 +450,6 @@ const MiddleBarSearch = styled.div`
   min-width: 0;
   display: flex;
   align-items: center;
-
-  @media (max-width: ${HEADER_NARROW_MQ}px) {
-    ${(p) => {
-      const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      if (t <= 0.02) return "";
-      return `
-      flex: 1 1 0;
-      min-width: 0;
-      width: 100%;
-      justify-content: stretch;
-    `;
-    }}
-  }
 `;
 
 const MiddleBarRight = styled.div`
@@ -1372,9 +1299,7 @@ export default function ShopHeader() {
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const h = Math.round(entry.contentRect.height);
-        setHeaderHeight(h);
-        document.documentElement.style.setProperty("--shop-header-h", `${h}px`);
+        setHeaderHeight(Math.round(entry.contentRect.height));
       }
     });
     ro.observe(el);
@@ -1400,9 +1325,10 @@ export default function ShopHeader() {
   }, []);
 
   const effectiveHideProgress = mainMenuOpen ? 0 : chromeHideProgress;
+  const snHideOnScroll = shopStyles?.secondNav?.hide_on_scroll !== false;
   const subNavHideProgress = !showHeaderFilterBar
     ? 1
-    : scrollPastThreshold
+    : snHideOnScroll && scrollPastThreshold
       ? effectiveHideProgress
       : 0;
   const secondNavHidden = subNavHideProgress >= 0.98 || !showHeaderFilterBar;
@@ -1632,7 +1558,10 @@ export default function ShopHeader() {
                   {(() => {
                     const devCfg = shopBranding.logo_config?.shop?.[logoDeviceKey];
                     const url = devCfg?.url || shopBranding.shop_logo_url || "";
-                    const height = Math.min(devCfg?.height ?? shopBranding.shop_logo_height ?? 34, 200);
+                    const height = Math.min(
+                      devCfg?.size ?? devCfg?.height ?? shopBranding.shop_logo_height ?? 34,
+                      200,
+                    );
                     const compactH = Math.max(22, Math.round(height * (1 - 0.32 * narrowCompactProgress)));
                     const pt = devCfg?.pt ?? 0;
                     const pr = devCfg?.pr ?? 0;

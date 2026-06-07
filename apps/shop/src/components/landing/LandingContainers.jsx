@@ -2118,18 +2118,9 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
   const isNarrow = useIsNarrow(1023);
   const images = (container.images || []).filter((i) => localizedAsset(i, "url", locale));
-  const { setLandingHeaderBg, setLandingHeaderFilterBar } = useLandingChrome();
+  const { setLandingHeaderBg } = useLandingChrome();
   const mobileScrollRef = useRef(null);
   const [activeIdx, setActiveIdx] = useState(0);
-
-  // Hide second nav immediately when hero-extending on mobile
-  const firstImgColor = images[0]?.color || "";
-  useEffect(() => {
-    if (!isFirstContainer) return;
-    const heroActive = isNarrow && !!firstImgColor;
-    if (heroActive) setLandingHeaderFilterBar(false);
-    return () => { if (heroActive) setLandingHeaderFilterBar(true); };
-  }, [isFirstContainer, isNarrow, firstImgColor, setLandingHeaderFilterBar]);
 
   // Track active slide for header gradient
   useEffect(() => {
@@ -2184,7 +2175,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   // mobile_item_width accepts any CSS length (vw, %, px). Falls back to calculated px value.
   const mobileItemW = String(container.mobile_item_width || "").trim() || `${mobileItemWidthPx}px`;
 
-  const renderImageCell = (img, isHero = false) => {
+  const renderImageCell = (img) => {
     const src = resolveUrl(lt(img, "url", locale));
     const ratio = pickImageCarouselRatio(container, isNarrow);
     const minH = isNarrow && (container.min_height_mobile != null) && String(container.min_height_mobile).trim() !== "";
@@ -2193,22 +2184,11 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
       width: "100%",
       aspectRatio: ratio,
       overflow: "hidden",
-      // Hero images extend behind the header — flush top edges, rounded bottom
-      borderRadius: isHero ? "0 0 12px 12px" : 12,
+      borderRadius: 12,
       background: "#f3f4f6",
-      position: "relative",
       ...(minH ? { minHeight: String(container.min_height_mobile).trim() } : {}),
       ...(maxH ? { maxHeight: maxH } : {}),
     };
-    const gradientOverlay = img.color ? (
-      <div style={{
-        position: "absolute",
-        inset: 0,
-        background: `linear-gradient(${img.gradient_direction || "to bottom"}, ${img.color} 0%, transparent ${img.gradient_stop || "80%"})`,
-        pointerEvents: "none",
-        borderRadius: "inherit",
-      }} />
-    ) : null;
     const imgTitle = lt(img, "title", locale);
     const imgText = lt(img, "text", locale);
     const hasTitle = !!(imgTitle && String(imgTitle).trim());
@@ -2223,7 +2203,6 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
       <>
         <div style={boxStyle}>
           <img src={src} alt={imgTitle || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-          {gradientOverlay}
         </div>
         {cap}
       </>
@@ -2264,20 +2243,10 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     const padLeft = rawPad.paddingLeft || "0px";
     const padRight = rawPad.paddingRight || "0px";
     const title = lt(container, "title", locale);
-    // Hero-extend: pull the carousel up behind the fixed header so the gradient
-    // flows seamlessly from the status bar through the header into the image.
-    const heroExtend = isFirstContainer && images[0]?.color;
     return (
-      <div style={{
-        background: bg,
-        ...(heroExtend ? { marginTop: "calc(var(--shop-header-h, 60px) * -1)" } : {}),
-      }}>
+      <div style={{ background: bg }}>
         {title && (
-          <div style={{
-            padding: `0 ${padLeft}`,
-            marginBottom: 12,
-            ...(heroExtend ? { paddingTop: "calc(var(--shop-header-h, 60px) + 8px)" } : {}),
-          }}>
+          <div style={{ padding: `0 ${padLeft}`, marginBottom: 12 }}>
             <h2 style={{ fontSize: "clamp(1rem, 2vw, 1.375rem)", fontWeight: 600, margin: 0 }}>{title}</h2>
           </div>
         )}
@@ -2308,7 +2277,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
                   ...(isLast ? { marginRight: padRight, scrollMarginRight: padRight } : {}),
                 }}
               >
-                {renderImageCell(img, heroExtend && isFirst)}
+                {renderImageCell(img)}
               </div>
             );
           })}

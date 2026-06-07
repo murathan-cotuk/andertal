@@ -69,28 +69,36 @@ function buildSellercentralLogoSlotsFromSettings(d) {
   const sc = d?.logo_config?.sellercentral;
   if (!sc || typeof sc !== "object") {
     const u = normalizeSellerCentralLogoUrl(legUrl) ?? "";
-    const slot = (height) => ({ url: u || "", height, ...pad({}) });
+    const slot = (size) => ({ url: u || "", size, height: size, ...pad({}) });
     return { desktop: slot(legH), tablet: slot(28), mobile: slot(26) };
   }
   const deskBlock = sc.desktop || {};
   const deskUrlStr = String(deskBlock.url ?? "").trim() || legUrl;
+  const slotSize = (block, fallback) => {
+    if (block?.size != null && Number.isFinite(Number(block.size))) return Number(block.size);
+    if (block?.height != null && Number.isFinite(Number(block.height))) return Number(block.height);
+    return fallback;
+  };
   const desktop = {
     url: normalizeSellerCentralLogoUrl(deskUrlStr) ?? "",
-    height: deskBlock.height != null ? Number(deskBlock.height) : legH,
+    size: slotSize(deskBlock, legH),
+    height: slotSize(deskBlock, legH),
     ...pad(deskBlock),
   };
   const tabBlock = sc.tablet || {};
   const tabUrlStr = String(tabBlock.url ?? "").trim() || deskUrlStr;
   const tablet = {
     url: normalizeSellerCentralLogoUrl(tabUrlStr) ?? "",
-    height: tabBlock.height != null ? Number(tabBlock.height) : 28,
+    size: slotSize(tabBlock, 28),
+    height: slotSize(tabBlock, 28),
     ...pad(tabBlock),
   };
   const mobBlock = sc.mobile || {};
   const mobUrlStr = String(mobBlock.url ?? "").trim() || deskUrlStr;
   const mobile = {
     url: normalizeSellerCentralLogoUrl(mobUrlStr) ?? "",
-    height: mobBlock.height != null ? Number(mobBlock.height) : 26,
+    size: slotSize(mobBlock, 26),
+    height: slotSize(mobBlock, 26),
     ...pad(mobBlock),
   };
   return { desktop, tablet, mobile };
@@ -497,7 +505,7 @@ export default function PolarisLayout({ children }) {
     return {
       sellercentral_logo_url: slot?.url || "",
       sellercentral_favicon_url: sellercentralFavicon,
-      sellercentral_logo_height: slot?.height ?? 30,
+      sellercentral_logo_height: slot?.size ?? slot?.height ?? 30,
       logo_pt: slot?.pt ?? 0,
       logo_pr: slot?.pr ?? 0,
       logo_pb: slot?.pb ?? 0,

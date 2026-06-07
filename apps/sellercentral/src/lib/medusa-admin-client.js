@@ -344,8 +344,12 @@ class MedusaAdminClient {
 
   /** PATCH /admin-hub/seller-settings – save store name to DB */
   async updateSellerSettings(data) {
-    const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
-    const body = sellerId ? { seller_id: sellerId, ...data } : data;
+    const explicitId = data?.seller_id != null ? String(data.seller_id).trim() : '';
+    const sellerId =
+      explicitId ||
+      (typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null) ||
+      'default';
+    const body = { ...data, seller_id: sellerId };
     const res = await this.request('/admin-hub/seller-settings', {
       method: 'PATCH',
       body: JSON.stringify(body),

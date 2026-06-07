@@ -5236,7 +5236,8 @@ async function start() {
         const announcement_bar_items = body.announcement_bar_items !== undefined
           ? (Array.isArray(body.announcement_bar_items) ? body.announcement_bar_items : null)
           : undefined
-        const logo_config = body.logo_config !== undefined
+        const logoConfigProvided = Object.prototype.hasOwnProperty.call(body, 'logo_config')
+        const logo_config = logoConfigProvided
           ? (body.logo_config && typeof body.logo_config === 'object' ? body.logo_config : null)
           : undefined
         const legalStr = (k) => body[k] !== undefined ? (body[k] ? String(body[k]).trim() : null) : undefined
@@ -5258,7 +5259,7 @@ async function start() {
         const thresholdsJson = free_shipping_thresholds ? JSON.stringify(free_shipping_thresholds) : null
         log.info('[sellerSettingsPATCH] saving free_shipping_thresholds:', thresholdsJson)
         const announcementJson = announcement_bar_items !== undefined ? JSON.stringify(announcement_bar_items) : undefined
-        const logoConfigJson = logo_config !== undefined ? JSON.stringify(logo_config) : undefined
+        const logoConfigJson = logoConfigProvided ? JSON.stringify(logo_config) : undefined
         await client.query(
           `INSERT INTO admin_hub_seller_settings (
              seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, storefront_url, logo_config,
