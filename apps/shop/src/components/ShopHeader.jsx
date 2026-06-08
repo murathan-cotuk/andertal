@@ -1276,6 +1276,8 @@ export default function ShopHeader() {
 
   useEffect(() => {
     setDrillCategoryId(null);
+    setMainMenuOpen(false);
+    setLocaleDropdownOpen(false);
     setScrollingDown(false);
     setChromeHideProgress(0);
     chromeHideProgressRef.current = 0;

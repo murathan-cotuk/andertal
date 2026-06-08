@@ -24,7 +24,7 @@ function menuItemHref(item) {
   }
   if (item.link_type === "page") {
     const pageSlug = parsed?.slug || parsed?.label_slug || itemSlug || slugify(item.label);
-    return pageSlug ? `/pages/${pageSlug}` : "#";
+    return pageSlug ? `/${pageSlug}` : "#";
   }
   if (item.link_type === "api") {
     const fn = String(parsed?.function || parsed?.api_function || value || "").trim().toLowerCase();
