@@ -1,4 +1,4 @@
-07.06.
+08.06.
 
 -- sellercentralde import-export sayfasindan ürün import etmek icin excel hazirladim. seller olarak yükledim ve su uyariyi verdi:
 

@@ -1758,13 +1758,17 @@ export default function ShopHeader() {
             </NarrowHeaderChrome>
           </MiddleBarInner>
         </MiddleBarWrap>
+        </HeaderChrome>
 
         <SubNavWrap
           id="subnav"
           className="second-nav"
           $hideProgress={subNavHideProgress}
           $chromeCover={snChromeCover}
-          style={isNarrowViewport && landingHeaderBg ? { borderTop: "none", borderBottom: "none" } : undefined}
+          style={{
+            ...(snChromeCover ? { background: "var(--header-chrome-bg)" } : {}),
+            ...(isNarrowViewport && landingHeaderBg ? { borderTop: "none", borderBottom: "none" } : {}),
+          }}
         >
           <SecondMenuRowInner>
             {secondMenuItems.map((item) => (
@@ -1778,7 +1782,6 @@ export default function ShopHeader() {
             ))}
           </SecondMenuRowInner>
         </SubNavWrap>
-        </HeaderChrome>
 
         {/* Mega menu panel — floats below the header bar */}
         {hasMegaNav && (
