@@ -29,7 +29,7 @@ function ImpersonateInner() {
     localStorage.setItem("sellerLoggedIn", "true");
 
     router.replace("/dashboard");
-  }, []);
+  }, [router]);
 
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "system-ui, sans-serif", background: "#f9fafb" }}>
