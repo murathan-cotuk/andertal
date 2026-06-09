@@ -2,12 +2,13 @@
 
 import React from "react";
 import styled from "styled-components";
+import { useShopStyles } from "@/context/ShopStylesContext";
 
 const Badge = styled.span`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   padding: 4px 10px;
   border-radius: 999px;
   background: linear-gradient(135deg, #2a1200 0%, #9a5b00 40%, #fbbf24 100%);
@@ -22,9 +23,21 @@ const Badge = styled.span`
 `;
 
 export default function BestsellerBadge({ children = "Bestseller", className, style }) {
+  const shopStyles = useShopStyles();
+  const imgUrl = shopStyles?.bestseller_badge?.image_url;
+
   return (
     <Badge className={className} style={style}>
-      <span aria-hidden style={{ fontSize: 10, lineHeight: 1 }}>★</span>
+      {imgUrl ? (
+        <img
+          src={imgUrl}
+          alt=""
+          aria-hidden
+          style={{ width: 14, height: 14, objectFit: "contain", verticalAlign: "middle", flexShrink: 0 }}
+        />
+      ) : (
+        <span aria-hidden style={{ fontSize: 10, lineHeight: 1 }}>★</span>
+      )}
       {children}
     </Badge>
   );

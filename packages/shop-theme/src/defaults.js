@@ -245,4 +245,8 @@ export const DEFAULT_SHOP_STYLES = {
     },
   },
   made_in_europe_badge: { ...DEFAULT_MADE_IN_EUROPE_BADGE },
+  bestseller_badge: {
+    /** Optional image URL — shown in badge instead of ★ star when set */
+    image_url: "",
+  },
 };

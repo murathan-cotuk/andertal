@@ -7,7 +7,6 @@ import {
 } from "@shopify/polaris";
 import { useRouter } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-import SellerImpersonationPanel from "@/components/SellerImpersonationPanel";
 
 const STATUS_META = {
   registered:           { label: "Kayıt Oldu",        tone: "info" },
@@ -121,14 +120,21 @@ export default function SellersPage() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [impersonating, setImpersonating] = useState(null); // { seller, token }
   const [impersonateLoading, setImpersonateLoading] = useState(null);
 
   const handleImpersonate = async (seller) => {
     setImpersonateLoading(seller.id);
     try {
       const r = await client.impersonateSeller(seller.id);
-      setImpersonating({ seller, token: r.token });
+      const locale = typeof window !== "undefined" ? (window.location.pathname.split("/")[1] || "de") : "de";
+      const params = new URLSearchParams({
+        token: r.token,
+        email: seller.email || "",
+        seller_id: seller.seller_id || seller.id || "",
+        store_name: seller.store_name || "",
+        is_superuser: isSellerSuperuser(seller) ? "true" : "false",
+      });
+      window.open(`/${locale}/auth/impersonate?${params.toString()}`, "_blank");
     } catch (e) {
       setError(e?.message || "Impersonation fehlgeschlagen");
     } finally {
@@ -272,13 +278,6 @@ export default function SellersPage() {
       </BlockStack>
     </Page>
 
-    {impersonating && (
-      <SellerImpersonationPanel
-        seller={impersonating.seller}
-        token={impersonating.token}
-        onClose={() => setImpersonating(null)}
-      />
-    )}
     </>
   );
 }

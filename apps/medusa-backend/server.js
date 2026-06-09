@@ -6395,17 +6395,40 @@ async function start() {
       if (bestsellerCache.expiresAt > now && bestsellerCache.ids && bestsellerCache.ids.size > 0) {
         return bestsellerCache.ids
       }
+      // Real sales data from paid orders (primary source)
+      const realSalesById = new Map()
+      const dbSalesClient = getProductsDbClient()
+      if (dbSalesClient) {
+        try {
+          await dbSalesClient.connect()
+          const res = await dbSalesClient.query(`
+            SELECT oi.product_id, SUM(oi.quantity)::int AS total_sold
+            FROM store_order_items oi
+            JOIN store_orders o ON o.id = oi.order_id
+            WHERE o.payment_status = 'bezahlt'
+              AND oi.product_id IS NOT NULL
+              AND oi.product_id <> ''
+            GROUP BY oi.product_id
+          `)
+          for (const row of res.rows) {
+            if (row.product_id && Number(row.total_sold) > 0) {
+              realSalesById.set(String(row.product_id).trim(), Number(row.total_sold))
+            }
+          }
+        } catch (_) { /* fall back to metadata */ }
+        finally { try { await dbSalesClient.end() } catch (_) {} }
+      }
       const approvedSellerIds = await getApprovedSellerIdsSet()
       let all = await listAdminHubProductsDb({ limit: 5000 })
       all = all.filter((p) => (p.status || '').toLowerCase() === 'published' && isStoreVisibleSellerProduct(p, approvedSellerIds))
       const byCollection = new Map()
       const byCategory = new Map()
       for (const p of all) {
-        const score = salesScoreFromMetadata(p.metadata)
+        // Real order data takes priority; metadata fields are fallback
+        const score = realSalesById.get(String(p.id).trim()) || salesScoreFromMetadata(p.metadata)
         if (!(score > 0)) continue
-        const keys = productCollectionKeys(p)
-        if (!keys.length) continue
-        for (const key of keys) {
+        const collectionKeys = productCollectionKeys(p)
+        for (const key of collectionKeys) {
           const prev = byCollection.get(key)
           if (!prev || score > prev.score) byCollection.set(key, { id: String(p.id), score })
         }

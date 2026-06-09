@@ -38,16 +38,6 @@ const TOPBAR_DISPLAY_MODE_OPTIONS = [
   { label: "Karussell (je ein Eintrag, Auto + manuell)", value: "carousel" },
 ];
 
-/** Header: Basis vs. nur Kategorie- oder Kollektions-Routen */
-const HEADER_EDIT_SCOPE_OPTIONS = [
-  { label: "Überall (Standard)", value: "standard" },
-  { label: "Nur Kategorie-Seiten (/category/…)", value: "category" },
-  {
-    label: "Nur Kollektion (collections, kollektion, Kurz-URL /handle)",
-    value: "collection",
-  },
-];
-
 const MOBILE_HEADER_ON_SCROLL_OPTIONS = [
   { label: "Kaydırınca buzlu beyaz + blur", value: "frosted_white" },
   { label: "Tema / Landing-Rolle beibehalten", value: "inherit" },
@@ -844,8 +834,8 @@ export default function StylesPage() {
   const [brandingSnapshot, setBrandingSnapshot] = useState(null);
   const [brandingPickerTarget, setBrandingPickerTarget] = useState(null); // e.g. "logo_shop_desktop"
   const [logoActiveDevice, setLogoActiveDevice] = useState("desktop");
-  const [headerEditScope, setHeaderEditScope] = useState("standard");
-  const [headerBgPickerScope, setHeaderBgPickerScope] = useState(null);
+  const [headerScopeTab, setHeaderScopeTab] = useState("category");
+  const [headerBgPickerScope, setHeaderBgPickerScope] = useState(null); // null | "global" | "category" | "collection"
   const [catalogNavOpen, setCatalogNavOpen] = useState(false);
 
   useEffect(() => {
@@ -984,41 +974,40 @@ export default function StylesPage() {
   const updateSection = (section, key, val) =>
     setStyles((prev) => ({ ...prev, [section]: { ...prev[section], [key]: val } }));
 
-  const headerUi = useMemo(() => {
-    const h = styles?.header;
-    if (!h) return {};
-    if (headerEditScope === "standard") return h;
-    const patch = h.scopes?.[headerEditScope] || {};
-    const { scopes, ...rest } = h;
-    return { ...rest, ...patch };
-  }, [styles?.header, headerEditScope]);
-
-  /** Verlauf-Farbfelder anzeigen, wenn mindestens eine Ansicht den gemeinsamen Chrome-Verlauf nutzt */
   const headerGradientAnyViewport = useMemo(() => {
-    if (!headerUi || typeof headerUi !== "object") return false;
+    const h = styles?.header;
+    if (!h) return false;
     return (
-      effectiveGradientEnabled(headerUi, "mobile") ||
-      effectiveGradientEnabled(headerUi, "tablet") ||
-      effectiveGradientEnabled(headerUi, "desktop")
+      effectiveGradientEnabled(h, "mobile") ||
+      effectiveGradientEnabled(h, "tablet") ||
+      effectiveGradientEnabled(h, "desktop")
     );
-  }, [headerUi]);
+  }, [styles?.header]);
 
-  const updateHeaderField = (key, val) => {
-    if (headerEditScope === "standard") {
-      if (key === "scopes") return;
-      updateSection("header", key, val);
-      return;
-    }
+  const headerScopeOverride = useMemo(() => {
+    return styles?.header?.scopes?.[headerScopeTab] || {};
+  }, [styles?.header?.scopes, headerScopeTab]);
+
+  const headerScopeGradient = useMemo(() => {
+    if (!headerScopeOverride || typeof headerScopeOverride !== "object") return false;
+    return (
+      effectiveGradientEnabled(headerScopeOverride, "mobile") ||
+      effectiveGradientEnabled(headerScopeOverride, "tablet") ||
+      effectiveGradientEnabled(headerScopeOverride, "desktop")
+    );
+  }, [headerScopeOverride]);
+
+  const updateHeaderScopeField = (key, val) => {
     setStyles((prev) => {
       const header = prev.header || {};
       const scopes = { ...(header.scopes || {}) };
-      const bucket = { ...(scopes[headerEditScope] || {}) };
+      const bucket = { ...(scopes[headerScopeTab] || {}) };
       if (val === "") {
         delete bucket[key];
       } else {
         bucket[key] = val;
       }
-      scopes[headerEditScope] = bucket;
+      scopes[headerScopeTab] = bucket;
       return { ...prev, header: { ...header, scopes } };
     });
   };
@@ -1292,6 +1281,53 @@ export default function StylesPage() {
                   </InlineStack>
                 </div>
               ))}
+
+              {/* Bestseller Badge Image */}
+              <Divider />
+              <Text as="h3" variant="headingSm">Bestseller-Abzeichen Bild</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Optionales Bild-Icon für das Bestseller-Etikett — ersetzt den ★-Stern.
+                Empfohlen: kleines transparentes PNG oder SVG (ca. 20×20 px).
+              </Text>
+              <InlineStack gap="200" blockAlign="end" wrap>
+                <div style={{ flex: 1, minWidth: 280 }}>
+                  <TextField
+                    label="Bild-URL"
+                    value={styles?.bestseller_badge?.image_url || ""}
+                    onChange={(v) =>
+                      setStyles((prev) => ({
+                        ...prev,
+                        bestseller_badge: { ...(prev.bestseller_badge || {}), image_url: v },
+                      }))
+                    }
+                    placeholder="https://... oder /uploads/..."
+                    autoComplete="off"
+                  />
+                </div>
+                <Button size="slim" onClick={() => setBrandingPickerTarget("bestseller_badge_image")}>Aus Medien</Button>
+                {(styles?.bestseller_badge?.image_url || "").trim() ? (
+                  <Button
+                    size="slim"
+                    tone="critical"
+                    variant="plain"
+                    onClick={() =>
+                      setStyles((prev) => ({
+                        ...prev,
+                        bestseller_badge: { ...(prev.bestseller_badge || {}), image_url: "" },
+                      }))
+                    }
+                  >
+                    Entfernen
+                  </Button>
+                ) : null}
+              </InlineStack>
+              {(styles?.bestseller_badge?.image_url || "").trim() ? (
+                <img
+                  src={styles.bestseller_badge.image_url}
+                  alt=""
+                  style={{ maxWidth: 60, maxHeight: 60, objectFit: "contain", borderRadius: 6, border: "1px solid var(--p-color-border)" }}
+                />
+              ) : null}
             </BlockStack>
         </AccordionCard>
 
@@ -1717,199 +1753,279 @@ export default function StylesPage() {
         </AccordionCard>
 
         {/* Header / Navbar */}
-        <AccordionCard title="Layout: Header / Navbar">
-          <BlockStack gap="400">
-            <Banner tone="info">
-                <p>
-                  Zuerst <strong>Überall</strong> einstellen (Shop-Standard). Über „Anwendungsbereich“ können Sie für
-                  Kategorie- oder Kollektions-Seiten nur abweichende Farben, Verlauf oder Hintergrundbild setzen —
-                  leere Felder dort übernehmen weiter den Standard.
-                </p>
-              </Banner>
-              <Divider />
+        <AccordionCard title=”Layout: Header / Navbar”>
+          <BlockStack gap=”400”>
+            <div style={{ display: “grid”, gridTemplateColumns: “repeat(auto-fill, minmax(200px, 1fr))”, gap: 16 }}>
               <Select
-                label="Anwendungsbereich"
-                options={HEADER_EDIT_SCOPE_OPTIONS}
-                value={headerEditScope}
-                onChange={setHeaderEditScope}
+                label=”Stil-Vorlage”
+                options={HEADER_PRESET_LABELS}
+                value={styles.header.variant || “default”}
+                onChange={(v) => updateSection(“header”, “variant”, v)}
               />
-              <Divider />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-                {headerEditScope === "standard" ? (
-                  <Select
-                    label="Stil-Vorlage"
-                    options={HEADER_PRESET_LABELS}
-                    value={styles.header.variant || "default"}
-                    onChange={(v) => updateSection("header", "variant", v)}
+              <ColorField
+                label=”Hintergrundfarbe (Basis / Verlauf Start)”
+                value={styles.header.bg_color}
+                onChange={(v) => updateSection(“header”, “bg_color”, v)}
+              />
+              <div style={{ gridColumn: “1 / -1” }}>
+                <BlockStack gap=”300”>
+                  <Text as=”p” variant=”bodySm” tone=”subdued”>
+                    <strong>Verlauf (Hintergrund)</strong> — pro Ansicht einzeln ein- oder ausschalten.
+                    Ziel-Farbe, Winkel und Stärke gelten für alle Ansichten, in denen der Verlauf eingeschaltet ist.
+                  </Text>
+                  <Checkbox
+                    label=”Standard-Verlauf (Fallback, wenn kein gerätespezifischer Schalter gesetzt ist)”
+                    checked={!!styles.header.bg_gradient_enabled}
+                    onChange={(v) => updateSection(“header”, “bg_gradient_enabled”, v)}
                   />
-                ) : (
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Die Stil-Vorlage gilt nur shopweit (Standard). Hier wirken nur Farbe, Verlauf, Bild und die Felder
-                      darunter.
-                    </Text>
-                  </div>
-                )}
-                <ColorField
-                  label="Hintergrund (Basis / Verlauf Start)"
-                  value={headerUi.bg_color}
-                  onChange={(v) => updateHeaderField("bg_color", v)}
-                />
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <BlockStack gap="300">
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      <strong>Gemeinsamer Hintergrund</strong> für Hauptleiste und Second Nav (eine Fläche).
-                      Pro Ansicht einzeln steuerbar. Ohne aktivierten Verlauf nur die Basisfarbe oben.
-                      Ziel-Farbe, Winkel und Stärke gelten für alle Ansichten, in denen der Verlauf eingeschaltet ist.
-                    </Text>
+                  <InlineStack gap=”400” wrap blockAlign=”center”>
                     <Checkbox
-                      label="Standard-Verlauf (Fallback, wenn für ein Gerät kein eigener Schalter gesetzt ist)"
-                      checked={!!headerUi.bg_gradient_enabled}
-                      onChange={(checked) => updateHeaderField("bg_gradient_enabled", checked)}
+                      label=”Desktop ≥1024px”
+                      checked={effectiveGradientEnabled(styles.header, “desktop”)}
+                      onChange={(v) => updateSection(“header”, “bg_gradient_enabled_desktop”, v)}
                     />
-                    <InlineStack gap="400" wrap blockAlign="center">
-                      <Checkbox
-                        label="Desktop ≥1024px"
-                        checked={effectiveGradientEnabled(headerUi, "desktop")}
-                        onChange={(checked) => updateHeaderField("bg_gradient_enabled_desktop", checked)}
-                      />
-                      <Checkbox
-                        label="Tablet 768–1023px"
-                        checked={effectiveGradientEnabled(headerUi, "tablet")}
-                        onChange={(checked) => updateHeaderField("bg_gradient_enabled_tablet", checked)}
-                      />
-                      <Checkbox
-                        label="Mobil ≤767px"
-                        checked={effectiveGradientEnabled(headerUi, "mobile")}
-                        onChange={(checked) => updateHeaderField("bg_gradient_enabled_mobile", checked)}
-                      />
-                    </InlineStack>
-                  </BlockStack>
-                </div>
-                {headerGradientAnyViewport ? (
-                  <>
-                    <ColorField
-                      label="Verlauf Ziel-Farbe"
-                      value={headerUi.bg_gradient_end || "#0f766e"}
-                      onChange={(v) => updateHeaderField("bg_gradient_end", v)}
+                    <Checkbox
+                      label=”Tablet 768–1023px”
+                      checked={effectiveGradientEnabled(styles.header, “tablet”)}
+                      onChange={(v) => updateSection(“header”, “bg_gradient_enabled_tablet”, v)}
                     />
-                    <Select
-                      label="Verlauf-Richtung (Winkel)"
-                      options={HEADER_GRADIENT_ANGLE_OPTIONS}
-                      value={String(headerUi.bg_gradient_angle ?? 135)}
-                      onChange={(v) => updateHeaderField("bg_gradient_angle", Number(v))}
+                    <Checkbox
+                      label=”Mobil ≤767px”
+                      checked={effectiveGradientEnabled(styles.header, “mobile”)}
+                      onChange={(v) => updateSection(“header”, “bg_gradient_enabled_mobile”, v)}
+                    />
+                  </InlineStack>
+                </BlockStack>
+              </div>
+              {headerGradientAnyViewport ? (
+                <>
+                  <ColorField
+                    label=”Verlauf Ziel-Farbe”
+                    value={styles.header.bg_gradient_end || “#0f766e”}
+                    onChange={(v) => updateSection(“header”, “bg_gradient_end”, v)}
+                  />
+                  <Select
+                    label=”Verlauf-Richtung (Winkel)”
+                    options={HEADER_GRADIENT_ANGLE_OPTIONS}
+                    value={String(styles.header.bg_gradient_angle ?? 135)}
+                    onChange={(v) => updateSection(“header”, “bg_gradient_angle”, Number(v))}
+                  />
+                  <TextField
+                    label=”Verlauf-Stärke (0–100)”
+                    type=”number”
+                    min={0}
+                    max={100}
+                    value={String(styles.header.bg_gradient_intensity ?? 75)}
+                    onChange={(v) => {
+                      const n = Math.min(100, Math.max(0, parseInt(v, 10) || 0));
+                      updateSection(“header”, “bg_gradient_intensity”, n);
+                    }}
+                    helpText=”0 = sanft (fast nur Basisfarbe), 100 = volle Mischung zur Ziel-Farbe”
+                    autoComplete=”off”
+                  />
+                </>
+              ) : null}
+              <div style={{ gridColumn: “1 / -1” }}>
+                <BlockStack gap=”200”>
+                  <Text as=”span” variant=”bodySm” fontWeight=”medium”>
+                    Hintergrundbild (optional, unter Farbe/Verlauf)
+                  </Text>
+                  <InlineStack gap=”200” blockAlign=”end” wrap>
+                    <div style={{ flex: “1 1 280px”, minWidth: 200 }}>
+                      <TextField
+                        label=”Bild-URL”
+                        value={styles.header.bg_image_url || “”}
+                        onChange={(v) => updateSection(“header”, “bg_image_url”, v)}
+                        placeholder=”https://…”
+                        autoComplete=”off”
+                      />
+                    </div>
+                    <Button onClick={() => setHeaderBgPickerScope(“global”)}>Aus Mediathek</Button>
+                  </InlineStack>
+                </BlockStack>
+              </div>
+              <ColorField
+                label=”Textfarbe”
+                value={styles.header.text_color}
+                onChange={(v) => updateSection(“header”, “text_color”, v)}
+              />
+              <div style={{ gridColumn: “1 / -1” }}>
+                <BlockStack gap=”200”>
+                  <Text as=”span” variant=”bodySm” fontWeight=”medium”>Normalhöhe</Text>
+                  <Text as=”p” variant=”bodySm” tone=”subdued”>
+                    Leer = nächstgrößeres Gerät als Fallback (Desktop → Tablet → Mobil → 72px).
+                  </Text>
+                  <div style={{ display: “grid”, gridTemplateColumns: “repeat(3, 1fr)”, gap: 12 }}>
+                    <TextField
+                      label=”Desktop (≥1024px)”
+                      value={styles.header.height_desktop || “”}
+                      onChange={(v) => updateSection(“header”, “height_desktop”, v)}
+                      placeholder={styles.header.height || “72px”}
+                      autoComplete=”off”
                     />
                     <TextField
-                      label="Verlauf-Stärke (0–100)"
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={String(headerUi.bg_gradient_intensity ?? 75)}
-                      onChange={(v) => {
-                        const n = Math.min(100, Math.max(0, parseInt(v, 10) || 0));
-                        updateHeaderField("bg_gradient_intensity", n);
-                      }}
-                      helpText="0 = sehr sanft (fast nur Basisfarbe), 100 = volle Mischung zur Ziel-Farbe"
-                      autoComplete="off"
+                      label=”Tablet (768–1023px)”
+                      value={styles.header.height_tablet || “”}
+                      onChange={(v) => updateSection(“header”, “height_tablet”, v)}
+                      placeholder={styles.header.height_desktop || styles.header.height || “72px”}
+                      autoComplete=”off”
                     />
-                  </>
-                ) : null}
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <BlockStack gap="200">
-                    <Text as="span" variant="bodySm" fontWeight="medium">
-                      Hintergrundbild (optional, unter Farbe/Verlauf, deckend)
-                    </Text>
-                    <InlineStack gap="200" blockAlign="end" wrap>
-                      <div style={{ flex: "1 1 280px", minWidth: 200 }}>
-                        <TextField
-                          label="Bild-URL"
-                          value={headerUi.bg_image_url || ""}
-                          onChange={(v) => updateHeaderField("bg_image_url", v)}
-                          placeholder="https://…"
-                          autoComplete="off"
-                        />
-                      </div>
-                      <Button onClick={() => setHeaderBgPickerScope(headerEditScope)}>Aus Mediathek</Button>
-                    </InlineStack>
-                  </BlockStack>
-                </div>
-                <ColorField
-                  label="Textfarbe"
-                  value={headerUi.text_color}
-                  onChange={(v) => updateHeaderField("text_color", v)}
-                />
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <BlockStack gap="200">
-                    <Text as="span" variant="bodySm" fontWeight="medium">Normalhöhe</Text>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                      <TextField
-                        label="Desktop (≥1024px)"
-                        value={headerUi.height_desktop || ""}
-                        onChange={(v) => updateHeaderField("height_desktop", v)}
-                        placeholder={headerUi.height || "72px"}
-                        autoComplete="off"
-                      />
-                      <TextField
-                        label="Tablet (768–1023px)"
-                        value={headerUi.height_tablet || ""}
-                        onChange={(v) => updateHeaderField("height_tablet", v)}
-                        placeholder={headerUi.height_desktop || headerUi.height || "72px"}
-                        autoComplete="off"
-                      />
-                      <TextField
-                        label="Mobil (≤767px)"
-                        value={headerUi.height_mobile || ""}
-                        onChange={(v) => updateHeaderField("height_mobile", v)}
-                        placeholder={headerUi.height_desktop || headerUi.height || "72px"}
-                        autoComplete="off"
-                      />
-                    </div>
-                  </BlockStack>
-                </div>
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <BlockStack gap="200">
-                    <Text as="span" variant="bodySm" fontWeight="medium">Compact-Höhe (beim Scrollen)</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Höhe nach dem Scrollen. Leer = keine Änderung (Header bleibt gleich groß).
-                    </Text>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                      <TextField
-                        label="Desktop (≥1024px)"
-                        value={headerUi.compact_height_desktop || ""}
-                        onChange={(v) => updateHeaderField("compact_height_desktop", v)}
-                        placeholder="leer = keine Änderung"
-                        autoComplete="off"
-                      />
-                      <TextField
-                        label="Tablet (768–1023px)"
-                        value={headerUi.compact_height_tablet || ""}
-                        onChange={(v) => updateHeaderField("compact_height_tablet", v)}
-                        placeholder="leer = keine Änderung"
-                        autoComplete="off"
-                      />
-                      <TextField
-                        label="Mobil (≤767px)"
-                        value={headerUi.compact_height_mobile || ""}
-                        onChange={(v) => updateHeaderField("compact_height_mobile", v)}
-                        placeholder="leer = keine Änderung"
-                        autoComplete="off"
-                      />
-                    </div>
-                  </BlockStack>
-                </div>
-                <TextField
-                  label="Schatten (box-shadow)"
-                  value={headerUi.shadow}
-                  onChange={(v) => updateHeaderField("shadow", v)}
-                  autoComplete="off"
-                />
-                <TextField
-                  label="Unterer Rand (border-bottom)"
-                  value={headerUi.border_bottom}
-                  onChange={(v) => updateHeaderField("border_bottom", v)}
-                  autoComplete="off"
-                />
+                    <TextField
+                      label=”Mobil (≤767px)”
+                      value={styles.header.height_mobile || “”}
+                      onChange={(v) => updateSection(“header”, “height_mobile”, v)}
+                      placeholder={styles.header.height_tablet || styles.header.height_desktop || styles.header.height || “72px”}
+                      autoComplete=”off”
+                    />
+                  </div>
+                </BlockStack>
               </div>
+              <div style={{ gridColumn: “1 / -1” }}>
+                <BlockStack gap=”200”>
+                  <Text as=”span” variant=”bodySm” fontWeight=”medium”>Compact-Höhe (beim Scrollen)</Text>
+                  <Text as=”p” variant=”bodySm” tone=”subdued”>
+                    Höhe nach dem Scrollen. Leer = keine Änderung (Header bleibt gleich groß).
+                    Kaskadiert: Tablet übernimmt Desktop-Wert wenn leer, Mobil übernimmt Tablet wenn leer.
+                  </Text>
+                  <div style={{ display: “grid”, gridTemplateColumns: “repeat(3, 1fr)”, gap: 12 }}>
+                    <TextField
+                      label=”Desktop (≥1024px)”
+                      value={styles.header.compact_height_desktop || “”}
+                      onChange={(v) => updateSection(“header”, “compact_height_desktop”, v)}
+                      placeholder=”leer = keine Änderung”
+                      autoComplete=”off”
+                    />
+                    <TextField
+                      label=”Tablet (768–1023px)”
+                      value={styles.header.compact_height_tablet || “”}
+                      onChange={(v) => updateSection(“header”, “compact_height_tablet”, v)}
+                      placeholder=”leer = keine Änderung”
+                      autoComplete=”off”
+                    />
+                    <TextField
+                      label=”Mobil (≤767px)”
+                      value={styles.header.compact_height_mobile || “”}
+                      onChange={(v) => updateSection(“header”, “compact_height_mobile”, v)}
+                      placeholder=”leer = keine Änderung”
+                      autoComplete=”off”
+                    />
+                  </div>
+                </BlockStack>
+              </div>
+              <TextField
+                label=”Schatten (box-shadow)”
+                value={styles.header.shadow}
+                onChange={(v) => updateSection(“header”, “shadow”, v)}
+                autoComplete=”off”
+              />
+              <TextField
+                label=”Unterer Rand (border-bottom)”
+                value={styles.header.border_bottom}
+                onChange={(v) => updateSection(“header”, “border_bottom”, v)}
+                autoComplete=”off”
+              />
+            </div>
+            <Divider />
+            <Text as=”h3” variant=”headingSm”>Seitenspezifischer Hintergrund (Optional)</Text>
+            <Text as=”p” variant=”bodySm” tone=”subdued”>
+              Für Kategorie- oder Kollektion-Seiten kann der Hintergrund hier abweichend gesetzt werden.
+              Leere Felder übernehmen den Standard oben. Höhe, Schatten und Rahmen sind immer global.
+            </Text>
+            <Select
+              label=”Seite anpassen”
+              options={[
+                { label: “Kategorie-Seiten (/category/…)”, value: “category” },
+                { label: “Kollektion-Seiten (/collections/…)”, value: “collection” },
+              ]}
+              value={headerScopeTab}
+              onChange={setHeaderScopeTab}
+            />
+            <div style={{ display: “grid”, gridTemplateColumns: “repeat(auto-fill, minmax(200px, 1fr))”, gap: 16 }}>
+              <ColorField
+                label=”Hintergrundfarbe”
+                value={headerScopeOverride.bg_color || “”}
+                onChange={(v) => updateHeaderScopeField(“bg_color”, v)}
+                helpText=”Leer = Standard-Hintergrundfarbe”
+              />
+              <div style={{ gridColumn: “1 / -1” }}>
+                <BlockStack gap=”300”>
+                  <Text as=”p” variant=”bodySm” tone=”subdued”>Verlauf für diese Seiten:</Text>
+                  <Checkbox
+                    label=”Standard-Verlauf (Fallback)”
+                    checked={!!headerScopeOverride.bg_gradient_enabled}
+                    onChange={(v) => updateHeaderScopeField(“bg_gradient_enabled”, v)}
+                  />
+                  <InlineStack gap=”400” wrap blockAlign=”center”>
+                    <Checkbox
+                      label=”Desktop”
+                      checked={effectiveGradientEnabled(headerScopeOverride, “desktop”)}
+                      onChange={(v) => updateHeaderScopeField(“bg_gradient_enabled_desktop”, v)}
+                    />
+                    <Checkbox
+                      label=”Tablet”
+                      checked={effectiveGradientEnabled(headerScopeOverride, “tablet”)}
+                      onChange={(v) => updateHeaderScopeField(“bg_gradient_enabled_tablet”, v)}
+                    />
+                    <Checkbox
+                      label=”Mobil”
+                      checked={effectiveGradientEnabled(headerScopeOverride, “mobile”)}
+                      onChange={(v) => updateHeaderScopeField(“bg_gradient_enabled_mobile”, v)}
+                    />
+                  </InlineStack>
+                </BlockStack>
+              </div>
+              {headerScopeGradient ? (
+                <>
+                  <ColorField
+                    label=”Verlauf Ziel-Farbe”
+                    value={headerScopeOverride.bg_gradient_end || “”}
+                    onChange={(v) => updateHeaderScopeField(“bg_gradient_end”, v)}
+                    helpText=”Leer = Standard-Zielfarbe”
+                  />
+                  <Select
+                    label=”Verlauf-Richtung”
+                    options={HEADER_GRADIENT_ANGLE_OPTIONS}
+                    value={String(headerScopeOverride.bg_gradient_angle ?? 135)}
+                    onChange={(v) => updateHeaderScopeField(“bg_gradient_angle”, Number(v))}
+                  />
+                  <TextField
+                    label=”Verlauf-Stärke (0–100)”
+                    type=”number”
+                    min={0}
+                    max={100}
+                    value={String(headerScopeOverride.bg_gradient_intensity ?? 75)}
+                    onChange={(v) => {
+                      const n = Math.min(100, Math.max(0, parseInt(v, 10) || 0));
+                      updateHeaderScopeField(“bg_gradient_intensity”, n);
+                    }}
+                    autoComplete=”off”
+                  />
+                </>
+              ) : null}
+              <div style={{ gridColumn: “1 / -1” }}>
+                <BlockStack gap=”200”>
+                  <Text as=”span” variant=”bodySm” fontWeight=”medium”>Hintergrundbild</Text>
+                  <InlineStack gap=”200” blockAlign=”end” wrap>
+                    <div style={{ flex: “1 1 280px”, minWidth: 200 }}>
+                      <TextField
+                        label=”Bild-URL”
+                        value={headerScopeOverride.bg_image_url || “”}
+                        onChange={(v) => updateHeaderScopeField(“bg_image_url”, v)}
+                        placeholder=”https://…”
+                        autoComplete=”off”
+                      />
+                    </div>
+                    <Button onClick={() => setHeaderBgPickerScope(headerScopeTab)}>Aus Mediathek</Button>
+                  </InlineStack>
+                </BlockStack>
+              </div>
+              <ColorField
+                label=”Textfarbe”
+                value={headerScopeOverride.text_color || “”}
+                onChange={(v) => updateHeaderScopeField(“text_color”, v)}
+                helpText=”Leer = Standard-Textfarbe”
+              />
+            </div>
           </BlockStack>
         </AccordionCard>
 
@@ -2388,6 +2504,11 @@ export default function StylesPage() {
               ...prev,
               made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), image_url: first },
             }));
+          } else if (brandingPickerTarget === "bestseller_badge_image") {
+            setStyles((prev) => ({
+              ...prev,
+              bestseller_badge: { ...(prev.bestseller_badge || {}), image_url: first },
+            }));
           } else {
             setBranding((p) => ({ ...p, [brandingPickerTarget]: first }));
           }
@@ -2402,7 +2523,7 @@ export default function StylesPage() {
         onSelect={(urls) => {
           const first = Array.isArray(urls) ? urls[0] : null;
           if (!first || headerBgPickerScope === null) return;
-          if (headerBgPickerScope === "standard") {
+          if (headerBgPickerScope === "global") {
             updateSection("header", "bg_image_url", first);
           } else {
             setStyles((prev) => {

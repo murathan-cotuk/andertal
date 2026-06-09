@@ -141,6 +141,7 @@ export function buildHeaderSurfaceCssVars(header, primary) {
   };
   if (h.shadow != null && h.shadow !== "") vars["--header-shadow"] = h.shadow;
   if (h.border_bottom != null && h.border_bottom !== "") vars["--header-border"] = h.border_bottom;
-  if (h.height != null && h.height !== "") vars["--header-h"] = h.height;
+  /* height is now controlled via --header-h CSS-variable per viewport (responsive media queries).
+     Setting it here as inline style would shadow the media-query overrides for all descendants. */
   return vars;
 }

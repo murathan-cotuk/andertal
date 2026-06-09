@@ -34,23 +34,21 @@ function levelFontFamily(typo, levelKey) {
   return `"Inter", system-ui, sans-serif`;
 }
 
-/** Pick per-viewport height; falls back to the legacy `height` field. */
+/** Pick per-viewport height; cascades desktop→tablet→mobile, falls back to legacy `height`. */
 function resolveVpHeight(section, fallback) {
-  const base = section.height || fallback;
-  return {
-    desktop: section.height_desktop || base,
-    tablet: section.height_tablet || base,
-    mobile: section.height_mobile || base,
-  };
+  const legacy = section.height || fallback;
+  const desktop = section.height_desktop || legacy;
+  const tablet = section.height_tablet || desktop;
+  const mobile = section.height_mobile || tablet;
+  return { desktop, tablet, mobile };
 }
 
-/** Compact (scrolled) height per viewport; falls back to normal height (no compaction). */
+/** Compact (scrolled) height per viewport; cascades desktop→tablet→mobile, falls back to normal height. */
 function resolveVpCompactHeight(section, normalVp) {
-  return {
-    desktop: section.compact_height_desktop || normalVp.desktop,
-    tablet: section.compact_height_tablet || normalVp.tablet,
-    mobile: section.compact_height_mobile || normalVp.mobile,
-  };
+  const desktop = section.compact_height_desktop || normalVp.desktop;
+  const tablet = section.compact_height_tablet || (section.compact_height_desktop ? desktop : normalVp.tablet);
+  const mobile = section.compact_height_mobile || ((section.compact_height_tablet || section.compact_height_desktop) ? tablet : normalVp.mobile);
+  return { desktop, tablet, mobile };
 }
 
 function getActiveCode(buttons, key) {
@@ -358,7 +356,6 @@ h5 {
 .second-nav {
   background: var(--second-nav-bg) !important;
   color: var(--second-nav-text) !important;
-  min-height: var(--second-nav-h);
   font-size: var(--second-nav-fs);
   font-weight: var(--second-nav-fw);
   border: var(--second-nav-border) !important;
