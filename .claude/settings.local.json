@@ -137,7 +137,8 @@
       "Bash(Select-Object -First 30)",
       "Bash(dir C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\sellercentral *)",
       "Bash(Remove-Item *)",
-      "PowerShell(Test-Path *)"
+      "PowerShell(Test-Path *)",
+      "Bash(npx next *)"
     ]
   }
 }
