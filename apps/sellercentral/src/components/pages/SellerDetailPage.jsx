@@ -8,6 +8,66 @@ import {
 import { useRouter } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
+// ── Admin seller card section ────────────────────────────────────────────────
+function AdminSellerCardSection({ sellerId }) {
+  const client = getMedusaAdminClient();
+  const [info, setInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try { setInfo(await client.getSellerCardByAdmin(sellerId)); }
+      catch (_) {}
+      finally { setLoading(false); }
+    })();
+  }, [client, sellerId]);
+
+  const handleDelete = useCallback(async () => {
+    if (!window.confirm("Karte wirklich entfernen?")) return;
+    setErr(""); setDeleting(true);
+    try {
+      await client.deleteSellerCardByAdmin(sellerId);
+      setInfo({ has_card: false, last4: null, brand: null });
+      setOk("Karte entfernt.");
+    } catch (e) {
+      setErr(e?.message || "Fehler.");
+    } finally { setDeleting(false); }
+  }, [client, sellerId]);
+
+  if (loading) return <Spinner size="small" />;
+
+  const brand = info?.brand ? (info.brand.charAt(0).toUpperCase() + info.brand.slice(1)) : "Karte";
+  const exp = info?.exp_month && info?.exp_year
+    ? `${String(info.exp_month).padStart(2, "0")}/${String(info.exp_year).slice(-2)}`
+    : null;
+
+  return (
+    <BlockStack gap="200">
+      <Text as="h3" variant="headingSm">Kreditkarte</Text>
+      {ok && <Banner tone="success" onDismiss={() => setOk("")}>{ok}</Banner>}
+      {err && <Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner>}
+      {info?.has_card ? (
+        <InlineStack gap="300" blockAlign="center">
+          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
+            <Text as="p" variant="bodyMd" fontWeight="semibold">
+              {brand} •••• {info.last4}
+              {exp ? <span style={{ fontWeight: 400, color: "#6b7280", marginLeft: 8 }}>{exp}</span> : null}
+            </Text>
+          </div>
+          <Button tone="critical" variant="plain" size="slim" onClick={handleDelete} loading={deleting}>
+            Entfernen
+          </Button>
+        </InlineStack>
+      ) : (
+        <Text as="p" variant="bodySm" tone="subdued">Keine Kreditkarte hinterlegt.</Text>
+      )}
+    </BlockStack>
+  );
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const STATUS_META = {
   registered:          { label: "Kayıt Oldu",       tone: "info",      next: ["documents_submitted", "pending_approval"] },
@@ -880,6 +940,9 @@ ${"=".repeat(50)}
                       )}
                     </BlockStack>
                   </div>
+
+                  <Divider />
+                  <AdminSellerCardSection sellerId={sellerId} />
                 </BlockStack>
               )}
             </Box>

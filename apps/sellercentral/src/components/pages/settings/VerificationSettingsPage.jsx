@@ -5,6 +5,7 @@ import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Modal, Sp
 import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
+import SellerCreditCardSection from "@/components/SellerCreditCardSection";
 
 const PHONE_CODES = [
   { code: "DE", dial: "+49" },
@@ -1166,6 +1167,22 @@ export default function VerificationSettingsPage() {
                 />
               ))}
             </BlockStack>
+          </Card>
+
+          {/* Credit Card */}
+          <Card>
+            <SellerCreditCardSection
+              title={
+                locale === "de" ? "Kreditkarte für Gebühren" :
+                locale === "tr" ? "Ücretler için Kredi Kartı" :
+                "Credit Card for Fees"
+              }
+              subtitle={
+                locale === "de" ? "Diese Karte wird belastet, wenn dein Guthaben für Plattformgebühren oder Rückbuchungen nicht ausreicht." :
+                locale === "tr" ? "Platform ücretleri veya iade durumunda bakiyeniz yetersiz kaldığında bu kart kullanılır." :
+                "This card is charged when your balance is insufficient for platform fees or chargebacks."
+              }
+            />
           </Card>
 
           {/* Submit */}

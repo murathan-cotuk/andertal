@@ -1,4 +1,6 @@
-09.06.
+10.06.
+
+-- escrow para asili birakma
 
 -- sellercentralde import-export sayfasindan ürün import etmek icin excel hazirladim. seller olarak yükledim ve su uyariyi verdi:
 
@@ -44,3 +46,5 @@ eco-parent3-160526: EAN already exists: 3234567891
 
 
 -- qr kodu okuttugumda telefondan localhost:3002 aciliyor. yanlis. onun acilmamasi gerekiyor.      sellercentral andertal icin bir endpoint olustur. o endpointte docusign gibi imza atma bölümü   ekle. qr kodu okutunca o endpointe yönlendirilsin saticilar. ilk önce sellercentral giris  bilgileri istensin sellerlardan. sonra direkt beyaz ekran üzerinde sari dikdörtgen gözüksün.  oraya imzasini atsin satici. o imza dökümana eklenecek. imzasini atip gönder butonuna  bastiginda basarili, sellercentrale geri dönüp bu ekrani kapatabilirsiniz tarzi bi bildirim  gözüksün. hangi dilde dogrulanma yapildiysa o dilde gözüksün bu sayfa. ayrica verification  sayfasi da ya ingilizce ya almanca. ispanyolcasi, italyacasi ya da sistemde secilebilen diger   dillere göre ayarlanmamis. legal agreements de cok kisa gözüküyor. cok uzun olmali, her sey  hukuki olarak en ince detayina kadar yazmali. bi 10-12 sayfa olmali bu icerik. bunu da  düzenle          
+
+-- content/landingpage sayfasinda ekleyebilmek icin bir container template olustur. ismi Bestseller carousel olsun. amazondaki mantik gibi. bir carousel olacak. bizde de var zaten kollektion karusel gibi bir template.bunun gibi yap. ancak bu konteyner da digerinden farkli olarak product card o kadar uzun olmayacak. bir seferde kac ürün gözükmesi gerektigini zaten sellercentral ayarlarda ayarlayabilicez. ayrica bu      Beststeller carouselde yine bir kategori sececegiz. ancak kollektion karusell templatimizden farkli olarak,     yalnizca secilen kategorideki BESTSELLER ürünler listelenecek burada. product cardlarin sol üstünde yine        bestseller etiketi gözükecek ve yanlarinda da o kategorideki bestseller siralamalari gözükecek. örnegin #5 gibi. carouselde mehr anzeigen dedigimizde kategori sayfasi template inde ürünlerin göründügü sayfa acilacak ve ürünler burada bestseller sirasina göre siralanacak. cok kritik ban anlasilmayan bir sey var ise muhakkak sor. net olalim bu konuda. her seyi tekte hallet.

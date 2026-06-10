@@ -1406,6 +1406,29 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/verification/start', { method: 'POST', body: JSON.stringify({}) })
   }
 
+  // ── Seller Credit Card ───────────────────────────────────────────────────
+  async getStripePublishableKey() {
+    return this.request('/admin-hub/v1/stripe-publishable-key')
+  }
+  async getSellerCard() {
+    return this.request('/admin-hub/v1/seller/card')
+  }
+  async deleteSellerCard() {
+    return this.request('/admin-hub/v1/seller/card', { method: 'DELETE' })
+  }
+  async createSellerCardSetupIntent() {
+    return this.request('/admin-hub/v1/seller/card/setup-intent', { method: 'POST', body: JSON.stringify({}) })
+  }
+  async confirmSellerCard(payment_method_id) {
+    return this.request('/admin-hub/v1/seller/card/confirm', { method: 'POST', body: JSON.stringify({ payment_method_id }) })
+  }
+  async getSellerCardByAdmin(sellerId) {
+    return this.request(`/admin-hub/v1/sellers/${sellerId}/card`)
+  }
+  async deleteSellerCardByAdmin(sellerId) {
+    return this.request(`/admin-hub/v1/sellers/${sellerId}/card`, { method: 'DELETE' })
+  }
+
   /** Create a sign token + QR code for agreement signing */
   async createSignToken(locale) {
     return this.request('/admin-hub/v1/seller/sign-token', { method: 'POST', body: JSON.stringify({ locale }) })

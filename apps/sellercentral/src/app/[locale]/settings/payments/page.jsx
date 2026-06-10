@@ -7,6 +7,7 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
+import SellerCreditCardSection from "@/components/SellerCreditCardSection";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const DEFAULT_COMMISSION_RATE = 0.12;
@@ -966,6 +967,12 @@ function SellerPaymentsView() {
             </Card>
             <Box paddingBlockStart="300">
               <IbanSection commissionRate={commissionRate} />
+            </Box>
+
+            <Box paddingBlockStart="300">
+              <Card>
+                <SellerCreditCardSection />
+              </Card>
             </Box>
           </Box>
 
