@@ -465,9 +465,13 @@ class MedusaClient {
 
   async getPageBySlug(slug) {
     if (!slug) return null
-    const res = await this.request(`/store/pages/${encodeURIComponent(slug)}`)
-    if (res?.__error) return null
-    return res
+    try {
+      const res = await fetch(`/api/store-pages/${encodeURIComponent(slug)}`, { cache: "no-store" })
+      if (!res.ok) return null
+      return await res.json()
+    } catch {
+      return null
+    }
   }
 
   /**

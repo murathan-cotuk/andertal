@@ -6,6 +6,7 @@ import { getMedusaClient, resolveMedusaBaseUrl } from "@/lib/medusa-client";
 import { useLandingChrome } from "@/context/LandingChromeContext";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
+import { toSalesScore } from "@/lib/bestseller";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale } from "next-intl";
@@ -1078,6 +1079,101 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
             </div>
           ))}
         </Carousel>
+      </div>
+    </div>
+  );
+}
+
+// ── Bestseller Carousel ───────────────────────────────────────────────────────
+function BestsellerCarousel({ container, locale = "de" }) {
+  const [products, setProducts] = useState(undefined);
+  const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
+  const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
+  const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
+  const isNarrow = useIsNarrow(1023);
+  const baseGap = container.gap != null ? Number(container.gap) : 16;
+  const gap = Number.isNaN(baseGap) ? 16 : baseGap;
+
+  useEffect(() => {
+    if (!container.category_slug) { setProducts([]); return; }
+    fetch(`/api/store-products?category=${encodeURIComponent(container.category_slug)}&limit=50`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const all = Array.isArray(d?.products) ? d.products : [];
+        all.sort((a, b) => toSalesScore(b.metadata) - toSalesScore(a.metadata));
+        setProducts(all);
+      })
+      .catch(() => setProducts([]));
+  }, [container.category_slug]);
+
+  if (products === undefined) {
+    return (
+      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+        <div style={{ display: "flex", gap, overflow: "hidden" }}>
+          {Array.from({ length: itemsPerRow }).map((_, i) => (
+            <div key={i} style={{ flex: `0 0 calc(${100 / itemsPerRow}% - 12px)`, height: 280, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!products.length) return null;
+
+  const categoryUrl = container.category_slug ? `/${container.category_slug}?sort=bestseller` : null;
+
+  const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
+  const renderItem = (product, i) => (
+    <ProductCard product={product} plainImage isBestseller rank={i + 1} />
+  );
+
+  if (isNarrow && isGrid) {
+    return (
+      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+        <div style={getContentInnerStyle(container, 1280)}>
+          <MobilePagedGridScroll
+            title={lt(container, "title", locale)}
+            gap={gap}
+            rows={rows}
+            cols={cols}
+            items={products}
+            itemKey={(p, i) => p.id || i}
+            renderItem={renderItem}
+            ariaLabel={lt(container, "title", locale) || "Bestseller"}
+          />
+          {categoryUrl && (
+            <div style={{ textAlign: "center", marginTop: 12 }}>
+              <Link href={categoryUrl} style={{ fontSize: 13, fontWeight: 600, color: "#111", textDecoration: "underline" }}>Mehr anzeigen</Link>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+      <div style={getContentInnerStyle(container, 1280)}>
+        <Carousel
+          contained={false}
+          title={lt(container, "title", locale) || undefined}
+          visibleCount={itemsPerRow}
+          navOnSides
+          gap={gap}
+          showFade={false}
+          ariaLabel={lt(container, "title", locale) || "Bestseller"}
+        >
+          {products.map((product, i) => (
+            <div key={product.id || i} style={{ minWidth: 0 }}>
+              {renderItem(product, i)}
+            </div>
+          ))}
+        </Carousel>
+        {categoryUrl && (
+          <div style={{ textAlign: "center", marginTop: 16 }}>
+            <Link href={categoryUrl} style={{ fontSize: 13, fontWeight: 600, color: "#111", textDecoration: "underline" }}>Mehr anzeigen</Link>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2338,6 +2434,7 @@ function renderContainer(c, preload = {}, ctx = {}) {
     case "image_carousel":       inner = <ImageCarousel container={c} locale={locale} isFirstContainer={ctx.firstVisibleId === c.id} />; break;
     case "banner_cta":           inner = <BannerCta container={c} locale={locale} />; break;
     case "collection_carousel":  inner = <CollectionCarousel container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
+    case "bestseller_carousel":  inner = <BestsellerCarousel container={c} locale={locale} />; break;
     case "content_mosaic":       inner = <ContentMosaic container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
     case "collections_carousel": inner = <CollectionsCarousel container={c} locale={locale} />; break;
     case "accordion":            inner = <Accordion container={c} locale={locale} />; break;

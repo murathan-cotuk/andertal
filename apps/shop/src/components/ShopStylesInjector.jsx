@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useLayoutEffect, useContext } from "react";
+import { useEffect, useLayoutEffect, useContext, useRef } from "react";
 import {
   DEFAULT_SHOP_STYLES,
   buildShopThemeCSS,
@@ -13,11 +13,16 @@ import { ShopStylesContext } from "@/context/ShopStylesContext";
 // Fetch styles through the internal API route (handles backend URL; route is no-store)
 const STYLES_URL = "/api/store-styles";
 
-function loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink) {
+function loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink, lastRawRef) {
   fetch(STYLES_URL, { cache: "no-store" })
     .then((r) => (r.ok ? r.json() : null))
     .then((data) => {
-      const raw = data?.styles || {};
+      if (!data) return;
+      const raw = data.styles || {};
+      const rawStr = JSON.stringify(raw);
+      // Skip expensive processing + React re-render if content hasn't changed
+      if (lastRawRef && lastRawRef.current === rawStr) return;
+      if (lastRawRef) lastRawRef.current = rawStr;
       const merged = mergeLoadedShopStyles(raw);
       injectCss(buildShopThemeCSS(merged, { merge: false }));
       const href = buildGoogleFontsLinkHrefForFamilies(collectTypographyGoogleFamilies(merged.typography));
@@ -60,6 +65,7 @@ function ensureGoogleFontLink(href) {
 export default function ShopStylesInjector() {
   const ctx = useContext(ShopStylesContext);
   const setStyles = ctx?.setStyles;
+  const lastRawRef = useRef(null);
 
   // İlk boyamadan önce :root değişkenleri (H1–H5, body) hazır olsun; yoksa rich text h1 body fontuna düşer
   useLayoutEffect(() => {
@@ -69,18 +75,28 @@ export default function ShopStylesInjector() {
   }, []);
 
   useEffect(() => {
-    loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink);
+    loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink, lastRawRef);
   }, [setStyles]);
 
   // Seller'da Templates kaydedilince sekmeye dönünce güncel sütun sayısı vb. yüklensin
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === "visible") {
-        loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink);
+        loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink, lastRawRef);
       }
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
+  }, [setStyles]);
+
+  // 1 saniyelik canlı güncelleme — sekme görünürken, içerik değişmemişse re-render yok
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink, lastRawRef);
+      }
+    }, 1000);
+    return () => clearInterval(id);
   }, [setStyles]);
 
   return null;

@@ -1876,8 +1876,8 @@ export default function ProductTemplateMobile() {
           <div style={{ position: "relative", width: "100%" }}>
             <MainImageWrap onClick={() => displayImages.length > 0 && setLightboxOpen(true)}>
               <MainImage src={mainImage} alt={displayTitle} />
-              {showMadeInEurope && <MadeInEuropeOverlay badgeConfig={madeInEuropeBadge} />}
             </MainImageWrap>
+            {showMadeInEurope && <MadeInEuropeOverlay badgeConfig={madeInEuropeBadge} />}
             {product?.id && (
               <GalleryActionRow
                 onClick={(e) => e.stopPropagation()}

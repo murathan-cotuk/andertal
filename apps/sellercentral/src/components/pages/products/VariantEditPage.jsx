@@ -467,14 +467,10 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
               <Divider />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                SKU & EAN
-              </Text>
               <InlineStack gap="300" wrap>
                 <Box minWidth="240px" flex="1">
                   <TextField
                     label="SKU"
-                    labelHidden
                     value={v.sku ?? ""}
                     onChange={(t) => patchVariant({ sku: t })}
                     autoComplete="off"
@@ -483,7 +479,6 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 <Box minWidth="240px" flex="1">
                   <TextField
                     label="EAN"
-                    labelHidden
                     value={v.ean ?? ""}
                     onChange={(t) => patchVariant({ ean: t || undefined })}
                     autoComplete="off"

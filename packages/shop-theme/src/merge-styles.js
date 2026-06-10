@@ -128,6 +128,7 @@ export function mergeLoadedShopStyles(loaded = {}) {
     made_in_europe_badge: mergeMadeInEuropeBadge(
       loaded.made_in_europe_badge || DEFAULT_SHOP_STYLES.made_in_europe_badge,
     ),
+    bestseller_badge: { ...DEFAULT_SHOP_STYLES.bestseller_badge, ...(loaded.bestseller_badge || {}) },
     seo_home_title: loaded.seo_home_title ?? '',
     seo_home_description: loaded.seo_home_description ?? '',
   };

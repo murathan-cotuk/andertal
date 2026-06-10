@@ -1822,10 +1822,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <TextField label="Title" labelHidden value={editingTitle} onChange={(v) => updateLocaleField("title", v)} placeholder="e.g. Cotton T-Shirt" autoComplete="off" />
 
               <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">SKU & EAN</Text>
               <InlineStack gap="300" wrap>
                 <Box minWidth="240px" flex="1">
-                  <TextField label="SKU" labelHidden value={product.sku || ""} onChange={(v) => update({ sku: v })} placeholder="SKU" autoComplete="off" />
+                  <TextField label="SKU" value={product.sku || ""} onChange={(v) => update({ sku: v })} placeholder="SKU" autoComplete="off" />
                 </Box>
                 <Box minWidth="240px" flex="1">
                   <TextField

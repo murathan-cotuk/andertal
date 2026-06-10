@@ -20,8 +20,8 @@ export const DEFAULT_MADE_IN_EUROPE_BADGE = {
   image_url: "",
   width: 88,
   height: 32,
-  offset_left: 10,
-  offset_bottom: 10,
+  offset_left: 0,
+  offset_bottom: 0,
 };
 
 /** @param {unknown} meta */

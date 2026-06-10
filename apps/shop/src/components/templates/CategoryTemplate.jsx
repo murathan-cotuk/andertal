@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import styled, { keyframes, css } from "styled-components";
 import { CategoryProductListing } from "@/components/CategoryProductListing";
 import { Link } from "@/i18n/navigation";
@@ -876,6 +876,7 @@ function visibleSubcats(children) {
 
 export default function CategoryTemplate() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params?.slug ? String(params.slug) : params?.handle ? String(params.handle) : "";
   const locale = params?.locale ? String(params.locale) : "de";
   const shopStyles = useShopStyles();
@@ -888,7 +889,10 @@ export default function CategoryTemplate() {
   const [ancestors, setAncestors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sort, setSort] = useState("default");
+  const initialSortVal = searchParams?.get("sort") || "";
+  const [sort, setSort] = useState(
+    ["bestseller", "newest", "price_asc", "price_desc", "title_asc", "title_desc"].includes(initialSortVal) ? initialSortVal : "default"
+  );
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({});
   const [panelOpen, setPanelOpen] = useState(false);

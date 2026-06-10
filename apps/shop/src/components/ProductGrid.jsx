@@ -2,6 +2,7 @@
 
 import { ProductCard, ProductListItem } from "@/components/ProductCard";
 import { useIsNarrow } from "@/hooks/useIsNarrow";
+import { toSalesScore } from "@/lib/bestseller";
 import styled from "styled-components";
 
 const STRIP_GAP = 8;
@@ -110,6 +111,14 @@ export function ProductGrid({
   const mobileCols = Math.max(1, Math.min(m, 3));
   const useMobileList = isMobile && mobileCols === 1;
 
+  // Bestseller = product with highest sales score in this context (per category/collection)
+  let bestsellerProductId = null;
+  let bestScore = 0;
+  for (const p of products) {
+    const s = toSalesScore(p.metadata);
+    if (s > bestScore) { bestScore = s; bestsellerProductId = p.id; }
+  }
+
   return (
     <CatalogWrap
       className="product-grid-strip"
@@ -120,8 +129,8 @@ export function ProductGrid({
       {products.map((p) => (
         <CardSlot key={p.id} $m={m}>
           {useMobileList
-            ? <ProductListItem product={p} activeFilters={activeFilters} />
-            : <ProductCard product={p} activeFilters={activeFilters} plainImage />
+            ? <ProductListItem product={p} activeFilters={activeFilters} isBestseller={p.id === bestsellerProductId} />
+            : <ProductCard product={p} activeFilters={activeFilters} plainImage isBestseller={p.id === bestsellerProductId} />
           }
         </CardSlot>
       ))}

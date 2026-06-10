@@ -14,7 +14,9 @@ import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes
 import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import BestsellerBadge from "@/components/BestsellerBadge";
+import MadeInEuropeOverlay from "@/components/MadeInEuropeOverlay";
 import { isBestsellerMetadata } from "@/lib/bestseller";
+import { isEuOriginVerified } from "@andertal/shop-theme";
 import { getBruttoCentsFromPricesMap } from "@/lib/product-price";
 import styled, { css } from "styled-components";
 
@@ -215,6 +217,18 @@ const Badges = styled.div`
   pointer-events: none;
 `;
 
+const RankBadge = styled.span`
+  display: inline-block;
+  padding: 2px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+`;
+
 const WishlistHeartWrap = styled.div`
   position: absolute;
   top: 8px;
@@ -407,7 +421,7 @@ const MorePill = styled.button`
  *  Component
  * ─────────────────────────────────────────────────────────── */
 
-export function ProductCard({ product, activeFilters = {}, plainImage = false }) {
+export function ProductCard({ product, activeFilters = {}, plainImage = false, isBestseller: isBestsellerProp, rank }) {
   const locale = useLocale();
   const marketPrefixVal = useMarketPrefix();
   const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
@@ -530,7 +544,8 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false })
     product.metadata?.badge === "new";
   const publishDate = product.metadata?.publish_date ? new Date(product.metadata.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
-  const isBestseller = isBestsellerMetadata(product.metadata || {});
+  const isBestseller = isBestsellerProp !== undefined ? isBestsellerProp : isBestsellerMetadata(product.metadata || {});
+  const isEuOrigin = isEuOriginVerified(product.metadata);
   const managesInventory = variant?.manage_inventory === true;
   const inventoryQty = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity;
   const outOfStock = managesInventory && typeof inventoryQty === "number" && inventoryQty <= 0;
@@ -621,7 +636,12 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false })
 
         {/* Badges */}
         <Badges>
-          {isBestseller && !isComingSoon && <BestsellerBadge />}
+          {isBestseller && !isComingSoon && (
+            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+              <BestsellerBadge />
+              {rank != null && <RankBadge>#{rank}</RankBadge>}
+            </div>
+          )}
           {isComingSoon && <Badge $comingSoon>Pek yakında</Badge>}
           {hasSale && !isComingSoon && <Badge $sale>Sale</Badge>}
           {isNew && !hasSale && !isComingSoon && <Badge>New</Badge>}
@@ -637,6 +657,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false })
             <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
           </WishlistHeartWrap>
         )}
+        {isEuOrigin && <MadeInEuropeOverlay />}
       </ImgBlock>
 
       <AddToCartBtn
@@ -909,7 +930,7 @@ const ListBadge = styled.span`
   background: ${(p) => p.$sale ? "#e53e3e" : p.$gray ? "#9ca3af" : p.$orange ? "#c2410c" : "#15803d"};
 `;
 
-export function ProductListItem({ product, activeFilters = {} }) {
+export function ProductListItem({ product, activeFilters = {}, isBestseller: isBestsellerProp }) {
   const locale = useLocale();
   const marketPrefixVal = useMarketPrefix();
   const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
@@ -952,7 +973,7 @@ export function ProductListItem({ product, activeFilters = {} }) {
   const meta = product.metadata || {};
   const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
-  const isBestseller = isBestsellerMetadata(meta);
+  const isBestseller = isBestsellerProp !== undefined ? isBestsellerProp : isBestsellerMetadata(meta);
   const inventoryQty = variant?.inventory_quantity ?? null;
   const outOfStock = variant?.manage_inventory === true && typeof inventoryQty === "number" && inventoryQty <= 0;
   const shippingGroupIdRaw = meta.shipping_group_id;

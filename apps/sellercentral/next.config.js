@@ -47,10 +47,10 @@ const nextConfig = {
       "default-src 'self'",
       // Next.js hydration + Polaris + styled-components require unsafe-inline/eval
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
       // User-uploaded images can come from the backend or any HTTPS CDN
       "img-src 'self' data: blob: https:",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com",
       // XHR/fetch to backend API; wss for any future WebSocket features
       "connect-src 'self' https: wss: http://localhost:9000 http://192.168.2.127:9000",
       // Admin panel must never be embeddable in any frame

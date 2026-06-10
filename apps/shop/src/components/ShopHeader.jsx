@@ -805,17 +805,23 @@ const UserBtn = styled.button`
 `;
 
 
-const SubNavWrap = styled.div`
+/* Outer clipper — collapses max-height AND clips SubNavWrap border via overflow:hidden */
+const SubNavClipper = styled.div`
   width: 100%;
+  overflow: hidden;
   max-height: ${(p) => {
-    /* chrome_covers: keep full height so header chrome stays visible; only opacity fades */
     if (p.$chromeCover) return `var(--second-nav-h, 50px)`;
     const t = Math.min(1, Math.max(0, p.$hideProgress ?? 0));
     return `calc(var(--second-nav-h, 50px) * ${1 - t})`;
   }};
+  opacity: ${(p) => 1 - Math.min(1, Math.max(0, p.$hideProgress ?? 0))};
+  pointer-events: ${(p) => ((p.$hideProgress ?? 0) >= 0.95 ? "none" : "auto")};
+`;
+
+const SubNavWrap = styled.div`
+  width: 100%;
   background: var(--second-nav-bg, transparent);
   overflow: hidden;
-  opacity: ${(p) => 1 - Math.min(1, Math.max(0, p.$hideProgress ?? 0))};
   display: flex;
   align-items: center;
   color: var(--second-nav-text, #374151);
@@ -823,7 +829,6 @@ const SubNavWrap = styled.div`
   font-weight: var(--second-nav-fw, 500);
   position: relative;
   z-index: 0;
-  pointer-events: ${(p) => ((p.$hideProgress ?? 0) >= 0.95 ? "none" : "auto")};
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     font-size: 13px;
@@ -1760,28 +1765,31 @@ export default function ShopHeader() {
         </MiddleBarWrap>
         </HeaderChrome>
 
-        <SubNavWrap
-          id="subnav"
-          className="second-nav"
+        <SubNavClipper
           $hideProgress={subNavHideProgress}
           $chromeCover={snChromeCover}
-          style={{
-            ...(snChromeCover ? { background: "var(--header-chrome-bg)" } : {}),
-            ...(isNarrowViewport && landingHeaderBg ? { borderTop: "none", borderBottom: "none" } : {}),
-          }}
         >
-          <SecondMenuRowInner>
-            {secondMenuItems.map((item) => (
-              <SecondLink
-                key={item.id}
-                className={secondNavUsePillClass ? "shop-second-nav-link" : undefined}
-                href={menuItemHref(item)}
-              >
-                {item.label}
-              </SecondLink>
-            ))}
-          </SecondMenuRowInner>
-        </SubNavWrap>
+          <SubNavWrap
+            id="subnav"
+            className="second-nav"
+            style={{
+              ...(snChromeCover ? { background: "var(--header-chrome-bg)" } : {}),
+              ...(isNarrowViewport && landingHeaderBg ? { borderTop: "none", borderBottom: "none" } : {}),
+            }}
+          >
+            <SecondMenuRowInner>
+              {secondMenuItems.map((item) => (
+                <SecondLink
+                  key={item.id}
+                  className={secondNavUsePillClass ? "shop-second-nav-link" : undefined}
+                  href={menuItemHref(item)}
+                >
+                  {item.label}
+                </SecondLink>
+              ))}
+            </SecondMenuRowInner>
+          </SubNavWrap>
+        </SubNavClipper>
 
         {/* Mega menu panel — floats below the header bar */}
         {hasMegaNav && (

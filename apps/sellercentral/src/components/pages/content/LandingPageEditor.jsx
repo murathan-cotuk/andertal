@@ -131,6 +131,7 @@ const CONTAINER_PADDING_DEFAULTS = {
   video_block: "32px 24px 32px 24px",
   banner_cta: "32px 48px 40px 48px",
   collection_carousel: "32px 24px 32px 24px",
+  bestseller_carousel: "32px 24px 32px 24px",
   collections_carousel: "32px 24px 32px 24px",
   content_mosaic: "32px 24px 32px 24px",
   accordion: "48px 24px 48px 24px",
@@ -191,6 +192,7 @@ function getContainerTypes(isTurkish) {
       { type: "video_block",         label: "Video",                          description: "Gömülü veya barındırılan video (masaüstü + mobil, dosya URL ya da YouTube/Vimeo)" },
       { type: "banner_cta",          label: "CTA Banner",                     description: "Eylem çağrısı ve konumlandırma içeren renkli banner" },
       { type: "collection_carousel", label: "Koleksiyon Karuseli",            description: "Bir koleksiyonun ürünlerini karusel olarak gösterir" },
+      { type: "bestseller_carousel", label: "Bestseller Karuseli",            description: "Seçilen kategorinin en çok satılan ürünlerini sırayla gösterir" },
       { type: "collections_carousel", label: "Koleksiyonlar Karuseli",        description: "Birden fazla koleksiyonu tıklanabilir kartlar halinde gösterir" },
       { type: "accordion",           label: "Akordeon (SSS)",                 description: "Açılır-kapanır soru-cevap bölümleri, SSS için ideal" },
       { type: "tabs",                label: "Sekmeler",                       description: "İçerikleri sekmeler arasında gösterir" },
@@ -211,6 +213,7 @@ function getContainerTypes(isTurkish) {
     { type: "video_block",         label: "Video",                 description: "Eingebettetes oder gehostetes Video (Desktop + Mobil, Datei-URL oder YouTube/Vimeo)" },
     { type: "banner_cta",          label: "CTA-Banner",            description: "Farbiger Banner mit Handlungsaufforderung und Positionierung" },
     { type: "collection_carousel", label: "Kollektion-Karussell",  description: "Produkte einer Kollektion als Karussell" },
+    { type: "bestseller_carousel", label: "Bestseller-Karussell", description: "Die meistverkauften Produkte einer Kategorie mit Rang-Nummer" },
     { type: "collections_carousel", label: "Kollektionen-Karussell", description: "Mehrere Kollektionen als anklickbare Karten nebeneinander" },
     { type: "accordion",           label: "Accordion (FAQ)",       description: "Aufklappbare Frage-Antwort-Sektionen, ideal für FAQs" },
     { type: "tabs",                label: "Tabs (Registerkarten)", description: "Inhalte in wechselbaren Reitern anzeigen" },
@@ -359,6 +362,8 @@ function newContainer(type) {
       return { ...base, title: "", subtitle: "", btn_text: "", btn_url: "", bg_color: "#ff971c", text_color: "#ffffff", text_position: "center", padding: "32px 48px 40px 48px", btn_bg: "#ffffff", btn_color: "#111827", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "collection_carousel":
       return { ...base, title: "", collection_id: "", collection_handle: "", product_captions: "", items_per_row: 4, items_per_row_mobile: 2, gap: 16, mobile_layout: "row", mobile_grid_rows: 2, mobile_grid_cols: 2, padding: "32px 24px", content_layout: "full" };
+    case "bestseller_carousel":
+      return { ...base, title: "", category_slug: "", items_per_row: 4, items_per_row_mobile: 2, gap: 16, mobile_layout: "row", mobile_grid_rows: 2, mobile_grid_cols: 2, padding: "32px 24px", content_layout: "full" };
     case "collections_carousel":
       return {
         ...base,
@@ -1612,6 +1617,93 @@ function CollectionCarouselEditor({ container, onChange, deviceTab = 0, editLang
   );
 }
 
+function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
+  const isMobileView = deviceTab >= 1;
+  const client = getMedusaAdminClient();
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    client.getAdminHubCategories({ all: true }).then((r) => {
+      const flat = [];
+      function flatten(list, depth = 0) {
+        (list || []).forEach((c) => {
+          flat.push({ ...c, _depth: depth });
+          if (c.children?.length) flatten(c.children, depth + 1);
+        });
+      }
+      flatten(Array.isArray(r?.categories) ? r.categories : (Array.isArray(r) ? r : []));
+      setCategories(flat);
+    }).catch(() => {});
+  }, []);
+
+  const catOptions = [
+    { label: "— Kategorie wählen —", value: "" },
+    ...categories.map((c) => ({
+      label: " ".repeat(c._depth * 2) + (c.name || c.title || c.slug || c.id),
+      value: c.slug || c.handle || c.id || "",
+    })),
+  ];
+
+  return (
+    <BlockStack gap="400">
+      <TextField label="Überschrift (optional)" value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+      <Select
+        label="Kategorie"
+        options={catOptions}
+        value={container.category_slug || ""}
+        onChange={(v) => onChange({ ...container, category_slug: v })}
+        helpText="Nur die Bestseller dieser Kategorie werden angezeigt."
+      />
+      <div style={EDITOR_FIELD_GRID}>
+        <Select
+          label="Produkte pro Reihe"
+          options={(isMobileView ? [1, 2, 3, 4] : [2, 3, 4, 5, 6]).map((n) => ({ label: String(n), value: String(n) }))}
+          value={String(isMobileView ? (container.items_per_row_mobile ?? 2) : (container.items_per_row || 4))}
+          onChange={(v) => onChange({
+            ...container,
+            ...(isMobileView ? { items_per_row_mobile: Number(v) } : { items_per_row: Number(v) }),
+          })}
+        />
+        <TextField
+          label="Abstand Karten (px)"
+          type="number"
+          value={String(container.gap ?? 16)}
+          onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })}
+          autoComplete="off"
+        />
+      </div>
+      {isMobileView && (
+        <>
+          <Divider />
+          <Text as="h3" variant="headingSm">Mobil (≤1023px)</Text>
+          <div style={EDITOR_FIELD_GRID}>
+            <Select
+              label="Darstellung"
+              options={LANDING_MOBILE_CAROUSEL_LAYOUT}
+              value={container.mobile_layout === "grid" ? "grid" : "row"}
+              onChange={(v) => onChange({ ...container, mobile_layout: v === "grid" ? "grid" : "row" })}
+            />
+            <Select
+              label="Raster: Spalten"
+              options={MOBILE_GRID_DIM_OPTIONS}
+              value={String(Math.min(4, Math.max(1, Math.round(Number(container.mobile_grid_cols)) || 2)))}
+              onChange={(v) => onChange({ ...container, mobile_grid_cols: Number(v) })}
+              disabled={container.mobile_layout !== "grid"}
+            />
+            <Select
+              label="Raster: Zeilen"
+              options={MOBILE_GRID_DIM_OPTIONS}
+              value={String(Math.min(4, Math.max(1, Math.round(Number(container.mobile_grid_rows)) || 2)))}
+              onChange={(v) => onChange({ ...container, mobile_grid_rows: Number(v) })}
+              disabled={container.mobile_layout !== "grid"}
+            />
+          </div>
+        </>
+      )}
+    </BlockStack>
+  );
+}
+
 function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
   const isMobileView = deviceTab >= 1;
   const client = getMedusaAdminClient();
@@ -2711,6 +2803,7 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
     case "image_carousel":       editor = <ImageCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "banner_cta":           editor = <BannerCtaEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "collection_carousel":  editor = <CollectionCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
+    case "bestseller_carousel":  editor = <BestsellerCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "collections_carousel": editor = <CollectionsCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "accordion":            editor = <AccordionEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "tabs":                 editor = <TabsEditor container={container} onChange={onChange} editLang={editLang} />; break;

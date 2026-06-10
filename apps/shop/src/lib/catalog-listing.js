@@ -4,6 +4,7 @@
 
 export const SORT_OPTIONS = [
   { value: "default", label: "Featured" },
+  { value: "bestseller", label: "Bestseller" },
   { value: "newest", label: "Newest" },
   { value: "price_asc", label: "Price: Low → High" },
   { value: "price_desc", label: "Price: High → Low" },
@@ -284,7 +285,7 @@ export function filterProductsByFacets(products, filters) {
 
 export function applyCatalogSort(sorted, sort, { bestsellerOnly = false } = {}) {
   const out = [...sorted];
-  if (bestsellerOnly && sort === "default") {
+  if (sort === "bestseller" || (bestsellerOnly && sort === "default")) {
     out.sort((a, b) => productSalesScore(b) - productSalesScore(a));
   }
   if (sort === "newest") {

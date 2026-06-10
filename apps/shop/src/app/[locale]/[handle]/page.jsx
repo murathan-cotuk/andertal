@@ -648,7 +648,10 @@ export default function CollectionPage() {
   const [error,       setError]       = useState(null);
   const [notFoundSt,  setNotFoundSt]  = useState(false);
   const [isCategorySlug, setIsCategorySlug] = useState(false);
-  const [sort,        setSort]        = useState("default");
+  const _initialSort = searchParams?.get("sort") || "";
+  const [sort,        setSort]        = useState(
+    ["bestseller", "newest", "price_asc", "price_desc", "title_asc", "title_desc"].includes(_initialSort) ? _initialSort : "default"
+  );
   const [page,        setPage]        = useState(1);
   const [filters,     setFilters]     = useState({});
   const [panelOpen,   setPanelOpen]   = useState(false);
@@ -744,17 +747,11 @@ export default function CollectionPage() {
 
         const col = colData?.collection ?? null;
         if (!col) {
-          // Fallback: try CMS page by menu label slug
-          const pageRes = await fetch(`${backendUrl}/store/page-by-label-slug/${encodeURIComponent(handle)}`).catch(() => null);
+          // Fallback: try CMS page by slug (via proxy — avoids CORS with direct backend URL)
+          const pageRes = await fetch(`/api/store-pages/${encodeURIComponent(handle)}`, { cache: "no-store" }).catch(() => null);
           if (pageRes?.ok) {
             const pageData = await pageRes.json().catch(() => null);
             if (pageData?.id) { setCmsPage(pageData); setLoading(false); return; }
-          }
-          // Fallback 2: try by page slug directly
-          const pageRes2 = await fetch(`${backendUrl}/store/pages/${encodeURIComponent(handle)}`).catch(() => null);
-          if (pageRes2?.ok) {
-            const pageData2 = await pageRes2.json().catch(() => null);
-            if (pageData2?.id) { setCmsPage(pageData2); setLoading(false); return; }
           }
           // Fallback 3: full tree lookup
           const catTreeRes = await fetch(`/api/store-categories?tree=true&is_visible=true`).catch(() => null);
