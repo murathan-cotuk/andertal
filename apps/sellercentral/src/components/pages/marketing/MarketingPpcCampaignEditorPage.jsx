@@ -17,6 +17,7 @@ import {
   ProgressBar,
 } from "@shopify/polaris";
 import { useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import {
@@ -410,6 +411,7 @@ function LocaleContentEditor({ localeContent, onChange }) {
 
 export default function MarketingPpcCampaignEditorPage({ campaignId }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -424,12 +426,22 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
   const [imageUploading, setImageUploading] = useState(false);
   const [expandedProductId, setExpandedProductId] = useState(null);
   const [keywordInput, setKeywordInput] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
     }
   }, []);
+
+  useEffect(() => {
+    const payment = searchParams?.get("payment");
+    if (payment === "success") {
+      setMsg({ tone: "success", text: "Zahlung erfolgreich! Deine Kampagne wurde eingereicht und wird von uns geprüft." });
+    } else if (payment === "cancelled") {
+      setMsg({ tone: "warning", text: "Zahlung abgebrochen. Du kannst es jederzeit erneut versuchen." });
+    }
+  }, [searchParams]);
 
   const loadConnectedPlatforms = useCallback(async () => {
     if (!isSuperuser) return;
@@ -667,6 +679,44 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
       setMsg({ tone: "critical", text: e?.message || "Fehler beim Speichern." });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePayAndSubmit = async () => {
+    if (!campaignId) return;
+    const budgetEuro = parseFloat(form.budget_daily_cents);
+    if (!form.budget_daily_cents || Number.isNaN(budgetEuro) || budgetEuro <= 0) {
+      setMsg({ tone: "warning", text: "Bitte zuerst ein gültiges Tagesbudget eingeben und speichern." });
+      return;
+    }
+    setCheckoutLoading(true);
+    setMsg(null);
+    try {
+      // Save first, then redirect to checkout
+      await getMedusaAdminClient().updateCampaign(campaignId, {
+        name: form.name.trim(),
+        description: form.description,
+        target_type: form.target_type,
+        product_ids: form.product_ids,
+        group_ids: form.group_ids,
+        variant_ids: form.variant_ids || [],
+        budget_daily_cents: Math.round(budgetEuro * 100),
+        start_at: form.start_at ? new Date(form.start_at).toISOString() : null,
+        end_at: form.end_at ? new Date(form.end_at).toISOString() : null,
+        campaign_type: "ppc",
+        discount_type: "percentage",
+        discount_value: 0,
+      });
+      const res = await getMedusaAdminClient().createCampaignCheckout(campaignId);
+      if (res?.checkout_url) {
+        window.location.href = res.checkout_url;
+      } else {
+        setMsg({ tone: "critical", text: res?.message || "Checkout konnte nicht gestartet werden." });
+        setCheckoutLoading(false);
+      }
+    } catch (e) {
+      setMsg({ tone: "critical", text: e?.message || "Fehler beim Bezahlen." });
+      setCheckoutLoading(false);
     }
   };
 
@@ -1470,12 +1520,28 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 )}
               </div>
 
-              <InlineStack gap="300">
+              <InlineStack gap="300" wrap>
                 <Button variant="primary" size="large" onClick={save} loading={saving}>
                   Speichern
                 </Button>
+                {!isSuperuser && (
+                  <Button
+                    tone="success"
+                    size="large"
+                    onClick={handlePayAndSubmit}
+                    loading={checkoutLoading}
+                    disabled={saving}
+                  >
+                    Bezahlen & einreichen
+                  </Button>
+                )}
                 <Button onClick={() => router.push("/marketing/campaigns")}>Abbrechen</Button>
               </InlineStack>
+              {!isSuperuser && (
+                <p style={{ margin: 0, fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
+                  Mit „Bezahlen & einreichen" wird ein 30-Tage-Budget ({form.budget_daily_cents ? `${(parseFloat(form.budget_daily_cents) * 30).toFixed(2)} €` : "—"}) via Stripe abgerechnet. Deine Kampagne wird danach zur Freigabe eingereicht.
+                </p>
+              )}
             </BlockStack>
             </div>
 

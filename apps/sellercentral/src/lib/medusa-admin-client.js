@@ -1534,6 +1534,10 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/campaigns/${id}/resume`, { method: 'POST' })
   }
 
+  async createCampaignCheckout(id, { success_url, cancel_url } = {}) {
+    return this.request(`/admin-hub/v1/campaigns/${id}/checkout`, { method: 'POST', body: JSON.stringify({ success_url, cancel_url }) })
+  }
+
   async getCampaignAttribution(params = {}) {
     const qs = new URLSearchParams();
     if (params.from) qs.set("from", params.from);

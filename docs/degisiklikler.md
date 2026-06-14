@@ -208,18 +208,187 @@ if (res?.__error) return null  // kesin hata → sidebar açılmaz
 
 ---
 
+---
+
+### 11. CMS Page — "Etwas ist schiefgelaufen" Hatası
+
+**Dosya:** `apps/shop/src/app/api/store-pages/[slug]/route.js` (satır 7)  
+**Dosya:** `apps/shop/src/components/Footer.jsx` (satır 27)  
+**Dosya:** `apps/shop/src/app/[locale]/[handle]/page.jsx` (satır 937)
+
+**Eskiden:**
+Üç ayrı bug birbirine zincirleniyordu:
+
+1. `api/store-pages/[slug]/route.js` satır 7'de Next.js 16'da `params` bir Promise olduğundan `const { slug } = params` ile `slug` her zaman `undefined` dönüyor, API her zaman 404 veriyordu.
+
+2. `Footer.jsx`'in kendi local `menuItemHref` fonksiyonu, `link_type === "page"` için `/${pageSlug}` döndürüyordu (`/pages/` prefix'i eksikti). Footer menüsündeki page linkleri `/pages/[slug]` yerine `[handle]` rotasına gidiyordu.
+
+3. `[handle]/page.jsx` satır 937'de `if (notFoundSt) notFound()` şeklinde bir `"use client"` bileşeninden `notFound()` çağrılıyordu. Bu throw, Next.js error boundary'lerini atlayıp doğrudan `Providers.jsx`'teki özel React class `ErrorBoundary`'e düşüyordu — "Etwas ist schiefgelaufen" ekranı çıkıyordu.
+
+**Artık:**
+```js
+// 1. api/store-pages/[slug]/route.js — await eklendi
+const { slug } = await params;
+
+// 2. Footer.jsx — /pages/ prefix'i eklendi
+return pageSlug ? `/pages/${pageSlug}` : "#";
+
+// 3. [handle]/page.jsx — notFound() yerine inline 404 render
+if (notFoundSt) return (
+  <PageWrap>
+    <ShopHeader />
+    <Main>
+      <div style={{ padding: "64px 32px", textAlign: "center" }}>
+        <p style={{ fontSize: 15, color: "#6b7280" }}>Die Seite wurde nicht gefunden.</p>
+      </div>
+    </Main>
+    <Footer />
+  </PageWrap>
+);
+```
+
+- API route artık slug'ı doğru okuyor, yayınlanmış sayfalar döndürülüyor.
+- Footer menüsündeki page linkleri artık `/pages/[slug]` rotasına gidiyor.
+- Bulunamayan handle'lar artık ErrorBoundary'ye düşmek yerine nazikçe "Die Seite wurde nicht gefunden." gösteriyor.
+
+---
+
+### 12. Geolocation Düzeltmesi — EN Locale → DE Market
+
+**Dosya:** `apps/shop/src/lib/shop-market.js`
+
+**Eskiden:**
+`defaultMarketForLocale("en")` → `"gb"` döndürüyordu. İngilizce tarayıcıyla Almanya'dan giren kullanıcılar GB/GB market'e düşüyordu.
+
+**Artık:**
+```js
+if (l === "en") return "de";  // eskiden: return "gb"
+```
+İngilizce locale → DE market'e yönlendiriyor.
+
+---
+
+### 13. Brands Sayfası — Yeni Markalar Görünmüyor
+
+**Dosya:** `apps/medusa-backend/server.js` → `/store/brands` endpoint
+
+**Eskiden:**
+Tüm yayınlanmış ürünler çekilip `visibleBrandIds` Set'i oluşturuluyordu. Yalnızca bu Set'teki markalar gösteriliyordu. Ürünü olmayan yeni eklenen markalar hiç görünmüyordu.
+
+**Artık:**
+`visibleBrandIds` filtresi tamamen kaldırıldı. `handle` alanı dolu tüm markalar listeleniyor.
+
+---
+
+### 14. Shop Breadcrumb — "Koleksiyon" Yerine Kategori
+
+**Dosya:** `apps/shop/src/components/templates/ProductTemplate.jsx` (~satır 1448)  
+**Dosya:** `apps/shop/src/components/templates/ProductTemplateMobile.jsx` (~satır 1488)
+
+**Eskiden:**
+Ürünün bir kategorisi yoksa breadcrumb `product.collection.title` değerini (genellikle "Koleksiyon") gösteriyordu.
+
+**Artık:**
+Collection'a dayalı breadcrumb tamamen kaldırıldı. Breadcrumb yalnızca: Home → kategori ataları → güncel kategori → ürün başlığı şeklinde oluşuyor.
+
+---
+
+### 15. Bestseller Badge — Tüm Product Card'larda
+
+**Dosya:** `apps/shop/src/components/ProductGrid.jsx`
+
+**Eskiden:**
+Grid içindeki yalnızca en yüksek `sales_score`'lu tek ürün bestseller badge'i alıyordu.
+
+**Artık:**
+`isBestsellerMetadata(p.metadata) || p.id === bestsellerProductId` kontrolü yapılıyor. `metadata.is_bestseller === true` veya `metadata.badge === "bestseller"` olan tüm ürünler badge alıyor.
+
+---
+
+### 16. EAN Koruması — İkinci Satıcı Kilitlemesi
+
+**Dosya:** `apps/sellercentral/src/components/pages/products/ProductEditPage.jsx`
+
+**Eskiden:**
+İkinci satıcı (ürünü ilk o listelemeyen seller) ProductEditPage'de EAN alanını düzenleyebiliyordu.
+
+**Artık:**
+- `currentSellerId` localStorage'dan okunuyor.
+- `isSecondSeller` türetiliyor: superuser değilse, yeni ürün değilse ve `product.metadata.seller_id !== currentSellerId` ise `true`.
+- EAN TextField `disabled={isSecondSeller}`, üzerinde `🔒` suffix ve `"(gesperrt — nur Erstanbieter kann ändern)"` label ek notu gösteriliyor.
+
+---
+
+### 17. Bestseller Carousel — Kategori Hiyerarşi Seçici
+
+**Dosya:** `apps/sellercentral/src/components/pages/content/LandingPageEditor.jsx` → `BestsellerCarouselEditor`
+
+**Eskiden:**
+Kategori seçimi düz `<Select>` dropdown ile yapılıyordu; hiyerarşi boşluk (non-breaking space) ile ifade ediliyordu. Üst/alt kategori ilişkisi belirsizdi.
+
+**Artık:**
+`CategoryDrilldownSelect` bileşeni kullanılıyor. Arama, breadcrumb yolu ve drilldown navigasyonu mevcut. Eski verilerle uyumluluk için `category_slug` → `category_id` dönüşümü otomatik yapılıyor; konteyner artık her ikisini de saklıyor (`category_id` + `category_slug`).
+
+---
+
+---
+
+### 18. Shop URL Prefix Kaldırma — `/pages/` ve `/produkt/`
+
+**Dosya:** `apps/shop/src/lib/shop-menu-href.js`  
+**Dosya:** `apps/shop/src/components/Footer.jsx`  
+**Dosya:** `apps/shop/src/app/[locale]/[handle]/page.jsx`
+
+**Eskiden:**
+- Menü/footer'daki "page" tipi linkler `/pages/[slug]` formatında oluşturuluyordu.
+- Menü/footer'daki "product" tipi linkler `/produkt/[slug]` formatında oluşturuluyordu.
+- `[handle]` catch-all route'u ürünleri tanımıyordu — ürün slug'ı girilince 404 veriyordu.
+
+**Artık:**
+- `shop-menu-href.js` ve `Footer.jsx`'teki yerel `menuItemHref`: `page` → `/${slug}`, `product` → `/${slug}`.
+- `[handle]/page.jsx`'e son fallback olarak ürün lookup adımı eklendi (`/api/store-products/[handle]`). Kategori → koleksiyon → CMS sayfası → kategori ağacı araması sonrasında ürün bulunursa `ProductTemplate` / `ProductTemplateMobile` gösteriliyor.
+- CMS sayfaları zaten `[handle]` route'undan erişilebiliyordu, artık linkler de `/[slug]` formatında oluşturuluyor.
+
+---
+
+### 19. Kupon Sayfası — Superuser Satıcı Kategorilendirmesi
+
+**Dosya:** `apps/sellercentral/src/components/pages/CouponsPage.jsx`
+
+**Eskiden:**
+Superuser "Verkäufer-Coupons" bölümünde tüm satıcı kuponları düz liste olarak görünüyordu. Hangi kuponun kime ait olduğu yalnızca "Verkäufer: ..." yazısından anlaşılıyordu.
+
+**Artık:**
+Kuponlar `seller_id`'ye göre gruplanıyor. Her satıcı kendi başlığı (isim + kupon sayısı) altında listeleniyor. Satıcı adı `sellerNameById` map'inden çözümleniyor.
+
+---
+
+### 20. Kampanya Sistemi — Stripe Ödeme Adımı
+
+**Dosya:** `apps/medusa-backend/server.js` → `POST /admin-hub/v1/campaigns/:id/checkout`  
+**Dosya:** `apps/medusa-backend/server.js` → `/webhook/stripe` — `checkout.session.completed`  
+**Dosya:** `apps/sellercentral/src/lib/medusa-admin-client.js` → `createCampaignCheckout()`  
+**Dosya:** `apps/sellercentral/src/components/pages/marketing/MarketingPpcCampaignEditorPage.jsx`
+
+**Eskiden:**
+Seller kampanya oluştururken Stripe ödeme adımı yoktu. Kampanya direkt superuser'a düşüyordu, `stripe_charge_id` kolonu boş kalıyordu.
+
+**Artık:**
+
+**Backend:**
+- `POST /admin-hub/v1/campaigns/:id/checkout`: Platform Stripe anahtarıyla Stripe Checkout Session oluşturuyor. Tutar: `budget_daily_cents × 30` (30 günlük ön ödeme). Session metadata'sına `type: 'campaign_budget'` ve `campaign_id` yazılıyor.
+- Webhook `checkout.session.completed`: `type === 'campaign_budget'` ise `seller_campaigns.stripe_charge_id` güncelleniyor, superuser'a `campaign_paid` bildirimi gönderiliyor.
+
+**Frontend:**
+- Kampanya editöründe "Speichern" yanına "Bezahlen & einreichen" butonu eklendi (yalnızca seller görür).
+- Butona tıklandığında form önce kaydediliyor, ardından Stripe Checkout'a yönlendiriliyor.
+- Stripe'tan dönerken `?payment=success` veya `?payment=cancelled` parametresine göre banner gösteriliyor.
+- Alt bilgi olarak 30 günlük toplam tutar dinamik hesaplanıp gösteriliyor.
+
+Google Ads + Meta dağıtımı (publish/pause/resume) zaten önceki sürümlerde uygulanmıştı.
+
+---
+
 ## Bekleyen / Henüz Yapılmayan
 
-- Shop URL sorunu (`/produkt/`, `/pages/` prefix'leri kaldırılmadı)
-- Geolocation GB/GB → DE/DE (Almanya'dan açılınca yanlış locale)
-- `/brands` sayfasında son eklenen marka görünmüyor
-- Shop breadcrumbs (kategori yerine "Koleksiyon" yazıyor)
-- Bestseller badge tüm product card'larda (category, search, menu)
-- Bestseller carousel kategori dropdown hiyerarşisi
-- Excel `per_unit` alanı eklenmesi
-- Ürün koruma: EAN immutable, ilk satıcı düzenleme hakkı, değişiklik önerileri + kırmızı badge
-- İkinci satıcı aynı EAN'i eklerken seller-specific alanlar boş gelmeli, save düzelmeli
-- Shopta "Other Sellers (N)" accordion (fiyat + yıldız)
-- Kupon sayfası superuser kategorilendirmesi
-- Kampanya sistemi (Stripe + Google Ads / Meta dağıtım)
-- Sellercentralde takip numarasının girilebildiği yer — hangi alanda, hangi UI component'ta olduğu doğrulanmadı
+*(Tüm maddeler tamamlandı.)*

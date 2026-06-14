@@ -2,7 +2,7 @@
 
 import { ProductCard, ProductListItem } from "@/components/ProductCard";
 import { useIsNarrow } from "@/hooks/useIsNarrow";
-import { toSalesScore } from "@/lib/bestseller";
+import { toSalesScore, isBestsellerMetadata } from "@/lib/bestseller";
 import styled from "styled-components";
 
 const STRIP_GAP = 8;
@@ -111,7 +111,7 @@ export function ProductGrid({
   const mobileCols = Math.max(1, Math.min(m, 3));
   const useMobileList = isMobile && mobileCols === 1;
 
-  // Bestseller = product with highest sales score in this context (per category/collection)
+  // Bestseller = product with explicit metadata flag OR the highest sales-score in this grid
   let bestsellerProductId = null;
   let bestScore = 0;
   for (const p of products) {
@@ -126,14 +126,17 @@ export function ProductGrid({
       $cols={cols}
       $mobileCols={mobileCols}
     >
-      {products.map((p) => (
+      {products.map((p) => {
+        const bs = isBestsellerMetadata(p.metadata) || p.id === bestsellerProductId;
+        return (
         <CardSlot key={p.id} $m={m}>
           {useMobileList
-            ? <ProductListItem product={p} activeFilters={activeFilters} isBestseller={p.id === bestsellerProductId} />
-            : <ProductCard product={p} activeFilters={activeFilters} plainImage isBestseller={p.id === bestsellerProductId} />
+            ? <ProductListItem product={p} activeFilters={activeFilters} isBestseller={bs} />
+            : <ProductCard product={p} activeFilters={activeFilters} plainImage isBestseller={bs} />
           }
         </CardSlot>
-      ))}
+        );
+      })}
     </CatalogWrap>
   );
 }

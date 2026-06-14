@@ -416,15 +416,30 @@ export default function CouponsPage() {
                 <Text tone="subdued">Keine Verkäufer-Coupons vorhanden.</Text>
               ) : (
                 <div>
-                  {sellerCoupons.map((c) => (
-                    <CouponRow
-                      key={c.id}
-                      c={c}
-                      onToggle={toggleActive}
-                      onRemove={remove}
-                      onEdit={openEdit}
-                      sellerLabel={sellerLabelFor(c)}
-                    />
+                  {Object.entries(
+                    sellerCoupons.reduce((groups, c) => {
+                      const sid = c.seller_id || "unknown";
+                      if (!groups[sid]) groups[sid] = [];
+                      groups[sid].push(c);
+                      return groups;
+                    }, {})
+                  ).map(([sid, sidCoupons]) => (
+                    <div key={sid} style={{ borderTop: "1px solid #f1f2f4", paddingTop: 12, marginTop: 8 }}>
+                      <div style={{ marginBottom: 4 }}>
+                        <Text as="span" fontWeight="semibold">{sellerNameById[sid] || sid}</Text>
+                        <Text as="span" tone="subdued"> ({sidCoupons.length})</Text>
+                      </div>
+                      {sidCoupons.map((c) => (
+                        <CouponRow
+                          key={c.id}
+                          c={c}
+                          onToggle={toggleActive}
+                          onRemove={remove}
+                          onEdit={openEdit}
+                          sellerLabel={null}
+                        />
+                      ))}
+                    </div>
                   ))}
                 </div>
               )}

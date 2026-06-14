@@ -1445,9 +1445,6 @@ export default function ProductTemplate() {
       ? categorySlugNorm.replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase())
       : "");
 
-  const collectionHandleNorm = product.collection?.handle ? String(product.collection.handle).replace(/^\//, "") : "";
-  const includeCollection = Boolean(product.collection) && collectionHandleNorm && collectionHandleNorm !== categorySlugNorm;
-
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     ...(categoryAncestors || []).map((anc) => {
@@ -1457,7 +1454,6 @@ export default function ProductTemplate() {
     ...(categorySlugNorm
       ? [{ label: categoryCurrentLabel, href: `/${categorySlugNorm}` }]
       : []),
-    ...(includeCollection ? [{ label: product.collection.title, href: `/${product.collection.handle}` }] : []),
     { label: displayTitle, href: null },
   ];
 

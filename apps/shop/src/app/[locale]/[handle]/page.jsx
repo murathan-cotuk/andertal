@@ -4,10 +4,13 @@ import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import LandingContainers from "@/components/landing/LandingContainers";
 import CategoryTemplate from "@/components/templates/CategoryTemplate";
+import ProductTemplate from "@/components/templates/ProductTemplate";
+import ProductTemplateMobile from "@/components/templates/ProductTemplateMobile";
 import { ProductGrid } from "@/components/ProductGrid";
+import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { useParams, useSearchParams, notFound } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
 import { getMedusaClient } from "@/lib/medusa-client";
@@ -648,6 +651,8 @@ export default function CollectionPage() {
   const [error,       setError]       = useState(null);
   const [notFoundSt,  setNotFoundSt]  = useState(false);
   const [isCategorySlug, setIsCategorySlug] = useState(false);
+  const [isProduct, setIsProduct] = useState(false);
+  const isMobile = useIsNarrow(767);
   const _initialSort = searchParams?.get("sort") || "";
   const [sort,        setSort]        = useState(
     ["bestseller", "newest", "price_asc", "price_desc", "title_asc", "title_desc"].includes(_initialSort) ? _initialSort : "default"
@@ -761,6 +766,12 @@ export default function CollectionPage() {
             if (findCategoryBySlug(catTree, handle)) {
               setIsCategorySlug(true); setLoading(false); return;
             }
+          }
+          // Fallback 4: product by handle
+          const productRes = await fetch(`/api/store-products/${encodeURIComponent(handle)}`, { cache: "no-store" }).catch(() => null);
+          if (productRes?.ok) {
+            const productData = await productRes.json().catch(() => null);
+            if (productData?.product?.id) { setIsProduct(true); setLoading(false); return; }
           }
           setNotFoundSt(true); setLoading(false); return;
         }
@@ -934,7 +945,27 @@ export default function CollectionPage() {
     </PageWrap>
   );
 
-  if (notFoundSt) notFound();
+  if (isProduct) return (
+    <div className="min-h-screen flex flex-col bg-white">
+      <ShopHeader />
+      <main className="flex-grow bg-white">
+        {isMobile ? <ProductTemplateMobile /> : <ProductTemplate />}
+      </main>
+      <Footer />
+    </div>
+  );
+
+  if (notFoundSt) return (
+    <PageWrap>
+      <ShopHeader />
+      <Main>
+        <div style={{ padding: "64px 32px", textAlign: "center" }}>
+          <p style={{ fontSize: 15, color: "#6b7280" }}>Die Seite wurde nicht gefunden.</p>
+        </div>
+      </Main>
+      <Footer />
+    </PageWrap>
+  );
 
   /* ────────────────────────────────────────────────────────── *
    *  Skeleton

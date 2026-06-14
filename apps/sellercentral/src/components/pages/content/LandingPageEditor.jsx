@@ -25,6 +25,7 @@ import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 import { mergeLoadedShopStyles } from "@andertal/shop-theme";
+import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 
 const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
@@ -1625,10 +1626,10 @@ function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang
   useEffect(() => {
     client.getAdminHubCategories({ all: true }).then((r) => {
       const flat = [];
-      function flatten(list, depth = 0) {
+      function flatten(list) {
         (list || []).forEach((c) => {
-          flat.push({ ...c, _depth: depth });
-          if (c.children?.length) flatten(c.children, depth + 1);
+          flat.push(c);
+          if (c.children?.length) flatten(c.children);
         });
       }
       flatten(Array.isArray(r?.categories) ? r.categories : (Array.isArray(r) ? r : []));
@@ -1636,24 +1637,33 @@ function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang
     }).catch(() => {});
   }, []);
 
-  const catOptions = [
-    { label: "— Kategorie wählen —", value: "" },
-    ...categories.map((c) => ({
-      label: " ".repeat(c._depth * 2) + (c.name || c.title || c.slug || c.id),
-      value: c.slug || c.handle || c.id || "",
-    })),
-  ];
+  // Backward-compat: if category_id missing but category_slug set, derive ID from slug
+  const resolvedCategoryId = useMemo(() => {
+    if (container.category_id) return container.category_id;
+    if (!container.category_slug || !categories.length) return "";
+    const match = categories.find((c) => (c.slug || c.handle || "") === container.category_slug);
+    return match?.id || "";
+  }, [container.category_id, container.category_slug, categories]);
+
+  const handleCategoryChange = (id) => {
+    const cat = categories.find((c) => c.id === id);
+    onChange({ ...container, category_id: id || "", category_slug: cat?.slug || cat?.handle || "" });
+  };
 
   return (
     <BlockStack gap="400">
       <TextField label="Überschrift (optional)" value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
-      <Select
-        label="Kategorie"
-        options={catOptions}
-        value={container.category_slug || ""}
-        onChange={(v) => onChange({ ...container, category_slug: v })}
-        helpText="Nur die Bestseller dieser Kategorie werden angezeigt."
-      />
+      <div>
+        <CategoryDrilldownSelect
+          label="Kategorie"
+          categories={categories}
+          value={resolvedCategoryId}
+          onChange={handleCategoryChange}
+          noneLabel="— Kategorie wählen —"
+          placeholder="Kategorie auswählen..."
+        />
+        <div style={{ marginTop: 4, fontSize: 12, color: "#6b7280" }}>Nur die Bestseller dieser Kategorie werden angezeigt.</div>
+      </div>
       <div style={EDITOR_FIELD_GRID}>
         <Select
           label="Produkte pro Reihe"

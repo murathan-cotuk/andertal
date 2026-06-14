@@ -26,7 +26,7 @@ export function menuItemHref(item) {
   }
   if (item.link_type === "page") {
     const pageSlug = parsed?.slug || parsed?.label_slug || itemSlug || slugify(item.label);
-    return pageSlug ? `/pages/${pageSlug}` : "#";
+    return pageSlug ? `/${pageSlug}` : "#";
   }
   if (item.link_type === "api") {
     const fn = String(parsed?.function || parsed?.api_function || value || "")
@@ -48,7 +48,7 @@ export function menuItemHref(item) {
   if (item.link_type === "url" && value) {
     return String(value).startsWith("http") ? value : `/${String(value).replace(/^\//, "")}`;
   }
-  if (item.link_type === "product" && value) return `/produkt/${value}`;
+  if (item.link_type === "product" && value) return `/${value}`;
   if (item.link_type === "category") {
     const slug = value ? String(value).replace(/^\//, "").trim() : "";
     return slug ? `/${slug}` : "#";

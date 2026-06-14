@@ -357,9 +357,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     return () => document.body.classList.remove("andertal-collections-dropdown-open");
   }, [collectionPopoverOpen]);
 
+  const [currentSellerId, setCurrentSellerId] = useState(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+    setCurrentSellerId(localStorage.getItem("sellerId") || null);
   }, []);
 
   const refetchPendingChangeRequests = useCallback(async (productId) => {
@@ -704,6 +706,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       return { ...prev, metadata: { ...m, translations: tr } };
     });
   }, [isNew, editingTitle, product?.title, locale]);
+
+  // Secondary seller: logged-in seller is NOT the product owner → EAN immutable
+  const productOwnerId = product?.metadata?.seller_id;
+  const isSecondSeller = !isSuperuser && !isNew && Boolean(productOwnerId) && Boolean(currentSellerId) && String(currentSellerId) !== String(productOwnerId);
 
   // Per-country pricing for the currently editing country
   const currentCountryConf = PRODUCT_COUNTRIES_MAP[editingCountry] || PRODUCT_COUNTRIES_MAP["DE"];
@@ -1832,14 +1838,21 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       <InlineStack gap="200" blockAlign="center" wrap={false}>
                         <span>EAN</span>
                         <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.ean" />
+                        {isSecondSeller && (
+                          <span style={{ fontSize: 10, color: "#6b7280", fontWeight: 400, marginLeft: 4 }}>
+                            (gesperrt — nur Erstanbieter kann ändern)
+                          </span>
+                        )}
                       </InlineStack>
                     }
                     value={getMeta(product, "ean")}
-                    onChange={(v) => { updateMeta("ean", v); setEanLookupState(null); }}
-                    onBlur={handleEanBlur}
+                    onChange={isSecondSeller ? undefined : (v) => { updateMeta("ean", v); setEanLookupState(null); }}
+                    onBlur={isSecondSeller ? undefined : handleEanBlur}
                     placeholder="EAN / Barcode"
                     autoComplete="off"
+                    disabled={isSecondSeller}
                     suffix={
+                      isSecondSeller ? "🔒" :
                       eanLookupState === "loading" ? "⏳" :
                       eanLookupState === "found" ? "✓ Produktdaten geladen" :
                       eanLookupState === "not_found" ? "— Neu" : undefined

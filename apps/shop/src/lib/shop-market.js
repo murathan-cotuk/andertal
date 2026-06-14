@@ -20,7 +20,7 @@ export const DEFAULT_CURRENCY = "eur";
 /** Default market when only language is known (legacy redirects). */
 export function defaultMarketForLocale(locale) {
   const l = String(locale || "de").toLowerCase();
-  if (l === "en") return "gb";
+  if (l === "en") return "de";
   if (l === "tr") return "tr";
   if (l === "fr") return "fr";
   if (l === "it") return "it";

@@ -7132,15 +7132,6 @@ async function start() {
       const client = getBrandsDbClient()
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {
-        const approvedSellerIds = await getApprovedSellerIdsSet()
-        let visibleProducts = await listAdminHubProductsDb({ limit: 5000 })
-        visibleProducts = visibleProducts.filter((p) => (p.status || '').toLowerCase() === 'published' && isStoreVisibleSellerProduct(p, approvedSellerIds))
-        const visibleBrandIds = new Set(
-          visibleProducts
-            .map((p) => p?.metadata?.brand_id != null ? String(p.metadata.brand_id).trim() : '')
-            .filter(Boolean)
-        )
-        if (visibleBrandIds.size === 0) return res.json({ brands: [], count: 0 })
         await client.connect()
         const r = await client.query(
           `SELECT id, name, handle, logo_image, banner_image, address
@@ -7150,7 +7141,6 @@ async function start() {
         )
         await client.end()
         const brands = (r.rows || [])
-          .filter((row) => visibleBrandIds.has(String(row.id)))
           .map((row) => ({
           id: row.id,
           name: row.name,
@@ -20148,6 +20138,48 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
+    // Campaign budget prepayment via Stripe Checkout (seller-initiated)
+    httpApp.post('/admin-hub/v1/campaigns/:id/checkout', requireSellerAuth, async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(403).json({ message: 'Seller ID required' })
+      const campaignId = req.params.id
+      const { success_url, cancel_url } = req.body || {}
+      const c = pgDbClient(); try {
+        await c.connect()
+        const cr = await c.query(`SELECT * FROM seller_campaigns WHERE id=$1`, [campaignId])
+        const camp = cr.rows[0]
+        if (!camp) { await c.end(); return res.status(404).json({ message: 'Campaign not found' }) }
+        if (!req.sellerUser?.is_superuser && camp.seller_id !== sellerId) { await c.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        const platformRow = await loadPlatformCheckoutRow(c)
+        await c.end()
+        const sk = resolveStripeSecretKeyFromPlatform(platformRow)
+        if (!sk) return res.status(400).json({ message: 'Stripe nicht konfiguriert.' })
+        const stripe = new (require('stripe'))(sk)
+        const dailyCents = parseInt(camp.budget_daily_cents || 0, 10)
+        if (dailyCents <= 0) return res.status(400).json({ message: 'Tagesbudget muss > 0 sein.' })
+        const totalCents = dailyCents * 30 // 30-day prepayment
+        const sellerCentral = process.env.NEXT_PUBLIC_SELLERCENTRAL_URL || 'https://sellercentral.andertal.de'
+        const session = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          line_items: [{
+            quantity: 1,
+            price_data: {
+              currency: 'eur',
+              unit_amount: totalCents,
+              product_data: {
+                name: `Werbekampagne: ${camp.name}`,
+                description: `30-Tage-Vorauszahlung · ${(dailyCents / 100).toFixed(2)} €/Tag`,
+              },
+            },
+          }],
+          metadata: { type: 'campaign_budget', campaign_id: campaignId, seller_id: sellerId },
+          success_url: success_url || `${sellerCentral}/de/marketing/campaigns/${campaignId}?payment=success`,
+          cancel_url: cancel_url || `${sellerCentral}/de/marketing/campaigns/${campaignId}?payment=cancelled`,
+        })
+        res.json({ checkout_url: session.url, session_id: session.id })
+      } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
+    })
+
     // ── Automation Rules (superuser only) ────────────────────────────────────────
     const VALID_AUTOMATION_TYPES = ['review_request', 'welcome_email', 'reorder_reminder', 'abandoned_cart', 'low_stock_alert', 'loyalty_reward', 'price_drop_alert']
 
@@ -22193,6 +22225,37 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           } catch (e) {
             try { await client.end() } catch (_) {}
             console.error('[webhook/stripe] payment_intent.succeeded error:', e.message)
+          }
+        }
+
+        // ── checkout.session.completed (campaign budget prepayment) ──────────
+        else if (event.type === 'checkout.session.completed') {
+          const session = event.data.object
+          const meta = session.metadata || {}
+          if (meta.type === 'campaign_budget' && meta.campaign_id) {
+            const client = mkClient()
+            try {
+              await client.connect()
+              await client.query(
+                `UPDATE seller_campaigns SET stripe_charge_id=$1, ad_status='pending', updated_at=now() WHERE id=$2`,
+                [session.payment_intent || session.id, meta.campaign_id]
+              )
+              await client.query(
+                `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+                 VALUES ('campaign_paid', $1, $2, $3, $4)
+                 ON CONFLICT DO NOTHING`,
+                [
+                  'Kampagne bezahlt',
+                  `Budget für Kampagne ${meta.campaign_id} wurde über Stripe beglichen.`,
+                  meta.seller_id || null,
+                  meta.campaign_id,
+                ]
+              ).catch(() => {})
+              await client.end()
+            } catch (e) {
+              try { await client.end() } catch (_) {}
+              console.error('[webhook/stripe] campaign_budget error:', e.message)
+            }
           }
         }
 
