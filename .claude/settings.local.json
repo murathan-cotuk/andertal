@@ -141,7 +141,12 @@
       "Bash(npx next *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\" -Recurse -File -Filter \"*.js\" -ErrorAction SilentlyContinue)",
       "Bash(Select-Object -First 20 FullName)",
-      "Bash(Get-ChildItem -Recurse -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\app\" -Name \"page*\")"
+      "Bash(Get-ChildItem -Recurse -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\app\" -Name \"page*\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\shop\\\\src\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\shop\" -Depth 0 | Where-Object { $_.PSIsContainer -eq $false } | Select-Object Name)"
     ]
   }
 }
