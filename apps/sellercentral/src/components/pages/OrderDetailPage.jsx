@@ -128,14 +128,13 @@ export default function OrderDetailPage() {
     loadOrder();
   }, [loadOrder]);
 
-  // Auto-abgeschlossen when (zugestellt or versendet) + bezahlt
   const handleDeliveryChange = (val) => {
     setDeliveryStatus(val);
-    if ((val === "zugestellt" || val === "versendet") && paymentStatus === "bezahlt") setOrderStatus("abgeschlossen");
+    if (val === "zugestellt" && paymentStatus === "bezahlt") setOrderStatus("abgeschlossen");
   };
   const handlePaymentChange = (val) => {
     setPaymentStatus(val);
-    if (val === "bezahlt" && (deliveryStatus === "zugestellt" || deliveryStatus === "versendet")) setOrderStatus("abgeschlossen");
+    if (val === "bezahlt" && deliveryStatus === "zugestellt") setOrderStatus("abgeschlossen");
   };
 
   const handleSaveStatus = async () => {

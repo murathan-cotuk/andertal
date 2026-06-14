@@ -696,6 +696,7 @@ export default function InventoryPage() {
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [mySellerId, setMySellerId] = useState("");
   const [sellerLabelById, setSellerLabelById] = useState({});
+  const [productListingsMap, setProductListingsMap] = useState({});
   const [sellerSearchFilter, setSellerSearchFilter] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -838,6 +839,10 @@ export default function InventoryPage() {
         setSellerLabelById(m);
       })
       .catch(() => {});
+    medusaClient
+      .getProductListingsMap()
+      .then((map) => setProductListingsMap(map || {}))
+      .catch(() => {});
   }, [isSuperuser, medusaClient]);
 
   useEffect(() => {
@@ -846,6 +851,9 @@ export default function InventoryPage() {
         setLoading(true);
         const data = await medusaClient.getAdminHubProducts();
         setProducts(data.products || []);
+        if (localStorage.getItem("sellerIsSuperuser") === "true") {
+          medusaClient.getProductListingsMap().then((map) => setProductListingsMap(map || {})).catch(() => {});
+        }
       } catch (err) {
         setError(err?.message || "Failed to load products");
       } finally {
@@ -980,8 +988,18 @@ export default function InventoryPage() {
     const g = new Map();
     for (const p of products) {
       if (!productMatchesFilters(p)) continue;
-      if (isOwnInventoryProduct(p, mySellerId)) own.push(p);
-      else {
+      if (isOwnInventoryProduct(p, mySellerId)) {
+        // For superuser: if this master product (null seller_id) has listings,
+        // put it under the primary seller instead of the superuser section.
+        const listingSellers = isSuperuser ? (productListingsMap[p.id] || []) : [];
+        if (isSuperuser && listingSellers.length > 0) {
+          const primarySid = listingSellers[0];
+          if (!g.has(primarySid)) g.set(primarySid, []);
+          g.get(primarySid).push({ ...p, _listingSellerIds: listingSellers });
+        } else {
+          own.push(p);
+        }
+      } else {
         const sid = String(p.seller_id || "unknown");
         if (!g.has(sid)) g.set(sid, []);
         g.get(sid).push(p);
@@ -991,7 +1009,7 @@ export default function InventoryPage() {
       (sellerLabelById[a] || a).localeCompare(sellerLabelById[b] || b, undefined, { sensitivity: "base" })
     );
     return { ownProducts: own, sellerGroups: keys.map((k) => ({ sellerId: k, items: g.get(k) })) };
-  }, [products, mySellerId, sellerLabelById, productMatchesFilters]);
+  }, [products, mySellerId, sellerLabelById, productMatchesFilters, isSuperuser, productListingsMap]);
 
   const filteredSellerGroups = useMemo(() => {
     const q = sellerSearchFilter.trim().toLowerCase();

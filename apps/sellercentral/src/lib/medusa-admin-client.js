@@ -189,6 +189,12 @@ class MedusaAdminClient {
     return res;
   }
 
+  /** GET /admin-hub/product-listings-map — { [product_id]: seller_id[] } for master products (superuser) */
+  async getProductListingsMap() {
+    const res = await this.request('/admin-hub/product-listings-map');
+    return res?.map ?? {};
+  }
+
   /** PATCH /admin-hub/products/:id/variants — variant-only update, no GPSR validation */
   async patchProductVariants(idOrHandle, variants) {
     return this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}/variants`, {

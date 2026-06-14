@@ -1079,7 +1079,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
             try { window.localStorage.removeItem("andertal_cart_id"); } catch (_) {}
           }
           setCart(null);
-          router.push(`/${locale}/order/${orderId}`);
+          router.push(`/${locale}/order/${orderId}?confirmed=1`);
         }
       } catch (err) {
         setError(err?.message || t("paymentError"));
@@ -1614,7 +1614,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
           try { window.localStorage.removeItem("andertal_cart_id"); } catch (_) {}
         }
         setCart(null);
-        router.push(`/${locale}/order/${orderId}`);
+        router.push(`/${locale}/order/${orderId}?confirmed=1`);
       }
     } catch (err) {
       setError(err?.message || t("paymentError"));

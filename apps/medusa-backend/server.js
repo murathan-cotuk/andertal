@@ -4126,19 +4126,61 @@ async function start() {
         let isNewMaster = true
 
         if (incomingEan) {
-          const allProds = await listAdminHubProductsDb({ limit: 5000 })
-          // Match by normalizeStoreEan (strips non-digits). Also accept stored EANs whose
-          // raw trimmed value normalizes to the same digits (belt-and-suspenders for EANs
-          // that were stored with hyphens/spaces via normalizeEanValue).
-          const eanMatchesProd = (p) => {
-            const e = extractEanFromHubProductRow(p)
-            if (e && e === incomingEan) return true
-            const rawMeta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
-            const rawEan = String(rawMeta.ean ?? '').trim()
-            return rawEan && normalizeStoreEan(rawEan) === incomingEan
+          // Direct SQL EAN lookup: more reliable than loading all products into memory.
+          // Normalizes EAN in SQL (strips non-digits) to match regardless of stored format.
+          const dbUrlEan = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+          const { Client: EanCl } = require('pg')
+          const eanCl = new EanCl({ connectionString: dbUrlEan, ssl: dbUrlEan.includes('render.com') ? { rejectUnauthorized: false } : false })
+          let eanDirectFound = false
+          try {
+            await eanCl.connect()
+            const eanSql = `
+              SELECT id, title, handle, sku, description, status, seller_id, collection_id,
+                     price_cents, inventory, metadata, variants, created_at, updated_at
+              FROM admin_hub_products
+              WHERE (
+                REGEXP_REPLACE(TRIM(COALESCE(metadata->>'ean', '')), '[^0-9]', '', 'g') = $1
+                OR EXISTS (
+                  SELECT 1 FROM jsonb_array_elements(
+                    CASE WHEN jsonb_typeof(COALESCE(variants, 'null'::jsonb)) = 'array'
+                      THEN variants ELSE '[]'::jsonb END
+                  ) AS v
+                  WHERE REGEXP_REPLACE(TRIM(COALESCE(v->>'ean', '')), '[^0-9]', '', 'g') = $1
+                )
+              )
+              ORDER BY (seller_id IS NULL) DESC, created_at ASC
+              LIMIT 1`
+            const eanRes = await eanCl.query(eanSql, [incomingEan])
+            if (eanRes.rows[0]) {
+              const r = eanRes.rows[0]
+              masterProduct = {
+                id: r.id, title: r.title, handle: r.handle, slug: r.handle, sku: r.sku,
+                description: r.description, status: r.status, seller_id: r.seller_id,
+                seller: r.seller_id, collection_id: r.collection_id,
+                price: r.price_cents != null ? r.price_cents / 100 : 0,
+                price_cents: r.price_cents, inventory: r.inventory != null ? r.inventory : 0,
+                metadata: r.metadata, variants: r.variants,
+                created_at: r.created_at, updated_at: r.updated_at,
+              }
+              eanDirectFound = true
+            }
+          } catch (eanLookupErr) {
+            console.warn('EAN direct SQL lookup failed, falling back to full scan:', eanLookupErr && eanLookupErr.message)
+          } finally {
+            try { await eanCl.end() } catch (_) {}
           }
-          const truemaster = allProds.find((p) => eanMatchesProd(p) && !p.seller_id)
-          masterProduct = truemaster || allProds.find((p) => eanMatchesProd(p)) || null
+          if (!eanDirectFound) {
+            const allProds = await listAdminHubProductsDb({ limit: 5000 })
+            const eanMatchesProd = (p) => {
+              const e = extractEanFromHubProductRow(p)
+              if (e && e === incomingEan) return true
+              const rawMeta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+              const rawEan = String(rawMeta.ean ?? '').trim()
+              return rawEan && normalizeStoreEan(rawEan) === incomingEan
+            }
+            const truemaster = allProds.find((p) => eanMatchesProd(p) && !p.seller_id)
+            masterProduct = truemaster || allProds.find((p) => eanMatchesProd(p)) || null
+          }
         }
 
         if (masterProduct) {
@@ -4306,17 +4348,46 @@ async function start() {
           // returned [] due to a transient DB error, or EAN format differs), find the
           // existing master and link the seller instead of surfacing an error.
           if (callerSellerId && typeof row.__error === 'string' && row.__error.startsWith('EAN already exists:')) {
-            const eanFromErr = row.__error.replace('EAN already exists:', '').trim()
+            const eanFromErr = normalizeStoreEan(row.__error.replace('EAN already exists:', '').trim()) || row.__error.replace('EAN already exists:', '').trim()
             let fallbackMaster = null
             try {
-              const fallbackProds = await listAdminHubProductsDb({ limit: 5000 })
-              const eanMatch = (p) => {
-                const e = extractEanFromHubProductRow(p)
-                return e && (e === eanFromErr || e === normalizeStoreEan(eanFromErr))
+              const dbUrlFb = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+              const { Client: FbCl } = require('pg')
+              const fbCl = new FbCl({ connectionString: dbUrlFb, ssl: dbUrlFb.includes('render.com') ? { rejectUnauthorized: false } : false })
+              try {
+                await fbCl.connect()
+                const fbSql = `
+                  SELECT id, title, handle, sku, description, status, seller_id, collection_id,
+                         price_cents, inventory, metadata, variants, created_at, updated_at
+                  FROM admin_hub_products
+                  WHERE (
+                    REGEXP_REPLACE(TRIM(COALESCE(metadata->>'ean', '')), '[^0-9]', '', 'g') = $1
+                    OR EXISTS (
+                      SELECT 1 FROM jsonb_array_elements(
+                        CASE WHEN jsonb_typeof(COALESCE(variants, 'null'::jsonb)) = 'array'
+                          THEN variants ELSE '[]'::jsonb END
+                      ) AS v
+                      WHERE REGEXP_REPLACE(TRIM(COALESCE(v->>'ean', '')), '[^0-9]', '', 'g') = $1
+                    )
+                  )
+                  ORDER BY (seller_id IS NULL) DESC, created_at ASC
+                  LIMIT 1`
+                const fbRes = await fbCl.query(fbSql, [eanFromErr])
+                if (fbRes.rows[0]) {
+                  const r = fbRes.rows[0]
+                  fallbackMaster = {
+                    id: r.id, title: r.title, handle: r.handle, slug: r.handle, sku: r.sku,
+                    description: r.description, status: r.status, seller_id: r.seller_id,
+                    seller: r.seller_id, collection_id: r.collection_id,
+                    price: r.price_cents != null ? r.price_cents / 100 : 0,
+                    price_cents: r.price_cents, inventory: r.inventory != null ? r.inventory : 0,
+                    metadata: r.metadata, variants: r.variants,
+                    created_at: r.created_at, updated_at: r.updated_at,
+                  }
+                }
+              } finally {
+                try { await fbCl.end() } catch (_) {}
               }
-              fallbackMaster = fallbackProds.find((p) => eanMatch(p) && !p.seller_id)
-                || fallbackProds.find((p) => eanMatch(p))
-                || null
             } catch (_) {}
             if (fallbackMaster) {
               const dbUrl2 = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -4439,7 +4510,8 @@ async function start() {
           await lc.connect()
           const lr = await lc.query(
             `SELECT sl.id, sl.seller_id, sl.price_cents, sl.inventory, sl.status, sl.sku, sl.created_at,
-                    su.first_name, su.last_name, su.email, su.shop_name
+                    su.first_name, su.last_name, su.email,
+                    COALESCE(su.store_name, su.shop_name) AS shop_name
              FROM admin_hub_seller_listings sl
              LEFT JOIN seller_users su ON TRIM(su.seller_id) = TRIM(sl.seller_id)
              WHERE sl.product_id = $1
@@ -4921,6 +4993,69 @@ async function start() {
     httpApp.get('/admin-hub/products/:id', requireSellerAuth, adminHubProductByIdGET)
     httpApp.put('/admin-hub/products/:id', requireSellerAuth, adminHubProductByIdPUT)
     httpApp.delete('/admin-hub/products/:id', requireSellerAuth, adminHubProductByIdDELETE)
+
+    // GET /admin-hub/products/:id/listings — returns all seller listings for a product (superuser only)
+    httpApp.get('/admin-hub/products/:id/listings', requireSellerAuth, async (req, res) => {
+      try {
+        if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser only' })
+        const productId = String(req.params.id || '').trim()
+        if (!productId) return res.status(400).json({ message: 'Product ID required' })
+        const dbUrlL = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        const { Client: ListCl } = require('pg')
+        const listCl = new ListCl({ connectionString: dbUrlL, ssl: dbUrlL.includes('render.com') ? { rejectUnauthorized: false } : false })
+        try {
+          await listCl.connect()
+          const lr = await listCl.query(
+            `SELECT sl.id, sl.seller_id, sl.price_cents, sl.inventory, sl.status, sl.created_at,
+                    COALESCE(su.store_name, su.shop_name) AS store_name, su.email
+             FROM admin_hub_seller_listings sl
+             LEFT JOIN seller_users su ON TRIM(su.seller_id) = TRIM(sl.seller_id)
+             WHERE sl.product_id = $1
+             ORDER BY sl.created_at ASC`,
+            [productId],
+          )
+          await listCl.end()
+          return res.json({ listings: lr.rows || [] })
+        } catch (e) {
+          try { await listCl.end() } catch (_) {}
+          throw e
+        }
+      } catch (err) {
+        console.error('product listings GET error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    })
+
+    // GET /admin-hub/product-listings-map — returns { [product_id]: string[] } for all master products (superuser only)
+    httpApp.get('/admin-hub/product-listings-map', requireSellerAuth, async (req, res) => {
+      try {
+        if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser only' })
+        const dbUrlMap = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        const { Client: MapCl } = require('pg')
+        const mapCl = new MapCl({ connectionString: dbUrlMap, ssl: dbUrlMap.includes('render.com') ? { rejectUnauthorized: false } : false })
+        try {
+          await mapCl.connect()
+          const mr = await mapCl.query(
+            `SELECT sl.product_id, array_agg(sl.seller_id ORDER BY sl.created_at ASC) AS seller_ids
+             FROM admin_hub_seller_listings sl
+             JOIN admin_hub_products p ON p.id = sl.product_id AND p.seller_id IS NULL
+             GROUP BY sl.product_id`,
+          )
+          await mapCl.end()
+          const map = {}
+          for (const row of (mr.rows || [])) {
+            map[row.product_id] = row.seller_ids || []
+          }
+          return res.json({ map })
+        } catch (e) {
+          try { await mapCl.end() } catch (_) {}
+          throw e
+        }
+      } catch (err) {
+        console.error('product-listings-map error:', err)
+        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+      }
+    })
 
     registerEuOriginRoutes(httpApp, {
       requireSellerAuth,
@@ -6933,7 +7068,12 @@ async function start() {
               const score = computeBuyBoxScore(price, st.avg, st.count, inv)
               return { p, score, price, inv, stats: st, sid }
             })
-            scored.sort((a, b) => b.score - a.score)
+            scored.sort((a, b) => {
+              const diff = b.score - a.score
+              if (diff !== 0) return diff
+              // Stable tie-break: first seller to list wins
+              return new Date(a.p.created_at || 0) - new Date(b.p.created_at || 0)
+            })
             winnerRow = scored[0].p
             const uniqueSellers = [...new Set(scored.map((x) => x.sid))]
             const storeNames = {}
@@ -7171,7 +7311,7 @@ async function start() {
         const productIds = list.map((it) => String(it.product_id || '')).filter(Boolean)
         if (productIds.length) {
           const lq = await client.query(
-            `SELECT DISTINCT seller_id FROM admin_hub_seller_listings WHERE product_id = ANY($1::varchar[]) AND status = 'active'`,
+            `SELECT DISTINCT seller_id FROM admin_hub_seller_listings WHERE product_id::text = ANY($1::text[]) AND status = 'active'`,
             [productIds]
           )
           sellersViaListings = (lq.rows || []).map((r) => String(r.seller_id || '')).filter(Boolean)
@@ -11517,6 +11657,13 @@ async function start() {
         const trackingChanged = tracking_number !== undefined && String(tracking_number || '').trim() && String(tracking_number || '').trim() !== String(prevRow.tracking_number || '').trim()
         const deliveryStatusChangedToVersendet = delivery_status === 'versendet' && prevRow.delivery_status !== 'versendet'
         const deliveryStatusChangedToZugestellt = delivery_status === 'zugestellt' && prevRow.delivery_status !== 'zugestellt'
+        // Auto-set delivery_status to versendet when tracking number is first added
+        if (trackingChanged && !['versendet', 'zugestellt', 'shipped', 'delivered'].includes(prevRow.delivery_status)) {
+          await client.query(
+            `UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt','shipped','delivered')`,
+            [id]
+          )
+        }
         if (trackingChanged || deliveryStatusChangedToVersendet) {
           const existingVersendet = await client.query(`SELECT id FROM store_shipment_events WHERE order_id=$1::uuid AND status='versendet' LIMIT 1`, [id])
           if (!existingVersendet.rows.length) {
@@ -12486,10 +12633,123 @@ async function start() {
             fetchError = e?.message || 'DHL API error'
           }
         }
-        // ── DPD API ──────────────────────────────────────────────────────────
-        // (DPD uses a SOAP API — add api_key support here if needed)
-        // ── UPS API ──────────────────────────────────────────────────────────
-        // (UPS uses OAuth2 — add here if needed)
+        // ── DPD API (public REST, no key required) ───────────────────────────
+        else if (carrierName === 'dpd' || carrierName.startsWith('dpd')) {
+          try {
+            const https = require('https')
+            const dpdData = await new Promise((resolve) => {
+              const path = `/parcel/${encodeURIComponent(trackingNumber)}/de_DE/parcelstatus`
+              const req2 = https.request(
+                { hostname: 'tracking.dpd.de', path, method: 'GET', headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0' } },
+                (resp) => {
+                  let body = ''; resp.on('data', d => { body += d }); resp.on('end', () => { try { resolve({ data: JSON.parse(body), status: resp.statusCode }) } catch { resolve({ data: {}, status: resp.statusCode }) } })
+                }
+              )
+              req2.on('error', () => resolve({ data: {}, status: 0 })); req2.end()
+            })
+            if (dpdData.status >= 400) {
+              fetchError = `DPD (${dpdData.status}): Sendung nicht gefunden`
+            } else {
+              const steps = dpdData.data?.parcelStatusList || []
+              for (const step of steps) {
+                const desc = (step.label || step.description || '').trim()
+                const rawDate = step.date || ''; const rawTime = step.time || '00:00:00'
+                const ts = rawDate ? new Date(`${rawDate}T${rawTime}`).toISOString() : new Date().toISOString()
+                const loc = step.city || null
+                const descLower = desc.toLowerCase()
+                let status = 'in_transit'
+                if (descLower.includes('zugestellt') || descLower.includes('übergeben an') || descLower.includes('delivered')) status = 'zugestellt'
+                else if (descLower.includes('aufgabe') || descLower.includes('übergabe an dpd') || descLower.includes('abgegeben')) status = 'versendet'
+                newEvents.push({ status, description: desc || '—', location: loc, event_time: ts })
+              }
+              if (newEvents.length) newEvents.sort((a, b) => new Date(a.event_time) - new Date(b.event_time))
+            }
+          } catch (e) { fetchError = e?.message || 'DPD Tracking error' }
+        }
+        // ── GLS API (public REST, no key required) ───────────────────────────
+        else if (carrierName === 'gls' || carrierName.startsWith('gls')) {
+          try {
+            const https = require('https')
+            const glsData = await new Promise((resolve) => {
+              const path = `/app/service/open/rest/DE/de/rstt001/?match=${encodeURIComponent(trackingNumber)}&type=standard&caller=witt&milis=${Date.now()}`
+              const req2 = https.request(
+                { hostname: 'gls-group.com', path, method: 'GET', headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0' } },
+                (resp) => {
+                  let body = ''; resp.on('data', d => { body += d }); resp.on('end', () => { try { resolve({ data: JSON.parse(body), status: resp.statusCode }) } catch { resolve({ data: {}, status: resp.statusCode }) } })
+                }
+              )
+              req2.on('error', () => resolve({ data: {}, status: 0 })); req2.end()
+            })
+            if (glsData.status >= 400) {
+              fetchError = `GLS (${glsData.status}): Sendung nicht gefunden`
+            } else {
+              const tuples = glsData.data?.tuples || []
+              for (const tuple of tuples) {
+                for (const ev of (tuple.history || [])) {
+                  const desc = (ev.evtDscr || ev.description || '').trim()
+                  const dateStr = ev.date || ''; const timeStr = ev.time || '00:00'
+                  const ts = dateStr ? new Date(`${dateStr}T${timeStr}:00`).toISOString() : new Date().toISOString()
+                  const loc = ev.location || null
+                  const descLower = desc.toLowerCase()
+                  let status = 'in_transit'
+                  if (descLower.includes('zugestellt') || descLower.includes('delivered')) status = 'zugestellt'
+                  else if (descLower.includes('aufgabe') || descLower.includes('einlieferung') || descLower.includes('paketshop')) status = 'versendet'
+                  newEvents.push({ status, description: desc || '—', location: loc, event_time: ts })
+                }
+              }
+              if (newEvents.length) newEvents.sort((a, b) => new Date(a.event_time) - new Date(b.event_time))
+            }
+          } catch (e) { fetchError = e?.message || 'GLS Tracking error' }
+        }
+        // ── UPS API (requires Client-ID + Secret as api_key:api_secret) ──────
+        else if (carrierName === 'ups') {
+          if (!apiKey) {
+            fetchError = 'UPS Client-ID fehlt: unter Einstellungen → Versand → Versanddienstleister „UPS" API-Key (Client-ID) und ggf. API-Secret eintragen.'
+          } else {
+            try {
+              const https = require('https')
+              const apiSecret = (carrierRow.api_secret && String(carrierRow.api_secret).trim()) || ''
+              const creds = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')
+              const tokenBody = 'grant_type=client_credentials'
+              const tokenData = await new Promise((resolve) => {
+                const req2 = https.request(
+                  { hostname: 'onlinetools.ups.com', path: '/security/v1/oauth/token', method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${creds}`, 'Content-Length': Buffer.byteLength(tokenBody) } },
+                  (resp) => { let b = ''; resp.on('data', d => { b += d }); resp.on('end', () => { try { resolve(JSON.parse(b)) } catch { resolve({}) } }) }
+                )
+                req2.on('error', () => resolve({})); req2.write(tokenBody); req2.end()
+              })
+              const accessToken = tokenData.access_token
+              if (!accessToken) {
+                fetchError = 'UPS OAuth2 fehlgeschlagen — Client-ID und Secret prüfen.'
+              } else {
+                const upsData = await new Promise((resolve) => {
+                  const req2 = https.request(
+                    { hostname: 'onlinetools.ups.com', path: `/api/track/v1/details/${encodeURIComponent(trackingNumber)}`, method: 'GET', headers: { Authorization: `Bearer ${accessToken}`, transId: `order-${id}`, transactionSrc: 'andertal', Accept: 'application/json' } },
+                    (resp) => { let b = ''; resp.on('data', d => { b += d }); resp.on('end', () => { try { resolve({ data: JSON.parse(b), status: resp.statusCode }) } catch { resolve({ data: {}, status: resp.statusCode }) } }) }
+                  )
+                  req2.on('error', () => resolve({ data: {}, status: 0 })); req2.end()
+                })
+                if (upsData.status >= 400) {
+                  fetchError = `UPS API (${upsData.status}): ${upsData.data?.response?.errors?.[0]?.message || 'Fehler'}`
+                } else {
+                  const activities = upsData.data?.trackResponse?.shipment?.[0]?.package?.[0]?.activity || []
+                  for (const act of activities) {
+                    const desc = (act.status?.description || '').trim()
+                    const loc = [act.location?.address?.city, act.location?.address?.countryCode].filter(Boolean).join(', ') || null
+                    const d = act.date || ''; const t = act.time || '000000'
+                    const ts = d.length === 8 ? new Date(`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}T${t.slice(0,2)}:${t.slice(2,4)}:${t.slice(4,6)}`).toISOString() : new Date().toISOString()
+                    const statusCode = String(act.status?.type || '').toUpperCase()
+                    let status = 'in_transit'
+                    if (statusCode === 'D' || statusCode === 'P') status = 'zugestellt'
+                    else if (statusCode === 'M' || statusCode === 'O') status = 'versendet'
+                    newEvents.push({ status, description: desc || '—', location: loc, event_time: ts })
+                  }
+                  if (newEvents.length) newEvents.sort((a, b) => new Date(a.event_time) - new Date(b.event_time))
+                }
+              }
+            } catch (e) { fetchError = e?.message || 'UPS API error' }
+          }
+        }
 
         if (!newEvents.length) {
           const evFallback = await client.query('SELECT * FROM store_shipment_events WHERE order_id=$1::uuid ORDER BY event_time ASC, created_at ASC', [id])
@@ -18858,49 +19118,98 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         await client.end()
         for (const order of r.rows) {
           const cn = String(order.carrier_name || '').toLowerCase().trim()
-          if (!(cn === 'dhl' || cn.startsWith('dhl'))) continue
+          const isDHL = cn === 'dhl' || cn.startsWith('dhl')
+          const isDPD = cn === 'dpd' || cn.startsWith('dpd')
+          const isGLS = cn === 'gls' || cn.startsWith('gls')
+          if (!isDHL && !isDPD && !isGLS) continue
           try {
-            // Reuse the tracking logic inline for background job
-            const envDhlKey = (process.env.DHL_API_KEY || process.env.DHL_TRACK_API_KEY || process.env.DHLPARCEL_API_KEY || '').toString().trim()
             const dbUrl2 = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
             const { Client: PgClient2 } = require('pg')
             const c2 = new PgClient2({ connectionString: dbUrl2, ssl: dbUrl2.includes('render.com') ? { rejectUnauthorized: false } : false })
             await c2.connect()
-            const cq = await c2.query('SELECT api_key FROM store_shipping_carriers WHERE LOWER(TRIM(name)) LIKE $1 AND is_active=true LIMIT 1', ['dhl%'])
-            const apiKey = (cq.rows[0]?.api_key && String(cq.rows[0].api_key).trim()) || envDhlKey
-            if (!apiKey) { await c2.end(); continue }
             const trackingNumber = String(order.tracking_number).trim()
             const https = require('https')
-            const pc = String(order.postal_code || '').trim().replace(/\s+/g, '')
-            let path = `/track/shipments?trackingNumber=${encodeURIComponent(trackingNumber)}`
-            if (pc) path += `&recipientPostalCode=${encodeURIComponent(pc)}`
-            const dhlData = await new Promise((resolve) => {
-              const req2 = https.request(
-                { hostname: 'api-eu.dhl.com', path, method: 'GET', headers: { 'DHL-API-Key': apiKey, Accept: 'application/json' } },
-                (resp) => {
-                  let body = ''; resp.on('data', (d) => { body += d }); resp.on('end', () => { try { resolve(JSON.parse(body || '{}')); } catch { resolve({}) } })
+            let bgEvents = []
+
+            if (isDHL) {
+              const envDhlKey = (process.env.DHL_API_KEY || process.env.DHL_TRACK_API_KEY || process.env.DHLPARCEL_API_KEY || '').toString().trim()
+              const cq = await c2.query('SELECT api_key FROM store_shipping_carriers WHERE LOWER(TRIM(name)) LIKE $1 AND is_active=true LIMIT 1', ['dhl%'])
+              const apiKey = (cq.rows[0]?.api_key && String(cq.rows[0].api_key).trim()) || envDhlKey
+              if (!apiKey) { await c2.end(); continue }
+              const pc = String(order.postal_code || '').trim().replace(/\s+/g, '')
+              let path = `/track/shipments?trackingNumber=${encodeURIComponent(trackingNumber)}`
+              if (pc) path += `&recipientPostalCode=${encodeURIComponent(pc)}`
+              const dhlData = await new Promise((resolve) => {
+                const req2 = https.request(
+                  { hostname: 'api-eu.dhl.com', path, method: 'GET', headers: { 'DHL-API-Key': apiKey, Accept: 'application/json' } },
+                  (resp) => { let body = ''; resp.on('data', (d) => { body += d }); resp.on('end', () => { try { resolve(JSON.parse(body || '{}')); } catch { resolve({}) } }) }
+                )
+                req2.on('error', () => resolve({})); req2.end()
+              })
+              const shipment = dhlData?.shipments?.[0] || null
+              const events = Array.isArray(shipment?.events) ? shipment.events : (shipment?.status ? [{ timestamp: shipment.timestamp, status: shipment.status, location: shipment.location }] : [])
+              for (const ev of events) {
+                const ts = ev.timestamp ? new Date(ev.timestamp).toISOString() : new Date().toISOString()
+                const addr = ev.location?.address || {}
+                const loc = [addr.addressLocality, addr.countryCode].filter(Boolean).join(', ') || null
+                const desc = (ev.description || ev.status?.description || '').trim()
+                bgEvents.push({ status: mapDhlStatus(ev), description: desc || null, location: loc, event_time: ts })
+              }
+            } else if (isDPD) {
+              const dpdData = await new Promise((resolve) => {
+                const path = `/parcel/${encodeURIComponent(trackingNumber)}/de_DE/parcelstatus`
+                const req2 = https.request(
+                  { hostname: 'tracking.dpd.de', path, method: 'GET', headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0' } },
+                  (resp) => { let body = ''; resp.on('data', d => { body += d }); resp.on('end', () => { try { resolve({ data: JSON.parse(body), ok: resp.statusCode < 400 }) } catch { resolve({ data: {}, ok: false }) } }) }
+                )
+                req2.on('error', () => resolve({ data: {}, ok: false })); req2.end()
+              })
+              if (dpdData.ok) {
+                for (const step of (dpdData.data?.parcelStatusList || [])) {
+                  const desc = (step.label || step.description || '').trim()
+                  const ts = step.date ? new Date(`${step.date}T${step.time || '00:00:00'}`).toISOString() : new Date().toISOString()
+                  const descLower = desc.toLowerCase()
+                  let status = 'in_transit'
+                  if (descLower.includes('zugestellt') || descLower.includes('übergeben an') || descLower.includes('delivered')) status = 'zugestellt'
+                  else if (descLower.includes('aufgabe') || descLower.includes('übergabe an dpd') || descLower.includes('abgegeben')) status = 'versendet'
+                  bgEvents.push({ status, description: desc || null, location: step.city || null, event_time: ts })
                 }
-              )
-              req2.on('error', () => resolve({})); req2.end()
-            })
-            const shipment = dhlData?.shipments?.[0] || null
-            const events = Array.isArray(shipment?.events) ? shipment.events : (shipment?.status ? [{ timestamp: shipment.timestamp, status: shipment.status, location: shipment.location }] : [])
+              }
+            } else if (isGLS) {
+              const glsData = await new Promise((resolve) => {
+                const path = `/app/service/open/rest/DE/de/rstt001/?match=${encodeURIComponent(trackingNumber)}&type=standard&caller=witt&milis=${Date.now()}`
+                const req2 = https.request(
+                  { hostname: 'gls-group.com', path, method: 'GET', headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0' } },
+                  (resp) => { let body = ''; resp.on('data', d => { body += d }); resp.on('end', () => { try { resolve({ data: JSON.parse(body), ok: resp.statusCode < 400 }) } catch { resolve({ data: {}, ok: false }) } }) }
+                )
+                req2.on('error', () => resolve({ data: {}, ok: false })); req2.end()
+              })
+              if (glsData.ok) {
+                for (const tuple of (glsData.data?.tuples || [])) {
+                  for (const ev of (tuple.history || [])) {
+                    const desc = (ev.evtDscr || ev.description || '').trim()
+                    const ts = ev.date ? new Date(`${ev.date}T${ev.time || '00:00'}:00`).toISOString() : new Date().toISOString()
+                    const descLower = desc.toLowerCase()
+                    let status = 'in_transit'
+                    if (descLower.includes('zugestellt') || descLower.includes('delivered')) status = 'zugestellt'
+                    else if (descLower.includes('aufgabe') || descLower.includes('einlieferung') || descLower.includes('paketshop')) status = 'versendet'
+                    bgEvents.push({ status, description: desc || null, location: ev.location || null, event_time: ts })
+                  }
+                }
+              }
+            }
+
             let mostRecentStatus = null
-            for (const ev of events) {
-              const ts = ev.timestamp ? new Date(ev.timestamp).toISOString() : new Date().toISOString()
-              const addr = ev.location?.address || {}
-              const location = [addr.addressLocality, addr.countryCode].filter(Boolean).join(', ') || null
-              const desc = (ev.description || ev.status?.description || '').trim()
-              const status = mapDhlStatus(ev)
-              mostRecentStatus = status
+            for (const ev of bgEvents) {
+              mostRecentStatus = ev.status
               const exists = await c2.query(
                 `SELECT id FROM store_shipment_events WHERE order_id=$1::uuid AND status=$2 AND event_time=$3::timestamptz AND description IS NOT DISTINCT FROM $4 LIMIT 1`,
-                [order.id, status, ts, desc || null]
+                [order.id, ev.status, ev.event_time, ev.description || null]
               )
               if (!exists.rows.length) {
                 await c2.query(
                   `INSERT INTO store_shipment_events (order_id, status, description, location, event_time, source) VALUES ($1::uuid,$2,$3,$4,$5::timestamptz,'auto')`,
-                  [order.id, status, desc || null, location, ts]
+                  [order.id, ev.status, ev.description || null, ev.location || null, ev.event_time]
                 )
               }
             }

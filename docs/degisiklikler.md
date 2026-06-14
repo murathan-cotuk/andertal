@@ -1,142 +1,225 @@
-# Değişiklik Günlüğü
+# Değişiklik Raporu
 
 ---
 
-## 2026-06-10
-
-### 1. Satıcı Kredi Kartı Yönetimi
-
-**Amaç:** Satıcıların platform ücreti veya iade/chargeback durumlarında yetersiz bakiye olduğunda ödeme yapılabilmesi için kredi kartı ekleyebilmeleri sağlandı. Süperkullanıcılar satıcıların kartlarını görüntüleyip silebilir.
-
-#### Backend — `apps/medusa-backend/server.js`
-
-**Veritabanı — `seller_users` tablosuna yeni sütunlar:**
-- `stripe_customer_id` — Stripe Customer ID (fatura için)
-- `stripe_payment_method_id` — Kayıtlı ödeme yöntemi ID'si
-- `stripe_card_last4` — Son 4 hane (maskelenmiş gösterim için)
-- `stripe_card_brand` — Kart markası (visa, mastercard, vb.)
-- `stripe_card_exp_month` — Son kullanma ayı
-- `stripe_card_exp_year` — Son kullanma yılı
-
-**Yeni API uç noktaları:**
-
-| Uç Nokta | Yetki | Açıklama |
-|---|---|---|
-| `GET /admin-hub/v1/stripe-publishable-key` | Satıcı | Stripe publishable key döner (kart formu için) |
-| `POST /admin-hub/v1/seller/card/setup-intent` | Satıcı | Stripe Customer + SetupIntent oluşturur, `client_secret` döner |
-| `POST /admin-hub/v1/seller/card/confirm` | Satıcı | Stripe.js'ten gelen PM ID ile kart bilgilerini DB'ye kaydeder |
-| `GET /admin-hub/v1/seller/card` | Satıcı | Mevcut kartın maskelenmiş bilgilerini döner |
-| `DELETE /admin-hub/v1/seller/card` | Satıcı | Kartı Stripe'tan detach eder, DB'den temizler |
-| `GET /admin-hub/v1/sellers/:id/card` | Süperkullanıcı | Seçili satıcının kart bilgisini döner |
-| `DELETE /admin-hub/v1/sellers/:id/card` | Süperkullanıcı | Seçili satıcının kartını siler |
-
-**PCI Uyumu:** Kart numarası hiçbir zaman sunuculara ulaşmaz. Stripe.js direkt Stripe'a gönderir; DB'de yalnızca son 4 hane, marka ve son kullanma tarihi saklanır.
+## 14.06.2026
 
 ---
 
-#### Frontend — `apps/sellercentral/src/`
+### 1. EAN Deduplication — Ürün İmport Sorunu
 
-**Yeni dosya: `components/SellerCreditCardSection.jsx`**
-- Stripe.js'i CDN'den yükler (`https://js.stripe.com/v3/`)
-- Mevcut kartı gösterir (marka + `**** last4` + son kullanma)
-- "Hinzufügen / Ändern" butonu ile Stripe Elements kart formu açar
-- SetupIntent akışını yürütür: `stripe.confirmCardSetup()` → backend'e PM ID gönderir
-- "Entfernen" ile kartı siler
-- `title` ve `subtitle` prop'ları ile sayfalara özel metin gösterilir
+**Dosya:** `apps/medusa-backend/server.js` → `adminHubProductsPOST` (~satır 4128–4184)
 
-**Güncellenen dosyalar:**
+**Eskiden:**
+Seller Excel ile ürün yüklerken EAN zaten veritabanında varsa `"EAN already exists"` hatası alıyor, 0 ürün oluşturuluyordu. Ürünler superuser envanterinde görünüyor ama seller'ın envanterinde görünmüyordu.
 
-| Dosya | Değişiklik |
-|---|---|
-| `components/pages/settings/VerificationSettingsPage.jsx` | Doğrulama formunda "Gönder" butonunun hemen üstüne `SellerCreditCardSection` eklendi (3 dilde etiket desteği: DE/TR/EN) |
-| `app/[locale]/settings/payments/page.jsx` | IBAN bölümünün altına `SellerCreditCardSection` eklendi |
-| `components/pages/SellerDetailPage.jsx` | "Firmendaten" sekmesine `AdminSellerCardSection` bileşeni eklendi — süperkullanıcı satıcı kartını görür ve silebilir |
-| `lib/medusa-admin-client.js` | 7 yeni istemci metodu eklendi: `getStripePublishableKey`, `getSellerCard`, `deleteSellerCard`, `createSellerCardSetupIntent`, `confirmSellerCard`, `getSellerCardByAdmin`, `deleteSellerCardByAdmin` |
+**Artık:**
+- Yüklenen EAN veritabanında mevcutsa hata verilmez, seller `admin_hub_seller_listings` tablosuna listeleme olarak eklenir.
+- EAN araması artık `listAdminHubProductsDb` yerine doğrudan PostgreSQL `REGEXP_REPLACE` sorgusuyla yapılıyor (daha güvenilir).
+- Veriler aynıysa sessizce listeleme oluşur, farklıysa superuser'a değişiklik bildirimi gider.
+- Safety net fallback da aynı şekilde doğrudan SQL'e alındı.
 
 ---
 
-### 2. Bestseller Karussell — Landing Page Container
+### 2. Superuser Ürün Sayfasında shop_name Hatası
 
-**Amaç:** Landing page editöründe "Bestseller Karussell" adlı yeni bir konteyner tipi oluşturuldu. Seçilen kategorideki en çok satan ürünleri sıralı biçimde gösterir.
+**Dosya:** `apps/medusa-backend/server.js` → `adminHubProductByIdGET` (~satır 4512)
 
-#### `apps/shop/src/components/landing/LandingContainers.jsx`
-- `BestsellerCarousel` bileşeni eklendi
-- `/api/store-products?category=...&limit=50` üzerinden ürün çeker
-- `toSalesScore()` ile sıralar, en yüksek satışlıdan başlar
-- Her kart üzerinde Bestseller etiketi + sıra numarası (`#1`, `#2`…) gösterir
-- "Mehr anzeigen" → ilgili kategori sayfasına `?sort=bestseller` ile yönlendirir
-- Mobil grid/row layout desteği
+**Eskiden:**
+`seller_users` tablosunda `shop_name` kolonu olmadığı için `seller_listings` her zaman boş dönüyordu. Ürün detayında hangi satıcıların listelediği görünmüyordu.
 
-#### `apps/sellercentral/src/components/pages/content/LandingPageEditor.jsx`
-- `BestsellerCarouselEditor` bileşeni eklendi (kategori seçici, başlık, satır başı ürün sayısı, boşluk, mobil düzen ayarları)
-- `getContainerTypes()` fonksiyonuna DE/TR dil desteğiyle yeni tip eklendi
-- `newContainer()` ve `renderContainer()` switch'lerine `bestseller_carousel` case'i eklendi
+**Artık:**
+`COALESCE(su.store_name, su.shop_name) AS shop_name` kullanılıyor. Doğru kolon okunuyor, ürün sayfasında satıcı listesi görünüyor.
 
 ---
 
-### 3. AGB Sayfası Yönlendirme Sorunu Düzeltmesi
+### 3. Superuser Envanter Sayfasında Master Ürün Görünümü
 
-**Sorun:** Menüde "AGB" linkine tıklandığında shop ana sayfasına yönlendiriyordu.
+**Dosya:** `apps/sellercentral/src/components/pages/InventoryPage.jsx`
 
-**Kök Neden:** `[handle]/page.jsx` içindeki CMS sayfa sorgusu `process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL` adresini tarayıcı tarafından çağırıyordu — bu URL CORS veya iç ağ kısıtlamaları nedeniyle erişilemezdi.
+**Eskiden:**
+Seller_id'si `NULL` olan master ürünler (EAN ile eklenen) superuser'ın kendi ürünleri arasında görünüyordu, hangi satıcıya ait olduğu belli değildi.
 
-#### Yeni dosyalar:
-- `apps/shop/src/app/api/store-pages/route.js` — tüm yayınlanmış sayfaları listeleyen proxy
-- `apps/shop/src/app/api/store-pages/[slug]/route.js` — tek sayfa getiren proxy
-
-#### Güncellenen dosyalar:
-- `apps/shop/src/lib/medusa-client.js` — `getPageBySlug()` proxy rotasını kullanacak şekilde güncellendi
-- `apps/shop/src/app/[locale]/[handle]/page.jsx` — CMS fallback proxy üzerinden çalışır hale getirildi
+**Artık:**
+`GET /admin-hub/product-listings-map` endpoint'i çekilip `productListingsMap` state'ine alınıyor. Master ürünler, onları listeleyen ilk satıcının grubu altında gösteriliyor.
 
 ---
 
-### 4. Made in Europe Badge — Kategori/Koleksiyon Sayfalarında Gösterim
+### 4. BuyBox Tie-Breaker Düzeltmesi
 
-**Sorun:** Badge yalnızca ürün detay sayfasında görünüyordu, kategori ve koleksiyon kartlarında yoktu.
+**Dosya:** `apps/medusa-backend/server.js` → `storeProductByIdFromAdminHubGET` (~satır 7071)
 
-#### `apps/shop/src/components/ProductCard.jsx`
-- `MadeInEuropeOverlay` ve `isEuOriginVerified` import'ları eklendi
-- `isEuOrigin = isEuOriginVerified(product.metadata)` hesaplanıp `ImgBlock` içine overlay yerleştirildi
+**Eskiden:**
+```js
+scored.sort((a, b) => b.score - a.score)
+```
+Score'lar eşit olduğunda son eklenen satıcı kazanıyordu (JavaScript sort kararsız).
 
----
-
-### 5. Made in Europe Badge — Taşma Sorunu Düzeltmesi
-
-**Sorun:** Ürün detay sayfasında badge'e offset verildiğinde `MainImageWrap`'in `overflow: hidden` özelliği badge'i kırpıyordu.
-
-#### `apps/shop/src/components/templates/ProductTemplate.jsx`
-#### `apps/shop/src/components/templates/ProductTemplateMobile.jsx`
-- `MadeInEuropeOverlay` `MainImageWrap` dışına taşındı; üst `position: relative` container içine alındı
-- Badge artık görselin dışına %5 taşabilir (`translateY(5%)`)
-
-#### `apps/shop/src/components/MadeInEuropeOverlay.jsx`
-- Varsayılan offset: `offset_left: 0`, `offset_bottom: 0`
-- `ShopStylesContext`'ten badge konfigürasyonu çeker
+**Artık:**
+```js
+scored.sort((a, b) => {
+  const diff = b.score - a.score
+  if (diff !== 0) return diff
+  return new Date(a.p.created_at || 0) - new Date(b.p.created_at || 0)
+})
+```
+Score eşitliğinde ilk listeleyen satıcı BuyBox'ı kazanır.
 
 ---
 
-### 6. Bestseller — Kategori Bazlı Hesaplama
+### 5. Kupon Kodu UUID Cast Hatası
 
-**Sorun:** Tüm ürünler bestseller etiketi alıyordu (statik metadata bayrağı).
+**Dosya:** `apps/medusa-backend/server.js` → `resolveCartCouponDiscountSync` (~satır 7309)
 
-**Çözüm:** Her kategori/koleksiyon listesi kendi içinde değerlendirilir; listedeki en yüksek satış skorlu tek ürün bestseller olarak işaretlenir.
+**Eskiden:**
+```sql
+WHERE product_id = ANY($1::varchar[])
+```
+`product_id` kolonu UUID tipinde, `::varchar[]` cast'i sessizce başarısız oluyordu. `sellersViaListings` her zaman boş dönüyordu. Satıcıya özgü kuponlar `"Ungültiger oder abgelaufener Coupon-Code"` hatası veriyordu.
 
-#### `apps/shop/src/components/ProductGrid.jsx`
-- `toSalesScore()` ile her liste render'ında en yüksek skorlu ürün belirlenir
-- Yalnızca o ürüne `isBestseller={true}` prop'u geçilir
-
-#### `apps/shop/src/lib/catalog-listing.js`
-- `SORT_OPTIONS`'a `{ value: "bestseller", label: "Bestseller" }` eklendi
-- `applyCatalogSort()`'a bestseller sıralama mantığı eklendi
-
-#### `apps/shop/src/components/templates/CategoryTemplate.jsx`
-- `useSearchParams` hook'u eklendi; URL'deki `?sort=bestseller` parametresi başlangıç sort değeri olarak okunur
+**Artık:**
+```sql
+WHERE product_id::text = ANY($1::text[])
+```
+UUID → text dönüşümü doğru çalışıyor, satıcı kuponları geçerli tanınıyor.
 
 ---
 
-### 7. SKU & EAN Alanı Düzeltmesi
+### 6. Sipariş Onay Sayfası Eksikti
 
-**Dosya:** `apps/sellercentral/src/components/pages/products/VariantEditPage.jsx`
+**Dosya:** `apps/shop/src/app/[locale]/checkout/page.jsx` (satır 1082 ve 1617)
 
-- "SKU & EAN" başlığı kaldırıldı
-- Her iki alandaki `labelHidden` prop'u kaldırıldı; etiketler yan yana görünür hale getirildi
+**Eskiden:**
+```js
+router.push(`/${locale}/order/${orderId}`)
+```
+Ödeme tamamlandıktan sonra doğrudan sipariş detay sayfasına yönlendiriliyordu, yeşil onay banner'ı ve teşekkür mesajı görünmüyordu.
+
+**Artık:**
+```js
+router.push(`/${locale}/order/${orderId}?confirmed=1`)
+```
+Sipariş detay sayfası `?confirmed=1` parametresini görünce yeşil tik, "Vielen Dank für Ihre Bestellung!" mesajı ve e-posta bildirimi gösteriyor.
+
+---
+
+### 7. Versendet Durumunda Yanlış Abgeschlossen
+
+**Dosya:** `apps/sellercentral/src/components/pages/OrderDetailPage.jsx` (satır 134, 138)
+
+**Eskiden:**
+```js
+// Yanlış: versendet + bezahlt → abgeschlossen
+if ((val === "zugestellt" || val === "versendet") && paymentStatus === "bezahlt") setOrderStatus("abgeschlossen")
+if (val === "bezahlt" && (deliveryStatus === "zugestellt" || deliveryStatus === "versendet")) setOrderStatus("abgeschlossen")
+```
+Lieferstatus `versendet` yapılıp Zahlungsstatus `bezahlt` iken sipariş `abgeschlossen` oluyordu.
+
+**Artık:**
+```js
+// Doğru: yalnızca zugestellt + bezahlt → abgeschlossen
+if (val === "zugestellt" && paymentStatus === "bezahlt") setOrderStatus("abgeschlossen")
+if (val === "bezahlt" && deliveryStatus === "zugestellt") setOrderStatus("abgeschlossen")
+```
+Sipariş yalnızca `zugestellt + bezahlt` kombinasyonunda `abgeschlossen` oluyor.
+
+---
+
+### 8. Tracking Numarası Girilince Lieferstatus Otomatik Versendet
+
+**Dosya:** `apps/medusa-backend/server.js` → `adminHubOrderPATCH` (~satır 11652)
+
+**Eskiden:**
+Tracking numarası girildiğinde yalnızca bir "Paket wurde versendet" shipment event'i oluşturuluyordu. `delivery_status` alanı otomatik olarak değişmiyordu, satıcının ayrıca elle `versendet` seçmesi gerekiyordu.
+
+**Artık:**
+```js
+if (trackingChanged && !['versendet','zugestellt','shipped','delivered'].includes(prevRow.delivery_status)) {
+  await client.query(
+    `UPDATE store_orders SET delivery_status='versendet' WHERE id=$1::uuid AND delivery_status NOT IN (...)`,
+    [id]
+  )
+}
+```
+Tracking numarası ilk girildiğinde `delivery_status` otomatik olarak `versendet` oluyor.
+
+---
+
+### 9. DPD, GLS ve UPS Kargo Takip Desteği
+
+**Dosya:** `apps/medusa-backend/server.js` → `adminHubOrderRefreshTrackingPOST` (~satır 12624)  
+**Dosya:** `apps/medusa-backend/server.js` → `runAutoTrackingRefresh` (~satır 18979)
+
+**Eskiden:**
+- Manuel "Tracking yenile" butonu ve arka plan otomatik yenileme (3 saatte bir) yalnızca DHL'i destekliyordu.
+- DPD, GLS, UPS siparişleri için `"Automatischer API-Abruf für diesen Versanddienst ist noch nicht angebunden."` mesajı dönüyordu.
+- Yalnızca "Paket wurde versendet" başlangıç event'i görünüyordu, sonraki kargo güncellemeleri yansımıyordu.
+
+**Artık:**
+
+| Carrier | API | Kimlik Bilgisi |
+|---------|-----|----------------|
+| DHL | `api-eu.dhl.com` | DHL API Key (mevcut) |
+| DPD | `tracking.dpd.de` (public REST) | Gerekmez |
+| GLS | `gls-group.com` (public REST) | Gerekmez |
+| UPS | `onlinetools.ups.com` (OAuth2) | Client-ID + Secret (Einstellungen → Versand) |
+
+- DPD ve GLS için API anahtarı gerekmez, tracking otomatik çalışır.
+- UPS için Versanddienstleister ayarlarına Client-ID (api_key) ve Client-Secret (api_secret) girilmesi yeterli.
+- Arka plan otomatik yenileme artık DHL + DPD + GLS'i kapsamakta (UPS OAuth2 gerektirdiği için arka planda çalışmaz, manuel refresh gerekir).
+- Status eşleştirmesi: `zugestellt`, `versendet`, `in_transit` olarak normalize edilip DB'ye yazılıyor.
+
+---
+
+### 10. Sepet — Stale Cart ve Sidebar Bug Düzeltmesi
+
+**Dosya:** `apps/shop/src/lib/medusa-client.js` (satır 172)  
+**Dosya:** `apps/shop/src/context/CartContext.jsx` (~satır 85)
+
+**Eskiden:**
+```js
+// medusa-client.js
+if (res?.__error) return { cart: null }
+// CartContext.jsx — addToCart başarısız olsa bile fetchCart çağrılıyordu
+const refreshed = await fetchCart(c.id)
+if (refreshed) { setCart(refreshed); return refreshed }  // truthy → sidebar açılıyordu!
+```
+`addToCart` backend hatası alınca (500/404) `fetchCart` ile eski cart çekiliyordu. Eski cart truthy döndüğü için sidebar açılıyordu ama ürün eklenmemişti.
+
+Ayrıca checkout sonrası cart ID localStorage'dan siliniyordu; tekrar ürün eklemeye çalışınca 404 alınıp sessizce başarısız oluyordu.
+
+**Artık:**
+```js
+// medusa-client.js — hata bilgisi iletiliyor
+if (res?.__error) return { cart: null, __error: true, status: res.status }
+
+// CartContext.jsx — stale cart otomatik yenileniyor, hata durumunda sidebar açılmıyor
+if (res?.__error && res?.status === 404) {
+  // localStorage temizle, yeni cart oluştur, tekrar dene
+  window.localStorage.removeItem(CART_ID_KEY)
+  setCart(null)
+  c = await createCart()
+  res = await client.addToCart(c.id, variantId, quantity, sellerId)
+}
+if (res?.__error) return null  // kesin hata → sidebar açılmaz
+```
+- 404 (cart bulunamadı): yeni cart oluşturulur, ürün tekrar eklenir.
+- Diğer hatalar: `null` döner, sidebar açılmaz, hata notice gösterilir.
+
+---
+
+## Bekleyen / Henüz Yapılmayan
+
+- Shop URL sorunu (`/produkt/`, `/pages/` prefix'leri kaldırılmadı)
+- Geolocation GB/GB → DE/DE (Almanya'dan açılınca yanlış locale)
+- `/brands` sayfasında son eklenen marka görünmüyor
+- Shop breadcrumbs (kategori yerine "Koleksiyon" yazıyor)
+- Bestseller badge tüm product card'larda (category, search, menu)
+- Bestseller carousel kategori dropdown hiyerarşisi
+- Excel `per_unit` alanı eklenmesi
+- Ürün koruma: EAN immutable, ilk satıcı düzenleme hakkı, değişiklik önerileri + kırmızı badge
+- İkinci satıcı aynı EAN'i eklerken seller-specific alanlar boş gelmeli, save düzelmeli
+- Shopta "Other Sellers (N)" accordion (fiyat + yıldız)
+- Kupon sayfası superuser kategorilendirmesi
+- Kampanya sistemi (Stripe + Google Ads / Meta dağıtım)
+- Sellercentralde takip numarasının girilebildiği yer — hangi alanda, hangi UI component'ta olduğu doğrulanmadı

@@ -91,17 +91,21 @@ export function CartProvider({ children }) {
         c = await createCart();
         if (!c) return null;
       }
-      const res = await client.addToCart(c.id, variantId, quantity, sellerId);
+      let res = await client.addToCart(c.id, variantId, quantity, sellerId);
+      // If cart not found (stale localStorage ID), create a new cart and retry once
+      if (res?.__error && res?.status === 404) {
+        try { window.localStorage.removeItem(CART_ID_KEY); } catch (_) {}
+        setCart(null);
+        c = await createCart();
+        if (!c) return null;
+        res = await client.addToCart(c.id, variantId, quantity, sellerId);
+      }
+      // If add explicitly failed, do not open sidebar
+      if (res?.__error) return null;
       const updated = res?.cart;
       if (updated) {
         setCart(updated);
         return updated;
-      }
-      // Some backends return eventual cart state slowly; force a refetch for instant UI sync.
-      const refreshed = await fetchCart(c.id);
-      if (refreshed) {
-        setCart(refreshed);
-        return refreshed;
       }
       return null;
     } catch (err) {

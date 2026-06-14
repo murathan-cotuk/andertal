@@ -169,7 +169,7 @@ class MedusaClient {
       method: 'POST',
       body: JSON.stringify(body),
     })
-    if (res?.__error) return { cart: null }
+    if (res?.__error) return { cart: null, __error: true, status: res.status }
     return this.getCart(cartId)
   }
 

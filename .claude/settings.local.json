@@ -138,7 +138,10 @@
       "Bash(dir C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\sellercentral *)",
       "Bash(Remove-Item *)",
       "PowerShell(Test-Path *)",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\" -Recurse -File -Filter \"*.js\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -First 20 FullName)",
+      "Bash(Get-ChildItem -Recurse -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\app\" -Name \"page*\")"
     ]
   }
 }
