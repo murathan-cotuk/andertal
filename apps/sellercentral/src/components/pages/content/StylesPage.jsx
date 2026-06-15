@@ -1185,8 +1185,13 @@ export default function StylesPage() {
                             type="number"
                             value={String(logoSlotSize(dev, section === "shop" ? 34 : 30))}
                             onChange={(v) => {
-                              const size = clampLogoSize(v, logoSlotSize(dev, section === "shop" ? 34 : 30));
-                              updateDev({ size, height: size });
+                              const n = Number(v);
+                              if (Number.isFinite(n) && n > 0) updateDev({ size: n, height: n });
+                            }}
+                            onBlur={() => {
+                              const cur = logoSlotSize(dev, section === "shop" ? 34 : 30);
+                              const clamped = clampLogoSize(cur, section === "shop" ? 34 : 30);
+                              if (clamped !== cur) updateDev({ size: clamped, height: clamped });
                             }}
                             helpText="Anzeigegröße des Logos; Breite passt sich proportional an."
                             autoComplete="off"

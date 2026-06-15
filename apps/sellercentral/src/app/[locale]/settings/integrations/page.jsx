@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -9,6 +9,7 @@ import { ChevronDownIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import MarketingAccountsSection from "@/components/settings/MarketingAccountsSection";
 import BillbeeSettingsPage from "@/components/pages/settings/BillbeeSettingsPage";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 const client = getMedusaAdminClient();
 
@@ -271,7 +272,7 @@ function SmtpSendersSection({ onToast }) {
   };
 
   const removeSender = async (row) => {
-    if (!confirm(`„${row.from_email}" gönderenini silmek istiyor musunuz?`)) return;
+    if (!(await confirmDelete(`„${row.from_email}" gönderenini silmek istiyor musunuz?`))) return;
     try {
       await client.deleteSmtpSender(row.id);
       onToast?.({ tone: "success", text: "Silindi." });
@@ -768,7 +769,7 @@ export default function IntegrationsSettingsPage() {
   };
 
   const rotateSecret = async (integration) => {
-    if (!confirm("Neuen Sicherheitsschlüssel erzeugen? Der alte Wert verliert sofort die Gültigkeit.")) return;
+    if (!(await confirmDelete("Neuen Sicherheitsschlüssel erzeugen? Der alte Wert verliert sofort die Gültigkeit."))) return;
     try {
       const data = await client.updateIntegration(integration.id, { regenerate_secret: true });
       const sec = data?.integration?.api_secret;
@@ -789,7 +790,7 @@ export default function IntegrationsSettingsPage() {
   };
 
   const remove = async (integration) => {
-    if (!confirm(`„${integration.name}" wirklich löschen?`)) return;
+    if (!(await confirmDelete(`„${integration.name}" wirklich löschen?`))) return;
     try {
       await client.deleteIntegration(integration.id);
       setIntegrations((prev) => prev.filter((i) => i.id !== integration.id));

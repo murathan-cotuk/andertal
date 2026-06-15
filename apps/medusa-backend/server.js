@@ -15299,8 +15299,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         if (sup) {
           verQ = await client.query(
             `SELECT n.id, n.title, n.body, n.seller_id, n.created_at,
+                    su.id AS seller_user_id,
                     (s.read_at IS NOT NULL) AS read
              FROM admin_hub_notifications n
+             LEFT JOIN seller_users su ON su.seller_id = n.seller_id AND su.sub_of_seller_id IS NULL
              LEFT JOIN seller_hub_notification_state s
                ON s.recipient_key = $1 AND s.source_type = 'verification' AND s.source_id = n.id
              WHERE n.type = 'verification_submitted'
@@ -15424,7 +15426,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             created_at: r.created_at,
             title: r.title || 'Evrak',
             subtitle: r.body || '',
-            href: r.seller_id ? `/sellers/${r.seller_id}` : '/sellers',
+            href: r.seller_user_id ? `/sellers/${r.seller_user_id}` : (r.seller_id ? `/sellers/${r.seller_id}` : '/sellers'),
           })
         }
         const campaignSubmittedFeedItems = []

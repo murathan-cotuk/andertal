@@ -7,6 +7,7 @@ import {
 } from "@shopify/polaris";
 import { useRouter } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 // ── Admin seller card section ────────────────────────────────────────────────
 function AdminSellerCardSection({ sellerId }) {
@@ -26,7 +27,7 @@ function AdminSellerCardSection({ sellerId }) {
   }, [client, sellerId]);
 
   const handleDelete = useCallback(async () => {
-    if (!window.confirm("Karte wirklich entfernen?")) return;
+    if (!(await confirmDelete("Karte wirklich entfernen?"))) return;
     setErr(""); setDeleting(true);
     try {
       await client.deleteSellerCardByAdmin(sellerId);
@@ -387,10 +388,10 @@ export default function SellerDetailPage({ sellerId }) {
   };
 
   const handleMarkPaid = async (payout) => {
-    if (!confirm(
+    if (!(await confirmDelete(
       `Auszahlung ${fmtDate(payout.period_start)}–${fmtDate(payout.period_end)} als extern überwiesen markieren?\n\n` +
       `Hinweis: Bu işlem banka/Stripe transferi başlatmaz. Önce ödemeyi platform hesabından seller IBAN'ına gerçekten gönderin, sonra burada "bezahlt" işaretleyin.`
-    )) return;
+    ))) return;
     try {
       await client.updatePayout(payout.id, { status: "bezahlt" });
       setMsg({ tone: "success", text: "Als extern überwiesen (bezahlt) markiert." });

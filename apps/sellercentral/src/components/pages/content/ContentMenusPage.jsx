@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -28,6 +28,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 const LINK_TYPES = [
   { label: "Category", value: "category" },
@@ -1024,7 +1025,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
 
   const handleDeleteMenu = (e, menu) => {
     e?.stopPropagation?.();
-    if (!confirm(`Delete menu "${menu.name}"? This will remove all its items.`)) return;
+    if (!(await confirmDelete(`Delete menu "${menu.name}"? This will remove all its items.`))) return;
     try {
       setError(null);
       client.deleteMenu(menu.id).then(() => {
@@ -1150,7 +1151,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   };
 
   const handleDeleteItem = async (item) => {
-    if (!confirm(`Remove "${item.label}" from menu?`)) return;
+    if (!(await confirmDelete(`Remove "${item.label}" from menu?`))) return;
     const menuId = effectiveMenuId ?? selectedMenuId;
     if (!menuId) return;
     setError(null);

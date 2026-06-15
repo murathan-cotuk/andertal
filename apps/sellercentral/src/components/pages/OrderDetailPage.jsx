@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -7,6 +7,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
 import TrackingSection from "@/components/orders/TrackingSection";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 function fmtCents(c) {
   return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
@@ -157,7 +158,7 @@ export default function OrderDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Bestellung wirklich löschen?")) return;
+    if (!(await confirmDelete("Bestellung wirklich löschen?"))) return;
     try {
       const client = getMedusaAdminClient();
       await client.deleteOrder(id);

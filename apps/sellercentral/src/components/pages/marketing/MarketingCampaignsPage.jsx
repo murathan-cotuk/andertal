@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
@@ -17,6 +17,7 @@ import {
 import { useRouter } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import {
+import { confirmDelete } from "@/lib/confirm-delete";
   PLATFORM_OPTIONS,
   fmtBudget,
   fmtDate,
@@ -213,7 +214,7 @@ export default function MarketingCampaignsPage() {
   };
 
   const remove = async (id) => {
-    if (!confirm("Kampagne wirklich löschen?")) return;
+    if (!(await confirmDelete("Kampagne wirklich löschen?"))) return;
     try {
       await getMedusaAdminClient().deleteCampaign(id);
       setMsg({ tone: "success", text: "Kampagne gelöscht." });

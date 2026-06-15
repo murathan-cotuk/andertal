@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -6,6 +6,7 @@ import { useLocale } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { Page, Layout, Card, Text, BlockStack, InlineStack, TextField, Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 function fmtDate(value) {
   if (!value) return "—";
@@ -108,7 +109,7 @@ export default function CustomerNewsletterSubscriberDetailPage() {
 
   const onDelete = async () => {
     if (!subscriberId) return;
-    if (!window.confirm("Abonenin kaydı silinsin mi?")) return;
+    if (!(await confirmDelete("Abonenin kaydı silinsin mi?"))) return;
     setDeleting(true);
     try {
       await getMedusaAdminClient().deleteNewsletterSubscriber(subscriberId);

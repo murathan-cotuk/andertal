@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { Page, Layout, Card, Text, BlockStack, InlineStack, Box, TextField, Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 function fmtDate(d) {
   if (!d) return "—";
@@ -243,7 +244,7 @@ export default function CustomerNewsletterSubscribersPage() {
 
   const removeSubscriber = async (id) => {
     if (!id) return;
-    if (!window.confirm("Diesen Abonnenten wirklich löschen?")) return;
+    if (!(await confirmDelete("Diesen Abonnenten wirklich löschen?"))) return;
     setBusyId(id);
     try {
       await getMedusaAdminClient().deleteNewsletterSubscriber(id);

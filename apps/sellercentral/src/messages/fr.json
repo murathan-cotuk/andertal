@@ -105,5 +105,10 @@
     "fr": "Français",
     "it": "Italiano",
     "es": "Español"
+  },
+  "confirmDelete": {
+    "title": "Confirmer la suppression",
+    "confirm": "Supprimer",
+    "cancel": "Annuler"
   }
 }

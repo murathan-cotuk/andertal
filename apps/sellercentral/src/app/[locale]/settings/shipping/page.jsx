@@ -17,6 +17,7 @@ import {
   InlineGrid,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 function normalizeSellerCountryCode(code) {
   const u = String(code ?? "").trim().toUpperCase();
@@ -306,7 +307,7 @@ function ShippingGroupsSection({ carriers }) {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Versandgruppe löschen?")) return;
+    if (!(await confirmDelete("Versandgruppe löschen?"))) return;
     try {
       await getMedusaAdminClient().request(`/admin-hub/v1/shipping-groups/${id}`, { method: "DELETE" });
       setGroups((prev) => prev.filter((g) => g.id !== id));
@@ -755,7 +756,7 @@ export default function ShippingSettingsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Carrier löschen?")) return;
+    if (!(await confirmDelete("Carrier löschen?"))) return;
     await getMedusaAdminClient().deleteCarrier(id);
     setCarriers((prev) => prev.filter((c) => c.id !== id));
   };

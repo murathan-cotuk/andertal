@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -18,6 +18,7 @@ import {
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import MediaPickerModal from "@/components/MediaPickerModal";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 const getDefaultBaseUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "") ||
@@ -193,7 +194,7 @@ export default function BrandPage() {
 
   const handleDelete = async (brand) => {
     if (!canEditBrand(brand)) return;
-    if (!confirm(`Delete "${brand.name}"?`)) return;
+    if (!(await confirmDelete(`Delete "${brand.name}"?`))) return;
     try {
       await client.deleteBrand(brand.id);
       loadBrands();

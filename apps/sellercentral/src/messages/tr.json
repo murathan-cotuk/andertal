@@ -98,6 +98,11 @@
       "agreeText": "<terms>Kullanım Koşulları</terms>'nı ve <privacy>Gizlilik Politikası</privacy>'nı kabul ediyorum"
     }
   },
+  "confirmDelete": {
+    "title": "Silme işlemini onayla",
+    "confirm": "Sil",
+    "cancel": "İptal"
+  },
   "locale": {
     "en": "English",
     "de": "Deutsch",

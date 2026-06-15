@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
@@ -18,6 +18,7 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { appendMediaFileToFormData } from "@/lib/media-upload";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "");
 
@@ -666,7 +667,7 @@ export default function MediaPage() {
 
   /* ── Delete folder ── */
   const handleDeleteFolder = async (folder) => {
-    if (!confirm(`Delete folder "${folder.name}"? Files will stay in root.`)) return;
+    if (!(await confirmDelete(`Delete folder "${folder.name}"? Files will stay in root.`))) return;
     try {
       await client.deleteMediaFolder(folder.id);
       if (currentFolder?.id === folder.id) navigateToFolder(null);

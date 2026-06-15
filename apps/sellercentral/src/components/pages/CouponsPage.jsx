@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import {
@@ -15,6 +15,7 @@ import {
   Modal,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("de-DE") : "—");
 
@@ -240,7 +241,7 @@ export default function CouponsPage() {
   };
 
   const remove = async (id) => {
-    if (!confirm("Coupon löschen?")) return;
+    if (!(await confirmDelete("Coupon löschen?"))) return;
     try {
       await getMedusaAdminClient().deleteCoupon(id);
       await load();

@@ -1,7 +1,7 @@
 "use client";
 
-import SettingsSubpage from "@/components/SettingsSubpage";
+import BillingSettingsPage from "@/components/pages/settings/BillingSettingsPage";
 
-export default function SettingsBilling() {
-  return <SettingsSubpage title="Billing" description="Invoices and billing history." />;
+export default function SettingsBillingRoute() {
+  return <BillingSettingsPage />;
 }

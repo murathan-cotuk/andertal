@@ -17,6 +17,9 @@ import {
   Icon,
 } from "@shopify/polaris";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
+import { useSellerImpersonation } from "@/context/SellerImpersonationContext";
+import SellerImperBar from "@/components/SellerImperBar";
+import { __registerConfirmModal, __resolveConfirmModal } from "@/lib/confirm-delete";
 import {
   HomeIcon,
   ProductIcon,
@@ -436,6 +439,10 @@ export default function PolarisLayout({ children }) {
     if (typeof window === "undefined") return null;
     try { return JSON.parse(localStorage.getItem("sellerPermissions") || "null"); } catch { return null; }
   });
+  const impersonation = useSellerImpersonation();
+  const [confirmDeleteState, setConfirmDeleteState] = useState({ open: false, message: "" });
+  const tConfirmRaw = useTranslations("confirmDelete");
+  const tConfirm = useCallback((k) => { try { return tConfirmRaw(k); } catch { return k; } }, [tConfirmRaw]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifData, setNotifData] = useState(null);
   const [msgUnread, setMsgUnread] = useState(0);
@@ -478,6 +485,24 @@ export default function PolarisLayout({ children }) {
   useEffect(() => {
     loadSellercentralShellBranding();
   }, [loadSellercentralShellBranding]);
+
+  // Register delete confirm modal
+  useEffect(() => {
+    __registerConfirmModal(setConfirmDeleteState);
+  }, []);
+
+  // Listen for impersonation context changes → update nav/header state
+  useEffect(() => {
+    const handler = () => {
+      setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+      setStoreName(localStorage.getItem("storeName") || "Seller Account");
+      try {
+        setUserPermissions(JSON.parse(localStorage.getItem("sellerPermissions") || "null"));
+      } catch { setUserPermissions(null); }
+    };
+    window.addEventListener("andertal-impersonation-changed", handler);
+    return () => window.removeEventListener("andertal-impersonation-changed", handler);
+  }, []);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
@@ -1241,12 +1266,35 @@ export default function PolarisLayout({ children }) {
             </Modal.Section>
           </Modal>
         )}
-        <div className="andertal-scroll-wrapper">
+        {/* Delete confirmation modal */}
+        {confirmDeleteState.open && (
+          <Modal
+            open
+            onClose={() => __resolveConfirmModal(false)}
+            title={tConfirm("title")}
+            primaryAction={{
+              content: tConfirm("confirm"),
+              destructive: true,
+              onAction: () => __resolveConfirmModal(true),
+            }}
+            secondaryActions={[
+              { content: tConfirm("cancel"), onAction: () => __resolveConfirmModal(false) },
+            ]}
+          >
+            <Modal.Section>
+              <Text as="p">{confirmDeleteState.message}</Text>
+            </Modal.Section>
+          </Modal>
+        )}
+
+        <div className="andertal-scroll-wrapper" key={impersonation?.expandedId || "superuser"}>
           <div className="andertal-page-content andertal-page-content-transition">
             {children}
           </div>
         </div>
       </Frame>
+      {/* Seller impersonation bottom tab bar */}
+      <SellerImperBar />
     </AppProvider>
   );
 }

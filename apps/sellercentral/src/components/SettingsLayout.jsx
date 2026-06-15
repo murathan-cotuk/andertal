@@ -10,7 +10,6 @@ import { ArrowLeftIcon } from "@shopify/polaris-icons";
 const SETTINGS_ITEMS_ALL = [
   { href: "/settings/general", label: "General" },
   { href: "/settings/verification", label: "Verification", sellerOnly: true },
-  { href: "/settings/plan", label: "Plan" },
   { href: "/settings/billing", label: "Billing" },
   { href: "/settings/users-permissions", label: "Users and Permissions" },
   { href: "/settings/payments", label: "Payments" },

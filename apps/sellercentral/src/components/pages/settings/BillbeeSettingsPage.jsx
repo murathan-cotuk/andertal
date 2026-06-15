@@ -12,6 +12,7 @@ import {
 } from "@shopify/polaris";
 import { DuplicateIcon, HideIcon, ViewIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 /** Festes Feld mit kleinem Kopieren-Icon oben rechts neben dem Label (übliches UI-Muster). */
 function CopyField({ label, value, helpText, multiline, masked = false }) {
@@ -116,7 +117,7 @@ export default function BillbeeSettingsPage({ embedded = false }) {
   }, [load]);
 
   const handleRotateSecret = async () => {
-    if (!confirm("Neues Basic-Auth-Passwort erzeugen? In Billbee musst du das Passwort danach aktualisieren.")) return;
+    if (!(await confirmDelete("Neues Basic-Auth-Passwort erzeugen? In Billbee musst du das Passwort danach aktualisieren."))) return;
     setRotating(true);
     setErr("");
     setOkBanner("");

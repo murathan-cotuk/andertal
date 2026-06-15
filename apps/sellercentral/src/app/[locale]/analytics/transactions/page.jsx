@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import DashboardLayout from "@/components/DashboardLayout";
 import { useState, useEffect, useCallback } from "react";
@@ -7,6 +7,7 @@ import {
   Badge, Button, Banner, Box, Select, Divider,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (cents, currency = "EUR") =>
@@ -309,7 +310,7 @@ function AdminTransactionsView() {
   const periodOptions = PERIODS.map((p) => ({ label: p.label, value: p.key }));
 
   const handleMarkPaid = async (s) => {
-    if (!confirm(`Auszahlung für "${s.store_name}" als bezahlt markieren? Betrag: ${fmt(s.payout)}`)) return;
+    if (!(await confirmDelete(`Auszahlung für "${s.store_name}" als bezahlt markieren? Betrag: ${fmt(s.payout)}`))) return;
     setMarkingPaid(s.seller_id);
     try {
       await getMedusaAdminClient().createPayout({
@@ -528,7 +529,7 @@ function PayoutsTable({ payouts, loading, isSuperuser, onRefresh }) {
   const [markingPaid, setMarkingPaid] = useState(null);
 
   const doMarkPaid = async (p) => {
-    if (!confirm("Diesen Eintrag als extern überwiesen markieren? (Bu işlem gerçek ödeme göndermez)")) return;
+    if (!(await confirmDelete("Diesen Eintrag als extern überwiesen markieren? (Bu işlem gerçek ödeme göndermez)"))) return;
     setMarkingPaid(p.id);
     try {
       await getMedusaAdminClient().updatePayout(p.id, { status: "bezahlt" });

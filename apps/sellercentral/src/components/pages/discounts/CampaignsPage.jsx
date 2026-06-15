@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import {
@@ -20,6 +20,7 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 const STATUS_OPTIONS = [
   { label: "Entwurf", value: "draft" },
@@ -245,7 +246,7 @@ export default function CampaignsPage() {
   };
 
   const remove = async (id) => {
-    if (!confirm("Kampagne wirklich löschen?")) return;
+    if (!(await confirmDelete("Kampagne wirklich löschen?"))) return;
     try {
       await client.deleteCampaign(id);
       setMsg({ tone: "success", text: "Kampagne gelöscht." });

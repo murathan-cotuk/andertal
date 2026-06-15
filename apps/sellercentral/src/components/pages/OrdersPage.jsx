@@ -10,6 +10,7 @@ import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
 import ShipLabelModal from "@/components/orders/ShipLabelModal";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function fmtCents(c) {
@@ -535,7 +536,7 @@ function ActionMenu({ order, onUpdate, onDelete, onVersenden }) {
             { label: "Details anzeigen", action: () => { router.push(`/${locale}/orders/${order.id}`); setOpen(false); } },
             { label: "Versenden", action: () => { onVersenden?.(); setOpen(false); } },
             { label: "Stornieren", action: () => { onUpdate(order.id, { order_status: "storniert" }); setOpen(false); }, danger: true },
-            { label: "Löschen", action: () => { if (confirm("Bestellung löschen?")) { onDelete(order.id); } setOpen(false); }, danger: true },
+            { label: "Löschen", action: async () => { if (await confirmDelete("Bestellung löschen?")) { onDelete(order.id); } setOpen(false); }, danger: true },
           ].map((item, i, arr) => (
             <button key={i} onClick={item.action} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 16px", background: "none", border: "none", fontSize: 13, cursor: "pointer", color: item.danger ? "#b91c1c" : "#111827", borderBottom: i < arr.length - 1 ? "1px solid #f3f4f6" : "none" }}
               onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}

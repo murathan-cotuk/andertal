@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { Card, Button, Input } from "@andertal/ui";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 /** Build nested tree from flat array using parent_id */
 function buildTree(flat) {
@@ -267,7 +268,7 @@ export default function AdminCategoriesPage() {
   };
 
   const handleDelete = useCallback(async (cat) => {
-    if (!confirm(`"${cat.name}" kategorisini silmek istediğinize emin misiniz?`)) return;
+    if (!(await confirmDelete(`"${cat.name}" kategorisini silmek istediğinize emin misiniz?`))) return;
     try {
       const client = getMedusaAdminClient();
       await client.deleteAdminHubCategory(cat.id);

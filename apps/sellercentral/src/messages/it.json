@@ -105,5 +105,10 @@
     "fr": "Français",
     "it": "Italiano",
     "es": "Español"
+  },
+  "confirmDelete": {
+    "title": "Conferma eliminazione",
+    "confirm": "Elimina",
+    "cancel": "Annulla"
   }
 }

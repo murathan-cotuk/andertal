@@ -1119,7 +1119,7 @@ export default function InventoryPage() {
         onAction: () => router.push("/products/new"),
       }}
       secondaryActions={[
-        { content: "Bulk upload", url: "/products/bulk-upload" },
+        { content: "Bulk upload", url: "/import-export" },
         { content: "Export", onAction: () => setExportModalOpen(true) },
       ]}
     >
@@ -1258,7 +1258,7 @@ export default function InventoryPage() {
                       <Text as="p" tone="subdued">No products yet. Add your first product to get started.</Text>
                       <InlineStack gap="200">
                         <Button variant="primary" url="/products/new">Add product</Button>
-                        <Button url="/products/bulk-upload">Bulk upload</Button>
+                        <Button url="/import-export">Bulk upload</Button>
                       </InlineStack>
                     </BlockStack>
                   </Box>

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Page, Card, Button, Checkbox, BlockStack, InlineStack, Text, Box } from "@shopify/polaris";
 import { Link } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 function itemKey(it) {
   return `${it.source_type}:${it.source_id}`;
@@ -187,7 +188,7 @@ export default function NotificationsPage() {
 
   const deleteAll = async () => {
     if (
-      !window.confirm(
+      !await confirmDelete(
         "Alle Einträge aus dieser Übersicht entfernen? Die Daten selbst (Bestellungen, Verkäufer usw.) bleiben unverändert — nur die Anzeige hier wird ausgeblendet.",
       )
     ) {

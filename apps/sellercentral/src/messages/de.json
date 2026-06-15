@@ -98,6 +98,11 @@
       "agreeText": "Ich stimme den <terms>Nutzungsbedingungen</terms> und der <privacy>Datenschutzerklärung</privacy> zu"
     }
   },
+  "confirmDelete": {
+    "title": "Löschen bestätigen",
+    "confirm": "Löschen",
+    "cancel": "Abbrechen"
+  },
   "locale": {
     "en": "English",
     "de": "Deutsch",

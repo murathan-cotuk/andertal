@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { appendMediaFileToFormData } from "@/lib/media-upload";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 /* ───────── helpers ───────── */
 function fmtSize(bytes) {
@@ -186,7 +187,7 @@ function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`"${item.filename}" löschen?`)) return;
+    if (!(await confirmDelete(`"${item.filename}" löschen?`))) return;
     try {
       const client = getMedusaAdminClient();
       await client.deleteMediaItem(item.id);
@@ -475,7 +476,7 @@ export default function MediaPage() {
               </button>
               <button
                 onClick={async () => {
-                  if (!confirm(`Ordner "${f.name}" löschen?`)) return;
+                  if (!(await confirmDelete(`Ordner "${f.name}" löschen?`))) return;
                   const client = getMedusaAdminClient();
                   await client.deleteMediaFolder(f.id).catch(() => {});
                   setFolders(prev => prev.filter(x => x.id !== f.id));

@@ -26,6 +26,7 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 import { mergeLoadedShopStyles } from "@andertal/shop-theme";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
@@ -3613,7 +3614,7 @@ export default function LandingPageEditor() {
                                         <ContainerEditor container={c} onChange={(updated) => updateContainer(c.id, updated)} deviceTab={seitenDeviceTab} editLang={contentEditLang} />
                                         <Box paddingBlockStart="400">
                                           <InlineStack align="end">
-                                            <Button size="slim" tone="critical" onClick={() => { if (confirm("Container entfernen?")) removeContainer(c.id); }}>
+                                            <Button size="slim" tone="critical" onClick={async () => { if (await confirmDelete("Container entfernen?")) removeContainer(c.id); }}>
                                               Entfernen
                                             </Button>
                                           </InlineStack>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -8,6 +8,7 @@ import {
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import SellerCreditCardSection from "@/components/SellerCreditCardSection";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const DEFAULT_COMMISSION_RATE = 0.12;
@@ -1025,9 +1026,9 @@ function AdminPaymentsView() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleMarkPaid = async (seller) => {
-    if (!confirm(
+    if (!(await confirmDelete(
       `Auszahlung für "${seller.store_name || seller.email}" als überwiesen markieren?\n\nBitte stelle sicher, dass die tatsächliche Überweisung bereits erfolgt ist.`
-    )) return;
+    ))) return;
     setPaying(seller.seller_id);
     try {
       await getMedusaAdminClient().markPayoutPaid({

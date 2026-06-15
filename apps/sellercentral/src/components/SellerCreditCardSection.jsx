@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Banner, BlockStack, Button, InlineStack, Spinner, Text } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 // Brand icons as simple text + color
 const BRAND_LABEL = {
@@ -152,7 +153,7 @@ export default function SellerCreditCardSection({ title, subtitle, compact = fal
   }, [client]);
 
   const handleDelete = useCallback(async () => {
-    if (!window.confirm("Karte wirklich entfernen?")) return;
+    if (!(await confirmDelete("Karte wirklich entfernen?"))) return;
     setErr(""); setDeleting(true);
     try {
       await client.deleteSellerCard();

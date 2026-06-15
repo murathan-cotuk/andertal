@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 const STATUS_META = {
   versendet: { label: "Versendet", color: "#1d4ed8", bg: "#eff6ff", icon: "🚚" },
@@ -102,7 +103,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
   };
 
   const handleDelete = async (eventId) => {
-    if (!confirm("Ereignis löschen?")) return;
+    if (!(await confirmDelete("Ereignis löschen?"))) return;
     setDeletingId(eventId);
     try {
       const client = getMedusaAdminClient();

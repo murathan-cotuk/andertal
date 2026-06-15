@@ -1,11 +1,14 @@
 "use client";
 
 import { UnsavedChangesProvider } from "@/context/UnsavedChangesContext";
+import { SellerImpersonationProvider } from "@/context/SellerImpersonationContext";
 
 export default function Providers({ children }) {
   return (
     <UnsavedChangesProvider>
-      {children}
+      <SellerImpersonationProvider>
+        {children}
+      </SellerImpersonationProvider>
     </UnsavedChangesProvider>
   );
 }

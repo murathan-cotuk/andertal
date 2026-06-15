@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -6,6 +6,7 @@ import {
   Button, Badge, Banner, Box, TextField, Modal, Checkbox,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 const approvalStatusTone = (s) => {
   const v = String(s || "registered").toLowerCase();
@@ -598,7 +599,7 @@ export default function UsersPermissionsPage() {
   const handleDeleteUser = async (user) => {
     const myEmail = typeof window !== "undefined" ? localStorage.getItem("sellerEmail") : "";
     if (user.email === myEmail) { alert("Sie können Ihr eigenes Konto nicht löschen."); return; }
-    if (!confirm(`Benutzer "${user.email}" wirklich löschen?`)) return;
+    if (!(await confirmDelete(`Benutzer "${user.email}" wirklich löschen?`))) return;
     setDeleting(user.id);
     try {
       await getMedusaAdminClient().deleteSellerUser(user.id);
@@ -620,7 +621,7 @@ export default function UsersPermissionsPage() {
   };
 
   const handleDeleteSubuser = async (user) => {
-    if (!confirm(`Benutzer "${user.first_name} ${user.last_name}" (${user.email}) wirklich entfernen?`)) return;
+    if (!(await confirmDelete(`Benutzer "${user.first_name} ${user.last_name}" (${user.email}) wirklich entfernen?`))) return;
     setDeletingSubuser(user.id);
     try {
       await getMedusaAdminClient().deleteSubuser(user.id);
@@ -630,7 +631,7 @@ export default function UsersPermissionsPage() {
   };
 
   const handleCancelInvite = async (invite) => {
-    if (!confirm(`Einladung für "${invite.email}" wirklich stornieren?`)) return;
+    if (!(await confirmDelete(`Einladung für "${invite.email}" wirklich stornieren?`))) return;
     setDeletingInvite(invite.id);
     try {
       await getMedusaAdminClient().deletePendingInvite(invite.id);
