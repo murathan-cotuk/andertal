@@ -1023,7 +1023,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
     }
   };
 
-  const handleDeleteMenu = (e, menu) => {
+  const handleDeleteMenu = async (e, menu) => {
     e?.stopPropagation?.();
     if (!(await confirmDelete(`Delete menu "${menu.name}"? This will remove all its items.`))) return;
     try {
