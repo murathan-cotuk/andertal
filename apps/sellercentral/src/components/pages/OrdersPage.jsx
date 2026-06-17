@@ -976,10 +976,10 @@ export default function OrdersPage() {
           onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#f9fafb"; }}
           onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fff"; }}
         >
-          <td style={{ padding: "10px 8px 10px 12px", width: 32 }} onClick={e => e.stopPropagation()}>
+          <td style={{ padding: "10px 6px 10px 12px", width: 32 }} onClick={e => e.stopPropagation()}>
             <CustomCheckbox checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} size={18} />
           </td>
-          <td style={{ padding: "10px 8px 10px 0", width: 32 }}>
+          <td style={{ padding: "10px 8px 10px 8px", width: 32 }}>
             <button onClick={() => toggleExpand(order)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#6b7280", padding: 0 }}>
               {loadingItems[order.id] ? "…" : expanded[order.id] ? "▼" : "▶"}
             </button>
