@@ -78,9 +78,12 @@ export default function GeneralSettingsPage() {
     }, 8000);
     const load = async () => {
       try {
-        const isSu = typeof window !== "undefined" ? localStorage.getItem("isSuperuser") === "true" : false;
+        const isSu = typeof window !== "undefined" ? localStorage.getItem("sellerIsSuperuser") === "true" : false;
         if (!cancelled) setIsSuperuser(isSu);
-        const data = await client.getSellerSettings();
+        const [data, accountData] = await Promise.all([
+          client.getSellerSettings(),
+          client.getSellerAccount().catch(() => ({})),
+        ]);
         if (!cancelled) {
           if (isSu) {
             const platData = await client.getSellerSettings("default").catch(() => ({}));
@@ -96,7 +99,7 @@ export default function GeneralSettingsPage() {
               legal_email: platData.legal_email || "",
             });
           }
-          const sellerUser = data?.sellerUser || data?.seller || {};
+          const sellerUser = accountData?.sellerUser || data?.sellerUser || data?.seller || {};
           const businessAddress = sellerUser.business_address || {};
           const warehouseAddress = sellerUser.warehouse_address || {};
           const documents = Array.isArray(sellerUser.documents) ? sellerUser.documents : [];

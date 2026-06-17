@@ -51,8 +51,9 @@ function resolveSellerDisplayLines(sellerInfo) {
 /**
  * Render customer invoice (Rechnung) into an open PDFKit document.
  * @param {object} sellerInfo - optional, from seller_users row
+ * @param {Buffer|null} shopLogoBuffer - optional logo image buffer for header
  */
-function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, shopName, sellerInfo }) {
+function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, shopName, sellerInfo, shopLogoBuffer }) {
   const left = doc.page.margins.left
   const right = doc.page.width - doc.page.margins.right
   const contentWidth = right - left
@@ -81,12 +82,22 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
     }
   }
 
-  doc.rect(left, 34, contentWidth, 44).fill('#111827')
-  doc
-    .fillColor('#ffffff')
-    .font('Helvetica-Bold')
-    .fontSize(16)
-    .text(pdfDeLatin(shopName || 'Andertal'), left + 14, 49, { width: contentWidth - 28, align: 'left' })
+  // Header: logo centered if available, else dark bar with shop name
+  const headerH = 60
+  if (shopLogoBuffer) {
+    doc.rect(left, 24, contentWidth, headerH).fill('#f8fafc')
+    try {
+      const logoMaxH = 40
+      doc.image(shopLogoBuffer, left, 24, { fit: [contentWidth, logoMaxH], align: 'center', valign: 'center' })
+    } catch (_) {
+      doc.fillColor('#111827').font('Helvetica-Bold').fontSize(16)
+        .text(pdfDeLatin(shopName || 'Andertal'), left, 24 + headerH / 2 - 8, { width: contentWidth, align: 'center' })
+    }
+  } else {
+    doc.rect(left, 34, contentWidth, 44).fill('#111827')
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16)
+      .text(pdfDeLatin(shopName || 'Andertal'), left + 14, 49, { width: contentWidth - 28, align: 'left' })
+  }
 
   doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(25).text('RECHNUNG', left, 94)
   doc.font('Helvetica').fontSize(10).fillColor('#4b5563').text(`Rechnungs-Nr.: ${invoiceNumber}`, right - invoiceMetaWidth, 96, {
@@ -94,7 +105,6 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
     align: 'right',
   })
   doc.text(`Datum: ${pdfFmtDate(row.created_at)}`, right - invoiceMetaWidth, 111, { width: invoiceMetaWidth, align: 'right' })
-  doc.text(`Bestell-ID: ${orderId}`, right - invoiceMetaWidth, 126, { width: invoiceMetaWidth, align: 'right' })
 
   doc.fillColor('#111827').font('Helvetica-Bold').fontSize(10).text('KUNDE', left, 152)
   doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
@@ -373,11 +383,23 @@ function renderProvisionsfakturPdfDocument(doc, { order, sellerInfo, shopName, c
   )
 }
 
-function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shopName }) {
+function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shopName, shopLogoBuffer }) {
   const on = invoiceNumber
-  doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Lieferschein'), { align: 'right' })
-  doc.moveDown(0.2)
-  doc.fontSize(9).fillColor('#666').text(pdfDeLatin(shopName), { align: 'right' })
+  const left = doc.page.margins.left
+  const right = doc.page.width - doc.page.margins.right
+  const contentWidth = right - left
+  if (shopLogoBuffer) {
+    try {
+      doc.image(shopLogoBuffer, left, doc.page.margins.top, { fit: [contentWidth, 50], align: 'center', valign: 'center' })
+      doc.y = doc.page.margins.top + 58
+    } catch (_) {}
+    doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Lieferschein'), { align: 'right' })
+    doc.moveDown(0.2)
+  } else {
+    doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Lieferschein'), { align: 'right' })
+    doc.moveDown(0.2)
+    doc.fontSize(9).fillColor('#666').text(pdfDeLatin(shopName), { align: 'right' })
+  }
   doc.fillColor('#111')
   doc.moveDown(1.2)
   doc.fontSize(10).text(`Lieferschein-Nr.: ${on}`)
@@ -444,6 +466,28 @@ function lieferscheinDocToBuffer(renderFn) {
   })
 }
 
+async function _fetchImageBuffer(url) {
+  if (!url || !String(url).startsWith('http')) return null
+  try {
+    const https = require('https')
+    const http = require('http')
+    const lib = String(url).startsWith('https') ? https : http
+    return await new Promise((resolve) => {
+      const req = lib.get(url, { timeout: 5000 }, (res) => {
+        if (res.statusCode !== 200) { res.resume(); return resolve(null) }
+        const chunks = []
+        res.on('data', (c) => chunks.push(c))
+        res.on('end', () => resolve(Buffer.concat(chunks)))
+        res.on('error', () => resolve(null))
+      })
+      req.on('error', () => resolve(null))
+      req.on('timeout', () => { req.destroy(); resolve(null) })
+    })
+  } catch (_) {
+    return null
+  }
+}
+
 async function _querySellerInfo(pgClient, sellerId) {
   if (!sellerId || String(sellerId).trim() === 'default') return null
   try {
@@ -468,6 +512,9 @@ async function buildInvoicePdfBuffer(pgClient, orderId) {
   const sellerInfo = await _querySellerInfo(pgClient, row.seller_id)
   const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
   const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
+  const logoUrl = await pgClient.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
+    .then((r) => r.rows?.[0]?.shop_logo_url || '').catch(() => '')
+  const shopLogoBuffer = logoUrl ? await _fetchImageBuffer(logoUrl) : null
   const buf = await pdfDocToBuffer((doc) =>
     renderInvoicePdfDocument(doc, {
       row,
@@ -476,6 +523,7 @@ async function buildInvoicePdfBuffer(pgClient, orderId) {
       invoiceNumber: on,
       shopName,
       sellerInfo,
+      shopLogoBuffer,
     }),
   )
   return { filename: `Rechnung-${on}.pdf`, content: buf }
@@ -490,8 +538,11 @@ async function buildLieferscheinPdfBuffer(pgClient, orderId) {
   const itemRows = iRes.rows || []
   const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
   const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
+  const logoUrl = await pgClient.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
+    .then((r) => r.rows?.[0]?.shop_logo_url || '').catch(() => '')
+  const shopLogoBuffer = logoUrl ? await _fetchImageBuffer(logoUrl) : null
   const buf = await lieferscheinDocToBuffer((doc) =>
-    renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber: on, shopName }),
+    renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber: on, shopName, shopLogoBuffer }),
   )
   return { filename: `Lieferschein-${on}.pdf`, content: buf }
 }

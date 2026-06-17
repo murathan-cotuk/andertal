@@ -11425,6 +11425,7 @@ async function start() {
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
         const itemRows = iRes.rows || []
         let sellerInfoHub = null
+        let shopLogoUrl = ''
         try {
           if (row.seller_id && row.seller_id !== 'default') {
             const sr = await client.query(
@@ -11434,9 +11435,24 @@ async function start() {
             )
             sellerInfoHub = sr.rows?.[0] || null
           }
+          const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
+          shopLogoUrl = lr.rows?.[0]?.shop_logo_url || ''
         } catch (_) {}
         await client.end()
         client = null
+        let shopLogoBuffer = null
+        if (shopLogoUrl) {
+          try {
+            shopLogoBuffer = await new Promise((resolve) => {
+              const mod = shopLogoUrl.startsWith('https') ? require('https') : require('http')
+              const req = mod.get(shopLogoUrl, { timeout: 5000 }, (r) => {
+                if (r.statusCode !== 200) { r.resume(); return resolve(null) }
+                const chunks = []; r.on('data', (c) => chunks.push(c)); r.on('end', () => resolve(Buffer.concat(chunks))); r.on('error', () => resolve(null))
+              })
+              req.on('error', () => resolve(null)); req.on('timeout', () => { req.destroy(); resolve(null) })
+            })
+          } catch (_) {}
+        }
         const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
         const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
         res.setHeader('Content-Type', 'application/pdf')
@@ -11450,6 +11466,7 @@ async function start() {
           invoiceNumber: on,
           shopName,
           sellerInfo: sellerInfoHub,
+          shopLogoBuffer,
         })
         doc.end()
       } catch (e) {
@@ -11477,17 +11494,43 @@ async function start() {
         }
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
         const itemRows = iRes.rows || []
+        let lieferscheinLogoUrl = ''
+        try {
+          const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
+          lieferscheinLogoUrl = lr.rows?.[0]?.shop_logo_url || ''
+        } catch (_) {}
         await client.end()
         client = null
+        let lieferscheinLogoBuffer = null
+        if (lieferscheinLogoUrl) {
+          try {
+            lieferscheinLogoBuffer = await new Promise((resolve) => {
+              const mod = lieferscheinLogoUrl.startsWith('https') ? require('https') : require('http')
+              const req = mod.get(lieferscheinLogoUrl, { timeout: 5000 }, (r) => {
+                if (r.statusCode !== 200) { r.resume(); return resolve(null) }
+                const chunks = []; r.on('data', (c) => chunks.push(c)); r.on('end', () => resolve(Buffer.concat(chunks))); r.on('error', () => resolve(null))
+              })
+              req.on('error', () => resolve(null)); req.on('timeout', () => { req.destroy(); resolve(null) })
+            })
+          } catch (_) {}
+        }
         const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
         const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="Lieferschein-${on}.pdf"`)
         const doc = new PDFDocument({ margin: 48, size: 'A4' })
         doc.pipe(res)
+        const lsLeft = doc.page.margins.left
+        const lsRight = doc.page.width - doc.page.margins.right
+        const lsW = lsRight - lsLeft
+        if (lieferscheinLogoBuffer) {
+          try {
+            doc.image(lieferscheinLogoBuffer, lsLeft, doc.page.margins.top, { fit: [lsW, 50], align: 'center', valign: 'center' })
+            doc.y = doc.page.margins.top + 58
+          } catch (_) {}
+        }
         doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Lieferschein'), { align: 'right' })
-        doc.moveDown(0.2)
-        doc.fontSize(9).fillColor('#666').text(pdfDeLatin(shopName), { align: 'right' })
+        if (!lieferscheinLogoBuffer) { doc.moveDown(0.2); doc.fontSize(9).fillColor('#666').text(pdfDeLatin(shopName), { align: 'right' }) }
         doc.fillColor('#111')
         doc.moveDown(1.2)
         doc.fontSize(10).text(`Lieferschein-Nr.: ${on}`)
