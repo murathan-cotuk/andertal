@@ -388,48 +388,93 @@ function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shop
   const left = doc.page.margins.left
   const right = doc.page.width - doc.page.margins.right
   const contentWidth = right - left
+  const custName = [row.first_name, row.last_name].filter(Boolean).join(' ')
+
+  // ── Header ──────────────────────────────────────────────────────────────
+  const headerH = 56
+  doc.rect(left, 30, contentWidth, headerH).fill('#1e293b')
   if (shopLogoBuffer) {
     try {
-      doc.image(shopLogoBuffer, left, doc.page.margins.top, { fit: [contentWidth, 50], align: 'center', valign: 'center' })
-      doc.y = doc.page.margins.top + 58
-    } catch (_) {}
-    doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Lieferschein'), { align: 'right' })
-    doc.moveDown(0.2)
+      doc.image(shopLogoBuffer, left + 12, 34, { fit: [160, 46], valign: 'center' })
+    } catch (_) {
+      doc.fillColor('#fff').font('Helvetica-Bold').fontSize(14)
+        .text(pdfDeLatin(shopName || 'Andertal'), left + 14, 48, { width: 180 })
+    }
   } else {
-    doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Lieferschein'), { align: 'right' })
-    doc.moveDown(0.2)
-    doc.fontSize(9).fillColor('#666').text(pdfDeLatin(shopName), { align: 'right' })
+    doc.fillColor('#fff').font('Helvetica-Bold').fontSize(14)
+      .text(pdfDeLatin(shopName || 'Andertal'), left + 14, 48, { width: 180 })
   }
-  doc.fillColor('#111')
-  doc.moveDown(1.2)
-  doc.fontSize(10).text(`Lieferschein-Nr.: ${on}`)
-  doc.text(`Datum: ${pdfFmtDate(row.created_at)}`)
-  doc.moveDown(0.6)
-  doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Lieferadresse'))
-  doc.font('Helvetica').fontSize(9)
-  const custName = [row.first_name, row.last_name].filter(Boolean).join(' ')
-  ;[custName, row.address_line1, row.address_line2, [row.postal_code, row.city].filter(Boolean).join(' '), row.country]
+  doc.fillColor('#94a3b8').font('Helvetica').fontSize(8)
+    .text('LIEFERSCHEIN', right - 120, 42, { width: 120, align: 'right' })
+  doc.fillColor('#fff').font('Helvetica-Bold').fontSize(11)
+    .text(pdfDeLatin(`Nr. ${on}`), right - 120, 54, { width: 120, align: 'right' })
+
+  // ── Meta strip ──────────────────────────────────────────────────────────
+  doc.rect(left, 30 + headerH, contentWidth, 22).fill('#f1f5f9')
+  doc.fillColor('#374151').font('Helvetica').fontSize(8.5)
+  doc.text(`Datum: ${pdfFmtDate(row.created_at)}`, left + 8, 30 + headerH + 7)
+  if (row.carrier_name) doc.text(pdfDeLatin(`Carrier: ${row.carrier_name}`), left + 130, 30 + headerH + 7)
+  if (row.tracking_number) doc.text(`Tracking: ${pdfDeLatin(String(row.tracking_number))}`, left + 280, 30 + headerH + 7)
+
+  // ── Two-column address block ─────────────────────────────────────────────
+  const blockTop = 30 + headerH + 34
+  const colW = Math.round(contentWidth / 2) - 12
+  const col2X = left + colW + 24
+
+  // Left: delivery address
+  doc.rect(left, blockTop, colW, 110).fill('#f8fafc').stroke('#e2e8f0')
+  doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7.5)
+    .text('LIEFERADRESSE', left + 10, blockTop + 10, { width: colW - 20, characterSpacing: 0.5 })
+  doc.fillColor('#111827').font('Helvetica-Bold').fontSize(10)
+    .text(pdfDeLatin(custName || '—'), left + 10, blockTop + 24)
+  doc.font('Helvetica').fontSize(9.5).fillColor('#374151')
+  ;[row.address_line1, row.address_line2, [row.postal_code, row.city].filter(Boolean).join(' '), row.country]
     .filter(Boolean)
-    .forEach((line) => doc.text(pdfDeLatin(line)))
-  doc.moveDown(0.8)
-  if (row.carrier_name || row.tracking_number) {
-    doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Versand'))
-    doc.font('Helvetica').fontSize(9)
-    if (row.carrier_name) doc.text(pdfDeLatin(String(row.carrier_name)))
-    if (row.tracking_number) doc.text(`Tracking: ${pdfDeLatin(String(row.tracking_number))}`)
-    doc.moveDown(0.6)
-  }
-  doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Packstücke / Artikel'))
-  doc.font('Helvetica').fontSize(9)
-  itemRows.forEach((it) => {
+    .forEach((line) => { doc.text(pdfDeLatin(line), left + 10, doc.y + 1, { width: colW - 20 }) })
+
+  // Right: order info
+  doc.rect(col2X, blockTop, colW, 110).fill('#f8fafc').stroke('#e2e8f0')
+  doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7.5)
+    .text('BESTELLINFO', col2X + 10, blockTop + 10, { width: colW - 20, characterSpacing: 0.5 })
+  const infoLines = [
+    row.email ? `E-Mail: ${pdfDeLatin(row.email)}` : null,
+    row.phone ? `Tel.: ${pdfDeLatin(String(row.phone))}` : null,
+  ].filter(Boolean)
+  doc.fillColor('#374151').font('Helvetica').fontSize(9.5)
+  let infoY = blockTop + 24
+  infoLines.forEach((l) => { doc.text(pdfDeLatin(l), col2X + 10, infoY, { width: colW - 20 }); infoY += 15 })
+
+  // ── Article table ────────────────────────────────────────────────────────
+  const tableTop = blockTop + 124
+  doc.rect(left, tableTop, contentWidth, 20).fill('#1e293b')
+  doc.fillColor('#fff').font('Helvetica-Bold').fontSize(8.5)
+  const qW = 48, prW = 100
+  doc.text('ARTIKEL', left + 8, tableTop + 6, { width: contentWidth - qW - prW - 16 })
+  doc.text('MENGE', right - qW - prW, tableTop + 6, { width: qW, align: 'right' })
+  doc.text('EINZELPREIS', right - prW, tableTop + 6, { width: prW - 4, align: 'right' })
+  doc.y = tableTop + 24
+
+  const rows2 = itemRows.length ? itemRows : [{ title: 'Keine Artikel', quantity: 1, unit_price_cents: 0 }]
+  rows2.forEach((it, idx) => {
     const qty = Number(it.quantity || 1)
-    doc.text(`${qty} x ${pdfDeLatin(it.title || 'Artikel')}${it.product_handle ? ` (${pdfDeLatin(it.product_handle)})` : ''}`, {
-      width: 500,
-    })
+    const unit = Number(it.unit_price_cents || 0)
+    const title = pdfDeLatin(it.title || 'Artikel')
+    const h = Math.max(18, doc.heightOfString(title, { width: contentWidth - qW - prW - 20 }) + 8)
+    const y = doc.y
+    if (idx % 2 === 1) doc.rect(left, y, contentWidth, h).fill('#f8fafc')
+    doc.fillColor('#111827').font('Helvetica').fontSize(9.5)
+      .text(title, left + 8, y + 4, { width: contentWidth - qW - prW - 16 })
+    doc.text(String(qty), right - qW - prW, y + 4, { width: qW, align: 'right' })
+    doc.text(pdfCents(unit), right - prW, y + 4, { width: prW - 4, align: 'right' })
+    doc.moveTo(left, y + h).lineTo(right, y + h).lineWidth(0.4).strokeColor('#e2e8f0').stroke()
+    doc.y = y + h
   })
-  doc.font('Helvetica').fontSize(8).fillColor('#666')
-  doc.moveDown(1)
-  doc.text(pdfDeLatin('Dieser Lieferschein dient der Zuordnung der Sendung. Keine Rechnung.'), { width: 480 })
+
+  // ── Footer note ─────────────────────────────────────────────────────────
+  doc.y += 12
+  doc.rect(left, doc.y, contentWidth, 26).fill('#f1f5f9')
+  doc.fillColor('#64748b').font('Helvetica').fontSize(8)
+    .text(pdfDeLatin('Dieser Lieferschein dient der Zuordnung der Sendung. Keine Rechnung.'), left + 8, doc.y + 9, { width: contentWidth - 16 })
 }
 
 function pdfDocToBuffer(renderFn) {

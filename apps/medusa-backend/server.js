@@ -14261,6 +14261,83 @@ async function start() {
     httpApp.get('/admin-hub/v1/orders/:id/pdf/invoice', adminHubOrderPdfInvoiceGET)
     httpApp.get('/admin-hub/v1/orders/:id/pdf/lieferschein', adminHubOrderPdfLieferscheinGET)
     httpApp.get('/admin-hub/v1/orders/:id/pdf/provisionsfaktur', requireSellerAuth, adminHubOrderPdfProvisionsfakturGET)
+    httpApp.get('/admin-hub/v1/orders/:id/pdf/versandlabel', async (req, res) => {
+      const id = (req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const r = await client.query('SELECT sendcloud_label_url, tracking_number FROM store_orders WHERE id=$1::uuid', [id])
+        await client.end(); client = null
+        const row = r.rows?.[0]
+        if (!row) return res.status(404).json({ message: 'Order not found' })
+        const labelUrl = row.sendcloud_label_url
+        if (!labelUrl) return res.status(404).json({ message: 'Kein Versandlabel für diese Bestellung vorhanden.' })
+        return res.redirect(302, labelUrl)
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        if (!res.headersSent) res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
+    httpApp.get('/admin-hub/v1/orders/:id/pdf/retoure', async (req, res) => {
+      const id = (req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
+      let client
+      try {
+        const PDFDocument = require('pdfkit')
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const oRes = await client.query('SELECT * FROM store_orders WHERE id=$1::uuid', [id])
+        const row = oRes.rows?.[0]
+        if (!row) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const rRes = await client.query('SELECT * FROM store_returns WHERE order_id=$1 ORDER BY created_at DESC LIMIT 1', [id])
+        const returnRow = rRes.rows?.[0] || null
+        await client.end(); client = null
+        const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
+        const rn = returnRow?.return_number || `R-${on}`
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', `attachment; filename="Retoure-${on}.pdf"`)
+        const doc = new PDFDocument({ margin: 48, size: 'A4' })
+        doc.pipe(res)
+        doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Retourenschein'), { align: 'center' })
+        doc.moveDown(0.4)
+        doc.fontSize(11).fillColor('#374151').text(pdfDeLatin(`Retoure-Nr.: ${rn}   ·   Bestellung: #${on}`), { align: 'center' })
+        doc.moveDown(1.2)
+        const boxTop = doc.y
+        doc.rect(72, boxTop, 450, 60).fill('#f3f4f6')
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#111827').text(pdfDeLatin('Retoure-Nummer (gut sichtbar aufs Paket kleben)'), 80, boxTop + 8, { width: 434, align: 'center' })
+        doc.fontSize(30).font('Helvetica-Bold').text(rn, 72, boxTop + 18, { width: 450, align: 'center' })
+        doc.y = boxTop + 70
+        doc.font('Helvetica').fontSize(10).fillColor('#374151')
+        doc.moveDown(1)
+        const custName = [row.first_name, row.last_name].filter(Boolean).join(' ')
+        doc.font('Helvetica-Bold').text(pdfDeLatin('Absender (Kunde)'))
+        doc.font('Helvetica')
+        ;[custName, row.address_line1, row.address_line2, [row.postal_code, row.city].filter(Boolean).join(' '), row.country].filter(Boolean).forEach((l) => doc.text(pdfDeLatin(l)))
+        doc.moveDown(0.8)
+        if (returnRow?.items && Array.isArray(returnRow.items)) {
+          doc.font('Helvetica-Bold').text(pdfDeLatin('Zurückgesendete Artikel'))
+          doc.font('Helvetica')
+          returnRow.items.forEach((it) => {
+            doc.text(pdfDeLatin(`- ${it.title || 'Artikel'} (Menge: ${it.quantity || 1})`))
+          })
+          doc.moveDown(0.6)
+        }
+        doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
+        doc.text(pdfDeLatin('Bitte legen Sie diesen Retourenschein gut sichtbar in das Paket. Vielen Dank!'), { width: 450 })
+        doc.end()
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        if (!res.headersSent) res.status(500).json({ message: e?.message || 'PDF error' })
+      }
+    })
     httpApp.get('/admin-hub/v1/orders/:id', adminHubOrderByIdGET)
     httpApp.patch('/admin-hub/v1/orders/:id', adminHubOrderPATCH)
     httpApp.delete('/admin-hub/v1/orders/:id', adminHubOrderDELETE)
