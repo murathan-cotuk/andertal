@@ -1067,13 +1067,13 @@ ${"=".repeat(50)}
                   ? 'On rejection/suspension, all seller products will be set to "Draft".'
                   : locale === "tr"
                     ? 'Red/askıya almada satıcının tüm ürünleri "Taslak" olarak ayarlanacak.'
-                    : locale === “fr”
-                      ? 'En cas de refus/suspension, tous les produits du vendeur seront définis comme “Brouillon”.'
-                      : locale === “es”
-                      ? 'Al rechazar/suspender, todos los productos del vendedor se establecerán como “Borrador”.'
-                      : locale === “it”
-                      ? 'In caso di rifiuto/sospensione, tutti i prodotti del venditore verranno impostati come “Bozza”.'
-                      : “Bei Ablehnung/Sperrung werden alle Produkte des Verkäufers auf „Entwurf” gesetzt.”}
+                    : locale === "fr"
+                      ? 'En cas de refus/suspension, tous les produits du vendeur seront définis comme "Brouillon".'
+                      : locale === "es"
+                      ? 'Al rechazar/suspender, todos los productos del vendedor se establecerán como "Borrador".'
+                      : locale === "it"
+                      ? 'In caso di rifiuto/sospensione, tutti i prodotti del venditore verranno impostati come "Bozza".'
+                      : 'Bei Ablehnung/Sperrung werden alle Produkte des Verkäufers auf "Entwurf" gesetzt.'}
               </Banner>
             )}
           </BlockStack>

@@ -806,7 +806,7 @@ function BreakdownModal({ productId, strategy, onClose, locale }) {
     [locale === "en" ? "Returns 30d" : locale === "tr" ? "İadeler 30g" : locale === "fr" ? "Retours 30j" : locale === "es" ? "Devoluciones 30d" : locale === "it" ? "Resi 30g" : "Rückgaben 30d", data.signals.return_count_30d],
     [locale === "en" ? "Discount" : locale === "tr" ? "İndirim" : locale === "fr" ? "Remise" : locale === "es" ? "Descuento" : locale === "it" ? "Sconto" : "Rabatt", `${data.signals.discount_pct}%`],
     [locale === "en" ? "Inventory" : locale === "tr" ? "Stok" : locale === "fr" ? "Stock" : locale === "es" ? "Inventario" : locale === "it" ? "Inventario" : "Lagerbestand", data.signals.inventory],
-    [locale === "en" ? "Age" : locale === "tr" ? "Yaş" : locale === "fr" ? "Âge" : locale === "es" ? "Antigüedad" : locale === "it" ? "Età", `${data.signals.days_since_published} ${labelDays}`],
+    [locale === "en" ? "Age" : locale === "tr" ? "Yaş" : locale === "fr" ? "Âge" : locale === "es" ? "Antigüedad" : locale === "it" ? "Età" : "Alter", `${data.signals.days_since_published} ${labelDays}`],
   ] : [];
 
   const contribRows = [

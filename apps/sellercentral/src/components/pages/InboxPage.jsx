@@ -1122,10 +1122,10 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
       <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--p-color-border)", borderRadius: "var(--p-border-radius-300)", background: "var(--p-color-bg-surface)" }}>
         {!showComposer ? (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Text as=”p” variant=”bodySm” tone=”subdued”>
+            <Text as="p" variant="bodySm" tone="subdued">
               {isSuperuser && !selectedSellerThread
-                ? (locale === “en” ? “Select a seller” : locale === “tr” ? “Bir satıcı seçin” : locale === “fr” ? “Sélectionner un vendeur” : locale === “es” ? “Seleccionar un vendedor” : locale === “it” ? “Seleziona un venditore” : “Verkäufer auswählen”)
-                : (locale === “en” ? “Select a topic or click \”New\”” : locale === “tr” ? “Bir konu seçin veya \”Yeni\”ye tıklayın” : locale === “fr” ? “Sélectionner un sujet ou cliquer sur \”Nouveau\”” : locale === “es” ? “Seleccionar un tema o hacer clic en \”Nuevo\”” : locale === “it” ? “Seleziona un argomento o clicca su \”Nuovo\”” : “Thema auswählen oder „Neu\””)}
+                ? (locale === "en" ? "Select a seller" : locale === "tr" ? "Bir satıcı seçin" : locale === "fr" ? "Sélectionner un vendeur" : locale === "es" ? "Seleccionar un vendedor" : locale === "it" ? "Seleziona un venditore" : "Verkäufer auswählen")
+                : (locale === "en" ? 'Select a topic or click "New"' : locale === "tr" ? 'Bir konu seçin veya "Yeni"ye tıklayın' : locale === "fr" ? 'Sélectionner un sujet ou cliquer sur "Nouveau"' : locale === "es" ? 'Seleccionar un tema o hacer clic en "Nuevo"' : locale === "it" ? 'Seleziona un argomento o clicca su "Nuovo"' : 'Thema auswählen oder "Neu"')}
             </Text>
           </div>
         ) : (
