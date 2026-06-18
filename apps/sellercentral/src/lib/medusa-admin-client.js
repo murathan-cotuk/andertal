@@ -796,6 +796,14 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/orders/${id}`, { method: 'DELETE' })
   }
 
+  /** Superuser: aktive Shop-Besucher (Live View) */
+  async getLiveVisitors(params = {}) {
+    const queryParams = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')),
+    ).toString();
+    return this.request(`/admin-hub/v1/live-visitors${queryParams ? `?${queryParams}` : ''}`);
+  }
+
   async getShipmentEvents(orderId) {
     return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/shipment-events`)
   }

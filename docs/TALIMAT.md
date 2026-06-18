@@ -1,4 +1,4 @@
-17.06.
+18.06.
 
 -- diller birbirine girmis ya her yerde. mesela simdi sellercentraldeyim. ingilizce dili secili. bi ingilizce
   icerik var bi almanca var. tüm sayfalarda her köselerde var bu sorun. sana tek tek izah etmem bile 3-4 saat   
@@ -6,9 +6,7 @@
   basla. ingilizce dili olsun tüüüm icerikler ingilizce dili secili oldugunda. en ince ayrintisina kadar.
   faturasindan lieferscheinina. müsteri bilgileri ayni kalacak sadece
   
--- sellercentraldeki settings/plan sayfasini kaldir.
--- sellercentraldeki settings/billing sayfasini kur. muhasebe, excel gibi listelenmis olacak. iki tab olacak. birinde tek tek müsterilerden gelen siparislerin faturalari, gönderim etiketi, iadeleri formlari, lieferscheinlari falan tüm belgeler olacak. siparis yazacak ve yaninda yan yana bu dosyalar gözükecek. tarih, tutar, isim, dosya cinsi (fatura mi, lieferschein mi vs.) gibi siralamalar ve filtreler yapilabilecek. buradaki dosyalar export edilebilecek. her satici sadece kendine ait siparislerin evraklarini görebilecek. ikinci tabde ise pazaryerinin kestigi komisyon faturasi olacak. hepsi tek sira olacak. dönem yazacak saginda rechnung diyecek. yanindaki pdf indirme butonuna basinca pdf inecek. toplu indirme yapilabilir. her satici sadece kendi faturasini görebilecek.
-superuserda ise bu durum diger fonskiyonlarda oldugu gibi olacak. en üstte kendine ait seyler, alta dogru saticiya ait seyler satici adinin altinda gruplanmis sekilde olacak her iki tabda da.
+  -- sellercentralde dashboard sayfasina bi el at kurban olayim. cok cirkin gözüküyor. daha detayli ve daha güzel sayfa yerlesimli bir dashboard imiz olsun. hizli erisim butonlari, raporlar, izlemeler vs aklina gelebilecek tüm detaylar cok güzelce kategorize edilmis olsun. overview kismi daha ölceklenmis olsun. siparisler gözükürken siparis numaralari vs gözüksün 1-2 tane mesela. grafikler gözüksün tablolar gözüksün. yani muhtesem, cagimiza uygun teknolojide cok shik bir dashboard istiyorum. ayrica superuserlar anlik olarak websitesindeki ziyaretcileri ip leri ve konumlarina göre görebilsin. total sayi gözüksün basta sadece. asagi actiginda altinda liste seklinde ciksin. sortieren ve filtern yapilabilsin bilgilere göre
 
 
 

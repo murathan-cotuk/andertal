@@ -1692,6 +1692,24 @@ async function start() {
           );
         `).catch(() => {})
         await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pma_platform ON platform_marketing_accounts(platform)`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS shop_live_presence (
+            session_id varchar(64) PRIMARY KEY,
+            ip_address varchar(45),
+            country_code varchar(8),
+            city varchar(120),
+            region varchar(120),
+            page_path text,
+            page_title text,
+            referrer text,
+            user_agent text,
+            device_type varchar(20),
+            first_seen_at timestamptz NOT NULL DEFAULT now(),
+            last_seen_at timestamptz NOT NULL DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_shop_live_presence_last_seen ON shop_live_presence(last_seen_at DESC)`).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_shop_live_presence_country ON shop_live_presence(country_code)`).catch(() => {})
         await client.end()
         log.info('Admin Hub: seller_campaigns (PPC columns), platform_marketing_accounts tabloları hazır')
       } catch (migErr) {
@@ -5568,6 +5586,25 @@ async function start() {
     function requireSuperuser(req, res, next) {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       next()
+    }
+
+    function getClientIpFromRequest(req) {
+      const xf = req.headers['x-forwarded-for']
+      if (xf) return String(xf).split(',')[0].trim()
+      return (
+        req.headers['cf-connecting-ip'] ||
+        req.headers['x-real-ip'] ||
+        (req.headers['x-vercel-forwarded-for'] || '').split(',')[0]?.trim() ||
+        req.socket?.remoteAddress ||
+        ''
+      )
+    }
+
+    function detectDeviceType(ua) {
+      const s = String(ua || '').toLowerCase()
+      if (/mobile|android|iphone|ipod|windows phone/i.test(s)) return 'mobile'
+      if (/ipad|tablet/i.test(s)) return 'tablet'
+      return 'desktop'
     }
 
     // POST /admin-hub/auth/register
@@ -11801,6 +11838,104 @@ async function start() {
       }
     }
 
+    const storePresenceHeartbeatPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl.startsWith('postgres')) return res.status(503).json({ message: 'Database unavailable' })
+      const body = req.body || {}
+      const sessionId = String(body.session_id || '').trim().slice(0, 64)
+      if (!sessionId || sessionId.length < 8) return res.status(400).json({ message: 'session_id required' })
+      const pagePath = String(body.path || body.page_path || '/').trim().slice(0, 2000)
+      const pageTitle = String(body.title || body.page_title || '').trim().slice(0, 500)
+      const referrer = String(body.referrer || '').trim().slice(0, 2000)
+      const userAgent = String(req.headers['user-agent'] || body.user_agent || '').trim().slice(0, 500)
+      const ip = getClientIpFromRequest(req).slice(0, 45)
+      const countryCode = String(
+        req.headers['cf-ipcountry'] ||
+        req.headers['x-vercel-ip-country'] ||
+        body.country_code ||
+        '',
+      ).trim().toUpperCase().slice(0, 8) || null
+      const city = String(req.headers['cf-ipcity'] || req.headers['x-vercel-ip-city'] || body.city || '').trim().slice(0, 120) || null
+      const region = String(req.headers['cf-region'] || req.headers['x-vercel-ip-country-region'] || body.region || '').trim().slice(0, 120) || null
+      const deviceType = detectDeviceType(userAgent)
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        await client.query(`DELETE FROM shop_live_presence WHERE last_seen_at < now() - interval '3 minutes'`)
+        await client.query(
+          `INSERT INTO shop_live_presence (
+            session_id, ip_address, country_code, city, region, page_path, page_title, referrer, user_agent, device_type, first_seen_at, last_seen_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
+          ON CONFLICT (session_id) DO UPDATE SET
+            ip_address = EXCLUDED.ip_address,
+            country_code = COALESCE(EXCLUDED.country_code, shop_live_presence.country_code),
+            city = COALESCE(EXCLUDED.city, shop_live_presence.city),
+            region = COALESCE(EXCLUDED.region, shop_live_presence.region),
+            page_path = EXCLUDED.page_path,
+            page_title = EXCLUDED.page_title,
+            referrer = EXCLUDED.referrer,
+            user_agent = EXCLUDED.user_agent,
+            device_type = EXCLUDED.device_type,
+            last_seen_at = now()`,
+          [sessionId, ip || null, countryCode, city, region, pagePath, pageTitle || null, referrer || null, userAgent || null, deviceType],
+        )
+        await client.end()
+        res.json({ ok: true })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubLiveVisitorsGET = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl.startsWith('postgres')) return res.status(503).json({ message: 'Database unavailable' })
+      const sort = String(req.query.sort || 'last_seen_desc')
+      const country = String(req.query.country || '').trim().toUpperCase()
+      const q = String(req.query.q || '').trim().toLowerCase()
+      let orderBy = 'last_seen_at DESC'
+      if (sort === 'last_seen_asc') orderBy = 'last_seen_at ASC'
+      else if (sort === 'country_asc') orderBy = 'country_code ASC NULLS LAST, last_seen_at DESC'
+      else if (sort === 'page_asc') orderBy = 'page_path ASC NULLS LAST, last_seen_at DESC'
+      else if (sort === 'ip_asc') orderBy = 'ip_address ASC NULLS LAST, last_seen_at DESC'
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        await client.query(`DELETE FROM shop_live_presence WHERE last_seen_at < now() - interval '3 minutes'`)
+        const params = []
+        const where = ["last_seen_at >= now() - interval '3 minutes'"]
+        if (country) {
+          params.push(country)
+          where.push(`UPPER(COALESCE(country_code, '')) = $${params.length}`)
+        }
+        if (q) {
+          params.push(`%${q}%`)
+          const i = params.length
+          where.push(`(
+            LOWER(COALESCE(ip_address, '')) LIKE $${i}
+            OR LOWER(COALESCE(city, '')) LIKE $${i}
+            OR LOWER(COALESCE(page_path, '')) LIKE $${i}
+            OR LOWER(COALESCE(page_title, '')) LIKE $${i}
+            OR LOWER(COALESCE(region, '')) LIKE $${i}
+          )`)
+        }
+        const sql = `SELECT session_id, ip_address, country_code, city, region, page_path, page_title, referrer, user_agent, device_type, first_seen_at, last_seen_at
+          FROM shop_live_presence
+          WHERE ${where.join(' AND ')}
+          ORDER BY ${orderBy}`
+        const { rows } = await client.query(sql, params)
+        await client.end()
+        res.json({ count: rows.length, visitors: rows })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     const adminHubOrderPOST = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       let client
@@ -14295,6 +14430,7 @@ async function start() {
     httpApp.get('/store/reviews/my', storeReviewsMyGET)
     httpApp.get('/store/reviews', storeReviewsGET)
     httpApp.post('/store/reviews', storeReviewsPOST)
+    httpApp.post('/store/presence/heartbeat', storePresenceHeartbeatPOST)
     httpApp.get('/admin-hub/reviews', requireSellerAuth, adminHubReviewsGET)
 
     httpApp.get('/admin-hub/v1/orders', adminHubOrdersGET)
@@ -14389,6 +14525,7 @@ async function start() {
     httpApp.post('/admin-hub/v1/orders/:id/label/rates', requireSellerAuth, adminHubLabelRatesPOST)
     httpApp.post('/admin-hub/v1/orders/:id/label/checkout', requireSellerAuth, adminHubLabelCheckoutPOST)
     httpApp.post('/admin-hub/v1/label/fulfill', requireSellerAuth, adminHubLabelFulfillPOST)
+    httpApp.get('/admin-hub/v1/live-visitors', requireSellerAuth, requireSuperuser, adminHubLiveVisitorsGET)
     httpApp.get('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomersGET)
     httpApp.post('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomerPOST)
     httpApp.patch('/admin-hub/v1/customers/:id', requireSellerAuth, adminHubCustomerPATCH)
