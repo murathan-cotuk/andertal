@@ -1208,6 +1208,44 @@ async function start() {
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS vat_id varchar(100) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS business_address jsonb DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS warehouse_address jsonb DEFAULT NULL;`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS seller_error_logs (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            seller_id varchar(255),
+            error_code varchar(100),
+            error_message text NOT NULL,
+            terminal_output text,
+            context varchar(255),
+            resolution text,
+            status varchar(20) NOT NULL DEFAULT 'open',
+            is_read boolean NOT NULL DEFAULT false,
+            created_at timestamp DEFAULT now(),
+            updated_at timestamp DEFAULT now()
+          );
+          CREATE INDEX IF NOT EXISTS idx_seller_error_logs_seller_id ON seller_error_logs(seller_id);
+          CREATE INDEX IF NOT EXISTS idx_seller_error_logs_status ON seller_error_logs(status);
+          CREATE INDEX IF NOT EXISTS idx_seller_error_logs_created_at ON seller_error_logs(created_at DESC);
+        `).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS seller_locations (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            seller_id varchar(255) NOT NULL,
+            name varchar(255) NOT NULL DEFAULT 'Hauptstandort',
+            type varchar(30) NOT NULL DEFAULT 'warehouse',
+            address_line1 text,
+            address_line2 text,
+            city varchar(255),
+            postal_code varchar(20),
+            country varchar(100) DEFAULT 'Deutschland',
+            phone varchar(100),
+            email varchar(255),
+            is_primary boolean NOT NULL DEFAULT false,
+            is_active boolean NOT NULL DEFAULT true,
+            created_at timestamp DEFAULT now(),
+            updated_at timestamp DEFAULT now()
+          );
+          CREATE INDEX IF NOT EXISTS idx_seller_locations_seller_id ON seller_locations(seller_id);
+        `).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS phone varchar(100) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS website varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS documents jsonb DEFAULT NULL;`).catch(() => {})
@@ -11743,6 +11781,9 @@ async function start() {
     }
 
     const adminHubOrderDELETE = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) {
+        return res.status(403).json({ message: 'Superuser access required' })
+      }
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const id = (req.params.id || '').trim()
       if (!id) return res.status(400).json({ message: 'id required' })
@@ -14340,7 +14381,7 @@ async function start() {
     })
     httpApp.get('/admin-hub/v1/orders/:id', adminHubOrderByIdGET)
     httpApp.patch('/admin-hub/v1/orders/:id', adminHubOrderPATCH)
-    httpApp.delete('/admin-hub/v1/orders/:id', adminHubOrderDELETE)
+    httpApp.delete('/admin-hub/v1/orders/:id', requireSellerAuth, adminHubOrderDELETE)
     httpApp.get('/admin-hub/v1/orders/:id/shipment-events', requireSellerAuth, adminHubShipmentEventsGET)
     httpApp.post('/admin-hub/v1/orders/:id/shipment-events', requireSellerAuth, adminHubShipmentEventPOST)
     httpApp.delete('/admin-hub/v1/shipment-events/:eventId', requireSellerAuth, adminHubShipmentEventDELETE)
@@ -18598,6 +18639,219 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    // GET /admin-hub/v1/commission-invoices — billing tab: lists seller_payouts as commission invoices
+    const adminHubCommissionInvoicesGET = async (req, res) => {
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const isSuperuser = req.sellerUser?.is_superuser || false
+        const callerSellerId = req.sellerUser?.seller_id
+        const params = []
+        let where = ''
+        if (!isSuperuser && callerSellerId) { params.push(callerSellerId); where = 'WHERE p.seller_id = $1' }
+        const r = await client.query(
+          `SELECT p.id, p.seller_id, p.period_start, p.period_end,
+                  p.total_cents, p.commission_cents, p.payout_cents,
+                  p.status, p.paid_at, p.created_at,
+                  s.store_name
+             FROM seller_payouts p
+             LEFT JOIN seller_users s ON s.seller_id = p.seller_id
+             ${where}
+             ORDER BY p.period_start DESC LIMIT 200`,
+          params
+        )
+        await client.end()
+        const invoices = r.rows.map((row) => {
+          const ps = new Date(row.period_start)
+          const pe = new Date(row.period_end)
+          const fmtD = (d) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          return {
+            id: row.id,
+            seller_id: row.seller_id,
+            store_name: row.store_name || null,
+            period: `${fmtD(ps)} – ${fmtD(pe)}`,
+            period_label: `${ps.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}`,
+            period_start: row.period_start,
+            period_end: row.period_end,
+            amount_cents: Number(row.commission_cents || 0),
+            total_cents: Number(row.total_cents || 0),
+            payout_cents: Number(row.payout_cents || 0),
+            status: row.status || 'offen',
+            paid_at: row.paid_at || null,
+            created_at: row.created_at,
+            pdf_url: `/admin-hub/v1/seller-payouts/${row.id}/pdf`,
+          }
+        })
+        res.json({ invoices, count: invoices.length })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // GET /admin-hub/v1/seller-payouts/:id/pdf — Provisionsfaktur PDF for a payout period
+    const adminHubSellerPayoutPdfGET = async (req, res) => {
+      const { id } = req.params
+      if (!id) return res.status(400).json({ message: 'id required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
+      const loggedSellerId = req.sellerUser?.seller_id
+      const isSuperuser = req.sellerUser?.is_superuser || false
+      let client
+      try {
+        const PDFDocument = require('pdfkit')
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const pRes = await client.query(
+          `SELECT p.*, s.store_name, s.company_name, s.first_name, s.last_name,
+                  s.vat_id, s.email, s.business_address, s.commission_rate, s.iban
+             FROM seller_payouts p
+             LEFT JOIN seller_users s ON s.seller_id = p.seller_id
+             WHERE p.id = $1::uuid LIMIT 1`,
+          [id]
+        )
+        const payout = pRes.rows?.[0]
+        if (!payout) { await client.end(); return res.status(404).json({ message: 'Payout not found' }) }
+        if (!isSuperuser && loggedSellerId && payout.seller_id !== loggedSellerId) {
+          await client.end(); return res.status(403).json({ message: 'Access denied' })
+        }
+
+        // Load orders for this period
+        const oRes = await client.query(
+          `SELECT order_number, created_at, subtotal_cents, stripe_application_fee_cents, seller_net_after_commission_cents
+             FROM store_orders
+             WHERE seller_id = $1
+               AND created_at >= $2::date
+               AND created_at < ($3::date + interval '1 day')
+               AND payment_status != 'storniert'
+             ORDER BY created_at ASC LIMIT 200`,
+          [payout.seller_id, payout.period_start, payout.period_end]
+        )
+        const orders = oRes.rows || []
+        await client.end(); client = null
+
+        const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal Marktplatz'
+        const platformAddress = process.env.PLATFORM_INVOICE_ADDRESS || ''
+        const platformVatId = process.env.PLATFORM_VAT_ID || ''
+        const platformVatPercent = Number(process.env.PLATFORM_VAT_PERCENT || '0')
+        const pdfDeLatin = (s) => String(s || '').replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/Ä/g,'Ae').replace(/Ö/g,'Oe').replace(/Ü/g,'Ue').replace(/ß/g,'ss')
+        const fmtCents = (c) => (Number(c || 0) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' EUR'
+        const fmtDate = (d) => new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+        const ps = new Date(payout.period_start)
+        const pe = new Date(payout.period_end)
+        const periodLabel = `${ps.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} – ${pe.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+        const invoiceNum = `PROV-${String(payout.period_start).slice(0, 7).replace('-', '')}`
+        const commCents = Number(payout.commission_cents || 0)
+        const totalCents = Number(payout.total_cents || 0)
+        const vatPercent = Number(platformVatPercent || 0)
+        const vatCents = vatPercent > 0 ? Math.round(commCents * vatPercent / 100) : 0
+        const totalWithVat = commCents + vatCents
+
+        const sellerLines = [
+          payout.company_name || [payout.first_name, payout.last_name].filter(Boolean).join(' '),
+          payout.store_name,
+          payout.business_address,
+          payout.email,
+          payout.vat_id ? `USt-IdNr.: ${payout.vat_id}` : null,
+        ].filter(Boolean)
+
+        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false })
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', `attachment; filename="Provisionsfaktur-${invoiceNum}.pdf"`)
+        doc.pipe(res)
+
+        const left = doc.page.margins.left
+        const right = doc.page.width - doc.page.margins.right
+        const cw = right - left
+
+        // Header
+        doc.rect(left, 30, cw, 50).fill('#1e293b')
+        doc.fillColor('#fff').font('Helvetica-Bold').fontSize(15).text(pdfDeLatin(shopName), left + 14, 44, { width: cw - 28, align: 'left' })
+        doc.fillColor('#94a3b8').font('Helvetica').fontSize(8).text('PROVISIONSFAKTUR', right - 130, 38, { width: 130, align: 'right' })
+        doc.fillColor('#fff').font('Helvetica-Bold').fontSize(11).text(invoiceNum, right - 130, 52, { width: 130, align: 'right' })
+
+        // Meta strip
+        doc.rect(left, 80, cw, 22).fill('#f1f5f9')
+        doc.fillColor('#374151').font('Helvetica').fontSize(8.5)
+        doc.text(`Datum: ${fmtDate(new Date())}`, left + 8, 88)
+        doc.text(`Abrechnungszeitraum: ${periodLabel}`, left + 150, 88)
+
+        // Addresses
+        const blockTop = 116
+        const colW2 = Math.round(cw / 2) - 12
+        const col2X = left + colW2 + 24
+        doc.rect(left, blockTop, colW2, 100).fill('#f8fafc').stroke('#e2e8f0')
+        doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7.5).text('EMPFAENGER (VERKAEUFER)', left + 10, blockTop + 10, { characterSpacing: 0.5 })
+        doc.fillColor('#111827').font('Helvetica').fontSize(9.5)
+        let addrY = blockTop + 24
+        sellerLines.forEach((l) => { doc.text(pdfDeLatin(l), left + 10, addrY, { width: colW2 - 20 }); addrY += 14 })
+        doc.rect(col2X, blockTop, colW2, 100).fill('#f8fafc').stroke('#e2e8f0')
+        doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7.5).text('AUSSTELLER (PLATTFORM)', col2X + 10, blockTop + 10, { characterSpacing: 0.5 })
+        doc.fillColor('#111827').font('Helvetica').fontSize(9.5)
+        let auY = blockTop + 24
+        doc.text(pdfDeLatin(shopName), col2X + 10, auY); auY += 14
+        if (platformAddress) { String(platformAddress).split(/[,\n]/).map(s=>s.trim()).filter(Boolean).forEach(l => { doc.text(pdfDeLatin(l), col2X + 10, auY, { width: colW2 - 20 }); auY += 14 }) }
+        if (platformVatId) { doc.text(`USt-IdNr.: ${platformVatId}`, col2X + 10, auY) }
+        else { doc.fontSize(8).fillColor('#6b7280').text(pdfDeLatin('Kleinunternehmer gem. §19 UStG'), col2X + 10, auY) }
+
+        // Orders table
+        const tTop = blockTop + 114
+        doc.rect(left, tTop, cw, 20).fill('#1e293b')
+        doc.fillColor('#fff').font('Helvetica-Bold').fontSize(8.5)
+        doc.text('BESTELLNR.', left + 8, tTop + 6, { width: 80 })
+        doc.text('DATUM', left + 90, tTop + 6, { width: 80 })
+        doc.text('WARENWERT', left + 180, tTop + 6, { width: 100, align: 'right' })
+        doc.text('PROVISION', right - 130, tTop + 6, { width: 130, align: 'right' })
+        doc.y = tTop + 24
+        orders.forEach((o, idx) => {
+          const sub = Number(o.subtotal_cents || 0)
+          const fee = Number(o.stripe_application_fee_cents || 0) || Math.round(sub * Number(payout.commission_rate || 0.12))
+          const rowH = 18
+          const y = doc.y
+          if (idx % 2 === 1) doc.rect(left, y, cw, rowH).fill('#f8fafc')
+          doc.fillColor('#111827').font('Helvetica').fontSize(9)
+          doc.text(`#${o.order_number || '—'}`, left + 8, y + 4, { width: 80 })
+          doc.text(fmtDate(o.created_at), left + 90, y + 4, { width: 80 })
+          doc.text(fmtCents(sub), left + 180, y + 4, { width: 100, align: 'right' })
+          doc.text(fmtCents(fee), right - 130, y + 4, { width: 130, align: 'right' })
+          doc.moveTo(left, y + rowH).lineTo(right, y + rowH).lineWidth(0.3).strokeColor('#e2e8f0').stroke()
+          doc.y = y + rowH
+        })
+        if (!orders.length) {
+          doc.fillColor('#9ca3af').font('Helvetica').fontSize(9).text('Keine Bestellungen im Zeitraum', left + 8, doc.y + 6)
+          doc.y += 22
+        }
+
+        // Totals
+        doc.y += 10
+        const drawTotal = (label, value, bold) => {
+          const y = doc.y
+          doc.rect(left, y, cw, 20).fill(bold ? '#1e293b' : '#f1f5f9')
+          doc.fillColor(bold ? '#fff' : '#374151').font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9.5)
+          doc.text(pdfDeLatin(label), left + 8, y + 5, { width: cw - 140 })
+          doc.text(value, right - 130, y + 5, { width: 130, align: 'right' })
+          doc.y = y + 24
+        }
+        drawTotal('Gesamtwarenwert (Periode)', fmtCents(totalCents))
+        drawTotal('Provision (netto)', fmtCents(commCents))
+        if (vatPercent > 0) drawTotal(`MwSt. ${vatPercent}%`, fmtCents(vatCents))
+        drawTotal('Provisionsbetrag gesamt', fmtCents(totalWithVat), true)
+
+        // Footer
+        doc.y += 14
+        doc.rect(left, doc.y, cw, 28).fill('#f1f5f9')
+        doc.fillColor('#64748b').font('Helvetica').fontSize(8)
+        doc.text(pdfDeLatin('Diese Rechnung wird vom Marktplatzbetreiber ausgestellt. Bitte beachten Sie die Zahlungsbedingungen.'), left + 8, doc.y + 10, { width: cw - 16 })
+        doc.end()
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        if (!res.headersSent) res.status(500).json({ message: e?.message || 'PDF error' })
+      }
+    }
+
     // GET /admin-hub/v1/payouts — list payout records
     const adminHubPayoutsGET = async (req, res) => {
       const client = getDbClient()
@@ -18701,6 +18955,53 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         }
         await client.end()
         res.json({ payout: row })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // POST /admin-hub/v1/payouts/backfill — superuser generates missing payout records for all past months
+    const adminHubPayoutsBackfillPOST = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `SELECT
+             o.seller_id,
+             date_trunc('month', o.created_at)::date AS month_start,
+             (date_trunc('month', o.created_at) + interval '1 month' - interval '1 day')::date AS month_end,
+             COALESCE(SUM(o.subtotal_cents), 0)::bigint AS total_cents,
+             ROUND(COALESCE(SUM(o.subtotal_cents), 0)::numeric * COALESCE(MAX(s.commission_rate), 0.12))::bigint AS commission_cents,
+             ROUND(COALESCE(SUM(o.subtotal_cents), 0)::numeric * (1 - COALESCE(MAX(s.commission_rate), 0.12)))::bigint AS payout_cents
+           FROM store_orders o
+           LEFT JOIN seller_users s ON s.seller_id = o.seller_id
+           WHERE o.payment_status = 'bezahlt'
+             AND date_trunc('month', o.created_at) < date_trunc('month', now())
+             AND o.seller_id IS NOT NULL
+             AND LOWER(COALESCE(s.approval_status, 'approved')) = 'approved'
+           GROUP BY o.seller_id, date_trunc('month', o.created_at)
+           ORDER BY month_start ASC`
+        )
+        let created = 0
+        let skipped = 0
+        for (const row of r.rows || []) {
+          const ex = await client.query(
+            `SELECT id FROM seller_payouts WHERE seller_id = $1 AND period_start = $2::date AND period_end = $3::date LIMIT 1`,
+            [row.seller_id, row.month_start, row.month_end]
+          )
+          if (ex.rows.length) { skipped++; continue }
+          await client.query(
+            `INSERT INTO seller_payouts (seller_id, period_start, period_end, total_cents, commission_cents, payout_cents, notes, status)
+             VALUES ($1, $2::date, $3::date, $4, $5, $6, 'Rückwirkend automatisch erstellt', 'offen')`,
+            [row.seller_id, row.month_start, row.month_end, row.total_cents, row.commission_cents, row.payout_cents]
+          )
+          created++
+        }
+        await client.end()
+        res.json({ message: `Backfill abgeschlossen: ${created} erstellt, ${skipped} übersprungen`, created, skipped })
       } catch (e) {
         try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -19535,6 +19836,221 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    // ── Seller Error Logs ─────────────────────────────────────────────────────
+    /** Call this anywhere in the backend to log a seller error */
+    const logSellerError = async (sellerId, { errorCode, errorMessage, terminalOutput, context }) => {
+      const client = getDbClient()
+      if (!client) return
+      try {
+        await client.connect()
+        await client.query(
+          `INSERT INTO seller_error_logs (seller_id, error_code, error_message, terminal_output, context)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [sellerId || null, errorCode || null, errorMessage || '(Unbekannt)', terminalOutput || null, context || null]
+        )
+        await client.end()
+      } catch (_) {
+        try { await client.end() } catch (_2) {}
+      }
+    }
+
+    const adminHubSellerErrorLogsGET = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const { seller_id, status } = req.query
+        const params = []; const wheres = []
+        if (seller_id) { params.push(seller_id); wheres.push(`e.seller_id = $${params.length}`) }
+        if (status && status !== 'all') { params.push(status); wheres.push(`e.status = $${params.length}`) }
+        const where = wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''
+        const r = await client.query(
+          `SELECT e.*, s.store_name, s.email AS seller_email, s.company_name
+             FROM seller_error_logs e
+             LEFT JOIN seller_users s ON s.seller_id = e.seller_id
+             ${where}
+             ORDER BY e.created_at DESC LIMIT 500`,
+          params
+        )
+        const unread = await client.query('SELECT COUNT(*) FROM seller_error_logs WHERE is_read = false')
+        await client.end()
+        res.json({ errors: r.rows, unread_count: parseInt(unread.rows[0]?.count || '0') })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubSellerErrorLogsPOST = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const { seller_id, error_code, error_message, terminal_output, context } = req.body || {}
+        if (!error_message) { await client.end(); return res.status(400).json({ message: 'error_message required' }) }
+        const r = await client.query(
+          `INSERT INTO seller_error_logs (seller_id, error_code, error_message, terminal_output, context)
+           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+          [seller_id || null, error_code || null, error_message, terminal_output || null, context || null]
+        )
+        await client.end()
+        res.json({ error: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubSellerErrorLogsPATCH = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
+      const { id } = req.params
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const { status, resolution, is_read } = req.body || {}
+        const sets = []; const params = []
+        if (status !== undefined) { params.push(status); sets.push(`status = $${params.length}`) }
+        if (resolution !== undefined) { params.push(resolution); sets.push(`resolution = $${params.length}`) }
+        if (is_read !== undefined) { params.push(is_read ? true : false); sets.push(`is_read = $${params.length}`) }
+        if (!sets.length) { await client.end(); return res.status(400).json({ message: 'Nothing to update' }) }
+        sets.push('updated_at = now()')
+        params.push(id)
+        const r = await client.query(`UPDATE seller_error_logs SET ${sets.join(', ')} WHERE id = $${params.length}::uuid RETURNING *`, params)
+        await client.end()
+        res.json({ error: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubSellerErrorLogsDELETE = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
+      const { id } = req.params
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        await client.query('DELETE FROM seller_error_logs WHERE id = $1::uuid', [id])
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // ── Seller Locations CRUD ─────────────────────────────────────────────────
+    const adminHubLocationsGET = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          'SELECT * FROM seller_locations WHERE seller_id = $1 ORDER BY is_primary DESC, created_at ASC',
+          [sellerId]
+        )
+        // If no locations yet, seed from warehouse_address
+        if (r.rows.length === 0) {
+          const su = await client.query('SELECT warehouse_address, business_address FROM seller_users WHERE seller_id = $1 LIMIT 1', [sellerId])
+          const seed = su.rows?.[0]
+          const addr = seed?.warehouse_address || seed?.business_address
+          if (addr) {
+            const a = typeof addr === 'string' ? JSON.parse(addr) : addr
+            await client.query(
+              `INSERT INTO seller_locations (seller_id, name, address_line1, address_line2, city, postal_code, country, is_primary, type)
+               VALUES ($1, 'Hauptstandort', $2, $3, $4, $5, $6, true, 'warehouse') ON CONFLICT DO NOTHING`,
+              [sellerId, a.address_line1 || a.street || null, a.address_line2 || null, a.city || null, a.postal_code || a.zip || null, a.country || 'Deutschland']
+            )
+            const r2 = await client.query('SELECT * FROM seller_locations WHERE seller_id = $1 ORDER BY is_primary DESC, created_at ASC', [sellerId])
+            await client.end()
+            return res.json({ locations: r2.rows })
+          }
+        }
+        await client.end()
+        res.json({ locations: r.rows })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubLocationsPOST = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const { name, type, address_line1, address_line2, city, postal_code, country, phone, email, is_primary } = req.body || {}
+        if (!name) { await client.end(); return res.status(400).json({ message: 'Name erforderlich' }) }
+        if (is_primary) await client.query('UPDATE seller_locations SET is_primary = false WHERE seller_id = $1', [sellerId])
+        const r = await client.query(
+          `INSERT INTO seller_locations (seller_id, name, type, address_line1, address_line2, city, postal_code, country, phone, email, is_primary)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+          [sellerId, name, type || 'warehouse', address_line1 || null, address_line2 || null, city || null, postal_code || null, country || 'Deutschland', phone || null, email || null, is_primary ? true : false]
+        )
+        await client.end()
+        res.json({ location: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubLocationsPATCH = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const { id } = req.params
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const chk = await client.query('SELECT id FROM seller_locations WHERE id = $1::uuid AND seller_id = $2 LIMIT 1', [id, sellerId])
+        if (!chk.rows.length) { await client.end(); return res.status(404).json({ message: 'Not found' }) }
+        const { name, type, address_line1, address_line2, city, postal_code, country, phone, email, is_primary, is_active } = req.body || {}
+        if (is_primary) await client.query('UPDATE seller_locations SET is_primary = false WHERE seller_id = $1', [sellerId])
+        const sets = []; const params = []
+        const add = (col, val) => { if (val !== undefined) { params.push(val); sets.push(`${col} = $${params.length}`) } }
+        add('name', name); add('type', type); add('address_line1', address_line1); add('address_line2', address_line2)
+        add('city', city); add('postal_code', postal_code); add('country', country)
+        add('phone', phone); add('email', email)
+        if (is_primary !== undefined) { params.push(is_primary ? true : false); sets.push(`is_primary = $${params.length}`) }
+        if (is_active !== undefined) { params.push(is_active ? true : false); sets.push(`is_active = $${params.length}`) }
+        if (!sets.length) { await client.end(); return res.status(400).json({ message: 'Nothing to update' }) }
+        sets.push('updated_at = now()')
+        params.push(id)
+        const r = await client.query(`UPDATE seller_locations SET ${sets.join(', ')} WHERE id = $${params.length}::uuid RETURNING *`, params)
+        await client.end()
+        res.json({ location: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    const adminHubLocationsDELETE = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      const { id } = req.params
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        await client.query('DELETE FROM seller_locations WHERE id = $1::uuid AND seller_id = $2', [id, sellerId])
+        await client.end()
+        res.json({ success: true })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     // POST /admin-hub/users/invite — invite a new seller sub-user
     const adminHubUsersInvitePOST = async (req, res) => {
       const inviterSellerId = req.sellerUser?.seller_id
@@ -19729,16 +20245,27 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.post('/admin-hub/v1/coupons', requireSellerAuth, adminHubCouponsPOST)
     httpApp.patch('/admin-hub/v1/coupons/:id', requireSellerAuth, adminHubCouponsPATCH)
     httpApp.delete('/admin-hub/v1/coupons/:id', requireSellerAuth, adminHubCouponsDELETE)
+    httpApp.get('/admin-hub/v1/commission-invoices', requireSellerAuth, adminHubCommissionInvoicesGET)
+    httpApp.get('/admin-hub/v1/seller-payouts/:id/pdf', requireSellerAuth, adminHubSellerPayoutPdfGET)
     httpApp.get('/admin-hub/v1/payouts', requireSellerAuth, adminHubPayoutsGET)
     httpApp.post('/admin-hub/v1/payouts', requireSellerAuth, adminHubPayoutsPOST)
     httpApp.patch('/admin-hub/v1/payouts/:id', requireSellerAuth, adminHubPayoutsPATCH)
     httpApp.post('/admin-hub/v1/payouts/mark-paid', requireSellerAuth, adminHubPayoutsMarkPaidPOST)
+    httpApp.post('/admin-hub/v1/payouts/backfill', requireSellerAuth, adminHubPayoutsBackfillPOST)
     httpApp.get('/admin-hub/v1/payout-summary', requireSellerAuth, adminHubPayoutSummaryGET)
     httpApp.get('/admin-hub/v1/payout-overview', requireSellerAuth, adminHubPayoutOverviewGET)
     httpApp.patch('/admin-hub/v1/seller/iban', requireSellerAuth, adminHubSellerIbanPATCH)
     httpApp.get('/admin-hub/v1/seller/account', requireSellerAuth, adminHubSellerAccountGET)
     httpApp.patch('/admin-hub/v1/seller/password', requireSellerAuth, adminHubSellerPasswordPATCH)
     httpApp.get('/admin-hub/v1/seller/profile', requireSellerAuth, adminHubSellerProfileGET)
+    httpApp.get('/admin-hub/v1/seller/locations', requireSellerAuth, adminHubLocationsGET)
+    httpApp.post('/admin-hub/v1/seller/locations', requireSellerAuth, adminHubLocationsPOST)
+    httpApp.patch('/admin-hub/v1/seller/locations/:id', requireSellerAuth, adminHubLocationsPATCH)
+    httpApp.delete('/admin-hub/v1/seller/locations/:id', requireSellerAuth, adminHubLocationsDELETE)
+    httpApp.get('/admin-hub/v1/seller-errors', requireSellerAuth, adminHubSellerErrorLogsGET)
+    httpApp.post('/admin-hub/v1/seller-errors', requireSellerAuth, adminHubSellerErrorLogsPOST)
+    httpApp.patch('/admin-hub/v1/seller-errors/:id', requireSellerAuth, adminHubSellerErrorLogsPATCH)
+    httpApp.delete('/admin-hub/v1/seller-errors/:id', requireSellerAuth, adminHubSellerErrorLogsDELETE)
     httpApp.post('/admin-hub/users/invite', requireSellerAuth, adminHubUsersInvitePOST)
     httpApp.get('/admin-hub/v1/subusers', requireSellerAuth, adminHubSubusersGET)
     httpApp.patch('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserUpdatePATCH)

@@ -18,11 +18,13 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { routing } from "@/i18n/routing";
+import { getUI } from "@/lib/ui-strings";
 
 export default function GeneralSettingsPage() {
   const client = getMedusaAdminClient();
   const router = useRouter();
   const locale = useLocale();
+  const ui = getUI(locale || "de");
   const pathname = usePathname() || "/";
   const pathWithoutLocale = pathname.startsWith("/") ? pathname : `/${pathname}`;
   const t = useTranslations("locale");
@@ -192,7 +194,7 @@ export default function GeneralSettingsPage() {
       setLegalSaved(true);
       setTimeout(() => setLegalSaved(false), 3000);
     } catch (e) {
-      setLegalError(e?.message || "Speichern fehlgeschlagen.");
+      setLegalError(e?.message || ui.saveError);
     } finally {
       setLegalSaving(false);
     }
@@ -449,44 +451,43 @@ export default function GeneralSettingsPage() {
       {isSuperuser && (
         <Card>
           <BlockStack gap="400">
-            <Text variant="headingMd" as="h2">Admin Informationen (Plattformbetreiber)</Text>
+            <Text variant="headingMd" as="h2">{ui.adminInfo}</Text>
             <Text variant="bodySm" tone="subdued">
-              Diese Angaben erscheinen als Plattformbetreiber-Block im unterzeichneten Seller Agreement PDF.
-              Nur für Superuser sichtbar.
+              {ui.adminInfoNote}
             </Text>
             <Divider />
-            <TextField label="Firmenname" value={legalInfo.legal_company_name}
+            <TextField label={ui.companyName} value={legalInfo.legal_company_name}
               onChange={(v) => setLegalInfo((p) => ({ ...p, legal_company_name: v }))}
               placeholder="Andertal GmbH" autoComplete="off" />
-            <TextField label="Vertreten durch (Geschäftsführer)" value={legalInfo.legal_representative}
+            <TextField label={locale === "de" ? "Vertreten durch (Geschäftsführer)" : "Managing Director"} value={legalInfo.legal_representative}
               onChange={(v) => setLegalInfo((p) => ({ ...p, legal_representative: v }))}
-              placeholder="Vorname Nachname" autoComplete="off" />
-            <TextField label="Straße und Hausnummer" value={legalInfo.legal_street}
+              placeholder="First Last" autoComplete="off" />
+            <TextField label={ui.address} value={legalInfo.legal_street}
               onChange={(v) => setLegalInfo((p) => ({ ...p, legal_street: v }))}
-              placeholder="Musterstraße 1" autoComplete="off" />
-            <TextField label="PLZ und Stadt" value={legalInfo.legal_city}
+              placeholder="Main St 1" autoComplete="off" />
+            <TextField label={ui.postalCode + " / City"} value={legalInfo.legal_city}
               onChange={(v) => setLegalInfo((p) => ({ ...p, legal_city: v }))}
               placeholder="41564 Kaarst" autoComplete="off" />
-            <TextField label="Handelsregisternummer" value={legalInfo.legal_trade_register}
+            <TextField label={locale === "de" ? "Handelsregisternummer" : "Trade Register No."} value={legalInfo.legal_trade_register}
               onChange={(v) => setLegalInfo((p) => ({ ...p, legal_trade_register: v }))}
               placeholder="HRB XXXXX" autoComplete="off" />
-            <TextField label="Registergericht" value={legalInfo.legal_register_court}
+            <TextField label={locale === "de" ? "Registergericht" : "Registry Court"} value={legalInfo.legal_register_court}
               onChange={(v) => setLegalInfo((p) => ({ ...p, legal_register_court: v }))}
               placeholder="Amtsgericht Düsseldorf" autoComplete="off" />
-            <TextField label="USt-IdNr." value={legalInfo.legal_vat_id}
+            <TextField label={ui.vatId} value={legalInfo.legal_vat_id}
               onChange={(v) => setLegalInfo((p) => ({ ...p, legal_vat_id: v }))}
               placeholder="DE123456789" autoComplete="off" />
-            <TextField label="Steuernummer" value={legalInfo.legal_tax_id}
+            <TextField label={ui.taxId} value={legalInfo.legal_tax_id}
               onChange={(v) => setLegalInfo((p) => ({ ...p, legal_tax_id: v }))}
               placeholder="12/345/67890" autoComplete="off" />
-            <TextField label="Rechtliche E-Mail" value={legalInfo.legal_email}
+            <TextField label={ui.email} value={legalInfo.legal_email}
               onChange={(v) => setLegalInfo((p) => ({ ...p, legal_email: v }))}
               placeholder="info@andertal.com" autoComplete="off" type="email" />
             {legalError && <Banner tone="critical"><p>{legalError}</p></Banner>}
-            {legalSaved && <Banner tone="success"><p>Admin-Informationen gespeichert.</p></Banner>}
+            {legalSaved && <Banner tone="success"><p>{ui.savedSuccess}</p></Banner>}
             <InlineStack gap="200">
               <Button variant="primary" loading={legalSaving} onClick={handleLegalSave}>
-                Speichern
+                {ui.save}
               </Button>
             </InlineStack>
           </BlockStack>

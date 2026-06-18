@@ -461,7 +461,7 @@ export default function CustomerDetailPage() {
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
               {loading ? "Laden…" : fullName}
             </h1>
-            {customer && (
+            {customer && isSuperuser && (
               <>
                 {customer.is_registered ? (
                   <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>Registriert</span>
@@ -474,9 +474,9 @@ export default function CustomerDetailPage() {
               </>
             )}
           </div>
-          {customer?.customer_number && (
+          {isSuperuser && customer?.customer_number && (
             <div style={{ fontSize: 13, color: "#6b7280", marginTop: 3 }}>
-              #{customer.customer_number}{isSuperuser && customer.email ? ` · ${customer.email}` : ""}
+              #{customer.customer_number}{customer.email ? ` · ${customer.email}` : ""}
             </div>
           )}
         </div>
@@ -812,21 +812,21 @@ export default function CustomerDetailPage() {
               {isSuperuser && <InfoRow label="E-Mail" value={customer.email} />}
               {isSuperuser && <InfoRow label="Telefon" value={customer.phone} />}
               {customer.gender && <InfoRow label="Geschlecht" value={customer.gender === "male" ? "Männlich" : customer.gender === "female" ? "Weiblich" : customer.gender} />}
-              {customer.birth_date && <InfoRow label="Geburtsdatum" value={fmtBirthDate(customer.birth_date)} />}
-              <InfoRow label="Kundentyp" value={accountTypeLabel()} />
-              <InfoRow label="Konto" value={customer.is_registered ? "Registriert" : "Gastkunde"} />
-              <InfoRow label="Newsletter" value={customer.newsletter_opted_in ? "✓ Abonniert" : "Nicht abonniert"} />
-              {customer.email_marketing_consent && <InfoRow label="Marketing E-Mail" value="Zugestimmt" />}
+              {isSuperuser && customer.birth_date && <InfoRow label="Geburtsdatum" value={fmtBirthDate(customer.birth_date)} />}
+              {isSuperuser && <InfoRow label="Kundentyp" value={accountTypeLabel()} />}
+              {isSuperuser && <InfoRow label="Konto" value={customer.is_registered ? "Registriert" : "Gastkunde"} />}
+              {isSuperuser && <InfoRow label="Newsletter" value={customer.newsletter_opted_in ? "✓ Abonniert" : "Nicht abonniert"} />}
+              {isSuperuser && customer.email_marketing_consent && <InfoRow label="Marketing E-Mail" value="Zugestimmt" />}
               {customer.account_type === "gewerbe" && (
                 <>
                   <InfoRow label="Firmenname" value={customer.company_name} />
                   <InfoRow label="USt-IdNr." value={customer.vat_number} mono />
                 </>
               )}
-              <InfoRow label="Kundennummer" value={customer.customer_number ? `#${customer.customer_number}` : "—"} />
-              <InfoRow label="Erstellt am" value={fmtDateShort(customer.created_at)} />
-              <InfoRow label="Erste Bestellung" value={fmtDateShort(firstOrder)} />
-              <InfoRow label="Letzte Bestellung" value={fmtDateShort(lastOrder)} />
+              {isSuperuser && <InfoRow label="Kundennummer" value={customer.customer_number ? `#${customer.customer_number}` : "—"} />}
+              {isSuperuser && <InfoRow label="Erstellt am" value={fmtDateShort(customer.created_at)} />}
+              {isSuperuser && <InfoRow label="Erste Bestellung" value={fmtDateShort(firstOrder)} />}
+              {isSuperuser && <InfoRow label="Letzte Bestellung" value={fmtDateShort(lastOrder)} />}
             </Card>
 
             {/* Delivery address */}
@@ -879,6 +879,7 @@ export default function CustomerDetailPage() {
             </Card>
 
             {/* Timeline */}
+            {isSuperuser && (
             <Card title="Aktivität">
               <div style={{ paddingTop: 8 }}>
                 {[
@@ -896,6 +897,7 @@ export default function CustomerDetailPage() {
                 ))}
               </div>
             </Card>
+            )}
           </div>
         </div>
       )}

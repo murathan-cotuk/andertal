@@ -1,4 +1,16 @@
-14.06.
+17.06.
+
+-- diller birbirine girmis ya her yerde. mesela simdi sellercentraldeyim. ingilizce dili secili. bi ingilizce
+  icerik var bi almanca var. tüm sayfalarda her köselerde var bu sorun. sana tek tek izah etmem bile 3-4 saat   
+  sürer. sen simdi dil dil tüm sayfayi kontrol edicen ve dogru icerigi yazican kocum. anladin? ingilizceyle
+  basla. ingilizce dili olsun tüüüm icerikler ingilizce dili secili oldugunda. en ince ayrintisina kadar.
+  faturasindan lieferscheinina. müsteri bilgileri ayni kalacak sadece
+  
+-- sellercentraldeki settings/plan sayfasini kaldir.
+-- sellercentraldeki settings/billing sayfasini kur. muhasebe, excel gibi listelenmis olacak. iki tab olacak. birinde tek tek müsterilerden gelen siparislerin faturalari, gönderim etiketi, iadeleri formlari, lieferscheinlari falan tüm belgeler olacak. siparis yazacak ve yaninda yan yana bu dosyalar gözükecek. tarih, tutar, isim, dosya cinsi (fatura mi, lieferschein mi vs.) gibi siralamalar ve filtreler yapilabilecek. buradaki dosyalar export edilebilecek. her satici sadece kendine ait siparislerin evraklarini görebilecek. ikinci tabde ise pazaryerinin kestigi komisyon faturasi olacak. hepsi tek sira olacak. dönem yazacak saginda rechnung diyecek. yanindaki pdf indirme butonuna basinca pdf inecek. toplu indirme yapilabilir. her satici sadece kendi faturasini görebilecek.
+superuserda ise bu durum diger fonskiyonlarda oldugu gibi olacak. en üstte kendine ait seyler, alta dogru saticiya ait seyler satici adinin altinda gruplanmis sekilde olacak her iki tabda da.
+
+
 
 --- sellercentralde import-export sayfasindan ürün import etmek icin excel hazirladim. seller olarak yükledim ve su uyariyi verdi:
 

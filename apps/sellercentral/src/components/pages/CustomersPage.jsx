@@ -14,6 +14,8 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { CustomerFormModal } from "@/components/CustomerFormModal";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 
 function fmtCents(c) {
   return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
@@ -23,10 +25,10 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-function accountTypeLabel(type) {
-  if (type === "gastkunde") return "Gast";
-  if (type === "gewerbe") return "Gewerbe";
-  return "Privat";
+function accountTypeLabel(type, ui) {
+  if (type === "gastkunde") return ui?.guestCustomer || "Gast";
+  if (type === "gewerbe") return ui?.businessCustomer || "Gewerbe";
+  return ui?.privateCustomer || "Privat";
 }
 
 const ACCOUNT_TYPE_COLORS = {
@@ -35,7 +37,7 @@ const ACCOUNT_TYPE_COLORS = {
   privat:    { bg: "#d1fae5", color: "#065f46" },
 };
 
-function ActionMenu({ customer, onEdit, onDelete, canManage }) {
+function ActionMenu({ customer, onEdit, onDelete, canManage, ui }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, bottom: "auto", right: 0 });
   const ref = useRef(null);
@@ -92,7 +94,7 @@ function ActionMenu({ customer, onEdit, onDelete, canManage }) {
             onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
             onMouseLeave={e => e.currentTarget.style.background = "none"}
           >
-            Bearbeiten
+            {ui?.edit || "Bearbeiten"}
           </button>
           <button
             onClick={() => { setOpen(false); onDelete(customer); }}
@@ -100,7 +102,7 @@ function ActionMenu({ customer, onEdit, onDelete, canManage }) {
             onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
             onMouseLeave={e => e.currentTarget.style.background = "none"}
           >
-            Löschen
+            {ui?.delete || "Löschen"}
           </button>
         </div>
       )}
@@ -108,7 +110,8 @@ function ActionMenu({ customer, onEdit, onDelete, canManage }) {
   );
 }
 
-const COLS = ["Kundennr.", "Name", "Email", "Typ", "Registriert", "Newsletter", "Land", "Bestellungen", "Gesamtumsatz", "Letzter Kauf", ""];
+/** Placeholder — overridden per-render inside component */
+const COLS_FALLBACK = ["#", "Name", "Email", "Typ", "Reg.", "Newsletter", "Land", "Bestellungen", "Umsatz", "Letzter Kauf", ""];
 
 /** Gruppenschlüssel für Kunden ohne main_seller_id / default */
 const PLATFORM_SELLER_KEY = "__platform__";
@@ -124,6 +127,13 @@ function normalizeCustomerSellerKey(c) {
 
 export default function CustomersPage() {
   const router = useRouter();
+  const localeFromIntl = useLocale();
+  const ui = getUI(localeFromIntl || "de");
+  const COLS = [
+    ui.colNumber, ui.colName, ui.colEmail,
+    ui.colType, ui.statusActive, "Newsletter",
+    ui.colCountry, ui.totalOrders, ui.totalSpent, ui.lastOrder, "",
+  ];
 
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -209,7 +219,7 @@ export default function CustomersPage() {
       await client.deleteCustomer(confirmDelete.id);
       setCustomers(prev => prev.filter(c => c.id !== confirmDelete.id));
     } catch (e) {
-      alert(e?.message || "Kunde konnte nicht gelöscht werden. Bitte Konsole/Netzwerk prüfen.");
+      alert(e?.message || ui.error);
     }
     setConfirmDelete(null);
   };
@@ -262,19 +272,19 @@ export default function CustomersPage() {
           <td style={{ padding: "10px 12px", color: "#6b7280" }}>{isSuperuser ? c.email : "—"}</td>
           <td style={{ padding: "10px 12px" }}>
             <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: typeColor.bg, color: typeColor.color, fontWeight: 600 }}>
-              {accountTypeLabel(c.account_type)}
+              {accountTypeLabel(c.account_type, ui)}
             </span>
           </td>
           <td style={{ padding: "10px 12px" }}>
             {c.is_registered ? (
-              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>Registriert</span>
+              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>{ui.statusActive}</span>
             ) : (
-              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>Gast</span>
+              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>{ui.guestCustomer}</span>
             )}
           </td>
           <td style={{ padding: "10px 12px" }}>
             {c.newsletter_opted_in ? (
-              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#ede9fe", color: "#6d28d9", fontWeight: 600 }}>✓ Abonniert</span>
+              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#ede9fe", color: "#6d28d9", fontWeight: 600 }}>✓</span>
             ) : (
               <span style={{ fontSize: 11, color: "#9ca3af" }}>—</span>
             )}
@@ -289,6 +299,7 @@ export default function CustomersPage() {
               canManage={isSuperuser}
               onEdit={(cust) => setModal({ mode: "edit", customer: cust })}
               onDelete={(cust) => setConfirmDelete(cust)}
+              ui={ui}
             />
           </td>
         </tr>
@@ -297,9 +308,9 @@ export default function CustomersPage() {
 
   return (
     <Page
-      title="Kunden"
+      title={ui.customers}
       primaryAction={{
-        content: "Neuer Kunde",
+        content: ui.addCustomer,
         onAction: () => setModal({ mode: "create" }),
       }}
     >
@@ -313,13 +324,13 @@ export default function CustomersPage() {
       {confirmDelete && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#fff", borderRadius: 12, padding: 28, maxWidth: 380, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <h3 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 700 }}>Kunde löschen?</h3>
+            <h3 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 700 }}>{ui.deleteCustomer}?</h3>
             <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6b7280" }}>
-              {[confirmDelete.first_name, confirmDelete.last_name].filter(Boolean).join(" ") || confirmDelete.email} wird dauerhaft gelöscht.
+              {[confirmDelete.first_name, confirmDelete.last_name].filter(Boolean).join(" ") || confirmDelete.email}
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setConfirmDelete(null)} style={{ padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>Abbrechen</button>
-              <button onClick={handleDeleteConfirm} style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>Löschen</button>
+              <button onClick={() => setConfirmDelete(null)} style={{ padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>{ui.cancel}</button>
+              <button onClick={handleDeleteConfirm} style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>{ui.delete}</button>
             </div>
           </div>
         </div>
@@ -331,18 +342,18 @@ export default function CustomersPage() {
             <BlockStack gap="400">
               <InlineStack align="space-between" blockAlign="center" wrap>
                 <Text as="h2" variant="headingSm">
-                  Alle Kunden
+                  {ui.customers}
                 </Text>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  {customers.length} {customers.length === 1 ? "Kunde" : "Kunden"}
+                  {customers.length} {ui.customers}
                 </Text>
               </InlineStack>
               <InlineStack gap="300" wrap>
                 <Box maxWidth="400px">
                   <TextField
-                    label="Suche"
+                    label={ui.search}
                     labelHidden
-                    placeholder="Suche nach Name, Email oder #Kundennr…"
+                    placeholder={ui.search + "…"}
                     value={search}
                     onChange={onSearchChange}
                     autoComplete="off"
@@ -350,7 +361,7 @@ export default function CustomersPage() {
                 </Box>
                 {isSuperuser && (
                   <input
-                    placeholder="Verkäufer suchen (Name)…"
+                    placeholder={ui.searchSeller + "…"}
                     value={sellerSearchFilter}
                     onChange={(e) => setSellerSearchFilter(e.target.value)}
                     style={{ flex: 1, minWidth: 200, padding: "7px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13 }}
@@ -370,13 +381,13 @@ export default function CustomersPage() {
                   </thead>
                   <tbody>
                     {loading && (
-                      <tr><td colSpan={11} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Laden…</td></tr>
+                      <tr><td colSpan={11} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{ui.loading}</td></tr>
                     )}
                     {!loading && customers.length === 0 && (
                       <tr>
                         <td colSpan={11} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
-                          <div style={{ fontSize: 40, marginBottom: 12 }}>👤</div>
-                          <div>Keine Kunden gefunden</div>
+                          <div style={{ marginBottom: 12 }}>👤</div>
+                          <div>{ui.noCustomers}</div>
                         </td>
                       </tr>
                     )}
@@ -385,7 +396,7 @@ export default function CustomersPage() {
                       (filteredCustomerGroups.length === 0 ? (
                         <tr>
                           <td colSpan={11} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
-                            Keine Kunden in dieser Ansicht{sellerSearchFilter.trim() ? " (Verkäufer-Filter)" : ""}.
+                            {ui.noCustomers}{sellerSearchFilter.trim() ? " (Filter)" : ""}.
                           </td>
                         </tr>
                       ) : (
@@ -421,7 +432,7 @@ export default function CustomersPage() {
                                 >
                                   <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{label}</span>
                                   <span style={{ fontSize: 12, color: "#6b7280" }}>
-                                    {open ? "▾" : "▸"} {items.length} Kunde{items.length !== 1 ? "n" : ""}
+                                    {open ? "▾" : "▸"} {items.length} {ui.customers}
                                   </span>
                                 </button>
                               </td>

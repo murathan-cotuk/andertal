@@ -1,7 +1,12 @@
 "use client";
 
-import SettingsSubpage from "@/components/SettingsSubpage";
+import SettingsLayout from "@/components/SettingsLayout";
+import LocationsSettingsPage from "@/components/pages/settings/LocationsSettingsPage";
 
 export default function SettingsLocations() {
-  return <SettingsSubpage title="Locations" description="Inventory and fulfillment locations." />;
+  return (
+    <SettingsLayout>
+      <LocationsSettingsPage />
+    </SettingsLayout>
+  );
 }

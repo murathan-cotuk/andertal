@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 
 /* ── Icons (inline SVG, no extra dep) ─────────────────────────────── */
 const Icon = ({ d, size = 16, color = "currentColor" }) => (
@@ -27,44 +29,11 @@ const ICONS = {
   notifications:"M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z",
 };
 
-const GROUPS = [
-  {
-    label: "Konto",
-    items: [
-      { href: "/settings/general",          label: "Allgemein",             icon: "general" },
-      { href: "/settings/verification",      label: "Verifizierung",         icon: "verification", sellerOnly: true },
-      { href: "/settings/billing",           label: "Abrechnung",            icon: "billing" },
-      { href: "/settings/security",          label: "Sicherheit",            icon: "security" },
-    ],
-  },
-  {
-    label: "Team",
-    items: [
-      { href: "/settings/users-permissions", label: "Benutzer & Rechte",     icon: "users" },
-    ],
-  },
-  {
-    label: "Shop",
-    items: [
-      { href: "/settings/payments",          label: "Zahlungen",             icon: "payments" },
-      { href: "/settings/checkout",          label: "Checkout",              icon: "checkout",     superuserOnly: true },
-      { href: "/settings/shipping",          label: "Versand & Lieferung",   icon: "shipping" },
-      { href: "/settings/taxes",             label: "Steuern & Abgaben",     icon: "taxes" },
-      { href: "/settings/locations",         label: "Standorte",             icon: "locations" },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { href: "/settings/integrations",      label: "Apps & Integrationen",  icon: "integrations" },
-      { href: "/settings/notifications",     label: "Benachrichtigungen",    icon: "notifications" },
-    ],
-  },
-];
-
 export default function SettingsLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
+  const locale = useLocale();
+  const ui = getUI(locale);
   const [isSuperuser, setIsSuperuser] = useState(false);
 
   useEffect(() => {
@@ -72,6 +41,41 @@ export default function SettingsLayout({ children }) {
       typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true",
     );
   }, []);
+
+  // Build groups dynamically using ui strings so they update on locale change
+  const GROUPS = [
+    {
+      label: ui.settingsGroupAccount,
+      items: [
+        { href: "/settings/general",          label: ui.settingsGeneral,       icon: "general" },
+        { href: "/settings/verification",      label: ui.settingsVerification,  icon: "verification", sellerOnly: true },
+        { href: "/settings/billing",           label: ui.settingsBilling,       icon: "billing" },
+        { href: "/settings/security",          label: ui.settingsSecurity,      icon: "security" },
+      ],
+    },
+    {
+      label: ui.settingsGroupTeam,
+      items: [
+        { href: "/settings/users-permissions", label: ui.settingsUsers,         icon: "users" },
+      ],
+    },
+    {
+      label: ui.settingsGroupShop,
+      items: [
+        { href: "/settings/payments",          label: ui.settingsPayments,      icon: "payments" },
+        { href: "/settings/checkout",          label: ui.settingsCheckout,      icon: "checkout",     superuserOnly: true },
+        { href: "/settings/shipping",          label: ui.settingsShipping,      icon: "shipping" },
+        { href: "/settings/locations",         label: ui.settingsLocations,     icon: "locations" },
+      ],
+    },
+    {
+      label: ui.settingsGroupSystem,
+      items: [
+        { href: "/settings/integrations",      label: ui.settingsIntegrations,  icon: "integrations" },
+        { href: "/notifications",               label: ui.settingsNotifications, icon: "notifications" },
+      ],
+    },
+  ];
 
   const currentPath = String(pathname || "");
   const isActive = (href) => !!(href && (currentPath === href || currentPath.endsWith(href)));
@@ -100,7 +104,7 @@ export default function SettingsLayout({ children }) {
           <svg width={16} height={16} viewBox="0 0 20 20" fill="none">
             <path d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" fill="currentColor" />
           </svg>
-          Zurück
+          {ui.settingsBack}
         </button>
       </div>
 
@@ -125,8 +129,8 @@ export default function SettingsLayout({ children }) {
               </svg>
             </div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>Einstellungen</div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 1 }}>Plattform konfigurieren</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>{ui.settingsTitle}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 1 }}>{ui.settingsSubtitle}</div>
             </div>
           </div>
 

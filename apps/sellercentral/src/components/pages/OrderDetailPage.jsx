@@ -197,10 +197,13 @@ export default function OrderDetailPage() {
   const billingSame = order?.billing_same_as_shipping !== false;
   const hasBillingAddr = !billingSame && order?.billing_address_line1;
 
-  // Customer label
-  const customerLabel = order?.customer_number
-    ? `${order.customer_number} – ${[order?.first_name, order?.last_name].filter(Boolean).join(" ") || "—"}`
-    : `Gast – ${[order?.first_name, order?.last_name].filter(Boolean).join(" ") || "—"}`;
+  // Customer label — Kundennummer nur für Superuser
+  const customerName = [order?.first_name, order?.last_name].filter(Boolean).join(" ") || "—";
+  const customerLabel = isSuperuser
+    ? order?.customer_number
+      ? `${order.customer_number} – ${customerName}`
+      : `Gast – ${customerName}`
+    : customerName;
 
   const goToCustomerProfile = async (e) => {
     e?.preventDefault?.();
@@ -408,12 +411,14 @@ export default function OrderDetailPage() {
             )}
           </Section>
 
-          {/* Customer info */}
+          {/* Customer info — nur Superuser */}
+          {isSuperuser && (
           <Section title="Kundeninfo">
             <InfoRow label="Kundentyp" value={order?.is_guest !== false ? "Gastkunde" : "Registrierter Kunde"} />
             <InfoRow label="Erste Bestellung" value={order?.is_first_order ? "Ja" : "Nein"} />
             <InfoRow label="Newsletter" value={order?.newsletter_opted_in ? "Ja" : "Nein"} />
           </Section>
+          )}
 
           {/* Shipping address */}
           <Section title="Lieferadresse">
@@ -467,7 +472,8 @@ export default function OrderDetailPage() {
             </div>
           </Section>
 
-          {/* Danger zone */}
+          {/* Danger zone — nur Superuser */}
+          {isSuperuser && (
           <div style={{ background: "#fff", border: "1px solid #fecaca", borderRadius: 10, padding: 16 }}>
             <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#b91c1c" }}>Bestellung löschen</h3>
             <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>Diese Aktion kann nicht rückgängig gemacht werden.</p>
@@ -475,6 +481,7 @@ export default function OrderDetailPage() {
               Bestellung löschen
             </button>
           </div>
+          )}
         </div>
       </div>
     </div>

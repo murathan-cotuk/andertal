@@ -5,6 +5,8 @@ import styled from "styled-components";
 import { Card, Button, Input } from "@andertal/ui";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 
 const Container = styled.div`
   max-width: 1200px;
@@ -309,6 +311,8 @@ const VARIANT_TYPES = [
 ];
 
 export default function ProductsPage() {
+  const localeFromIntl = useLocale();
+  const ui = getUI(localeFromIntl || "de");
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -413,9 +417,9 @@ export default function ProductsPage() {
       await medusaClient.updateAdminHubProduct(pid, { variants: payloadVariants });
       const data = await medusaClient.getAdminHubProducts();
       setProducts(data.products || []);
-      setMessage({ type: "success", text: "Varyasyonlar güncellendi." });
+      setMessage({ type: "success", text: ui.saved });
     } catch (error) {
-      setMessage({ type: "error", text: error?.message || "Varyasyonlar güncellenemedi." });
+      setMessage({ type: "error", text: error?.message || ui.error });
     } finally {
       setSavingVariantProductId("");
     }
@@ -977,7 +981,7 @@ export default function ProductsPage() {
                       onClick={() => toggleProductVariants(product)}
                       style={{ padding: "8px 12px", fontSize: 13 }}
                     >
-                      {expandedProducts.has(String(product.id)) ? "Varyasyonları gizle" : "Varyasyonları göster"}
+                      {expandedProducts.has(String(product.id)) ? ui.hideVariants : ui.showVariants}
                     </Button>
                     {expandedProducts.has(String(product.id)) && (
                       <div style={{ marginTop: 10, border: "1px solid #e5e7eb", borderRadius: 8, padding: 10, background: "#fafafa" }}>
@@ -985,7 +989,7 @@ export default function ProductsPage() {
                           <div key={`${product.id}-${idx}`} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 0.8fr 0.8fr", gap: 8, alignItems: "center", marginBottom: 8 }}>
                             <Input
                               label=""
-                              placeholder="Variant adı"
+                              placeholder={ui.variantName}
                               value={variantLabel(v, idx)}
                               disabled
                             />
@@ -1000,7 +1004,7 @@ export default function ProductsPage() {
                               type="number"
                               step="0.01"
                               min="0"
-                              placeholder="Fiyat"
+                              placeholder={ui.variantPrice}
                               value={variantPriceInput(v)}
                               onChange={(e) => updateVariantDraft(product.id, idx, "price", e.target.value)}
                             />
@@ -1008,7 +1012,7 @@ export default function ProductsPage() {
                               label=""
                               type="number"
                               min="0"
-                              placeholder="Stok"
+                              placeholder={ui.variantInventory}
                               value={variantInventoryInput(v)}
                               onChange={(e) => updateVariantDraft(product.id, idx, "inventory", e.target.value)}
                             />
@@ -1020,7 +1024,7 @@ export default function ProductsPage() {
                             onClick={() => saveVariantsForProduct(product)}
                             disabled={savingVariantProductId === String(product.id)}
                           >
-                            {savingVariantProductId === String(product.id) ? "Kaydediliyor..." : "Varyasyonları kaydet"}
+                            {savingVariantProductId === String(product.id) ? ui.savingVariants : ui.saveVariants}
                           </Button>
                         </div>
                       </div>

@@ -266,6 +266,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       icon: StoreIcon,
       subNavigationItems: [
         { url: "/sellers", label: tx("view", "View"), superuserOnly: true },
+        { url: "/sellers/errors", label: "Sorun Günlüğü", superuserOnly: true },
       ],
     });
   }
@@ -278,7 +279,6 @@ function getMenuItemsMain(t, isSuperuser = false) {
       subNavigationItems: [
         { url: "/marketing/campaigns", label: tx("campaigns", "Campaigns") },
         { url: "/marketing/attribution", label: tx("attribution", "Attribution") },
-        { url: "/marketing/automations", label: tx("automations", "Automations") },
       ],
     },
     {
@@ -614,6 +614,7 @@ export default function PolarisLayout({ children }) {
   // Routes blocked for non-superuser sellers
   const SELLER_BLOCKED_ROUTES = new Set([
     "/sellers",
+    "/sellers/errors",
     "/products/collections",
     "/products/collections/new",
     "/content/menus",

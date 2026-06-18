@@ -8,6 +8,8 @@ import {
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import { useParams } from "next/navigation";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 
 function fmtDate(d) {
   if (!d) return "—";
@@ -28,11 +30,11 @@ function customerName(o) {
   return [o?.first_name, o?.last_name].filter(Boolean).join(" ") || o?.email || "—";
 }
 
-const DOC_TYPES = [
-  { key: "invoice", label: "Rechnung" },
-  { key: "lieferschein", label: "Lieferschein" },
-  { key: "versandlabel", label: "Versandlabel" },
-  { key: "retoure", label: "Retoure" },
+const DOC_TYPE_KEYS = [
+  { key: "invoice",     uiKey: "invoiceDoc" },
+  { key: "lieferschein",uiKey: "deliveryNoteDoc" },
+  { key: "versandlabel",uiKey: "shippingLabel" },
+  { key: "retoure",     uiKey: "returnDoc" },
 ];
 
 function DocBtn({ orderId, kind, label, available }) {
@@ -86,8 +88,15 @@ function ColHeader({ label, field, sort, onSort, align = "left" }) {
   );
 }
 
-function exportCSV(rows, filename = "belgeleri.csv") {
-  const headers = ["Sipariş #", "Tarih", "Müşteri", "Tutar (€)", "Rechnung URL", "Lieferschein URL"];
+function exportCSV(rows, filename = "order-documents.csv", ui = {}) {
+  const headers = [
+    ui.colOrderNumber || "Order #",
+    ui.colDate || "Date",
+    ui.colCustomer || "Customer",
+    (ui.colAmount || "Amount") + " (€)",
+    (ui.invoiceDoc || "Invoice") + " URL",
+    (ui.deliveryNoteDoc || "Delivery Note") + " URL",
+  ];
   const lines = rows.map((o) => [
     `#${o.order_number || o.id?.slice(0, 8) || ""}`,
     fmtDate(o.created_at),
@@ -131,7 +140,7 @@ function SellerGroupHeader({ label }) {
   );
 }
 
-function OrderDocRow({ order, selected, onToggle, returnsSet, locale }) {
+function OrderDocRow({ order, selected, onToggle, returnsSet, locale, ui }) {
   const hasReturn = returnsSet.has(order.id);
   const hasTracking =
     !!order.tracking_number ||
@@ -171,22 +180,22 @@ function OrderDocRow({ order, selected, onToggle, returnsSet, locale }) {
         {fmtCents(orderTotal(order))}
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
-        <DocBtn orderId={order.id} kind="invoice" label="Rechnung" available />
+        <DocBtn orderId={order.id} kind="invoice" label={ui.invoiceDoc} available />
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
-        <DocBtn orderId={order.id} kind="lieferschein" label="Lieferschein" available />
+        <DocBtn orderId={order.id} kind="lieferschein" label={ui.deliveryNoteDoc} available />
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
-        <DocBtn orderId={order.id} kind="versandlabel" label="Versandlabel" available={hasTracking} />
+        <DocBtn orderId={order.id} kind="versandlabel" label={ui.shippingLabel} available={hasTracking} />
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
-        <DocBtn orderId={order.id} kind="retoure" label="Retoure" available={hasReturn} />
+        <DocBtn orderId={order.id} kind="retoure" label={ui.returnDoc} available={hasReturn} />
       </td>
     </tr>
   );
 }
 
-function OrderDocTable({ orders, selectedSet, onToggleOne, returnsSet, locale }) {
+function OrderDocTable({ orders, selectedSet, onToggleOne, returnsSet, locale, ui }) {
   return orders.map((o) => (
     <OrderDocRow
       key={o.id}
@@ -195,13 +204,16 @@ function OrderDocTable({ orders, selectedSet, onToggleOne, returnsSet, locale })
       onToggle={() => onToggleOne(o.id)}
       returnsSet={returnsSet}
       locale={locale}
+      ui={ui}
     />
   ));
 }
 
 function OrderDocumentsTab({ isSuperuser, mySellerId }) {
   const params = useParams();
-  const locale = params?.locale || "de";
+  const localeFromIntl = useLocale();
+  const locale = localeFromIntl || params?.locale || "de";
+  const ui = getUI(locale);
   const client = getMedusaAdminClient();
 
   const [orders, setOrders] = useState([]);
@@ -232,7 +244,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
         setReturns(returnsRes?.returns || []);
         setSellers(sellersRes?.sellers || []);
       } catch (e) {
-        if (!cancelled) setError(e?.message || "Fehler beim Laden");
+        if (!cancelled) setError(e?.message || ui.error);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -362,7 +374,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
       selected.size > 0
         ? filteredOrders.filter((o) => selected.has(o.id))
         : filteredOrders;
-    exportCSV(toExport, "siparis-belgeleri.csv");
+    exportCSV(toExport, "order-documents.csv", ui);
   };
 
   const handleBulkDownload = () => {
@@ -380,7 +392,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
       <Box padding="400">
         <InlineStack gap="200" blockAlign="center">
           <Spinner size="small" />
-          <Text as="p" tone="subdued">Laden…</Text>
+          <Text as="p" tone="subdued">{ui.loading}</Text>
         </InlineStack>
       </Box>
     );
@@ -405,10 +417,10 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
           <InlineStack gap="200" blockAlign="end" wrap>
             <Box minWidth="220px">
               <TextField
-                label="Suche"
+                label={ui.search}
                 value={search}
                 onChange={setSearch}
-                placeholder="Bestellnr. oder Kundenname…"
+                placeholder={ui.searchOrderPlaceholder}
                 clearButton
                 onClearButtonClick={() => setSearch("")}
                 autoComplete="off"
@@ -416,7 +428,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
             </Box>
             <Box minWidth="140px">
               <TextField
-                label="Von"
+                label={ui.from}
                 type="date"
                 value={dateFrom}
                 onChange={setDateFrom}
@@ -425,7 +437,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
             </Box>
             <Box minWidth="140px">
               <TextField
-                label="Bis"
+                label={ui.to}
                 type="date"
                 value={dateTo}
                 onChange={setDateTo}
@@ -434,14 +446,14 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
             </Box>
             <Box minWidth="160px">
               <Select
-                label="Dokumenttyp"
+                label={ui.documentType}
                 value={docFilter}
                 options={[
-                  { label: "Alle Dokumente", value: "all" },
-                  { label: "Rechnung", value: "invoice" },
-                  { label: "Lieferschein", value: "lieferschein" },
-                  { label: "Versandlabel", value: "versandlabel" },
-                  { label: "Retoure", value: "retoure" },
+                  { label: ui.allDocuments, value: "all" },
+                  { label: ui.invoiceDoc, value: "invoice" },
+                  { label: ui.deliveryNoteDoc, value: "lieferschein" },
+                  { label: ui.shippingLabel, value: "versandlabel" },
+                  { label: ui.returnDoc, value: "retoure" },
                 ]}
                 onChange={setDocFilter}
               />
@@ -449,14 +461,14 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
           </InlineStack>
           <InlineStack gap="200">
             <Button size="slim" onClick={handleExport}>
-              CSV Export {selected.size > 0 ? `(${selected.size} ausgewählt)` : ""}
+              {ui.csvExport} {selected.size > 0 ? `(${selected.size})` : ""}
             </Button>
             <Button size="slim" onClick={handleBulkDownload}>
-              Rechnungen öffnen {selected.size > 0 ? `(${selected.size})` : "(alle)"}
+              {ui.openInvoices} {selected.size > 0 ? `(${selected.size})` : ""}
             </Button>
             <Text as="span" tone="subdued" variant="bodySm">
-              {filteredOrders.length} Bestellungen
-              {selected.size > 0 ? ` · ${selected.size} ausgewählt` : ""}
+              {filteredOrders.length} {ui.orders}
+              {selected.size > 0 ? ` · ${selected.size} ${ui.selected}` : ""}
             </Text>
           </InlineStack>
         </BlockStack>
@@ -478,11 +490,11 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
                     style={{ cursor: "pointer" }}
                   />
                 </th>
-                <ColHeader label="Sipariş #" field="order_number" sort={sort} onSort={toggleSort} />
-                <ColHeader label="Tarih" field="created_at" sort={sort} onSort={toggleSort} />
-                <ColHeader label="Müşteri" field="customer" sort={sort} onSort={toggleSort} />
-                <ColHeader label="Tutar" field="total" sort={sort} onSort={toggleSort} align="right" />
-                {DOC_TYPES.map((dt) => (
+                <ColHeader label={ui.colOrderNumber} field="order_number" sort={sort} onSort={toggleSort} />
+                <ColHeader label={ui.colDate} field="created_at" sort={sort} onSort={toggleSort} />
+                <ColHeader label={ui.colCustomer} field="customer" sort={sort} onSort={toggleSort} />
+                <ColHeader label={ui.colAmount} field="total" sort={sort} onSort={toggleSort} align="right" />
+                {DOC_TYPE_KEYS.map((dt) => (
                   <th
                     key={dt.key}
                     style={{
@@ -496,7 +508,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {dt.label}
+                    {ui[dt.uiKey] || dt.uiKey}
                   </th>
                 ))}
               </tr>
@@ -508,20 +520,21 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
                     colSpan={9}
                     style={{ padding: "40px 16px", textAlign: "center", color: "#9ca3af" }}
                   >
-                    Keine Bestellungen gefunden.
+                    {ui.noOrdersFound}
                   </td>
                 </tr>
               ) : isSuperuser ? (
                 <>
                   {ownOrders.length > 0 && (
                     <>
-                      <SellerGroupHeader label="Plattform (eigene)" />
+                      <SellerGroupHeader label={ui.platformOwn} />
                       <OrderDocTable
                         orders={ownOrders}
                         selectedSet={selected}
                         onToggleOne={toggleOne}
                         returnsSet={returnsSet}
                         locale={locale}
+                        ui={ui}
                       />
                     </>
                   )}
@@ -536,6 +549,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
                         onToggleOne={toggleOne}
                         returnsSet={returnsSet}
                         locale={locale}
+                        ui={ui}
                       />
                     </React.Fragment>
                   ))}
@@ -547,6 +561,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
                   onToggleOne={toggleOne}
                   returnsSet={returnsSet}
                   locale={locale}
+                  ui={ui}
                 />
               )}
             </tbody>
@@ -560,6 +575,8 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
 /* ─── Tab 2: Komisyon Faturaları ────────────────────────────────────────────── */
 
 function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
+  const localeFromIntl = useLocale();
+  const ui = getUI(localeFromIntl || "de");
   const client = getMedusaAdminClient();
   const [invoices, setInvoices] = useState([]);
   const [sellers, setSellers] = useState([]);
@@ -630,12 +647,29 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
     }
   };
 
+  const [backfilling, setBackfilling] = useState(false);
+  const handleBackfill = async () => {
+    if (!isSuperuser) return;
+    setBackfilling(true);
+    try {
+      const res = await client.request("/admin-hub/v1/payouts/backfill", { method: "POST" });
+      alert(res?.message || "Backfill abgeschlossen");
+      // Reload
+      const invRes = await client.request("/admin-hub/v1/commission-invoices").catch(() => ({ invoices: [] }));
+      setInvoices(invRes?.invoices || []);
+    } catch (e) {
+      alert("Fehler: " + (e?.message || "Unbekannt"));
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box padding="400">
         <InlineStack gap="200" blockAlign="center">
           <Spinner size="small" />
-          <Text as="p" tone="subdued">Laden…</Text>
+          <Text as="p" tone="subdued">{ui.loading}</Text>
         </InlineStack>
       </Box>
     );
@@ -670,7 +704,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
               fontSize: 12,
             }}
           >
-            Rechnung
+            {ui.invoiceDoc}
           </span>
         </td>
         <td style={{ padding: "10px 12px", fontSize: 13, textAlign: "right" }}>
@@ -716,7 +750,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
             style={{ cursor: "pointer" }}
           />
         </th>
-        {["Dönem", "Typ", "Betrag", "PDF"].map((h, i) => (
+        {[ui.period, ui.type, ui.amount, "PDF"].map((h, i) => (
           <th
             key={h}
             style={{
@@ -740,10 +774,15 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
     <BlockStack gap="300">
       <InlineStack gap="200" blockAlign="center">
         <Button size="slim" onClick={handleBulkDownload} disabled={invoices.length === 0}>
-          Alle herunterladen {selected.size > 0 ? `(${selected.size} ausgewählt)` : ""}
+          {ui.downloadAll} {selected.size > 0 ? `(${selected.size})` : ""}
         </Button>
+        {isSuperuser && (
+          <Button size="slim" tone="critical" onClick={handleBackfill} loading={backfilling}>
+            {ui.backfill}
+          </Button>
+        )}
         <Text as="span" tone="subdued" variant="bodySm">
-          {invoices.length} Rechnungen
+          {invoices.length} {ui.commissionInvoices}
         </Text>
       </InlineStack>
 
@@ -752,10 +791,10 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
           {invoices.length === 0 ? (
             <div style={{ padding: "48px 16px", textAlign: "center", color: "#9ca3af" }}>
               <Text as="p" tone="subdued">
-                Noch keine Provisionsrechnungen vorhanden.
+                {ui.noInvoices}
               </Text>
               <Text as="p" tone="subdued" variant="bodySm">
-                Provisionsrechnungen erscheinen hier, sobald die Plattform diese bereitstellt.
+                {ui.noInvoicesNote}
               </Text>
             </div>
           ) : (
@@ -779,7 +818,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                               borderBottom: "1px solid #bfdbfe",
                             }}
                           >
-                            Plattform (eigene)
+                            {ui.platformOwn}
                           </td>
                         </tr>
                         {renderRows(ownInvoices)}
@@ -825,6 +864,8 @@ export default function BillingSettingsPage() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [mySellerId, setMySellerId] = useState(null);
+  const localeFromIntl = useLocale();
+  const ui = getUI(localeFromIntl || "de");
 
   useEffect(() => {
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
@@ -832,8 +873,8 @@ export default function BillingSettingsPage() {
   }, []);
 
   const tabs = [
-    { id: "order-docs", content: "Sipariş Belgeleri" },
-    { id: "commission", content: "Komisyon Faturaları" },
+    { id: "order-docs", content: ui.orderDocuments },
+    { id: "commission", content: ui.commissionInvoices },
   ];
 
   return (
