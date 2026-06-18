@@ -141,43 +141,74 @@ export default function BillbeeSettingsPage({ embedded = false }) {
         <BlockStack gap="200">
           <Text as="p" variant="bodySm">
             <strong>Billbee:</strong>{" "}
-            <strong>Einstellungen → Kanäle → Shop hinzufügen → „Eigener Webshop (Billbee API)"</strong>
+            {locale === "en"
+              ? <strong>Settings → Channels → Add shop → "Custom web shop (Billbee API)"</strong>
+              : locale === "tr"
+              ? <strong>Ayarlar → Kanallar → Mağaza ekle → "Özel web mağazası (Billbee API)"</strong>
+              : locale === "fr"
+              ? <strong>Paramètres → Canaux → Ajouter une boutique → « Boutique web personnalisée (API Billbee) »</strong>
+              : locale === "es"
+              ? <strong>Configuración → Canales → Agregar tienda → "Tienda web personalizada (API Billbee)"</strong>
+              : locale === "it"
+              ? <strong>Impostazioni → Canali → Aggiungi negozio → "Negozio web personalizzato (API Billbee)"</strong>
+              : <strong>Einstellungen → Kanäle → Shop hinzufügen → „Eigener Webshop (Billbee API)"</strong>
+            }
           </Text>
           <Text as="p" variant="bodySm">
-            Felder in Billbee ausfüllen:
+            {locale === "en" ? "Fill in the fields in Billbee:" : locale === "tr" ? "Billbee'deki alanları doldurun:" : locale === "fr" ? "Remplissez les champs dans Billbee :" : locale === "es" ? "Complete los campos en Billbee:" : locale === "it" ? "Compilare i campi in Billbee:" : "Felder in Billbee ausfüllen:"}
           </Text>
           <Text as="p" variant="bodySm">
-            • <strong>Shop-URL</strong> → „URL (API-Basis)" unten kopieren (endet auf <code>/api/billbee</code>)
+            • <strong>{locale === "en" ? "Shop URL" : locale === "tr" ? "Mağaza URL" : locale === "fr" ? "URL boutique" : locale === "es" ? "URL de tienda" : locale === "it" ? "URL negozio" : "Shop-URL"}</strong>{" "}
+            → {locale === "en" ? <>Copy "URL (API Base)" below (ends with <code>/api/billbee</code>)</> : locale === "tr" ? <>Aşağıdaki "URL (API Tabanı)"nı kopyalayın (<code>/api/billbee</code> ile biter)</> : locale === "fr" ? <>Copier « URL (base API) » ci-dessous (se termine par <code>/api/billbee</code>)</> : locale === "es" ? <>Copiar "URL (Base API)" abajo (termina en <code>/api/billbee</code>)</> : locale === "it" ? <>Copiare "URL (base API)" qui sotto (termina con <code>/api/billbee</code>)</> : <>„URL (API-Basis)" unten kopieren (endet auf <code>/api/billbee</code>)</>}
           </Text>
           <Text as="p" variant="bodySm">
-            • <strong>Schlüssel / API-Key</strong> → „Schlüssel (API-Key)" unten kopieren (<code>andertal_seller_…</code>)
+            • <strong>{locale === "en" ? "Key / API Key" : locale === "tr" ? "Anahtar / API Anahtarı" : locale === "fr" ? "Clé / API Key" : locale === "es" ? "Clave / API Key" : locale === "it" ? "Chiave / API Key" : "Schlüssel / API-Key"}</strong>{" "}
+            → {locale === "en" ? <>Copy "Key (API Key)" below (<code>andertal_seller_…</code>)</> : locale === "tr" ? <>Aşağıdaki "Anahtar (API Anahtarı)"nı kopyalayın (<code>andertal_seller_…</code>)</> : locale === "fr" ? <>Copier « Clé (API Key) » ci-dessous (<code>andertal_seller_…</code>)</> : locale === "es" ? <>Copiar "Clave (API Key)" abajo (<code>andertal_seller_…</code>)</> : locale === "it" ? <>Copiare "Chiave (API Key)" qui sotto (<code>andertal_seller_…</code>)</> : <>„Schlüssel (API-Key)" unten kopieren (<code>andertal_seller_…</code>)</>}
           </Text>
           <Text as="p" variant="bodySm">
-            • <strong>Benutzername</strong> → „Basic Auth Benutzername" (deine E-Mail) <em>oder</em> den Schlüssel nochmal eintragen
+            • <strong>{locale === "en" ? "Username" : locale === "tr" ? "Kullanıcı adı" : locale === "fr" ? "Nom d'utilisateur" : locale === "es" ? "Nombre de usuario" : locale === "it" ? "Nome utente" : "Benutzername"}</strong>{" "}
+            → {locale === "en" ? <>"Basic Auth Username" (your email) <em>or</em> enter the key again</> : locale === "tr" ? <>"Basic Auth Kullanıcı Adı" (e-postanız) <em>veya</em> anahtarı tekrar girin</> : locale === "fr" ? <>"Nom d'utilisateur Basic Auth" (votre e-mail) <em>ou</em> entrez à nouveau la clé</> : locale === "es" ? <>"Nombre de usuario Basic Auth" (su correo) <em>o</em> ingrese la clave nuevamente</> : locale === "it" ? <>"Nome utente Basic Auth" (la tua email) <em>o</em> inserisci di nuovo la chiave</> : <>"Basic Auth Benutzername" (deine E-Mail) <em>oder</em> den Schlüssel nochmal eintragen</>}
           </Text>
           <Text as="p" variant="bodySm">
-            • <strong>Passwort</strong> → „Basic Auth Passwort" unten kopieren
+            • <strong>{locale === "en" ? "Password" : locale === "tr" ? "Şifre" : locale === "fr" ? "Mot de passe" : locale === "es" ? "Contraseña" : locale === "it" ? "Password" : "Passwort"}</strong>{" "}
+            → {locale === "en" ? 'Copy "Basic Auth Password" below' : locale === "tr" ? 'Aşağıdaki "Basic Auth Şifresi"ni kopyalayın' : locale === "fr" ? '« Mot de passe Basic Auth » ci-dessous' : locale === "es" ? 'Copiar "Contraseña Basic Auth" abajo' : locale === "it" ? 'Copiare "Password Basic Auth" qui sotto' : '„Basic Auth Passwort" unten kopieren'}
           </Text>
           <Text as="p" variant="bodySm" tone="subdued">
-            Tipp: Wenn Billbee nur das Schlüssel-Feld verwendet (kein Benutzername/Passwort), reicht der Schlüssel allein für die Verbindung.
+            {locale === "en"
+              ? "Tip: If Billbee only uses the key field (no username/password), the key alone is sufficient for the connection."
+              : locale === "tr"
+              ? "İpucu: Billbee yalnızca anahtar alanını kullanıyorsa (kullanıcı adı/şifre yok), bağlantı için anahtar tek başına yeterlidir."
+              : locale === "fr"
+              ? "Conseil : si Billbee n'utilise que le champ clé (sans nom d'utilisateur/mot de passe), la clé seule suffit pour la connexion."
+              : locale === "es"
+              ? "Consejo: si Billbee solo usa el campo de clave (sin nombre de usuario/contraseña), la clave sola es suficiente para la conexión."
+              : locale === "it"
+              ? "Suggerimento: se Billbee utilizza solo il campo chiave (senza nome utente/password), la chiave da sola è sufficiente per la connessione."
+              : "Tipp: Wenn Billbee nur das Schlüssel-Feld verwendet (kein Benutzername/Passwort), reicht der Schlüssel allein für die Verbindung."
+            }
           </Text>
         </BlockStack>
       </Banner>
 
-      <TextField label="Name (Vorschlag)" value={loading ? "…" : name} readOnly autoComplete="off" />
+      <TextField
+        label={locale === "en" ? "Name (suggestion)" : locale === "tr" ? "Ad (öneri)" : locale === "fr" ? "Nom (suggestion)" : locale === "es" ? "Nombre (sugerencia)" : locale === "it" ? "Nome (suggerimento)" : "Name (Vorschlag)"}
+        value={loading ? "…" : name}
+        readOnly
+        autoComplete="off"
+      />
 
       <CopyField
-        label="URL (API-Basis)"
+        label={locale === "en" ? "URL (API Base)" : locale === "tr" ? "URL (API Tabanı)" : locale === "fr" ? "URL (base API)" : locale === "es" ? "URL (base API)" : locale === "it" ? "URL (base API)" : "URL (API-Basis)"}
         value={loading ? "" : apiBaseUrl}
-        helpText={locale === "en" ? "Often used as Shop URL in Billbee; endpoints: /orders, /products, /stock" : locale === "tr" ? "Billbee'de genellikle Shop URL olarak kullanılır; uç noktalar: /orders, /products, /stock" : "Oft als Shop-URL in Billbee; Endpunkte: /orders, /products, /stock"}
+        helpText={locale === "en" ? "Often used as Shop URL in Billbee; endpoints: /orders, /products, /stock" : locale === "tr" ? "Billbee'de genellikle Shop URL olarak kullanılır; uç noktalar: /orders, /products, /stock" : locale === "fr" ? "Souvent utilisé comme URL de boutique dans Billbee ; points de terminaison : /orders, /products, /stock" : locale === "es" ? "Se usa frecuentemente como URL de tienda en Billbee; puntos finales: /orders, /products, /stock" : locale === "it" ? "Spesso usato come URL negozio in Billbee; endpoint: /orders, /products, /stock" : "Oft als Shop-URL in Billbee; Endpunkte: /orders, /products, /stock"}
         multiline
         locale={locale}
       />
 
       <CopyField
-        label="Schlüssel (API-Key)"
+        label={locale === "en" ? "Key (API Key)" : locale === "tr" ? "Anahtar (API Anahtarı)" : locale === "fr" ? "Clé (API Key)" : locale === "es" ? "Clave (API Key)" : locale === "it" ? "Chiave (API Key)" : "Schlüssel (API-Key)"}
         value={loading ? "" : apiKey}
-        helpText={locale === "en" ? "Format andertal_seller_… — also optionally as X-Andertal-Api-Key header" : locale === "tr" ? "Format andertal_seller_… — opsiyonel olarak X-Andertal-Api-Key başlığı olarak da kullanılabilir" : "Format andertal_seller_… — zusätzlich optional als X-Andertal-Api-Key Header"}
+        helpText={locale === "en" ? "Format andertal_seller_… — also optionally as X-Andertal-Api-Key header" : locale === "tr" ? "Format andertal_seller_… — opsiyonel olarak X-Andertal-Api-Key başlığı olarak da kullanılabilir" : locale === "fr" ? "Format andertal_seller_… — également optionnellement en tant qu'en-tête X-Andertal-Api-Key" : locale === "es" ? "Formato andertal_seller_… — también opcionalmente como cabecera X-Andertal-Api-Key" : locale === "it" ? "Formato andertal_seller_… — anche opzionalmente come intestazione X-Andertal-Api-Key" : "Format andertal_seller_… — zusätzlich optional als X-Andertal-Api-Key Header"}
         multiline={false}
         locale={locale}
       />

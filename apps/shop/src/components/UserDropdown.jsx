@@ -7,6 +7,7 @@ import { getToken } from "@andertal/lib";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { LogoutButton } from "@andertal/ui";
 
 /* ─── Trigger icon (ShopHeader) ─── */
 function PersonIcon() {
@@ -76,13 +77,6 @@ const ICONS = {
   messages: (
     <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  ),
-  logout: (
-    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   ),
 };
@@ -266,24 +260,6 @@ function NavPill({ href, icon, children, onClick }) {
       {icon}
       {children}
     </Link>
-  );
-}
-
-function NavPillButton({ onClick, icon, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex flex-shrink-0 items-center gap-1.5 rounded-full border border-red-100 bg-red-50/80 px-3 py-1.5",
-        "text-[12.5px] font-semibold text-red-600",
-        "transition-colors duration-150 hover:bg-red-100/80 active:scale-[0.98] sm:py-2 sm:text-[13px]",
-        "[&>svg]:text-red-400",
-      )}
-    >
-      {icon}
-      {children}
-    </button>
   );
 }
 
@@ -522,15 +498,13 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
                 <NavPill href="/bonus" onClick={close} icon={ICONS.bonus}>
                   {t("navBonus")}
                 </NavPill>
-                <NavPillButton
+                <LogoutButton
+                  label={tCommon("logout")}
                   onClick={() => {
                     onLogout();
                     close();
                   }}
-                  icon={ICONS.logout}
-                >
-                  {tCommon("logout")}
-                </NavPillButton>
+                />
               </div>
 
               <div className="space-y-5">

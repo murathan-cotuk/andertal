@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { routing } from "@/i18n/routing";
 
@@ -34,13 +34,19 @@ export function UnsavedChangesProvider({ children }) {
 
   const runSave = useCallback(async () => {
     const fn = saveHandlerRef.current;
-    if (typeof fn === "function") await Promise.resolve(fn());
-    setDirty(false);
-    setShowNavigateConfirm(false);
-    if (pendingNav) {
-      const to = getLocalizedPath(pendingNav);
-      setPendingNav(null);
-      router.push(to);
+    if (typeof fn !== "function") return;
+    try {
+      const result = await Promise.resolve(fn());
+      if (result === false) return;
+      setDirty(false);
+      setShowNavigateConfirm(false);
+      if (pendingNav) {
+        const to = getLocalizedPath(pendingNav);
+        setPendingNav(null);
+        router.push(to);
+      }
+    } catch {
+      // Keep dirty state when save fails
     }
   }, [pendingNav, router]);
 
@@ -70,18 +76,31 @@ export function UnsavedChangesProvider({ children }) {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [isDirty]);
 
-  const value = {
-    isDirty,
-    setDirty,
-    setHandlers,
-    clearHandlers,
-    showNavigateConfirm,
-    setShowNavigateConfirm,
-    pendingNav,
-    startNavigate,
-    runSave,
-    runDiscard,
-  };
+  const value = useMemo(
+    () => ({
+      isDirty,
+      setDirty,
+      setHandlers,
+      clearHandlers,
+      showNavigateConfirm,
+      setShowNavigateConfirm,
+      pendingNav,
+      startNavigate,
+      runSave,
+      runDiscard,
+    }),
+    [
+      isDirty,
+      setDirty,
+      setHandlers,
+      clearHandlers,
+      showNavigateConfirm,
+      pendingNav,
+      startNavigate,
+      runSave,
+      runDiscard,
+    ],
+  );
 
   return (
     <UnsavedChangesContext.Provider value={value}>

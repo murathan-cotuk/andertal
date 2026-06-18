@@ -39,6 +39,11 @@ import {
   formatChangeRequestValuePreview,
 } from "@/lib/product-change-request-format";
 import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
+import {
+  ProductSectionHeading,
+  ProductSectionRule,
+  PRODUCT_SECTION_STYLES,
+} from "@/components/products/ProductSection";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -238,6 +243,38 @@ function getEmptyProduct() {
   };
 }
 
+function normalizeProductForCompare(p) {
+  if (!p) return null;
+  return {
+    title: p.title ?? "",
+    handle: p.handle ?? "",
+    sku: p.sku ?? "",
+    description: p.description ?? "",
+    status: p.status ?? "draft",
+    price: p.price ?? 0,
+    inventory: p.inventory ?? 0,
+    metadata: p.metadata && typeof p.metadata === "object" ? p.metadata : {},
+    variants: Array.isArray(p.variants) ? p.variants : [],
+  };
+}
+
+function productSnapshot(p) {
+  return JSON.stringify(normalizeProductForCompare(p));
+}
+
+function localizeProductForEditing(p, locale) {
+  if (!p) return p;
+  const tr = p.metadata?.translations;
+  if (tr?.[locale]) {
+    return {
+      ...p,
+      title: tr[locale].title ?? p.title,
+      description: tr[locale].description ?? p.description,
+    };
+  }
+  return p;
+}
+
 function getMeta(product, key, fallback = "") {
   const m = product?.metadata;
   if (!m || typeof m !== "object") return fallback;
@@ -301,8 +338,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [relatedProductPopoverOpen, setRelatedProductPopoverOpen] = useState(false);
   const [descriptionMode, setDescriptionMode] = useState("visual");
   const descEditorRef = useRef(null);
-  const initialSnapshotRef = useRef(null);
-  const afterCleanRef = useRef(false);
+  const [baselineSnapshot, setBaselineSnapshot] = useState(() => {
+    const p = initialProduct ?? (isNew ? getEmptyProduct() : null);
+    return p ? productSnapshot(localizeProductForEditing(p, locale)) : null;
+  });
   const [expandedVariantIndex, setExpandedVariantIndex] = useState(null);
   const dragGroupIdx = useRef(null);
   const [eanLookupState, setEanLookupState] = useState(null); // null | "loading" | "found" | "not_found"
@@ -408,8 +447,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       const localized = mergeLocaleFields(fresh);
       if (localized) {
         setProduct(localized);
-        initialSnapshotRef.current = JSON.stringify(normalizeForCompare(localized));
-        unsavedRef.current?.setDirty(false);
+        setBaselineSnapshot(productSnapshot(localized));
       }
       await refetchPendingChangeRequests(product.id);
       setMessage({ type: "success", text: locale === "tr" ? "Değişiklik onaylandı ve ürün güncellendi." : locale === "de" ? "Änderung genehmigt und Produkt aktualisiert." : "Change approved and product updated." });
@@ -440,8 +478,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       const localized = mergeLocaleFields(fresh);
       if (localized) {
         setProduct(localized);
-        initialSnapshotRef.current = JSON.stringify(normalizeForCompare(localized));
-        unsavedRef.current?.setDirty(false);
+        setBaselineSnapshot(productSnapshot(localized));
       }
       await refetchPendingChangeRequests(product.id);
       setMessage({ type: "success", text: locale === "tr" ? "Değişiklik düzenlenip onaylandı." : locale === "de" ? "Änderung bearbeitet und freigegeben." : "Change edited and approved." });
@@ -479,8 +516,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   useEffect(() => {
     const next = initialProduct ?? (isNew ? getEmptyProduct() : null);
     if (!next) { setProduct((prev) => prev ?? null); return; }
-    const tr = next.metadata?.translations;
-    const localized = tr?.[locale] ? { ...next, title: tr[locale].title ?? next.title, description: tr[locale].description ?? next.description } : next;
+    const localized = localizeProductForEditing(next, locale);
     setProduct((prev) => {
       const prevKey = prev?.id ?? prev?.handle ?? "";
       if (prevKey && initialProductId && prevKey === initialProductId) {
@@ -488,9 +524,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       }
       return localized;
     });
-    // Snapshot must match what product state is set to (localized), not raw next
-    initialSnapshotRef.current = JSON.stringify(normalizeForCompare(localized));
-  }, [initialProductId, isNew, locale]);
+    setBaselineSnapshot(productSnapshot(localized));
+  }, [initialProductId, isNew, locale, initialProduct]);
 
   // Load categories, collections, brands in parallel so the page feels faster
   useEffect(() => {
@@ -573,57 +608,36 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     }
   }, [descriptionMode, locale, product?.description, product?.metadata?.translations]);
 
-  function normalizeForCompare(p) {
-    if (!p) return null;
-    return {
-      title: p.title ?? "",
-      handle: p.handle ?? "",
-      sku: p.sku ?? "",
-      description: p.description ?? "",
-      status: p.status ?? "draft",
-      price: p.price ?? 0,
-      inventory: p.inventory ?? 0,
-      metadata: p.metadata && typeof p.metadata === "object" ? p.metadata : {},
-      variants: Array.isArray(p.variants) ? p.variants : [],
-    };
-  }
-  const isDirty = product && initialSnapshotRef.current != null && JSON.stringify(normalizeForCompare(product)) !== initialSnapshotRef.current;
+  const isDirty =
+    !!product &&
+    baselineSnapshot != null &&
+    productSnapshot(product) !== baselineSnapshot;
   const unsaved = useUnsavedChanges();
-  const unsavedRef = useRef(unsaved);
-  unsavedRef.current = unsaved;
 
   const handleDiscard = useCallback(() => {
-    afterCleanRef.current = true;
-    setTimeout(() => { afterCleanRef.current = false; }, 100);
-    setProduct(initialProduct ?? (isNew ? getEmptyProduct() : null));
-    if (initialProduct) initialSnapshotRef.current = JSON.stringify(normalizeForCompare(initialProduct));
-    else if (isNew) initialSnapshotRef.current = JSON.stringify(normalizeForCompare(getEmptyProduct()));
-    unsavedRef.current?.setDirty(false);
-  }, [initialProduct, isNew]);
+    const reset = initialProduct ?? (isNew ? getEmptyProduct() : null);
+    const localized = localizeProductForEditing(reset, locale);
+    setProduct(localized);
+    setBaselineSnapshot(productSnapshot(localized));
+    unsaved?.setDirty(false);
+  }, [initialProduct, isNew, locale, unsaved]);
 
   useEffect(() => {
-    if (isDirty && afterCleanRef.current) {
-      afterCleanRef.current = false;
-      if (product) initialSnapshotRef.current = JSON.stringify(normalizeForCompare(product));
-      unsavedRef.current?.setDirty(false);
-      return;
-    }
-    unsavedRef.current?.setDirty(isDirty);
-  }, [isDirty]);
+    if (!unsaved) return;
+    unsaved.setDirty(!!isDirty);
+  }, [isDirty, unsaved]);
 
   useEffect(() => {
-    afterCleanRef.current = true;
-    setTimeout(() => { afterCleanRef.current = false; }, 100);
-    unsavedRef.current?.setHandlers({
+    if (!unsaved) return;
+    unsaved.setHandlers({
       onSave: () => saveRef.current?.(),
       onDiscard: () => discardRef.current?.(),
     });
     return () => {
-      afterCleanRef.current = false;
-      unsavedRef.current?.clearHandlers();
-      unsavedRef.current?.setDirty(false);
+      unsaved.clearHandlers();
+      unsaved.setDirty(false);
     };
-  }, []);
+  }, [unsaved]);
 
   const meta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
 
@@ -862,7 +876,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   }, [categories]);
 
   const save = async () => {
-    if (!product) return;
+    if (!product) return false;
     // Flush visual editor content for the current editing locale
     const editingDescToSave = descriptionMode === "visual" && descEditorRef.current
       ? descriptionVisualToHtml(descEditorRef.current.innerHTML || "")
@@ -935,8 +949,16 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       const variantsToSave = product.variants || [];
       const missingVariantEan = variantsToSave.find((row) => String(row?.ean || "").trim() === "");
       if (missingVariantEan) {
-        setMessage({ type: "error", text: "Variant EAN darf nicht leer sein. Boş varyant EAN ile kayıt yapılamaz." });
-        return;
+        setMessage({
+          type: "warning",
+          text:
+            locale === "tr"
+              ? "Kaydetmek için tüm varyantlarda EAN girilmelidir."
+              : locale === "de"
+                ? "Bitte EAN für alle Varianten eintragen, um zu speichern."
+                : "Enter EAN for all variants before saving.",
+        });
+        return false;
       }
       const gpsrMissing = [];
       if (!String(metadata.hersteller || "").trim()) gpsrMissing.push("Hersteller");
@@ -944,10 +966,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       if (!String(metadata.verantwortliche_person_information || "").trim()) gpsrMissing.push("Verantwortliche Person (EU)");
       if (gpsrMissing.length > 0) {
         setMessage({
-          type: "error",
-          text: `GPSR ist verpflichtend. Bitte folgende Felder ausfüllen: ${gpsrMissing.join(", ")}`,
+          type: "warning",
+          text:
+            locale === "tr"
+              ? `Kaydetmek için GPSR alanlarını doldurun: ${gpsrMissing.join(", ")}`
+              : locale === "de"
+                ? `Bitte folgende GPSR-Felder ausfüllen, um zu speichern: ${gpsrMissing.join(", ")}`
+                : `Fill in these GPSR fields to save: ${gpsrMissing.join(", ")}`,
         });
-        return;
+        return false;
       }
       const collectionId = (metadata.collection_ids && metadata.collection_ids[0]) || product.collection_id || null;
       // Canonical title = DE locale (for backward compat with shop)
@@ -979,7 +1006,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         }
         onReload?.();
         if (created?.id) router.push(`/products/${created.id}`);
-        return;
+        return true;
       }
       const updatedRaw = await client.updateAdminHubProduct(idOrHandle, payload);
 
@@ -989,9 +1016,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("andertal-notifications-refresh"));
         }
+        const merged = { ...product, ...payload, metadata: payload.metadata ?? product.metadata };
+        setProduct(merged);
+        setBaselineSnapshot(productSnapshot(merged));
+        unsaved?.setDirty(false);
         await refetchPendingChangeRequests(product.id);
-        setSaving(false);
-        return;
+        return true;
       }
 
       // Handle listing_saved (seller-specific fields saved to listing, not master product)
@@ -1012,13 +1042,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         : savedProductRaw;
 
       setProduct(savedProduct);
-      initialSnapshotRef.current = JSON.stringify(normalizeForCompare(savedProduct));
-      unsavedRef.current?.setDirty(false);
+      setBaselineSnapshot(productSnapshot(savedProduct));
+      unsaved?.setDirty(false);
       setMessage({ type: "success", text: updatedRaw?.listing_saved ? "Preis, Bestand und eigene Daten gespeichert." : "Saved" });
       await refetchPendingChangeRequests(savedProduct.id);
       onReload?.();
+      return true;
     } catch (err) {
       setMessage({ type: "error", text: err?.message || "Save failed" });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1575,6 +1607,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .product-edit-header .product-edit-title-link { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--p-color-text); font-size: 0.875rem; }
         .product-edit-header .product-edit-title-link:hover { color: var(--p-color-text); }
         .product-edit-header .product-edit-name { margin: 0; font-size: 0.875rem; font-weight: 700; }
+        ${PRODUCT_SECTION_STYLES}
         .product-edit-label { font-size: 0.8125rem; font-weight: 400; color: var(--p-color-text-subdued); margin-bottom: 4px; }
         .product-price-strike { text-decoration: line-through; color: var(--p-color-text-subdued); }
         .product-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; max-width: 400px; }
@@ -1695,7 +1728,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
       {message.text && (
         <Box paddingBlockEnd="200">
-          <Banner tone={message.type === "success" ? "success" : "critical"} onDismiss={() => setMessage({ type: "", text: "" })}>{message.text}</Banner>
+          <Banner
+            tone={message.type === "success" ? "success" : message.type === "warning" ? "warning" : "critical"}
+            onDismiss={() => setMessage({ type: "", text: "" })}
+          >
+            {message.text}
+          </Banner>
         </Box>
       )}
 
@@ -1820,14 +1858,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       <Layout>
         <Layout.Section>
           <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center" wrap={false}>
-                <Text as="h2" variant="bodyMd" fontWeight="regular">Title</Text>
-                <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="title" />
-              </InlineStack>
+            <div className="product-edit-sections">
+            <BlockStack gap="500">
+              <ProductSectionHeading badge={<ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="title" />}>
+                Title
+              </ProductSectionHeading>
               <TextField label="Title" labelHidden value={editingTitle} onChange={(v) => updateLocaleField("title", v)} placeholder="e.g. Cotton T-Shirt" autoComplete="off" />
 
-              <Divider />
+              <ProductSectionRule />
               <InlineStack gap="300" wrap>
                 <Box minWidth="240px" flex="1">
                   <TextField label="SKU" value={product.sku || ""} onChange={(v) => update({ sku: v })} placeholder="SKU" autoComplete="off" />
@@ -1861,30 +1899,33 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 </Box>
               </InlineStack>
 
-              <Divider />
-              <InlineStack gap="200" blockAlign="center" wrap={false}>
-                <Text as="h2" variant="bodyMd" fontWeight="regular">Produkt-Etikett</Text>
-                <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.badge" />
-              </InlineStack>
-              <Select
-                label="Badge / Etikett"
-                labelHidden
-                options={[
-                  { label: "Kein Etikett", value: "" },
-                  { label: "⭐ Bestseller", value: "bestseller" },
-                  { label: "🆕 Neu", value: "new" },
-                  { label: "🔥 Sale", value: "sale" },
-                ]}
-                value={getMeta(product, "badge") || ""}
-                onChange={(v) => updateMeta("badge", v || null)}
-              />
+              <ProductSectionRule />
+              {isSuperuser && (
+                <>
+                  <ProductSectionHeading badge={<ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.badge" />}>
+                    Produkt-Etikett
+                  </ProductSectionHeading>
+                  <Select
+                    label="Badge / Etikett"
+                    labelHidden
+                    options={[
+                      { label: "Kein Etikett", value: "" },
+                      { label: "⭐ Bestseller", value: "bestseller" },
+                      { label: "🆕 Neu", value: "new" },
+                      { label: "🔥 Sale", value: "sale" },
+                    ]}
+                    value={getMeta(product, "badge") || ""}
+                    onChange={(v) => updateMeta("badge", v || null)}
+                  />
+                  <ProductSectionRule />
+                </>
+              )}
 
-              <Divider />
               <Box padding="400" background="bg-surface-secondary" borderRadius="300" borderWidth="025" borderColor="border">
                 <BlockStack gap="300">
                   <InlineStack align="space-between" blockAlign="start" gap="400" wrap>
                     <BlockStack gap="150">
-                      <Text as="h2" variant="headingSm">Shop-Zuordnung</Text>
+                      <ProductSectionHeading>Shop-Zuordnung</ProductSectionHeading>
                       <Text as="p" variant="bodySm" tone="subdued">
                         Kategorie, Marke, Versandgruppe{isSuperuser ? " und Kollektionen" : ""} — steuern Katalog und Shop-Navigation.
                       </Text>
@@ -2030,12 +2071,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 </BlockStack>
               </Box>
 
-              <Divider />
+              <ProductSectionRule />
               <BlockStack gap="200">
-                <InlineStack gap="200" blockAlign="center" wrap={false}>
-                  <Text as="h2" variant="bodyMd" fontWeight="regular">Description</Text>
-                  <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="description" />
-                </InlineStack>
+                <ProductSectionHeading badge={<ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="description" />}>
+                  Description
+                </ProductSectionHeading>
                 <div className="product-description-box">
                   <div className="product-description-toolbar">
                     <div className="product-description-toolbar-left">
@@ -2099,8 +2139,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 <p className="product-description-hint">Shown on the product page. Changes are saved when you blur the field or switch mode.</p>
               </BlockStack>
 
-              <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Media</Text>
+              <ProductSectionRule />
+              <ProductSectionHeading>Media</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
                 Neue Bild-Uploads: JPEG oder PNG, mindestens 1000×1000 px; der Server speichert quadratisches WebP (1000×1000) für den Shop.
               </Text>
@@ -2193,8 +2233,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 }}
               />
 
-              <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Produktdokumente &amp; Compliance</Text>
+              <ProductSectionRule />
+              <ProductSectionHeading>Produktdokumente &amp; Compliance</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
                 WEEE-Reg.-Nummer, EPREL-Nummer und Produktdateien (z. B. Produktdatenblatt, EEK-Label). Dateien werden im Shop unter der Produktbeschreibung angezeigt.
               </Text>
@@ -2314,8 +2354,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 )}
               </InlineStack>
 
-              <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Pricing</Text>
+              <ProductSectionRule />
+              <ProductSectionHeading>Pricing</ProductSectionHeading>
 
               <Text as="p" variant="bodySm" tone="subdued">
                 {currentCountryConf.label} · {currentCountryConf.currency} · {currentCountryConf.taxLabel} {currentCountryConf.vatRate}%
@@ -2491,8 +2531,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 </Box>
               </div>
 
-              <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Bullet points (max 5, je max. 120 Zeichen)</Text>
+              <ProductSectionRule />
+              <ProductSectionHeading>Bullet points (max 5, je max. 120 Zeichen)</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">Short selling points shown on the product page.</Text>
               {[0, 1, 2, 3, 4].map((i) => {
                 const val = editingBullets[i] ?? "";
@@ -2522,14 +2562,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 );
               })}
 
-              <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Inventory</Text>
+              <ProductSectionRule />
+              <ProductSectionHeading>Inventory</ProductSectionHeading>
               <Box minWidth="120px">
                 <TextField label="Quantity" labelHidden type="number" value={product.inventory != null ? String(product.inventory) : "0"} onChange={(v) => update({ inventory: parseInt(v, 10) || 0 })} min={0} />
               </Box>
               <Text as="p" variant="bodySm" tone="subdued">Warehouse split can be set later in metadata.</Text>
 
-              <Divider />
+              <ProductSectionRule />
 
               {/* ════════════════════════════════════════════════════════
                   VARIATION ENGINE  (Amazon / eBay style)
@@ -2537,7 +2577,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   ════════════════════════════════════════════════════════ */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                 <div>
-                  <Text as="h2" variant="bodyMd" fontWeight="semibold">Variations</Text>
+                  <ProductSectionHeading>Variations</ProductSectionHeading>
                   <Text as="p" variant="bodySm" tone="subdued">
                     Add groups (e.g. Color, Size). Variant combinations are auto-generated.
                     Option values use one internal key (set on first entry); switch the globe to translate labels per language — shop shows the label for each locale.
@@ -2820,10 +2860,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 );
               })()}
 
-              <Divider />
+              <ProductSectionRule />
               <BlockStack gap="400">
                 <BlockStack gap="150">
-                  <Text as="h2" variant="headingSm">Metafelder (Katalog)</Text>
+                  <ProductSectionHeading>Metafelder (Katalog)</ProductSectionHeading>
                   <Text as="p" variant="bodySm" tone="subdued">
                     Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen“ ausgewählte — werden angezeigt (nicht der gesamte Katalog).
                   </Text>
@@ -3053,8 +3093,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 </Modal.Section>
               </Modal>
 
-              <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Produktsicherheitsinformationen (GPSR)</Text>
+              <ProductSectionRule />
+              <ProductSectionHeading>Produktsicherheitsinformationen (GPSR)</ProductSectionHeading>
               <TextField
                 label={
                   <InlineStack gap="200" blockAlign="center" wrap={false}>
@@ -3095,8 +3135,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 multiline={2}
               />
 
-              <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">Made in Europe (optional)</Text>
+              <ProductSectionRule />
+              <ProductSectionHeading>Made in Europe (optional)</ProductSectionHeading>
               <Text as="p" tone="subdued">
                 Registry-ID und Nachweisdokument optional. Nach Speichern mit geänderten Angaben: Status „pending“.
                 Im Shop erscheint das Badge nur bei Status „verified“ (Superuser oder spätere Registry-Prüfung).
@@ -3179,8 +3219,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 ) : null}
               </InlineStack>
 
-              <Divider />
-              <Text as="h2" variant="bodyMd" fontWeight="regular">SEO</Text>
+              <ProductSectionRule />
+              <ProductSectionHeading>SEO</ProductSectionHeading>
               {isSuperuser ? (
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "var(--p-color-text-subdued)", marginBottom: 4 }}>
@@ -3280,19 +3320,21 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 autoComplete="off"
               />
             </BlockStack>
+            </div>
           </Card>
         </Layout.Section>
 
         <Layout.Section variant="oneThird">
+          <div className="product-edit-sidebar">
           <BlockStack gap="300">
             <Card>
               <BlockStack gap="400">
                 <BlockStack gap="200">
-                  <Text as="h2" variant="bodyMd" fontWeight="regular">Status</Text>
+                  <ProductSectionHeading>Status</ProductSectionHeading>
                   <Select label="Status" labelHidden options={STATUS_OPTIONS} value={product.status || "draft"} onChange={(v) => update({ status: v })} />
                 </BlockStack>
                 <BlockStack gap="200">
-                  <Text as="h2" variant="bodyMd" fontWeight="regular">Yayın tarihi (opsiyonel)</Text>
+                  <ProductSectionHeading>Yayın tarihi (opsiyonel)</ProductSectionHeading>
                   <TextField
                     label=""
                     labelHidden
@@ -3325,7 +3367,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
                 <div style={{ position: "relative", zIndex: relatedProductPopoverOpen ? 10000 : undefined, overflow: "visible" }}>
                   <BlockStack gap="200">
-                    <Text as="h2" variant="bodyMd" fontWeight="regular">Related products (Kunden kauften auch)</Text>
+                    <ProductSectionHeading>Related products (Kunden kauften auch)</ProductSectionHeading>
                     <Text as="p" variant="bodySm" tone="subdued">Ürün sayfasında &quot;Kunden, die diesen Artikel gekauft haben, kauften auch&quot; bölümünde gösterilecek ürünler.</Text>
                     <TextField
                       label=""
@@ -3395,17 +3437,17 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   </BlockStack>
                 </div>
 
-                <Divider />
+                <ProductSectionRule />
 
                 <BlockStack gap="200">
-                  <Text as="h2" variant="bodyMd" fontWeight="regular">Sales</Text>
+                  <ProductSectionHeading>Sales</ProductSectionHeading>
                   <Text as="p" variant="bodyMd">{meta.sales_count != null ? meta.sales_count : 0} sales</Text>
                 </BlockStack>
 
-                <Divider />
+                <ProductSectionRule />
 
                 <BlockStack gap="200">
-                  <Text as="h2" variant="bodyMd" fontWeight="regular">Type</Text>
+                  <ProductSectionHeading>Type</ProductSectionHeading>
                   <TextField label="Product type" labelHidden value={meta.type ?? ""} onChange={(v) => updateMeta("type", v)} placeholder="e.g. T-Shirt" autoComplete="off" />
                 </BlockStack>
               </BlockStack>
@@ -3413,7 +3455,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
             <Card>
               <BlockStack gap="200">
-                <Text as="h2" variant="bodyMd" fontWeight="regular">Weight & dimensions</Text>
+                <ProductSectionHeading>Weight & dimensions</ProductSectionHeading>
                 <TextField label="Weight (g)" labelHidden type="number" value={meta.weight_grams != null ? String(meta.weight_grams) : ""} onChange={(v) => updateMeta("weight_grams", v === "" ? "" : parseInt(v, 10))} placeholder="grams" />
                 <InlineStack gap="200">
                   <TextField label="L (cm)" labelHidden type="number" value={meta.dimensions_length != null ? String(meta.dimensions_length) : ""} onChange={(v) => updateMeta("dimensions_length", v)} placeholder="L" />
@@ -3425,7 +3467,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
             <Card>
               <BlockStack gap="200">
-                <Text as="h2" variant="bodyMd" fontWeight="regular">Content per unit</Text>
+                <ProductSectionHeading>Content per unit</ProductSectionHeading>
                 <Text as="p" variant="bodySm" tone="subdued">Shown on product e.g. &quot;Content: 200 g (€5.00* / 1 kg)&quot;. Enter the amount, unit, and reference quantity for the price per unit.</Text>
                 <TextField label="Amount" labelHidden type="number" value={meta.unit_value != null ? String(meta.unit_value) : ""} onChange={(v) => updateMeta("unit_value", v)} placeholder="e.g. 200" helpText="Numeric amount (e.g. 200 for 200 g)" />
                 <Select label="Unit" options={UNIT_TYPE_OPTIONS} value={meta.unit_type ?? ""} onChange={(v) => updateMeta("unit_type", v)} />
@@ -3433,6 +3475,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               </BlockStack>
             </Card>
           </BlockStack>
+          </div>
         </Layout.Section>
       </Layout>
 

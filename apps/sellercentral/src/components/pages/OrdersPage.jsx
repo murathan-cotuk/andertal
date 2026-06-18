@@ -13,6 +13,7 @@ import ShipLabelModal from "@/components/orders/ShipLabelModal";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
+import { resolveSellerFacingError, readSellerIsSuperuser } from "@/lib/seller-system-errors";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function fmtCents(c) {
@@ -847,7 +848,7 @@ export default function OrdersPage() {
         fetchOrders();
       })
       .catch(e => {
-        setLabelFulfillResult({ error: e?.message || "Etikett konnte nicht erstellt werden." });
+        setLabelFulfillResult({ error: resolveSellerFacingError(e, locale, readSellerIsSuperuser()) });
       });
   }, []);
 

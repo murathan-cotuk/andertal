@@ -13,6 +13,7 @@ import { resolveImageUrl } from "@/lib/image-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
+import { enrichVariationGroups } from "@/lib/product-variations";
 import { localizeMetaKey, localizeSectionLabel } from "@/lib/prop-labels";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
@@ -34,7 +35,7 @@ const TrustpilotWordmark  = dynamic(
   () => import("@/components/TrustpilotTrustBox").then((m) => ({ default: m.TrustpilotWordmark })),
   { ssr: false }
 );
-import ToCartButton from "@/components/ui/To Cart Button";
+import ProductPurchaseActions from "@/components/ui/ProductPurchaseActions";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import MadeInEuropeOverlay from "@/components/MadeInEuropeOverlay";
@@ -557,63 +558,6 @@ const TaxLine = styled.div`
   margin-top: 6px;
 `;
 
-const StockRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 12px;
-  border-radius: 14px;
-  background: rgba(249, 250, 251, 0.9);
-  border: 1px solid rgba(229, 231, 235, 0.9);
-  margin-bottom: 14px;
-`;
-
-const QtyWrap = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-`;
-
-const QtyLabel = styled.label`
-  font-size: 0.75rem;
-  color: #6b7280;
-  font-weight: 600;
-`;
-
-const QtySelect = styled.select`
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 7px 10px;
-  font-size: 0.9rem;
-  background: #fff;
-  cursor: pointer;
-  font-weight: 700;
-  color: #111;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  &[type="number"] {
-    width: 11.5rem;
-    min-width: 0;
-    box-sizing: border-box;
-    text-align: center;
-    padding-left: 6px;
-    padding-right: 6px;
-    cursor: text;
-  }
-  &:focus {
-    border-color: rgba(255,106,0,0.55);
-    box-shadow: 0 0 0 4px rgba(255,106,0,0.12);
-  }
-`;
-
-const CtaStack = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 14px;
-`;
-
 const InfoList = styled.div`
   border-top: 1px solid rgba(229,231,235,0.9);
   padding-top: 12px;
@@ -639,23 +583,6 @@ const InfoValue = styled.span`
   text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
-`;
-
-const CartNotice = styled.div`
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #065f46;
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.28);
-  border-radius: 10px;
-  padding: 8px 10px;
-  text-align: center;
-  opacity: ${(p) => (p.$visible ? 1 : 0)};
-  transform: translateY(${(p) => (p.$visible ? "0px" : "6px")});
-  transition: opacity 450ms ease, transform 450ms ease;
-  z-index: 5;
-  position: relative;
-  pointer-events: none;
 `;
 
 const SectionTitle = styled.h2`
@@ -1010,7 +937,6 @@ function findAncestors(nodes, slug, path = []) {
 }
 
 export default function ProductTemplate() {
-  const VISIBLE_VARIATION_COUNT = 3;
   const params = useParams();
   const locale = useLocale();
   const marketPrefixVal = useMarketPrefix();
@@ -1034,7 +960,6 @@ export default function ProductTemplate() {
   const [multiOffer, setMultiOffer] = useState(null);
   const [selectedSellerId, setSelectedSellerId] = useState(null);
   const [otherSellersOpen, setOtherSellersOpen] = useState(false);
-  const [expandedVariantGroups, setExpandedVariantGroups] = useState({});
   const [categoryAncestors, setCategoryAncestors] = useState([]);
   const [categoryCurrentNode, setCategoryCurrentNode] = useState(null);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
@@ -1257,10 +1182,11 @@ export default function ProductTemplate() {
   const rawVariants = product.variants || [];
   const variationGroups = product.variation_groups || null;
   const variants = normalizeVariants(rawVariants, variationGroups);
-  const useLinkedVariations = Array.isArray(variationGroups) && variationGroups.length > 0 &&
-    variants.some((v) => Array.isArray(v.option_values) && v.option_values.length === variationGroups.length);
+  const displayVariationGroups = enrichVariationGroups(variationGroups, variants);
+  const useLinkedVariations = Array.isArray(displayVariationGroups) && displayVariationGroups.length > 0 &&
+    variants.some((v) => Array.isArray(v.option_values) && v.option_values.length === displayVariationGroups.length);
   const effectiveVariantIndex = useLinkedVariations
-    ? findVariantIndexByMap(variants, variationGroups, selectedOptions)
+    ? findVariantIndexByMap(variants, displayVariationGroups, selectedOptions)
     : selectedVariantIndex;
   const variant = variants[effectiveVariantIndex] ?? variants[selectedVariantIndex] ?? variants[0];
   // Variant media: prefer metadata.media array, fall back to single image_url
@@ -1489,9 +1415,9 @@ export default function ProductTemplate() {
       : {}),
   } : null;
 
-  const variantSelectorContent = useLinkedVariations && variationGroups?.length ? (
+  const variantSelectorContent = useLinkedVariations && displayVariationGroups?.length ? (
     <VariantSection>
-      {variationGroups.map((group, gIdx) => {
+      {displayVariationGroups.map((group, gIdx) => {
         const groupName = group.name || "";
         const selected = selectedOptions[groupName] ?? "";
         const groupTitle = variationGroupDisplayName(group, gIdx, meta, locale);
@@ -1511,14 +1437,14 @@ export default function ProductTemplate() {
               {selectedLabel && <VarLabelSelected>: {selectedLabel}</VarLabelSelected>}
             </VarLabel>
             <VarRow>
-              {(expandedVariantGroups[groupName] ? (group.options || []) : (group.options || []).slice(0, VISIBLE_VARIATION_COUNT)).map((opt, oIdx) => {
+              {(group.options || []).map((opt, oIdx) => {
                 const valueStr = optionCanonicalValue(opt);
                 const displayStr = optionDisplayLabel(opt, locale) || `Option ${oIdx + 1}`;
                 const swatchUrl = typeof opt === "object" && opt.swatch_image
                   ? resolveImageUrl(opt.swatch_image)
                   : null;
                 const isSelected = selected.trim().toLowerCase() === valueStr.toLowerCase();
-                const inStockOpt = hasStockForOption(variants, variationGroups, groupName, valueStr, selectedOptions);
+                const inStockOpt = hasStockForOption(variants, displayVariationGroups, groupName, valueStr, selectedOptions);
                 const handleClick = () => {
                   if (isSelected || !inStockOpt) return;
                   setSelectedOptions((prev) => ({ ...prev, [groupName]: valueStr }));
@@ -1558,19 +1484,6 @@ export default function ProductTemplate() {
                 );
               })}
             </VarRow>
-            {(group.options || []).length > VISIBLE_VARIATION_COUNT && (
-              <VarToggleBtn
-                type="button"
-                onClick={() =>
-                  setExpandedVariantGroups((prev) => ({
-                    ...prev,
-                    [groupName]: !prev[groupName],
-                  }))
-                }
-              >
-                {expandedVariantGroups[groupName] ? "Weniger anzeigen" : "Mehr anzeigen"}
-              </VarToggleBtn>
-            )}
           </VarGroup>
         );
       })}
@@ -1584,7 +1497,7 @@ export default function ProductTemplate() {
           <VarGroup key={group.title}>
             <VarLabel>{group.title}</VarLabel>
             <VarRow>
-              {(expandedVariantGroups[group.title] ? group.options : group.options.slice(0, VISIBLE_VARIATION_COUNT)).map(({ variant: v, index: idx }) => {
+              {group.options.map(({ variant: v, index: idx }) => {
                 const qty = v.inventory_quantity ?? v.inventory ?? 0;
                 const oos = Number(qty) <= 0;
                 return (
@@ -1601,19 +1514,6 @@ export default function ProductTemplate() {
                 );
               })}
             </VarRow>
-            {group.options.length > VISIBLE_VARIATION_COUNT && (
-              <VarToggleBtn
-                type="button"
-                onClick={() =>
-                  setExpandedVariantGroups((prev) => ({
-                    ...prev,
-                    [group.title]: !prev[group.title],
-                  }))
-                }
-              >
-                {expandedVariantGroups[group.title] ? "Weniger anzeigen" : "Mehr anzeigen"}
-              </VarToggleBtn>
-            )}
           </VarGroup>
         ))}
       </VariantSection>
@@ -1826,55 +1726,20 @@ export default function ProductTemplate() {
                 grundpreis={grundpreis}
               />
 
-              <StockRow>
-                <QtyWrap>
-                  <QtyLabel>Menge</QtyLabel>
-                  <QtySelect
-                    as="input"
-                    type="number"
-                    min={1}
-                    value={quantity}
-                    onChange={(e) => {
-                      const v = Math.max(1, Math.floor(Number(e.target.value)) || 1);
-                      setQuantity(v);
-                    }}
-                    onBlur={(e) => {
-                      const v = Math.max(1, Math.floor(Number(e.target.value)) || 1);
-                      setQuantity(v);
-                    }}
-                    disabled={!inStock || isComingSoon || shippingUnavailable}
-                  />
-                </QtyWrap>
-              </StockRow>
-
-              <CtaStack>
-                {cartNotice.text ? (
-                  <CartNotice $visible={cartNotice.visible}>{cartNotice.text}</CartNotice>
-                ) : null}
-                <ToCartButton
-                  onClick={handleAddToCart}
-                  disabled={!inStock || isComingSoon || shippingUnavailable}
-                >
-                  {shippingUnavailable
-                    ? ({ de: "Nicht in diese Region lieferbar", tr: "Bu bölgeye teslimat yok", fr: "Pas de livraison dans cette région", it: "Nessuna consegna in questa regione", es: "Sin envío a esta región" }[locale] ?? "Not available in this region")
-                    : isComingSoon
-                      ? ({ de: "Bald verfügbar", tr: "Yakında", fr: "Bientôt disponible", it: "Disponibile presto", es: "Próximamente" }[locale] ?? "Coming Soon")
-                      : !inStock
-                        ? ({ de: "Ausverkauft", tr: "Stokta Yok", fr: "Épuisé", it: "Esaurito", es: "Agotado" }[locale] ?? "Out of Stock")
-                        : ({ de: "In den Einkaufswagen", tr: "Sepete Ekle", fr: "Ajouter au panier", it: "Aggiungi al carrello", es: "Añadir al carrito" }[locale] ?? "Add to Cart")
-                  }
-                </ToCartButton>
-                {isComingSoon && publishDate && (
-                  <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "8px 0 0", fontWeight: 400 }}>
-                    {({ de: "Bald verfügbar", tr: "Pek yakında", fr: "Bientôt disponible", it: "Disponibile presto", es: "Próximamente" }[locale] ?? "Coming Soon")}
-                    {publishDate && !isNaN(publishDate.getTime()) && (
-                      <span style={{ marginLeft: 6 }}>
-                        ({publishDate.toLocaleDateString(locale === "tr" ? "tr-TR" : "de-DE", { day: "numeric", month: "long", year: "numeric" })})
-                      </span>
-                    )}
-                  </p>
-                )}
-              </CtaStack>
+              <ProductPurchaseActions
+                locale={locale}
+                quantity={quantity}
+                onQuantityChange={setQuantity}
+                maxQty={maxQty}
+                purchaseDisabled={!inStock || isComingSoon || shippingUnavailable}
+                onAddToCart={handleAddToCart}
+                cartNotice={cartNotice}
+                shippingUnavailable={shippingUnavailable}
+                isComingSoon={isComingSoon}
+                inStock={inStock}
+                publishDate={publishDate}
+                stackOnly
+              />
 
               <InfoList>
                 {[

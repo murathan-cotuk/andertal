@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import { useLocale } from "next-intl";
 import styled from "styled-components";
 import { Card, Button } from "@andertal/ui";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { getUI } from "@/lib/ui-strings";
 
 const Container = styled.div`max-width: 1200px; margin: 0 auto;`;
 const Title = styled.h1`font-size: 32px; font-weight: 700; margin-bottom: 32px; color: #1f2937;`;
@@ -69,6 +71,8 @@ const STATUS_COLOR = {
 };
 
 export default function BulkUploadPage() {
+  const locale = useLocale();
+  const ui = getUI(locale);
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null); // array of parsed rows
@@ -80,7 +84,7 @@ export default function BulkUploadPage() {
 
   const handleFile = (f) => {
     if (!f) return;
-    if (!f.name.endsWith(".csv")) { setError("Bitte eine .csv Datei hochladen."); return; }
+    if (!f.name.endsWith(".csv")) { setError(locale === "en" ? "Please upload a .csv file." : locale === "tr" ? "Lütfen bir .csv dosyası yükleyin." : locale === "fr" ? "Veuillez télécharger un fichier .csv." : locale === "es" ? "Por favor sube un archivo .csv." : locale === "it" ? "Carica un file .csv." : "Bitte eine .csv Datei hochladen."); return; }
     setError("");
     setResults(null);
     setFile(f);
@@ -90,7 +94,7 @@ export default function BulkUploadPage() {
         const rows = parseCSV(e.target.result);
         setPreview(rows);
       } catch {
-        setError("CSV konnte nicht gelesen werden.");
+        setError(locale === "en" ? "Could not read CSV." : locale === "tr" ? "CSV okunamadı." : locale === "fr" ? "Impossible de lire le CSV." : locale === "es" ? "No se pudo leer el CSV." : locale === "it" ? "Impossibile leggere il CSV." : "CSV konnte nicht gelesen werden.");
       }
     };
     reader.readAsText(f, "utf-8");
@@ -123,7 +127,7 @@ export default function BulkUploadPage() {
       }
       setResults(allResults);
     } catch (e) {
-      setError(e?.message || "Upload fehlgeschlagen.");
+      setError(e?.message || (locale === "en" ? "Upload failed." : locale === "tr" ? "Yükleme başarısız." : locale === "fr" ? "Échec du téléchargement." : locale === "es" ? "Error al subir." : locale === "it" ? "Caricamento fallito." : "Upload fehlgeschlagen."));
     } finally {
       setUploading(false);
       setProgress(100);
@@ -136,7 +140,7 @@ export default function BulkUploadPage() {
 
   return (
     <Container>
-      <Title>Produkte per CSV hochladen</Title>
+      <Title>{locale === "en" ? "Upload products via CSV" : locale === "tr" ? "CSV ile ürün yükle" : locale === "fr" ? "Importer des produits via CSV" : locale === "es" ? "Subir productos por CSV" : locale === "it" ? "Carica prodotti via CSV" : "Produkte per CSV hochladen"}</Title>
 
       <Section>
         {/* Template download */}
@@ -144,12 +148,12 @@ export default function BulkUploadPage() {
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <i className="fas fa-file-csv" style={{ fontSize: "24px", color: "#0ea5e9" }} />
             <div>
-              <p style={{ margin: 0, fontWeight: 600, color: "#1f2937" }}>CSV-Vorlage herunterladen</p>
-              <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>Spalten: {CSV_COLUMNS.join(", ")}</p>
+              <p style={{ margin: 0, fontWeight: 600, color: "#1f2937" }}>{locale === "en" ? "Download CSV template" : locale === "tr" ? "CSV şablonu indir" : locale === "fr" ? "Télécharger le modèle CSV" : locale === "es" ? "Descargar plantilla CSV" : locale === "it" ? "Scarica il modello CSV" : "CSV-Vorlage herunterladen"}</p>
+              <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>{locale === "en" ? "Columns" : locale === "tr" ? "Sütunlar" : locale === "fr" ? "Colonnes" : locale === "es" ? "Columnas" : locale === "it" ? "Colonne" : "Spalten"}: {CSV_COLUMNS.join(", ")}</p>
             </div>
           </div>
           <Button onClick={downloadTemplate}>
-            <i className="fas fa-download" style={{ marginRight: "8px" }} />Vorlage
+            <i className="fas fa-download" style={{ marginRight: "8px" }} />{locale === "en" ? "Template" : locale === "tr" ? "Şablon" : locale === "fr" ? "Modèle" : locale === "es" ? "Plantilla" : locale === "it" ? "Modello" : "Vorlage"}
           </Button>
         </div>
 
@@ -163,8 +167,8 @@ export default function BulkUploadPage() {
         >
           <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
           <i className="fas fa-cloud-upload-alt" style={{ fontSize: "48px", color: "#0ea5e9", marginBottom: "16px", display: "block" }} />
-          <p style={{ fontSize: "16px", color: "#6b7280", margin: "0 0 8px" }}>CSV-Datei hier ablegen oder klicken</p>
-          <p style={{ fontSize: "14px", color: "#9ca3af", margin: 0 }}>Nur .csv – max. 500 Produkte, max. 10 MB</p>
+          <p style={{ fontSize: "16px", color: "#6b7280", margin: "0 0 8px" }}>{locale === "en" ? "Drop CSV file here or click" : locale === "tr" ? "CSV dosyasını buraya bırakın veya tıklayın" : locale === "fr" ? "Déposez le fichier CSV ici ou cliquez" : locale === "es" ? "Suelta el archivo CSV aquí o haz clic" : locale === "it" ? "Trascina il file CSV qui o clicca" : "CSV-Datei hier ablegen oder klicken"}</p>
+          <p style={{ fontSize: "14px", color: "#9ca3af", margin: 0 }}>{locale === "en" ? ".csv only – max. 500 products, max. 10 MB" : locale === "tr" ? "Sadece .csv – max. 500 ürün, max. 10 MB" : locale === "fr" ? ".csv uniquement – max. 500 produits, max. 10 Mo" : locale === "es" ? "Solo .csv – máx. 500 productos, máx. 10 MB" : locale === "it" ? "Solo .csv – max. 500 prodotti, max. 10 MB" : "Nur .csv – max. 500 Produkte, max. 10 MB"}</p>
         </UploadArea>
 
         {error && (
@@ -175,11 +179,11 @@ export default function BulkUploadPage() {
         {preview && !results && (
           <div style={{ marginTop: "24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <p style={{ margin: 0, fontWeight: 600, color: "#1f2937" }}>{preview.length} Produkte erkannt</p>
+              <p style={{ margin: 0, fontWeight: 600, color: "#1f2937" }}>{preview.length} {locale === "en" ? "products detected" : locale === "tr" ? "ürün algılandı" : locale === "fr" ? "produits détectés" : locale === "es" ? "productos detectados" : locale === "it" ? "prodotti rilevati" : "Produkte erkannt"}</p>
               <div style={{ display: "flex", gap: "8px" }}>
-                <Button onClick={() => { setFile(null); setPreview(null); setError(""); }}>Abbrechen</Button>
+                <Button onClick={() => { setFile(null); setPreview(null); setError(""); }}>{ui.cancel}</Button>
                 <Button onClick={handleUpload} disabled={uploading}>
-                  {uploading ? `Hochladen… ${progress}%` : `${preview.length} Produkte importieren`}
+                  {uploading ? `${ui.uploading} ${progress}%` : `${ui.import} ${preview.length} ${locale === "en" ? "products" : locale === "tr" ? "ürün" : locale === "fr" ? "produits" : locale === "es" ? "productos" : locale === "it" ? "prodotti" : "Produkte"}`}
                 </Button>
               </div>
             </div>
@@ -192,7 +196,7 @@ export default function BulkUploadPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                 <thead>
                   <tr style={{ backgroundColor: "#f9fafb", position: "sticky", top: 0 }}>
-                    {["Titel", "SKU", "Preis", "Bestand", "Status", "EAN", "Kategorie", "Marke"].map(h => (
+                    {[locale === "en" ? "Title" : locale === "tr" ? "Başlık" : locale === "fr" ? "Titre" : locale === "es" ? "Título" : locale === "it" ? "Titolo" : "Titel", "SKU", locale === "en" ? "Price" : locale === "tr" ? "Fiyat" : locale === "fr" ? "Prix" : locale === "es" ? "Precio" : locale === "it" ? "Prezzo" : "Preis", locale === "en" ? "Inventory" : locale === "tr" ? "Stok" : locale === "fr" ? "Inventaire" : locale === "es" ? "Inventario" : locale === "it" ? "Inventario" : "Bestand", "Status", "EAN", locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie", locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"].map(h => (
                       <th key={h} style={{ padding: "8px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -207,7 +211,7 @@ export default function BulkUploadPage() {
                   ))}
                 </tbody>
               </table>
-              {preview.length > 100 && <p style={{ padding: "8px 12px", color: "#6b7280", margin: 0 }}>… und {preview.length - 100} weitere Zeilen</p>}
+              {preview.length > 100 && <p style={{ padding: "8px 12px", color: "#6b7280", margin: 0 }}>… {locale === "en" ? "and" : locale === "tr" ? "ve" : locale === "fr" ? "et" : locale === "es" ? "y" : locale === "it" ? "e" : "und"} {preview.length - 100} {locale === "en" ? "more rows" : locale === "tr" ? "satır daha" : locale === "fr" ? "lignes supplémentaires" : locale === "es" ? "filas más" : locale === "it" ? "righe in più" : "weitere Zeilen"}</p>}
             </div>
           </div>
         )}
@@ -217,9 +221,9 @@ export default function BulkUploadPage() {
           <div style={{ marginTop: "24px" }}>
             <div style={{ display: "flex", gap: "16px", marginBottom: "16px", flexWrap: "wrap" }}>
               {[
-                { label: "Erstellt", count: created, color: "#065f46", bg: "#d1fae5" },
-                { label: "Fehler",   count: errors,  color: "#991b1b", bg: "#fee2e2" },
-                { label: "Übersprungen", count: skipped, color: "#92400e", bg: "#fef3c7" },
+                { label: locale === "en" ? "Created" : locale === "tr" ? "Oluşturuldu" : locale === "fr" ? "Créé" : locale === "es" ? "Creado" : locale === "it" ? "Creato" : "Erstellt", count: created, color: "#065f46", bg: "#d1fae5" },
+                { label: ui.error,   count: errors,  color: "#991b1b", bg: "#fee2e2" },
+                { label: locale === "en" ? "Skipped" : locale === "tr" ? "Atlandı" : locale === "fr" ? "Ignoré" : locale === "es" ? "Omitido" : locale === "it" ? "Saltato" : "Übersprungen", count: skipped, color: "#92400e", bg: "#fef3c7" },
               ].map(s => (
                 <div key={s.label} style={{ padding: "12px 20px", borderRadius: "8px", backgroundColor: s.bg, color: s.color, fontWeight: 600 }}>
                   {s.count} {s.label}
@@ -230,7 +234,7 @@ export default function BulkUploadPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                 <thead>
                   <tr style={{ backgroundColor: "#f9fafb", position: "sticky", top: 0 }}>
-                    {["Titel", "Status", "Info"].map(h => (
+                    {[locale === "en" ? "Title" : locale === "tr" ? "Başlık" : locale === "fr" ? "Titre" : locale === "es" ? "Título" : locale === "it" ? "Titolo" : "Titel", "Status", "Info"].map(h => (
                       <th key={h} style={{ padding: "8px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 600, color: "#374151" }}>{h}</th>
                     ))}
                   </tr>
@@ -253,7 +257,7 @@ export default function BulkUploadPage() {
             </div>
             <div style={{ marginTop: "12px" }}>
               <Button onClick={() => { setFile(null); setPreview(null); setResults(null); setError(""); setProgress(0); }}>
-                Neuer Upload
+                {locale === "en" ? "New upload" : locale === "tr" ? "Yeni yükleme" : locale === "fr" ? "Nouveau téléchargement" : locale === "es" ? "Nueva subida" : locale === "it" ? "Nuovo caricamento" : "Neuer Upload"}
               </Button>
             </div>
           </div>

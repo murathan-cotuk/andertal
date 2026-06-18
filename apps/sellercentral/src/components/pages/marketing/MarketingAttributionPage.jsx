@@ -14,19 +14,8 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { fmtDate, AD_STATUS_TONE, AD_STATUS_LABEL } from "@/components/pages/marketing/ppcCampaignShared";
-
-const ATTRIBUTION_MODELS = [
-  { value: "last_click", label: "Letzter Klick" },
-  { value: "first_click", label: "Erster Klick" },
-  { value: "linear", label: "Linear (gleichmäßig)" },
-];
-
-const DATE_PRESETS = [
-  { value: "7d", label: "Letzte 7 Tage" },
-  { value: "14d", label: "Letzte 14 Tage" },
-  { value: "30d", label: "Letzte 30 Tage" },
-  { value: "90d", label: "Letzte 90 Tage" },
-];
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 
 function presetToRange(preset) {
   const to = new Date();
@@ -90,7 +79,7 @@ function MiniBar({ value, max }) {
   );
 }
 
-function CampaignRow({ row, maxClicks, maxOrders }) {
+function CampaignRow({ row, maxClicks, maxOrders, locale }) {
   const acos = row.spend_cents > 0 && row.revenue_cents > 0
     ? ((row.spend_cents / row.revenue_cents) * 100).toFixed(1)
     : null;
@@ -101,6 +90,8 @@ function CampaignRow({ row, maxClicks, maxOrders }) {
     ? ((row.clicks / row.impressions) * 100).toFixed(2)
     : null;
   const adStatus = row.ad_status || "draft";
+  const impressionsLabel = locale === "de" ? "Einbl." : locale === "tr" ? "Göst." : locale === "fr" ? "Impr." : locale === "es" ? "Impr." : locale === "it" ? "Impr." : "Impr.";
+  const ordersLabel = locale === "de" ? "Best." : locale === "tr" ? "Sip." : locale === "fr" ? "Com." : locale === "es" ? "Ped." : locale === "it" ? "Ord." : "Ord.";
 
   return (
     <div
@@ -124,7 +115,7 @@ function CampaignRow({ row, maxClicks, maxOrders }) {
       <div style={{ fontSize: 13, color: "#475569" }}>{fmtEur(row.spend_cents)}</div>
       <div>
         <MiniBar value={row.impressions || 0} max={row.impressions || 0} />
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(row.impressions)} Einbl.</span>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(row.impressions)} {impressionsLabel}</span>
       </div>
       <div>
         <MiniBar value={row.clicks || 0} max={maxClicks} />
@@ -132,7 +123,7 @@ function CampaignRow({ row, maxClicks, maxOrders }) {
       </div>
       <div>
         <MiniBar value={row.orders || 0} max={maxOrders} />
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(row.orders)} Best.</span>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(row.orders)} {ordersLabel}</span>
       </div>
       <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>{fmtEur(row.revenue_cents)}</div>
       <div>
@@ -160,6 +151,22 @@ function CampaignRow({ row, maxClicks, maxOrders }) {
 }
 
 export default function MarketingAttributionPage() {
+  const locale = useLocale();
+  const ui = getUI(locale);
+
+  const ATTRIBUTION_MODELS = [
+    { value: "last_click", label: locale === "de" ? "Letzter Klick" : locale === "tr" ? "Son Tıklama" : locale === "fr" ? "Dernier clic" : locale === "es" ? "Último clic" : locale === "it" ? "Ultimo clic" : "Last click" },
+    { value: "first_click", label: locale === "de" ? "Erster Klick" : locale === "tr" ? "İlk Tıklama" : locale === "fr" ? "Premier clic" : locale === "es" ? "Primer clic" : locale === "it" ? "Primo clic" : "First click" },
+    { value: "linear", label: locale === "de" ? "Linear (gleichmäßig)" : locale === "tr" ? "Doğrusal (eşit dağılım)" : locale === "fr" ? "Linéaire (répartition égale)" : locale === "es" ? "Lineal (distribución uniforme)" : locale === "it" ? "Lineare (distribuzione uniforme)" : "Linear (evenly distributed)" },
+  ];
+
+  const DATE_PRESETS = [
+    { value: "7d", label: locale === "de" ? "Letzte 7 Tage" : locale === "tr" ? "Son 7 gün" : locale === "fr" ? "7 derniers jours" : locale === "es" ? "Últimos 7 días" : locale === "it" ? "Ultimi 7 giorni" : "Last 7 days" },
+    { value: "14d", label: locale === "de" ? "Letzte 14 Tage" : locale === "tr" ? "Son 14 gün" : locale === "fr" ? "14 derniers jours" : locale === "es" ? "Últimos 14 días" : locale === "it" ? "Ultimi 14 giorni" : "Last 14 days" },
+    { value: "30d", label: locale === "de" ? "Letzte 30 Tage" : locale === "tr" ? "Son 30 gün" : locale === "fr" ? "30 derniers jours" : locale === "es" ? "Últimos 30 días" : locale === "it" ? "Ultimi 30 giorni" : "Last 30 days" },
+    { value: "90d", label: locale === "de" ? "Letzte 90 Tage" : locale === "tr" ? "Son 90 gün" : locale === "fr" ? "90 derniers jours" : locale === "es" ? "Últimos 90 días" : locale === "it" ? "Ultimi 90 giorni" : "Last 90 days" },
+  ];
+
   const [loading, setLoading] = useState(true);
   const [campaigns, setCampaigns] = useState([]);
   const [attribution, setAttribution] = useState([]);
@@ -205,7 +212,7 @@ export default function MarketingAttributionPage() {
         })));
       }
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Daten konnten nicht geladen werden." });
+      setMsg({ tone: "critical", text: e?.message || (locale === "de" ? "Daten konnten nicht geladen werden." : locale === "tr" ? "Veriler yüklenemedi." : locale === "fr" ? "Impossible de charger les données." : locale === "es" ? "No se pudieron cargar los datos." : locale === "it" ? "Impossibile caricare i dati." : "Could not load data.") });
     } finally {
       setLoading(false);
     }
@@ -243,14 +250,24 @@ export default function MarketingAttributionPage() {
   const maxOrders = Math.max(...rows.map((r) => r.orders || 0), 1);
 
   const campaignOptions = [
-    { value: "all", label: "Alle Kampagnen" },
+    { value: "all", label: locale === "de" ? "Alle Kampagnen" : locale === "tr" ? "Tüm Kampanyalar" : locale === "fr" ? "Toutes les campagnes" : locale === "es" ? "Todas las campañas" : locale === "it" ? "Tutte le campagne" : "All campaigns" },
     ...campaigns.map((c) => ({ value: c.id, label: c.name })),
+  ];
+
+  const tableHeaders = [
+    locale === "de" ? "Kampagne" : locale === "tr" ? "Kampanya" : locale === "fr" ? "Campagne" : locale === "es" ? "Campaña" : locale === "it" ? "Campagna" : "Campaign",
+    locale === "de" ? "Ausgaben" : locale === "tr" ? "Harcama" : locale === "fr" ? "Dépenses" : locale === "es" ? "Gasto" : locale === "it" ? "Spesa" : "Spend",
+    locale === "de" ? "Einblendungen" : locale === "tr" ? "Gösterimler" : locale === "fr" ? "Impressions" : locale === "es" ? "Impresiones" : locale === "it" ? "Impressioni" : "Impressions",
+    locale === "de" ? "Klicks" : locale === "tr" ? "Tıklamalar" : locale === "fr" ? "Clics" : locale === "es" ? "Clics" : locale === "it" ? "Clic" : "Clicks",
+    locale === "de" ? "Bestellungen" : locale === "tr" ? "Siparişler" : locale === "fr" ? "Commandes" : locale === "es" ? "Pedidos" : locale === "it" ? "Ordini" : "Orders",
+    locale === "de" ? "Umsatz" : locale === "tr" ? "Gelir" : locale === "fr" ? "Chiffre d'affaires" : locale === "es" ? "Ingresos" : locale === "it" ? "Fatturato" : "Revenue",
+    locale === "de" ? "Performance" : locale === "tr" ? "Performans" : locale === "fr" ? "Performance" : locale === "es" ? "Rendimiento" : locale === "it" ? "Performance" : "Performance",
   ];
 
   return (
     <Page
       title="Attribution"
-      subtitle="Werbeleistung & Umsatz je Kampagne"
+      subtitle={locale === "de" ? "Werbeleistung & Umsatz je Kampagne" : locale === "tr" ? "Reklam performansı & kampanya başına gelir" : locale === "fr" ? "Performance publicitaire & chiffre d'affaires par campagne" : locale === "es" ? "Rendimiento publicitario & ingresos por campaña" : locale === "it" ? "Performance pubblicitaria & fatturato per campagna" : "Ad performance & revenue per campaign"}
     >
       <BlockStack gap="400">
         {msg && (
@@ -264,7 +281,7 @@ export default function MarketingAttributionPage() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
             <div style={{ flex: "1 1 180px" }}>
               <Select
-                label="Zeitraum"
+                label={locale === "de" ? "Zeitraum" : locale === "tr" ? "Dönem" : locale === "fr" ? "Période" : locale === "es" ? "Período" : locale === "it" ? "Periodo" : "Period"}
                 options={DATE_PRESETS}
                 value={datePreset}
                 onChange={setDatePreset}
@@ -272,7 +289,7 @@ export default function MarketingAttributionPage() {
             </div>
             <div style={{ flex: "1 1 200px" }}>
               <Select
-                label="Kampagne"
+                label={locale === "de" ? "Kampagne" : locale === "tr" ? "Kampanya" : locale === "fr" ? "Campagne" : locale === "es" ? "Campaña" : locale === "it" ? "Campagna" : "Campaign"}
                 options={campaignOptions}
                 value={filterCampaign}
                 onChange={setFilterCampaign}
@@ -280,7 +297,7 @@ export default function MarketingAttributionPage() {
             </div>
             <div style={{ flex: "1 1 200px" }}>
               <Select
-                label="Attributionsmodell"
+                label={locale === "de" ? "Attributionsmodell" : locale === "tr" ? "Atıf modeli" : locale === "fr" ? "Modèle d'attribution" : locale === "es" ? "Modelo de atribución" : locale === "it" ? "Modello di attribuzione" : "Attribution model"}
                 options={ATTRIBUTION_MODELS}
                 value={model}
                 onChange={setModel}
@@ -292,25 +309,25 @@ export default function MarketingAttributionPage() {
         {loading ? (
           <Card>
             <div style={{ padding: 48, textAlign: "center" }}>
-              <Spinner size="large" accessibilityLabel="Laden" />
-              <p style={{ marginTop: 16, color: "#64748b", fontSize: 14 }}>Attributionsdaten werden geladen …</p>
+              <Spinner size="large" accessibilityLabel={ui.loading} />
+              <p style={{ marginTop: 16, color: "#64748b", fontSize: 14 }}>{locale === "de" ? "Attributionsdaten werden geladen …" : locale === "tr" ? "Atıf verileri yükleniyor…" : locale === "fr" ? "Chargement des données d'attribution…" : locale === "es" ? "Cargando datos de atribución…" : locale === "it" ? "Caricamento dati di attribuzione…" : "Loading attribution data…"}</p>
             </div>
           </Card>
         ) : (
           <>
             {!hasRealData && (
               <Banner tone="info">
-                Noch keine Klick- und Konversionsdaten. Sobald Kampagnen aktiv sind und Traffic erzeugt wird, erscheinen hier die Auswertungen.
+                {locale === "de" ? "Noch keine Klick- und Konversionsdaten. Sobald Kampagnen aktiv sind und Traffic erzeugt wird, erscheinen hier die Auswertungen." : locale === "tr" ? "Henüz tıklama ve dönüşüm verisi yok. Kampanyalar aktif olup trafik oluşturduğunda burada raporlar görünecek." : locale === "fr" ? "Pas encore de données de clics et de conversions. Dès que les campagnes sont actives et génèrent du trafic, les rapports apparaîtront ici." : locale === "es" ? "Aún no hay datos de clics y conversiones. En cuanto las campañas estén activas y generen tráfico, los informes aparecerán aquí." : locale === "it" ? "Ancora nessun dato di clic e conversioni. Non appena le campagne saranno attive e genereranno traffico, i report appariranno qui." : "No click and conversion data yet. Once campaigns are active and generating traffic, reports will appear here."}
               </Banner>
             )}
 
             {/* KPI Summary */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-              <KpiCard label="Ausgaben" value={hasRealData ? fmtEur(totals.spend) : "—"} sub={`${DATE_PRESETS.find(d => d.value === datePreset)?.label}`} />
-              <KpiCard label="Einblendungen" value={hasRealData ? fmt(totals.impressions) : "—"} />
-              <KpiCard label="Klicks" value={hasRealData ? fmt(totals.clicks) : "—"} sub={totalCtr ? `CTR ${totalCtr} %` : undefined} />
-              <KpiCard label="Bestellungen" value={hasRealData ? fmt(totals.orders) : "—"} />
-              <KpiCard label="Umsatz" value={hasRealData ? fmtEur(totals.revenue) : "—"} accent="#0ea5e9" />
+              <KpiCard label={locale === "de" ? "Ausgaben" : locale === "tr" ? "Harcama" : locale === "fr" ? "Dépenses" : locale === "es" ? "Gasto" : locale === "it" ? "Spesa" : "Spend"} value={hasRealData ? fmtEur(totals.spend) : "—"} sub={`${DATE_PRESETS.find(d => d.value === datePreset)?.label}`} />
+              <KpiCard label={locale === "de" ? "Einblendungen" : locale === "tr" ? "Gösterimler" : locale === "fr" ? "Impressions" : locale === "es" ? "Impresiones" : locale === "it" ? "Impressioni" : "Impressions"} value={hasRealData ? fmt(totals.impressions) : "—"} />
+              <KpiCard label={locale === "de" ? "Klicks" : locale === "tr" ? "Tıklamalar" : locale === "fr" ? "Clics" : locale === "es" ? "Clics" : locale === "it" ? "Clic" : "Clicks"} value={hasRealData ? fmt(totals.clicks) : "—"} sub={totalCtr ? `CTR ${totalCtr} %` : undefined} />
+              <KpiCard label={locale === "de" ? "Bestellungen" : locale === "tr" ? "Siparişler" : locale === "fr" ? "Commandes" : locale === "es" ? "Pedidos" : locale === "it" ? "Ordini" : "Orders"} value={hasRealData ? fmt(totals.orders) : "—"} />
+              <KpiCard label={locale === "de" ? "Umsatz" : locale === "tr" ? "Gelir" : locale === "fr" ? "Chiffre d'affaires" : locale === "es" ? "Ingresos" : locale === "it" ? "Fatturato" : "Revenue"} value={hasRealData ? fmtEur(totals.revenue) : "—"} accent="#0ea5e9" />
               <KpiCard
                 label="ACoS"
                 value={hasRealData && totalAcos ? `${totalAcos} %` : "—"}
@@ -321,10 +338,10 @@ export default function MarketingAttributionPage() {
 
             {/* Attribution Model Info */}
             <div style={{ padding: "10px 16px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: 13, color: "#475569" }}>
-              <strong>Modell:</strong>{" "}
-              {model === "last_click" && "Letzter Klick — der letzte Klick vor dem Kauf erhält 100 % der Attribution."}
-              {model === "first_click" && "Erster Klick — der erste Klick einer Session erhält 100 % der Attribution."}
-              {model === "linear" && "Linear — alle Klicks im Conversion-Pfad erhalten gleichmäßig Attribution."}
+              <strong>{locale === "de" ? "Modell" : locale === "tr" ? "Model" : locale === "fr" ? "Modèle" : locale === "es" ? "Modelo" : locale === "it" ? "Modello" : "Model"}:</strong>{" "}
+              {model === "last_click" && (locale === "de" ? "Letzter Klick — der letzte Klick vor dem Kauf erhält 100 % der Attribution." : locale === "tr" ? "Son Tıklama — satın almadan önceki son tıklama %100 atıf alır." : locale === "fr" ? "Dernier clic — le dernier clic avant l'achat reçoit 100 % de l'attribution." : locale === "es" ? "Último clic — el último clic antes de la compra recibe el 100 % de la atribución." : locale === "it" ? "Ultimo clic — l'ultimo clic prima dell'acquisto riceve il 100 % dell'attribuzione." : "Last click — the last click before purchase receives 100 % of attribution.")}
+              {model === "first_click" && (locale === "de" ? "Erster Klick — der erste Klick einer Session erhält 100 % der Attribution." : locale === "tr" ? "İlk Tıklama — bir oturumun ilk tıklaması %100 atıf alır." : locale === "fr" ? "Premier clic — le premier clic d'une session reçoit 100 % de l'attribution." : locale === "es" ? "Primer clic — el primer clic de una sesión recibe el 100 % de la atribución." : locale === "it" ? "Primo clic — il primo clic di una sessione riceve il 100 % dell'attribuzione." : "First click — the first click of a session receives 100 % of attribution.")}
+              {model === "linear" && (locale === "de" ? "Linear — alle Klicks im Conversion-Pfad erhalten gleichmäßig Attribution." : locale === "tr" ? "Doğrusal — dönüşüm yolundaki tüm tıklamalar eşit atıf alır." : locale === "fr" ? "Linéaire — tous les clics du chemin de conversion reçoivent une attribution égale." : locale === "es" ? "Lineal — todos los clics del camino de conversión reciben atribución igualitaria." : locale === "it" ? "Lineare — tutti i clic nel percorso di conversione ricevono attribuzione uguale." : "Linear — all clicks in the conversion path receive equal attribution.")}
             </div>
 
             {/* Campaign Table */}
@@ -342,14 +359,14 @@ export default function MarketingAttributionPage() {
                     borderRadius: "12px 12px 0 0",
                   }}
                 >
-                  {["Kampagne", "Ausgaben", "Einblendungen", "Klicks", "Bestellungen", "Umsatz", "Performance"].map((h) => (
+                  {tableHeaders.map((h) => (
                     <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                       {h}
                     </span>
                   ))}
                 </div>
                 {rows.map((row) => (
-                  <CampaignRow key={row.id} row={row} maxClicks={maxClicks} maxOrders={maxOrders} />
+                  <CampaignRow key={row.id} row={row} maxClicks={maxClicks} maxOrders={maxOrders} locale={locale} />
                 ))}
               </Card>
             )}
@@ -357,15 +374,15 @@ export default function MarketingAttributionPage() {
             {rows.length === 0 && (
               <Card>
                 <div style={{ padding: "48px 32px", textAlign: "center" }}>
-                  <Text tone="subdued" as="p">Keine Kampagnendaten für den gewählten Zeitraum.</Text>
+                  <Text tone="subdued" as="p">{locale === "de" ? "Keine Kampagnendaten für den gewählten Zeitraum." : locale === "tr" ? "Seçilen dönem için kampanya verisi yok." : locale === "fr" ? "Aucune donnée de campagne pour la période sélectionnée." : locale === "es" ? "Sin datos de campaña para el período seleccionado." : locale === "it" ? "Nessun dato di campagna per il periodo selezionato." : "No campaign data for the selected period."}</Text>
                 </div>
               </Card>
             )}
 
             {/* Attribution Window Info */}
             <div style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", fontSize: 12, color: "#94a3b8" }}>
-              Attributionsfenster: 7 Tage nach Klick · 1 Tag nach Einblendung.
-              {isSuperuser && " Superuser sieht alle Verkäufer-Kampagnen zusammen."}
+              {locale === "de" ? "Attributionsfenster: 7 Tage nach Klick · 1 Tag nach Einblendung." : locale === "tr" ? "Atıf penceresi: tıklamadan sonra 7 gün · gösterimden sonra 1 gün." : locale === "fr" ? "Fenêtre d'attribution : 7 jours après le clic · 1 jour après l'impression." : locale === "es" ? "Ventana de atribución: 7 días tras el clic · 1 día tras la impresión." : locale === "it" ? "Finestra di attribuzione: 7 giorni dopo il clic · 1 giorno dopo l'impressione." : "Attribution window: 7 days after click · 1 day after impression."}
+              {isSuperuser && (" " + (locale === "de" ? "Superuser sieht alle Verkäufer-Kampagnen zusammen." : locale === "tr" ? "Süper kullanıcı tüm satıcı kampanyalarını birlikte görür." : locale === "fr" ? "Le superutilisateur voit toutes les campagnes vendeur ensemble." : locale === "es" ? "El superusuario ve todas las campañas de vendedores juntas." : locale === "it" ? "Il superutente vede tutte le campagne dei venditori insieme." : "Superuser sees all seller campaigns together."))}
             </div>
           </>
         )}

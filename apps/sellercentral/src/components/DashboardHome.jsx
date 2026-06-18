@@ -5,6 +5,14 @@ import { useRouter } from "@/i18n/navigation";
 import { Page, Banner, Button, Spinner } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import LiveVisitorsPanel from "@/components/dashboard/LiveVisitorsPanel";
+import RevenueAreaChart from "@/components/dashboard/RevenueAreaChart";
+import {
+  generatePayoutPeriods,
+  initialPayoutPeriodKey,
+  isOrderInPayoutPeriod,
+  isReturnInPayoutPeriod,
+  buildPeriodRevenueChart,
+} from "@/lib/payout-periods";
 
 function fmtEuro(cents) {
   return (Number(cents || 0) / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -101,34 +109,6 @@ function Panel({ title, subtitle, action, children, noPad }) {
   );
 }
 
-function RevenueChart({ data }) {
-  const max = Math.max(...data.map((d) => d.revenue), 1);
-  return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 140, paddingTop: 8 }}>
-      {data.map((d) => {
-        const h = Math.max(4, Math.round((d.revenue / max) * 120));
-        return (
-          <div key={d.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0 }}>
-            <div style={{ fontSize: 10, color: "#6b7280", fontWeight: 600 }}>{d.revenue > 0 ? fmtEuro(d.revenue) : ""}</div>
-            <div
-              style={{
-                width: "100%",
-                maxWidth: 48,
-                height: h,
-                borderRadius: "6px 6px 2px 2px",
-                background: "linear-gradient(180deg, #008060 0%, #0d9488 100%)",
-                transition: "height 0.3s ease",
-              }}
-              title={`${d.label}: ${fmtEuro(d.revenue)}`}
-            />
-            <div style={{ fontSize: 10, color: "#9ca3af", textAlign: "center" }}>{d.label}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function StatusBars({ counts }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
@@ -205,6 +185,25 @@ export default function DashboardHome() {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [pendingReturns, setPendingReturns] = useState([]);
+  const [allReturns, setAllReturns] = useState([]);
+  const payoutPeriods = useMemo(() => generatePayoutPeriods(24), []);
+  const [periodKey, setPeriodKey] = useState(() => initialPayoutPeriodKey(generatePayoutPeriods(24)));
+  const selectedPeriod = useMemo(
+    () => payoutPeriods.find((p) => p.key === periodKey) || payoutPeriods[0],
+    [payoutPeriods, periodKey],
+  );
+
+  const periodOrders = useMemo(
+    () => orders.filter((o) => isOrderInPayoutPeriod(o, selectedPeriod)),
+    [orders, selectedPeriod],
+  );
+
+  const periodReturns = useMemo(
+    () => allReturns.filter((r) => isReturnInPayoutPeriod(r, selectedPeriod)),
+    [allReturns, selectedPeriod],
+  );
+
+  const periodLabel = selectedPeriod?.label || "Abrechnungszeitraum";
 
   useEffect(() => {
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
@@ -223,10 +222,11 @@ export default function DashboardHome() {
         ]);
         const allProducts = (productsData?.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
         const allOrders = ordersData?.orders || [];
-        const allReturns = returnsData?.returns || [];
+        const allReturnsList = returnsData?.returns || [];
         setProducts(allProducts);
         setOrders(allOrders);
-        setPendingReturns(allReturns.filter((r) => r.status === "offen"));
+        setAllReturns(allReturnsList);
+        setPendingReturns(allReturnsList.filter((r) => r.status === "offen"));
       } catch (e) {
         setError(e?.message || "Dashboard konnte nicht geladen werden");
       } finally {
@@ -237,7 +237,7 @@ export default function DashboardHome() {
 
   const stats = useMemo(() => {
     let revenueCents = 0;
-    for (const o of orders) revenueCents += orderTotalCents(o);
+    for (const o of periodOrders) revenueCents += orderTotalCents(o);
     const pending = orders.filter((o) => {
       const s = orderStatus(o).toLowerCase();
       return s === "offen" || s === "pending" || s === "open" || s === "in_bearbeitung";
@@ -246,52 +246,39 @@ export default function DashboardHome() {
       const d = (o.delivery_status || "").toLowerCase();
       return d === "offen" || d === "";
     }).length;
-    const avg = orders.length ? Math.round(revenueCents / orders.length) : 0;
+    const avg = periodOrders.length ? Math.round(revenueCents / periodOrders.length) : 0;
+    const returnsInPeriod = periodReturns.length;
+    const returnsOpenInPeriod = periodReturns.filter((r) => r.status === "offen").length;
     return {
       revenueCents,
-      orderCount: orders.length,
+      orderCount: periodOrders.length,
       productCount: products.length,
       pending,
       toShip,
       avg,
-      returnsOpen: pendingReturns.length,
+      returnsInPeriod,
+      returnsOpenInPeriod,
+      returnsOpenAll: pendingReturns.length,
     };
-  }, [orders, products, pendingReturns]);
+  }, [orders, periodOrders, products, pendingReturns, periodReturns]);
 
-  const chartData = useMemo(() => {
-    const days = [];
-    for (let i = 6; i >= 0; i -= 1) {
-      const d = new Date();
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
-      days.push({
-        key,
-        label: d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit" }),
-        revenue: 0,
-      });
-    }
-    for (const o of orders) {
-      if (!o.created_at) continue;
-      const key = new Date(o.created_at).toISOString().slice(0, 10);
-      const bucket = days.find((d) => d.key === key);
-      if (bucket) bucket.revenue += orderTotalCents(o);
-    }
-    return days;
-  }, [orders]);
+  const chartData = useMemo(
+    () => buildPeriodRevenueChart(selectedPeriod, orders, orderTotalCents),
+    [selectedPeriod, orders],
+  );
 
   const statusCounts = useMemo(() => {
     const c = {};
-    for (const o of orders) {
+    for (const o of periodOrders) {
       const s = orderStatus(o).toLowerCase();
       c[s] = (c[s] || 0) + 1;
     }
     return c;
-  }, [orders]);
+  }, [periodOrders]);
 
   const recentOrders = useMemo(
-    () => [...orders].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).slice(0, 5),
-    [orders],
+    () => [...periodOrders].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).slice(0, 5),
+    [periodOrders],
   );
 
   const greeting = useMemo(() => {
@@ -323,13 +310,39 @@ export default function DashboardHome() {
         </div>
       )}
 
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 800, color: "#111827" }}>{greeting}</h1>
-        <p style={{ margin: 0, fontSize: 14, color: "#6b7280" }}>
-          {new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          {" · "}
-          Übersicht Ihres Shops auf einen Blick
-        </p>
+      <div style={{ marginBottom: 24, display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
+        <div>
+          <h1 style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 800, color: "#111827" }}>{greeting}</h1>
+          <p style={{ margin: 0, fontSize: 14, color: "#6b7280" }}>
+            {new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+          </p>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+          <label htmlFor="dashboard-period" style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Abrechnungszeitraum
+          </label>
+          <select
+            id="dashboard-period"
+            value={periodKey}
+            onChange={(e) => setPeriodKey(e.target.value)}
+            style={{
+              minWidth: 220,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid #d1d5db",
+              background: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#111827",
+              cursor: "pointer",
+            }}
+          >
+            {payoutPeriods.map((p) => (
+              <option key={p.key} value={p.key}>{p.label}</option>
+            ))}
+          </select>
+          <Button variant="plain" onClick={() => router.push("/settings/payments")}>Zahlungen</Button>
+        </div>
       </div>
 
       {isSuperuser && <LiveVisitorsPanel />}
@@ -343,20 +356,20 @@ export default function DashboardHome() {
           marginBottom: 20,
         }}
       >
-        <KpiCard icon="💰" label="Umsatz" value={fmtEuro(stats.revenueCents)} sub="Brutto (alle Bestellungen)" accent="#008060" onClick={() => router.push("/analytics/reports")} />
-        <KpiCard icon="📦" label="Bestellungen" value={stats.orderCount} sub={`Ø ${fmtEuro(stats.avg)}`} accent="#2563eb" onClick={() => router.push("/orders")} />
+        <KpiCard icon="💰" label="Umsatz" value={fmtEuro(stats.revenueCents)} sub={periodLabel} accent="#008060" onClick={() => router.push("/settings/payments")} />
+        <KpiCard icon="📦" label="Bestellungen" value={stats.orderCount} sub={`Ø ${fmtEuro(stats.avg)} · ${periodLabel}`} accent="#2563eb" onClick={() => router.push("/orders")} />
+        <KpiCard icon="↩️" label="Retouren" value={stats.returnsInPeriod} sub={stats.returnsOpenInPeriod > 0 ? `${stats.returnsOpenInPeriod} offen in dieser Periode` : periodLabel} accent="#ef4444" onClick={() => router.push("/orders/returns")} />
+        <KpiCard icon="⏳" label="Offen" value={stats.pending} sub="Alle offenen Bestellungen" accent="#f59e0b" onClick={() => router.push("/orders")} />
+        <KpiCard icon="🚚" label="Versand offen" value={stats.toShip} sub="Lieferstatus offen (gesamt)" accent="#6366f1" onClick={() => router.push("/orders")} />
         <KpiCard icon="🏷️" label="Produkte" value={stats.productCount} sub="Aktiv (ohne Entwurf)" accent="#7c3aed" onClick={() => router.push("/products")} />
-        <KpiCard icon="⏳" label="Offen" value={stats.pending} sub="In Bearbeitung" accent="#f59e0b" onClick={() => router.push("/orders")} />
-        <KpiCard icon="🚚" label="Versand offen" value={stats.toShip} sub="Lieferstatus offen" accent="#6366f1" onClick={() => router.push("/orders")} />
-        <KpiCard icon="↩️" label="Retouren" value={stats.returnsOpen} sub="Antwort ausstehend" accent="#ef4444" onClick={() => router.push("/orders/returns")} />
       </div>
 
       {/* Charts row */}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", gap: 16, marginBottom: 20, alignItems: "stretch" }}>
-        <Panel title="Umsatz · letzte 7 Tage" subtitle="Basierend auf Bestelldaten">
-          <RevenueChart data={chartData} />
+        <Panel title="Umsatz · Tagesverlauf" subtitle={periodLabel}>
+          <RevenueAreaChart data={chartData} accent="#008060" height={220} />
         </Panel>
-        <Panel title="Bestellstatus" subtitle="Verteilung aller Bestellungen">
+        <Panel title="Bestellstatus" subtitle={periodLabel}>
           <StatusBars counts={statusCounts} />
         </Panel>
       </div>
@@ -365,7 +378,7 @@ export default function DashboardHome() {
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(0, 1fr)", gap: 16, marginBottom: 20, alignItems: "start" }}>
         <Panel
           title="Letzte Bestellungen"
-          subtitle="Schnellzugriff auf aktuelle Aufträge"
+          subtitle={periodLabel}
           action={<Button variant="plain" onClick={() => router.push("/orders")}>Alle anzeigen</Button>}
           noPad
         >
@@ -471,7 +484,7 @@ export default function DashboardHome() {
               )}
               {pendingReturns.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: "#fef2f2", borderRadius: 10, border: "1px solid #fecaca" }}>
-                  <span style={{ fontSize: 13, color: "#b91c1c" }}>↩️ <strong>{pendingReturns.length}</strong> Retourenanfrage(n) offen</span>
+                  <span style={{ fontSize: 13, color: "#b91c1c" }}>↩️ <strong>{stats.returnsOpenAll}</strong> Retourenanfrage(n) offen (gesamt)</span>
                   <Button size="slim" tone="critical" onClick={() => router.push("/orders/returns")}>Öffnen</Button>
                 </div>
               )}

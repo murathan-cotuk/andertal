@@ -328,6 +328,7 @@ async function start() {
         })
       })
     }
+    let logSellerError = async () => {}
     const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '10mb'
     // Preserve raw Buffer on req.rawBody for Stripe webhook signature verification.
     // express.json() still parses normally; webhook handler reads req.rawBody instead of req.body.
@@ -13013,6 +13014,26 @@ async function start() {
 
     // ── Sendcloud label purchase flow ─────────────────────────────────────────
 
+    const sellerTechnicalMessage = (locale) => {
+      const loc = String(locale || 'de').slice(0, 2).toLowerCase()
+      if (loc === 'tr') return 'Teknik bir sorun nedeniyle işlem şu an tamamlanamıyor. Ekibimiz bilgilendirildi — en kısa sürede ilgileneceğiz.'
+      if (loc === 'en') return 'This action could not be completed due to a technical issue. Our team has been notified and will resolve it shortly.'
+      return 'Aus technischen Gründen konnte die Aktion nicht abgeschlossen werden. Unser Team wurde informiert und kümmert sich darum.'
+    }
+
+    const respondSellerSystemError = async (req, res, { status = 503, errorCode, errorMessage, terminalOutput, context, sellerId }) => {
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const locale = req.body?.locale || req.query?.locale || 'de'
+      await logSellerError(sellerId || req.sellerUser?.seller_id || null, {
+        errorCode: errorCode || 'SYSTEM_ERROR',
+        errorMessage: errorMessage || 'Unbekannter Systemfehler',
+        terminalOutput: terminalOutput || null,
+        context: context || null,
+      })
+      const userMessage = isSuperuser ? (errorMessage || sellerTechnicalMessage(locale)) : sellerTechnicalMessage(locale)
+      return res.status(status).json({ message: userMessage, code: errorCode || 'SYSTEM_ERROR' })
+    }
+
     const getSendcloudCredentials = async (pgClient) => {
       const r = await pgClient.query(
         `SELECT api_key, api_secret, config FROM store_integrations WHERE LOWER(TRIM(slug))='sendcloud' AND seller_scope_key='platform' LIMIT 1`
@@ -13064,12 +13085,31 @@ async function start() {
         const order = ownerCheck.rows[0]
         const sc = await getSendcloudCredentials(client)
         await client.end()
-        if (!sc.public_key || !sc.secret_key) return res.status(400).json({ message: 'Sendcloud nicht konfiguriert' })
-        const { weight_kg = 1, length_cm = 30, width_cm = 20, height_cm = 15 } = req.body || {}
+        if (!sc.public_key || !sc.secret_key) {
+          return respondSellerSystemError(req, res, {
+            errorCode: 'SENDCLOUD_NOT_CONFIGURED',
+            errorMessage: 'Sendcloud nicht konfiguriert (API-Schlüssel fehlen)',
+            sellerId: callerSellerId,
+            context: JSON.stringify({ order_id: id, endpoint: 'label/rates' }),
+          })
+        }
+        const { weight_kg = 1, length_cm = 30, width_cm = 20, height_cm = 15, locale = 'de' } = req.body || {}
         const weightG = Math.round(Number(weight_kg) * 1000) || 1000
         const toCountry = (order.country || 'DE').trim().toUpperCase().slice(0, 2)
-        const qs = `?from_country=DE&to_country=${toCountry}&weight=${weightG}&length=${Math.round(Number(length_cm)||30)}&width=${Math.round(Number(width_cm)||20)}&height=${Math.round(Number(height_cm)||15)}`
+        const length = Math.round(Number(length_cm) || 30)
+        const width = Math.round(Number(width_cm) || 20)
+        const height = Math.round(Number(height_cm) || 15)
+        const qs = `?from_country=DE&to_country=${toCountry}&weight=${weightG}&length=${length}&width=${width}&height=${height}`
         const resp = await sendcloudRequest('/api/v2/shipping_products' + qs, sc)
+        if (resp.status >= 400) {
+          return respondSellerSystemError(req, res, {
+            errorCode: 'SENDCLOUD_API_ERROR',
+            errorMessage: `Sendcloud API ${resp.status}: ${JSON.stringify(resp.data?.error || resp.data)}`,
+            terminalOutput: JSON.stringify(resp.data || {}),
+            sellerId: callerSellerId,
+            context: JSON.stringify({ order_id: id, endpoint: 'label/rates', qs }),
+          })
+        }
         const products = resp.data?.shipping_products || []
         const markup = 1 + (Number(sc.markup_pct) || 5) / 100
         const rates = []
@@ -13099,10 +13139,24 @@ async function start() {
           }
         }
         rates.sort((a, b) => a.price_eur - b.price_eur)
+        if (rates.length === 0) {
+          return respondSellerSystemError(req, res, {
+            errorCode: 'SENDCLOUD_NO_RATES',
+            errorMessage: `Keine Versandoptionen für ${toCountry}, ${weightG}g, ${length}×${width}×${height} cm. Sendcloud-Produkte: ${products.length}`,
+            sellerId: callerSellerId,
+            context: JSON.stringify({ order_id: id, endpoint: 'label/rates', to_country: toCountry, weight_g: weightG, products_count: products.length }),
+          })
+        }
         res.json({ rates, to_country: toCountry, markup_pct: sc.markup_pct })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
-        res.status(500).json({ message: e?.message || 'Error' })
+        return respondSellerSystemError(req, res, {
+          errorCode: 'LABEL_RATES_ERROR',
+          errorMessage: e?.message || 'Versandoptionen konnten nicht geladen werden',
+          terminalOutput: e?.stack || null,
+          sellerId: callerSellerId,
+          context: JSON.stringify({ order_id: id, endpoint: 'label/rates' }),
+        })
       }
     }
 
@@ -13125,7 +13179,14 @@ async function start() {
         const checkoutRow = await loadPlatformCheckoutRow(client)
         const secretKey = resolveStripeSecretKeyFromPlatform(checkoutRow)
         await client.end()
-        if (!secretKey) return res.status(400).json({ message: 'Stripe nicht konfiguriert' })
+        if (!secretKey) {
+          return respondSellerSystemError(req, res, {
+            errorCode: 'STRIPE_NOT_CONFIGURED',
+            errorMessage: 'Stripe nicht konfiguriert (Label-Checkout)',
+            sellerId: callerSellerId,
+            context: JSON.stringify({ order_id: id, endpoint: 'label/checkout' }),
+          })
+        }
         const { service_id, service_name, carrier, price_eur, weight_kg, length_cm, width_cm, height_cm, locale = 'de' } = req.body || {}
         if (!service_id || !price_eur) return res.status(400).json({ message: 'service_id und price_eur erforderlich' })
         const stripe = new (require('stripe'))(secretKey)
@@ -13148,7 +13209,13 @@ async function start() {
         res.json({ checkout_url: session.url })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
-        res.status(500).json({ message: e?.message || 'Error' })
+        return respondSellerSystemError(req, res, {
+          errorCode: 'LABEL_CHECKOUT_ERROR',
+          errorMessage: e?.message || 'Checkout konnte nicht erstellt werden',
+          terminalOutput: e?.stack || null,
+          sellerId: callerSellerId,
+          context: JSON.stringify({ order_id: id, endpoint: 'label/checkout' }),
+        })
       }
     }
 
@@ -13163,7 +13230,15 @@ async function start() {
         await client.connect()
         const checkoutRow = await loadPlatformCheckoutRow(client)
         const secretKey = resolveStripeSecretKeyFromPlatform(checkoutRow)
-        if (!secretKey) { await client.end(); return res.status(400).json({ message: 'Stripe nicht konfiguriert' }) }
+        if (!secretKey) {
+          await client.end()
+          return respondSellerSystemError(req, res, {
+            errorCode: 'STRIPE_NOT_CONFIGURED',
+            errorMessage: 'Stripe nicht konfiguriert (Label-Fulfill)',
+            sellerId: req.sellerUser?.seller_id || null,
+            context: JSON.stringify({ session_id, endpoint: 'label/fulfill' }),
+          })
+        }
         const stripe = new (require('stripe'))(secretKey)
         const session = await stripe.checkout.sessions.retrieve(session_id)
         if (session.payment_status !== 'paid') { await client.end(); return res.status(400).json({ message: 'Zahlung nicht abgeschlossen' }) }
@@ -13181,7 +13256,15 @@ async function start() {
         const order = orderR.rows[0]
         if (!order) { await client.end(); return res.status(404).json({ message: 'Bestellung nicht gefunden' }) }
         const sc = await getSendcloudCredentials(client)
-        if (!sc.public_key || !sc.secret_key) { await client.end(); return res.status(400).json({ message: 'Sendcloud nicht konfiguriert' }) }
+        if (!sc.public_key || !sc.secret_key) {
+          await client.end()
+          return respondSellerSystemError(req, res, {
+            errorCode: 'SENDCLOUD_NOT_CONFIGURED',
+            errorMessage: 'Sendcloud nicht konfiguriert (Label-Erstellung nach Zahlung)',
+            sellerId: meta.seller_id || req.sellerUser?.seller_id || null,
+            context: JSON.stringify({ order_id: orderId, session_id, endpoint: 'label/fulfill' }),
+          })
+        }
         const parcelBody = JSON.stringify({ parcel: {
           name: [order.first_name, order.last_name].filter(Boolean).join(' ') || order.email || 'Kunde',
           address: order.address_line1 || '',
@@ -13202,7 +13285,13 @@ async function start() {
         const scResp = await sendcloudRequest('/api/v2/parcels', sc, { method: 'POST', body: parcelBody })
         if (scResp.status >= 400) {
           await client.end()
-          return res.status(500).json({ message: `Sendcloud Fehler: ${JSON.stringify(scResp.data?.error || scResp.data)}` })
+          return respondSellerSystemError(req, res, {
+            errorCode: 'SENDCLOUD_PARCEL_ERROR',
+            errorMessage: `Sendcloud Fehler: ${JSON.stringify(scResp.data?.error || scResp.data)}`,
+            terminalOutput: JSON.stringify(scResp.data || {}),
+            sellerId: meta.seller_id || req.sellerUser?.seller_id || null,
+            context: JSON.stringify({ order_id: orderId, session_id, service_id: meta.service_id, endpoint: 'label/fulfill' }),
+          })
         }
         const parcel = scResp.data?.parcel || {}
         const trackingNumber = parcel.tracking_number || ''
@@ -13216,7 +13305,13 @@ async function start() {
         res.json({ label_url: labelUrl, tracking_number: trackingNumber, carrier_name: carrierName })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
-        res.status(500).json({ message: e?.message || 'Error' })
+        return respondSellerSystemError(req, res, {
+          errorCode: 'LABEL_FULFILL_ERROR',
+          errorMessage: e?.message || 'Etikett konnte nicht erstellt werden',
+          terminalOutput: e?.stack || null,
+          sellerId: req.sellerUser?.seller_id || null,
+          context: JSON.stringify({ session_id, endpoint: 'label/fulfill' }),
+        })
       }
     }
 
@@ -19223,6 +19318,118 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    // GET /admin-hub/v1/analytics/marketing — impressions, clicks, conversions for reports
+    const adminHubAnalyticsMarketingGET = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      const isSuperuser = req.sellerUser?.is_superuser
+      if (!sellerId && !isSuperuser) return res.status(401).json({ message: 'Unauthorized' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const from = String(req.query.from || '').slice(0, 10)
+      const to = String(req.query.to || '').slice(0, 10)
+      if (!from || !to) return res.status(400).json({ message: 'from and to required (YYYY-MM-DD)' })
+      try {
+        await client.connect()
+        const sellerFilter = isSuperuser ? '' : 'AND seller_id = $1'
+        const evParams = isSuperuser ? [from, to] : [sellerId, from, to]
+        const evR = await client.query(
+          `SELECT event_type, COUNT(*)::int AS cnt
+           FROM product_events
+           WHERE created_at >= $${isSuperuser ? 1 : 2}::date
+             AND created_at < ($${isSuperuser ? 2 : 3}::date + interval '1 day')
+             AND event_type IN ('impression', 'click', 'add_to_cart')
+             ${sellerFilter}
+           GROUP BY event_type`,
+          evParams,
+        )
+        const dailyEvR = await client.query(
+          `SELECT DATE(created_at) AS day, event_type, COUNT(*)::int AS cnt
+           FROM product_events
+           WHERE created_at >= $${isSuperuser ? 1 : 2}::date
+             AND created_at < ($${isSuperuser ? 2 : 3}::date + interval '1 day')
+             AND event_type IN ('impression', 'click')
+             ${sellerFilter}
+           GROUP BY DATE(created_at), event_type
+           ORDER BY day`,
+          evParams,
+        )
+        const orderParams = isSuperuser ? [from, to] : [sellerId, from, to]
+        const orderSellerFilter = isSuperuser ? '' : 'AND o.seller_id = $1'
+        const ordersR = await client.query(
+          `SELECT
+             DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) AS day,
+             COUNT(*)::int AS orders,
+             COALESCE(SUM(
+               CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::bigint
+                    ELSE GREATEST(0, COALESCE(o.total_cents, 0))::bigint END
+             ), 0)::bigint AS revenue_cents
+           FROM store_orders o
+           WHERE o.payment_status = 'bezahlt'
+             AND o.order_status NOT IN ('storniert', 'cancelled')
+             AND DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) >= $${isSuperuser ? 1 : 2}::date
+             AND DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) <= $${isSuperuser ? 2 : 3}::date
+             ${orderSellerFilter}
+           GROUP BY DATE(COALESCE(o.delivery_date::timestamp, o.created_at))
+           ORDER BY day`,
+          orderParams,
+        )
+        const spendR = await client.query(
+          `SELECT COALESCE(SUM(budget_daily_cents), 0)::bigint AS daily_budget
+           FROM seller_campaigns
+           WHERE campaign_type = 'ppc'
+             AND ad_status IN ('active', 'running', 'approved', 'live', 'paused')
+             ${isSuperuser ? '' : 'AND seller_id = $1'}`,
+          isSuperuser ? [] : [sellerId],
+        )
+        await client.end()
+
+        const totals = { impressions: 0, clicks: 0, add_to_cart: 0, orders: 0, revenue_cents: 0, spend_cents: 0 }
+        for (const row of evR.rows || []) {
+          if (row.event_type === 'impression') totals.impressions = row.cnt
+          if (row.event_type === 'click') totals.clicks = row.cnt
+          if (row.event_type === 'add_to_cart') totals.add_to_cart = row.cnt
+        }
+        for (const row of ordersR.rows || []) {
+          totals.orders += row.orders
+          totals.revenue_cents += Number(row.revenue_cents) || 0
+        }
+        const dayMs = Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1)
+        totals.spend_cents = (Number(spendR.rows[0]?.daily_budget) || 0) * dayMs
+
+        const dailyMap = new Map()
+        const ensureDay = (dayKey) => {
+          const k = String(dayKey).slice(0, 10)
+          if (!dailyMap.has(k)) {
+            dailyMap.set(k, { date: k, impressions: 0, clicks: 0, orders: 0, revenue_cents: 0 })
+          }
+          return dailyMap.get(k)
+        }
+        for (const row of dailyEvR.rows || []) {
+          const d = ensureDay(row.day)
+          if (row.event_type === 'impression') d.impressions = row.cnt
+          if (row.event_type === 'click') d.clicks = row.cnt
+        }
+        for (const row of ordersR.rows || []) {
+          const d = ensureDay(row.day)
+          d.orders = row.orders
+          d.revenue_cents = Number(row.revenue_cents) || 0
+        }
+
+        const ctr = totals.impressions > 0 ? totals.clicks / totals.impressions : null
+        const conversion_rate = totals.clicks > 0 ? totals.orders / totals.clicks : null
+        const roas = totals.spend_cents > 0 ? totals.revenue_cents / totals.spend_cents : null
+
+        res.json({
+          totals,
+          derived: { ctr, conversion_rate, roas },
+          daily: [...dailyMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
+        })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     // GET /admin-hub/v1/payout-overview — superuser: all sellers summary for a period
     const adminHubPayoutOverviewGET = async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
@@ -19975,7 +20182,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
     // ── Seller Error Logs ─────────────────────────────────────────────────────
     /** Call this anywhere in the backend to log a seller error */
-    const logSellerError = async (sellerId, { errorCode, errorMessage, terminalOutput, context }) => {
+    logSellerError = async (sellerId, { errorCode, errorMessage, terminalOutput, context }) => {
       const client = getDbClient()
       if (!client) return
       try {
@@ -20390,6 +20597,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.post('/admin-hub/v1/payouts/mark-paid', requireSellerAuth, adminHubPayoutsMarkPaidPOST)
     httpApp.post('/admin-hub/v1/payouts/backfill', requireSellerAuth, adminHubPayoutsBackfillPOST)
     httpApp.get('/admin-hub/v1/payout-summary', requireSellerAuth, adminHubPayoutSummaryGET)
+    httpApp.get('/admin-hub/v1/analytics/marketing', requireSellerAuth, adminHubAnalyticsMarketingGET)
     httpApp.get('/admin-hub/v1/payout-overview', requireSellerAuth, adminHubPayoutOverviewGET)
     httpApp.patch('/admin-hub/v1/seller/iban', requireSellerAuth, adminHubSellerIbanPATCH)
     httpApp.get('/admin-hub/v1/seller/account', requireSellerAuth, adminHubSellerAccountGET)

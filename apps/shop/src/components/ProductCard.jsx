@@ -9,6 +9,7 @@ import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
+import { enrichVariationGroups } from "@/lib/product-variations";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-price";
@@ -434,17 +435,21 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
   const shippingGroups = cartCtx?.shippingGroups ?? [];
 
   const variants = product.variants || [];
-  const variationGroups = Array.isArray(product.variation_groups) && product.variation_groups.length > 0
+  const variationGroupsRaw = Array.isArray(product.variation_groups) && product.variation_groups.length > 0
     ? product.variation_groups : null;
 
   // Normalize variants for linked-group products (title "Red / S" → option_values ["Red","S"])
-  const normalizedVariants = variationGroups ? variants.map((v) => {
+  const normalizedVariants = variationGroupsRaw ? variants.map((v) => {
     const ov = Array.isArray(v.option_values) ? v.option_values : [];
-    if (ov.length === variationGroups.length) return v;
+    if (ov.length === variationGroupsRaw.length) return v;
     const parts = (v.title || v.value || "").split(" / ").map((s) => s.trim()).filter(Boolean);
-    if (parts.length === variationGroups.length) return { ...v, option_values: parts };
+    if (parts.length === variationGroupsRaw.length) return { ...v, option_values: parts };
     return v;
   }) : variants;
+
+  const variationGroups = variationGroupsRaw
+    ? enrichVariationGroups(variationGroupsRaw, normalizedVariants)
+    : null;
 
   // Find best initial variant: filter-matching first, then first in-stock, then 0
   const filterVals = Object.values(activeFilters).flat().map(s => String(s).toLowerCase());

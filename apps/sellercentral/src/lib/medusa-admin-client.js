@@ -1556,6 +1556,14 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/campaigns/attribution${q ? "?" + q : ""}`);
   }
 
+  async getMarketingAnalytics(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.from) qs.set("from", params.from);
+    if (params.to) qs.set("to", params.to);
+    const q = qs.toString();
+    return this.request(`/admin-hub/v1/analytics/marketing${q ? "?" + q : ""}`);
+  }
+
   // ── Platform Marketing Accounts (superuser) ─────────────────────────────────
   async getMarketingAccounts() {
     return this.request('/admin-hub/v1/marketing-accounts')

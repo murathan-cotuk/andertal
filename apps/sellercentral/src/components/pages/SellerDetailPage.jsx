@@ -31,27 +31,27 @@ function AdminSellerCardSection({ sellerId }) {
   }, [client, sellerId]);
 
   const handleDelete = useCallback(async () => {
-    if (!(await confirmDelete(locale === "en" ? "Really remove card?" : locale === "tr" ? "Kartı gerçekten kaldır?" : "Karte wirklich entfernen?"))) return;
+    if (!(await confirmDelete(locale === "en" ? "Really remove card?" : locale === "tr" ? "Kartı gerçekten kaldır?" : locale === "fr" ? "Vraiment supprimer la carte ?" : locale === "es" ? "¿Realmente eliminar la tarjeta?" : locale === "it" ? "Rimuovere davvero la carta?" : "Karte wirklich entfernen?"))) return;
     setErr(""); setDeleting(true);
     try {
       await client.deleteSellerCardByAdmin(sellerId);
       setInfo({ has_card: false, last4: null, brand: null });
-      setOk(locale === "en" ? "Card removed." : locale === "tr" ? "Kart kaldırıldı." : "Karte entfernt.");
+      setOk(locale === "en" ? "Card removed." : locale === "tr" ? "Kart kaldırıldı." : locale === "fr" ? "Carte supprimée." : locale === "es" ? "Tarjeta eliminada." : locale === "it" ? "Carta rimossa." : "Karte entfernt.");
     } catch (e) {
-      setErr(e?.message || (locale === "en" ? "Error." : locale === "tr" ? "Hata." : "Fehler."));
+      setErr(e?.message || (locale === "en" ? "Error." : locale === "tr" ? "Hata." : locale === "fr" ? "Erreur." : locale === "es" ? "Error." : locale === "it" ? "Errore." : "Fehler."));
     } finally { setDeleting(false); }
   }, [client, sellerId]);
 
   if (loading) return <Spinner size="small" />;
 
-  const brand = info?.brand ? (info.brand.charAt(0).toUpperCase() + info.brand.slice(1)) : (locale === "en" ? "Card" : locale === "tr" ? "Kart" : "Karte");
+  const brand = info?.brand ? (info.brand.charAt(0).toUpperCase() + info.brand.slice(1)) : (locale === "en" ? "Card" : locale === "tr" ? "Kart" : locale === "fr" ? "Carte" : locale === "es" ? "Tarjeta" : locale === "it" ? "Carta" : "Karte");
   const exp = info?.exp_month && info?.exp_year
     ? `${String(info.exp_month).padStart(2, "0")}/${String(info.exp_year).slice(-2)}`
     : null;
 
   return (
     <BlockStack gap="200">
-      <Text as="h3" variant="headingSm">{locale === "en" ? "Credit card" : locale === "tr" ? "Kredi kartı" : "Kreditkarte"}</Text>
+      <Text as="h3" variant="headingSm">{locale === "en" ? "Credit card" : locale === "tr" ? "Kredi kartı" : locale === "fr" ? "Carte de crédit" : locale === "es" ? "Tarjeta de crédito" : locale === "it" ? "Carta di credito" : "Kreditkarte"}</Text>
       {ok && <Banner tone="success" onDismiss={() => setOk("")}>{ok}</Banner>}
       {err && <Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner>}
       {info?.has_card ? (
@@ -63,11 +63,11 @@ function AdminSellerCardSection({ sellerId }) {
             </Text>
           </div>
           <Button tone="critical" variant="plain" size="slim" onClick={handleDelete} loading={deleting}>
-            {locale === "en" ? "Remove" : locale === "tr" ? "Kaldır" : "Entfernen"}
+            {locale === "en" ? "Remove" : locale === "tr" ? "Kaldır" : locale === "fr" ? "Supprimer" : locale === "es" ? "Eliminar" : locale === "it" ? "Rimuovi" : "Entfernen"}
           </Button>
         </InlineStack>
       ) : (
-        <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No credit card on file." : locale === "tr" ? "Kayıtlı kredi kartı yok." : "Keine Kreditkarte hinterlegt."}</Text>
+        <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No credit card on file." : locale === "tr" ? "Kayıtlı kredi kartı yok." : locale === "fr" ? "Aucune carte de crédit enregistrée." : locale === "es" ? "No hay tarjeta de crédito registrada." : locale === "it" ? "Nessuna carta di credito registrata." : "Keine Kreditkarte hinterlegt."}</Text>
       )}
     </BlockStack>
   );
@@ -221,9 +221,9 @@ function Stat({ label, value, sub, tone }) {
 }
 
 // ── Mini bar chart ─────────────────────────────────────────────────────────
-function BarChart({ data }) {
+function BarChart({ data, locale }) {
   if (!data || data.length === 0) return (
-    <Box padding="400"><Text tone="subdued">Keine Daten</Text></Box>
+    <Box padding="400"><Text tone="subdued">{locale === "en" ? "No data" : locale === "tr" ? "Veri yok" : locale === "fr" ? "Aucune donnée" : locale === "es" ? "Sin datos" : locale === "it" ? "Nessun dato" : "Keine Daten"}</Text></Box>
   );
   const max = Math.max(...data.map((d) => d.total_cents), 1);
   return (
@@ -305,7 +305,7 @@ export default function SellerDetailPage({ sellerId }) {
   const load = useCallback(() => {
     if (!sellerId) {
       setLoading(false);
-      setError(locale === "en" ? "No seller ID" : locale === "tr" ? "Satıcı kimliği yok" : "Keine Verkäufer-ID");
+      setError(locale === "en" ? "No seller ID" : locale === "tr" ? "Satıcı kimliği yok" : locale === "fr" ? "Aucun ID vendeur" : locale === "es" ? "Sin ID de vendedor" : locale === "it" ? "Nessun ID venditore" : "Keine Verkäufer-ID");
       return;
     }
     setLoading(true);
@@ -315,7 +315,7 @@ export default function SellerDetailPage({ sellerId }) {
         setCommissionVal(((r.seller?.commission_rate || 0.12) * 100).toFixed(1));
         setError(null);
       })
-      .catch((e) => setError(e?.message || (locale === "en" ? "Error loading" : locale === "tr" ? "Yükleme hatası" : "Fehler beim Laden")))
+      .catch((e) => setError(e?.message || (locale === "en" ? "Error loading" : locale === "tr" ? "Yükleme hatası" : locale === "fr" ? "Erreur de chargement" : locale === "es" ? "Error al cargar" : locale === "it" ? "Errore di caricamento" : "Fehler beim Laden")))
       .finally(() => setLoading(false));
   }, [sellerId]);
 
@@ -350,11 +350,11 @@ export default function SellerDetailPage({ sellerId }) {
     try {
       const r = await client.approveSellerById(sellerId, newStatus, rejectReason || undefined);
       setSeller(r.seller);
-      setMsg({ tone: "success", text: locale === "en" ? `Status changed to "${STATUS_META[newStatus]?.label}".` : locale === "tr" ? `Durum "${STATUS_META[newStatus]?.label}" olarak değiştirildi.` : `Status wurde auf "${STATUS_META[newStatus]?.label}" geändert.` });
+      setMsg({ tone: "success", text: locale === "en" ? `Status changed to "${STATUS_META[newStatus]?.label}".` : locale === "tr" ? `Durum "${STATUS_META[newStatus]?.label}" olarak değiştirildi.` : locale === "fr" ? `Statut changé en "${STATUS_META[newStatus]?.label}".` : locale === "es" ? `Estado cambiado a "${STATUS_META[newStatus]?.label}".` : locale === "it" ? `Stato cambiato in "${STATUS_META[newStatus]?.label}".` : `Status wurde auf "${STATUS_META[newStatus]?.label}" geändert.` });
       setApproveModal(false);
       setRejectReason("");
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler") });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : locale === "fr" ? "Erreur" : locale === "es" ? "Error" : locale === "it" ? "Errore" : "Fehler") });
     } finally {
       setApproving(false);
     }
@@ -364,13 +364,13 @@ export default function SellerDetailPage({ sellerId }) {
     setSavingCommission(true);
     try {
       const rate = parseFloat(commissionVal.replace(",", ".")) / 100;
-      if (isNaN(rate) || rate < 0 || rate > 1) throw new Error(locale === "en" ? "Invalid value (0–100%)" : locale === "tr" ? "Geçersiz değer (0–100%)" : "Ungültiger Wert (0–100%)");
+      if (isNaN(rate) || rate < 0 || rate > 1) throw new Error(locale === "en" ? "Invalid value (0–100%)" : locale === "tr" ? "Geçersiz değer (0–100%)" : locale === "fr" ? "Valeur invalide (0–100%)" : locale === "es" ? "Valor inválido (0–100%)" : locale === "it" ? "Valore non valido (0–100%)" : "Ungültiger Wert (0–100%)");
       const r = await client.updateSellerById(sellerId, { commission_rate: rate });
       setSeller((p) => ({ ...p, commission_rate: r.seller?.commission_rate ?? rate }));
-      setMsg({ tone: "success", text: locale === "en" ? "Commission saved." : locale === "tr" ? "Komisyon kaydedildi." : "Provision gespeichert." });
+      setMsg({ tone: "success", text: locale === "en" ? "Commission saved." : locale === "tr" ? "Komisyon kaydedildi." : locale === "fr" ? "Commission enregistrée." : locale === "es" ? "Comisión guardada." : locale === "it" ? "Commissione salvata." : "Provision gespeichert." });
       setEditCommission(false);
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler") });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : locale === "fr" ? "Erreur" : locale === "es" ? "Error" : locale === "it" ? "Errore" : "Fehler") });
     } finally {
       setSavingCommission(false);
     }
@@ -392,12 +392,12 @@ export default function SellerDetailPage({ sellerId }) {
         iban: seller.iban || null,
         notes: payoutForm.notes || null,
       });
-      setMsg({ tone: "success", text: locale === "en" ? "Payout created." : locale === "tr" ? "Ödeme oluşturuldu." : "Auszahlung erstellt." });
+      setMsg({ tone: "success", text: locale === "en" ? "Payout created." : locale === "tr" ? "Ödeme oluşturuldu." : locale === "fr" ? "Paiement créé." : locale === "es" ? "Pago creado." : locale === "it" ? "Pagamento creato." : "Auszahlung erstellt." });
       setPayoutModal(false);
       setPayoutForm({ period_start: "", period_end: "", total_cents: "", commission_cents: "", payout_cents: "", notes: "" });
       load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler") });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : locale === "fr" ? "Erreur" : locale === "es" ? "Error" : locale === "it" ? "Errore" : "Fehler") });
     } finally {
       setSavingPayout(false);
     }
@@ -408,14 +408,20 @@ export default function SellerDetailPage({ sellerId }) {
       ? `Mark payout ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} as externally transferred?\n\nNote: This does not initiate a bank/Stripe transfer. First send the payment from the platform account to the seller IBAN, then mark as paid here.`
       : locale === "tr"
       ? `${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} ödemesini dışarıdan havale edildi olarak işaretle?\n\nNot: Bu işlem banka/Stripe transferi başlatmaz. Önce ödemeyi platform hesabından seller IBAN'ına gerçekten gönderin, sonra burada işaretleyin.`
-      : `Auszahlung ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} als extern überwiesen markieren?\n\nHinweis: Bu işlem banka/Stripe transferi başlatmaz. Önce ödemeyi platform hesabından seller IBAN'ına gerçekten gönderin, sonra burada "bezahlt" işaretleyin.`;
+      : locale === "fr"
+      ? `Marquer le paiement ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} comme transféré extérieurement ?\n\nRemarque : Cela ne lance pas de virement bancaire/Stripe. Envoyez d'abord le paiement depuis le compte de la plateforme vers l'IBAN du vendeur, puis marquez-le ici.`
+      : locale === "es"
+      ? `¿Marcar el pago ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} como transferido externamente?\n\nNota: Esto no inicia una transferencia bancaria/Stripe. Primero envíe el pago desde la cuenta de la plataforma al IBAN del vendedor y luego márquelo aquí.`
+      : locale === "it"
+      ? `Contrassegnare il pagamento ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} come trasferito esternamente?\n\nNota: Questo non avvia un bonifico bancario/Stripe. Prima inviare il pagamento dal conto della piattaforma all'IBAN del venditore, poi contrassegnarlo qui.`
+      : `Auszahlung ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} als extern überwiesen markieren?\n\nHinweis: Dies startet keine Bank-/Stripe-Überweisung. Erst die Zahlung vom Plattformkonto zur Seller-IBAN senden, dann hier als bezahlt markieren.`;
     if (!(await confirmDelete(confirmMsg))) return;
     try {
       await client.updatePayout(payout.id, { status: "bezahlt" });
-      setMsg({ tone: "success", text: locale === "en" ? "Marked as externally transferred (paid)." : locale === "tr" ? "Dışarıdan havale edildi (ödendi) olarak işaretlendi." : "Als extern überwiesen (bezahlt) markiert." });
+      setMsg({ tone: "success", text: locale === "en" ? "Marked as externally transferred (paid)." : locale === "tr" ? "Dışarıdan havale edildi (ödendi) olarak işaretlendi." : locale === "fr" ? "Marqué comme transféré externalement (payé)." : locale === "es" ? "Marcado como transferido externamente (pagado)." : locale === "it" ? "Contrassegnato come trasferito esternamente (pagato)." : "Als extern überwiesen (bezahlt) markiert." });
       load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler") });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : locale === "fr" ? "Erreur" : locale === "es" ? "Error" : locale === "it" ? "Errore" : "Fehler") });
     }
   };
 
@@ -490,10 +496,10 @@ ${"=".repeat(50)}
   const payoutTotal = totalRevenue - commissionTotal;
 
   const tabs = [
-    { id: "overview", content: locale === "en" ? "Overview" : locale === "tr" ? "Genel Bakış" : "Übersicht" },
-    { id: "finance", content: locale === "en" ? "Finance & Commissions" : locale === "tr" ? "Finans & Komisyonlar" : "Finanzen & Provisionen" },
-    { id: "products", content: locale === "en" ? "Products" : locale === "tr" ? "Ürünler" : "Produkte" },
-    { id: "company", content: locale === "en" ? "Company data" : locale === "tr" ? "Firma bilgileri" : "Firmendaten" },
+    { id: "overview", content: locale === "en" ? "Overview" : locale === "tr" ? "Genel Bakış" : locale === "fr" ? "Aperçu" : locale === "es" ? "Resumen" : locale === "it" ? "Panoramica" : "Übersicht" },
+    { id: "finance", content: locale === "en" ? "Finance & Commissions" : locale === "tr" ? "Finans & Komisyonlar" : locale === "fr" ? "Finances & Commissions" : locale === "es" ? "Finanzas & Comisiones" : locale === "it" ? "Finanze & Commissioni" : "Finanzen & Provisionen" },
+    { id: "products", content: locale === "en" ? "Products" : locale === "tr" ? "Ürünler" : locale === "fr" ? "Produits" : locale === "es" ? "Productos" : locale === "it" ? "Prodotti" : "Produkte" },
+    { id: "company", content: locale === "en" ? "Company data" : locale === "tr" ? "Firma bilgileri" : locale === "fr" ? "Données entreprise" : locale === "es" ? "Datos empresa" : locale === "it" ? "Dati azienda" : "Firmendaten" },
   ];
   const selectedPeriod = PAYOUT_PERIODS.find((p) => p.key === periodKey) || PAYOUT_PERIODS[0];
   const selectedYear = getPeriodYear(selectedPeriod);
@@ -516,7 +522,7 @@ ${"=".repeat(50)}
 
   return (
     <Page
-      backAction={{ content: locale === "en" ? "Sellers" : locale === "tr" ? "Satıcılar" : "Verkäufer", onAction: () => router.push("/sellers") }}
+      backAction={{ content: locale === "en" ? "Sellers" : locale === "tr" ? "Satıcılar" : locale === "fr" ? "Vendeurs" : locale === "es" ? "Vendedores" : locale === "it" ? "Venditori" : "Verkäufer", onAction: () => router.push("/sellers") }}
       title={seller.store_name || seller.email}
       titleMetadata={<Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>}
       subtitle={seller.email}
@@ -536,14 +542,14 @@ ${"=".repeat(50)}
 
         {/* ── Stat strip ─────────────────────────────────────────────── */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Stat label={locale === "en" ? "Total Revenue" : locale === "tr" ? "Toplam Ciro" : "Gesamtumsatz"} value={fmtCents(totalRevenue, locale)} sub={`${totalOrders} ${locale === "en" ? "Orders" : locale === "tr" ? "Sipariş" : "Bestellungen"}`} />
-          <Stat label={locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : "Provision"} value={fmtCents(commissionTotal, locale)} sub={`${commissionPct}% Rate`} tone="critical" />
-          <Stat label={locale === "en" ? "Payout Amount" : locale === "tr" ? "Ödeme Tutarı" : "Auszahlungsbetrag"} value={fmtCents(payoutTotal, locale)} tone="success" />
-          <Stat label={locale === "en" ? "Products" : locale === "tr" ? "Ürünler" : "Produkte"} value={
+          <Stat label={locale === "en" ? "Total Revenue" : locale === "tr" ? "Toplam Ciro" : locale === "fr" ? "Chiffre d'affaires total" : locale === "es" ? "Ingresos totales" : locale === "it" ? "Fatturato totale" : "Gesamtumsatz"} value={fmtCents(totalRevenue, locale)} sub={`${totalOrders} ${locale === "en" ? "Orders" : locale === "tr" ? "Sipariş" : locale === "fr" ? "Commandes" : locale === "es" ? "Pedidos" : locale === "it" ? "Ordini" : "Bestellungen"}`} />
+          <Stat label={locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : locale === "fr" ? "Commission" : locale === "es" ? "Comisión" : locale === "it" ? "Commissione" : "Provision"} value={fmtCents(commissionTotal, locale)} sub={`${commissionPct}% Rate`} tone="critical" />
+          <Stat label={locale === "en" ? "Payout Amount" : locale === "tr" ? "Ödeme Tutarı" : locale === "fr" ? "Montant du paiement" : locale === "es" ? "Monto del pago" : locale === "it" ? "Importo del pagamento" : "Auszahlungsbetrag"} value={fmtCents(payoutTotal, locale)} tone="success" />
+          <Stat label={locale === "en" ? "Products" : locale === "tr" ? "Ürünler" : locale === "fr" ? "Produits" : locale === "es" ? "Productos" : locale === "it" ? "Prodotti" : "Produkte"} value={
             (seller.products_by_category || []).reduce((a, c) => a + c.count, 0)
           } />
-          <Stat label={locale === "en" ? "Paid Payouts" : locale === "tr" ? "Ödenmiş Ödemeler" : "Bezahlte Auszahlungen"} value={fmtCents(seller.payout_summary?.total_paid_cents, locale)} />
-          <Stat label={locale === "en" ? "Pending" : locale === "tr" ? "Bekleyen" : "Ausstehend"} value={fmtCents(seller.payout_summary?.total_pending_cents, locale)} tone="warning" />
+          <Stat label={locale === "en" ? "Paid Payouts" : locale === "tr" ? "Ödenmiş Ödemeler" : locale === "fr" ? "Paiements effectués" : locale === "es" ? "Pagos realizados" : locale === "it" ? "Pagamenti effettuati" : "Bezahlte Auszahlungen"} value={fmtCents(seller.payout_summary?.total_paid_cents, locale)} />
+          <Stat label={locale === "en" ? "Pending" : locale === "tr" ? "Bekleyen" : locale === "fr" ? "En attente" : locale === "es" ? "Pendiente" : locale === "it" ? "In sospeso" : "Ausstehend"} value={fmtCents(seller.payout_summary?.total_pending_cents, locale)} tone="warning" />
         </div>
 
         {/* ── Tabs ──────────────────────────────────────────────────── */}
@@ -556,8 +562,8 @@ ${"=".repeat(50)}
                 <BlockStack gap="400">
                   {/* Revenue chart */}
                   <BlockStack gap="200">
-                    <Text as="h3" variant="headingSm">{locale === "en" ? "Monthly Revenue (last 12 months)" : locale === "tr" ? "Aylık Ciro (son 12 ay)" : "Monatlicher Umsatz (letzte 12 Monate)"}</Text>
-                    <BarChart data={seller.monthly_revenue} />
+                    <Text as="h3" variant="headingSm">{locale === "en" ? "Monthly Revenue (last 12 months)" : locale === "tr" ? "Aylık Ciro (son 12 ay)" : locale === "fr" ? "Chiffre d'affaires mensuel (12 derniers mois)" : locale === "es" ? "Ingresos mensuales (últimos 12 meses)" : locale === "it" ? "Fatturato mensile (ultimi 12 mesi)" : "Monatlicher Umsatz (letzte 12 Monate)"}</Text>
+                    <BarChart data={seller.monthly_revenue} locale={locale} />
                   </BlockStack>
 
                   <Divider />
@@ -565,31 +571,31 @@ ${"=".repeat(50)}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                     {/* Seller info */}
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">{locale === "en" ? "Account" : locale === "tr" ? "Hesap" : "Konto"}</Text>
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Account" : locale === "tr" ? "Hesap" : locale === "fr" ? "Compte" : locale === "es" ? "Cuenta" : locale === "it" ? "Account" : "Konto"}</Text>
                       <InfoRow label="Seller ID" value={seller.seller_id} />
                       <InfoRow label={ui.colEmail} value={seller.email} />
-                      <InfoRow label={locale === "en" ? "Shop Name" : locale === "tr" ? "Mağaza Adı" : "Shop-Name"} value={seller.store_name} />
-                      <InfoRow label={locale === "en" ? "Registered" : locale === "tr" ? "Kayıt Tarihi" : "Registriert"} value={fmtDate(seller.created_at, locale)} />
-                      <InfoRow label={locale === "en" ? "Approved on" : locale === "tr" ? "Onaylandı" : "Genehmigt am"} value={fmtDate(seller.approved_at, locale)} />
+                      <InfoRow label={locale === "en" ? "Shop Name" : locale === "tr" ? "Mağaza Adı" : locale === "fr" ? "Nom de la boutique" : locale === "es" ? "Nombre de la tienda" : locale === "it" ? "Nome negozio" : "Shop-Name"} value={seller.store_name} />
+                      <InfoRow label={locale === "en" ? "Registered" : locale === "tr" ? "Kayıt Tarihi" : locale === "fr" ? "Inscrit le" : locale === "es" ? "Registrado" : locale === "it" ? "Registrato" : "Registriert"} value={fmtDate(seller.created_at, locale)} />
+                      <InfoRow label={locale === "en" ? "Approved on" : locale === "tr" ? "Onaylandı" : locale === "fr" ? "Approuvé le" : locale === "es" ? "Aprobado el" : locale === "it" ? "Approvato il" : "Genehmigt am"} value={fmtDate(seller.approved_at, locale)} />
                       <InfoRow label="Superuser" value={seller.is_superuser ? ui.yes : ui.no} />
                       <InfoRow label="IBAN" value={seller.iban ? seller.iban.replace(/(.{4})/g, "$1 ").trim() : null} />
                     </BlockStack>
 
                     {/* Provision */}
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">{locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : "Provision"}</Text>
-                      <InfoRow label={locale === "en" ? "Commission rate" : locale === "tr" ? "Komisyon oranı" : "Provisionssatz"} value={`${commissionPct}%`} />
-                      <InfoRow label={locale === "en" ? "Total commission" : locale === "tr" ? "Toplam komisyon" : "Ges. Provision"} value={fmtCents(commissionTotal, locale)} />
-                      <InfoRow label={locale === "en" ? "Total payout" : locale === "tr" ? "Toplam ödeme" : "Ges. Auszahlung"} value={fmtCents(payoutTotal, locale)} />
-                      <InfoRow label={locale === "en" ? "Paid" : locale === "tr" ? "Ödendi" : "Bezahlt"} value={fmtCents(seller.payout_summary?.total_paid_cents, locale)} />
-                      <InfoRow label={locale === "en" ? "Pending" : locale === "tr" ? "Bekleyen" : "Ausstehend"} value={fmtCents(seller.payout_summary?.total_pending_cents, locale)} />
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : locale === "fr" ? "Commission" : locale === "es" ? "Comisión" : locale === "it" ? "Commissione" : "Provision"}</Text>
+                      <InfoRow label={locale === "en" ? "Commission rate" : locale === "tr" ? "Komisyon oranı" : locale === "fr" ? "Taux de commission" : locale === "es" ? "Tasa de comisión" : locale === "it" ? "Tasso di commissione" : "Provisionssatz"} value={`${commissionPct}%`} />
+                      <InfoRow label={locale === "en" ? "Total commission" : locale === "tr" ? "Toplam komisyon" : locale === "fr" ? "Commission totale" : locale === "es" ? "Comisión total" : locale === "it" ? "Commissione totale" : "Ges. Provision"} value={fmtCents(commissionTotal, locale)} />
+                      <InfoRow label={locale === "en" ? "Total payout" : locale === "tr" ? "Toplam ödeme" : locale === "fr" ? "Paiement total" : locale === "es" ? "Pago total" : locale === "it" ? "Pagamento totale" : "Ges. Auszahlung"} value={fmtCents(payoutTotal, locale)} />
+                      <InfoRow label={locale === "en" ? "Paid" : locale === "tr" ? "Ödendi" : locale === "fr" ? "Payé" : locale === "es" ? "Pagado" : locale === "it" ? "Pagato" : "Bezahlt"} value={fmtCents(seller.payout_summary?.total_paid_cents, locale)} />
+                      <InfoRow label={locale === "en" ? "Pending" : locale === "tr" ? "Bekleyen" : locale === "fr" ? "En attente" : locale === "es" ? "Pendiente" : locale === "it" ? "In sospeso" : "Ausstehend"} value={fmtCents(seller.payout_summary?.total_pending_cents, locale)} />
                     </BlockStack>
                   </div>
 
                   {/* Status history / rejection reason */}
                   {seller.rejection_reason && (
                     <Banner tone="critical">
-                      <Text as="p" variant="bodySm"><strong>{locale === "en" ? "Rejection reason:" : locale === "tr" ? "Red gerekçesi:" : "Ablehnungsgrund:"}</strong> {seller.rejection_reason}</Text>
+                      <Text as="p" variant="bodySm"><strong>{locale === "en" ? "Rejection reason:" : locale === "tr" ? "Red gerekçesi:" : locale === "fr" ? "Motif de refus :" : locale === "es" ? "Motivo de rechazo:" : locale === "it" ? "Motivo del rifiuto:" : "Ablehnungsgrund:"}</strong> {seller.rejection_reason}</Text>
                     </Banner>
                   )}
                 </BlockStack>
@@ -603,11 +609,17 @@ ${"=".repeat(50)}
                       ? <>Automatic payouts are prepared on the 1st and 15th (status: <strong>processing</strong>).<br /><strong>Important:</strong> "Mark as paid" does not initiate a payment. First complete the actual bank transfer from the platform account to the seller IBAN, then mark as paid here.</>
                       : locale === "tr"
                       ? <>Otomatik ödemeler 1. ve 15. günlerde hazırlanır (durum: <strong>processing</strong>).<br /><strong>Önemli:</strong> "Ödendi olarak işaretle" bir ödeme başlatmaz. Önce platform hesabından satıcı IBAN'ına gerçek transferi yapın, ardından burada ödendi olarak işaretleyin.</>
+                      : locale === "fr"
+                      ? <>Les paiements automatiques sont préparés les 1er et 15 (statut : <strong>processing</strong>).<br /><strong>Important :</strong> "Marquer comme payé" ne lance pas un paiement. Effectuez d'abord le virement bancaire/Stripe depuis le compte plateforme vers l'IBAN du vendeur, puis marquez-le ici.</>
+                      : locale === "es"
+                      ? <>Los pagos automáticos se preparan el 1 y el 15 (estado: <strong>processing</strong>).<br /><strong>Importante:</strong> "Marcar como pagado" no inicia un pago. Primero realice la transferencia bancaria/Stripe desde la cuenta de la plataforma al IBAN del vendedor y luego márquelo aquí.</>
+                      : locale === "it"
+                      ? <>I pagamenti automatici vengono preparati il 1° e il 15 (stato: <strong>processing</strong>).<br /><strong>Importante:</strong> "Segna come pagato" non avvia un pagamento. Prima effettuare il bonifico bancario/Stripe dal conto piattaforma all'IBAN del venditore, poi contrassegnarlo qui.</>
                       : <>Automatische Auszahlungen werden am 01. und 15. vorbereitet (Status: <strong>processing</strong>).<br /><strong>Wichtig:</strong> "Bezahlt/markieren" startet keine Zahlung. Erst echte Überweisung (z. B. Bank/Stripe) vom Plattformkonto zur Seller-IBAN durchführen, danach hier als bezahlt markieren.</>
                     }
                   </Banner>
                   <InlineStack gap="300" blockAlign="center" align="space-between">
-                    <Text as="h3" variant="headingSm">{locale === "en" ? "Payout History & Billing Details" : locale === "tr" ? "Ödeme Geçmişi & Fatura Detayları" : "Auszahlungshistorie & Abrechnungsdetails"}</Text>
+                    <Text as="h3" variant="headingSm">{locale === "en" ? "Payout History & Billing Details" : locale === "tr" ? "Ödeme Geçmişi & Fatura Detayları" : locale === "fr" ? "Historique des paiements & Détails de facturation" : locale === "es" ? "Historial de pagos & Detalles de facturación" : locale === "it" ? "Storico pagamenti & Dettagli di fatturazione" : "Auszahlungshistorie & Abrechnungsdetails"}</Text>
                     <InlineStack gap="200" blockAlign="center">
                       <div style={{ minWidth: 560 }}>
                         <BlockStack gap="100">
@@ -711,30 +723,30 @@ ${"=".repeat(50)}
                             total_cents: (periodTotalCents / 100).toFixed(2),
                             commission_cents: (periodCommissionCents / 100).toFixed(2),
                             payout_cents: (periodPayoutCents / 100).toFixed(2),
-                            notes: p.notes || `Periode ${selectedPeriod.label}`,
+                            notes: p.notes || `${locale === "en" ? "Period" : locale === "tr" ? "Dönem" : locale === "fr" ? "Période" : locale === "es" ? "Período" : locale === "it" ? "Periodo" : "Periode"} ${selectedPeriod.label}`,
                           }));
                           setPayoutModal(true);
                         }}
                       >
-                        {locale === "en" ? "+ Create payout" : locale === "tr" ? "+ Ödeme oluştur" : "+ Auszahlung erstellen"}
+                        {locale === "en" ? "+ Create payout" : locale === "tr" ? "+ Ödeme oluştur" : locale === "fr" ? "+ Créer un paiement" : locale === "es" ? "+ Crear pago" : locale === "it" ? "+ Crea pagamento" : "+ Auszahlung erstellen"}
                       </Button>
                     </InlineStack>
                   </InlineStack>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(160px, 1fr))", gap: 10 }}>
-                    <Stat label={locale === "en" ? "Revenue (Period)" : locale === "tr" ? "Ciro (Dönem)" : "Umsatz (Periode)"} value={fmtCents(periodTotalCents, locale)} />
-                    <Stat label={locale === "en" ? "Commission (Period)" : locale === "tr" ? "Komisyon (Dönem)" : "Provision (Periode)"} value={fmtCents(periodCommissionCents, locale)} />
-                    <Stat label={locale === "en" ? "Payout (Period)" : locale === "tr" ? "Ödeme (Dönem)" : "Auszahlung (Periode)"} value={fmtCents(periodPayoutCents, locale)} tone="success" />
-                    <Stat label={locale === "en" ? "Orders (eligible / total)" : locale === "tr" ? "Siparişler (uygun / toplam)" : "Orders (eligible / total)"} value={`${periodEligibleCount} / ${periodTransactions.length}`} />
+                    <Stat label={locale === "en" ? "Revenue (Period)" : locale === "tr" ? "Ciro (Dönem)" : locale === "fr" ? "CA (Période)" : locale === "es" ? "Ingresos (Período)" : locale === "it" ? "Fatturato (Periodo)" : "Umsatz (Periode)"} value={fmtCents(periodTotalCents, locale)} />
+                    <Stat label={locale === "en" ? "Commission (Period)" : locale === "tr" ? "Komisyon (Dönem)" : locale === "fr" ? "Commission (Période)" : locale === "es" ? "Comisión (Período)" : locale === "it" ? "Commissione (Periodo)" : "Provision (Periode)"} value={fmtCents(periodCommissionCents, locale)} />
+                    <Stat label={locale === "en" ? "Payout (Period)" : locale === "tr" ? "Ödeme (Dönem)" : locale === "fr" ? "Paiement (Période)" : locale === "es" ? "Pago (Período)" : locale === "it" ? "Pagamento (Periodo)" : "Auszahlung (Periode)"} value={fmtCents(periodPayoutCents, locale)} tone="success" />
+                    <Stat label={locale === "en" ? "Orders (eligible / total)" : locale === "tr" ? "Siparişler (uygun / toplam)" : locale === "fr" ? "Commandes (éligibles / total)" : locale === "es" ? "Pedidos (elegibles / total)" : locale === "it" ? "Ordini (idonei / totale)" : "Bestellungen (geeignet / gesamt)"} value={`${periodEligibleCount} / ${periodTransactions.length}`} />
                   </div>
 
                   <Card>
                     <BlockStack gap="200">
-                      <Text as="h3" variant="headingSm">{locale === "en" ? "Transactions in selected period" : locale === "tr" ? "Seçili dönemdeki işlemler" : "Transaktionen in gewählter Periode"}</Text>
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Transactions in selected period" : locale === "tr" ? "Seçili dönemdeki işlemler" : locale === "fr" ? "Transactions dans la période sélectionnée" : locale === "es" ? "Transacciones en el período seleccionado" : locale === "it" ? "Transazioni nel periodo selezionato" : "Transaktionen in gewählter Periode"}</Text>
                       {periodTransactionsLoading ? (
                         <Text as="p" variant="bodySm" tone="subdued">{ui.loading}</Text>
                       ) : periodTransactions.length === 0 ? (
-                        <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No transactions in this period." : locale === "tr" ? "Bu dönemde işlem yok." : "Keine Transaktionen in dieser Periode."}</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No transactions in this period." : locale === "tr" ? "Bu dönemde işlem yok." : locale === "fr" ? "Aucune transaction dans cette période." : locale === "es" ? "Sin transacciones en este período." : locale === "it" ? "Nessuna transazione in questo periodo." : "Keine Transaktionen in dieser Periode."}</Text>
                       ) : (
                         <div style={{ overflowX: "auto" }}>
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -744,6 +756,12 @@ ${"=".repeat(50)}
                                   ? ["Order", "Customer", "Date", "Revenue", "Commission", "Payout", "Delivery", "Eligible"]
                                   : locale === "tr"
                                   ? ["Sipariş", "Müşteri", "Tarih", "Ciro", "Komisyon", "Ödeme", "Teslimat", "Uygun"]
+                                  : locale === "fr"
+                                  ? ["Commande", "Client", "Date", "CA", "Commission", "Paiement", "Livraison", "Éligible"]
+                                  : locale === "es"
+                                  ? ["Pedido", "Cliente", "Fecha", "Ingresos", "Comisión", "Pago", "Entrega", "Elegible"]
+                                  : locale === "it"
+                                  ? ["Ordine", "Cliente", "Data", "Fatturato", "Commissione", "Pagamento", "Consegna", "Idoneo"]
                                   : ["Bestellung", "Kunde", "Datum", "Umsatz", "Provision", "Auszahlung", "Lieferung", "Eligible"]
                                 ).map((h) => (
                                   <th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "#6d7175", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
@@ -774,7 +792,7 @@ ${"=".repeat(50)}
 
                   {!seller.payouts || seller.payouts.length === 0 ? (
                     <Box padding="600" background="bg-surface-secondary" borderRadius="200">
-                      <Text as="p" tone="subdued">{locale === "en" ? "No payouts yet." : locale === "tr" ? "Henüz ödeme yok." : "Noch keine Auszahlungen."}</Text>
+                      <Text as="p" tone="subdued">{locale === "en" ? "No payouts yet." : locale === "tr" ? "Henüz ödeme yok." : locale === "fr" ? "Aucun paiement pour l'instant." : locale === "es" ? "Aún no hay pagos." : locale === "it" ? "Ancora nessun pagamento." : "Noch keine Auszahlungen."}</Text>
                     </Box>
                   ) : (
                     <div style={{ overflowX: "auto" }}>
@@ -785,6 +803,12 @@ ${"=".repeat(50)}
                               ? ["Period", "Revenue", "Commission", "Payout", "Status", "IBAN", ""]
                               : locale === "tr"
                               ? ["Dönem", "Ciro", "Komisyon", "Ödeme", "Durum", "IBAN", ""]
+                              : locale === "fr"
+                              ? ["Période", "CA", "Commission", "Paiement", "Statut", "IBAN", ""]
+                              : locale === "es"
+                              ? ["Período", "Ingresos", "Comisión", "Pago", "Estado", "IBAN", ""]
+                              : locale === "it"
+                              ? ["Periodo", "Fatturato", "Commissione", "Pagamento", "Stato", "IBAN", ""]
                               : ["Zeitraum", "Umsatz", "Provision", "Auszahlung", "Status", "IBAN", ""]
                             ).map((h, i) => (
                               <th key={i} style={{ padding: "8px 12px", textAlign: i >= 2 && i <= 4 ? "right" : "left", fontWeight: 600, color: "#6d7175", whiteSpace: "nowrap" }}>{h}</th>
@@ -800,7 +824,7 @@ ${"=".repeat(50)}
                               <td style={{ padding: "8px 12px", textAlign: "right", color: "#16a34a", fontWeight: 600 }}>{fmtCents(p.payout_cents, locale)}</td>
                               <td style={{ padding: "8px 12px" }}>
                                 <Badge tone={p.status === "bezahlt" ? "success" : "attention"}>
-                                  {p.status === "bezahlt" ? (locale === "en" ? "Paid" : locale === "tr" ? "Ödendi" : "Bezahlt") : (locale === "en" ? "Open" : locale === "tr" ? "Açık" : "Offen")}
+                                  {p.status === "bezahlt" ? (locale === "en" ? "Paid" : locale === "tr" ? "Ödendi" : locale === "fr" ? "Payé" : locale === "es" ? "Pagado" : locale === "it" ? "Pagato" : "Bezahlt") : (locale === "en" ? "Open" : locale === "tr" ? "Açık" : locale === "fr" ? "Ouvert" : locale === "es" ? "Abierto" : locale === "it" ? "Aperto" : "Offen")}
                                 </Badge>
                               </td>
                               <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: 11, color: "#6b7280" }}>
@@ -809,9 +833,9 @@ ${"=".repeat(50)}
                               <td style={{ padding: "8px 12px" }}>
                                 <InlineStack gap="200">
                                   {p.status !== "bezahlt" && (
-                                    <Button size="slim" variant="primary" onClick={() => handleMarkPaid(p)}>{locale === "en" ? "Mark as transferred" : locale === "tr" ? "Havale edildi olarak işaretle" : "Als überwiesen markieren"}</Button>
+                                    <Button size="slim" variant="primary" onClick={() => handleMarkPaid(p)}>{locale === "en" ? "Mark as transferred" : locale === "tr" ? "Havale edildi olarak işaretle" : locale === "fr" ? "Marquer comme transféré" : locale === "es" ? "Marcar como transferido" : locale === "it" ? "Contrassegna come trasferito" : "Als überwiesen markieren"}</Button>
                                   )}
-                                  <Button size="slim" onClick={() => generateInvoice(p)}>{locale === "en" ? "Invoice" : locale === "tr" ? "Fatura" : "Rechnung"}</Button>
+                                  <Button size="slim" onClick={() => generateInvoice(p)}>{locale === "en" ? "Invoice" : locale === "tr" ? "Fatura" : locale === "fr" ? "Facture" : locale === "es" ? "Factura" : locale === "it" ? "Fattura" : "Rechnung"}</Button>
                                 </InlineStack>
                               </td>
                             </tr>
@@ -826,11 +850,11 @@ ${"=".repeat(50)}
               {/* ── PRODUCTS TAB ─────────────────────────────────── */}
               {activeTab === 2 && (
                 <BlockStack gap="400">
-                  <Text as="h3" variant="headingSm">{locale === "en" ? "Products by category" : locale === "tr" ? "Kategoriye göre ürünler" : "Produkte nach Kategorie"}</Text>
+                  <Text as="h3" variant="headingSm">{locale === "en" ? "Products by category" : locale === "tr" ? "Kategoriye göre ürünler" : locale === "fr" ? "Produits par catégorie" : locale === "es" ? "Productos por categoría" : locale === "it" ? "Prodotti per categoria" : "Produkte nach Kategorie"}</Text>
 
                   {!seller.products_by_category || seller.products_by_category.length === 0 ? (
                     <Box padding="600" background="bg-surface-secondary" borderRadius="200">
-                      <Text as="p" tone="subdued">{locale === "en" ? "No products found." : locale === "tr" ? "Ürün bulunamadı." : "Keine Produkte gefunden."}</Text>
+                      <Text as="p" tone="subdued">{locale === "en" ? "No products found." : locale === "tr" ? "Ürün bulunamadı." : locale === "fr" ? "Aucun produit trouvé." : locale === "es" ? "No se encontraron productos." : locale === "it" ? "Nessun prodotto trovato." : "Keine Produkte gefunden."}</Text>
                     </Box>
                   ) : (
                     <div>
@@ -840,7 +864,7 @@ ${"=".repeat(50)}
                         return (
                           <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid #f1f1f1" }}>
                             <div style={{ flex: "0 0 180px" }}>
-                              <Text as="span" variant="bodyMd">{cat.category || (locale === "en" ? "Uncategorized" : locale === "tr" ? "Kategorisiz" : "Unkategorisiert")}</Text>
+                              <Text as="span" variant="bodyMd">{cat.category || (locale === "en" ? "Uncategorized" : locale === "tr" ? "Kategorisiz" : locale === "fr" ? "Non catégorisé" : locale === "es" ? "Sin categoría" : locale === "it" ? "Non categorizzato" : "Unkategorisiert")}</Text>
                             </div>
                             <div style={{ flex: 1, background: "#e5e7eb", borderRadius: 4, height: 8, overflow: "hidden" }}>
                               <div style={{ width: `${pct}%`, height: "100%", background: "#2563eb", borderRadius: 4 }} />
@@ -864,70 +888,77 @@ ${"=".repeat(50)}
                       ? "Company data review: Please check company details, legal consent, and uploaded documents (contract, signature, passport/ID, etc.)."
                       : locale === "tr"
                       ? "Firma bilgileri incelemesi: Lütfen şirket bilgilerini, yasal onayı ve yüklenen belgeleri (sözleşme, imza, pasaport/kimlik vb.) kontrol edin."
+                      : locale === "fr"
+                      ? "Vérification des données entreprise : Veuillez vérifier les informations de l'entreprise, le consentement légal et les documents téléversés (contrat, signature, passeport/ID, etc.)."
+                      : locale === "es"
+                      ? "Revisión de datos de empresa: Por favor revise los detalles de la empresa, el consentimiento legal y los documentos subidos (contrato, firma, pasaporte/ID, etc.)."
+                      : locale === "it"
+                      ? "Revisione dati azienda: Si prega di verificare i dettagli aziendali, il consenso legale e i documenti caricati (contratto, firma, passaporto/ID, ecc.)."
                       : "Firmendaten-Review: Bitte Gesellschaftsdaten, rechtliche Zustimmung und hochgeladene Nachweise (Vertrag, Unterschrift, Pass/ID usw.) prüfen."
                     }
                   </Banner>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">{locale === "en" ? "Company details" : locale === "tr" ? "Firma bilgileri" : "Firmendaten"}</Text>
-                      <InfoRow label={locale === "en" ? "Company name" : locale === "tr" ? "Firma adı" : "Firmenname"} value={seller.company_name} />
-                      <InfoRow label={locale === "en" ? "Authorized person" : locale === "tr" ? "Yetkili kişi" : "Bevollmächtigte Person"} value={seller.authorized_person_name} />
-                      <InfoRow label={locale === "en" ? "Tax No." : locale === "tr" ? "Vergi No." : "Steuer-Nr."} value={seller.tax_id} />
-                      <InfoRow label={locale === "en" ? "VAT ID" : locale === "tr" ? "KDV No." : "USt-IdNr."} value={seller.vat_id} />
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Company details" : locale === "tr" ? "Firma bilgileri" : locale === "fr" ? "Données entreprise" : locale === "es" ? "Datos empresa" : locale === "it" ? "Dati azienda" : "Firmendaten"}</Text>
+                      <InfoRow label={locale === "en" ? "Company name" : locale === "tr" ? "Firma adı" : locale === "fr" ? "Nom de l'entreprise" : locale === "es" ? "Nombre de la empresa" : locale === "it" ? "Nome azienda" : "Firmenname"} value={seller.company_name} />
+                      <InfoRow label={locale === "en" ? "Authorized person" : locale === "tr" ? "Yetkili kişi" : locale === "fr" ? "Personne autorisée" : locale === "es" ? "Persona autorizada" : locale === "it" ? "Persona autorizzata" : "Bevollmächtigte Person"} value={seller.authorized_person_name} />
+                      <InfoRow label={locale === "en" ? "Tax No." : locale === "tr" ? "Vergi No." : locale === "fr" ? "N° fiscal" : locale === "es" ? "N° fiscal" : locale === "it" ? "N° fiscale" : "Steuer-Nr."} value={seller.tax_id} />
+                      <InfoRow label={locale === "en" ? "VAT ID" : locale === "tr" ? "KDV No." : locale === "fr" ? "N° TVA" : locale === "es" ? "N° IVA" : locale === "it" ? "N° IVA" : "USt-IdNr."} value={seller.vat_id} />
                       <InfoRow label={ui.phone} value={seller.phone} />
                       <InfoRow label="Website" value={seller.website} />
                       <InfoRow label="IBAN" value={seller.iban ? seller.iban.replace(/(.{4})/g, "$1 ").trim() : null} />
                     </BlockStack>
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">{locale === "en" ? "Legal consent" : locale === "tr" ? "Yasal onay" : "Rechtliche Zustimmung"}</Text>
-                      <InfoRow label={locale === "en" ? "Agreement accepted" : locale === "tr" ? "Sözleşme onaylandı" : "Agreement akzeptiert"} value={seller.agreement_accepted ? ui.yes : ui.no} />
-                      <InfoRow label={locale === "en" ? "Accepted on" : locale === "tr" ? "Onaylandı" : "Akzeptiert am"} value={fmtDate(seller.agreement_accepted_at, locale)} />
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Legal consent" : locale === "tr" ? "Yasal onay" : locale === "fr" ? "Consentement légal" : locale === "es" ? "Consentimiento legal" : locale === "it" ? "Consenso legale" : "Rechtliche Zustimmung"}</Text>
+                      <InfoRow label={locale === "en" ? "Agreement accepted" : locale === "tr" ? "Sözleşme onaylandı" : locale === "fr" ? "Accord accepté" : locale === "es" ? "Acuerdo aceptado" : locale === "it" ? "Accordo accettato" : "Agreement akzeptiert"} value={seller.agreement_accepted ? ui.yes : ui.no} />
+                      <InfoRow label={locale === "en" ? "Accepted on" : locale === "tr" ? "Onaylandı" : locale === "fr" ? "Accepté le" : locale === "es" ? "Aceptado el" : locale === "it" ? "Accettato il" : "Akzeptiert am"} value={fmtDate(seller.agreement_accepted_at, locale)} />
                       <InfoRow label={locale === "en" ? "Version" : locale === "tr" ? "Versiyon" : "Version"} value={seller.agreement_version} />
                       <InfoRow label="IP" value={seller.agreement_ip} />
                       <div style={{ marginTop: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
-                        <Text as="h4" variant="headingSm">{locale === "en" ? "Handwritten signature" : locale === "tr" ? "El yazısı imza" : "Handschriftliche Unterschrift"}</Text>
+                        <Text as="h4" variant="headingSm">{locale === "en" ? "Handwritten signature" : locale === "tr" ? "El yazısı imza" : locale === "fr" ? "Signature manuscrite" : locale === "es" ? "Firma manuscrita" : locale === "it" ? "Firma autografa" : "Handschriftliche Unterschrift"}</Text>
                         {seller.signature_at ? (
                           <BlockStack gap="100">
-                            <InfoRow label={locale === "en" ? "Signed on" : locale === "tr" ? "İmzalandı" : "Unterzeichnet am"} value={new Date(seller.signature_at).toLocaleString(locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE", { dateStyle: "short", timeStyle: "medium" })} />
-                            <InfoRow label={locale === "en" ? "Signature IP" : locale === "tr" ? "İmza IP" : "Unterschrift-IP"} value={seller.signature_ip} />
+                            <InfoRow label={locale === "en" ? "Signed on" : locale === "tr" ? "İmzalandı" : locale === "fr" ? "Signé le" : locale === "es" ? "Firmado el" : locale === "it" ? "Firmato il" : "Unterzeichnet am"} value={new Date(seller.signature_at).toLocaleString(locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "de-DE", { dateStyle: "short", timeStyle: "medium" })} />
+                            <InfoRow label={locale === "en" ? "Signature IP" : locale === "tr" ? "İmza IP" : locale === "fr" ? "IP de signature" : locale === "es" ? "IP de firma" : locale === "it" ? "IP firma" : "Unterschrift-IP"} value={seller.signature_ip} />
                             {seller.signature_data && (
                               <div style={{ marginTop: 6 }}>
                                 <img
                                   src={seller.signature_data}
-                                  alt={locale === "en" ? "Signature" : locale === "tr" ? "İmza" : "Unterschrift"}
+                                  alt={locale === "en" ? "Signature" : locale === "tr" ? "İmza" : locale === "fr" ? "Signature" : locale === "es" ? "Firma" : locale === "it" ? "Firma" : "Unterschrift"}
                                   style={{ border: "1px solid #e5e7eb", borderRadius: 6, maxWidth: 240, maxHeight: 80, display: "block" }}
                                 />
                               </div>
                             )}
                             <div style={{ marginTop: 6 }}>
                               <Button size="slim" onClick={downloadSellerPdf} loading={pdfDownloading}>
-                                {locale === "en" ? "Download signed PDF" : locale === "tr" ? "İmzalı PDF indir" : "Unterzeichnetes PDF herunterladen"}
+                                {locale === "en" ? "Download signed PDF" : locale === "tr" ? "İmzalı PDF indir" : locale === "fr" ? "Télécharger le PDF signé" : locale === "es" ? "Descargar PDF firmado" : locale === "it" ? "Scarica PDF firmato" : "Unterzeichnetes PDF herunterladen"}
                               </Button>
                             </div>
                           </BlockStack>
                         ) : (
-                          <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No handwritten signature yet." : locale === "tr" ? "Henüz el yazısı imza yok." : "Noch keine handschriftliche Unterschrift vorhanden."}</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No handwritten signature yet." : locale === "tr" ? "Henüz el yazısı imza yok." : locale === "fr" ? "Pas encore de signature manuscrite." : locale === "es" ? "Aún no hay firma manuscrita." : locale === "it" ? "Ancora nessuna firma autografa." : "Noch keine handschriftliche Unterschrift vorhanden."}</Text>
                         )}
                       </div>
                     </BlockStack>
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">{locale === "en" ? "Business address" : locale === "tr" ? "İş adresi" : "Geschäftsadresse"}</Text>
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Business address" : locale === "tr" ? "İş adresi" : locale === "fr" ? "Adresse professionnelle" : locale === "es" ? "Dirección comercial" : locale === "it" ? "Indirizzo aziendale" : "Geschäftsadresse"}</Text>
                       <AddressBlock addr={seller.business_address} />
                     </BlockStack>
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">{locale === "en" ? "Warehouse address" : locale === "tr" ? "Depo adresi" : "Lageradresse"}</Text>
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Warehouse address" : locale === "tr" ? "Depo adresi" : locale === "fr" ? "Adresse entrepôt" : locale === "es" ? "Dirección almacén" : locale === "it" ? "Indirizzo magazzino" : "Lageradresse"}</Text>
                       <AddressBlock addr={seller.warehouse_address} />
                     </BlockStack>
                     <BlockStack gap="100">
                       <InlineStack align="space-between" blockAlign="center">
-                        <Text as="h3" variant="headingSm">{locale === "en" ? "Documents & Proof" : locale === "tr" ? "Belgeler & Kanıtlar" : "Dokumente & Nachweise"}</Text>
+                        <Text as="h3" variant="headingSm">{locale === "en" ? "Documents & Proof" : locale === "tr" ? "Belgeler & Kanıtlar" : locale === "fr" ? "Documents & Preuves" : locale === "es" ? "Documentos & Pruebas" : locale === "it" ? "Documenti & Prove" : "Dokumente & Nachweise"}</Text>
                         <Badge tone={sellerDocs.length > 0 ? "success" : "attention"}>{sellerDocs.length}</Badge>
                       </InlineStack>
                       {sellerDocs.length > 0 ? (
                         <BlockStack gap="100">
                           {sellerDocs.map((doc, i) => {
                             const url = typeof doc === "string" ? doc : (doc?.url || "");
-                            const name = typeof doc === "string" ? `Dokument ${i + 1}` : (doc?.name || `Dokument ${i + 1}`);
+                            const docFallback = locale === "en" ? "Document" : locale === "tr" ? "Belge" : locale === "fr" ? "Document" : locale === "es" ? "Documento" : locale === "it" ? "Documento" : "Dokument";
+                            const name = typeof doc === "string" ? `${docFallback} ${i + 1}` : (doc?.name || `${docFallback} ${i + 1}`);
                             const typeLabel = detectDocTypeLabel(doc, locale);
                             return (
                               <div key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px" }}>
@@ -961,10 +992,10 @@ ${"=".repeat(50)}
                                       }}
                                       style={{ color: "#2563eb", fontSize: 13, textDecoration: "underline", cursor: "pointer" }}
                                     >
-                                      {locale === "en" ? "Download" : locale === "tr" ? "İndir" : "Herunterladen"}
+                                      {locale === "en" ? "Download" : locale === "tr" ? "İndir" : locale === "fr" ? "Télécharger" : locale === "es" ? "Descargar" : locale === "it" ? "Scarica" : "Herunterladen"}
                                     </a>
                                   ) : (
-                                    <Text as="span" tone="subdued">{locale === "en" ? "No link" : locale === "tr" ? "Link yok" : "Kein Link"}</Text>
+                                    <Text as="span" tone="subdued">{locale === "en" ? "No link" : locale === "tr" ? "Link yok" : locale === "fr" ? "Pas de lien" : locale === "es" ? "Sin enlace" : locale === "it" ? "Nessun link" : "Kein Link"}</Text>
                                   )}
                                 </InlineStack>
                               </div>
@@ -977,6 +1008,12 @@ ${"=".repeat(50)}
                             ? "No documents uploaded. For legally compliant approval, please request contract, signature, and ID/passport proof."
                             : locale === "tr"
                             ? "Belge yüklenmedi. Hukuki onay için sözleşme, imza ve kimlik/pasaport belgesi talep edin."
+                            : locale === "fr"
+                            ? "Aucun document téléversé. Pour une approbation conforme à la loi, veuillez demander le contrat, la signature et une preuve de passeport/ID."
+                            : locale === "es"
+                            ? "No se han subido documentos. Para una aprobación legalmente válida, solicite contrato, firma y prueba de pasaporte/DNI."
+                            : locale === "it"
+                            ? "Nessun documento caricato. Per un'approvazione legalmente valida, richiedere contratto, firma e prova di passaporto/ID."
                             : "Keine Dokumente hochgeladen. Für rechtssichere Freigabe bitte Vertrag, Unterschrift und Ausweis-/Pass-Nachweise anfordern."
                           }
                         </Banner>
@@ -997,31 +1034,31 @@ ${"=".repeat(50)}
       <Modal
         open={approveModal}
         onClose={() => setApproveModal(false)}
-        title={locale === "en" ? "Change status" : locale === "tr" ? "Durumu değiştir" : "Status ändern"}
+        title={locale === "en" ? "Change status" : locale === "tr" ? "Durumu değiştir" : locale === "fr" ? "Changer le statut" : locale === "es" ? "Cambiar estado" : locale === "it" ? "Cambia stato" : "Status ändern"}
         primaryAction={{ content: ui.save, onAction: handleApprove, loading: approving }}
         secondaryActions={[{ content: ui.cancel, onAction: () => setApproveModal(false) }]}
       >
         <Modal.Section>
           <BlockStack gap="300">
             <Select
-              label={locale === "en" ? "New status" : locale === "tr" ? "Yeni durum" : "Neuer Status"}
+              label={locale === "en" ? "New status" : locale === "tr" ? "Yeni durum" : locale === "fr" ? "Nouveau statut" : locale === "es" ? "Nuevo estado" : locale === "it" ? "Nuovo stato" : "Neuer Status"}
               options={STATUS_LABELS}
               value={newStatus}
               onChange={setNewStatus}
             />
             {newStatus === "rejected" && (
               <TextField
-                label={locale === "en" ? "Rejection reason" : locale === "tr" ? "Red gerekçesi" : "Ablehnungsgrund"}
+                label={locale === "en" ? "Rejection reason" : locale === "tr" ? "Red gerekçesi" : locale === "fr" ? "Motif de refus" : locale === "es" ? "Motivo de rechazo" : locale === "it" ? "Motivo del rifiuto" : "Ablehnungsgrund"}
                 value={rejectReason}
                 onChange={setRejectReason}
                 multiline={3}
                 autoComplete="off"
-                placeholder={locale === "en" ? "Please provide the reason for rejection…" : locale === "tr" ? "Lütfen red gerekçesini girin…" : "Bitte geben Sie den Grund für die Ablehnung an…"}
+                placeholder={locale === "en" ? "Please provide the reason for rejection…" : locale === "tr" ? "Lütfen red gerekçesini girin…" : locale === "fr" ? "Veuillez indiquer le motif du refus…" : locale === "es" ? "Por favor indique el motivo del rechazo…" : locale === "it" ? "Si prega di indicare il motivo del rifiuto…" : "Bitte geben Sie den Grund für die Ablehnung an…"}
               />
             )}
             {newStatus === "approved" && (
               <Banner tone="success">
-                {locale === "en" ? "After approval, all seller products will be automatically published." : locale === "tr" ? "Onaydan sonra satıcının tüm ürünleri otomatik olarak yayımlanacak." : "Nach der Genehmigung werden alle Produkte des Verkäufers automatisch veröffentlicht."}
+                {locale === "en" ? "After approval, all seller products will be automatically published." : locale === "tr" ? "Onaydan sonra satıcının tüm ürünleri otomatik olarak yayımlanacak." : locale === "fr" ? "Après approbation, tous les produits du vendeur seront automatiquement publiés." : locale === "es" ? "Tras la aprobación, todos los productos del vendedor se publicarán automáticamente." : locale === "it" ? "Dopo l'approvazione, tutti i prodotti del venditore verranno pubblicati automaticamente." : "Nach der Genehmigung werden alle Produkte des Verkäufers automatisch veröffentlicht."}
               </Banner>
             )}
             {(newStatus === "rejected" || newStatus === "suspended") && (
@@ -1030,7 +1067,13 @@ ${"=".repeat(50)}
                   ? 'On rejection/suspension, all seller products will be set to "Draft".'
                   : locale === "tr"
                     ? 'Red/askıya almada satıcının tüm ürünleri "Taslak" olarak ayarlanacak.'
-                    : "Bei Ablehnung/Sperrung werden alle Produkte des Verkäufers auf „Entwurf“ gesetzt."}
+                    : locale === “fr”
+                      ? 'En cas de refus/suspension, tous les produits du vendeur seront définis comme “Brouillon”.'
+                      : locale === “es”
+                      ? 'Al rechazar/suspender, todos los productos del vendedor se establecerán como “Borrador”.'
+                      : locale === “it”
+                      ? 'In caso di rifiuto/sospensione, tutti i prodotti del venditore verranno impostati come “Bozza”.'
+                      : “Bei Ablehnung/Sperrung werden alle Produkte des Verkäufers auf „Entwurf” gesetzt.”}
               </Banner>
             )}
           </BlockStack>
@@ -1041,13 +1084,13 @@ ${"=".repeat(50)}
       <Modal
         open={editCommission}
         onClose={() => setEditCommission(false)}
-        title={locale === "en" ? "Change commission rate" : locale === "tr" ? "Komisyon oranını değiştir" : "Provisonssatz ändern"}
+        title={locale === "en" ? "Change commission rate" : locale === "tr" ? "Komisyon oranını değiştir" : locale === "fr" ? "Modifier le taux de commission" : locale === "es" ? "Cambiar tasa de comisión" : locale === "it" ? "Modifica tasso di commissione" : "Provisionssatz ändern"}
         primaryAction={{ content: ui.save, onAction: handleSaveCommission, loading: savingCommission }}
         secondaryActions={[{ content: ui.cancel, onAction: () => setEditCommission(false) }]}
       >
         <Modal.Section>
           <TextField
-            label={locale === "en" ? "Commission rate (%)" : locale === "tr" ? "Komisyon oranı (%)" : "Provisionssatz (%)"}
+            label={locale === "en" ? "Commission rate (%)" : locale === "tr" ? "Komisyon oranı (%)" : locale === "fr" ? "Taux de commission (%)" : locale === "es" ? "Tasa de comisión (%)" : locale === "it" ? "Tasso di commissione (%)" : "Provisionssatz (%)"}
             value={commissionVal}
             onChange={setCommissionVal}
             type="number"
@@ -1055,7 +1098,7 @@ ${"=".repeat(50)}
             max="100"
             suffix="%"
             autoComplete="off"
-            helpText={locale === "en" ? "Default: 12%. Valid values: 0–100." : locale === "tr" ? "Varsayılan: %12. Geçerli değerler: 0–100." : "Standard: 12%. Gültige Werte: 0–100."}
+            helpText={locale === "en" ? "Default: 12%. Valid values: 0–100." : locale === "tr" ? "Varsayılan: %12. Geçerli değerler: 0–100." : locale === "fr" ? "Par défaut : 12%. Valeurs valides : 0–100." : locale === "es" ? "Predeterminado: 12%. Valores válidos: 0–100." : locale === "it" ? "Predefinito: 12%. Valori validi: 0–100." : "Standard: 12%. Gültige Werte: 0–100."}
           />
         </Modal.Section>
       </Modal>
@@ -1064,7 +1107,7 @@ ${"=".repeat(50)}
       <Modal
         open={payoutModal}
         onClose={() => setPayoutModal(false)}
-        title="Neue Auszahlung erstellen"
+        title={locale === "en" ? "Create payout" : locale === "tr" ? "Ödeme oluştur" : locale === "fr" ? "Créer un paiement" : locale === "es" ? "Crear pago" : locale === "it" ? "Crea pagamento" : "Neue Auszahlung erstellen"}
         primaryAction={{ content: locale === "en" ? "Create" : locale === "tr" ? "Oluştur" : "Erstellen", onAction: handleCreatePayout, loading: savingPayout }}
         secondaryActions={[{ content: ui.cancel, onAction: () => setPayoutModal(false) }]}
       >

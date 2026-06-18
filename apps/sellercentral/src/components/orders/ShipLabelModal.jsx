@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button, Banner, Spinner } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { readSellerIsSuperuser, resolveSellerFacingError, sellerTechnicalMessage } from "@/lib/seller-system-errors";
 
 /* ── Standard carrier-compatible package sizes ───────────────── */
 const PRESETS = [
@@ -95,6 +96,7 @@ function RateCard({ rate, selected, onClick }) {
 }
 
 export default function ShipLabelModal({ order, onClose, locale = "de" }) {
+  const isSuperuser = readSellerIsSuperuser();
   const [selectedPreset, setSelectedPreset] = useState(null);
   const [dims, setDims] = useState({ weight_kg: "1", length_cm: "35", width_cm: "25", height_cm: "10" });
   const [dimsChanged, setDimsChanged] = useState(false);
@@ -137,19 +139,22 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
         length_cm: Number(d.length_cm) || 35,
         width_cm: Number(d.width_cm) || 25,
         height_cm: Number(d.height_cm) || 10,
+        locale,
       });
       if (!data?.rates?.length) {
-        setError("Keine Versandoptionen gefunden. Überprüfe Gewicht/Maße oder ob Sendcloud korrekt konfiguriert ist.");
+        setError(isSuperuser
+          ? "Keine Versandoptionen gefunden. Sendcloud-Konfiguration oder Gewicht/Maße prüfen."
+          : sellerTechnicalMessage(locale));
       } else {
         setRates(data.rates);
         setStep("rates");
       }
     } catch (e) {
-      setError(e?.message || "Preise konnten nicht geladen werden.");
+      setError(resolveSellerFacingError(e, locale, isSuperuser));
     }
     setLoadingRates(false);
     setDimsChanged(false);
-  }, [order.id, dims]);
+  }, [order.id, dims, locale, isSuperuser]);
 
   const handleCheckout = async () => {
     if (!selectedRate) return;
@@ -170,11 +175,11 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
       if (data?.checkout_url) {
         window.location.href = data.checkout_url;
       } else {
-        setError("Kein Checkout-Link erhalten.");
+        setError(isSuperuser ? "Kein Checkout-Link erhalten." : sellerTechnicalMessage(locale));
         setCheckingOut(false);
       }
     } catch (e) {
-      setError(e?.message || "Checkout konnte nicht erstellt werden.");
+      setError(resolveSellerFacingError(e, locale, isSuperuser));
       setCheckingOut(false);
     }
   };

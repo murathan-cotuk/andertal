@@ -112,7 +112,7 @@ function AddressBlock({ label, line1, line2, zip, city, country }) {
   );
 }
 
-function DiscountModal({ customerId, onClose, onAdded, ui }) {
+function DiscountModal({ customerId, onClose, onAdded, ui, locale }) {
   const [form, setForm] = useState({ code: "", type: "percentage", value: "", min_order_cents: "", max_uses: "1", expires_at: "", notes: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -122,8 +122,8 @@ function DiscountModal({ customerId, onClose, onAdded, ui }) {
   const lbl = { fontSize: 12, color: "#374151", fontWeight: 500, display: "block", marginBottom: 3 };
 
   const handleSave = async () => {
-    if (!form.code) { setErr("Code ist erforderlich"); return; }
-    if (!form.value) { setErr("Wert ist erforderlich"); return; }
+    if (!form.code) { setErr(locale === "en" ? "Code is required" : locale === "tr" ? "Kod gereklidir" : locale === "fr" ? "Le code est requis" : locale === "es" ? "El código es obligatorio" : locale === "it" ? "Il codice è obbligatorio" : "Code ist erforderlich"); return; }
+    if (!form.value) { setErr(locale === "en" ? "Value is required" : locale === "tr" ? "Değer gereklidir" : locale === "fr" ? "La valeur est requise" : locale === "es" ? "El valor es obligatorio" : locale === "it" ? "Il valore è obbligatorio" : "Wert ist erforderlich"); return; }
     setSaving(true); setErr("");
     try {
       const client = getMedusaAdminClient();
@@ -138,7 +138,7 @@ function DiscountModal({ customerId, onClose, onAdded, ui }) {
       });
       onAdded();
       onClose();
-    } catch (e) { setErr(e?.message || "Fehler"); }
+    } catch (e) { setErr(e?.message || ui.error); }
     setSaving(false);
   };
 
@@ -146,7 +146,7 @@ function DiscountModal({ customerId, onClose, onAdded, ui }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ background: "#fff", borderRadius: 12, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ padding: "16px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Rabattcode erstellen</h3>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{locale === "en" ? "Create discount code" : locale === "tr" ? "İndirim kodu oluştur" : locale === "fr" ? "Créer un code de réduction" : locale === "es" ? "Crear código de descuento" : locale === "it" ? "Crea codice sconto" : "Rabattcode erstellen"}</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>×</button>
         </div>
         <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -155,31 +155,31 @@ function DiscountModal({ customerId, onClose, onAdded, ui }) {
             <input style={inp} value={form.code} onChange={e => set("code", e.target.value.toUpperCase())} placeholder="SOMMER20" />
           </div>
           <div>
-            <label style={lbl}>Typ</label>
+            <label style={lbl}>{locale === "en" ? "Type" : locale === "tr" ? "Tür" : locale === "fr" ? "Type" : locale === "es" ? "Tipo" : locale === "it" ? "Tipo" : "Typ"}</label>
             <select style={inp} value={form.type} onChange={e => set("type", e.target.value)}>
-              <option value="percentage">Prozent (%)</option>
-              <option value="fixed">Festbetrag (€)</option>
-              <option value="free_shipping">Versandkostenfrei</option>
+              <option value="percentage">{locale === "en" ? "Percentage (%)" : locale === "tr" ? "Yüzde (%)" : locale === "fr" ? "Pourcentage (%)" : locale === "es" ? "Porcentaje (%)" : locale === "it" ? "Percentuale (%)" : "Prozent (%)"}</option>
+              <option value="fixed">{locale === "en" ? "Fixed amount (€)" : locale === "tr" ? "Sabit tutar (€)" : locale === "fr" ? "Montant fixe (€)" : locale === "es" ? "Importe fijo (€)" : locale === "it" ? "Importo fisso (€)" : "Festbetrag (€)"}</option>
+              <option value="free_shipping">{locale === "en" ? "Free shipping" : locale === "tr" ? "Ücretsiz kargo" : locale === "fr" ? "Livraison gratuite" : locale === "es" ? "Envío gratis" : locale === "it" ? "Spedizione gratuita" : "Versandkostenfrei"}</option>
             </select>
           </div>
           <div>
-            <label style={lbl}>Wert *</label>
+            <label style={lbl}>{locale === "en" ? "Value *" : locale === "tr" ? "Değer *" : locale === "fr" ? "Valeur *" : locale === "es" ? "Valor *" : locale === "it" ? "Valore *" : "Wert *"}</label>
             <input style={inp} type="number" value={form.value} onChange={e => set("value", e.target.value)} placeholder={form.type === "percentage" ? "10" : "5.00"} />
           </div>
           <div>
-            <label style={lbl}>Mindestbestellwert (€)</label>
+            <label style={lbl}>{locale === "en" ? "Min. order value (€)" : locale === "tr" ? "Min. sipariş değeri (€)" : locale === "fr" ? "Valeur min. de commande (€)" : locale === "es" ? "Valor mín. de pedido (€)" : locale === "it" ? "Valore min. ordine (€)" : "Mindestbestellwert (€)"}</label>
             <input style={inp} type="number" value={form.min_order_cents} onChange={e => set("min_order_cents", e.target.value)} placeholder="0" />
           </div>
           <div>
-            <label style={lbl}>Max. Verwendungen</label>
+            <label style={lbl}>{locale === "en" ? "Max. uses" : locale === "tr" ? "Maks. kullanım" : locale === "fr" ? "Utilisations max." : locale === "es" ? "Usos máx." : locale === "it" ? "Usi massimi" : "Max. Verwendungen"}</label>
             <input style={inp} type="number" min="1" value={form.max_uses} onChange={e => set("max_uses", e.target.value)} />
           </div>
           <div style={{ gridColumn: "1/-1" }}>
-            <label style={lbl}>Gültig bis</label>
+            <label style={lbl}>{locale === "en" ? "Valid until" : locale === "tr" ? "Geçerlilik tarihi" : locale === "fr" ? "Valide jusqu'au" : locale === "es" ? "Válido hasta" : locale === "it" ? "Valido fino al" : "Gültig bis"}</label>
             <input style={inp} type="date" value={form.expires_at} onChange={e => set("expires_at", e.target.value)} />
           </div>
           <div style={{ gridColumn: "1/-1" }}>
-            <label style={lbl}>Notizen</label>
+            <label style={lbl}>{ui.notes || (locale === "en" ? "Notes" : locale === "tr" ? "Notlar" : locale === "fr" ? "Notes" : locale === "es" ? "Notas" : locale === "it" ? "Note" : "Notizen")}</label>
             <input style={inp} value={form.notes} onChange={e => set("notes", e.target.value)} />
           </div>
         </div>
@@ -438,6 +438,7 @@ export default function CustomerDetailPage() {
           onClose={() => setShowDiscountModal(false)}
           onAdded={() => { loadCustomer(); }}
           ui={ui}
+          locale={locale}
         />
       )}
       {isSuperuser && (

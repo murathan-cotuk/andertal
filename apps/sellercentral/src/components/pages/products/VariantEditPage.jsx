@@ -22,6 +22,11 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import { decodeVariantPathKey, findVariantIndexByOptionKey } from "@/lib/variant-path-key";
+import {
+  ProductSectionHeading,
+  ProductSectionRule,
+  PRODUCT_SECTION_STYLES,
+} from "@/components/products/ProductSection";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -118,11 +123,13 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
   const [priceInputs, setPriceInputs] = useState({});
   const priceInputsRef = useRef({});
 
-  const initialSnapshotRef = useRef("");
+  const [baselineSnapshot, setBaselineSnapshot] = useState(() =>
+    initialProduct ? JSON.stringify(normalizeForCompareProduct(initialProduct)) : null,
+  );
 
   useEffect(() => {
     setProduct(initialProduct);
-    initialSnapshotRef.current = JSON.stringify(normalizeForCompareProduct(initialProduct));
+    setBaselineSnapshot(initialProduct ? JSON.stringify(normalizeForCompareProduct(initialProduct)) : null);
   }, [initialProduct]);
 
   const variantIndex = useMemo(() => {
@@ -138,7 +145,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
   const variantGroups = Array.isArray(meta.variation_groups) ? meta.variation_groups : [];
 
   const isDirty =
-    product && initialSnapshotRef.current != null && JSON.stringify(normalizeForCompareProduct(product)) !== initialSnapshotRef.current;
+    !!product &&
+    baselineSnapshot != null &&
+    JSON.stringify(normalizeForCompareProduct(product)) !== baselineSnapshot;
 
   useEffect(() => {
     unsaved?.setDirty(!!isDirty);
@@ -157,7 +166,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
   const discard = useCallback(() => {
     setProduct(initialProduct);
-    initialSnapshotRef.current = JSON.stringify(normalizeForCompareProduct(initialProduct));
+    setBaselineSnapshot(initialProduct ? JSON.stringify(normalizeForCompareProduct(initialProduct)) : null);
     unsaved?.setDirty(false);
   }, [initialProduct, unsaved]);
 
@@ -219,7 +228,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
   }, [v, variantGroups, locale]);
 
   const save = useCallback(async () => {
-    if (!product || variantIndex < 0) return;
+    if (!product || variantIndex < 0) return false;
     const fallbackStatus = initialProduct?.status ?? "draft";
     const nextStatus =
       product.status != null && String(product.status).trim() !== ""
@@ -269,9 +278,16 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       const variantsToSave = product.variants || [];
       const missingVariantEanIndex = variantsToSave.findIndex((row) => String(row?.ean || "").trim() === "");
       if (missingVariantEanIndex >= 0) {
-        setMessage({ type: "error", text: "Variant EAN darf nicht leer sein. Bitte EAN eintragen." });
-        setSaving(false);
-        return;
+        setMessage({
+          type: "warning",
+          text:
+            locale === "tr"
+              ? "Kaydetmek için tüm varyantlarda EAN girilmelidir."
+              : locale === "de"
+                ? "Bitte EAN für alle Varianten eintragen, um zu speichern."
+                : "Enter EAN for all variants before saving.",
+        });
+        return false;
       }
       const collectionId = (metadata.collection_ids && metadata.collection_ids[0]) || product.collection_id || null;
       const canonicalTitle = metadata.translations?.de?.title || product.title || "Untitled";
@@ -297,16 +313,18 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       const updated = await client.updateAdminHubProduct(idOrHandle, payload);
       const saved = updated || { ...product, ...payload };
       setProduct(saved);
-      initialSnapshotRef.current = JSON.stringify(normalizeForCompareProduct(saved));
+      setBaselineSnapshot(JSON.stringify(normalizeForCompareProduct(saved)));
       unsaved?.setDirty(false);
       setMessage({ type: "success", text: "Saved" });
       onReload?.();
+      return true;
     } catch (err) {
       setMessage({ type: "error", text: err?.message || "Save failed" });
+      return false;
     } finally {
       setSaving(false);
     }
-  }, [product, variantIndex, idOrHandle, client, initialProduct?.status, onReload, unsaved]);
+  }, [product, variantIndex, idOrHandle, client, initialProduct?.status, onReload, unsaved, locale]);
 
   const saveRef = useRef(save);
   const discardRef = useRef(discard);
@@ -398,11 +416,15 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
         .product-description-toolbar .product-desc-html-btn.active { background: var(--p-color-bg-surface-selected); }
         .product-description-editor { min-height: 160px; padding: 16px; outline: none; font-size: 14px; line-height: 1.6; }
         .product-description-html { min-height: 160px; width: 100%; padding: 16px; font-family: ui-monospace, monospace; font-size: 13px; border: none; resize: vertical; box-sizing: border-box; }
+        ${PRODUCT_SECTION_STYLES}
       `}</style>
 
       {message.text && (
         <Box paddingBlockEnd="200">
-          <Banner tone={message.type === "success" ? "success" : "critical"} onDismiss={() => setMessage({ type: "", text: "" })}>
+          <Banner
+            tone={message.type === "success" ? "success" : message.type === "warning" ? "warning" : "critical"}
+            onDismiss={() => setMessage({ type: "", text: "" })}
+          >
             {message.text}
           </Banner>
         </Box>
@@ -425,10 +447,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       <Layout>
         <Layout.Section>
           <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Variant options
-              </Text>
+            <div className="product-edit-sections">
+            <BlockStack gap="500">
+              <ProductSectionHeading>Variant options</ProductSectionHeading>
               <InlineStack gap="200" wrap>
                 {(v.option_values || []).map((val, i) => (
                   <span
@@ -449,11 +470,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 Internal keys above; customer-facing labels follow your product variation translations. Edit groups on the main product page.
               </Text>
 
-              <Divider />
+              <ProductSectionRule />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Title ({locale.toUpperCase()})
-              </Text>
+              <ProductSectionHeading>Title ({locale.toUpperCase()})</ProductSectionHeading>
               <TextField
                 label="Title"
                 labelHidden
@@ -487,11 +506,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 </Box>
               </InlineStack>
 
-              <Divider />
+              <ProductSectionRule />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Description
-              </Text>
+              <ProductSectionHeading>Description</ProductSectionHeading>
               <div className="product-description-box">
                 <div className="product-description-toolbar">
                   <div />
@@ -539,11 +556,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 )}
               </div>
 
-              <Divider />
+              <ProductSectionRule />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Media (variant gallery)
-              </Text>
+              <ProductSectionHeading>Media (variant gallery)</ProductSectionHeading>
               {locale !== "de" && (
                 <Text as="p" variant="bodySm" tone="subdued">
                   {hasLocaleVariantMedia
@@ -598,11 +613,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 }}
               />
 
-              <Divider />
+              <ProductSectionRule />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Cover image (picker / locale)
-              </Text>
+              <ProductSectionHeading>Cover image (picker / locale)</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
                 Same as matrix: German uses image_url; other locales use image_urls.{`{locale}`}.
               </Text>
@@ -618,11 +631,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 })()}
               </div>
 
-              <Divider />
+              <ProductSectionRule />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Stock
-              </Text>
+              <ProductSectionHeading>Stock</ProductSectionHeading>
               <TextField
                 label="Inventory"
                 labelHidden
@@ -632,11 +643,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 onChange={(t) => patchVariant({ inventory: t === "" ? 0 : parseInt(String(t), 10) || 0 })}
               />
 
-              <Divider />
+              <ProductSectionRule />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Prices (€)
-              </Text>
+              <ProductSectionHeading>Prices (€)</ProductSectionHeading>
               {[
                 { field: "price", centsKey: "price_cents", label: "Price" },
                 { field: "compare_at_price", centsKey: "compare_at_price_cents", label: "UVP" },
@@ -675,11 +684,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 );
               })}
 
-              <Divider />
+              <ProductSectionRule />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Bullet points (max 5, je max. 120 Zeichen)
-              </Text>
+              <ProductSectionHeading>Bullet points (max 5, je max. 120 Zeichen)</ProductSectionHeading>
               {bullets.map((b, i) => {
                 const len = String(b ?? "").length;
                 const overLimit = len > 120;
@@ -718,11 +725,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 </Button>
               )}
 
-              <Divider />
+              <ProductSectionRule />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Content per unit
-              </Text>
+              <ProductSectionHeading>Content per unit</ProductSectionHeading>
 
               <TextField
                 label="Amount"
@@ -751,11 +756,11 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 helpText="Reference for price per unit (e.g. 1 = per 1 kg when unit is kg)"
               />
 
-              <Divider />
+              <ProductSectionRule />
 
               <BlockStack gap="400">
                 <BlockStack gap="150">
-                  <Text as="h2" variant="headingSm">Metafelder (Variante)</Text>
+                  <ProductSectionHeading>Metafelder (Variante)</ProductSectionHeading>
                   <Text as="p" variant="bodySm" tone="subdued">
                     Optionale Key/Value-Paare nur für diese Variante (z. B. shop-spezifische Attribute).
                   </Text>
@@ -826,11 +831,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 </Box>
               </BlockStack>
 
-              <Divider />
+              <ProductSectionRule />
 
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                SEO (variant)
-              </Text>
+              <ProductSectionHeading>SEO (variant)</ProductSectionHeading>
               <TextField
                 label="Meta title"
                 value={vm.seo_meta_title ?? vTr.seo_title ?? ""}
@@ -848,15 +851,15 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 onChange={(t) => updateVariantMeta("seo_keywords", t || undefined)}
               />
             </BlockStack>
+            </div>
           </Card>
         </Layout.Section>
 
         <Layout.Section variant="oneThird">
+          <div className="product-edit-sidebar">
           <Card>
             <BlockStack gap="300">
-              <Text as="h2" variant="bodyMd" fontWeight="regular">
-                Product status
-              </Text>
+              <ProductSectionHeading>Product status</ProductSectionHeading>
               <Select
                 label="Status"
                 labelHidden
@@ -871,6 +874,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
               <Button onClick={() => router.push(`/products/${idOrHandle}`)}>Back to product</Button>
             </BlockStack>
           </Card>
+          </div>
         </Layout.Section>
       </Layout>
     </Page>

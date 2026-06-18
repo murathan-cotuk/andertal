@@ -32,7 +32,7 @@ import {
 } from "@/lib/product-change-request-format";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
-const INVENTORY_ROW_GRID = "40px 56px 110px 72px minmax(320px, 2fr) minmax(140px, 0.9fr) minmax(150px, 1fr) minmax(200px, 1.2fr) 108px";
+const INVENTORY_ROW_GRID = "40px 56px 110px 72px minmax(320px, 2fr) minmax(140px, 0.9fr) minmax(150px, 1fr) minmax(200px, 1.2fr) 148px";
 const EXCEL_BORDER = "1px solid #e5e7eb";
 
 const DEFAULT_DUPLICATE_OPTIONS = {
@@ -228,6 +228,66 @@ function statusColors(statusRaw) {
   return { bg: "#fee2e2", fg: "#991b1b", br: "#fecaca" };
 }
 
+function isMasterCatalogProduct(product) {
+  return !String(product?.seller_id || "").trim();
+}
+
+/** Product row toggle: master catalog listings use active/inactive; own products use published/archived (ProductEditPage). */
+function productToggleStatusValues(product) {
+  if (isMasterCatalogProduct(product)) {
+    return { on: "active", off: "inactive" };
+  }
+  return { on: "published", off: "archived" };
+}
+
+function isProductToggleOn(statusRaw) {
+  return statusLabel(statusRaw) === "active";
+}
+
+function ProductStatusToggle({ on, onChange, disabled, title }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!disabled) onChange(!on);
+      }}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      aria-checked={on}
+      role="switch"
+      style={{
+        width: 46,
+        height: 26,
+        borderRadius: 13,
+        padding: 0,
+        background: on ? "#10b981" : "#d1d5db",
+        border: "none",
+        cursor: disabled ? "not-allowed" : "pointer",
+        position: "relative",
+        transition: "background 0.2s",
+        flexShrink: 0,
+        opacity: disabled ? 0.55 : 1,
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: 3,
+          left: on ? 23 : 3,
+          width: 20,
+          height: 20,
+          borderRadius: "50%",
+          background: "#fff",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+          transition: "left 0.2s",
+        }}
+      />
+    </button>
+  );
+}
+
 function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
   const matrixVariants = (product.variants || []).filter((v) => Array.isArray(v.option_values) && v.option_values.length > 0);
   const [drafts, setDrafts] = useState(() =>
@@ -393,8 +453,11 @@ function InventoryProductRow({
   onOpenChangeRequests,
 }) {
   const [variantsOpen, setVariantsOpen] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
   const shopBaseUrl = getDefaultShopUrl();
   const l = String(locale || "en").toLowerCase();
+  const statusOn = isProductToggleOn(product.status);
+  const statusValues = productToggleStatusValues(product);
   const i18n = {
     sku: "SKU",
     ean: "EAN",
@@ -407,6 +470,39 @@ function InventoryProductRow({
     noVariants: l === "tr" ? "Varyasyon yok" : l === "de" ? "Keine Variationen" : "No variations",
     changeProposed: l === "tr" ? "Değişiklik önerildi" : l === "de" ? "Änderung vorgeschlagen" : "Change proposed",
     changeProposedShort: l === "tr" ? "Öneri" : l === "de" ? "Vorschlag" : "Proposal",
+    activateProduct: l === "tr" ? "Ürünü aktifleştir" : l === "de" ? "Produkt aktivieren" : l === "fr" ? "Activer le produit" : l === "it" ? "Attiva prodotto" : l === "es" ? "Activar producto" : "Activate product",
+    deactivateProduct: l === "tr" ? "Ürünü pasifleştir" : l === "de" ? "Produkt deaktivieren" : l === "fr" ? "Désactiver le produit" : l === "it" ? "Disattiva prodotto" : l === "es" ? "Desactivar producto" : "Deactivate product",
+  };
+  const handleStatusToggle = async (nextOn) => {
+    const nextStatus = nextOn ? statusValues.on : statusValues.off;
+    setStatusSaving(true);
+    try {
+      const res = await medusaClient.updateAdminHubProduct(product.id, { status: nextStatus });
+      if (res?.suggestion_submitted) {
+        window.alert(
+          l === "tr"
+            ? "Değişiklik onaya gönderildi."
+            : l === "de"
+              ? "Änderung zur Freigabe eingereicht."
+              : "Change submitted for approval.",
+        );
+        return;
+      }
+      const updated = res?.product ?? res;
+      const newStatus = updated?.status ?? nextStatus;
+      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, status: newStatus } : p)));
+    } catch (err) {
+      console.error("Failed to update product status", err);
+      window.alert(
+        l === "tr"
+          ? "Durum güncellenemedi."
+          : l === "de"
+            ? "Status konnte nicht aktualisiert werden."
+            : "Could not update status.",
+      );
+    } finally {
+      setStatusSaving(false);
+    }
   };
   const localizeStatus = (k) => {
     if (k === "active") return i18n.active;
@@ -666,6 +762,12 @@ function InventoryProductRow({
               </div>
             )}
           </Box>
+          <ProductStatusToggle
+            on={statusOn}
+            disabled={statusSaving}
+            title={statusOn ? i18n.deactivateProduct : i18n.activateProduct}
+            onChange={handleStatusToggle}
+          />
         </InlineStack>
       </div>
       {variantsOpen && hasVariants && (

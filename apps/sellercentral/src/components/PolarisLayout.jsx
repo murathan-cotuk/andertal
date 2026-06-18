@@ -38,6 +38,7 @@ import dynamic from "next/dynamic";
 import en from "@shopify/polaris/locales/en.json";
 import "@shopify/polaris/build/esm/styles.css";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { LogoutButton } from "@andertal/ui";
 import { fieldNameDisplayLabel } from "@/lib/product-change-request-format";
 
 const discardBtnStyles = `
@@ -412,6 +413,7 @@ export default function PolarisLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const tRaw = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const t = useCallback((key) => {
     try {
       return tRaw(key);
@@ -706,8 +708,7 @@ export default function PolarisLayout({ children }) {
   const userMenuActions = [
     {
       items: [
-        { content: "Settings", onAction: () => router.push("/settings") },
-        { content: "Logout", destructive: true, onAction: handleLogout },
+        { content: tCommon("settings"), onAction: () => router.push("/settings") },
       ],
     },
   ];
@@ -988,6 +989,9 @@ export default function PolarisLayout({ children }) {
               </div>
             )}
           </div>
+
+          {/* Logout */}
+          <LogoutButton label={tCommon("logout")} onClick={handleLogout} />
 
           {/* Profile */}
           <TopBar.UserMenu

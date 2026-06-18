@@ -9,7 +9,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
+import { LogoutButton } from "@andertal/ui";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { restPathFromPathname } from "@/lib/shop-market";
@@ -277,31 +279,11 @@ const IcoClose = () => (
   </svg>
 );
 
-const IcoLogout = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
-
 /* ─── Hover helpers ──────────────────────────────────────── */
 function HoverLink({ style, ...props }) {
   const [hov, setHov] = useState(false);
   return (
     <Link
-      {...props}
-      style={{ ...style, background: hov ? "#f3f4f6" : "transparent" }}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-    />
-  );
-}
-
-function HoverBtn({ style, ...props }) {
-  const [hov, setHov] = useState(false);
-  return (
-    <button
       {...props}
       style={{ ...style, background: hov ? "#f3f4f6" : "transparent" }}
       onMouseEnter={() => setHov(true)}
@@ -332,6 +314,7 @@ export default function MobileNav({ layout = "fixed" }) {
   const mc = shopStyles?.mobileChrome || {};
   const { mobileBottomNavScroll } = useMobileBottomNavScroll();
   const pathname = usePathname();
+  const t = useTranslations("common");
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount } = useCart();
   const { ids: wishlistIds } = useWishlist();
@@ -512,17 +495,16 @@ export default function MobileNav({ layout = "fixed" }) {
               <HoverLink href="/account" onClick={closeDrawer} style={{ ...css.drawerLink, fontWeight: 700, color: TEAL }}>
                 <span>Konto Übersicht</span><IcoChevron />
               </HoverLink>
-              <HoverBtn
-                style={{ ...css.drawerBtn, color: "#ef4444" }}
-                onClick={() => {
-                  closeDrawer();
-                  document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
-                  logout();
-                }}
-              >
-                <span>Abmelden</span>
-                <IcoLogout />
-              </HoverBtn>
+              <div style={{ padding: "8px 16px 4px" }}>
+                <LogoutButton
+                  label={t("logout")}
+                  onClick={() => {
+                    closeDrawer();
+                    document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
+                    logout();
+                  }}
+                />
+              </div>
             </>
           ) : (
             <>

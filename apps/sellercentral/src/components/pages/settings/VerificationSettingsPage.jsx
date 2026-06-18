@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Modal, Spinner, Text, TextField } from "@shopify/polaris";
 import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import SellerCreditCardSection from "@/components/SellerCreditCardSection";
@@ -71,6 +72,15 @@ const tByLocale = (l) => {
       reviewingTitle: "Doğrulama inceleniyor",
       reviewingDetail: "Evraklarınız ve bilgileriniz ekibimiz tarafından inceleniyor. Bu süreç genellikle 1-3 iş günü sürer. Sonuç e-posta ile bildirilecektir.",
       statusLabel: "Hesap durumu",
+      qrGenerating: "QR kod oluşturuluyor...",
+      qrScanPrompt: "Sözleşmeyi imzalamak için lütfen QR kodu mobil cihazınla tara.",
+      waitingSignature: "İmza bekleniyor...",
+      agreementSigned: (at) => `Sözleşme imzalandı${at ? " — " + new Date(at).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : ""}`,
+      downloadSignedPdf: "İmzalı PDF'i indir",
+      creditCardTitle: "Ücretler için Kredi Kartı",
+      creditCardSubtitle: "Platform ücretleri veya iade durumunda bakiyeniz yetersiz kaldığında bu kart kullanılır.",
+      invalidFormatError: "Doğrulama verileri hatalı formatta gönderildi. Lütfen adres ve belge alanlarını kontrol edip tekrar deneyin.",
+      closeModal: "Kapat",
       status: {
         registered: "Kayıt oldu - satış öncesi doğrulama gerekli",
         documents_submitted: "Evraklar gönderildi - inceleme bekleniyor",
@@ -131,6 +141,15 @@ const tByLocale = (l) => {
       reviewingTitle: "Verifizierung wird geprüft",
       reviewingDetail: "Deine Dokumente und Angaben werden von unserem Team geprüft. Dies dauert in der Regel 1–3 Werktage. Das Ergebnis wird per E-Mail mitgeteilt.",
       statusLabel: "Kontostatus",
+      qrGenerating: "QR-Code wird generiert...",
+      qrScanPrompt: "Bitte scanne den QR-Code mit deinem Mobilgerät, um die Vereinbarung zu unterzeichnen.",
+      waitingSignature: "Warte auf Unterschrift...",
+      agreementSigned: (at) => `Vereinbarung unterzeichnet${at ? " am " + new Date(at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : ""}`,
+      downloadSignedPdf: "Unterzeichnetes PDF herunterladen",
+      creditCardTitle: "Kreditkarte für Gebühren",
+      creditCardSubtitle: "Diese Karte wird belastet, wenn dein Guthaben für Plattformgebühren oder Rückbuchungen nicht ausreicht.",
+      invalidFormatError: "Ungültiges Datenformat für die Verifizierung. Bitte Adress- und Dokumentfelder prüfen und erneut senden.",
+      closeModal: "Schließen",
       status: {
         registered: "Registriert - Verifizierung vor dem Verkauf erforderlich",
         documents_submitted: "Dokumente eingereicht - Prüfung läuft",
@@ -191,6 +210,15 @@ const tByLocale = (l) => {
       reviewingTitle: "Vérification en cours",
       reviewingDetail: "Vos documents et informations sont en cours d'examen par notre équipe. Cela prend généralement 1 à 3 jours ouvrables. Vous serez informé par e-mail.",
       statusLabel: "Statut du compte",
+      qrGenerating: "Génération du QR code...",
+      qrScanPrompt: "Veuillez scanner le QR code avec votre appareil mobile pour signer l'accord.",
+      waitingSignature: "En attente de signature...",
+      agreementSigned: (at) => `Accord signé${at ? " le " + new Date(at).toLocaleDateString("fr-FR") : ""}`,
+      downloadSignedPdf: "Télécharger le PDF signé",
+      creditCardTitle: "Carte de crédit pour les frais",
+      creditCardSubtitle: "Cette carte est débitée lorsque votre solde est insuffisant pour les frais de plateforme ou les rétrofacturations.",
+      invalidFormatError: "Format de données de vérification invalide. Veuillez vérifier les champs d'adresse et de documents et réessayer.",
+      closeModal: "Fermer",
       status: {
         registered: "Inscrit - vérification requise avant la vente",
         documents_submitted: "Documents soumis - en cours d'examen",
@@ -251,6 +279,15 @@ const tByLocale = (l) => {
       reviewingTitle: "Verificación en curso",
       reviewingDetail: "Nuestro equipo está revisando sus documentos e información. Esto suele tardar entre 1 y 3 días hábiles. Se le notificará por correo electrónico.",
       statusLabel: "Estado de la cuenta",
+      qrGenerating: "Generando código QR...",
+      qrScanPrompt: "Por favor, escanee el código QR con su dispositivo móvil para firmar el acuerdo.",
+      waitingSignature: "Esperando firma...",
+      agreementSigned: (at) => `Acuerdo firmado${at ? " el " + new Date(at).toLocaleDateString("es-ES") : ""}`,
+      downloadSignedPdf: "Descargar PDF firmado",
+      creditCardTitle: "Tarjeta de crédito para comisiones",
+      creditCardSubtitle: "Esta tarjeta se carga cuando su saldo es insuficiente para las comisiones de la plataforma o las devoluciones de cargo.",
+      invalidFormatError: "Formato de datos de verificación no válido. Revise los campos de dirección y documentos e inténtelo de nuevo.",
+      closeModal: "Cerrar",
       status: {
         registered: "Registrado - verificación requerida antes de vender",
         documents_submitted: "Documentos enviados - en revisión",
@@ -311,6 +348,15 @@ const tByLocale = (l) => {
       reviewingTitle: "Verifica in corso",
       reviewingDetail: "Il nostro team sta esaminando i tuoi documenti e le tue informazioni. Questa operazione richiede in genere 1-3 giorni lavorativi. Sarai notificato via e-mail.",
       statusLabel: "Stato dell'account",
+      qrGenerating: "Generazione QR code...",
+      qrScanPrompt: "Scansiona il QR code con il tuo dispositivo mobile per firmare l'accordo.",
+      waitingSignature: "In attesa di firma...",
+      agreementSigned: (at) => `Accordo firmato${at ? " il " + new Date(at).toLocaleDateString("it-IT") : ""}`,
+      downloadSignedPdf: "Scarica PDF firmato",
+      creditCardTitle: "Carta di credito per le commissioni",
+      creditCardSubtitle: "Questa carta viene addebitata quando il saldo è insufficiente per le commissioni della piattaforma o i chargeback.",
+      invalidFormatError: "Formato dati di verifica non valido. Controlla i campi indirizzo e documenti e riprova.",
+      closeModal: "Chiudi",
       status: {
         registered: "Registrato - verifica richiesta prima di vendere",
         documents_submitted: "Documenti inviati - in revisione",
@@ -370,6 +416,15 @@ const tByLocale = (l) => {
     reviewingTitle: "Verification under review",
     reviewingDetail: "Your documents and details are being reviewed by our team. This typically takes 1–3 business days. You will be notified by email once complete.",
     statusLabel: "Account status",
+    qrGenerating: "Generating QR code...",
+    qrScanPrompt: "Please scan the QR code with your mobile device to sign the agreement.",
+    waitingSignature: "Waiting for signature...",
+    agreementSigned: (at) => `Agreement signed${at ? " on " + new Date(at).toLocaleDateString("en-GB") : ""}`,
+    downloadSignedPdf: "Download signed PDF",
+    creditCardTitle: "Credit Card for Fees",
+    creditCardSubtitle: "This card is charged when your balance is insufficient for platform fees or chargebacks.",
+    invalidFormatError: "Invalid verification data format. Please review address and document fields and try again.",
+    closeModal: "Close",
     status: {
       registered: "Registered - verification required before selling",
       documents_submitted: "Documents submitted - under review",
@@ -524,14 +579,14 @@ const CONTRACT_SECTIONS = {
   ],
 };
 
-function ContractModal({ locale, title, onClose }) {
+function ContractModal({ locale, title, onClose, closeLabel }) {
   const sections = CONTRACT_SECTIONS[locale] || CONTRACT_SECTIONS.en;
   return (
     <Modal
       open
       onClose={onClose}
       title={title}
-      primaryAction={{ content: locale === "tr" ? "Kapat" : locale === "de" ? "Schließen" : "Close", onAction: onClose }}
+      primaryAction={{ content: closeLabel, onAction: onClose }}
       large
     >
       <Modal.Section>
@@ -613,6 +668,7 @@ function DocUploadRow({ label, hint, docType, doc, onUpload, uploading, t }) {
 export default function VerificationSettingsPage() {
   const unsaved = useUnsavedChanges();
   const locale = useLocale();
+  const ui = getUI(locale);
   const t = useMemo(() => tByLocale(locale), [locale]);
   const client = getMedusaAdminClient();
 
@@ -838,11 +894,7 @@ export default function VerificationSettingsPage() {
     } catch (e) {
       const rawMsg = String(e?.message || "");
       if (rawMsg.toLowerCase().includes("invalid input syntax for type json")) {
-        setError(locale === "tr"
-          ? "Doğrulama verileri hatalı formatta gönderildi. Lütfen adres ve belge alanlarını kontrol edip tekrar deneyin."
-          : locale === "de"
-            ? "Ungültiges Datenformat für die Verifizierung. Bitte Adress- und Dokumentfelder prüfen und erneut senden."
-            : "Invalid verification data format. Please review address and document fields and try again.");
+        setError(t.invalidFormatError);
       } else {
         setError(e?.message || "Save failed.");
       }
@@ -921,7 +973,7 @@ export default function VerificationSettingsPage() {
   if (loading) {
     return (
       <Card>
-        <Text as="p" tone="subdued">Loading...</Text>
+        <Text as="p" tone="subdued">{ui.loading}</Text>
       </Card>
     );
   }
@@ -1009,24 +1061,20 @@ export default function VerificationSettingsPage() {
                     <InlineStack gap="200" blockAlign="center">
                       <Spinner size="small" />
                       <Text as="p" variant="bodySm" tone="subdued">
-                        {locale === "de" ? "QR-Code wird generiert..." : locale === "tr" ? "QR kod oluşturuluyor..." : "Generating QR code..."}
+                        {t.qrGenerating}
                       </Text>
                     </InlineStack>
                   ) : qrDataUrl ? (
                     <BlockStack gap="200">
                       <Text as="p" variant="bodyMd" fontWeight="semibold">
-                        {locale === "de"
-                          ? "Bitte scanne den QR-Code mit deinem Mobilgerät, um die Vereinbarung zu unterzeichnen."
-                          : locale === "tr"
-                          ? "Sözleşmeyi imzalamak için lütfen QR kodu mobil cihazınla tara."
-                          : "Please scan the QR code with your mobile device to sign the agreement."}
+                        {t.qrScanPrompt}
                       </Text>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
                         <img src={qrDataUrl} alt="QR Code" style={{ width: 180, height: 180, border: "1px solid #e5e7eb", borderRadius: 8 }} />
                         <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 8 }}>
                           <Spinner size="small" />
                           <Text as="p" variant="bodySm" tone="subdued">
-                            {locale === "de" ? "Warte auf Unterschrift..." : locale === "tr" ? "İmza bekleniyor..." : "Waiting for signature..."}
+                            {t.waitingSignature}
                           </Text>
                         </div>
                       </div>
@@ -1042,15 +1090,11 @@ export default function VerificationSettingsPage() {
                     <InlineStack gap="200" blockAlign="center">
                       <span style={{ color: "#10b981", fontSize: 18 }}>✓</span>
                       <Text as="p" variant="bodyMd" fontWeight="semibold" tone="success">
-                        {locale === "de"
-                          ? `Vereinbarung unterzeichnet${signatureAt ? " am " + new Date(signatureAt).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : ""}`
-                          : locale === "tr"
-                          ? `Sözleşme imzalandı${signatureAt ? " — " + new Date(signatureAt).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : ""}`
-                          : `Agreement signed${signatureAt ? " on " + new Date(signatureAt).toLocaleDateString("en-GB") : ""}`}
+                        {t.agreementSigned(signatureAt)}
                       </Text>
                     </InlineStack>
                     <Button size="slim" onClick={downloadPdf} loading={pdfDownloading}>
-                      {locale === "de" ? "Unterzeichnetes PDF herunterladen" : locale === "tr" ? "İmzalı PDF'i indir" : "Download signed PDF"}
+                      {t.downloadSignedPdf}
                     </Button>
                   </BlockStack>
                 </div>
@@ -1063,6 +1107,7 @@ export default function VerificationSettingsPage() {
               locale={locale}
               title={t.contractModalTitle}
               onClose={() => setContractOpen(false)}
+              closeLabel={t.closeModal}
             />
           )}
 
@@ -1172,16 +1217,8 @@ export default function VerificationSettingsPage() {
           {/* Credit Card */}
           <Card>
             <SellerCreditCardSection
-              title={
-                locale === "de" ? "Kreditkarte für Gebühren" :
-                locale === "tr" ? "Ücretler için Kredi Kartı" :
-                "Credit Card for Fees"
-              }
-              subtitle={
-                locale === "de" ? "Diese Karte wird belastet, wenn dein Guthaben für Plattformgebühren oder Rückbuchungen nicht ausreicht." :
-                locale === "tr" ? "Platform ücretleri veya iade durumunda bakiyeniz yetersiz kaldığında bu kart kullanılır." :
-                "This card is charged when your balance is insufficient for platform fees or chargebacks."
-              }
+              title={t.creditCardTitle}
+              subtitle={t.creditCardSubtitle}
             />
           </Card>
 

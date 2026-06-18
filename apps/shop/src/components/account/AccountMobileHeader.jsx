@@ -3,7 +3,9 @@
 import { useEffect, useRef } from "react";
 import styled from "styled-components";
 import { Link, usePathname } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
+import { LogoutButton } from "@andertal/ui";
 import { restPathFromPathname } from "@/lib/shop-market";
 
 const ORANGE = "#ff971c";
@@ -82,21 +84,11 @@ const NavPill = styled(Link)`
   transition: all 0.12s;
 `;
 
-const NavLogout = styled.button`
+const NavLogoutWrap = styled.div`
   flex: 0 0 auto;
   scroll-snap-align: start;
   display: inline-flex;
   align-items: center;
-  padding: 7px 15px;
-  background: #fff;
-  color: #ef4444;
-  border: 1.5px solid #fecaca;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  font-family: inherit;
 `;
 
 function normalizePath(pathname) {
@@ -107,6 +99,7 @@ function normalizePath(pathname) {
 
 export default function AccountMobileHeader({ onLogout }) {
   const { user } = useAuth();
+  const t = useTranslations("common");
   const pathname = usePathname() || "/";
   const appPath = normalizePath(pathname);
   const firstName = user?.firstName || user?.first_name || "";
@@ -149,15 +142,15 @@ export default function AccountMobileHeader({ onLogout }) {
           );
         })}
         {onLogout && (
-          <NavLogout
-            type="button"
-            onClick={() => {
-              document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
-              onLogout();
-            }}
-          >
-            Abmelden
-          </NavLogout>
+          <NavLogoutWrap>
+            <LogoutButton
+              label={t("logout")}
+              onClick={() => {
+                document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
+                onLogout();
+              }}
+            />
+          </NavLogoutWrap>
         )}
       </NavScroll>
     </Wrap>

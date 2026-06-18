@@ -5,6 +5,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { Page, Layout, Card, Text, BlockStack, InlineStack, Box, TextField, Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { getUI } from "@/lib/ui-strings";
 import { confirmDelete } from "@/lib/confirm-delete";
 
 function fmtDate(d) {

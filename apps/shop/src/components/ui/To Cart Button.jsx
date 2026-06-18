@@ -1,113 +1,79 @@
 "use client";
 
 import React from "react";
+import styled from "styled-components";
 
-/* Brand colours — fallback values; overridden by ShopStylesInjector via CSS variables */
-const C_BASE   = "var(--shop-primary, #ff971c)";
-const C_DARK   = "var(--shop-accent, #ef8200)";
-const C_ACTIVE = "var(--shop-accent, #ef8200)";
+const Btn = styled.button`
+  position: relative;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: none;
+  border-radius: 12px;
+  background: var(--shop-primary, #ff971c);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 14px rgba(255, 151, 28, 0.22);
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+
+  @media (max-width: 767px) {
+    min-height: 56px;
+    font-size: 1rem;
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--shop-accent, #ef8200);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08), 0 6px 18px rgba(239, 130, 0, 0.28);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: #9ca3af;
+    box-shadow: none;
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+`;
+
+function CartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="9" cy="20" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="20" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M3 4h2l2.2 11.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.76L21 7H6.2" />
+    </svg>
+  );
+}
 
 export function ToCartButton({ type = "button", children, disabled, onClick, style, className = "" }) {
   return (
-    <>
-      <style>{`
-        .atc-btn {
-          position: relative;
-          width: 100%;
-          height: 52px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          border: 1.5px solid ${C_DARK};
-          border-radius: 10px;
-          background-color: ${C_BASE};
-          overflow: hidden;
-          padding: 0;
-          user-select: none;
-          box-sizing: border-box;
-          transition: background-color 0.3s, border-color 0.3s;
-        }
-        .atc-btn, .atc-btn__text, .atc-btn__icon {
-          transition: all 0.3s;
-        }
-        .atc-btn:hover:not(:disabled) {
-          background-color: ${C_DARK};
-        }
-        .atc-btn:active:not(:disabled) {
-          background-color: ${C_ACTIVE};
-          border-color: ${C_ACTIVE};
-        }
-        .atc-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-          background-color: #9ca3af;
-          border-color: #9ca3af;
-        }
-        .atc-btn__text {
-          flex: 1;
-          text-align: center;
-          color: #fff;
-          font-weight: 700;
-          font-size: 15px;
-          letter-spacing: 0.01em;
-          padding: 0 54px 0 12px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          z-index: 1;
-          pointer-events: none;
-        }
-        .atc-btn:hover:not(:disabled) .atc-btn__text {
-          color: transparent;
-        }
-        .atc-btn__icon {
-          position: absolute;
-          top: 0;
-          right: 0;
-          height: 100%;
-          width: 50px;
-          background-color: ${C_DARK};
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 0 8px 8px 0;
-          z-index: 2;
-          pointer-events: none;
-        }
-        .atc-btn:hover:not(:disabled) .atc-btn__icon {
-          width: 100%;
-          border-radius: 8px;
-        }
-        .atc-btn:active:not(:disabled) .atc-btn__icon {
-          background-color: ${C_ACTIVE};
-        }
-        .atc-btn__icon svg {
-          width: 26px;
-          height: 26px;
-          stroke: #fff;
-          stroke-width: 2.5;
-          stroke-linecap: round;
-          stroke-linejoin: round;
-          fill: none;
-          flex-shrink: 0;
-        }
-      `}</style>
-      <button
-        type={type}
-        disabled={disabled}
-        onClick={onClick}
-        style={style}
-        className={`atc-btn${className ? ` ${className}` : ""}`}
-      >
-        <span className="atc-btn__text">{children}</span>
-        <span className="atc-btn__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5"  y1="12" x2="19" y2="12" />
-          </svg>
-        </span>
-      </button>
-    </>
+    <Btn type={type} disabled={disabled} onClick={onClick} style={style} className={className}>
+      <CartIcon />
+      <span>{children}</span>
+    </Btn>
   );
 }
 

@@ -1,7 +1,9 @@
 ﻿"use client";
 
 import { Link, usePathname } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
+import { LogoutButton } from "@andertal/ui";
 import { restPathFromPathname } from "@/lib/shop-market";
 import { useState, useEffect } from "react";
 
@@ -30,6 +32,7 @@ export default function AccountSidebar({ onLogout, onNavigate }) {
   const pathname = usePathname() || "/";
   const appPath = normalizePath(pathname);
   const { user } = useAuth();
+  const t = useTranslations("common");
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -83,23 +86,16 @@ export default function AccountSidebar({ onLogout, onNavigate }) {
           </Link>
         );
       })}
-      <button
-        type="button"
-        onClick={() => {
-          document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
-          onNavigate?.();
-          onLogout?.();
-        }}
-        style={{
-          display: "flex", alignItems: "center", gap: 10,
-          padding: "14px 18px", fontSize: 14, fontWeight: 500,
-          color: "#ef4444", background: "transparent",
-          border: "none", borderLeft: "3px solid transparent",
-          width: "100%", textAlign: "left", cursor: "pointer",
-        }}
-      >
-        Abmelden
-      </button>
+      <div style={{ padding: "14px 18px", borderTop: `1px solid ${BORDER}` }}>
+        <LogoutButton
+          label={t("logout")}
+          onClick={() => {
+            document.cookie = "andertal_cauth=; path=/; max-age=0; SameSite=Lax";
+            onNavigate?.();
+            onLogout?.();
+          }}
+        />
+      </div>
     </nav>
   );
 }
