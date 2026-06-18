@@ -4,29 +4,37 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Card, Text, BlockStack, InlineStack, Button, Box, TextField, Select, Spinner, Banner,
 } from "@shopify/polaris";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/components/confirm-delete";
 
-const STATUS_OPTIONS = [
-  { label: "Alle", value: "all" },
-  { label: "Offen", value: "open" },
-  { label: "Gelöst", value: "resolved" },
-  { label: "In Bearbeitung", value: "in_progress" },
-];
-
-const STATUS_STYLE = {
-  open:        { bg: "#fef2f2", color: "#991b1b", label: "Offen" },
-  in_progress: { bg: "#fffbeb", color: "#92400e", label: "In Bearbeitung" },
-  resolved:    { bg: "#f0fdf4", color: "#166534", label: "Gelöst" },
-};
-
-function fmtDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+function getStatusOptions(locale) {
+  return [
+    { label: locale === "en" ? "All" : locale === "tr" ? "Tümü" : "Alle", value: "all" },
+    { label: locale === "en" ? "Open" : locale === "tr" ? "Açık" : "Offen", value: "open" },
+    { label: locale === "en" ? "Resolved" : locale === "tr" ? "Çözüldü" : "Gelöst", value: "resolved" },
+    { label: locale === "en" ? "In progress" : locale === "tr" ? "İşlemde" : "In Bearbeitung", value: "in_progress" },
+  ];
 }
 
-function StatusBadge({ status }) {
-  const s = STATUS_STYLE[status] || { bg: "#f3f4f6", color: "#374151", label: status };
+function getStatusStyle(locale) {
+  return {
+    open:        { bg: "#fef2f2", color: "#991b1b", label: locale === "en" ? "Open" : locale === "tr" ? "Açık" : "Offen" },
+    in_progress: { bg: "#fffbeb", color: "#92400e", label: locale === "en" ? "In progress" : locale === "tr" ? "İşlemde" : "In Bearbeitung" },
+    resolved:    { bg: "#f0fdf4", color: "#166534", label: locale === "en" ? "Resolved" : locale === "tr" ? "Çözüldü" : "Gelöst" },
+  };
+}
+
+function fmtDate(d, locale) {
+  if (!d) return "—";
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return new Date(d).toLocaleString(loc, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function StatusBadge({ status, locale = "de" }) {
+  const styleMap = getStatusStyle(locale);
+  const s = styleMap[status] || { bg: "#f3f4f6", color: "#374151", label: status };
   return (
     <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color }}>
       {s.label}
@@ -34,7 +42,8 @@ function StatusBadge({ status }) {
   );
 }
 
-function ErrorDetailModal({ error, onClose, onUpdate }) {
+function ErrorDetailModal({ error, onClose, onUpdate, locale = "de" }) {
+  const ui = getUI(locale);
   const client = getMedusaAdminClient();
   const [resolution, setResolution] = useState(error.resolution || "");
   const [status, setStatus] = useState(error.status || "open");
@@ -50,7 +59,7 @@ function ErrorDetailModal({ error, onClose, onUpdate }) {
       onUpdate();
       onClose();
     } catch (e) {
-      alert("Fehler: " + (e?.message || "Unbekannt"));
+      alert((locale === "en" ? "Error: " : locale === "tr" ? "Hata: " : "Fehler: ") + (e?.message || (locale === "en" ? "Unknown" : locale === "tr" ? "Bilinmiyor" : "Unbekannt")));
     } finally {
       setSaving(false);
     }
@@ -68,10 +77,10 @@ function ErrorDetailModal({ error, onClose, onUpdate }) {
             <BlockStack gap="050">
               <Text variant="headingMd" as="h2" tone="text-inverse">Sorun Detayı</Text>
               <Text as="p" variant="bodySm" tone="text-inverse">
-                {error.store_name || error.seller_email || error.seller_id || "Unbekannter Verkäufer"} · {fmtDate(error.created_at)}
+                {error.store_name || error.seller_email || error.seller_id || (locale === "en" ? "Unknown seller" : locale === "tr" ? "Bilinmeyen satıcı" : "Unbekannter Verkäufer")} · {fmtDate(error.created_at, locale)}
               </Text>
             </BlockStack>
-            <StatusBadge status={error.status} />
+            <StatusBadge status={error.status} locale={locale} />
           </InlineStack>
         </div>
 
@@ -115,12 +124,8 @@ function ErrorDetailModal({ error, onClose, onUpdate }) {
 
             {/* Editable fields */}
             <Select
-              label="Durum"
-              options={[
-                { label: "Offen", value: "open" },
-                { label: "In Bearbeitung", value: "in_progress" },
-                { label: "Gelöst", value: "resolved" },
-              ]}
+              label={locale === "en" ? "Status" : locale === "tr" ? "Durum" : "Status"}
+              options={getStatusOptions(locale).filter(o => o.value !== "all")}
               value={status}
               onChange={setStatus}
             />
@@ -136,8 +141,8 @@ function ErrorDetailModal({ error, onClose, onUpdate }) {
         </div>
 
         <div style={{ padding: "14px 22px 18px", borderTop: "1px solid #e5e7eb", display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <Button onClick={onClose} disabled={saving}>Kapat</Button>
-          <Button variant="primary" onClick={handleSave} loading={saving}>Kaydet</Button>
+          <Button onClick={onClose} disabled={saving}>{ui.close}</Button>
+          <Button variant="primary" onClick={handleSave} loading={saving}>{ui.save}</Button>
         </div>
       </div>
     </div>
@@ -145,6 +150,8 @@ function ErrorDetailModal({ error, onClose, onUpdate }) {
 }
 
 export default function SellerErrorsPage() {
+  const locale = useLocale();
+  const ui = getUI(locale);
   const client = getMedusaAdminClient();
   const [errors, setErrors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -169,7 +176,7 @@ export default function SellerErrorsPage() {
       setErrors(res?.errors || []);
       setUnreadCount(res?.unread_count || 0);
     } catch (e) {
-      setError(e?.message || "Fehler");
+      setError(e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler"));
     } finally {
       setLoading(false);
     }
@@ -185,7 +192,12 @@ export default function SellerErrorsPage() {
   };
 
   const handleDelete = async (err) => {
-    if (!await confirmDelete(`Bu hatayı sil: "${(err.error_message || "").slice(0, 60)}…"?`)) return;
+    const confirmMsg = locale === "en"
+      ? `Delete this error: "${(err.error_message || "").slice(0, 60)}…"?`
+      : locale === "tr"
+      ? `Bu hatayı sil: "${(err.error_message || "").slice(0, 60)}…"?`
+      : `Diesen Fehler löschen: "${(err.error_message || "").slice(0, 60)}…"?`;
+    if (!await confirmDelete(confirmMsg)) return;
     await client.request(`/admin-hub/v1/seller-errors/${err.id}`, { method: "DELETE" }).catch(() => {});
     load();
   };
@@ -199,7 +211,7 @@ export default function SellerErrorsPage() {
       setNewError({ seller_id: "", error_code: "", error_message: "", terminal_output: "", context: "" });
       load();
     } catch (e) {
-      alert(e?.message || "Fehler");
+      alert(e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler"));
     } finally {
       setAdding(false);
     }
@@ -258,7 +270,7 @@ export default function SellerErrorsPage() {
         <Card padding="300">
           <InlineStack gap="200" blockAlign="end" wrap>
             <Box minWidth="160px">
-              <Select label="Durum" options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
+              <Select label={locale === "en" ? "Status" : locale === "tr" ? "Durum" : "Status"} options={getStatusOptions(locale)} value={statusFilter} onChange={setStatusFilter} />
             </Box>
             <Box minWidth="200px">
               <TextField
@@ -309,7 +321,7 @@ export default function SellerErrorsPage() {
                       <td style={{ padding: "8px 4px 8px 12px", width: 8 }}>
                         {!e.is_read && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }} />}
                       </td>
-                      <td style={{ padding: "10px 12px", fontSize: 12, color: "#374151", whiteSpace: "nowrap" }}>{fmtDate(e.created_at)}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 12, color: "#374151", whiteSpace: "nowrap" }}>{fmtDate(e.created_at, locale)}</td>
                       <td style={{ padding: "10px 12px", fontSize: 12, color: "#374151" }}>
                         {e.store_name || e.company_name || <span style={{ color: "#9ca3af" }}>{e.seller_id || "—"}</span>}
                         {e.seller_email && <div style={{ fontSize: 11, color: "#9ca3af" }}>{e.seller_email}</div>}
@@ -323,9 +335,9 @@ export default function SellerErrorsPage() {
                         <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.error_message}</div>
                         {e.context && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{e.context}</div>}
                       </td>
-                      <td style={{ padding: "10px 12px" }}><StatusBadge status={e.status} /></td>
+                      <td style={{ padding: "10px 12px" }}><StatusBadge status={e.status} locale={locale} /></td>
                       <td style={{ padding: "10px 12px" }} onClick={(ev) => ev.stopPropagation()}>
-                        <Button size="slim" tone="critical" onClick={() => handleDelete(e)}>Sil</Button>
+                        <Button size="slim" tone="critical" onClick={() => handleDelete(e)}>{ui.delete}</Button>
                       </td>
                     </tr>
                   ))}
@@ -342,6 +354,7 @@ export default function SellerErrorsPage() {
           error={selectedError}
           onClose={() => setSelectedError(null)}
           onUpdate={load}
+          locale={locale}
         />
       )}
 
@@ -365,8 +378,8 @@ export default function SellerErrorsPage() {
               </BlockStack>
             </div>
             <div style={{ padding: "14px 22px 18px", borderTop: "1px solid #e5e7eb", display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <Button onClick={() => setAddOpen(false)} disabled={adding}>İptal</Button>
-              <Button variant="primary" onClick={handleAdd} loading={adding}>Ekle</Button>
+              <Button onClick={() => setAddOpen(false)} disabled={adding}>{ui.cancel}</Button>
+              <Button variant="primary" onClick={handleAdd} loading={adding}>{ui.add}</Button>
             </div>
           </div>
         </div>

@@ -5,17 +5,30 @@ import {
   Card, Text, BlockStack, InlineStack, Button, Box, TextField, Select,
   Spinner, Banner, Checkbox, Badge,
 } from "@shopify/polaris";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/components/confirm-delete";
 
-const LOCATION_TYPES = [
-  { label: "Lager / Fulfillment", value: "warehouse" },
-  { label: "Filiale / Store", value: "store" },
-  { label: "Büro", value: "office" },
-  { label: "Sonstige", value: "other" },
-];
+function getLocationTypes(locale) {
+  return [
+    { label: locale === "en" ? "Warehouse / Fulfillment" : locale === "tr" ? "Depo / Fulfillment" : "Lager / Fulfillment", value: "warehouse" },
+    { label: locale === "en" ? "Branch / Store" : locale === "tr" ? "Şube / Mağaza" : "Filiale / Store", value: "store" },
+    { label: locale === "en" ? "Office" : locale === "tr" ? "Ofis" : "Büro", value: "office" },
+    { label: locale === "en" ? "Other" : locale === "tr" ? "Diğer" : "Sonstige", value: "other" },
+  ];
+}
 
-const TYPE_LABELS = { warehouse: "Lager", store: "Filiale", office: "Büro", other: "Sonstige" };
+function getTypeLabel(type, locale) {
+  const map = {
+    warehouse: locale === "en" ? "Warehouse" : locale === "tr" ? "Depo" : "Lager",
+    store: locale === "en" ? "Branch" : locale === "tr" ? "Şube" : "Filiale",
+    office: locale === "en" ? "Office" : locale === "tr" ? "Ofis" : "Büro",
+    other: locale === "en" ? "Other" : locale === "tr" ? "Diğer" : "Sonstige",
+  };
+  return map[type] || type;
+}
+
 const TYPE_COLORS = { warehouse: "#0070f3", store: "#10b981", office: "#f59e0b", other: "#6b7280" };
 
 const EMPTY = {
@@ -23,7 +36,7 @@ const EMPTY = {
   city: "", postal_code: "", country: "Deutschland", phone: "", email: "", is_primary: false,
 };
 
-function LocationModal({ location, onSave, onClose }) {
+function LocationModal({ location, onSave, onClose, locale, ui }) {
   const [form, setForm] = useState(location ? { ...EMPTY, ...location } : { ...EMPTY });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -32,7 +45,7 @@ function LocationModal({ location, onSave, onClose }) {
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
-    if (!form.name.trim()) { setError("Name erforderlich"); return; }
+    if (!form.name.trim()) { setError(locale === "en" ? "Name required" : locale === "tr" ? "Ad gerekli" : "Name erforderlich"); return; }
     setSaving(true); setError(null);
     try {
       if (location?.id) {
@@ -46,7 +59,7 @@ function LocationModal({ location, onSave, onClose }) {
       }
       onSave();
     } catch (e) {
-      setError(e?.message || "Fehler beim Speichern");
+      setError(e?.message || (locale === "en" ? "Error saving" : locale === "tr" ? "Kaydetme hatası" : "Fehler beim Speichern"));
     } finally {
       setSaving(false);
     }
@@ -71,7 +84,9 @@ function LocationModal({ location, onSave, onClose }) {
           borderRadius: "12px 12px 0 0",
         }}>
           <Text variant="headingMd" as="h2" tone="text-inverse">
-            {location?.id ? "Standort bearbeiten" : "Standort hinzufügen"}
+            {location?.id
+              ? (locale === "en" ? "Edit location" : locale === "tr" ? "Konumu düzenle" : "Standort bearbeiten")
+              : (locale === "en" ? "Add location" : locale === "tr" ? "Konum ekle" : "Standort hinzufügen")}
           </Text>
         </div>
         <div style={{ padding: "20px 22px" }}>
@@ -79,38 +94,53 @@ function LocationModal({ location, onSave, onClose }) {
             {error && <Banner tone="critical"><p>{error}</p></Banner>}
             <InlineStack gap="300" wrap={false}>
               <div style={{ flex: 1 }}>
-                <TextField label="Name *" value={form.name} onChange={set("name")} placeholder="z. B. Hauptlager" autoComplete="off" />
+                <TextField
+                  label={locale === "en" ? "Name *" : locale === "tr" ? "Ad *" : "Name *"}
+                  value={form.name}
+                  onChange={set("name")}
+                  placeholder={locale === "en" ? "e.g. Main warehouse" : locale === "tr" ? "örn. Ana depo" : "z. B. Hauptlager"}
+                  autoComplete="off"
+                />
               </div>
               <div style={{ minWidth: 160 }}>
-                <Select label="Typ" options={LOCATION_TYPES} value={form.type} onChange={set("type")} />
+                <Select
+                  label={locale === "en" ? "Type" : locale === "tr" ? "Tür" : "Typ"}
+                  options={getLocationTypes(locale)}
+                  value={form.type}
+                  onChange={set("type")}
+                />
               </div>
             </InlineStack>
-            <TextField label="Straße" value={form.address_line1} onChange={set("address_line1")} autoComplete="off" />
-            <TextField label="Adresszusatz" value={form.address_line2} onChange={set("address_line2")} autoComplete="off" />
+            <TextField label={locale === "en" ? "Street" : locale === "tr" ? "Sokak" : "Straße"} value={form.address_line1} onChange={set("address_line1")} autoComplete="off" />
+            <TextField label={locale === "en" ? "Address line 2" : locale === "tr" ? "Adres satırı 2" : "Adresszusatz"} value={form.address_line2} onChange={set("address_line2")} autoComplete="off" />
             <InlineStack gap="200" wrap={false}>
               <div style={{ minWidth: 100 }}>
-                <TextField label="PLZ" value={form.postal_code} onChange={set("postal_code")} autoComplete="off" />
+                <TextField label={locale === "en" ? "Postal code" : locale === "tr" ? "Posta kodu" : "PLZ"} value={form.postal_code} onChange={set("postal_code")} autoComplete="off" />
               </div>
               <div style={{ flex: 1 }}>
-                <TextField label="Stadt" value={form.city} onChange={set("city")} autoComplete="off" />
+                <TextField label={locale === "en" ? "City" : locale === "tr" ? "Şehir" : "Stadt"} value={form.city} onChange={set("city")} autoComplete="off" />
               </div>
             </InlineStack>
-            <TextField label="Land" value={form.country} onChange={set("country")} autoComplete="off" />
+            <TextField label={locale === "en" ? "Country" : locale === "tr" ? "Ülke" : "Land"} value={form.country} onChange={set("country")} autoComplete="off" />
             <InlineStack gap="200" wrap={false}>
               <div style={{ flex: 1 }}>
-                <TextField label="Telefon" value={form.phone} onChange={set("phone")} autoComplete="off" type="tel" />
+                <TextField label={ui.phone} value={form.phone} onChange={set("phone")} autoComplete="off" type="tel" />
               </div>
               <div style={{ flex: 1 }}>
-                <TextField label="E-Mail" value={form.email} onChange={set("email")} autoComplete="off" type="email" />
+                <TextField label={ui.colEmail} value={form.email} onChange={set("email")} autoComplete="off" type="email" />
               </div>
             </InlineStack>
-            <Checkbox label="Als Primärstandort setzen" checked={!!form.is_primary} onChange={set("is_primary")} />
+            <Checkbox
+              label={locale === "en" ? "Set as primary location" : locale === "tr" ? "Birincil konum olarak ayarla" : "Als Primärstandort setzen"}
+              checked={!!form.is_primary}
+              onChange={set("is_primary")}
+            />
           </BlockStack>
         </div>
         <div style={{ padding: "14px 22px 18px", borderTop: "1px solid #e5e7eb", display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <Button onClick={onClose} disabled={saving}>Abbrechen</Button>
+          <Button onClick={onClose} disabled={saving}>{ui.cancel}</Button>
           <Button variant="primary" onClick={handleSave} loading={saving}>
-            {location?.id ? "Speichern" : "Hinzufügen"}
+            {location?.id ? ui.save : ui.add}
           </Button>
         </div>
       </div>
@@ -118,9 +148,9 @@ function LocationModal({ location, onSave, onClose }) {
   );
 }
 
-function LocationCard({ loc, onEdit, onDelete, onSetPrimary }) {
+function LocationCard({ loc, onEdit, onDelete, onSetPrimary, locale, ui }) {
   const typeColor = TYPE_COLORS[loc.type] || "#6b7280";
-  const typeLabel = TYPE_LABELS[loc.type] || loc.type;
+  const typeLabel = getTypeLabel(loc.type, locale);
   const addressLines = [loc.address_line1, loc.address_line2, [loc.postal_code, loc.city].filter(Boolean).join(" "), loc.country].filter(Boolean);
 
   return (
@@ -143,10 +173,10 @@ function LocationCard({ loc, onEdit, onDelete, onSetPrimary }) {
               <span style={{
                 display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600,
                 background: "#d1fae5", color: "#065f46",
-              }}>Primär</span>
+              }}>{locale === "en" ? "Primary" : locale === "tr" ? "Birincil" : "Primär"}</span>
             )}
             {!loc.is_active && (
-              <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "#f3f4f6", color: "#9ca3af" }}>Inaktiv</span>
+              <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "#f3f4f6", color: "#9ca3af" }}>{ui.inactive}</span>
             )}
           </InlineStack>
           {addressLines.length > 0 && (
@@ -165,10 +195,10 @@ function LocationCard({ loc, onEdit, onDelete, onSetPrimary }) {
         </BlockStack>
         <InlineStack gap="100" blockAlign="start">
           {!loc.is_primary && (
-            <Button size="slim" onClick={() => onSetPrimary(loc)}>Primär setzen</Button>
+            <Button size="slim" onClick={() => onSetPrimary(loc)}>{locale === "en" ? "Set primary" : locale === "tr" ? "Birincil yap" : "Primär setzen"}</Button>
           )}
-          <Button size="slim" onClick={() => onEdit(loc)}>Bearbeiten</Button>
-          <Button size="slim" tone="critical" onClick={() => onDelete(loc)}>Löschen</Button>
+          <Button size="slim" onClick={() => onEdit(loc)}>{ui.edit}</Button>
+          <Button size="slim" tone="critical" onClick={() => onDelete(loc)}>{ui.delete}</Button>
         </InlineStack>
       </InlineStack>
     </div>
@@ -176,6 +206,8 @@ function LocationCard({ loc, onEdit, onDelete, onSetPrimary }) {
 }
 
 export default function LocationsSettingsPage() {
+  const locale = useLocale();
+  const ui = getUI(locale);
   const client = getMedusaAdminClient();
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -188,7 +220,7 @@ export default function LocationsSettingsPage() {
       const res = await client.request("/admin-hub/v1/seller/locations");
       setLocations(res?.locations || []);
     } catch (e) {
-      setError(e?.message || "Fehler beim Laden");
+      setError(e?.message || (locale === "en" ? "Error loading" : locale === "tr" ? "Yükleme hatası" : "Fehler beim Laden"));
     } finally {
       setLoading(false);
     }
@@ -197,12 +229,17 @@ export default function LocationsSettingsPage() {
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (loc) => {
-    if (!await confirmDelete(`Standort "${loc.name}" löschen?`)) return;
+    const confirmMsg = locale === "en"
+      ? `Delete location "${loc.name}"?`
+      : locale === "tr"
+      ? `"${loc.name}" konumunu sil?`
+      : `Standort "${loc.name}" löschen?`;
+    if (!await confirmDelete(confirmMsg)) return;
     try {
       await client.request(`/admin-hub/v1/seller/locations/${loc.id}`, { method: "DELETE" });
       load();
     } catch (e) {
-      alert("Fehler: " + (e?.message || "Unbekannt"));
+      alert((locale === "en" ? "Error: " : locale === "tr" ? "Hata: " : "Fehler: ") + (e?.message || (locale === "en" ? "Unknown" : locale === "tr" ? "Bilinmiyor" : "Unbekannt")));
     }
   };
 
@@ -213,7 +250,7 @@ export default function LocationsSettingsPage() {
       });
       load();
     } catch (e) {
-      alert("Fehler: " + (e?.message || "Unbekannt"));
+      alert((locale === "en" ? "Error: " : locale === "tr" ? "Hata: " : "Fehler: ") + (e?.message || (locale === "en" ? "Unknown" : locale === "tr" ? "Bilinmiyor" : "Unbekannt")));
     }
   };
 
@@ -223,13 +260,13 @@ export default function LocationsSettingsPage() {
         <BlockStack gap="200">
           <InlineStack align="space-between" blockAlign="center">
             <BlockStack gap="050">
-              <Text variant="headingMd" as="h2">Standorte</Text>
+              <Text variant="headingMd" as="h2">{locale === "en" ? "Locations" : locale === "tr" ? "Konumlar" : "Standorte"}</Text>
               <Text as="p" tone="subdued" variant="bodySm">
-                Verwalten Sie Ihre Lager-, Filial- und Bürostandorte.
+                {locale === "en" ? "Manage your warehouse, branch and office locations." : locale === "tr" ? "Depo, şube ve ofis konumlarınızı yönetin." : "Verwalten Sie Ihre Lager-, Filial- und Bürostandorte."}
               </Text>
             </BlockStack>
             <Button variant="primary" onClick={() => setModal("add")}>
-              + Standort hinzufügen
+              {locale === "en" ? "+ Add location" : locale === "tr" ? "+ Konum ekle" : "+ Standort hinzufügen"}
             </Button>
           </InlineStack>
         </BlockStack>
@@ -243,7 +280,7 @@ export default function LocationsSettingsPage() {
         <Card padding="400">
           <InlineStack gap="200" blockAlign="center">
             <Spinner size="small" />
-            <Text as="p" tone="subdued">Laden…</Text>
+            <Text as="p" tone="subdued">{ui.loading}</Text>
           </InlineStack>
         </Card>
       ) : locations.length === 0 ? (
@@ -251,10 +288,10 @@ export default function LocationsSettingsPage() {
           <BlockStack gap="200" inlineAlign="center">
             <div style={{ fontSize: 40, textAlign: "center" }}>📍</div>
             <Text as="p" tone="subdued" alignment="center">
-              Noch keine Standorte hinterlegt.
+              {locale === "en" ? "No locations added yet." : locale === "tr" ? "Henüz konum eklenmedi." : "Noch keine Standorte hinterlegt."}
             </Text>
             <Button variant="primary" onClick={() => setModal("add")}>
-              Ersten Standort hinzufügen
+              {locale === "en" ? "Add first location" : locale === "tr" ? "İlk konumu ekle" : "Ersten Standort hinzufügen"}
             </Button>
           </BlockStack>
         </Card>
@@ -267,6 +304,8 @@ export default function LocationsSettingsPage() {
               onEdit={(l) => setModal(l)}
               onDelete={handleDelete}
               onSetPrimary={handleSetPrimary}
+              locale={locale}
+              ui={ui}
             />
           ))}
         </BlockStack>
@@ -277,6 +316,8 @@ export default function LocationsSettingsPage() {
           location={modal === "add" ? null : modal}
           onSave={() => { setModal(null); load(); }}
           onClose={() => setModal(null)}
+          locale={locale}
+          ui={ui}
         />
       )}
     </BlockStack>

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import styled from "styled-components";
 import { Card } from "@andertal/ui";
+import { useLocale } from "next-intl";
 
 const Container = styled.div`
   max-width: 1200px;
@@ -46,6 +47,7 @@ const StatLabel = styled.div`
 `;
 
 export default function OrdersReportsPage() {
+  const locale = useLocale();
   const [exporting, setExporting] = useState("");
 
   const runExport = async (format) => {
@@ -53,7 +55,7 @@ export default function OrdersReportsPage() {
       setExporting(format);
       const token = typeof window !== "undefined" ? localStorage.getItem("sellerToken") : null;
       if (!token) {
-        alert("Bitte erneut einloggen.");
+        alert(locale === "en" ? "Please log in again." : locale === "tr" ? "Lütfen tekrar giriş yapın." : "Bitte erneut einloggen.");
         return;
       }
       const response = await fetch("/api/import-export/export", {

@@ -3,11 +3,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button, InlineStack, BlockStack } from "@shopify/polaris";
+import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { buildShipLabelsHtml, buildShipLieferscheinHtml, openShipCombinedPrintWindow } from "@/lib/ship-print-html";
 
-function fmtCents(c) {
-  return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
+function fmtCents(c, locale) {
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return (Number(c || 0) / 100).toLocaleString(loc, { minimumFractionDigits: 2 }) + " €";
 }
 
 const FALLBACK_CARRIERS = ["DHL", "DPD", "GLS", "UPS", "FedEx", "Hermes", "Go! Express", "Sonstige"];
@@ -15,7 +17,7 @@ const FALLBACK_CARRIERS = ["DHL", "DPD", "GLS", "UPS", "FedEx", "Hermes", "Go! E
 export default function VersandPage() {
   const router = useRouter();
   const params = useParams();
-  const locale = params?.locale || "de";
+  const locale = useLocale();
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -318,7 +320,7 @@ export default function VersandPage() {
                   {[currentOrder.address_line1, currentOrder.city, currentOrder.country].filter(Boolean).join(", ")}
                 </div>
               </div>
-              <div style={{ textAlign: "right", fontSize: 18, fontWeight: 700 }}>{fmtCents(currentOrder.total_cents)}</div>
+              <div style={{ textAlign: "right", fontSize: 18, fontWeight: 700 }}>{fmtCents(currentOrder.total_cents, locale)}</div>
             </div>
 
             {/* Items checklist */}
@@ -343,7 +345,7 @@ export default function VersandPage() {
                       <div style={{ fontWeight: scanned ? 600 : 400, color: scanned ? "#15803d" : "#111827", textDecoration: scanned ? "line-through" : "none", opacity: scanned ? 0.7 : 1 }}>{it.title}</div>
                       <div style={{ fontSize: 12, color: "#6b7280" }}>Menge: {it.quantity}</div>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{fmtCents(it.unit_price_cents)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{fmtCents(it.unit_price_cents, locale)}</div>
                   </div>
                 );
               })}

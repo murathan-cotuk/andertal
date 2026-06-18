@@ -2,21 +2,25 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import { Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
 import TrackingSection from "@/components/orders/TrackingSection";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { getUI } from "@/lib/ui-strings";
 
-function fmtCents(c) {
-  return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
+function fmtCents(c, locale) {
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return (Number(c || 0) / 100).toLocaleString(loc, { minimumFractionDigits: 2 }) + " €";
 }
-function fmtDate(d) {
+function fmtDate(d, locale) {
   if (!d) return "—";
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
   const dt = new Date(d);
-  const date = dt.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const time = dt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const date = dt.toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
+  const time = dt.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return `${date} / ${time}`;
 }
 function formatPaymentMethod(pm) {
@@ -89,7 +93,8 @@ export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id;
-  const locale = params?.locale || "de";
+  const locale = useLocale();
+  const ui = getUI(locale);
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -120,7 +125,7 @@ export default function OrderDetailPage() {
       setPaymentStatus(o?.payment_status || "bezahlt");
       setDeliveryStatus(o?.delivery_status || "offen");
     } catch (e) {
-      setError(e?.message || "Bestellung konnte nicht geladen werden");
+      setError(e?.message || (locale === "en" ? "Order could not be loaded" : locale === "tr" ? "Sipariş yüklenemedi" : "Bestellung konnte nicht geladen werden"));
     }
     setLoading(false);
   }, [id]);
@@ -152,31 +157,31 @@ export default function OrderDetailPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      setError(e?.message || "Speichern fehlgeschlagen");
+      setError(e?.message || (locale === "en" ? "Save failed" : locale === "tr" ? "Kaydetme başarısız" : "Speichern fehlgeschlagen"));
     }
     setSaving(false);
   };
 
   const handleDelete = async () => {
-    if (!(await confirmDelete("Bestellung wirklich löschen?"))) return;
+    if (!(await confirmDelete(locale === "en" ? "Really delete order?" : locale === "tr" ? "Sipariş gerçekten silinsin mi?" : "Bestellung wirklich löschen?"))) return;
     try {
       const client = getMedusaAdminClient();
       await client.deleteOrder(id);
       router.push(`/${locale}/orders`);
     } catch (e) {
-      setError(e?.message || "Löschen fehlgeschlagen");
+      setError(e?.message || (locale === "en" ? "Delete failed" : locale === "tr" ? "Silme başarısız" : "Löschen fehlgeschlagen"));
     }
   };
 
   if (loading) {
-    return <div style={{ padding: 24, color: "#9ca3af", textAlign: "center", marginTop: 60 }}>Laden…</div>;
+    return <div style={{ padding: 24, color: "#9ca3af", textAlign: "center", marginTop: 60 }}>{ui.loading}</div>;
   }
 
   if (error && !order) {
     return (
       <div style={{ padding: 24 }}>
         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 16, color: "#b91c1c" }}>{error}</div>
-        <button onClick={() => router.push(`/${locale}/orders`)} style={btnStyle}>← Zurück zu Bestellungen</button>
+        <button onClick={() => router.push(`/${locale}/orders`)} style={btnStyle}>← {ui.orders}</button>
       </div>
     );
   }
@@ -202,7 +207,7 @@ export default function OrderDetailPage() {
   const customerLabel = isSuperuser
     ? order?.customer_number
       ? `${order.customer_number} – ${customerName}`
-      : `Gast – ${customerName}`
+      : `${ui.guestBadge} – ${customerName}`
     : customerName;
 
   const goToCustomerProfile = async (e) => {
@@ -251,9 +256,9 @@ export default function OrderDetailPage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", minWidth: 0 }}>
-          <Button onClick={() => router.push(`/${locale}/orders`)}>← Bestellungen</Button>
+          <Button onClick={() => router.push(`/${locale}/orders`)}>← {ui.orders}</Button>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
-            Bestellung #{order?.order_number || "—"}
+            {locale === "en" ? "Order" : locale === "tr" ? "Sipariş" : "Bestellung"} #{order?.order_number || "—"}
           </h1>
           <span style={{ fontSize: 12, color: "#9ca3af" }}>{fmtDate(order?.created_at)}</span>
         </div>
@@ -269,10 +274,10 @@ export default function OrderDetailPage() {
             }}
           >
             <Button url={getOrderPdfDownloadUrl(order.id, "invoice")} external variant="secondary">
-              Rechnung (PDF)
+              {ui.invoice}
             </Button>
             <Button url={getOrderPdfDownloadUrl(order.id, "lieferschein")} external variant="secondary">
-              Lieferschein (PDF)
+              {ui.deliveryNote}
             </Button>
           </div>
         )}
@@ -288,19 +293,19 @@ export default function OrderDetailPage() {
         {/* Left column */}
         <div>
           {/* Order items */}
-          <Section title="Artikel">
+          <Section title={ui.items}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11, textTransform: "uppercase" }}>
-                  <th style={{ textAlign: "left", padding: "4px 0 8px" }}>Produkt</th>
-                  <th style={{ textAlign: "right", padding: "4px 0 8px" }}>Menge</th>
-                  <th style={{ textAlign: "right", padding: "4px 0 8px" }}>Einzelpreis</th>
-                  <th style={{ textAlign: "right", padding: "4px 0 8px" }}>Gesamt</th>
+                  <th style={{ textAlign: "left", padding: "4px 0 8px" }}>{ui.colProduct}</th>
+                  <th style={{ textAlign: "right", padding: "4px 0 8px" }}>{ui.qty}</th>
+                  <th style={{ textAlign: "right", padding: "4px 0 8px" }}>{ui.unitPrice}</th>
+                  <th style={{ textAlign: "right", padding: "4px 0 8px" }}>{ui.colTotal}</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 && (
-                  <tr><td colSpan={4} style={{ padding: "20px 0", color: "#9ca3af", textAlign: "center" }}>Keine Artikel</td></tr>
+                  <tr><td colSpan={4} style={{ padding: "20px 0", color: "#9ca3af", textAlign: "center" }}>{ui.noItems}</td></tr>
                 )}
                 {items.map((it, i) => {
                   const productUrl = it.product_id
@@ -328,45 +333,45 @@ export default function OrderDetailPage() {
                       </div>
                     </td>
                     <td style={{ textAlign: "right", padding: "10px 0", color: "#374151" }}>{it.quantity}</td>
-                    <td style={{ textAlign: "right", padding: "10px 0", color: "#374151" }}>{fmtCents(it.unit_price_cents)}</td>
-                    <td style={{ textAlign: "right", padding: "10px 0", fontWeight: 600 }}>{fmtCents((it.unit_price_cents || 0) * (it.quantity || 1))}</td>
+                    <td style={{ textAlign: "right", padding: "10px 0", color: "#374151" }}>{fmtCents(it.unit_price_cents, locale)}</td>
+                    <td style={{ textAlign: "right", padding: "10px 0", fontWeight: 600 }}>{fmtCents((it.unit_price_cents || 0) * (it.quantity || 1), locale)}</td>
                   </tr>
                   );
                 })}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} style={{ textAlign: "right", padding: "8px 0 4px", color: "#6b7280", fontSize: 12 }}>Versand</td>
+                  <td colSpan={3} style={{ textAlign: "right", padding: "8px 0 4px", color: "#6b7280", fontSize: 12 }}>{ui.shipping}</td>
                   <td style={{ textAlign: "right", padding: "8px 0 4px", fontSize: 12 }}>
-                    {shippingCents > 0 ? fmtCents(shippingCents) : "Kostenlos"}
+                    {shippingCents > 0 ? fmtCents(shippingCents, locale) : ui.shippingFree}
                   </td>
                 </tr>
                 {couponDisc > 0 && (
                   <tr>
                     <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", color: "#6b7280", fontSize: 12 }}>
-                      Gutschein{order?.coupon_code ? ` (${order.coupon_code})` : ""}
+                      {locale === "en" ? "Coupon" : locale === "tr" ? "Kupon" : "Gutschein"}{order?.coupon_code ? ` (${order.coupon_code})` : ""}
                     </td>
-                    <td style={{ textAlign: "right", padding: "4px 0", fontSize: 12, color: "#15803d" }}>−{fmtCents(couponDisc)}</td>
+                    <td style={{ textAlign: "right", padding: "4px 0", fontSize: 12, color: "#15803d" }}>−{fmtCents(couponDisc, locale)}</td>
                   </tr>
                 )}
                 <tr>
-                  <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", fontWeight: 700, borderTop: "2px solid #e5e7eb", paddingTop: 10 }}>Gesamt</td>
-                  <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 700, borderTop: "2px solid #e5e7eb", paddingTop: 10, fontSize: 15 }}>{fmtCents(total)}</td>
+                  <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", fontWeight: 700, borderTop: "2px solid #e5e7eb", paddingTop: 10 }}>{ui.grandTotal}</td>
+                  <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 700, borderTop: "2px solid #e5e7eb", paddingTop: 10, fontSize: 15 }}>{fmtCents(total, locale)}</td>
                 </tr>
               </tfoot>
             </table>
           </Section>
 
           {/* Status management */}
-          <Section title="Status verwalten">
-            <StatusSelect label="Bestellstatus" value={orderStatus} options={["offen", "in_bearbeitung", "abgeschlossen", "storniert"]} onChange={setOrderStatus} saving={saving} />
-            <StatusSelect label="Zahlungsstatus" value={paymentStatus} options={["offen", "bezahlt", "teil_erstattet", "erstattet"]} onChange={handlePaymentChange} saving={saving} />
-            <StatusSelect label="Lieferstatus" value={deliveryStatus} options={["offen", "versendet", "zugestellt"]} onChange={handleDeliveryChange} saving={saving} />
+          <Section title={locale === "en" ? "Manage status" : locale === "tr" ? "Durumu yönet" : "Status verwalten"}>
+            <StatusSelect label={ui.orderStatus} value={orderStatus} options={["offen", "in_bearbeitung", "abgeschlossen", "storniert"]} onChange={setOrderStatus} saving={saving} />
+            <StatusSelect label={ui.paymentStatus} value={paymentStatus} options={["offen", "bezahlt", "teil_erstattet", "erstattet"]} onChange={handlePaymentChange} saving={saving} />
+            <StatusSelect label={ui.deliveryStatus} value={deliveryStatus} options={["offen", "versendet", "zugestellt"]} onChange={handleDeliveryChange} saving={saving} />
             <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
               <Button variant="primary" onClick={handleSaveStatus} disabled={saving} loading={saving}>
-                Status speichern
+                {locale === "en" ? "Save status" : locale === "tr" ? "Durumu kaydet" : "Status speichern"}
               </Button>
-              {saved && <span style={{ fontSize: 12, color: "#15803d" }}>✓ Gespeichert</span>}
+              {saved && <span style={{ fontSize: 12, color: "#15803d" }}>✓ {ui.saved}</span>}
             </div>
           </Section>
 
@@ -376,22 +381,22 @@ export default function OrderDetailPage() {
             onOrderStatusChanged={loadOrder}
           />
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>Versand bearbeiten oder als versendet markieren</span>
+            <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>{locale === "en" ? "Edit shipping or mark as shipped" : locale === "tr" ? "Kargoyu düzenle veya kargoya verildi olarak işaretle" : "Versand bearbeiten oder als versendet markieren"}</span>
             <Button variant="primary" onClick={() => setShipModalOpen(true)}>
-              Versand bearbeiten
+              {locale === "en" ? "Edit shipping" : locale === "tr" ? "Kargoyu düzenle" : "Versand bearbeiten"}
             </Button>
           </div>
 
           {/* Payment info */}
-          <Section title="Zahlungsinfo">
-            <InfoRow label="Zahlungsmethode" value={formatPaymentMethod(order?.payment_method)} />
+          <Section title={locale === "en" ? "Payment info" : locale === "tr" ? "Ödeme bilgisi" : "Zahlungsinfo"}>
+            <InfoRow label={ui.paymentMethod} value={formatPaymentMethod(order?.payment_method)} />
           </Section>
         </div>
 
         {/* Right column */}
         <div>
           {/* Customer */}
-          <Section title="Kunde">
+          <Section title={ui.customer}>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
               <a
                 href={order?.customer_id ? `/${locale}/customers/${order.customer_id}` : `/${locale}/customers`}
@@ -413,15 +418,15 @@ export default function OrderDetailPage() {
 
           {/* Customer info — nur Superuser */}
           {isSuperuser && (
-          <Section title="Kundeninfo">
-            <InfoRow label="Kundentyp" value={order?.is_guest !== false ? "Gastkunde" : "Registrierter Kunde"} />
-            <InfoRow label="Erste Bestellung" value={order?.is_first_order ? "Ja" : "Nein"} />
-            <InfoRow label="Newsletter" value={order?.newsletter_opted_in ? "Ja" : "Nein"} />
+          <Section title={locale === "en" ? "Customer info" : locale === "tr" ? "Müşteri bilgisi" : "Kundeninfo"}>
+            <InfoRow label={ui.accountType} value={order?.is_guest !== false ? ui.guestCustomer : (locale === "en" ? "Registered customer" : locale === "tr" ? "Kayıtlı müşteri" : "Registrierter Kunde")} />
+            <InfoRow label={locale === "en" ? "First order" : locale === "tr" ? "İlk sipariş" : "Erste Bestellung"} value={order?.is_first_order ? ui.yes : ui.no} />
+            <InfoRow label="Newsletter" value={order?.newsletter_opted_in ? ui.yes : ui.no} />
           </Section>
           )}
 
           {/* Shipping address */}
-          <Section title="Lieferadresse">
+          <Section title={locale === "en" ? "Shipping address" : locale === "tr" ? "Teslimat adresi" : "Lieferadresse"}>
             <div style={{ fontSize: 13, lineHeight: 1.7, color: "#374151" }}>
               {[order?.first_name, order?.last_name].filter(Boolean).join(" ")}<br />
               {order?.address_line1 && <>{order.address_line1}<br /></>}
@@ -432,9 +437,9 @@ export default function OrderDetailPage() {
           </Section>
 
           {/* Billing address */}
-          <Section title="Rechnungsadresse">
+          <Section title={locale === "en" ? "Billing address" : locale === "tr" ? "Fatura adresi" : "Rechnungsadresse"}>
             {billingSame ? (
-              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>gleich wie Lieferadresse</div>
+              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>{locale === "en" ? "Same as shipping address" : locale === "tr" ? "Teslimat adresiyle aynı" : "gleich wie Lieferadresse"}</div>
             ) : hasBillingAddr ? (
               <div style={{ fontSize: 13, lineHeight: 1.7, color: "#374151" }}>
                 {[order?.first_name, order?.last_name].filter(Boolean).join(" ")}<br />
@@ -444,30 +449,30 @@ export default function OrderDetailPage() {
                 {order?.billing_country || ""}
               </div>
             ) : (
-              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>gleich wie Lieferadresse</div>
+              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>{locale === "en" ? "Same as shipping address" : locale === "tr" ? "Teslimat adresiyle aynı" : "gleich wie Lieferadresse"}</div>
             )}
           </Section>
 
           {/* Summary */}
-          <Section title="Zusammenfassung">
+          <Section title={locale === "en" ? "Summary" : locale === "tr" ? "Özet" : "Zusammenfassung"}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: "#6b7280" }}>Bestellnummer</span>
+              <span style={{ color: "#6b7280" }}>{ui.orderNumber}</span>
               <span style={{ fontWeight: 600 }}>#{order?.order_number || "—"}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: "#6b7280" }}>Datum</span>
-              <span>{fmtDate(order?.created_at)}</span>
+              <span style={{ color: "#6b7280" }}>{ui.colDate}</span>
+              <span>{fmtDate(order?.created_at, locale)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: "#6b7280" }}>Bestellstatus</span>
+              <span style={{ color: "#6b7280" }}>{ui.orderStatus}</span>
               <Badge value={order?.order_status} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: "#6b7280" }}>Zahlung</span>
+              <span style={{ color: "#6b7280" }}>{ui.paymentStatus}</span>
               <Badge value={order?.payment_status} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: "#6b7280" }}>Lieferung</span>
+              <span style={{ color: "#6b7280" }}>{ui.deliveryStatus}</span>
               <Badge value={order?.delivery_status} />
             </div>
           </Section>
@@ -475,10 +480,10 @@ export default function OrderDetailPage() {
           {/* Danger zone — nur Superuser */}
           {isSuperuser && (
           <div style={{ background: "#fff", border: "1px solid #fecaca", borderRadius: 10, padding: 16 }}>
-            <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#b91c1c" }}>Bestellung löschen</h3>
-            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>Diese Aktion kann nicht rückgängig gemacht werden.</p>
+            <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#b91c1c" }}>{ui.deleteOrder}</h3>
+            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>{locale === "en" ? "This action cannot be undone." : locale === "tr" ? "Bu işlem geri alınamaz." : "Diese Aktion kann nicht rückgängig gemacht werden."}</p>
             <button onClick={handleDelete} style={{ padding: "7px 14px", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-              Bestellung löschen
+              {ui.deleteOrder}
             </button>
           </div>
           )}

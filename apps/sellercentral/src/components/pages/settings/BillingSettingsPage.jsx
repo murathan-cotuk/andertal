@@ -11,13 +11,15 @@ import { useParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
 
-function fmtDate(d) {
+function fmtDate(d, locale) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
-function fmtCents(c) {
+function fmtCents(c, locale) {
   if (c == null || c === "") return "—";
-  return (Number(c) / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return (Number(c) / 100).toLocaleString(loc, { style: "currency", currency: "EUR" });
 }
 function orderTotal(o) {
   return (
@@ -88,7 +90,7 @@ function ColHeader({ label, field, sort, onSort, align = "left" }) {
   );
 }
 
-function exportCSV(rows, filename = "order-documents.csv", ui = {}) {
+function exportCSV(rows, filename = "order-documents.csv", ui = {}, locale = "de") {
   const headers = [
     ui.colOrderNumber || "Order #",
     ui.colDate || "Date",
@@ -99,7 +101,7 @@ function exportCSV(rows, filename = "order-documents.csv", ui = {}) {
   ];
   const lines = rows.map((o) => [
     `#${o.order_number || o.id?.slice(0, 8) || ""}`,
-    fmtDate(o.created_at),
+    fmtDate(o.created_at, locale),
     customerName(o),
     (orderTotal(o) / 100).toFixed(2),
     getOrderPdfDownloadUrl(o.id, "invoice"),
@@ -171,13 +173,13 @@ function OrderDocRow({ order, selected, onToggle, returnsSet, locale, ui }) {
         </a>
       </td>
       <td style={{ padding: "8px 12px", fontSize: 13, color: "#374151", whiteSpace: "nowrap" }}>
-        {fmtDate(order.created_at)}
+        {fmtDate(order.created_at, locale)}
       </td>
       <td style={{ padding: "8px 12px", fontSize: 13, color: "#374151" }}>
         {customerName(order)}
       </td>
       <td style={{ padding: "8px 12px", fontSize: 13, textAlign: "right", whiteSpace: "nowrap" }}>
-        {fmtCents(orderTotal(order))}
+        {fmtCents(orderTotal(order), locale)}
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
         <DocBtn orderId={order.id} kind="invoice" label={ui.invoiceDoc} available />
@@ -374,7 +376,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
       selected.size > 0
         ? filteredOrders.filter((o) => selected.has(o.id))
         : filteredOrders;
-    exportCSV(toExport, "order-documents.csv", ui);
+    exportCSV(toExport, "order-documents.csv", ui, locale);
   };
 
   const handleBulkDownload = () => {
@@ -576,7 +578,8 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
 
 function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
   const localeFromIntl = useLocale();
-  const ui = getUI(localeFromIntl || "de");
+  const locale = localeFromIntl || "de";
+  const ui = getUI(locale);
   const client = getMedusaAdminClient();
   const [invoices, setInvoices] = useState([]);
   const [sellers, setSellers] = useState([]);
@@ -653,12 +656,12 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
     setBackfilling(true);
     try {
       const res = await client.request("/admin-hub/v1/payouts/backfill", { method: "POST" });
-      alert(res?.message || "Backfill abgeschlossen");
+      alert(res?.message || (locale === "en" ? "Backfill completed" : locale === "tr" ? "Backfill tamamlandı" : "Backfill abgeschlossen"));
       // Reload
       const invRes = await client.request("/admin-hub/v1/commission-invoices").catch(() => ({ invoices: [] }));
       setInvoices(invRes?.invoices || []);
     } catch (e) {
-      alert("Fehler: " + (e?.message || "Unbekannt"));
+      alert((locale === "en" ? "Error: " : locale === "tr" ? "Hata: " : "Fehler: ") + (e?.message || (locale === "en" ? "Unknown" : locale === "tr" ? "Bilinmiyor" : "Unbekannt")));
     } finally {
       setBackfilling(false);
     }
@@ -708,7 +711,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
           </span>
         </td>
         <td style={{ padding: "10px 12px", fontSize: 13, textAlign: "right" }}>
-          {inv.amount_cents != null ? fmtCents(inv.amount_cents) : "—"}
+          {inv.amount_cents != null ? fmtCents(inv.amount_cents, locale) : "—"}
         </td>
         <td style={{ padding: "10px 12px", textAlign: "center" }}>
           {inv.pdf_url ? (
@@ -865,7 +868,8 @@ export default function BillingSettingsPage() {
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [mySellerId, setMySellerId] = useState(null);
   const localeFromIntl = useLocale();
-  const ui = getUI(localeFromIntl || "de");
+  const locale = localeFromIntl || "de";
+  const ui = getUI(locale);
 
   useEffect(() => {
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");

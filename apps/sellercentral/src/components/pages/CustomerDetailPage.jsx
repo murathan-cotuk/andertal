@@ -2,27 +2,33 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { useLocale } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
+import { getUI } from "@/lib/ui-strings";
 import { Modal, BlockStack, TextField, Text, Button, InlineStack } from "@shopify/polaris";
 import { EditIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { CustomerFormModal } from "@/components/CustomerFormModal";
 
-function fmtCents(c) {
-  return (Number(c || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €";
+function fmtCents(c, locale) {
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return (Number(c || 0) / 100).toLocaleString(loc, { minimumFractionDigits: 2 }) + " €";
 }
-function fmtDate(d) {
+function fmtDate(d, locale) {
   if (!d) return "—";
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
   const dt = new Date(d);
-  return dt.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) + " / " + dt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return dt.toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" }) + " / " + dt.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
 }
-function fmtDateShort(d) {
+function fmtDateShort(d, locale) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
-function fmtBirthDate(d) {
+function fmtBirthDate(d, locale) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "long", year: "numeric" });
 }
 
 function bonusSourceLabel(source) {
@@ -106,7 +112,7 @@ function AddressBlock({ label, line1, line2, zip, city, country }) {
   );
 }
 
-function DiscountModal({ customerId, onClose, onAdded }) {
+function DiscountModal({ customerId, onClose, onAdded, ui }) {
   const [form, setForm] = useState({ code: "", type: "percentage", value: "", min_order_cents: "", max_uses: "1", expires_at: "", notes: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -180,9 +186,9 @@ function DiscountModal({ customerId, onClose, onAdded }) {
         {err && <div style={{ margin: "0 24px 12px", color: "#ef4444", fontSize: 12 }}>{err}</div>}
         <div style={{ padding: "12px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end" }}>
           <InlineStack gap="200">
-            <Button onClick={onClose}>Abbrechen</Button>
+            <Button onClick={onClose}>{ui ? ui.cancel : "Abbrechen"}</Button>
             <Button variant="primary" onClick={handleSave} loading={saving}>
-              Erstellen
+              {ui ? ui.create : "Erstellen"}
             </Button>
           </InlineStack>
         </div>
@@ -191,7 +197,7 @@ function DiscountModal({ customerId, onClose, onAdded }) {
   );
 }
 
-function BonusLedgerAddModal({ open, onClose, customerId, onAdded }) {
+function BonusLedgerAddModal({ open, onClose, customerId, onAdded, locale }) {
   const [description, setDescription] = useState("");
   const [points, setPoints] = useState("");
   const [saving, setSaving] = useState(false);
@@ -238,13 +244,13 @@ function BonusLedgerAddModal({ open, onClose, customerId, onAdded }) {
     <Modal
       open={open}
       onClose={() => !saving && onClose()}
-      title="Bonuspunkte buchen"
+      title={locale === "en" ? "Book bonus points" : locale === "tr" ? "Bonus puanı ekle" : "Bonuspunkte buchen"}
       primaryAction={{
-        content: "Hinzufügen",
+        content: locale === "en" ? "Add" : locale === "tr" ? "Ekle" : "Hinzufügen",
         onAction: handleAdd,
         loading: saving,
       }}
-      secondaryActions={[{ content: "Abbrechen", onAction: () => !saving && onClose() }]}
+      secondaryActions={[{ content: locale === "en" ? "Cancel" : locale === "tr" ? "İptal" : "Abbrechen", onAction: () => !saving && onClose() }]}
     >
       <Modal.Section>
         <BlockStack gap="400">
@@ -282,6 +288,8 @@ export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id;
+  const locale = useLocale();
+  const ui = getUI(locale);
 
   const [customer, setCustomer] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -349,9 +357,9 @@ export default function CustomerDetailPage() {
   const fullName = [customer?.first_name, customer?.last_name].filter(Boolean).join(" ") || customer?.email || "—";
 
   const accountTypeLabel = () => {
-    if (customer?.account_type === "gastkunde") return "Gastkunde";
-    if (customer?.account_type === "gewerbe") return "Gewerbekunde";
-    return "Privatkunde";
+    if (customer?.account_type === "gastkunde") return ui.guestCustomer;
+    if (customer?.account_type === "gewerbe") return ui.businessCustomer;
+    return ui.privateCustomer;
   };
 
   const handleSaveNotes = async () => {
@@ -429,6 +437,7 @@ export default function CustomerDetailPage() {
           customerId={id}
           onClose={() => setShowDiscountModal(false)}
           onAdded={() => { loadCustomer(); }}
+          ui={ui}
         />
       )}
       {isSuperuser && (
@@ -437,6 +446,7 @@ export default function CustomerDetailPage() {
           onClose={() => setShowBonusLedgerModal(false)}
           customerId={id}
           onAdded={handleBonusLedgerAdded}
+          locale={locale}
         />
       )}
       {isSuperuser && editCustomerModal && customer && (
@@ -454,19 +464,19 @@ export default function CustomerDetailPage() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
         <div style={{ flexShrink: 0, marginTop: 4 }}>
-          <Button onClick={() => router.push("/customers")}>← Zurück</Button>
+          <Button onClick={() => router.push("/customers")}>← {ui.customers}</Button>
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
-              {loading ? "Laden…" : fullName}
+              {loading ? ui.loading : fullName}
             </h1>
             {customer && isSuperuser && (
               <>
                 {customer.is_registered ? (
-                  <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>Registriert</span>
+                  <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>{locale === "en" ? "Registered" : locale === "tr" ? "Kayıtlı" : "Registriert"}</span>
                 ) : (
-                  <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>Gastkunde</span>
+                  <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>{ui.guestCustomer}</span>
                 )}
                 {customer.newsletter_opted_in && (
                   <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#ede9fe", color: "#6d28d9", fontWeight: 600 }}>Newsletter</span>
@@ -486,13 +496,13 @@ export default function CustomerDetailPage() {
             onClick={() => setEditCustomerModal(true)}
             style={{ padding: "7px 16px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff", flexShrink: 0 }}
           >
-            Bearbeiten
+            {ui.edit}
           </button>
         )}
       </div>
 
       {loading && (
-        <div style={{ padding: 60, textAlign: "center", color: "#9ca3af", background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb" }}>Laden…</div>
+        <div style={{ padding: 60, textAlign: "center", color: "#9ca3af", background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb" }}>{ui.loading}</div>
       )}
       {!loading && error && (
         <div style={{ padding: 40, textAlign: "center", color: "#ef4444", background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb" }}>{error}</div>
@@ -505,17 +515,17 @@ export default function CustomerDetailPage() {
             {/* Stats */}
             <div style={{ display: "grid", gridTemplateColumns: isSuperuser ? "repeat(4, 1fr)" : "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
               {[
-                { label: "Gesamtumsatz", value: fmtCents(totalSpent), icon: "💰" },
-                { label: "Bestellungen", value: orders.length, icon: "📦" },
-                { label: "Ø Bestellwert", value: fmtCents(avgOrder), icon: "📊" },
-                ...(isSuperuser ? [{ label: "Bonuspunkte", value: customer.bonus_points ?? 0, icon: "⭐", editable: true, onEdit: () => { setBonusVal(String(customer.bonus_points || 0)); setEditBonus(true); } }] : []),
+                { label: ui.totalSpent, value: fmtCents(totalSpent, locale), icon: "💰" },
+                { label: ui.orders, value: orders.length, icon: "📦" },
+                { label: locale === "en" ? "Avg. order" : locale === "tr" ? "Ort. sipariş" : "Ø Bestellwert", value: fmtCents(avgOrder, locale), icon: "📊" },
+                ...(isSuperuser ? [{ label: locale === "en" ? "Bonus points" : locale === "tr" ? "Bonus puanı" : "Bonuspunkte", value: customer.bonus_points ?? 0, icon: "⭐", editable: true, onEdit: () => { setBonusVal(String(customer.bonus_points || 0)); setEditBonus(true); } }] : []),
               ].map((s, i) => (
                 <div key={i} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontSize: 18 }}>{s.icon}</span>
                     {s.editable && (
                       <Button variant="plain" size="micro" onClick={s.onEdit}>
-                        Ändern
+                        {ui.edit}
                       </Button>
                     )}
                   </div>
@@ -529,10 +539,10 @@ export default function CustomerDetailPage() {
                         autoFocus
                       />
                       <Button size="micro" variant="primary" onClick={handleSaveBonus} disabled={savingBonus} loading={savingBonus}>
-                        Speichern
+                        {ui.save}
                       </Button>
                       <Button size="micro" onClick={() => setEditBonus(false)}>
-                        Abbrechen
+                        {ui.cancel}
                       </Button>
                     </div>
                   ) : (
@@ -544,19 +554,19 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Order history */}
-            <Card title={`Bestellhistorie (${orders.length})`}>
+            <Card title={`${locale === "en" ? "Order history" : locale === "tr" ? "Sipariş geçmişi" : "Bestellhistorie"} (${orders.length})`}>
               {orders.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>Keine Bestellungen</p>
+                <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>{ui.noOrders}</p>
               ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
                   <thead>
                     <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
-                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Nr.</th>
-                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Status</th>
-                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Zahlung</th>
-                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Lieferung</th>
-                      <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Betrag</th>
-                      <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Datum</th>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colNumber}</th>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colOrderStatus}</th>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colPaymentStatus}</th>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colDeliveryStatus}</th>
+                      <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{ui.colAmount}</th>
+                      <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{ui.colDate}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -571,15 +581,15 @@ export default function CustomerDetailPage() {
                         <td style={{ padding: "9px 0", fontWeight: 600, color: "#202223" }}>#{o.order_number || "—"}</td>
                         <td style={{ padding: "9px 0" }}>
                           {returnsMap[o.id] ? (
-                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#fef2f2", color: "#b91c1c", fontWeight: 600 }}>Retoure</span>
+                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#fef2f2", color: "#b91c1c", fontWeight: 600 }}>{ui.retoure}</span>
                           ) : (
                             <StatusBadge value={o.order_status} />
                           )}
                         </td>
                         <td style={{ padding: "9px 0" }}><StatusBadge value={o.payment_status} /></td>
                         <td style={{ padding: "9px 0" }}><StatusBadge value={o.delivery_status} /></td>
-                        <td style={{ padding: "9px 0", textAlign: "right", fontWeight: 600 }}>{fmtCents(o.total_cents)}</td>
-                        <td style={{ padding: "9px 0", textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtDateShort(o.created_at)}</td>
+                        <td style={{ padding: "9px 0", textAlign: "right", fontWeight: 600 }}>{fmtCents(o.total_cents, locale)}</td>
+                        <td style={{ padding: "9px 0", textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtDateShort(o.created_at, locale)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -588,17 +598,17 @@ export default function CustomerDetailPage() {
             </Card>
 
             {/* Reviews */}
-            <Card title={`Bewertungen (${reviews.length})`}>
+            <Card title={`${ui.reviewsTitle} (${reviews.length})`}>
               {reviews.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>Keine Bewertungen</p>
+                <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>{ui.noReviews}</p>
               ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
                   <thead>
                     <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
-                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>SKU / Produkt</th>
-                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Bewertung</th>
-                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Kommentar</th>
-                      <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Datum</th>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>SKU / {ui.colProduct}</th>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colRating}</th>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{locale === "en" ? "Comment" : locale === "tr" ? "Yorum" : "Kommentar"}</th>
+                      <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{ui.colDate}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -609,7 +619,7 @@ export default function CustomerDetailPage() {
                           <span style={{ color: "#f59e0b", letterSpacing: 1 }}>{"★".repeat(r.rating || 0)}{"☆".repeat(5 - (r.rating || 0))}</span>
                         </td>
                         <td style={{ padding: "9px 0", color: "#6b7280", maxWidth: 300 }}>{r.comment || "—"}</td>
-                        <td style={{ padding: "9px 0", textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtDateShort(r.created_at)}</td>
+                        <td style={{ padding: "9px 0", textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtDateShort(r.created_at, locale)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -621,24 +631,24 @@ export default function CustomerDetailPage() {
               <>
                 {/* Discounts */}
                 <Card
-                  title="Rabatte & Gutscheine"
+                  title={locale === "en" ? "Discounts & Coupons" : locale === "tr" ? "İndirimler & Kuponlar" : "Rabatte & Gutscheine"}
                   action={
                     <Button size="slim" variant="primary" onClick={() => setShowDiscountModal(true)}>
-                      Hinzufügen
+                      {ui.add}
                     </Button>
                   }
                 >
                   {discounts.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>Keine Rabattcodes</p>
+                    <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>{ui.noResults}</p>
                   ) : (
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
                       <thead>
                         <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
                           <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Code</th>
-                          <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Typ</th>
-                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Wert</th>
-                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Nutzungen</th>
-                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>Gültig bis</th>
+                          <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colType}</th>
+                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{locale === "en" ? "Value" : locale === "tr" ? "Değer" : "Wert"}</th>
+                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{locale === "en" ? "Uses" : locale === "tr" ? "Kullanım" : "Nutzungen"}</th>
+                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{locale === "en" ? "Valid until" : locale === "tr" ? "Geçerlilik" : "Gültig bis"}</th>
                           <th></th>
                         </tr>
                       </thead>
@@ -649,16 +659,16 @@ export default function CustomerDetailPage() {
                           return (
                             <tr key={i} style={{ borderBottom: "1px solid #f3f4f6", opacity: (isExpired || isExhausted) ? 0.5 : 1 }}>
                               <td style={{ padding: "8px 0", fontWeight: 700, fontFamily: "monospace", fontSize: 12 }}>{d.code}</td>
-                              <td style={{ padding: "8px 0", color: "#6b7280" }}>{d.type === "percentage" ? "%" : d.type === "fixed" ? "Fest" : "Versand"}</td>
+                              <td style={{ padding: "8px 0", color: "#6b7280" }}>{d.type === "percentage" ? "%" : d.type === "fixed" ? (locale === "en" ? "Fixed" : locale === "tr" ? "Sabit" : "Fest") : ui.shipping}</td>
                               <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600 }}>
                                 {d.type === "percentage" ? `${d.value}%` : d.type === "fixed" ? `${Number(d.value).toFixed(2)} €` : "—"}
                               </td>
                               <td style={{ padding: "8px 0", textAlign: "right", color: "#6b7280" }}>{d.used_count}/{d.max_uses}</td>
                               <td style={{ padding: "8px 0", textAlign: "right", fontSize: 12, color: isExpired ? "#ef4444" : "#6b7280" }}>
-                                {d.expires_at ? fmtDateShort(d.expires_at) : "—"}
+                                {d.expires_at ? fmtDateShort(d.expires_at, locale) : "—"}
                               </td>
                               <td style={{ padding: "8px 0", textAlign: "right" }}>
-                                <button type="button" onClick={() => handleDeleteDiscount(d.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 12 }}>Löschen</button>
+                                <button type="button" onClick={() => handleDeleteDiscount(d.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 12 }}>{ui.delete}</button>
                               </td>
                             </tr>
                           );
@@ -670,10 +680,10 @@ export default function CustomerDetailPage() {
 
                 {/* Notes */}
                 <Card
-                  title="Notizen"
+                  title={ui.notes}
                   action={!editNotes && (
                     <Button size="slim" onClick={() => setEditNotes(true)}>
-                      Bearbeiten
+                      {ui.edit}
                     </Button>
                   )}
                 >
@@ -683,21 +693,21 @@ export default function CustomerDetailPage() {
                         value={notesVal}
                         onChange={e => setNotesVal(e.target.value)}
                         style={{ width: "100%", height: 100, padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
-                        placeholder="Interne Notizen zum Kunden…"
+                        placeholder={locale === "en" ? "Internal notes about the customer…" : locale === "tr" ? "Müşteri hakkında dahili notlar…" : "Interne Notizen zum Kunden…"}
                         autoFocus
                       />
                       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                         <Button variant="primary" onClick={handleSaveNotes} disabled={savingNotes} loading={savingNotes}>
-                          Speichern
+                          {ui.save}
                         </Button>
                         <Button onClick={() => { setEditNotes(false); setNotesVal(customer?.notes || ""); }}>
-                          Abbrechen
+                          {ui.cancel}
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <p style={{ fontSize: 13, color: notesVal ? "#111827" : "#9ca3af", margin: "10px 0 4px", whiteSpace: "pre-wrap" }}>
-                      {notesVal || "Keine Notizen"}
+                      {notesVal || (locale === "en" ? "No notes" : locale === "tr" ? "Not yok" : "Keine Notizen")}
                     </p>
                   )}
                 </Card>
@@ -707,23 +717,23 @@ export default function CustomerDetailPage() {
             {/* Bonus ledger (superuser only) */}
             {isSuperuser && (
             <Card
-              title="Bonuspunkte — Verlauf"
+              title={locale === "en" ? "Bonus points — History" : locale === "tr" ? "Bonus puanları — Geçmiş" : "Bonuspunkte — Verlauf"}
               action={
                 <Button size="slim" variant="primary" onClick={() => setShowBonusLedgerModal(true)}>
-                  Hinzufügen
+                  {ui.add}
                 </Button>
               }
             >
               {bonusLedger.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", padding: "8px 0" }}>Noch keine Einträge im Verlauf.</p>
+                <p style={{ fontSize: 13, color: "#9ca3af", padding: "8px 0" }}>{locale === "en" ? "No ledger entries yet." : locale === "tr" ? "Henüz kayıt yok." : "Noch keine Einträge im Verlauf."}</p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
                       <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
-                        <th style={{ textAlign: "left", padding: "6px 8px 10px", width: 110 }}>Datum</th>
-                        <th style={{ textAlign: "left", padding: "6px 8px 10px" }}>Beschreibung</th>
-                        <th style={{ textAlign: "right", padding: "6px 8px 10px", width: 100 }}>Bonuspunkte</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px 10px", width: 110 }}>{ui.colDate}</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px 10px" }}>{ui.colDescription}</th>
+                        <th style={{ textAlign: "right", padding: "6px 8px 10px", width: 100 }}>{locale === "en" ? "Bonus points" : locale === "tr" ? "Bonus puan" : "Bonuspunkte"}</th>
                         <th style={{ textAlign: "right", padding: "6px 8px 10px", width: 1 }} />
                       </tr>
                     </thead>
@@ -733,7 +743,7 @@ export default function CustomerDetailPage() {
                         return (
                           <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6", verticalAlign: "top" }}>
                             <td style={{ padding: "10px 8px", whiteSpace: "nowrap", color: "#6b7280", fontSize: 12 }}>
-                              {fmtDateShort(row.occurred_at)}
+                              {fmtDateShort(row.occurred_at, locale)}
                             </td>
                             <td style={{ padding: "10px 8px", minWidth: 180 }}>
                               {isEdit ? (
@@ -806,31 +816,31 @@ export default function CustomerDetailPage() {
           {/* RIGHT COLUMN */}
           <div>
             {/* Customer info */}
-            <Card title="Kundenprofil">
-              <InfoRow label="Vorname" value={customer.first_name} />
-              <InfoRow label="Nachname" value={customer.last_name} />
-              {isSuperuser && <InfoRow label="E-Mail" value={customer.email} />}
-              {isSuperuser && <InfoRow label="Telefon" value={customer.phone} />}
-              {customer.gender && <InfoRow label="Geschlecht" value={customer.gender === "male" ? "Männlich" : customer.gender === "female" ? "Weiblich" : customer.gender} />}
-              {isSuperuser && customer.birth_date && <InfoRow label="Geburtsdatum" value={fmtBirthDate(customer.birth_date)} />}
-              {isSuperuser && <InfoRow label="Kundentyp" value={accountTypeLabel()} />}
-              {isSuperuser && <InfoRow label="Konto" value={customer.is_registered ? "Registriert" : "Gastkunde"} />}
-              {isSuperuser && <InfoRow label="Newsletter" value={customer.newsletter_opted_in ? "✓ Abonniert" : "Nicht abonniert"} />}
-              {isSuperuser && customer.email_marketing_consent && <InfoRow label="Marketing E-Mail" value="Zugestimmt" />}
+            <Card title={locale === "en" ? "Customer Profile" : locale === "tr" ? "Müşteri Profili" : "Kundenprofil"}>
+              <InfoRow label={ui.firstName} value={customer.first_name} />
+              <InfoRow label={ui.lastName} value={customer.last_name} />
+              {isSuperuser && <InfoRow label={ui.colEmail} value={customer.email} />}
+              {isSuperuser && <InfoRow label={ui.phone} value={customer.phone} />}
+              {customer.gender && <InfoRow label={locale === "en" ? "Gender" : locale === "tr" ? "Cinsiyet" : "Geschlecht"} value={customer.gender === "male" ? (locale === "en" ? "Male" : locale === "tr" ? "Erkek" : "Männlich") : customer.gender === "female" ? (locale === "en" ? "Female" : locale === "tr" ? "Kadın" : "Weiblich") : customer.gender} />}
+              {isSuperuser && customer.birth_date && <InfoRow label={locale === "en" ? "Date of birth" : locale === "tr" ? "Doğum tarihi" : "Geburtsdatum"} value={fmtBirthDate(customer.birth_date, locale)} />}
+              {isSuperuser && <InfoRow label={ui.accountType} value={accountTypeLabel()} />}
+              {isSuperuser && <InfoRow label={locale === "en" ? "Account" : locale === "tr" ? "Hesap" : "Konto"} value={customer.is_registered ? (locale === "en" ? "Registered" : locale === "tr" ? "Kayıtlı" : "Registriert") : ui.guestCustomer} />}
+              {isSuperuser && <InfoRow label="Newsletter" value={customer.newsletter_opted_in ? (locale === "en" ? "✓ Subscribed" : locale === "tr" ? "✓ Abone" : "✓ Abonniert") : (locale === "en" ? "Not subscribed" : locale === "tr" ? "Abone değil" : "Nicht abonniert")} />}
+              {isSuperuser && customer.email_marketing_consent && <InfoRow label={locale === "en" ? "Marketing email" : locale === "tr" ? "Pazarlama e-postası" : "Marketing E-Mail"} value={locale === "en" ? "Consented" : locale === "tr" ? "Onaylandı" : "Zugestimmt"} />}
               {customer.account_type === "gewerbe" && (
                 <>
-                  <InfoRow label="Firmenname" value={customer.company_name} />
+                  <InfoRow label={ui.companyName} value={customer.company_name} />
                   <InfoRow label="USt-IdNr." value={customer.vat_number} mono />
                 </>
               )}
-              {isSuperuser && <InfoRow label="Kundennummer" value={customer.customer_number ? `#${customer.customer_number}` : "—"} />}
-              {isSuperuser && <InfoRow label="Erstellt am" value={fmtDateShort(customer.created_at)} />}
-              {isSuperuser && <InfoRow label="Erste Bestellung" value={fmtDateShort(firstOrder)} />}
-              {isSuperuser && <InfoRow label="Letzte Bestellung" value={fmtDateShort(lastOrder)} />}
+              {isSuperuser && <InfoRow label={locale === "en" ? "Customer no." : locale === "tr" ? "Müşteri no." : "Kundennummer"} value={customer.customer_number ? `#${customer.customer_number}` : "—"} />}
+              {isSuperuser && <InfoRow label={locale === "en" ? "Created on" : locale === "tr" ? "Oluşturulma" : "Erstellt am"} value={fmtDateShort(customer.created_at, locale)} />}
+              {isSuperuser && <InfoRow label={locale === "en" ? "First order" : locale === "tr" ? "İlk sipariş" : "Erste Bestellung"} value={fmtDateShort(firstOrder, locale)} />}
+              {isSuperuser && <InfoRow label={ui.lastOrder} value={fmtDateShort(lastOrder, locale)} />}
             </Card>
 
             {/* Delivery address */}
-            <Card title="Lieferadresse">
+            <Card title={locale === "en" ? "Delivery address" : locale === "tr" ? "Teslimat adresi" : "Lieferadresse"}>
               <AddressBlock
                 label=""
                 line1={customer.address_line1}
@@ -840,12 +850,12 @@ export default function CustomerDetailPage() {
                 country={customer.country}
               />
               {!customer.address_line1 && !customer.city && (
-                <p style={{ fontSize: 13, color: "#9ca3af", margin: "10px 0 4px" }}>Keine Lieferadresse</p>
+                <p style={{ fontSize: 13, color: "#9ca3af", margin: "10px 0 4px" }}>{locale === "en" ? "No delivery address" : locale === "tr" ? "Teslimat adresi yok" : "Keine Lieferadresse"}</p>
               )}
             </Card>
 
             {/* Billing address */}
-            <Card title="Rechnungsadresse">
+            <Card title={locale === "en" ? "Billing address" : locale === "tr" ? "Fatura adresi" : "Rechnungsadresse"}>
               {hasStoredBilling ? (
                 <AddressBlock
                   label=""
@@ -869,29 +879,29 @@ export default function CustomerDetailPage() {
                 </>
               ) : (customer.address_line1 || customer.city) ? (
                 <p style={{ fontSize: 13, color: "#6b7280", margin: "10px 0 4px", lineHeight: 1.5 }}>
-                  Entspricht der Lieferadresse (keine abweichende Rechnungsadresse).
+                  {locale === "en" ? "Same as delivery address (no separate billing address)." : locale === "tr" ? "Teslimat adresiyle aynı (ayrı fatura adresi yok)." : "Entspricht der Lieferadresse (keine abweichende Rechnungsadresse)."}
                 </p>
               ) : (
                 <p style={{ fontSize: 13, color: "#9ca3af", margin: "10px 0 4px" }}>
-                  Keine Rechnungsadresse hinterlegt.
+                  {locale === "en" ? "No billing address on file." : locale === "tr" ? "Kayıtlı fatura adresi yok." : "Keine Rechnungsadresse hinterlegt."}
                 </p>
               )}
             </Card>
 
             {/* Timeline */}
             {isSuperuser && (
-            <Card title="Aktivität">
+            <Card title={locale === "en" ? "Activity" : locale === "tr" ? "Aktivite" : "Aktivität"}>
               <div style={{ paddingTop: 8 }}>
                 {[
-                  customer.created_at && { date: customer.created_at, text: "Kunde erstellt" },
-                  firstOrder && { date: firstOrder, text: "Erste Bestellung" },
-                  orders.length > 1 && lastOrder && { date: lastOrder, text: "Letzte Bestellung" },
+                  customer.created_at && { date: customer.created_at, text: locale === "en" ? "Customer created" : locale === "tr" ? "Müşteri oluşturuldu" : "Kunde erstellt" },
+                  firstOrder && { date: firstOrder, text: locale === "en" ? "First order" : locale === "tr" ? "İlk sipariş" : "Erste Bestellung" },
+                  orders.length > 1 && lastOrder && { date: lastOrder, text: locale === "en" ? "Last order" : locale === "tr" ? "Son sipariş" : "Letzte Bestellung" },
                 ].filter(Boolean).sort((a, b) => new Date(b.date) - new Date(a.date)).map((ev, i) => (
                   <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "flex-start" }}>
                     <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#008060", marginTop: 5, flexShrink: 0 }} />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{ev.text}</div>
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>{fmtDateShort(ev.date)}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>{fmtDateShort(ev.date, locale)}</div>
                     </div>
                   </div>
                 ))}

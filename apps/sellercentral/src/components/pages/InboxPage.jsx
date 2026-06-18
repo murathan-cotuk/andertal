@@ -5,6 +5,8 @@ import {
   Page, Text, Button, Badge, BlockStack, InlineStack,
   Box, Divider, Spinner, TextField, Tabs, Select,
 } from "@shopify/polaris";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import FlowEmailBodyEditor, { htmlToPlainText } from "@/components/content/FlowEmailBodyEditor";
 import {
@@ -14,9 +16,10 @@ import {
   buildSupportInboxPlaceholderContext,
 } from "@/lib/message-template-placeholders";
 
-function fmtDate(d) {
+function fmtDate(d, locale) {
   if (!d) return "";
-  return new Date(d).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return new Date(d).toLocaleString(loc, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function fmtCents(c) {
@@ -206,6 +209,8 @@ function useMessageTemplates(client) {
 // ── Customer tab (original inbox) ──────────────────────────────────────────
 
 function CustomerInbox({ client, isSuperuser, sellerNames }) {
+  const locale = useLocale();
+  const ui = getUI(locale);
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -405,7 +410,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
                   {unread}
                 </span>
               )}
-              <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at)}</Text>
+              <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at, locale)}</Text>
             </InlineStack>
           </InlineStack>
           <Text as="p" variant="bodySm" tone="subdued">
@@ -532,7 +537,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
                         </div>
                       )}
                       <MessageBubbleBody body={m.body} />
-                      <div style={{ fontSize: 10, marginTop: 4, opacity: isSeller ? 0.85 : 0.65 }}>{fmtDate(m.created_at)}</div>
+                      <div style={{ fontSize: 10, marginTop: 4, opacity: isSeller ? 0.85 : 0.65 }}>{fmtDate(m.created_at, locale)}</div>
                     </div>
                   </div>
                 );
@@ -583,7 +588,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
                     />
                   </div>
                   <Button onClick={saveCurrentReplyAsTemplate} loading={templateSaving} disabled={templateSaving || !replyPlainTrim || !templateName.trim()}>
-                    Speichern
+                    {ui.save}
                   </Button>
                 </InlineStack>
                 <FlowEmailBodyEditor
@@ -697,6 +702,8 @@ function unreadTotalForSellerSupportThread(sellerThread, isSuperuser) {
 }
 
 function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUserIds }) {
+  const locale = useLocale();
+  const ui = getUI(locale);
   const [rawMessages, setRawMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [supportSearchQ, setSupportSearchQ] = useState("");
@@ -1009,7 +1016,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                             {unread}
                           </span>
                         )}
-                        <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at)}</Text>
+                        <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at, locale)}</Text>
                       </InlineStack>
                     </InlineStack>
                     <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -1086,7 +1093,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                           {unread}
                         </span>
                       )}
-                      <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at)}</Text>
+                      <Text as="span" variant="bodySm" tone="subdued">{fmtDate(last?.created_at, locale)}</Text>
                     </InlineStack>
                   </InlineStack>
                   <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -1154,7 +1161,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                           </div>
                         )}
                         <MessageBubbleBody body={m.body} />
-                        <div style={{ fontSize: 10, marginTop: 4, opacity: isMe ? 0.85 : 0.65 }}>{fmtDate(m.created_at)}</div>
+                        <div style={{ fontSize: 10, marginTop: 4, opacity: isMe ? 0.85 : 0.65 }}>{fmtDate(m.created_at, locale)}</div>
                       </div>
                     </div>
                   );
@@ -1210,7 +1217,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                     />
                   </div>
                   <Button onClick={saveCurrentReplyAsTemplate} loading={templateSaving} disabled={templateSaving || !replyPlainTrim || !templateName.trim()}>
-                    Speichern
+                    {ui.save}
                   </Button>
                 </InlineStack>
                 <FlowEmailBodyEditor
@@ -1240,6 +1247,8 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
 // ── Main InboxPage ──────────────────────────────────────────────────────────
 
 export default function InboxPage() {
+  const locale = useLocale();
+  const ui = getUI(locale);
   const [activeTab, setActiveTab] = useState(0);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [mySellerID, setMySellerID] = useState(null);

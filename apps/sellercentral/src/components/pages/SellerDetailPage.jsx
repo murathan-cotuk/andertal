@@ -6,12 +6,16 @@ import {
   TextField, Select, Box, Spinner, Divider, Modal, Tabs,
 } from "@shopify/polaris";
 import { useRouter } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 
 // ── Admin seller card section ────────────────────────────────────────────────
 function AdminSellerCardSection({ sellerId }) {
   const client = getMedusaAdminClient();
+  const locale = useLocale();
+  const ui = getUI(locale);
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
@@ -27,27 +31,27 @@ function AdminSellerCardSection({ sellerId }) {
   }, [client, sellerId]);
 
   const handleDelete = useCallback(async () => {
-    if (!(await confirmDelete("Karte wirklich entfernen?"))) return;
+    if (!(await confirmDelete(locale === "en" ? "Really remove card?" : locale === "tr" ? "Kartı gerçekten kaldır?" : "Karte wirklich entfernen?"))) return;
     setErr(""); setDeleting(true);
     try {
       await client.deleteSellerCardByAdmin(sellerId);
       setInfo({ has_card: false, last4: null, brand: null });
-      setOk("Karte entfernt.");
+      setOk(locale === "en" ? "Card removed." : locale === "tr" ? "Kart kaldırıldı." : "Karte entfernt.");
     } catch (e) {
-      setErr(e?.message || "Fehler.");
+      setErr(e?.message || (locale === "en" ? "Error." : locale === "tr" ? "Hata." : "Fehler."));
     } finally { setDeleting(false); }
   }, [client, sellerId]);
 
   if (loading) return <Spinner size="small" />;
 
-  const brand = info?.brand ? (info.brand.charAt(0).toUpperCase() + info.brand.slice(1)) : "Karte";
+  const brand = info?.brand ? (info.brand.charAt(0).toUpperCase() + info.brand.slice(1)) : (locale === "en" ? "Card" : locale === "tr" ? "Kart" : "Karte");
   const exp = info?.exp_month && info?.exp_year
     ? `${String(info.exp_month).padStart(2, "0")}/${String(info.exp_year).slice(-2)}`
     : null;
 
   return (
     <BlockStack gap="200">
-      <Text as="h3" variant="headingSm">Kreditkarte</Text>
+      <Text as="h3" variant="headingSm">{locale === "en" ? "Credit card" : locale === "tr" ? "Kredi kartı" : "Kreditkarte"}</Text>
       {ok && <Banner tone="success" onDismiss={() => setOk("")}>{ok}</Banner>}
       {err && <Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner>}
       {info?.has_card ? (
@@ -59,11 +63,11 @@ function AdminSellerCardSection({ sellerId }) {
             </Text>
           </div>
           <Button tone="critical" variant="plain" size="slim" onClick={handleDelete} loading={deleting}>
-            Entfernen
+            {locale === "en" ? "Remove" : locale === "tr" ? "Kaldır" : "Entfernen"}
           </Button>
         </InlineStack>
       ) : (
-        <Text as="p" variant="bodySm" tone="subdued">Keine Kreditkarte hinterlegt.</Text>
+        <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No credit card on file." : locale === "tr" ? "Kayıtlı kredi kartı yok." : "Keine Kreditkarte hinterlegt."}</Text>
       )}
     </BlockStack>
   );
@@ -81,14 +85,16 @@ const STATUS_META = {
 
 const STATUS_LABELS = Object.entries(STATUS_META).map(([v, m]) => ({ value: v, label: m.label }));
 
-function fmtCents(c) {
+function fmtCents(c, locale) {
   if (!c && c !== 0) return "€0,00";
-  return (c / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return (c / 100).toLocaleString(loc, { style: "currency", currency: "EUR" });
 }
 
-function fmtDate(d) {
+function fmtDate(d, locale) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function parseDocuments(raw) {
@@ -101,21 +107,28 @@ function parseDocuments(raw) {
   }
 }
 
-function detectDocTypeLabel(doc) {
+function detectDocTypeLabel(doc, locale) {
   const hay = `${doc?.name || ""} ${doc?.type || ""} ${doc?.kind || ""}`.toLowerCase();
-  if (hay.includes("vertrag") || hay.includes("contract") || hay.includes("agreement")) return "Vertrag / Agreement";
-  if (hay.includes("sign") || hay.includes("imza") || hay.includes("signature")) return "Unterschrift / Signature";
-  if (hay.includes("pass") || hay.includes("passport")) return "Pass / Passport";
-  if (hay.includes("id") || hay.includes("ausweis") || hay.includes("kimlik")) return "ID / Ausweis";
-  if (hay.includes("handels") || hay.includes("register")) return "Handelsregister";
-  if (hay.includes("steuer") || hay.includes("tax") || hay.includes("vat")) return "Steuer / VAT";
-  return "Dokument";
+  if (hay.includes("vertrag") || hay.includes("contract") || hay.includes("agreement"))
+    return locale === "en" ? "Contract / Agreement" : locale === "tr" ? "Sözleşme" : "Vertrag / Agreement";
+  if (hay.includes("sign") || hay.includes("imza") || hay.includes("signature"))
+    return locale === "en" ? "Signature" : locale === "tr" ? "İmza" : "Unterschrift / Signature";
+  if (hay.includes("pass") || hay.includes("passport"))
+    return locale === "en" ? "Passport" : locale === "tr" ? "Pasaport" : "Pass / Passport";
+  if (hay.includes("id") || hay.includes("ausweis") || hay.includes("kimlik"))
+    return locale === "en" ? "ID / Identity card" : locale === "tr" ? "Kimlik" : "ID / Ausweis";
+  if (hay.includes("handels") || hay.includes("register"))
+    return locale === "en" ? "Trade register" : locale === "tr" ? "Ticaret sicili" : "Handelsregister";
+  if (hay.includes("steuer") || hay.includes("tax") || hay.includes("vat"))
+    return locale === "en" ? "Tax / VAT" : locale === "tr" ? "Vergi / KDV" : "Steuer / VAT";
+  return locale === "en" ? "Document" : locale === "tr" ? "Belge" : "Dokument";
 }
 
-function fmtMonth(d) {
+function fmtMonth(d, locale) {
   if (!d) return "";
   const dt = new Date(d);
-  return dt.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return dt.toLocaleDateString(loc, { month: "short", year: "2-digit" });
 }
 
 function toIsoDate(d) {
@@ -191,8 +204,9 @@ function getPeriodMonth(period) {
   return period?.start?.getMonth?.() ?? null;
 }
 
-function monthLabelDe(monthIdx) {
-  return new Date(2026, Number(monthIdx) || 0, 1).toLocaleDateString("de-DE", { month: "long" });
+function monthLabel(monthIdx, locale) {
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return new Date(2026, Number(monthIdx) || 0, 1).toLocaleDateString(loc, { month: "long" });
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────
@@ -220,10 +234,10 @@ function BarChart({ data }) {
         return (
           <div key={i} style={{ width: 22, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
             <div
-              title={`${fmtMonth(d.month)}: ${fmtCents(d.total_cents)}`}
+              title={`${fmtMonth(d.month, locale)}: ${fmtCents(d.total_cents, locale)}`}
               style={{ width: "100%", height: h, background: "#2563eb", borderRadius: "3px 3px 0 0", transition: "height .2s" }}
             />
-            <span style={{ fontSize: 9, color: "#9ca3af", whiteSpace: "nowrap" }}>{fmtMonth(d.month)}</span>
+            <span style={{ fontSize: 9, color: "#9ca3af", whiteSpace: "nowrap" }}>{fmtMonth(d.month, locale)}</span>
           </div>
         );
       })}
@@ -258,6 +272,8 @@ function AddressBlock({ addr }) {
 // ════════════════════════════════════════════════════════════════════════════
 export default function SellerDetailPage({ sellerId }) {
   const router = useRouter();
+  const locale = useLocale();
+  const ui = getUI(locale);
   const client = getMedusaAdminClient();
 
   const [seller, setSeller] = useState(null);
@@ -289,7 +305,7 @@ export default function SellerDetailPage({ sellerId }) {
   const load = useCallback(() => {
     if (!sellerId) {
       setLoading(false);
-      setError("Keine Verkäufer-ID");
+      setError(locale === "en" ? "No seller ID" : locale === "tr" ? "Satıcı kimliği yok" : "Keine Verkäufer-ID");
       return;
     }
     setLoading(true);
@@ -299,7 +315,7 @@ export default function SellerDetailPage({ sellerId }) {
         setCommissionVal(((r.seller?.commission_rate || 0.12) * 100).toFixed(1));
         setError(null);
       })
-      .catch((e) => setError(e?.message || "Fehler beim Laden"))
+      .catch((e) => setError(e?.message || (locale === "en" ? "Error loading" : locale === "tr" ? "Yükleme hatası" : "Fehler beim Laden")))
       .finally(() => setLoading(false));
   }, [sellerId]);
 
@@ -334,11 +350,11 @@ export default function SellerDetailPage({ sellerId }) {
     try {
       const r = await client.approveSellerById(sellerId, newStatus, rejectReason || undefined);
       setSeller(r.seller);
-      setMsg({ tone: "success", text: `Status wurde auf "${STATUS_META[newStatus]?.label}" geändert.` });
+      setMsg({ tone: "success", text: locale === "en" ? `Status changed to "${STATUS_META[newStatus]?.label}".` : locale === "tr" ? `Durum "${STATUS_META[newStatus]?.label}" olarak değiştirildi.` : `Status wurde auf "${STATUS_META[newStatus]?.label}" geändert.` });
       setApproveModal(false);
       setRejectReason("");
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Fehler" });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler") });
     } finally {
       setApproving(false);
     }
@@ -348,13 +364,13 @@ export default function SellerDetailPage({ sellerId }) {
     setSavingCommission(true);
     try {
       const rate = parseFloat(commissionVal.replace(",", ".")) / 100;
-      if (isNaN(rate) || rate < 0 || rate > 1) throw new Error("Ungültiger Wert (0–100%)");
+      if (isNaN(rate) || rate < 0 || rate > 1) throw new Error(locale === "en" ? "Invalid value (0–100%)" : locale === "tr" ? "Geçersiz değer (0–100%)" : "Ungültiger Wert (0–100%)");
       const r = await client.updateSellerById(sellerId, { commission_rate: rate });
       setSeller((p) => ({ ...p, commission_rate: r.seller?.commission_rate ?? rate }));
-      setMsg({ tone: "success", text: "Provision gespeichert." });
+      setMsg({ tone: "success", text: locale === "en" ? "Commission saved." : locale === "tr" ? "Komisyon kaydedildi." : "Provision gespeichert." });
       setEditCommission(false);
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Fehler" });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler") });
     } finally {
       setSavingCommission(false);
     }
@@ -376,35 +392,38 @@ export default function SellerDetailPage({ sellerId }) {
         iban: seller.iban || null,
         notes: payoutForm.notes || null,
       });
-      setMsg({ tone: "success", text: "Auszahlung erstellt." });
+      setMsg({ tone: "success", text: locale === "en" ? "Payout created." : locale === "tr" ? "Ödeme oluşturuldu." : "Auszahlung erstellt." });
       setPayoutModal(false);
       setPayoutForm({ period_start: "", period_end: "", total_cents: "", commission_cents: "", payout_cents: "", notes: "" });
       load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Fehler" });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler") });
     } finally {
       setSavingPayout(false);
     }
   };
 
   const handleMarkPaid = async (payout) => {
-    if (!(await confirmDelete(
-      `Auszahlung ${fmtDate(payout.period_start)}–${fmtDate(payout.period_end)} als extern überwiesen markieren?\n\n` +
-      `Hinweis: Bu işlem banka/Stripe transferi başlatmaz. Önce ödemeyi platform hesabından seller IBAN'ına gerçekten gönderin, sonra burada "bezahlt" işaretleyin.`
-    ))) return;
+    const confirmMsg = locale === "en"
+      ? `Mark payout ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} as externally transferred?\n\nNote: This does not initiate a bank/Stripe transfer. First send the payment from the platform account to the seller IBAN, then mark as paid here.`
+      : locale === "tr"
+      ? `${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} ödemesini dışarıdan havale edildi olarak işaretle?\n\nNot: Bu işlem banka/Stripe transferi başlatmaz. Önce ödemeyi platform hesabından seller IBAN'ına gerçekten gönderin, sonra burada işaretleyin.`
+      : `Auszahlung ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} als extern überwiesen markieren?\n\nHinweis: Bu işlem banka/Stripe transferi başlatmaz. Önce ödemeyi platform hesabından seller IBAN'ına gerçekten gönderin, sonra burada "bezahlt" işaretleyin.`;
+    if (!(await confirmDelete(confirmMsg))) return;
     try {
       await client.updatePayout(payout.id, { status: "bezahlt" });
-      setMsg({ tone: "success", text: "Als extern überwiesen (bezahlt) markiert." });
+      setMsg({ tone: "success", text: locale === "en" ? "Marked as externally transferred (paid)." : locale === "tr" ? "Dışarıdan havale edildi (ödendi) olarak işaretlendi." : "Als extern überwiesen (bezahlt) markiert." });
       load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Fehler" });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler") });
     }
   };
 
   // Generate invoice text (simple text-based)
   const generateInvoice = (payout) => {
     const s = seller;
-    const today = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+    const today = new Date().toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
     const text = `PROVISIONSNOTE\n${"=".repeat(50)}\n
 Aussteller: Andertal GmbH
 Datum: ${today}
@@ -414,12 +433,12 @@ ${s.company_name || s.store_name || s.email}
 ${s.business_address ? JSON.stringify(s.business_address) : ""}
 ${s.tax_id ? `USt-IdNr.: ${s.tax_id}` : ""}
 
-Abrechnungszeitraum: ${fmtDate(payout.period_start)} – ${fmtDate(payout.period_end)}
+Abrechnungszeitraum: ${fmtDate(payout.period_start, locale)} – ${fmtDate(payout.period_end, locale)}
 
-Gesamtumsatz (Brutto):    ${fmtCents(payout.total_cents)}
-Provision (${((seller.commission_rate || 0.12) * 100).toFixed(1)}%):       ${fmtCents(payout.commission_cents)}
+Gesamtumsatz (Brutto):    ${fmtCents(payout.total_cents, locale)}
+Provision (${((seller.commission_rate || 0.12) * 100).toFixed(1)}%):       ${fmtCents(payout.commission_cents, locale)}
 ${"─".repeat(40)}
-Auszahlungsbetrag:        ${fmtCents(payout.payout_cents)}
+Auszahlungsbetrag:        ${fmtCents(payout.payout_cents, locale)}
 
 IBAN: ${payout.iban || s.iban || "—"}
 
@@ -471,10 +490,10 @@ ${"=".repeat(50)}
   const payoutTotal = totalRevenue - commissionTotal;
 
   const tabs = [
-    { id: "overview", content: "Übersicht" },
-    { id: "finance", content: "Finanzen & Provisionen" },
-    { id: "products", content: "Produkte" },
-    { id: "company", content: "Firmendaten" },
+    { id: "overview", content: locale === "en" ? "Overview" : locale === "tr" ? "Genel Bakış" : "Übersicht" },
+    { id: "finance", content: locale === "en" ? "Finance & Commissions" : locale === "tr" ? "Finans & Komisyonlar" : "Finanzen & Provisionen" },
+    { id: "products", content: locale === "en" ? "Products" : locale === "tr" ? "Ürünler" : "Produkte" },
+    { id: "company", content: locale === "en" ? "Company data" : locale === "tr" ? "Firma bilgileri" : "Firmendaten" },
   ];
   const selectedPeriod = PAYOUT_PERIODS.find((p) => p.key === periodKey) || PAYOUT_PERIODS[0];
   const selectedYear = getPeriodYear(selectedPeriod);
@@ -497,17 +516,17 @@ ${"=".repeat(50)}
 
   return (
     <Page
-      backAction={{ content: "Verkäufer", onAction: () => router.push("/sellers") }}
+      backAction={{ content: locale === "en" ? "Sellers" : locale === "tr" ? "Satıcılar" : "Verkäufer", onAction: () => router.push("/sellers") }}
       title={seller.store_name || seller.email}
       titleMetadata={<Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>}
       subtitle={seller.email}
       primaryAction={{
-        content: "Status ändern",
+        content: locale === "en" ? "Change status" : locale === "tr" ? "Durumu değiştir" : "Status ändern",
         onAction: () => { setNewStatus(STATUS_META[status]?.next?.[0] || "approved"); setApproveModal(true); },
       }}
       secondaryActions={[
-        { content: "Provision bearbeiten", onAction: () => setEditCommission(true) },
-        { content: "Auszahlung erstellen", onAction: () => setPayoutModal(true) },
+        { content: locale === "en" ? "Edit commission" : locale === "tr" ? "Komisyonu düzenle" : "Provision bearbeiten", onAction: () => setEditCommission(true) },
+        { content: locale === "en" ? "Create payout" : locale === "tr" ? "Ödeme oluştur" : "Auszahlung erstellen", onAction: () => setPayoutModal(true) },
       ]}
     >
       <BlockStack gap="500">
@@ -517,14 +536,14 @@ ${"=".repeat(50)}
 
         {/* ── Stat strip ─────────────────────────────────────────────── */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Stat label="Gesamtumsatz" value={fmtCents(totalRevenue)} sub={`${totalOrders} Bestellungen`} />
-          <Stat label="Provision" value={fmtCents(commissionTotal)} sub={`${commissionPct}% Rate`} tone="critical" />
-          <Stat label="Auszahlungsbetrag" value={fmtCents(payoutTotal)} tone="success" />
-          <Stat label="Produkte" value={
+          <Stat label={locale === "en" ? "Total Revenue" : locale === "tr" ? "Toplam Ciro" : "Gesamtumsatz"} value={fmtCents(totalRevenue, locale)} sub={`${totalOrders} ${locale === "en" ? "Orders" : locale === "tr" ? "Sipariş" : "Bestellungen"}`} />
+          <Stat label={locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : "Provision"} value={fmtCents(commissionTotal, locale)} sub={`${commissionPct}% Rate`} tone="critical" />
+          <Stat label={locale === "en" ? "Payout Amount" : locale === "tr" ? "Ödeme Tutarı" : "Auszahlungsbetrag"} value={fmtCents(payoutTotal, locale)} tone="success" />
+          <Stat label={locale === "en" ? "Products" : locale === "tr" ? "Ürünler" : "Produkte"} value={
             (seller.products_by_category || []).reduce((a, c) => a + c.count, 0)
           } />
-          <Stat label="Bezahlte Auszahlungen" value={fmtCents(seller.payout_summary?.total_paid_cents)} />
-          <Stat label="Ausstehend" value={fmtCents(seller.payout_summary?.total_pending_cents)} tone="warning" />
+          <Stat label={locale === "en" ? "Paid Payouts" : locale === "tr" ? "Ödenmiş Ödemeler" : "Bezahlte Auszahlungen"} value={fmtCents(seller.payout_summary?.total_paid_cents, locale)} />
+          <Stat label={locale === "en" ? "Pending" : locale === "tr" ? "Bekleyen" : "Ausstehend"} value={fmtCents(seller.payout_summary?.total_pending_cents, locale)} tone="warning" />
         </div>
 
         {/* ── Tabs ──────────────────────────────────────────────────── */}
@@ -537,7 +556,7 @@ ${"=".repeat(50)}
                 <BlockStack gap="400">
                   {/* Revenue chart */}
                   <BlockStack gap="200">
-                    <Text as="h3" variant="headingSm">Monatlicher Umsatz (letzte 12 Monate)</Text>
+                    <Text as="h3" variant="headingSm">{locale === "en" ? "Monthly Revenue (last 12 months)" : locale === "tr" ? "Aylık Ciro (son 12 ay)" : "Monatlicher Umsatz (letzte 12 Monate)"}</Text>
                     <BarChart data={seller.monthly_revenue} />
                   </BlockStack>
 
@@ -546,31 +565,31 @@ ${"=".repeat(50)}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                     {/* Seller info */}
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">Konto</Text>
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Account" : locale === "tr" ? "Hesap" : "Konto"}</Text>
                       <InfoRow label="Seller ID" value={seller.seller_id} />
-                      <InfoRow label="E-Mail" value={seller.email} />
-                      <InfoRow label="Shop-Name" value={seller.store_name} />
-                      <InfoRow label="Registriert" value={fmtDate(seller.created_at)} />
-                      <InfoRow label="Genehmigt am" value={fmtDate(seller.approved_at)} />
-                      <InfoRow label="Superuser" value={seller.is_superuser ? "Ja" : "Nein"} />
+                      <InfoRow label={ui.colEmail} value={seller.email} />
+                      <InfoRow label={locale === "en" ? "Shop Name" : locale === "tr" ? "Mağaza Adı" : "Shop-Name"} value={seller.store_name} />
+                      <InfoRow label={locale === "en" ? "Registered" : locale === "tr" ? "Kayıt Tarihi" : "Registriert"} value={fmtDate(seller.created_at, locale)} />
+                      <InfoRow label={locale === "en" ? "Approved on" : locale === "tr" ? "Onaylandı" : "Genehmigt am"} value={fmtDate(seller.approved_at, locale)} />
+                      <InfoRow label="Superuser" value={seller.is_superuser ? ui.yes : ui.no} />
                       <InfoRow label="IBAN" value={seller.iban ? seller.iban.replace(/(.{4})/g, "$1 ").trim() : null} />
                     </BlockStack>
 
                     {/* Provision */}
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">Provision</Text>
-                      <InfoRow label="Provisionssatz" value={`${commissionPct}%`} />
-                      <InfoRow label="Ges. Provision" value={fmtCents(commissionTotal)} />
-                      <InfoRow label="Ges. Auszahlung" value={fmtCents(payoutTotal)} />
-                      <InfoRow label="Bezahlt" value={fmtCents(seller.payout_summary?.total_paid_cents)} />
-                      <InfoRow label="Ausstehend" value={fmtCents(seller.payout_summary?.total_pending_cents)} />
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : "Provision"}</Text>
+                      <InfoRow label={locale === "en" ? "Commission rate" : locale === "tr" ? "Komisyon oranı" : "Provisionssatz"} value={`${commissionPct}%`} />
+                      <InfoRow label={locale === "en" ? "Total commission" : locale === "tr" ? "Toplam komisyon" : "Ges. Provision"} value={fmtCents(commissionTotal, locale)} />
+                      <InfoRow label={locale === "en" ? "Total payout" : locale === "tr" ? "Toplam ödeme" : "Ges. Auszahlung"} value={fmtCents(payoutTotal, locale)} />
+                      <InfoRow label={locale === "en" ? "Paid" : locale === "tr" ? "Ödendi" : "Bezahlt"} value={fmtCents(seller.payout_summary?.total_paid_cents, locale)} />
+                      <InfoRow label={locale === "en" ? "Pending" : locale === "tr" ? "Bekleyen" : "Ausstehend"} value={fmtCents(seller.payout_summary?.total_pending_cents, locale)} />
                     </BlockStack>
                   </div>
 
                   {/* Status history / rejection reason */}
                   {seller.rejection_reason && (
                     <Banner tone="critical">
-                      <Text as="p" variant="bodySm"><strong>Ablehnungsgrund:</strong> {seller.rejection_reason}</Text>
+                      <Text as="p" variant="bodySm"><strong>{locale === "en" ? "Rejection reason:" : locale === "tr" ? "Red gerekçesi:" : "Ablehnungsgrund:"}</strong> {seller.rejection_reason}</Text>
                     </Banner>
                   )}
                 </BlockStack>
@@ -580,12 +599,15 @@ ${"=".repeat(50)}
               {activeTab === 1 && (
                 <BlockStack gap="400">
                   <Banner tone="info">
-                    Automatische Auszahlungen werden am 01. und 15. vorbereitet (Status: <strong>processing</strong>).
-                    <br />
-                    <strong>Wichtig:</strong> "Bezahlt/markieren" startet keine Zahlung. Erst echte Überweisung (z. B. Bank/Stripe) vom Plattformkonto zur Seller-IBAN durchführen, danach hier als bezahlt markieren.
+                    {locale === "en"
+                      ? <>Automatic payouts are prepared on the 1st and 15th (status: <strong>processing</strong>).<br /><strong>Important:</strong> "Mark as paid" does not initiate a payment. First complete the actual bank transfer from the platform account to the seller IBAN, then mark as paid here.</>
+                      : locale === "tr"
+                      ? <>Otomatik ödemeler 1. ve 15. günlerde hazırlanır (durum: <strong>processing</strong>).<br /><strong>Önemli:</strong> "Ödendi olarak işaretle" bir ödeme başlatmaz. Önce platform hesabından satıcı IBAN'ına gerçek transferi yapın, ardından burada ödendi olarak işaretleyin.</>
+                      : <>Automatische Auszahlungen werden am 01. und 15. vorbereitet (Status: <strong>processing</strong>).<br /><strong>Wichtig:</strong> "Bezahlt/markieren" startet keine Zahlung. Erst echte Überweisung (z. B. Bank/Stripe) vom Plattformkonto zur Seller-IBAN durchführen, danach hier als bezahlt markieren.</>
+                    }
                   </Banner>
                   <InlineStack gap="300" blockAlign="center" align="space-between">
-                    <Text as="h3" variant="headingSm">Auszahlungshistorie & Abrechnungsdetails</Text>
+                    <Text as="h3" variant="headingSm">{locale === "en" ? "Payout History & Billing Details" : locale === "tr" ? "Ödeme Geçmişi & Fatura Detayları" : "Auszahlungshistorie & Abrechnungsdetails"}</Text>
                     <InlineStack gap="200" blockAlign="center">
                       <div style={{ minWidth: 560 }}>
                         <BlockStack gap="100">
@@ -644,7 +666,7 @@ ${"=".repeat(50)}
                                     cursor: "pointer",
                                   }}
                                 >
-                                  {monthLabelDe(m)}
+                                  {monthLabel(m, locale)}
                                 </button>
                               );
                             })}
@@ -659,7 +681,7 @@ ${"=".repeat(50)}
                                   type="button"
                                   disabled={!selectable}
                                   onClick={() => setPeriodKey(p.key)}
-                                  title={selectable ? p.label : "Ab dem 16. des Monats verfügbar"}
+                                  title={selectable ? p.label : (locale === "en" ? "Available from the 16th of the month" : locale === "tr" ? "Ayın 16'sından itibaren mevcut" : "Ab dem 16. des Monats verfügbar")}
                                   style={{
                                     padding: "6px 10px",
                                     borderRadius: 8,
@@ -694,31 +716,36 @@ ${"=".repeat(50)}
                           setPayoutModal(true);
                         }}
                       >
-                        + Auszahlung erstellen
+                        {locale === "en" ? "+ Create payout" : locale === "tr" ? "+ Ödeme oluştur" : "+ Auszahlung erstellen"}
                       </Button>
                     </InlineStack>
                   </InlineStack>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(160px, 1fr))", gap: 10 }}>
-                    <Stat label="Umsatz (Periode)" value={fmtCents(periodTotalCents)} />
-                    <Stat label="Provision (Periode)" value={fmtCents(periodCommissionCents)} />
-                    <Stat label="Auszahlung (Periode)" value={fmtCents(periodPayoutCents)} tone="success" />
-                    <Stat label="Orders (eligible / total)" value={`${periodEligibleCount} / ${periodTransactions.length}`} />
+                    <Stat label={locale === "en" ? "Revenue (Period)" : locale === "tr" ? "Ciro (Dönem)" : "Umsatz (Periode)"} value={fmtCents(periodTotalCents, locale)} />
+                    <Stat label={locale === "en" ? "Commission (Period)" : locale === "tr" ? "Komisyon (Dönem)" : "Provision (Periode)"} value={fmtCents(periodCommissionCents, locale)} />
+                    <Stat label={locale === "en" ? "Payout (Period)" : locale === "tr" ? "Ödeme (Dönem)" : "Auszahlung (Periode)"} value={fmtCents(periodPayoutCents, locale)} tone="success" />
+                    <Stat label={locale === "en" ? "Orders (eligible / total)" : locale === "tr" ? "Siparişler (uygun / toplam)" : "Orders (eligible / total)"} value={`${periodEligibleCount} / ${periodTransactions.length}`} />
                   </div>
 
                   <Card>
                     <BlockStack gap="200">
-                      <Text as="h3" variant="headingSm">Transaktionen in gewählter Periode</Text>
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Transactions in selected period" : locale === "tr" ? "Seçili dönemdeki işlemler" : "Transaktionen in gewählter Periode"}</Text>
                       {periodTransactionsLoading ? (
-                        <Text as="p" variant="bodySm" tone="subdued">Laden…</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">{ui.loading}</Text>
                       ) : periodTransactions.length === 0 ? (
-                        <Text as="p" variant="bodySm" tone="subdued">Keine Transaktionen in dieser Periode.</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No transactions in this period." : locale === "tr" ? "Bu dönemde işlem yok." : "Keine Transaktionen in dieser Periode."}</Text>
                       ) : (
                         <div style={{ overflowX: "auto" }}>
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                             <thead>
                               <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
-                                {["Bestellung", "Kunde", "Datum", "Umsatz", "Provision", "Auszahlung", "Lieferung", "Eligible"].map((h) => (
+                                {(locale === "en"
+                                  ? ["Order", "Customer", "Date", "Revenue", "Commission", "Payout", "Delivery", "Eligible"]
+                                  : locale === "tr"
+                                  ? ["Sipariş", "Müşteri", "Tarih", "Ciro", "Komisyon", "Ödeme", "Teslimat", "Uygun"]
+                                  : ["Bestellung", "Kunde", "Datum", "Umsatz", "Provision", "Auszahlung", "Lieferung", "Eligible"]
+                                ).map((h) => (
                                   <th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "#6d7175", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
                                 ))}
                               </tr>
@@ -728,13 +755,13 @@ ${"=".repeat(50)}
                                 <tr key={t.id} style={{ borderBottom: "1px solid #f1f1f1" }}>
                                   <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>#{t.order_number || "—"}</td>
                                   <td style={{ padding: "8px 10px" }}>{[t.first_name, t.last_name].filter(Boolean).join(" ") || "—"}</td>
-                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{fmtDate(t.created_at)}</td>
-                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{fmtCents(t.total_cents || 0)}</td>
-                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap", color: "#dc2626" }}>{fmtCents(t.commission_cents || 0)}</td>
-                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap", color: "#16a34a" }}>{fmtCents(t.payout_cents || 0)}</td>
-                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{fmtDate(t.delivery_date)}</td>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{fmtDate(t.created_at, locale)}</td>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{fmtCents(t.total_cents || 0, locale)}</td>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap", color: "#dc2626" }}>{fmtCents(t.commission_cents || 0, locale)}</td>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap", color: "#16a34a" }}>{fmtCents(t.payout_cents || 0, locale)}</td>
+                                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{fmtDate(t.delivery_date, locale)}</td>
                                   <td style={{ padding: "8px 10px" }}>
-                                    <Badge tone={t.payout_eligible ? "success" : "warning"}>{t.payout_eligible ? "Ja" : "Nein"}</Badge>
+                                    <Badge tone={t.payout_eligible ? "success" : "warning"}>{t.payout_eligible ? ui.yes : ui.no}</Badge>
                                   </td>
                                 </tr>
                               ))}
@@ -747,14 +774,19 @@ ${"=".repeat(50)}
 
                   {!seller.payouts || seller.payouts.length === 0 ? (
                     <Box padding="600" background="bg-surface-secondary" borderRadius="200">
-                      <Text as="p" tone="subdued">Noch keine Auszahlungen.</Text>
+                      <Text as="p" tone="subdued">{locale === "en" ? "No payouts yet." : locale === "tr" ? "Henüz ödeme yok." : "Noch keine Auszahlungen."}</Text>
                     </Box>
                   ) : (
                     <div style={{ overflowX: "auto" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                         <thead>
                           <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
-                            {["Zeitraum", "Umsatz", "Provision", "Auszahlung", "Status", "IBAN", ""].map((h, i) => (
+                            {(locale === "en"
+                              ? ["Period", "Revenue", "Commission", "Payout", "Status", "IBAN", ""]
+                              : locale === "tr"
+                              ? ["Dönem", "Ciro", "Komisyon", "Ödeme", "Durum", "IBAN", ""]
+                              : ["Zeitraum", "Umsatz", "Provision", "Auszahlung", "Status", "IBAN", ""]
+                            ).map((h, i) => (
                               <th key={i} style={{ padding: "8px 12px", textAlign: i >= 2 && i <= 4 ? "right" : "left", fontWeight: 600, color: "#6d7175", whiteSpace: "nowrap" }}>{h}</th>
                             ))}
                           </tr>
@@ -762,13 +794,13 @@ ${"=".repeat(50)}
                         <tbody>
                           {seller.payouts.map((p) => (
                             <tr key={p.id} style={{ borderBottom: "1px solid #f1f1f1" }}>
-                              <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>{fmtDate(p.period_start)} – {fmtDate(p.period_end)}</td>
-                              <td style={{ padding: "8px 12px", textAlign: "right" }}>{fmtCents(p.total_cents)}</td>
-                              <td style={{ padding: "8px 12px", textAlign: "right", color: "#dc2626" }}>{fmtCents(p.commission_cents)}</td>
-                              <td style={{ padding: "8px 12px", textAlign: "right", color: "#16a34a", fontWeight: 600 }}>{fmtCents(p.payout_cents)}</td>
+                              <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>{fmtDate(p.period_start, locale)} – {fmtDate(p.period_end, locale)}</td>
+                              <td style={{ padding: "8px 12px", textAlign: "right" }}>{fmtCents(p.total_cents, locale)}</td>
+                              <td style={{ padding: "8px 12px", textAlign: "right", color: "#dc2626" }}>{fmtCents(p.commission_cents, locale)}</td>
+                              <td style={{ padding: "8px 12px", textAlign: "right", color: "#16a34a", fontWeight: 600 }}>{fmtCents(p.payout_cents, locale)}</td>
                               <td style={{ padding: "8px 12px" }}>
                                 <Badge tone={p.status === "bezahlt" ? "success" : "attention"}>
-                                  {p.status === "bezahlt" ? "Bezahlt" : "Offen"}
+                                  {p.status === "bezahlt" ? (locale === "en" ? "Paid" : locale === "tr" ? "Ödendi" : "Bezahlt") : (locale === "en" ? "Open" : locale === "tr" ? "Açık" : "Offen")}
                                 </Badge>
                               </td>
                               <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: 11, color: "#6b7280" }}>
@@ -777,9 +809,9 @@ ${"=".repeat(50)}
                               <td style={{ padding: "8px 12px" }}>
                                 <InlineStack gap="200">
                                   {p.status !== "bezahlt" && (
-                                    <Button size="slim" variant="primary" onClick={() => handleMarkPaid(p)}>Als überwiesen markieren</Button>
+                                    <Button size="slim" variant="primary" onClick={() => handleMarkPaid(p)}>{locale === "en" ? "Mark as transferred" : locale === "tr" ? "Havale edildi olarak işaretle" : "Als überwiesen markieren"}</Button>
                                   )}
-                                  <Button size="slim" onClick={() => generateInvoice(p)}>Rechnung</Button>
+                                  <Button size="slim" onClick={() => generateInvoice(p)}>{locale === "en" ? "Invoice" : locale === "tr" ? "Fatura" : "Rechnung"}</Button>
                                 </InlineStack>
                               </td>
                             </tr>
@@ -794,11 +826,11 @@ ${"=".repeat(50)}
               {/* ── PRODUCTS TAB ─────────────────────────────────── */}
               {activeTab === 2 && (
                 <BlockStack gap="400">
-                  <Text as="h3" variant="headingSm">Produkte nach Kategorie</Text>
+                  <Text as="h3" variant="headingSm">{locale === "en" ? "Products by category" : locale === "tr" ? "Kategoriye göre ürünler" : "Produkte nach Kategorie"}</Text>
 
                   {!seller.products_by_category || seller.products_by_category.length === 0 ? (
                     <Box padding="600" background="bg-surface-secondary" borderRadius="200">
-                      <Text as="p" tone="subdued">Keine Produkte gefunden.</Text>
+                      <Text as="p" tone="subdued">{locale === "en" ? "No products found." : locale === "tr" ? "Ürün bulunamadı." : "Keine Produkte gefunden."}</Text>
                     </Box>
                   ) : (
                     <div>
@@ -808,7 +840,7 @@ ${"=".repeat(50)}
                         return (
                           <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid #f1f1f1" }}>
                             <div style={{ flex: "0 0 180px" }}>
-                              <Text as="span" variant="bodyMd">{cat.category || "Unkategorisiert"}</Text>
+                              <Text as="span" variant="bodyMd">{cat.category || (locale === "en" ? "Uncategorized" : locale === "tr" ? "Kategorisiz" : "Unkategorisiert")}</Text>
                             </div>
                             <div style={{ flex: 1, background: "#e5e7eb", borderRadius: 4, height: 8, overflow: "hidden" }}>
                               <div style={{ width: `${pct}%`, height: "100%", background: "#2563eb", borderRadius: 4 }} />
@@ -828,62 +860,67 @@ ${"=".repeat(50)}
               {activeTab === 3 && (
                 <BlockStack gap="400">
                   <Banner tone="info">
-                    Firmendaten-Review: Bitte Gesellschaftsdaten, rechtliche Zustimmung und hochgeladene Nachweise (Vertrag, Unterschrift, Pass/ID usw.) prüfen.
+                    {locale === "en"
+                      ? "Company data review: Please check company details, legal consent, and uploaded documents (contract, signature, passport/ID, etc.)."
+                      : locale === "tr"
+                      ? "Firma bilgileri incelemesi: Lütfen şirket bilgilerini, yasal onayı ve yüklenen belgeleri (sözleşme, imza, pasaport/kimlik vb.) kontrol edin."
+                      : "Firmendaten-Review: Bitte Gesellschaftsdaten, rechtliche Zustimmung und hochgeladene Nachweise (Vertrag, Unterschrift, Pass/ID usw.) prüfen."
+                    }
                   </Banner>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">Firmendaten</Text>
-                      <InfoRow label="Firmenname" value={seller.company_name} />
-                      <InfoRow label="Bevollmächtigte Person" value={seller.authorized_person_name} />
-                      <InfoRow label="Steuer-Nr." value={seller.tax_id} />
-                      <InfoRow label="USt-IdNr." value={seller.vat_id} />
-                      <InfoRow label="Telefon" value={seller.phone} />
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Company details" : locale === "tr" ? "Firma bilgileri" : "Firmendaten"}</Text>
+                      <InfoRow label={locale === "en" ? "Company name" : locale === "tr" ? "Firma adı" : "Firmenname"} value={seller.company_name} />
+                      <InfoRow label={locale === "en" ? "Authorized person" : locale === "tr" ? "Yetkili kişi" : "Bevollmächtigte Person"} value={seller.authorized_person_name} />
+                      <InfoRow label={locale === "en" ? "Tax No." : locale === "tr" ? "Vergi No." : "Steuer-Nr."} value={seller.tax_id} />
+                      <InfoRow label={locale === "en" ? "VAT ID" : locale === "tr" ? "KDV No." : "USt-IdNr."} value={seller.vat_id} />
+                      <InfoRow label={ui.phone} value={seller.phone} />
                       <InfoRow label="Website" value={seller.website} />
                       <InfoRow label="IBAN" value={seller.iban ? seller.iban.replace(/(.{4})/g, "$1 ").trim() : null} />
                     </BlockStack>
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">Rechtliche Zustimmung</Text>
-                      <InfoRow label="Agreement akzeptiert" value={seller.agreement_accepted ? "Ja" : "Nein"} />
-                      <InfoRow label="Akzeptiert am" value={fmtDate(seller.agreement_accepted_at)} />
-                      <InfoRow label="Version" value={seller.agreement_version} />
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Legal consent" : locale === "tr" ? "Yasal onay" : "Rechtliche Zustimmung"}</Text>
+                      <InfoRow label={locale === "en" ? "Agreement accepted" : locale === "tr" ? "Sözleşme onaylandı" : "Agreement akzeptiert"} value={seller.agreement_accepted ? ui.yes : ui.no} />
+                      <InfoRow label={locale === "en" ? "Accepted on" : locale === "tr" ? "Onaylandı" : "Akzeptiert am"} value={fmtDate(seller.agreement_accepted_at, locale)} />
+                      <InfoRow label={locale === "en" ? "Version" : locale === "tr" ? "Versiyon" : "Version"} value={seller.agreement_version} />
                       <InfoRow label="IP" value={seller.agreement_ip} />
                       <div style={{ marginTop: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
-                        <Text as="h4" variant="headingSm">Handschriftliche Unterschrift</Text>
+                        <Text as="h4" variant="headingSm">{locale === "en" ? "Handwritten signature" : locale === "tr" ? "El yazısı imza" : "Handschriftliche Unterschrift"}</Text>
                         {seller.signature_at ? (
                           <BlockStack gap="100">
-                            <InfoRow label="Unterzeichnet am" value={new Date(seller.signature_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "medium" })} />
-                            <InfoRow label="Unterschrift-IP" value={seller.signature_ip} />
+                            <InfoRow label={locale === "en" ? "Signed on" : locale === "tr" ? "İmzalandı" : "Unterzeichnet am"} value={new Date(seller.signature_at).toLocaleString(locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE", { dateStyle: "short", timeStyle: "medium" })} />
+                            <InfoRow label={locale === "en" ? "Signature IP" : locale === "tr" ? "İmza IP" : "Unterschrift-IP"} value={seller.signature_ip} />
                             {seller.signature_data && (
                               <div style={{ marginTop: 6 }}>
                                 <img
                                   src={seller.signature_data}
-                                  alt="Unterschrift"
+                                  alt={locale === "en" ? "Signature" : locale === "tr" ? "İmza" : "Unterschrift"}
                                   style={{ border: "1px solid #e5e7eb", borderRadius: 6, maxWidth: 240, maxHeight: 80, display: "block" }}
                                 />
                               </div>
                             )}
                             <div style={{ marginTop: 6 }}>
                               <Button size="slim" onClick={downloadSellerPdf} loading={pdfDownloading}>
-                                Unterzeichnetes PDF herunterladen
+                                {locale === "en" ? "Download signed PDF" : locale === "tr" ? "İmzalı PDF indir" : "Unterzeichnetes PDF herunterladen"}
                               </Button>
                             </div>
                           </BlockStack>
                         ) : (
-                          <Text as="p" variant="bodySm" tone="subdued">Noch keine handschriftliche Unterschrift vorhanden.</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No handwritten signature yet." : locale === "tr" ? "Henüz el yazısı imza yok." : "Noch keine handschriftliche Unterschrift vorhanden."}</Text>
                         )}
                       </div>
                     </BlockStack>
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">Geschäftsadresse</Text>
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Business address" : locale === "tr" ? "İş adresi" : "Geschäftsadresse"}</Text>
                       <AddressBlock addr={seller.business_address} />
                     </BlockStack>
                     <BlockStack gap="100">
-                      <Text as="h3" variant="headingSm">Lageradresse</Text>
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Warehouse address" : locale === "tr" ? "Depo adresi" : "Lageradresse"}</Text>
                       <AddressBlock addr={seller.warehouse_address} />
                     </BlockStack>
                     <BlockStack gap="100">
                       <InlineStack align="space-between" blockAlign="center">
-                        <Text as="h3" variant="headingSm">Dokumente & Nachweise</Text>
+                        <Text as="h3" variant="headingSm">{locale === "en" ? "Documents & Proof" : locale === "tr" ? "Belgeler & Kanıtlar" : "Dokumente & Nachweise"}</Text>
                         <Badge tone={sellerDocs.length > 0 ? "success" : "attention"}>{sellerDocs.length}</Badge>
                       </InlineStack>
                       {sellerDocs.length > 0 ? (
@@ -891,14 +928,14 @@ ${"=".repeat(50)}
                           {sellerDocs.map((doc, i) => {
                             const url = typeof doc === "string" ? doc : (doc?.url || "");
                             const name = typeof doc === "string" ? `Dokument ${i + 1}` : (doc?.name || `Dokument ${i + 1}`);
-                            const typeLabel = detectDocTypeLabel(doc);
+                            const typeLabel = detectDocTypeLabel(doc, locale);
                             return (
                               <div key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px" }}>
                                 <InlineStack align="space-between" blockAlign="start">
                                   <BlockStack gap="050">
                                     <Text as="p" variant="bodyMd" fontWeight="semibold">{name}</Text>
                                     <Text as="p" variant="bodySm" tone="subdued">{typeLabel}</Text>
-                                    {doc?.uploaded_at && <Text as="p" variant="bodySm" tone="subdued">Upload: {fmtDate(doc.uploaded_at)}</Text>}
+                                    {doc?.uploaded_at && <Text as="p" variant="bodySm" tone="subdued">Upload: {fmtDate(doc.uploaded_at, locale)}</Text>}
                                   </BlockStack>
                                   {url ? (
                                     <a
@@ -924,10 +961,10 @@ ${"=".repeat(50)}
                                       }}
                                       style={{ color: "#2563eb", fontSize: 13, textDecoration: "underline", cursor: "pointer" }}
                                     >
-                                      Herunterladen
+                                      {locale === "en" ? "Download" : locale === "tr" ? "İndir" : "Herunterladen"}
                                     </a>
                                   ) : (
-                                    <Text as="span" tone="subdued">Kein Link</Text>
+                                    <Text as="span" tone="subdued">{locale === "en" ? "No link" : locale === "tr" ? "Link yok" : "Kein Link"}</Text>
                                   )}
                                 </InlineStack>
                               </div>
@@ -936,7 +973,12 @@ ${"=".repeat(50)}
                         </BlockStack>
                       ) : (
                         <Banner tone="warning">
-                          Keine Dokumente hochgeladen. Für rechtssichere Freigabe bitte Vertrag, Unterschrift und Ausweis-/Pass-Nachweise anfordern.
+                          {locale === "en"
+                            ? "No documents uploaded. For legally compliant approval, please request contract, signature, and ID/passport proof."
+                            : locale === "tr"
+                            ? "Belge yüklenmedi. Hukuki onay için sözleşme, imza ve kimlik/pasaport belgesi talep edin."
+                            : "Keine Dokumente hochgeladen. Für rechtssichere Freigabe bitte Vertrag, Unterschrift und Ausweis-/Pass-Nachweise anfordern."
+                          }
                         </Banner>
                       )}
                     </BlockStack>
@@ -955,36 +997,36 @@ ${"=".repeat(50)}
       <Modal
         open={approveModal}
         onClose={() => setApproveModal(false)}
-        title="Status ändern"
-        primaryAction={{ content: "Speichern", onAction: handleApprove, loading: approving }}
-        secondaryActions={[{ content: "Abbrechen", onAction: () => setApproveModal(false) }]}
+        title={locale === "en" ? "Change status" : locale === "tr" ? "Durumu değiştir" : "Status ändern"}
+        primaryAction={{ content: ui.save, onAction: handleApprove, loading: approving }}
+        secondaryActions={[{ content: ui.cancel, onAction: () => setApproveModal(false) }]}
       >
         <Modal.Section>
           <BlockStack gap="300">
             <Select
-              label="Neuer Status"
+              label={locale === "en" ? "New status" : locale === "tr" ? "Yeni durum" : "Neuer Status"}
               options={STATUS_LABELS}
               value={newStatus}
               onChange={setNewStatus}
             />
             {newStatus === "rejected" && (
               <TextField
-                label="Ablehnungsgrund"
+                label={locale === "en" ? "Rejection reason" : locale === "tr" ? "Red gerekçesi" : "Ablehnungsgrund"}
                 value={rejectReason}
                 onChange={setRejectReason}
                 multiline={3}
                 autoComplete="off"
-                placeholder="Bitte geben Sie den Grund für die Ablehnung an…"
+                placeholder={locale === "en" ? "Please provide the reason for rejection…" : locale === "tr" ? "Lütfen red gerekçesini girin…" : "Bitte geben Sie den Grund für die Ablehnung an…"}
               />
             )}
             {newStatus === "approved" && (
               <Banner tone="success">
-                Nach der Genehmigung werden alle Produkte des Verkäufers automatisch veröffentlicht.
+                {locale === "en" ? "After approval, all seller products will be automatically published." : locale === "tr" ? "Onaydan sonra satıcının tüm ürünleri otomatik olarak yayımlanacak." : "Nach der Genehmigung werden alle Produkte des Verkäufers automatisch veröffentlicht."}
               </Banner>
             )}
             {(newStatus === "rejected" || newStatus === "suspended") && (
               <Banner tone="warning">
-                Bei Ablehnung/Sperrung werden alle Produkte des Verkäufers auf „Entwurf" gesetzt.
+                {locale === "en" ? "On rejection/suspension, all seller products will be set to "Draft"." : locale === "tr" ? "Red/askıya almada satıcının tüm ürünleri "Taslak" olarak ayarlanacak." : "Bei Ablehnung/Sperrung werden alle Produkte des Verkäufers auf „Entwurf" gesetzt."}
               </Banner>
             )}
           </BlockStack>
@@ -995,13 +1037,13 @@ ${"=".repeat(50)}
       <Modal
         open={editCommission}
         onClose={() => setEditCommission(false)}
-        title="Provisonssatz ändern"
-        primaryAction={{ content: "Speichern", onAction: handleSaveCommission, loading: savingCommission }}
-        secondaryActions={[{ content: "Abbrechen", onAction: () => setEditCommission(false) }]}
+        title={locale === "en" ? "Change commission rate" : locale === "tr" ? "Komisyon oranını değiştir" : "Provisonssatz ändern"}
+        primaryAction={{ content: ui.save, onAction: handleSaveCommission, loading: savingCommission }}
+        secondaryActions={[{ content: ui.cancel, onAction: () => setEditCommission(false) }]}
       >
         <Modal.Section>
           <TextField
-            label="Provisionssatz (%)"
+            label={locale === "en" ? "Commission rate (%)" : locale === "tr" ? "Komisyon oranı (%)" : "Provisionssatz (%)"}
             value={commissionVal}
             onChange={setCommissionVal}
             type="number"
@@ -1009,7 +1051,7 @@ ${"=".repeat(50)}
             max="100"
             suffix="%"
             autoComplete="off"
-            helpText="Standard: 12%. Gültige Werte: 0–100."
+            helpText={locale === "en" ? "Default: 12%. Valid values: 0–100." : locale === "tr" ? "Varsayılan: %12. Geçerli değerler: 0–100." : "Standard: 12%. Gültige Werte: 0–100."}
           />
         </Modal.Section>
       </Modal>
@@ -1019,27 +1061,27 @@ ${"=".repeat(50)}
         open={payoutModal}
         onClose={() => setPayoutModal(false)}
         title="Neue Auszahlung erstellen"
-        primaryAction={{ content: "Erstellen", onAction: handleCreatePayout, loading: savingPayout }}
-        secondaryActions={[{ content: "Abbrechen", onAction: () => setPayoutModal(false) }]}
+        primaryAction={{ content: locale === "en" ? "Create" : locale === "tr" ? "Oluştur" : "Erstellen", onAction: handleCreatePayout, loading: savingPayout }}
+        secondaryActions={[{ content: ui.cancel, onAction: () => setPayoutModal(false) }]}
       >
         <Modal.Section>
           <BlockStack gap="300">
             <InlineStack gap="300">
-              <TextField label="Zeitraum von" type="date" value={payoutForm.period_start}
+              <TextField label={locale === "en" ? "Period from" : locale === "tr" ? "Dönem başlangıcı" : "Zeitraum von"} type="date" value={payoutForm.period_start}
                 onChange={(v) => setPayoutForm((p) => ({ ...p, period_start: v }))} autoComplete="off" />
-              <TextField label="Zeitraum bis" type="date" value={payoutForm.period_end}
+              <TextField label={locale === "en" ? "Period to" : locale === "tr" ? "Dönem bitişi" : "Zeitraum bis"} type="date" value={payoutForm.period_end}
                 onChange={(v) => setPayoutForm((p) => ({ ...p, period_end: v }))} autoComplete="off" />
             </InlineStack>
-            <TextField label="Gesamtumsatz (€)" value={payoutForm.total_cents}
+            <TextField label={locale === "en" ? "Total revenue (€)" : locale === "tr" ? "Toplam ciro (€)" : "Gesamtumsatz (€)"} value={payoutForm.total_cents}
               onChange={(v) => setPayoutForm((p) => ({ ...p, total_cents: v }))}
-              autoComplete="off" placeholder="z.B. 1234.56" />
-            <TextField label={`Provision (${commissionPct}%)`} value={payoutForm.commission_cents}
+              autoComplete="off" placeholder={locale === "en" ? "e.g. 1234.56" : locale === "tr" ? "örn. 1234.56" : "z.B. 1234.56"} />
+            <TextField label={`${locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : "Provision"} (${commissionPct}%)`} value={payoutForm.commission_cents}
               onChange={(v) => setPayoutForm((p) => ({ ...p, commission_cents: v }))}
-              autoComplete="off" placeholder="z.B. 123.46" />
-            <TextField label="Auszahlungsbetrag (€)" value={payoutForm.payout_cents}
+              autoComplete="off" placeholder={locale === "en" ? "e.g. 123.46" : locale === "tr" ? "örn. 123.46" : "z.B. 123.46"} />
+            <TextField label={locale === "en" ? "Payout amount (€)" : locale === "tr" ? "Ödeme tutarı (€)" : "Auszahlungsbetrag (€)"} value={payoutForm.payout_cents}
               onChange={(v) => setPayoutForm((p) => ({ ...p, payout_cents: v }))}
-              autoComplete="off" placeholder="Leer = Umsatz − Provision" />
-            <TextField label="Notizen" value={payoutForm.notes}
+              autoComplete="off" placeholder={locale === "en" ? "Empty = revenue − commission" : locale === "tr" ? "Boş = ciro − komisyon" : "Leer = Umsatz − Provision"} />
+            <TextField label={locale === "en" ? "Notes" : locale === "tr" ? "Notlar" : "Notizen"} value={payoutForm.notes}
               onChange={(v) => setPayoutForm((p) => ({ ...p, notes: v }))}
               multiline={2} autoComplete="off" />
             {seller.iban && (

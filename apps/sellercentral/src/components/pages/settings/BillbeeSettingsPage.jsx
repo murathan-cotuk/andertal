@@ -11,11 +11,13 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { DuplicateIcon, HideIcon, ViewIcon } from "@shopify/polaris-icons";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 
-/** Festes Feld mit kleinem Kopieren-Icon oben rechts neben dem Label (übliches UI-Muster). */
-function CopyField({ label, value, helpText, multiline, masked = false }) {
+/** Read-only field with copy icon (and optional show/hide for masked fields). */
+function CopyField({ label, value, helpText, multiline, masked = false, locale = "de" }) {
   const [copied, setCopied] = useState(false);
   const [visible, setVisible] = useState(false);
   const copy = useCallback(() => {
@@ -50,8 +52,8 @@ function CopyField({ label, value, helpText, multiline, masked = false }) {
               variant="plain"
               size="slim"
               disabled={!value}
-              accessibilityLabel={hidden ? "Anzeigen" : "Ausblenden"}
-              title={hidden ? "Anzeigen" : "Ausblenden"}
+              accessibilityLabel={hidden ? (locale === "en" ? "Show" : locale === "tr" ? "Göster" : "Anzeigen") : (locale === "en" ? "Hide" : locale === "tr" ? "Gizle" : "Ausblenden")}
+              title={hidden ? (locale === "en" ? "Show" : locale === "tr" ? "Göster" : "Anzeigen") : (locale === "en" ? "Hide" : locale === "tr" ? "Gizle" : "Ausblenden")}
               onClick={() => setVisible((v) => !v)}
             />
           ) : null}
@@ -60,8 +62,8 @@ function CopyField({ label, value, helpText, multiline, masked = false }) {
             variant="plain"
             size="slim"
             disabled={!value}
-            accessibilityLabel={copied ? "Kopiert" : "Kopieren"}
-            title={copied ? "Kopiert" : "Kopieren"}
+            accessibilityLabel={copied ? (locale === "en" ? "Copied" : locale === "tr" ? "Kopyalandı" : "Kopiert") : (locale === "en" ? "Copy" : locale === "tr" ? "Kopyala" : "Kopieren")}
+            title={copied ? (locale === "en" ? "Copied" : locale === "tr" ? "Kopyalandı" : "Kopiert") : (locale === "en" ? "Copy" : locale === "tr" ? "Kopyala" : "Kopieren")}
             onClick={copy}
           />
         </InlineStack>
@@ -80,8 +82,10 @@ function CopyField({ label, value, helpText, multiline, masked = false }) {
   );
 }
 
-/** Marketplace-Verbindung für Billbee. Mit embedded=true in Apps & Integrationen eingebettet (ohne eigene Route). */
+/** Billbee marketplace connection. With embedded=true it is embedded in Apps & Integrations (no own route). */
 export default function BillbeeSettingsPage({ embedded = false }) {
+  const locale = useLocale();
+  const ui = getUI(locale);
   const client = getMedusaAdminClient();
   const [loading, setLoading] = useState(true);
   const [rotating, setRotating] = useState(false);
@@ -107,7 +111,7 @@ export default function BillbeeSettingsPage({ embedded = false }) {
       setBasicPass(data?.basic_auth_password || "");
       setHint(data?.hint || "");
     } catch (e) {
-      setErr(e?.message || "Verbindungsdaten konnten nicht geladen werden.");
+      setErr(e?.message || (locale === "en" ? "Connection data could not be loaded." : locale === "tr" ? "Bağlantı verileri yüklenemedi." : "Verbindungsdaten konnten nicht geladen werden."));
     }
     setLoading(false);
   }, [client]);
@@ -117,16 +121,16 @@ export default function BillbeeSettingsPage({ embedded = false }) {
   }, [load]);
 
   const handleRotateSecret = async () => {
-    if (!(await confirmDelete("Neues Basic-Auth-Passwort erzeugen? In Billbee musst du das Passwort danach aktualisieren."))) return;
+    if (!(await confirmDelete(locale === "en" ? "Generate new Basic Auth password? You will need to update it in Billbee afterwards." : locale === "tr" ? "Yeni Basic Auth şifresi oluşturulsun mu? Ardından Billbee'de güncellemeniz gerekecek." : "Neues Basic-Auth-Passwort erzeugen? In Billbee musst du das Passwort danach aktualisieren."))) return;
     setRotating(true);
     setErr("");
     setOkBanner("");
     try {
       const data = await client.rotateBillbeeMarketplaceSecret();
       if (data?.basic_auth_password) setBasicPass(data.basic_auth_password);
-      setOkBanner("Neues Passwort gespeichert. Bitte in Billbee eintragen.");
+      setOkBanner(locale === "en" ? "New password saved. Please update it in Billbee." : locale === "tr" ? "Yeni şifre kaydedildi. Lütfen Billbee'de güncelleyin." : "Neues Passwort gespeichert. Bitte in Billbee eintragen.");
     } catch (e) {
-      setErr(e?.message || "Fehler beim Erneuern.");
+      setErr(e?.message || (locale === "en" ? "Error generating new password." : locale === "tr" ? "Yeni şifre oluşturma hatası." : "Fehler beim Erneuern."));
     }
     setRotating(false);
   };
@@ -165,32 +169,36 @@ export default function BillbeeSettingsPage({ embedded = false }) {
       <CopyField
         label="URL (API-Basis)"
         value={loading ? "" : apiBaseUrl}
-        helpText="Oft als Shop-URL in Billbee; Endpunkte: /orders, /products, /stock"
+        helpText={locale === "en" ? "Often used as Shop URL in Billbee; endpoints: /orders, /products, /stock" : locale === "tr" ? "Billbee'de genellikle Shop URL olarak kullanılır; uç noktalar: /orders, /products, /stock" : "Oft als Shop-URL in Billbee; Endpunkte: /orders, /products, /stock"}
         multiline
+        locale={locale}
       />
 
       <CopyField
         label="Schlüssel (API-Key)"
         value={loading ? "" : apiKey}
-        helpText="Format andertal_seller_… — zusätzlich optional als X-Andertal-Api-Key Header"
+        helpText={locale === "en" ? "Format andertal_seller_… — also optionally as X-Andertal-Api-Key header" : locale === "tr" ? "Format andertal_seller_… — opsiyonel olarak X-Andertal-Api-Key başlığı olarak da kullanılabilir" : "Format andertal_seller_… — zusätzlich optional als X-Andertal-Api-Key Header"}
         multiline={false}
+        locale={locale}
       />
 
       <CopyField
-        label="Basic Auth Benutzername"
+        label={locale === "en" ? "Basic Auth Username" : locale === "tr" ? "Basic Auth Kullanıcı Adı" : "Basic Auth Benutzername"}
         value={loading ? "" : basicUser}
-        helpText="Deine Seller-Central E-Mail-Adresse"
+        helpText={locale === "en" ? "Your Seller Central email address" : locale === "tr" ? "Seller Central e-posta adresiniz" : "Deine Seller-Central E-Mail-Adresse"}
+        locale={locale}
       />
 
       <BlockStack gap="200">
         <CopyField
-          label="Basic Auth Passwort"
+          label={locale === "en" ? "Basic Auth Password" : locale === "tr" ? "Basic Auth Şifresi" : "Basic Auth Passwort"}
           value={loading ? "" : basicPass}
-          helpText="Auge-Symbol: ein-/ausblenden. Doppelblatt-Symbol: kopieren."
+          helpText={locale === "en" ? "Eye icon: show/hide. Duplicate icon: copy." : locale === "tr" ? "Göz ikonu: göster/gizle. Kopyala ikonu: kopyala." : "Auge-Symbol: ein-/ausblenden. Doppelblatt-Symbol: kopieren."}
           masked
+          locale={locale}
         />
         <Button onClick={handleRotateSecret} loading={rotating} disabled={loading}>
-          Neues Passwort erzeugen
+          {locale === "en" ? "Generate new password" : locale === "tr" ? "Yeni şifre oluştur" : "Neues Passwort erzeugen"}
         </Button>
       </BlockStack>
 
@@ -202,7 +210,7 @@ export default function BillbeeSettingsPage({ embedded = false }) {
 
       <InlineStack gap="200">
         <Button onClick={load} disabled={loading}>
-          Aktualisieren
+          {ui.refresh}
         </Button>
       </InlineStack>
     </BlockStack>
@@ -216,13 +224,22 @@ export default function BillbeeSettingsPage({ embedded = false }) {
             Billbee ↔ Andertal
           </Text>
           <Text as="p" variant="bodyMd" tone="subdued">
-            Andertal stellt die API unter <Text as="span" fontWeight="semibold">/api/billbee</Text> bereit. Billbee ruft{" "}
-            <strong>deinen Shop</strong> mit den unten angezeigten Zugangsdaten ab — getrennt pro Verkäuferkonto.
+            {locale === "en"
+              ? <>Andertal provides the API at <Text as="span" fontWeight="semibold">/api/billbee</Text>. Billbee fetches <strong>your shop</strong> using the credentials shown below — separately per seller account.</>
+              : locale === "tr"
+              ? <>Andertal, API'yi <Text as="span" fontWeight="semibold">/api/billbee</Text> adresinde sunar. Billbee, <strong>mağazanızı</strong> aşağıda gösterilen kimlik bilgileriyle çeker — her satıcı hesabı için ayrı ayrı.</>
+              : <>Andertal stellt die API unter <Text as="span" fontWeight="semibold">/api/billbee</Text> bereit. Billbee ruft{" "}<strong>deinen Shop</strong> mit den unten angezeigten Zugangsdaten ab — getrennt pro Verkäuferkonto.</>
+            }
           </Text>
         </BlockStack>
       ) : (
         <Text as="p" variant="bodySm" tone="subdued">
-          Andertal stellt die API unter <Text as="span" fontWeight="semibold">/api/billbee</Text> bereit — Zugang nur für dein Verkäuferkonto.
+          {locale === "en"
+            ? <>Andertal provides the API at <Text as="span" fontWeight="semibold">/api/billbee</Text> — access only for your seller account.</>
+            : locale === "tr"
+            ? <>Andertal, API'yi <Text as="span" fontWeight="semibold">/api/billbee</Text> adresinde sunar — yalnızca satıcı hesabınıza erişim.</>
+            : <>Andertal stellt die API unter <Text as="span" fontWeight="semibold">/api/billbee</Text> bereit — Zugang nur für dein Verkäuferkonto.</>
+          }
         </Text>
       )}
 

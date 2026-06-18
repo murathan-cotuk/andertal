@@ -13,6 +13,8 @@ import {
   InlineStack,
 } from "@shopify/polaris";
 import { useRouter, usePathname } from "next/navigation";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 
 const LOCALE_OPTIONS = [
   { label: "Deutsch", value: "de" },
@@ -26,6 +28,8 @@ const LOCALE_OPTIONS = [
 export default function AccountSettingsPage() {
   const router = useRouter();
   const pathname = usePathname();
+  const currentLocale = useLocale();
+  const ui = getUI(currentLocale);
 
   const [locale, setLocale] = useState("de");
   const [saved, setSaved] = useState(false);
@@ -77,33 +81,40 @@ export default function AccountSettingsPage() {
     setSaved(false);
   };
 
+  const pageTitle = currentLocale === "en" ? "Account Settings" : currentLocale === "tr" ? "Hesap Ayarları" : "Konto-Einstellungen";
+  const pageDesc = currentLocale === "en" ? "Personal settings for your Sellercentral account." : currentLocale === "tr" ? "Sellercentral hesabınız için kişisel ayarlar." : "Persönliche Einstellungen für Ihren Sellercentral-Account.";
+  const savedMsg = currentLocale === "en" ? "Settings saved." : currentLocale === "tr" ? "Ayarlar kaydedildi." : "Einstellungen gespeichert.";
+  const uiLangTitle = currentLocale === "en" ? "Interface language" : currentLocale === "tr" ? "Arayüz dili" : "Sprache der Benutzeroberfläche";
+  const uiLangDesc = currentLocale === "en" ? "Choose the language in which Sellercentral should be displayed. The change takes effect immediately after saving." : currentLocale === "tr" ? "Sellercentral'ın hangi dilde görüntüleneceğini seçin. Değişiklik kaydetme sonrasında hemen geçerli olur." : "Wählen Sie die Sprache, in der Sellercentral angezeigt werden soll. Die Änderung tritt nach dem Speichern sofort in Kraft.";
+  const langLabel = currentLocale === "en" ? "Language" : currentLocale === "tr" ? "Dil" : "Sprache";
+  const discardLabel = currentLocale === "en" ? "Discard" : currentLocale === "tr" ? "Vazgeç" : "Verwerfen";
+
   return (
-    <Page title="Konto-Einstellungen">
+    <Page title={pageTitle}>
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
             <Text as="p" tone="subdued">
-              Persönliche Einstellungen für Ihren Sellercentral-Account.
+              {pageDesc}
             </Text>
 
             {saved && (
               <Banner tone="success" onDismiss={() => setSaved(false)}>
-                <Text as="p">Einstellungen gespeichert.</Text>
+                <Text as="p">{savedMsg}</Text>
               </Banner>
             )}
 
             <Card>
               <BlockStack gap="400">
                 <Text variant="headingMd" as="h2">
-                  Sprache der Benutzeroberfläche
+                  {uiLangTitle}
                 </Text>
                 <Text as="p" tone="subdued">
-                  Wählen Sie die Sprache, in der Sellercentral angezeigt werden
-                  soll. Die Änderung tritt nach dem Speichern sofort in Kraft.
+                  {uiLangDesc}
                 </Text>
                 <div style={{ maxWidth: 280 }}>
                   <Select
-                    label="Sprache"
+                    label={langLabel}
                     options={LOCALE_OPTIONS}
                     value={locale}
                     onChange={handleLocaleChange}
@@ -111,11 +122,11 @@ export default function AccountSettingsPage() {
                 </div>
                 <InlineStack gap="300">
                   <Button variant="primary" onClick={save} disabled={!dirty}>
-                    Speichern
+                    {ui.save}
                   </Button>
                   {dirty && (
                     <Button variant="plain" onClick={discard}>
-                      Verwerfen
+                      {discardLabel}
                     </Button>
                   )}
                 </InlineStack>

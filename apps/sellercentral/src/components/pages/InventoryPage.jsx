@@ -1297,7 +1297,7 @@ export default function InventoryPage() {
                   </InlineStack>
                   <Divider />
                   {ownProducts.length === 0 ? (
-                    <Text as="p" tone="subdued">Keine Produkte in diesem Bereich.</Text>
+                    <Text as="p" tone="subdued">{l === "tr" ? "Bu bölümde ürün yok." : l === "de" ? "Keine Produkte in diesem Bereich." : "No products in this section."}</Text>
                   ) : (
                     <TableShell>
                       {renderInventoryHeader()}
@@ -1309,18 +1309,18 @@ export default function InventoryPage() {
 
               <Card>
                 <BlockStack gap="400">
-                  <Text as="h2" variant="headingSm">Verkäufer-Produkte</Text>
+                  <Text as="h2" variant="headingSm">{l === "tr" ? "Satıcı ürünleri" : l === "de" ? "Verkäufer-Produkte" : "Seller products"}</Text>
                   <TextField
-                    label="Verkäufer filter"
+                    label="Seller filter"
                     labelHidden
-                    placeholder="Verkäufer suchen (Store-Name)…"
+                    placeholder={l === "tr" ? "Satıcı ara (Mağaza adı)…" : l === "de" ? "Verkäufer suchen (Store-Name)…" : "Search seller (store name)…"}
                     value={sellerSearchFilter}
                     onChange={setSellerSearchFilter}
                     autoComplete="off"
                   />
                   <Divider />
                   {filteredSellerGroups.length === 0 ? (
-                    <Text as="p" tone="subdued">Keine weiteren Verkäufer-Produkte{sellerSearchFilter.trim() ? " (Filter)" : ""}.</Text>
+                    <Text as="p" tone="subdued">{l === "tr" ? `Başka satıcı ürünü yok${sellerSearchFilter.trim() ? " (Filtre)" : ""}.` : l === "de" ? `Keine weiteren Verkäufer-Produkte${sellerSearchFilter.trim() ? " (Filter)" : ""}.` : `No more seller products${sellerSearchFilter.trim() ? " (filter)" : ""}.`}</Text>
                   ) : (
                     <BlockStack gap="300">
                       {filteredSellerGroups.map(({ sellerId, items }) => {

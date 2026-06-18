@@ -1,6 +1,8 @@
 ﻿"use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { appendMediaFileToFormData } from "@/lib/media-upload";
 import { confirmDelete } from "@/lib/confirm-delete";
@@ -12,9 +14,10 @@ function fmtSize(bytes) {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
-function fmtDate(d) {
+function fmtDate(d, locale) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function isImage(mime) {
   return !mime || mime.startsWith("image/");
@@ -262,6 +265,8 @@ function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
 
 /* ───────── Main page ───────── */
 export default function MediaPage() {
+  const locale = useLocale();
+  const ui = getUI(locale);
   const [media, setMedia] = useState([]);
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -386,7 +391,11 @@ export default function MediaPage() {
   };
 
   const totalCount = media.length;
-  const folderLabel = activeFolder === "all" ? "Alle Medien" : activeFolder === "none" ? "Ohne Ordner" : (folders.find(f => f.id === activeFolder)?.name || "Ordner");
+  const folderLabel = activeFolder === "all"
+    ? (locale === "en" ? "All media" : locale === "tr" ? "Tüm medya" : "Alle Medien")
+    : activeFolder === "none"
+    ? (locale === "en" ? "Without folder" : locale === "tr" ? "Klasörsüz" : "Ohne Ordner")
+    : (folders.find(f => f.id === activeFolder)?.name || (locale === "en" ? "Folder" : locale === "tr" ? "Klasör" : "Ordner"));
 
   const handleDragEnter = (e) => {
     e.preventDefault();
@@ -425,20 +434,20 @@ export default function MediaPage() {
         }}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 52, marginBottom: 12 }}>📂</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#2563eb" }}>Bilder hier ablegen</div>
-            <div style={{ fontSize: 13, color: "#3b82f6", marginTop: 4 }}>Loslassen um hochzuladen</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#2563eb" }}>{locale === "en" ? "Drop images here" : locale === "tr" ? "Görselleri buraya bırakın" : "Bilder hier ablegen"}</div>
+            <div style={{ fontSize: 13, color: "#3b82f6", marginTop: 4 }}>{locale === "en" ? "Release to upload" : locale === "tr" ? "Yüklemek için bırakın" : "Loslassen um hochzuladen"}</div>
           </div>
         </div>
       )}
       {/* Sidebar */}
       <div style={{ width: 220, background: "#fff", borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "16px 16px 8px", borderBottom: "1px solid #f3f4f6" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>Mediathek</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>{locale === "en" ? "Media library" : locale === "tr" ? "Medya kütüphanesi" : "Mediathek"}</div>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
           {[
-            { id: "all", label: "Alle Medien", icon: "🖼" },
-            { id: "none", label: "Ohne Ordner", icon: "📄" },
+            { id: "all", label: locale === "en" ? "All media" : locale === "tr" ? "Tüm medya" : "Alle Medien", icon: "🖼" },
+            { id: "none", label: locale === "en" ? "Without folder" : locale === "tr" ? "Klasörsüz" : "Ohne Ordner", icon: "📄" },
           ].map(item => (
             <button
               key={item.id}
@@ -456,7 +465,7 @@ export default function MediaPage() {
           ))}
 
           {folders.length > 0 && (
-            <div style={{ padding: "10px 16px 4px", fontSize: 10, color: "#9ca3af", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>Ordner</div>
+            <div style={{ padding: "10px 16px 4px", fontSize: 10, color: "#9ca3af", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>{locale === "en" ? "Folders" : locale === "tr" ? "Klasörler" : "Ordner"}</div>
           )}
           {folders.map(f => (
             <div key={f.id} style={{ display: "flex", alignItems: "center" }}>
@@ -476,14 +485,14 @@ export default function MediaPage() {
               </button>
               <button
                 onClick={async () => {
-                  if (!(await confirmDelete(`Ordner "${f.name}" löschen?`))) return;
+                  if (!(await confirmDelete(locale === "en" ? `Delete folder "${f.name}"?` : locale === "tr" ? `"${f.name}" klasörünü sil?` : `Ordner "${f.name}" löschen?`))) return;
                   const client = getMedusaAdminClient();
                   await client.deleteMediaFolder(f.id).catch(() => {});
                   setFolders(prev => prev.filter(x => x.id !== f.id));
                   if (activeFolder === f.id) handleFolderChange("all");
                 }}
                 style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 10px", color: "#d1d5db", fontSize: 12 }}
-                title="Ordner löschen"
+                title={locale === "en" ? "Delete folder" : locale === "tr" ? "Klasörü sil" : "Ordner löschen"}
               >
                 ✕
               </button>
@@ -495,7 +504,7 @@ export default function MediaPage() {
             onClick={() => setShowCreateFolder(true)}
             style={{ width: "100%", padding: "7px 0", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151" }}
           >
-            + Neuer Ordner
+            {locale === "en" ? "+ New folder" : locale === "tr" ? "+ Yeni klasör" : "+ Neuer Ordner"}
           </button>
         </div>
       </div>

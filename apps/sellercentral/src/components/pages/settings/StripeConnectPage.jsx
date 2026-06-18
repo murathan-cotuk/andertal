@@ -3,9 +3,13 @@
 import React, { useEffect, useState } from "react";
 import { Banner, BlockStack, Box, Button, Card, InlineStack, Text } from "@shopify/polaris";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 export default function StripeConnectPage() {
+  const locale = useLocale();
+  const ui = getUI(locale);
   const searchParams = useSearchParams();
   const router = useRouter();
   const client = getMedusaAdminClient();
@@ -108,7 +112,7 @@ export default function StripeConnectPage() {
       )}
 
       {loading ? (
-        <Card><Text as="p" tone="subdued">Laden…</Text></Card>
+        <Card><Text as="p" tone="subdued">{ui.loading}</Text></Card>
       ) : (
         <>
           {/* Status card */}

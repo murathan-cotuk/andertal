@@ -6,26 +6,46 @@ import {
   Box, Spinner, Banner, Select,
 } from "@shopify/polaris";
 import { useRouter } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useSellerImpersonation } from "@/context/SellerImpersonationContext";
 
-const STATUS_META = {
-  registered:           { label: "Kayıt Oldu",        tone: "info" },
-  documents_submitted:  { label: "Evrak Gönderildi",  tone: "attention" },
-  pending_approval:     { label: "Onay Bekliyor",      tone: "warning" },
-  approved:             { label: "Onaylandı",          tone: "success" },
-  rejected:             { label: "Reddedildi",         tone: "critical" },
-  suspended:            { label: "Askıya Alındı",      tone: "critical" },
-};
-
-function fmtCents(c) {
-  if (!c) return "€0,00";
-  return (c / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+function getStatusMeta(status, locale) {
+  const map = {
+    registered:          { en: "Registered",           tr: "Kayıt Oldu",       de: "Registriert" },
+    documents_submitted: { en: "Documents submitted",  tr: "Evrak Gönderildi", de: "Dokumente eingereicht" },
+    pending_approval:    { en: "Pending approval",     tr: "Onay Bekliyor",     de: "Genehmigung ausstehend" },
+    approved:            { en: "Approved",             tr: "Onaylandı",         de: "Genehmigt" },
+    rejected:            { en: "Rejected",             tr: "Reddedildi",        de: "Abgelehnt" },
+    suspended:           { en: "Suspended",            tr: "Askıya Alındı",     de: "Gesperrt" },
+  };
+  const tones = {
+    registered: "info",
+    documents_submitted: "attention",
+    pending_approval: "warning",
+    approved: "success",
+    rejected: "critical",
+    suspended: "critical",
+  };
+  const entry = map[status];
+  const label = entry ? (locale === "en" ? entry.en : locale === "tr" ? entry.tr : entry.de) : status;
+  return { label, tone: tones[status] || "info" };
 }
 
-function fmtDate(d) {
+function fmtCents(c, locale) {
+  if (!c) {
+    const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+    return (0).toLocaleString(loc, { style: "currency", currency: "EUR" });
+  }
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return (c / 100).toLocaleString(loc, { style: "currency", currency: "EUR" });
+}
+
+function fmtDate(d, locale) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 /** API / DB may return boolean or string */
@@ -34,13 +54,11 @@ function isSellerSuperuser(s) {
   return v === true || v === "true" || v === 1 || v === "1";
 }
 
-// ── Status dot ────────────────────────────────────────────────────────────
-function StatusBadge({ status }) {
-  const meta = STATUS_META[status] || { label: status, tone: "info" };
+function StatusBadge({ status, locale }) {
+  const meta = getStatusMeta(status, locale);
   return <Badge tone={meta.tone}>{meta.label}</Badge>;
 }
 
-// ── Stat card ─────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub }) {
   return (
     <div style={{ flex: 1, minWidth: 140, background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px" }}>
@@ -51,15 +69,13 @@ function StatCard({ label, value, sub }) {
   );
 }
 
-const TABLE_HEADERS = ["Shop-Name", "E-Mail", "Firma", "Status", "Produkte", "Umsatz", "Provision", "IBAN", "Beigetreten", ""];
-
-function SellerTable({ rows, router, onImpersonate }) {
+function SellerTable({ rows, router, onImpersonate, locale, headers }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
           <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
-            {TABLE_HEADERS.map((h, i) => (
+            {headers.map((h, i) => (
               <th key={i} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#6d7175", whiteSpace: "nowrap" }}>{h}</th>
             ))}
           </tr>
@@ -78,14 +94,14 @@ function SellerTable({ rows, router, onImpersonate }) {
               </td>
               <td style={{ padding: "10px 12px", color: "#374151" }}>{seller.email}</td>
               <td style={{ padding: "10px 12px", color: "#6b7280" }}>{seller.company_name || "—"}</td>
-              <td style={{ padding: "10px 12px" }}><StatusBadge status={seller.approval_status || "registered"} /></td>
+              <td style={{ padding: "10px 12px" }}><StatusBadge status={seller.approval_status || "registered"} locale={locale} /></td>
               <td style={{ padding: "10px 12px", textAlign: "right" }}>{seller.product_count ?? 0}</td>
-              <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(seller.revenue_cents)}</td>
-              <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(seller.commission_cents)}</td>
+              <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(seller.revenue_cents, locale)}</td>
+              <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(seller.commission_cents, locale)}</td>
               <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 11, color: "#6b7280" }}>
                 {seller.iban ? seller.iban.replace(/(.{4})/g, "$1 ").trim() : "—"}
               </td>
-              <td style={{ padding: "10px 12px", color: "#9ca3af", whiteSpace: "nowrap" }}>{fmtDate(seller.created_at)}</td>
+              <td style={{ padding: "10px 12px", color: "#9ca3af", whiteSpace: "nowrap" }}>{fmtDate(seller.created_at, locale)}</td>
               <td style={{ padding: "10px 12px" }}>
                 <InlineStack gap="200">
                   <Button
@@ -99,7 +115,7 @@ function SellerTable({ rows, router, onImpersonate }) {
                     size="slim"
                     onClick={(e) => { e.stopPropagation(); onImpersonate(seller); }}
                   >
-                    Als Seller anmelden
+                    {locale === "en" ? "Log in as seller" : locale === "tr" ? "Satıcı olarak giriş" : "Als Seller anmelden"}
                   </Button>
                 </InlineStack>
               </td>
@@ -113,6 +129,8 @@ function SellerTable({ rows, router, onImpersonate }) {
 
 export default function SellersPage() {
   const router = useRouter();
+  const locale = useLocale();
+  const ui = getUI(locale);
   const client = getMedusaAdminClient();
   const { openTab } = useSellerImpersonation();
 
@@ -138,7 +156,7 @@ export default function SellersPage() {
         r.token
       );
     } catch (e) {
-      setError(e?.message || "Impersonation fehlgeschlagen");
+      setError(e?.message || (locale === "en" ? "Impersonation failed" : locale === "tr" ? "Giriş başarısız" : "Impersonation fehlgeschlagen"));
     } finally {
       setImpersonateLoading(null);
     }
@@ -148,7 +166,7 @@ export default function SellersPage() {
     setLoading(true);
     client.getSellers()
       .then((r) => { setSellers(r.sellers || []); setError(null); })
-      .catch((e) => setError(e?.message || "Fehler beim Laden"))
+      .catch((e) => setError(e?.message || (locale === "en" ? "Error loading" : locale === "tr" ? "Yükleme hatası" : "Fehler beim Laden")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -169,7 +187,6 @@ export default function SellersPage() {
     setFiltered(list);
   }, [sellers, search, statusFilter]);
 
-  // Summary stats
   const totalRevenue = sellers.reduce((a, s) => a + (s.revenue_cents || 0), 0);
   const totalCommission = sellers.reduce((a, s) => a + (s.commission_cents || 0), 0);
   const approvedCount = sellers.filter((s) => s.approval_status === "approved").length;
@@ -180,33 +197,56 @@ export default function SellersPage() {
   const superusersFiltered = filtered.filter((s) => isSellerSuperuser(s));
   const sellersFiltered = filtered.filter((s) => !isSellerSuperuser(s));
 
+  const statusOptions = [
+    { label: locale === "en" ? "All statuses" : locale === "tr" ? "Tüm durumlar" : "Alle Status", value: "all" },
+    ...["registered", "documents_submitted", "pending_approval", "approved", "rejected", "suspended"].map((k) => ({
+      label: getStatusMeta(k, locale).label,
+      value: k,
+    })),
+  ];
+
+  const tableHeaders = [
+    locale === "en" ? "Shop name" : locale === "tr" ? "Mağaza adı" : "Shop-Name",
+    "E-Mail",
+    locale === "en" ? "Company" : locale === "tr" ? "Firma" : "Firma",
+    ui.status,
+    locale === "en" ? "Products" : locale === "tr" ? "Ürünler" : "Produkte",
+    locale === "en" ? "Revenue" : locale === "tr" ? "Gelir" : "Umsatz",
+    locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : "Provision",
+    "IBAN",
+    locale === "en" ? "Joined" : locale === "tr" ? "Katıldı" : "Beigetreten",
+    "",
+  ];
+
   return (
     <>
     <Page
-      title="Verkäufer"
-      subtitle="Alle registrierten Verkäufer verwalten und freischalten"
+      title={locale === "en" ? "Sellers" : locale === "tr" ? "Satıcılar" : "Verkäufer"}
+      subtitle={locale === "en" ? "Manage and approve all registered sellers" : locale === "tr" ? "Tüm kayıtlı satıcıları yönetin ve onaylayın" : "Alle registrierten Verkäufer verwalten und freischalten"}
     >
       <BlockStack gap="500">
         {error && <Banner tone="critical" onDismiss={() => setError(null)}>{error}</Banner>}
 
-        {/* Summary stats */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <StatCard label="Gesamt Verkäufer" value={sellers.length} sub={`Superuser: ${superuserCount} · Verkäufer: ${sellerOnlyCount}`} />
-          <StatCard label="Aktiv / Genehmigt" value={approvedCount} />
-          <StatCard label="Warten auf Genehmigung" value={pendingCount} />
-          <StatCard label="Gesamtumsatz" value={fmtCents(totalRevenue)} />
-          <StatCard label="Provision (gesamt)" value={fmtCents(totalCommission)} />
+          <StatCard
+            label={locale === "en" ? "Total sellers" : locale === "tr" ? "Toplam satıcı" : "Gesamt Verkäufer"}
+            value={sellers.length}
+            sub={`Superuser: ${superuserCount} · ${locale === "en" ? "Sellers" : locale === "tr" ? "Satıcılar" : "Verkäufer"}: ${sellerOnlyCount}`}
+          />
+          <StatCard label={locale === "en" ? "Active / Approved" : locale === "tr" ? "Aktif / Onaylı" : "Aktiv / Genehmigt"} value={approvedCount} />
+          <StatCard label={locale === "en" ? "Pending approval" : locale === "tr" ? "Onay bekliyor" : "Warten auf Genehmigung"} value={pendingCount} />
+          <StatCard label={locale === "en" ? "Total revenue" : locale === "tr" ? "Toplam gelir" : "Gesamtumsatz"} value={fmtCents(totalRevenue, locale)} />
+          <StatCard label={locale === "en" ? "Commission (total)" : locale === "tr" ? "Komisyon (toplam)" : "Provision (gesamt)"} value={fmtCents(totalCommission, locale)} />
         </div>
 
         <Card>
-          {/* Filters */}
           <BlockStack gap="400">
             <InlineStack gap="300" blockAlign="center">
               <div style={{ flex: 1, maxWidth: 340 }}>
                 <TextField
                   label=""
                   labelHidden
-                  placeholder="Shop-Name, E-Mail oder ID suchen…"
+                  placeholder={locale === "en" ? "Search shop name, email or ID…" : locale === "tr" ? "Mağaza adı, e-posta veya ID ara…" : "Shop-Name, E-Mail oder ID suchen…"}
                   value={search}
                   onChange={setSearch}
                   autoComplete="off"
@@ -218,15 +258,12 @@ export default function SellersPage() {
                 <Select
                   label=""
                   labelHidden
-                  options={[
-                    { label: "Alle Status", value: "all" },
-                    ...Object.entries(STATUS_META).map(([k, v]) => ({ label: v.label, value: k })),
-                  ]}
+                  options={statusOptions}
                   value={statusFilter}
                   onChange={setStatusFilter}
                 />
               </div>
-              <Button onClick={load} loading={loading}>Aktualisieren</Button>
+              <Button onClick={load} loading={loading}>{ui.refresh}</Button>
             </InlineStack>
 
             {loading ? (
@@ -235,7 +272,7 @@ export default function SellersPage() {
               </Box>
             ) : filtered.length === 0 ? (
               <Box padding="800" background="bg-surface-secondary" borderRadius="200">
-                <Text as="p" tone="subdued" alignment="center">Keine Verkäufer gefunden.</Text>
+                <Text as="p" tone="subdued" alignment="center">{locale === "en" ? "No sellers found." : locale === "tr" ? "Satıcı bulunamadı." : "Keine Verkäufer gefunden."}</Text>
               </Box>
             ) : (
               <BlockStack gap="500">
@@ -244,32 +281,32 @@ export default function SellersPage() {
                     Superuser ({superusersFiltered.length})
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Plattform-Administratoren mit Vollzugriff
+                    {locale === "en" ? "Platform administrators with full access" : locale === "tr" ? "Tam erişimli platform yöneticileri" : "Plattform-Administratoren mit Vollzugriff"}
                   </Text>
                   <Box paddingBlockStart="300">
                     {superusersFiltered.length === 0 ? (
                       <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                        <Text as="p" tone="subdued" alignment="center">Keine Superuser für diese Filter.</Text>
+                        <Text as="p" tone="subdued" alignment="center">{locale === "en" ? "No superusers for these filters." : locale === "tr" ? "Bu filtreler için süper kullanıcı yok." : "Keine Superuser für diese Filter."}</Text>
                       </Box>
                     ) : (
-                      <SellerTable rows={superusersFiltered} router={router} onImpersonate={handleImpersonate} />
+                      <SellerTable rows={superusersFiltered} router={router} onImpersonate={handleImpersonate} locale={locale} headers={tableHeaders} />
                     )}
                   </Box>
                 </div>
                 <div>
                   <Text as="h2" variant="headingSm" fontWeight="semibold">
-                    Verkäufer ({sellersFiltered.length})
+                    {locale === "en" ? "Sellers" : locale === "tr" ? "Satıcılar" : "Verkäufer"} ({sellersFiltered.length})
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Reguläre Shop-Betreiber
+                    {locale === "en" ? "Regular shop operators" : locale === "tr" ? "Normal mağaza işletmecileri" : "Reguläre Shop-Betreiber"}
                   </Text>
                   <Box paddingBlockStart="300">
                     {sellersFiltered.length === 0 ? (
                       <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                        <Text as="p" tone="subdued" alignment="center">Keine Verkäufer für diese Filter.</Text>
+                        <Text as="p" tone="subdued" alignment="center">{locale === "en" ? "No sellers for these filters." : locale === "tr" ? "Bu filtreler için satıcı yok." : "Keine Verkäufer für diese Filter."}</Text>
                       </Box>
                     ) : (
-                      <SellerTable rows={sellersFiltered} router={router} onImpersonate={handleImpersonate} />
+                      <SellerTable rows={sellersFiltered} router={router} onImpersonate={handleImpersonate} locale={locale} headers={tableHeaders} />
                     )}
                   </Box>
                 </div>

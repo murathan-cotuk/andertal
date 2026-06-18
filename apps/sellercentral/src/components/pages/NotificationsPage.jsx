@@ -1,8 +1,10 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Page, Card, Button, Checkbox, BlockStack, InlineStack, Text, Box } from "@shopify/polaris";
 import { Link } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 
@@ -10,20 +12,22 @@ function itemKey(it) {
   return `${it.source_type}:${it.source_id}`;
 }
 
-function formatDateDmy(value) {
+function formatDateDmy(value, locale) {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("de-DE", {
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return d.toLocaleDateString(loc, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
 }
 
-function NotificationRow({ it, busy, selected, onToggle, onDeleteOne }) {
+function NotificationRow({ it, busy, selected, onToggle, onDeleteOne, locale }) {
   const k = itemKey(it);
-  const dt = formatDateDmy(it.created_at);
+  const dt = formatDateDmy(it.created_at, locale);
+  const removeLabel = locale === "en" ? "Remove from list" : locale === "tr" ? "Listeden kaldır" : "Aus Liste entfernen";
   return (
     <div
       style={{
@@ -43,7 +47,7 @@ function NotificationRow({ it, busy, selected, onToggle, onDeleteOne }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {!it.read && (
             <span
-              title="Ungelesen"
+              title={locale === "en" ? "Unread" : locale === "tr" ? "Okunmadı" : "Ungelesen"}
               style={{
                 width: 8,
                 height: 8,
@@ -64,7 +68,7 @@ function NotificationRow({ it, busy, selected, onToggle, onDeleteOne }) {
       <div style={{ fontSize: 12, color: "#9ca3af", whiteSpace: "nowrap" }}>{dt}</div>
       <div>
         <Button size="slim" variant="plain" tone="critical" disabled={busy} onClick={() => onDeleteOne(it)}>
-          Aus Liste entfernen
+          {removeLabel}
         </Button>
       </div>
     </div>
@@ -72,6 +76,9 @@ function NotificationRow({ it, busy, selected, onToggle, onDeleteOne }) {
 }
 
 export default function NotificationsPage() {
+  const locale = useLocale();
+  const ui = getUI(locale);
+
   const [groups, setGroups] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -187,13 +194,12 @@ export default function NotificationsPage() {
   };
 
   const deleteAll = async () => {
-    if (
-      !await confirmDelete(
-        "Alle Einträge aus dieser Übersicht entfernen? Die Daten selbst (Bestellungen, Verkäufer usw.) bleiben unverändert — nur die Anzeige hier wird ausgeblendet.",
-      )
-    ) {
-      return;
-    }
+    const confirmMsg = locale === "en"
+      ? "Remove all entries from this view? The underlying data (orders, sellers, etc.) will remain unchanged — only the display here will be hidden."
+      : locale === "tr"
+      ? "Tüm girişler bu görünümden kaldırılsın mı? Asıl veriler (siparişler, satıcılar vb.) değişmeyecek — yalnızca buradaki görüntü gizlenecek."
+      : "Alle Einträge aus dieser Übersicht entfernen? Die Daten selbst (Bestellungen, Verkäufer usw.) bleiben unverändert — nur die Anzeige hier wird ausgeblendet.";
+    if (!await confirmDelete(confirmMsg)) return;
     setBusy(true);
     try {
       await getMedusaAdminClient().deleteNotifications({ all: true });
@@ -229,27 +235,58 @@ export default function NotificationsPage() {
     setBusy(false);
   };
 
+  const pageTitle = locale === "en" ? "Notifications" : locale === "tr" ? "Bildirimler" : "Benachrichtigungen";
+  const pageSubtitle = locale === "en"
+    ? "Select a category above; only its notifications appear below."
+    : locale === "tr"
+    ? "Yukarıdan bir kategori seçin; yalnızca ilgili bildirimler aşağıda görünür."
+    : "Kategorien oben auswählen, darunter erscheinen nur die zugehörigen Benachrichtigungen.";
+  const infoText = locale === "en"
+    ? "Opening this page marks unread notifications as read (the red counter at the top disappears). Orders and other records are never deleted by this action."
+    : locale === "tr"
+    ? "Bu sayfayı açmak okunmamış bildirimleri okundu olarak işaretler (üstteki kırmızı sayaç kaybolur). Siparişler ve diğer kayıtlar bu işlemle hiçbir zaman silinmez."
+    : "Beim Öffnen dieser Seite werden ungelesene Hinweise als gelesen markiert (roter Zähler oben verschwindet). Bestellungen und andere Stammdaten werden nie durch diese Aktion gelöscht.";
+  const removeSelectedLabel = locale === "en"
+    ? `Remove selected from list (${selected.size})`
+    : locale === "tr"
+    ? `Seçilenleri listeden kaldır (${selected.size})`
+    : `Ausgewählte aus Liste entfernen (${selected.size})`;
+  const removeAllLabel = locale === "en" ? "Remove all from list" : locale === "tr" ? "Tümünü listeden kaldır" : "Alle aus Liste entfernen";
+  const categoryLabel = locale === "en" ? "Category" : locale === "tr" ? "Kategori" : "Kategorie";
+  const noNotifInCategory = locale === "en" ? "No notifications in this category." : locale === "tr" ? "Bu kategoride bildirim yok." : "Keine Benachrichtigungen in dieser Kategorie.";
+
+  const getGroupLabel = (g) => {
+    if (locale === "en" && g.label_en) return g.label_en;
+    if (locale === "tr" && g.label_tr) return g.label_tr;
+    return g.label_de || g.key;
+  };
+
+  const footerText = () => {
+    const hasVerif = groups.some((x) => x.key === "verification" || x.key === "change_suggestion");
+    if (locale === "en") {
+      return `${grandTotal} entries total — up to 500 per category (orders, returns${hasVerif ? ", verification, change suggestions" : ""}).`;
+    }
+    if (locale === "tr") {
+      return `Toplam ${grandTotal} kayıt — kategori başına en fazla 500 (siparişler, iadeler${hasVerif ? ", doğrulama, değişiklik önerileri" : ""}).`;
+    }
+    return `${grandTotal} Einträge gesamt — bis zu 500 je Kategorie (Bestellungen, Rücksendungen${hasVerif ? ", Verifizierung, Änderungsvorschläge" : ""}).`;
+  };
+
   return (
-    <Page
-      title="Benachrichtigungen"
-      subtitle="Kategorien oben auswählen, darunter erscheinen nur die zugehörigen Benachrichtigungen."
-    >
+    <Page title={pageTitle} subtitle={pageSubtitle}>
       <BlockStack gap="400">
         <Card>
           <BlockStack gap="300">
-            <Text as="p" tone="subdued">
-              Beim Öffnen dieser Seite werden ungelesene Hinweise als gelesen markiert (roter Zähler oben verschwindet).
-              Bestellungen und andere Stammdaten werden nie durch diese Aktion gelöscht.
-            </Text>
+            <Text as="p" tone="subdued">{infoText}</Text>
             <InlineStack gap="200" wrap>
               <Button disabled={busy || selected.size === 0} onClick={deleteSelected}>
-                Ausgewählte aus Liste entfernen ({selected.size})
+                {removeSelectedLabel}
               </Button>
               <Button tone="critical" disabled={busy || flatItems.length === 0} onClick={deleteAll}>
-                Alle aus Liste entfernen
+                {removeAllLabel}
               </Button>
               <Button variant="plain" disabled={busy || loading} onClick={load}>
-                Aktualisieren
+                {ui.refresh}
               </Button>
             </InlineStack>
           </BlockStack>
@@ -258,12 +295,12 @@ export default function NotificationsPage() {
         <Card padding="0">
           {loading ? (
             <Box padding="400">
-              <Text as="p">Laden…</Text>
+              <Text as="p">{ui.loading}</Text>
             </Box>
           ) : flatItems.length === 0 ? (
             <Box padding="400">
               <Text as="p" tone="subdued">
-                Keine Benachrichtigungen.
+                {ui.noNotifications}.
               </Text>
             </Box>
           ) : (
@@ -297,7 +334,7 @@ export default function NotificationsPage() {
                         cursor: "pointer",
                       }}
                     >
-                      {g.label_de || g.key} ({count})
+                      {getGroupLabel(g)} ({count})
                     </button>
                   );
                 })}
@@ -328,10 +365,10 @@ export default function NotificationsPage() {
                   />
                 </div>
                 <div>
-                  {groups.find((g) => g.key === activeGroupKey)?.label_de || "Kategorie"} (
+                  {getGroupLabel(groups.find((g) => g.key === activeGroupKey) || {})} (
                   {activeGroupItems.length})
                 </div>
-                <div style={{ textAlign: "right" }}>Datum</div>
+                <div style={{ textAlign: "right" }}>{ui.colDate}</div>
                 <div />
               </div>
 
@@ -339,7 +376,7 @@ export default function NotificationsPage() {
                 {activeGroupItems.length === 0 ? (
                   <Box padding="400">
                     <Text as="p" tone="subdued">
-                      Bu kategoride bildirim yok.
+                      {noNotifInCategory}
                     </Text>
                   </Box>
                 ) : (
@@ -351,6 +388,7 @@ export default function NotificationsPage() {
                       selected={selected}
                       onToggle={toggleOne}
                       onDeleteOne={deleteOne}
+                      locale={locale}
                     />
                   ))
                 )}
@@ -360,9 +398,7 @@ export default function NotificationsPage() {
           {!loading && flatItems.length > 0 && (
             <Box padding="300">
               <Text as="p" tone="subdued">
-                {grandTotal} Einträge gesamt — bis zu 500 je Kategorie (Bestellungen, Rücksendungen
-                {groups.some((x) => x.key === "verification" || x.key === "change_suggestion") ? ", Verifizierung, Änderungsvorschläge" : ""}
-                ).
+                {footerText()}
               </Text>
             </Box>
           )}

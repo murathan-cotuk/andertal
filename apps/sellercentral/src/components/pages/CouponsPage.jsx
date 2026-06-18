@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import {
@@ -14,10 +14,16 @@ import {
   Badge,
   Modal,
 } from "@shopify/polaris";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 
-const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("de-DE") : "—");
+const fmtDate = (v, locale) => {
+  if (!v) return "—";
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  return new Date(v).toLocaleDateString(loc);
+};
 
 function toDateInput(iso) {
   if (!iso) return "";
@@ -30,29 +36,29 @@ function toDateInput(iso) {
   }
 }
 
-function CouponRow({ c, onToggle, onRemove, onEdit, sellerLabel }) {
+function CouponRow({ c, onToggle, onRemove, onEdit, sellerLabel, ui, locale }) {
   return (
     <div style={{ borderTop: "1px solid #f1f2f4", padding: "12px 0" }}>
       <InlineStack align="space-between" blockAlign="center">
         <BlockStack gap="100">
           <InlineStack gap="200" blockAlign="center">
             <Text as="span" fontWeight="semibold">{c.code}</Text>
-            <Badge tone={c.active ? "success" : "critical"}>{c.active ? "Aktiv" : "Inaktiv"}</Badge>
+            <Badge tone={c.active ? "success" : "critical"}>{c.active ? ui.active : ui.inactive}</Badge>
           </InlineStack>
           <Text tone="subdued" as="span">
             {c.discount_type === "fixed" ? `${(Number(c.discount_value || 0) / 100).toFixed(2)} €` : `${c.discount_value}%`} |
-            Min: {(Number(c.min_subtotal_cents || 0) / 100).toFixed(2)} € |
-            Nutzung: {Number(c.used_count || 0)}{c.usage_limit != null ? ` / ${c.usage_limit}` : ""} |
-            Ablauf: {fmtDate(c.expires_at)}
+            {locale === "en" ? "Min" : locale === "tr" ? "Min" : "Min"}: {(Number(c.min_subtotal_cents || 0) / 100).toFixed(2)} € |
+            {locale === "en" ? "Usage" : locale === "tr" ? "Kullanım" : "Nutzung"}: {Number(c.used_count || 0)}{c.usage_limit != null ? ` / ${c.usage_limit}` : ""} |
+            {locale === "en" ? "Expires" : locale === "tr" ? "Bitiş" : "Ablauf"}: {fmtDate(c.expires_at, locale)}
           </Text>
           {sellerLabel ? (
-            <Text tone="subdued" as="span" variant="bodySm">Verkäufer: {sellerLabel}</Text>
+            <Text tone="subdued" as="span" variant="bodySm">{locale === "en" ? "Seller" : locale === "tr" ? "Satıcı" : "Verkäufer"}: {sellerLabel}</Text>
           ) : null}
         </BlockStack>
         <InlineStack gap="200">
-          <Button size="slim" onClick={() => onEdit(c)}>Bearbeiten</Button>
-          <Button size="slim" onClick={() => onToggle(c)}>{c.active ? "Deaktivieren" : "Aktivieren"}</Button>
-          <Button size="slim" tone="critical" variant="plain" onClick={() => onRemove(c.id)}>Löschen</Button>
+          <Button size="slim" onClick={() => onEdit(c)}>{ui.edit}</Button>
+          <Button size="slim" onClick={() => onToggle(c)}>{c.active ? (locale === "en" ? "Deactivate" : locale === "tr" ? "Devre dışı bırak" : "Deaktivieren") : (locale === "en" ? "Activate" : locale === "tr" ? "Etkinleştir" : "Aktivieren")}</Button>
+          <Button size="slim" tone="critical" variant="plain" onClick={() => onRemove(c.id)}>{ui.delete}</Button>
         </InlineStack>
       </InlineStack>
     </div>
@@ -60,6 +66,9 @@ function CouponRow({ c, onToggle, onRemove, onEdit, sellerLabel }) {
 }
 
 export default function CouponsPage() {
+  const locale = useLocale();
+  const ui = getUI(locale);
+
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -118,7 +127,7 @@ export default function CouponsPage() {
       const res = await getMedusaAdminClient().getCoupons();
       setCoupons(Array.isArray(res?.coupons) ? res.coupons : []);
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Coupons konnten nicht geladen werden." });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Could not load coupons." : locale === "tr" ? "Kuponlar yüklenemedi." : "Coupons konnten nicht geladen werden.") });
     } finally {
       setLoading(false);
     }
@@ -142,7 +151,7 @@ export default function CouponsPage() {
   const submit = async () => {
     const dVal = discountValueForCreateApi();
     if (dVal == null || dVal <= 0) {
-      setMsg({ tone: "warning", text: "Bitte einen gültigen Rabattwert eingeben." });
+      setMsg({ tone: "warning", text: locale === "en" ? "Please enter a valid discount value." : locale === "tr" ? "Lütfen geçerli bir indirim değeri girin." : "Bitte einen gültigen Rabattwert eingeben." });
       return;
     }
     setSaving(true);
@@ -157,10 +166,10 @@ export default function CouponsPage() {
         expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
       });
       setForm({ code: "", discount_type: "percent", discount_value: "", min_subtotal_cents: "", usage_limit: "", expires_at: "" });
-      setMsg({ tone: "success", text: "Coupon erstellt." });
+      setMsg({ tone: "success", text: locale === "en" ? "Coupon created." : locale === "tr" ? "Kupon oluşturuldu." : "Coupon erstellt." });
       await load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Coupon konnte nicht erstellt werden." });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Could not create coupon." : locale === "tr" ? "Kupon oluşturulamadı." : "Coupon konnte nicht erstellt werden.") });
     } finally {
       setSaving(false);
     }
@@ -199,12 +208,12 @@ export default function CouponsPage() {
     if (!editingId) return;
     const code = editForm.code.trim();
     if (!code) {
-      setMsg({ tone: "warning", text: "Bitte einen Code eingeben." });
+      setMsg({ tone: "warning", text: locale === "en" ? "Please enter a code." : locale === "tr" ? "Lütfen bir kod girin." : "Bitte einen Code eingeben." });
       return;
     }
     const raw = Number(editForm.discount_value || 0);
     if (!Number.isFinite(raw) || raw <= 0) {
-      setMsg({ tone: "warning", text: "Bitte einen gültigen Rabattwert eingeben." });
+      setMsg({ tone: "warning", text: locale === "en" ? "Please enter a valid discount value." : locale === "tr" ? "Lütfen geçerli bir indirim değeri girin." : "Bitte einen gültigen Rabattwert eingeben." });
       return;
     }
     const discountValue =
@@ -221,11 +230,11 @@ export default function CouponsPage() {
         usage_limit: editForm.usage_limit === "" ? null : Number(editForm.usage_limit),
         expires_at: editForm.expires_at ? new Date(editForm.expires_at).toISOString() : null,
       });
-      setMsg({ tone: "success", text: "Coupon aktualisiert." });
+      setMsg({ tone: "success", text: locale === "en" ? "Coupon updated." : locale === "tr" ? "Kupon güncellendi." : "Coupon aktualisiert." });
       closeEdit();
       await load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Coupon konnte nicht aktualisiert werden." });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Could not update coupon." : locale === "tr" ? "Kupon güncellenemedi." : "Coupon konnte nicht aktualisiert werden.") });
     } finally {
       setEditSaving(false);
     }
@@ -236,17 +245,17 @@ export default function CouponsPage() {
       await getMedusaAdminClient().updateCoupon(c.id, { active: !c.active });
       await load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Status konnte nicht geändert werden." });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Could not change status." : locale === "tr" ? "Durum değiştirilemedi." : "Status konnte nicht geändert werden.") });
     }
   };
 
   const remove = async (id) => {
-    if (!(await confirmDelete("Coupon löschen?"))) return;
+    if (!(await confirmDelete(locale === "en" ? "Delete coupon?" : locale === "tr" ? "Kuponu sil?" : "Coupon löschen?"))) return;
     try {
       await getMedusaAdminClient().deleteCoupon(id);
       await load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Coupon konnte nicht gelöscht werden." });
+      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Could not delete coupon." : locale === "tr" ? "Kupon silinemedi." : "Coupon konnte nicht gelöscht werden.") });
     }
   };
 
@@ -257,6 +266,17 @@ export default function CouponsPage() {
     if (!isSuperuser || !c.seller_id || c.seller_id === "default") return null;
     return sellerNameById[c.seller_id] || null;
   };
+
+  const typeLabel = locale === "en" ? "Type" : locale === "tr" ? "Tür" : "Typ";
+  const percentLabel = locale === "en" ? "Percent" : locale === "tr" ? "Yüzde" : "Prozent";
+  const fixedLabel = locale === "en" ? "Fixed (€)" : locale === "tr" ? "Sabit (€)" : "Fix (€)";
+  const valuePercentLabel = locale === "en" ? "Value (%)" : locale === "tr" ? "Değer (%)" : "Wert (%)";
+  const valueEuroLabel = locale === "en" ? "Value (€)" : locale === "tr" ? "Değer (€)" : "Wert (€)";
+  const minOrderLabel = locale === "en" ? "Minimum order value (€)" : locale === "tr" ? "Minimum sipariş tutarı (€)" : "Mindestbestellwert (€)";
+  const usageLimitLabel = locale === "en" ? "Usage limit (optional)" : locale === "tr" ? "Kullanım limiti (isteğe bağlı)" : "Nutzungslimit (optional)";
+  const expiryLabel = locale === "en" ? "Expiry date (optional)" : locale === "tr" ? "Bitiş tarihi (isteğe bağlı)" : "Ablaufdatum (optional)";
+  const createTitle = locale === "en" ? "Create coupon" : locale === "tr" ? "Kupon oluştur" : "Coupon erstellen";
+  const editModalTitle = locale === "en" ? "Edit coupon" : locale === "tr" ? "Kuponu düzenle" : "Coupon bearbeiten";
 
   return (
     <Page title="Coupons">
@@ -270,9 +290,9 @@ export default function CouponsPage() {
         <Modal
           open={editOpen}
           onClose={closeEdit}
-          title="Coupon bearbeiten"
-          primaryAction={{ content: "Speichern", onAction: saveEdit, loading: editSaving }}
-          secondaryActions={[{ content: "Abbrechen", onAction: closeEdit }]}
+          title={editModalTitle}
+          primaryAction={{ content: ui.save, onAction: saveEdit, loading: editSaving }}
+          secondaryActions={[{ content: ui.cancel, onAction: closeEdit }]}
         >
           <Modal.Section>
             <BlockStack gap="400">
@@ -283,16 +303,16 @@ export default function CouponsPage() {
                 autoComplete="off"
               />
               <Select
-                label="Typ"
+                label={typeLabel}
                 options={[
-                  { label: "Prozent", value: "percent" },
-                  { label: "Fix (€)", value: "fixed" },
+                  { label: percentLabel, value: "percent" },
+                  { label: fixedLabel, value: "fixed" },
                 ]}
                 value={editForm.discount_type}
                 onChange={(v) => setEditForm((p) => ({ ...p, discount_type: v }))}
               />
               <TextField
-                label={editForm.discount_type === "percent" ? "Wert (%)" : "Wert (€)"}
+                label={editForm.discount_type === "percent" ? valuePercentLabel : valueEuroLabel}
                 type="number"
                 min="0"
                 max={editForm.discount_type === "percent" ? "100" : undefined}
@@ -301,7 +321,7 @@ export default function CouponsPage() {
                 autoComplete="off"
               />
               <TextField
-                label="Mindestbestellwert (€)"
+                label={minOrderLabel}
                 type="number"
                 min="0"
                 value={editForm.min_subtotal_euros}
@@ -309,7 +329,7 @@ export default function CouponsPage() {
                 autoComplete="off"
               />
               <TextField
-                label="Nutzungslimit (optional)"
+                label={usageLimitLabel}
                 type="number"
                 min="0"
                 value={editForm.usage_limit}
@@ -317,7 +337,7 @@ export default function CouponsPage() {
                 autoComplete="off"
               />
               <TextField
-                label="Ablaufdatum (optional)"
+                label={expiryLabel}
                 type="date"
                 value={editForm.expires_at}
                 onChange={(v) => setEditForm((p) => ({ ...p, expires_at: v }))}
@@ -329,20 +349,20 @@ export default function CouponsPage() {
 
         <Card>
           <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Coupon erstellen</Text>
+            <Text as="h2" variant="headingMd">{createTitle}</Text>
             <InlineStack gap="300" align="start">
               <TextField label="Code" value={form.code} onChange={(v) => setForm((p) => ({ ...p, code: v }))} autoComplete="off" />
               <Select
-                label="Typ"
+                label={typeLabel}
                 options={[
-                  { label: "Prozent", value: "percent" },
-                  { label: "Fix (€)", value: "fixed" },
+                  { label: percentLabel, value: "percent" },
+                  { label: fixedLabel, value: "fixed" },
                 ]}
                 value={form.discount_type}
                 onChange={(v) => setForm((p) => ({ ...p, discount_type: v }))}
               />
               <TextField
-                label={form.discount_type === "percent" ? "Wert (%)" : "Wert (€)"}
+                label={form.discount_type === "percent" ? valuePercentLabel : valueEuroLabel}
                 type="number"
                 min="0"
                 max={form.discount_type === "percent" ? "100" : undefined}
@@ -351,7 +371,7 @@ export default function CouponsPage() {
                 autoComplete="off"
               />
               <TextField
-                label="Mindestbestellwert (€)"
+                label={minOrderLabel}
                 type="number"
                 min="0"
                 value={form.min_subtotal_cents}
@@ -359,7 +379,7 @@ export default function CouponsPage() {
                 autoComplete="off"
               />
               <TextField
-                label="Usage limit (optional)"
+                label={usageLimitLabel}
                 type="number"
                 min="0"
                 value={form.usage_limit}
@@ -367,7 +387,7 @@ export default function CouponsPage() {
                 autoComplete="off"
               />
               <TextField
-                label="Ablaufdatum (optional)"
+                label={expiryLabel}
                 type="date"
                 value={form.expires_at}
                 onChange={(v) => setForm((p) => ({ ...p, expires_at: v }))}
@@ -376,7 +396,7 @@ export default function CouponsPage() {
             </InlineStack>
             <InlineStack>
               <Button variant="primary" onClick={submit} loading={saving} disabled={!form.code || !form.discount_value}>
-                Coupon speichern
+                {locale === "en" ? "Save coupon" : locale === "tr" ? "Kuponu kaydet" : "Coupon speichern"}
               </Button>
             </InlineStack>
           </BlockStack>
@@ -386,12 +406,14 @@ export default function CouponsPage() {
           <BlockStack gap="200">
             <InlineStack align="space-between" blockAlign="center">
               <Text as="h2" variant="headingMd">
-                {isSuperuser ? `Eigene Coupons (${ownCoupons.length})` : `Coupons (${coupons.length})`}
+                {isSuperuser
+                  ? (locale === "en" ? `Own coupons (${ownCoupons.length})` : locale === "tr" ? `Kendi kuponlarım (${ownCoupons.length})` : `Eigene Coupons (${ownCoupons.length})`)
+                  : `Coupons (${coupons.length})`}
               </Text>
-              <Button onClick={load} loading={loading} size="slim">Aktualisieren</Button>
+              <Button onClick={load} loading={loading} size="slim">{ui.refresh}</Button>
             </InlineStack>
             {ownCoupons.length === 0 ? (
-              <Text tone="subdued">Noch keine Coupons vorhanden.</Text>
+              <Text tone="subdued">{locale === "en" ? "No coupons yet." : locale === "tr" ? "Henüz kupon yok." : "Noch keine Coupons vorhanden."}</Text>
             ) : (
               <div>
                 {ownCoupons.map((c) => (
@@ -402,6 +424,8 @@ export default function CouponsPage() {
                     onRemove={remove}
                     onEdit={openEdit}
                     sellerLabel={sellerLabelFor(c)}
+                    ui={ui}
+                    locale={locale}
                   />
                 ))}
               </div>
@@ -412,9 +436,9 @@ export default function CouponsPage() {
         {isSuperuser && (
           <Card>
             <BlockStack gap="200">
-              <Text as="h2" variant="headingMd">Verkäufer-Coupons ({sellerCoupons.length})</Text>
+              <Text as="h2" variant="headingMd">{locale === "en" ? `Seller coupons (${sellerCoupons.length})` : locale === "tr" ? `Satıcı kuponları (${sellerCoupons.length})` : `Verkäufer-Coupons (${sellerCoupons.length})`}</Text>
               {sellerCoupons.length === 0 ? (
-                <Text tone="subdued">Keine Verkäufer-Coupons vorhanden.</Text>
+                <Text tone="subdued">{locale === "en" ? "No seller coupons." : locale === "tr" ? "Satıcı kuponu yok." : "Keine Verkäufer-Coupons vorhanden."}</Text>
               ) : (
                 <div>
                   {Object.entries(
@@ -438,6 +462,8 @@ export default function CouponsPage() {
                           onRemove={remove}
                           onEdit={openEdit}
                           sellerLabel={null}
+                          ui={ui}
+                          locale={locale}
                         />
                       ))}
                     </div>

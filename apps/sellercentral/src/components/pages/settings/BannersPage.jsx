@@ -18,6 +18,8 @@ import {
   EmptyState,
   Box,
 } from "@shopify/polaris";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 const EMPTY_FORM = {
@@ -32,6 +34,8 @@ const EMPTY_FORM = {
 };
 
 export default function BannersPage() {
+  const locale = useLocale();
+  const ui = getUI(locale);
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -55,7 +59,7 @@ export default function BannersPage() {
       const d = await getMedusaAdminClient().getBanners();
       setBanners(d?.banners || []);
     } catch (e) {
-      setErr(e?.message || "Laden fehlgeschlagen.");
+      setErr(e?.message || (locale === "en" ? "Loading failed." : locale === "tr" ? "Yükleme başarısız." : "Laden fehlgeschlagen."));
     } finally {
       setLoading(false);
     }
@@ -93,7 +97,7 @@ export default function BannersPage() {
   };
 
   const handleSave = async () => {
-    if (!form.title.trim()) { setFormErr("Titel ist erforderlich."); return; }
+    if (!form.title.trim()) { setFormErr(locale === "en" ? "Title is required." : locale === "tr" ? "Başlık gerekli." : "Titel ist erforderlich."); return; }
     setSaving(true);
     setFormErr("");
     try {
@@ -112,11 +116,13 @@ export default function BannersPage() {
       } else {
         await getMedusaAdminClient().createBanner(payload);
       }
-      setOk(editing ? "Banner aktualisiert." : "Banner erstellt.");
+      setOk(editing
+        ? (locale === "en" ? "Banner updated." : locale === "tr" ? "Banner güncellendi." : "Banner aktualisiert.")
+        : (locale === "en" ? "Banner created." : locale === "tr" ? "Banner oluşturuldu." : "Banner erstellt."));
       setModalOpen(false);
       await load();
     } catch (e) {
-      setFormErr(e?.message || "Speichern fehlgeschlagen.");
+      setFormErr(e?.message || (locale === "en" ? "Saving failed." : locale === "tr" ? "Kaydetme başarısız." : "Speichern fehlgeschlagen."));
     } finally {
       setSaving(false);
     }
@@ -127,11 +133,11 @@ export default function BannersPage() {
     setDeleting(true);
     try {
       await getMedusaAdminClient().deleteBanner(deleteTarget.id);
-      setOk(`Banner „${deleteTarget.title}" gelöscht.`);
+      setOk(locale === "en" ? `Banner "${deleteTarget.title}" deleted.` : locale === "tr" ? `"${deleteTarget.title}" banner silindi.` : `Banner „${deleteTarget.title}" gelöscht.`);
       setDeleteTarget(null);
       await load();
     } catch (e) {
-      setErr(e?.message || "Löschen fehlgeschlagen.");
+      setErr(e?.message || (locale === "en" ? "Deletion failed." : locale === "tr" ? "Silme başarısız." : "Löschen fehlgeschlagen."));
       setDeleteTarget(null);
     } finally {
       setDeleting(false);
@@ -143,7 +149,7 @@ export default function BannersPage() {
       await getMedusaAdminClient().updateBanner(banner.id, { ...banner, is_active: !banner.is_active });
       await load();
     } catch (e) {
-      setErr(e?.message || "Fehler beim Aktualisieren.");
+      setErr(e?.message || (locale === "en" ? "Error updating." : locale === "tr" ? "Güncelleme hatası." : "Fehler beim Aktualisieren."));
     }
   };
 
@@ -168,27 +174,27 @@ export default function BannersPage() {
     ) : <Text variant="bodySm" tone="subdued" key="nolink">–</Text>,
     <Text variant="bodySm" key="pos">{b.position}</Text>,
     <Badge key="active" tone={b.is_active ? "success" : "attention"}>
-      {b.is_active ? "Aktiv" : "Inaktiv"}
+      {b.is_active ? ui.active : ui.inactive}
     </Badge>,
     <InlineStack gap="200" key="actions">
       <Button size="slim" onClick={() => toggleActive(b)}>
-        {b.is_active ? "Deaktivieren" : "Aktivieren"}
+        {b.is_active ? (locale === "en" ? "Deactivate" : locale === "tr" ? "Deaktive et" : "Deaktivieren") : (locale === "en" ? "Activate" : locale === "tr" ? "Aktive et" : "Aktivieren")}
       </Button>
-      <Button size="slim" onClick={() => openEdit(b)}>Bearbeiten</Button>
-      <Button size="slim" tone="critical" onClick={() => setDeleteTarget(b)}>Löschen</Button>
+      <Button size="slim" onClick={() => openEdit(b)}>{ui.edit}</Button>
+      <Button size="slim" tone="critical" onClick={() => setDeleteTarget(b)}>{ui.delete}</Button>
     </InlineStack>,
   ]);
 
   return (
     <Page
-      title="Banner-Verwaltung"
-      primaryAction={{ content: "Banner erstellen", onAction: openCreate }}
+      title={locale === "en" ? "Banner Management" : locale === "tr" ? "Banner Yönetimi" : "Banner-Verwaltung"}
+      primaryAction={{ content: locale === "en" ? "Create banner" : locale === "tr" ? "Banner oluştur" : "Banner erstellen", onAction: openCreate }}
     >
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
             <Text as="p" tone="subdued">
-              Erstellen und verwalten Sie Werbebanner für den Shop-Header und die Startseite.
+              {locale === "en" ? "Create and manage advertising banners for the shop header and homepage." : locale === "tr" ? "Mağaza başlığı ve anasayfa için reklam bannerları oluşturun ve yönetin." : "Erstellen und verwalten Sie Werbebanner für den Shop-Header und die Startseite."}
             </Text>
 
             {err && (
@@ -205,20 +211,26 @@ export default function BannersPage() {
             <Card padding="0">
               {loading ? (
                 <Box padding="400">
-                  <Text tone="subdued">Laden…</Text>
+                  <Text tone="subdued">{ui.loading}</Text>
                 </Box>
               ) : banners.length === 0 ? (
                 <EmptyState
-                  heading="Noch keine Banner"
-                  action={{ content: "Banner erstellen", onAction: openCreate }}
+                  heading={locale === "en" ? "No banners yet" : locale === "tr" ? "Henüz banner yok" : "Noch keine Banner"}
+                  action={{ content: locale === "en" ? "Create banner" : locale === "tr" ? "Banner oluştur" : "Banner erstellen", onAction: openCreate }}
                   image=""
                 >
-                  <Text as="p">Erstellen Sie Ihren ersten Werbebanner für den Shop.</Text>
+                  <Text as="p">{locale === "en" ? "Create your first advertising banner for the shop." : locale === "tr" ? "Mağaza için ilk reklam bannerınızı oluşturun." : "Erstellen Sie Ihren ersten Werbebanner für den Shop."}</Text>
                 </EmptyState>
               ) : (
                 <DataTable
                   columnContentTypes={["text", "text", "numeric", "text", "text"]}
-                  headings={["Banner", "Link", "Position", "Status", "Aktionen"]}
+                  headings={[
+                    locale === "en" ? "Banner" : "Banner",
+                    "Link",
+                    locale === "en" ? "Position" : locale === "tr" ? "Konum" : "Position",
+                    ui.status,
+                    locale === "en" ? "Actions" : locale === "tr" ? "İşlemler" : "Aktionen",
+                  ]}
                   rows={rows}
                 />
               )}
@@ -231,9 +243,11 @@ export default function BannersPage() {
       <Modal
         open={modalOpen}
         onClose={closeModal}
-        title={editing ? "Banner bearbeiten" : "Neuer Banner"}
-        primaryAction={{ content: saving ? "Speichern…" : "Speichern", onAction: handleSave, loading: saving }}
-        secondaryActions={[{ content: "Abbrechen", onAction: closeModal }]}
+        title={editing
+          ? (locale === "en" ? "Edit banner" : locale === "tr" ? "Bannerı düzenle" : "Banner bearbeiten")
+          : (locale === "en" ? "New banner" : locale === "tr" ? "Yeni banner" : "Neuer Banner")}
+        primaryAction={{ content: ui.save, onAction: handleSave, loading: saving }}
+        secondaryActions={[{ content: ui.cancel, onAction: closeModal }]}
       >
         <Modal.Section>
           <BlockStack gap="400">
@@ -243,42 +257,42 @@ export default function BannersPage() {
               </Banner>
             )}
             <TextField
-              label="Titel *"
+              label={locale === "en" ? "Title *" : locale === "tr" ? "Başlık *" : "Titel *"}
               value={form.title}
               onChange={(v) => setForm((f) => ({ ...f, title: v }))}
               autoComplete="off"
-              placeholder="z. B. Sommerkollektion 2025"
+              placeholder={locale === "en" ? "e.g. Summer Collection 2025" : locale === "tr" ? "örn. Yaz Koleksiyonu 2025" : "z. B. Sommerkollektion 2025"}
             />
             <TextField
-              label="Untertitel"
+              label={locale === "en" ? "Subtitle" : locale === "tr" ? "Alt başlık" : "Untertitel"}
               value={form.subtitle}
               onChange={(v) => setForm((f) => ({ ...f, subtitle: v }))}
               autoComplete="off"
-              placeholder="Kurze Beschreibung oder Claim"
+              placeholder={locale === "en" ? "Short description or tagline" : locale === "tr" ? "Kısa açıklama veya slogan" : "Kurze Beschreibung oder Claim"}
             />
             <TextField
-              label="Bild-URL"
+              label={locale === "en" ? "Image URL" : locale === "tr" ? "Görsel URL" : "Bild-URL"}
               value={form.image_url}
               onChange={(v) => setForm((f) => ({ ...f, image_url: v }))}
               autoComplete="off"
               placeholder="https://…/banner.jpg"
-              helpText="Direktlink zu einem Bild (1200×400 px empfohlen)"
+              helpText={locale === "en" ? "Direct link to an image (1200×400 px recommended)" : locale === "tr" ? "Bir görsele doğrudan bağlantı (1200×400 px önerilir)" : "Direktlink zu einem Bild (1200×400 px empfohlen)"}
             />
             {form.image_url && (
               <img
                 src={form.image_url}
-                alt="Vorschau"
+                alt={locale === "en" ? "Preview" : locale === "tr" ? "Önizleme" : "Vorschau"}
                 style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 6, border: "1px solid #e5e7eb" }}
                 onError={(e) => { e.target.style.display = "none"; }}
               />
             )}
             <TextField
-              label="Video-URL (optional)"
+              label={locale === "en" ? "Video URL (optional)" : locale === "tr" ? "Video URL (isteğe bağlı)" : "Video-URL (optional)"}
               value={form.video_url}
               onChange={(v) => setForm((f) => ({ ...f, video_url: v }))}
               autoComplete="off"
               placeholder="https://…/banner.mp4"
-              helpText="MP4/WebM Video — ersetzt das Bild, wenn gesetzt"
+              helpText={locale === "en" ? "MP4/WebM video — replaces the image when set" : locale === "tr" ? "MP4/WebM video — ayarlandığında görselin yerini alır" : "MP4/WebM Video — ersetzt das Bild, wenn gesetzt"}
             />
             {form.video_url && (
               <video
@@ -290,32 +304,32 @@ export default function BannersPage() {
               />
             )}
             <TextField
-              label="Link-URL"
+              label={locale === "en" ? "Link URL" : locale === "tr" ? "Bağlantı URL" : "Link-URL"}
               value={form.link_url}
               onChange={(v) => setForm((f) => ({ ...f, link_url: v }))}
               autoComplete="off"
               placeholder="/de/bestsellers"
             />
             <TextField
-              label="Button-Text"
+              label={locale === "en" ? "Button text" : locale === "tr" ? "Düğme metni" : "Button-Text"}
               value={form.button_text}
               onChange={(v) => setForm((f) => ({ ...f, button_text: v }))}
               autoComplete="off"
-              placeholder="z. B. Jetzt entdecken"
+              placeholder={locale === "en" ? "e.g. Discover now" : locale === "tr" ? "örn. Şimdi keşfet" : "z. B. Jetzt entdecken"}
             />
             <TextField
-              label="Position (Anzeigereihenfolge)"
+              label={locale === "en" ? "Position (display order)" : locale === "tr" ? "Konum (görüntüleme sırası)" : "Position (Anzeigereihenfolge)"}
               type="number"
               value={String(form.position)}
               onChange={(v) => setForm((f) => ({ ...f, position: parseInt(v) || 0 }))}
               autoComplete="off"
-              helpText="Kleinere Zahlen erscheinen zuerst"
+              helpText={locale === "en" ? "Smaller numbers appear first" : locale === "tr" ? "Küçük sayılar önce görünür" : "Kleinere Zahlen erscheinen zuerst"}
             />
             <Checkbox
-              label="Banner aktiv"
+              label={locale === "en" ? "Banner active" : locale === "tr" ? "Banner aktif" : "Banner aktiv"}
               checked={form.is_active}
               onChange={(v) => setForm((f) => ({ ...f, is_active: v }))}
-              helpText="Inaktive Banner werden im Shop nicht angezeigt"
+              helpText={locale === "en" ? "Inactive banners are not shown in the shop" : locale === "tr" ? "Pasif bannerlar mağazada gösterilmez" : "Inaktive Banner werden im Shop nicht angezeigt"}
             />
           </BlockStack>
         </Modal.Section>
@@ -325,13 +339,18 @@ export default function BannersPage() {
       <Modal
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Banner löschen?"
-        primaryAction={{ content: "Löschen", onAction: handleDelete, loading: deleting, destructive: true }}
-        secondaryActions={[{ content: "Abbrechen", onAction: () => setDeleteTarget(null) }]}
+        title={locale === "en" ? "Delete banner?" : locale === "tr" ? "Banner silinsin mi?" : "Banner löschen?"}
+        primaryAction={{ content: ui.delete, onAction: handleDelete, loading: deleting, destructive: true }}
+        secondaryActions={[{ content: ui.cancel, onAction: () => setDeleteTarget(null) }]}
       >
         <Modal.Section>
           <Text as="p">
-            Möchten Sie den Banner <strong>„{deleteTarget?.title}"</strong> wirklich dauerhaft löschen?
+            {locale === "en"
+              ? <>Do you really want to permanently delete the banner <strong>"{deleteTarget?.title}"</strong>?</>
+              : locale === "tr"
+              ? <><strong>"{deleteTarget?.title}"</strong> bannerını kalıcı olarak silmek istiyor musunuz?</>
+              : <>Möchten Sie den Banner <strong>„{deleteTarget?.title}"</strong> wirklich dauerhaft löschen?</>
+            }
           </Text>
         </Modal.Section>
       </Modal>
