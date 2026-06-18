@@ -1026,7 +1026,11 @@ ${"=".repeat(50)}
             )}
             {(newStatus === "rejected" || newStatus === "suspended") && (
               <Banner tone="warning">
-                {locale === "en" ? "On rejection/suspension, all seller products will be set to "Draft"." : locale === "tr" ? "Red/askıya almada satıcının tüm ürünleri "Taslak" olarak ayarlanacak." : "Bei Ablehnung/Sperrung werden alle Produkte des Verkäufers auf „Entwurf" gesetzt."}
+                {locale === "en"
+                  ? 'On rejection/suspension, all seller products will be set to "Draft".'
+                  : locale === "tr"
+                    ? 'Red/askıya almada satıcının tüm ürünleri "Taslak" olarak ayarlanacak.'
+                    : "Bei Ablehnung/Sperrung werden alle Produkte des Verkäufers auf „Entwurf“ gesetzt."}
               </Banner>
             )}
           </BlockStack>

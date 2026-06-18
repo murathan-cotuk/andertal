@@ -8,7 +8,7 @@ import {
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-import { confirmDelete } from "@/components/confirm-delete";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 function getLocationTypes(locale) {
   return [
