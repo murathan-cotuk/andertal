@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { Box, Banner, SkeletonBodyText, SkeletonDisplayText, Card, BlockStack, Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { userError } from "@/lib/api-error-messages";
 import DashboardLayout from "@/components/DashboardLayout";
 import CollectionEditPage from "@/components/pages/products/CollectionEditPage";
 
@@ -30,7 +31,7 @@ export default function CollectionDetailRoute() {
         if (newPath !== pathname) router.replace(newPath);
       }
     } catch (err) {
-      setError(err?.message || "Failed to load collection");
+      setError(userError(err, null, "Failed to load collection"));
       setCollection(null);
     } finally {
       setLoading(false);

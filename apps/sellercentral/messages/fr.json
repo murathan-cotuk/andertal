@@ -104,7 +104,13 @@
     "sellers": "Vendeurs",
     "coupons": "Coupons",
     "landingPage": "Page d'atterrissage",
-    "styles": "Styles"
+    "styles": "Styles",
+    "promotions": "Promotions",
+    "flows": "Flux",
+    "newsletter": "Newsletter",
+    "productGroups": "Groupes de produits",
+    "issueLog": "Journal des incidents",
+    "transactions": "Transactions"
   },
   "rankingPage": {
     "title": "Classement des produits dans la boutique",

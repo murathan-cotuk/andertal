@@ -47,9 +47,9 @@ export default function CustomerNewsletterSubscribersPage() {
       colActions: "Aktionen",
       open: "Öffnen",
       delete: "Löschen",
-      status_active: "Kayıtlı",
-      status_unsubscribed: "Çıkmış",
-      status_deactivated: "Deaktif",
+      status_active: "Aktiv",
+      status_unsubscribed: "Abgemeldet",
+      status_deactivated: "Deaktiviert",
     },
     tr: {
       pageTitle: "Newsletter Aboneleri",
@@ -245,7 +245,8 @@ export default function CustomerNewsletterSubscribersPage() {
 
   const removeSubscriber = async (id) => {
     if (!id) return;
-    if (!(await confirmDelete("Diesen Abonnenten wirklich löschen?"))) return;
+    const confirmMsg = locale === "en" ? "Really delete this subscriber?" : locale === "tr" ? "Bu abone gerçekten silinsin mi?" : locale === "fr" ? "Supprimer cet abonné ?" : locale === "es" ? "¿Eliminar este suscriptor?" : locale === "it" ? "Eliminare questo iscritto?" : "Diesen Abonnenten wirklich löschen?";
+    if (!(await confirmDelete(confirmMsg))) return;
     setBusyId(id);
     try {
       await getMedusaAdminClient().deleteNewsletterSubscriber(id);
@@ -257,9 +258,9 @@ export default function CustomerNewsletterSubscribersPage() {
 
   const statusBadge = (statusRaw) => {
     const status = String(statusRaw || "active").toLowerCase();
-    if (status === "active") return { label: "Kayıtlı", bg: "#dcfce7", color: "#166534" };
-    if (status === "unsubscribed") return { label: "Çıkmış", bg: "#fee2e2", color: "#991b1b" };
-    if (status === "deactivated") return { label: "Deaktif", bg: "#e5e7eb", color: "#374151" };
+    if (status === "active") return { label: t.status_active, bg: "#dcfce7", color: "#166534" };
+    if (status === "unsubscribed") return { label: t.status_unsubscribed, bg: "#fee2e2", color: "#991b1b" };
+    if (status === "deactivated") return { label: t.status_deactivated, bg: "#e5e7eb", color: "#374151" };
     return { label: status, bg: "#f3f4f6", color: "#4b5563" };
   };
 

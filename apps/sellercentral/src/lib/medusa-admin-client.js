@@ -1,4 +1,6 @@
-﻿/**
+﻿import { formatApiError, getClientLocale } from './api-error-messages';
+
+/**
  * Medusa Admin API Client for Sellercentral
  * 
  * Sellercentral'dan Medusa backend'e product eklemek için REST API client
@@ -52,7 +54,9 @@ class MedusaAdminClient {
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({ message: response.statusText }));
         const msg = errorBody?.message || errorBody?.error || response.statusText;
-        const err = new Error(typeof msg === 'string' ? msg : `HTTP ${response.status}`);
+        const rawMsg = typeof msg === 'string' ? msg : `HTTP ${response.status}`;
+        const err = new Error(formatApiError({ message: rawMsg }, getClientLocale()));
+        err.originalMessage = rawMsg;
         err.statusCode = response.status;
         throw err;
       }
@@ -61,10 +65,11 @@ class MedusaAdminClient {
     } catch (error) {
       const isNetworkError = error?.message === 'Failed to fetch' || error?.name === 'TypeError' || error?.code === 'ECONNREFUSED';
       const method = (options?.method || 'GET').toUpperCase();
-      const friendlyMessage = isNetworkError
+      const rawFriendly = isNetworkError
         ? `Backend unreachable (${method} ${endpoint}). Set NEXT_PUBLIC_MEDUSA_BACKEND_URL to your backend URL (e.g. https://api.andertal.com) and ensure the backend is running.`
         : (error?.message || 'Request failed');
-      const out = new Error(friendlyMessage);
+      const out = new Error(formatApiError({ message: rawFriendly }, getClientLocale()));
+      out.originalMessage = rawFriendly;
       out.statusCode = error?.statusCode;
       out.cause = error;
       if (error?.statusCode === 404 || error?.statusCode === 503 || isNetworkError) {

@@ -10,6 +10,7 @@ import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
 import TrackingSection from "@/components/orders/TrackingSection";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
+import { statusLabel } from "@/lib/status-labels";
 
 function fmtCents(c, locale) {
   const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
@@ -26,8 +27,8 @@ function fmtDate(d, locale) {
 function formatPaymentMethod(pm) {
   const map = {
     visa: "Visa", mastercard: "Mastercard", amex: "American Express",
-    paypal: "PayPal", klarna: "Klarna", sepa_debit: "SEPA-Lastschrift",
-    card: "Kreditkarte", apple_pay: "Apple Pay", google_pay: "Google Pay",
+    paypal: "PayPal", klarna: "Klarna", sepa_debit: "SEPA Direct Debit",
+    card: "Credit Card", apple_pay: "Apple Pay", google_pay: "Google Pay",
     giropay: "Giropay", sofort: "Sofort", ideal: "iDEAL",
   };
   return map[pm] || (pm ? pm.charAt(0).toUpperCase() + pm.slice(1).replace(/_/g, " ") : "—");
@@ -45,11 +46,11 @@ const STATUS_COLORS = {
   zugestellt: { bg: "#f0fdf4", color: "#15803d" },
 };
 
-function Badge({ value }) {
+function Badge({ value, locale }) {
   const s = STATUS_COLORS[value] || { bg: "#f3f4f6", color: "#6b7280" };
   return (
     <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color }}>
-      {value || "—"}
+      {value ? statusLabel(locale, value) : "—"}
     </span>
   );
 }
@@ -72,18 +73,18 @@ function InfoRow({ label, value }) {
   );
 }
 
-function StatusSelect({ label, value, options, onChange, saving }) {
+function StatusSelect({ label, value, options, onChange, saving, locale }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
       <span style={{ fontSize: 13, color: "#6b7280", minWidth: 120 }}>{label}</span>
-      <Badge value={value} />
+      <Badge value={value} locale={locale} />
       <select
         value={value || ""}
         onChange={e => onChange(e.target.value)}
         disabled={saving}
         style={{ padding: "5px 8px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, background: "#fff", cursor: "pointer" }}
       >
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
+        {options.map(o => <option key={o} value={o}>{statusLabel(locale, o)}</option>)}
       </select>
     </div>
   );
@@ -273,10 +274,10 @@ export default function OrderDetailPage() {
               flexShrink: 0,
             }}
           >
-            <Button url={getOrderPdfDownloadUrl(order.id, "invoice")} external variant="secondary">
+            <Button url={getOrderPdfDownloadUrl(order.id, "invoice", locale)} external variant="secondary">
               {ui.invoice}
             </Button>
-            <Button url={getOrderPdfDownloadUrl(order.id, "lieferschein")} external variant="secondary">
+            <Button url={getOrderPdfDownloadUrl(order.id, "lieferschein", locale)} external variant="secondary">
               {ui.deliveryNote}
             </Button>
           </div>
@@ -364,9 +365,9 @@ export default function OrderDetailPage() {
 
           {/* Status management */}
           <Section title={locale === "en" ? "Manage status" : locale === "tr" ? "Durumu yönet" : "Status verwalten"}>
-            <StatusSelect label={ui.orderStatus} value={orderStatus} options={["offen", "in_bearbeitung", "abgeschlossen", "storniert"]} onChange={setOrderStatus} saving={saving} />
-            <StatusSelect label={ui.paymentStatus} value={paymentStatus} options={["offen", "bezahlt", "teil_erstattet", "erstattet"]} onChange={handlePaymentChange} saving={saving} />
-            <StatusSelect label={ui.deliveryStatus} value={deliveryStatus} options={["offen", "versendet", "zugestellt"]} onChange={handleDeliveryChange} saving={saving} />
+            <StatusSelect label={ui.orderStatus} value={orderStatus} options={["offen", "in_bearbeitung", "abgeschlossen", "storniert"]} onChange={setOrderStatus} saving={saving} locale={locale} />
+            <StatusSelect label={ui.paymentStatus} value={paymentStatus} options={["offen", "bezahlt", "teil_erstattet", "erstattet"]} onChange={handlePaymentChange} saving={saving} locale={locale} />
+            <StatusSelect label={ui.deliveryStatus} value={deliveryStatus} options={["offen", "versendet", "zugestellt"]} onChange={handleDeliveryChange} saving={saving} locale={locale} />
             <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
               <Button variant="primary" onClick={handleSaveStatus} disabled={saving} loading={saving}>
                 {locale === "en" ? "Save status" : locale === "tr" ? "Durumu kaydet" : "Status speichern"}
@@ -465,15 +466,15 @@ export default function OrderDetailPage() {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
               <span style={{ color: "#6b7280" }}>{ui.orderStatus}</span>
-              <Badge value={order?.order_status} />
+              <Badge value={order?.order_status} locale={locale} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
               <span style={{ color: "#6b7280" }}>{ui.paymentStatus}</span>
-              <Badge value={order?.payment_status} />
+              <Badge value={order?.payment_status} locale={locale} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
               <span style={{ color: "#6b7280" }}>{ui.deliveryStatus}</span>
-              <Badge value={order?.delivery_status} />
+              <Badge value={order?.delivery_status} locale={locale} />
             </div>
           </Section>
 

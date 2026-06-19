@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { useLocale } from "next-intl";
 import { Text, Select, Button, BlockStack, InlineStack, Box } from "@shopify/polaris";
+import { getFlowEmailEditorCopy } from "@/lib/landing-page-editor-i18n";
 
 function visualToHtml(html) {
   const s = (html || "").trim();
@@ -85,6 +87,15 @@ const FlowEmailBodyEditor = forwardRef(function FlowEmailBodyEditor(
   },
   ref,
 ) {
+  const locale = useLocale();
+  const editorUi = getFlowEmailEditorCopy(locale);
+  const resolvedModes = {
+    visual: modes?.visual ?? editorUi.modeVisual,
+    html: modes?.html ?? editorUi.modeHtml,
+    text: modes?.text ?? editorUi.modeText,
+  };
+  const resolvedTemplateLabel = templateSelectLabel === "Template" ? editorUi.template : templateSelectLabel;
+  const resolvedAppendLabel = templateAppendLabel === "Append" ? editorUi.append : templateAppendLabel;
   const [mode, setMode] = useState("visual");
   const [textDraft, setTextDraft] = useState("");
   const editorRef = useRef(null);
@@ -203,9 +214,9 @@ const FlowEmailBodyEditor = forwardRef(function FlowEmailBodyEditor(
         )}
         {templates.length > 0 && (
           <BlockStack gap="100">
-            <Text as="span" variant="bodySm" fontWeight="semibold">{templateSelectLabel}</Text>
+            <Text as="span" variant="bodySm" fontWeight="semibold">{resolvedTemplateLabel}</Text>
             <InlineTemplateRow
-              templateAppendLabel={templateAppendLabel}
+              templateAppendLabel={resolvedAppendLabel}
               templateOptions={templateOptions}
               templateChoice={templateChoice}
               setTemplateChoice={setTemplateChoice}
@@ -218,24 +229,24 @@ const FlowEmailBodyEditor = forwardRef(function FlowEmailBodyEditor(
           <div className="flow-rte-toolbar">
             <div className="flow-rte-toolbar-left">
               <div className="flow-rte-mode-group" role="tablist" aria-label="Editor mode">
-                <button type="button" className={`flow-rte-mode-btn ${mode === "visual" ? "active" : ""}`} onClick={() => switchMode("visual")}>{modes.visual}</button>
-                <button type="button" className={`flow-rte-mode-btn ${mode === "html" ? "active" : ""}`} onClick={() => switchMode("html")}>{modes.html}</button>
-                <button type="button" className={`flow-rte-mode-btn ${mode === "text" ? "active" : ""}`} onClick={() => switchMode("text")}>{modes.text}</button>
+                <button type="button" className={`flow-rte-mode-btn ${mode === "visual" ? "active" : ""}`} onClick={() => switchMode("visual")}>{resolvedModes.visual}</button>
+                <button type="button" className={`flow-rte-mode-btn ${mode === "html" ? "active" : ""}`} onClick={() => switchMode("html")}>{resolvedModes.html}</button>
+                <button type="button" className={`flow-rte-mode-btn ${mode === "text" ? "active" : ""}`} onClick={() => switchMode("text")}>{resolvedModes.text}</button>
               </div>
               {mode === "visual" && (
                 <>
                   <span className="flow-rte-divider" aria-hidden />
-                  <button type="button" className="flow-rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("bold"); }} title="Bold">
+                  <button type="button" className="flow-rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("bold"); }} title={editorUi.bold}>
                     <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2h4.5a3.501 3.501 0 0 1 2.852 5.53A3.499 3.499 0 0 1 9 14H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1m1 5.5h3.5a1.5 1.5 0 0 0 0-3H5zm0 2V12h4a1.5 1.5 0 0 0 0-3H5z"/></svg>
                   </button>
-                  <button type="button" className="flow-rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("italic"); }} title="Italic">
+                  <button type="button" className="flow-rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("italic"); }} title={editorUi.italic}>
                     <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 2.25a.75.75 0 0 1 .75-.75h6a.75.75 0 0 1 0 1.5H9.906l-2.273 10h2.117a.75.75 0 0 1 0 1.5h-6a.75.75 0 0 1 0-1.5h2.345l2.272-10H8.25a.75.75 0 0 1-.75-.75"/></svg>
                   </button>
                   <span className="flow-rte-divider" aria-hidden />
                   <button type="button" className="flow-rte-btn" style={{ width: 34, fontSize: 11 }} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "h2"); }}>H2</button>
                   <button type="button" className="flow-rte-btn" style={{ width: 34, fontSize: 11 }} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "h3"); }}>H3</button>
                   <span className="flow-rte-divider" aria-hidden />
-                  <button type="button" className="flow-rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("insertUnorderedList"); }} title="List">
+                  <button type="button" className="flow-rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("insertUnorderedList"); }} title={editorUi.list}>
                     <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2"/><path d="M2 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2"/><path d="M3 13a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/><path d="M5.25 2.25a.75.75 0 0 0 0 1.5h9a.75.75 0 0 0 0-1.5z"/><path d="M4.5 8a.75.75 0 0 1 .75-.75h9a.75.75 0 0 1 0 1.5h-9A.75.75 0 0 1 4.5 8"/><path d="M5.25 12.25a.75.75 0 0 0 0 1.5h9a.75.75 0 0 0 0-1.5z"/></svg>
                   </button>
                   <button type="button" className="flow-rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("insertOrderedList"); }} title="Ordered list">
@@ -307,7 +318,7 @@ function InlineTemplateRow({
     <InlineStack gap="300" blockAlign="end" wrap>
       <Box minWidth="200px" maxWidth="480px" width="100%">
         <Select
-          label="Template"
+          label={resolvedTemplateLabel}
           labelHidden
           options={templateOptions}
           value={templateChoice}

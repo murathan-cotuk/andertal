@@ -1,4 +1,5 @@
 ﻿import ExcelJS from "exceljs";
+import { getImportApiMessages, resolveRequestLocale } from "@/lib/import-export-i18n";
 
 const DEFAULT_BACKEND = "https://api.andertal.com";
 
@@ -441,9 +442,13 @@ async function toXlsx(columns, rows, groupBySeller = false, meta = {}) {
 export async function POST(request) {
   try {
     const body = await request.json().catch(() => ({}));
+    const locale = body.locale
+      ? String(body.locale).slice(0, 2).toLowerCase()
+      : resolveRequestLocale(request);
+    const msg = getImportApiMessages(locale);
     const backendUrl = getBackendBase();
     const token = str(body.sellerToken);
-    if (!token) return Response.json({ error: "Missing seller token" }, { status: 401 });
+    if (!token) return Response.json({ error: msg.missingSellerToken }, { status: 401 });
 
     const headers = { Authorization: `Bearer ${token}` };
     const accountRes = await fetchJson(`${backendUrl}/admin-hub/v1/seller/account`, { headers });
@@ -507,6 +512,6 @@ export async function POST(request) {
       },
     });
   } catch (e) {
-    return Response.json({ error: e?.message || "Export failed" }, { status: 500 });
+    return Response.json({ error: e?.message || msg.exportFailed }, { status: 500 });
   }
 }

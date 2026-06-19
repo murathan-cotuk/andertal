@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   Card,
@@ -16,83 +16,19 @@ import {
   Box,
   InlineGrid,
 } from "@shopify/polaris";
+import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { useUI } from "@/lib/ui-strings";
+import { getShippingCopy } from "@/lib/shipping-i18n";
+import { getCountryList } from "@/lib/countries";
+import { dateLocaleFor } from "@/lib/locale-text";
 
 function normalizeSellerCountryCode(code) {
   const u = String(code ?? "").trim().toUpperCase();
   if (u === "UK") return "GB";
   return /^[A-Z]{2}$/.test(u) ? u : "";
 }
-
-/* ── World countries ─────────────────────────────────────────── */
-const ALL_COUNTRIES = [
-  { code: "AF", label: "Afghanistan" }, { code: "AL", label: "Albanien" }, { code: "DZ", label: "Algerien" },
-  { code: "AD", label: "Andorra" }, { code: "AO", label: "Angola" }, { code: "AG", label: "Antigua und Barbuda" },
-  { code: "AR", label: "Argentinien" }, { code: "AM", label: "Armenien" }, { code: "AU", label: "Australien" },
-  { code: "AT", label: "Österreich" }, { code: "AZ", label: "Aserbaidschan" }, { code: "BS", label: "Bahamas" },
-  { code: "BH", label: "Bahrain" }, { code: "BD", label: "Bangladesch" }, { code: "BB", label: "Barbados" },
-  { code: "BY", label: "Belarus" }, { code: "BE", label: "Belgien" }, { code: "BZ", label: "Belize" },
-  { code: "BJ", label: "Benin" }, { code: "BT", label: "Bhutan" }, { code: "BO", label: "Bolivien" },
-  { code: "BA", label: "Bosnien und Herzegowina" }, { code: "BW", label: "Botswana" }, { code: "BR", label: "Brasilien" },
-  { code: "BN", label: "Brunei" }, { code: "BG", label: "Bulgarien" }, { code: "BF", label: "Burkina Faso" },
-  { code: "BI", label: "Burundi" }, { code: "CV", label: "Cabo Verde" }, { code: "KH", label: "Kambodscha" },
-  { code: "CM", label: "Kamerun" }, { code: "CA", label: "Kanada" }, { code: "CF", label: "Zentralafrikanische Republik" },
-  { code: "TD", label: "Tschad" }, { code: "CL", label: "Chile" }, { code: "CN", label: "China" },
-  { code: "CO", label: "Kolumbien" }, { code: "KM", label: "Komoren" }, { code: "CG", label: "Kongo" },
-  { code: "CD", label: "DR Kongo" }, { code: "CR", label: "Costa Rica" }, { code: "HR", label: "Kroatien" },
-  { code: "CU", label: "Kuba" }, { code: "CY", label: "Zypern" }, { code: "CZ", label: "Tschechien" },
-  { code: "DK", label: "Dänemark" }, { code: "DJ", label: "Dschibuti" }, { code: "DM", label: "Dominica" },
-  { code: "DO", label: "Dominikanische Republik" }, { code: "EC", label: "Ecuador" }, { code: "EG", label: "Ägypten" },
-  { code: "SV", label: "El Salvador" }, { code: "GQ", label: "Äquatorialguinea" }, { code: "ER", label: "Eritrea" },
-  { code: "EE", label: "Estland" }, { code: "SZ", label: "Eswatini" }, { code: "ET", label: "Äthiopien" },
-  { code: "FJ", label: "Fidschi" }, { code: "FI", label: "Finnland" }, { code: "FR", label: "Frankreich" },
-  { code: "GA", label: "Gabun" }, { code: "GM", label: "Gambia" }, { code: "GE", label: "Georgien" },
-  { code: "DE", label: "Deutschland" }, { code: "GH", label: "Ghana" }, { code: "GR", label: "Griechenland" },
-  { code: "GD", label: "Grenada" }, { code: "GT", label: "Guatemala" }, { code: "GN", label: "Guinea" },
-  { code: "GW", label: "Guinea-Bissau" }, { code: "GY", label: "Guyana" }, { code: "HT", label: "Haiti" },
-  { code: "HN", label: "Honduras" }, { code: "HU", label: "Ungarn" }, { code: "IS", label: "Island" },
-  { code: "IN", label: "Indien" }, { code: "ID", label: "Indonesien" }, { code: "IR", label: "Iran" },
-  { code: "IQ", label: "Irak" }, { code: "IE", label: "Irland" }, { code: "IL", label: "Israel" },
-  { code: "IT", label: "Italien" }, { code: "JM", label: "Jamaika" }, { code: "JP", label: "Japan" },
-  { code: "JO", label: "Jordanien" }, { code: "KZ", label: "Kasachstan" }, { code: "KE", label: "Kenia" },
-  { code: "KI", label: "Kiribati" }, { code: "KP", label: "Nordkorea" }, { code: "KR", label: "Südkorea" },
-  { code: "KW", label: "Kuwait" }, { code: "KG", label: "Kirgisistan" }, { code: "LA", label: "Laos" },
-  { code: "LV", label: "Lettland" }, { code: "LB", label: "Libanon" }, { code: "LS", label: "Lesotho" },
-  { code: "LR", label: "Liberia" }, { code: "LY", label: "Libyen" }, { code: "LI", label: "Liechtenstein" },
-  { code: "LT", label: "Litauen" }, { code: "LU", label: "Luxemburg" }, { code: "MG", label: "Madagaskar" },
-  { code: "MW", label: "Malawi" }, { code: "MY", label: "Malaysia" }, { code: "MV", label: "Malediven" },
-  { code: "ML", label: "Mali" }, { code: "MT", label: "Malta" }, { code: "MH", label: "Marshallinseln" },
-  { code: "MR", label: "Mauretanien" }, { code: "MU", label: "Mauritius" }, { code: "MX", label: "Mexiko" },
-  { code: "FM", label: "Mikronesien" }, { code: "MD", label: "Moldau" }, { code: "MC", label: "Monaco" },
-  { code: "MN", label: "Mongolei" }, { code: "ME", label: "Montenegro" }, { code: "MA", label: "Marokko" },
-  { code: "MZ", label: "Mosambik" }, { code: "MM", label: "Myanmar" }, { code: "NA", label: "Namibia" },
-  { code: "NR", label: "Nauru" }, { code: "NP", label: "Nepal" }, { code: "NL", label: "Niederlande" },
-  { code: "NZ", label: "Neuseeland" }, { code: "NI", label: "Nicaragua" }, { code: "NE", label: "Niger" },
-  { code: "NG", label: "Nigeria" }, { code: "MK", label: "Nordmazedonien" }, { code: "NO", label: "Norwegen" },
-  { code: "OM", label: "Oman" }, { code: "PK", label: "Pakistan" }, { code: "PW", label: "Palau" },
-  { code: "PA", label: "Panama" }, { code: "PG", label: "Papua-Neuguinea" }, { code: "PY", label: "Paraguay" },
-  { code: "PE", label: "Peru" }, { code: "PH", label: "Philippinen" }, { code: "PL", label: "Polen" },
-  { code: "PT", label: "Portugal" }, { code: "QA", label: "Katar" }, { code: "RO", label: "Rumänien" },
-  { code: "RU", label: "Russland" }, { code: "RW", label: "Ruanda" }, { code: "KN", label: "St. Kitts und Nevis" },
-  { code: "LC", label: "St. Lucia" }, { code: "VC", label: "St. Vincent und die Grenadinen" }, { code: "WS", label: "Samoa" },
-  { code: "SM", label: "San Marino" }, { code: "ST", label: "São Tomé und Príncipe" }, { code: "SA", label: "Saudi-Arabien" },
-  { code: "SN", label: "Senegal" }, { code: "RS", label: "Serbien" }, { code: "SC", label: "Seychellen" },
-  { code: "SL", label: "Sierra Leone" }, { code: "SG", label: "Singapur" }, { code: "SK", label: "Slowakei" },
-  { code: "SI", label: "Slowenien" }, { code: "SB", label: "Salomonen" }, { code: "SO", label: "Somalia" },
-  { code: "ZA", label: "Südafrika" }, { code: "SS", label: "Südsudan" }, { code: "ES", label: "Spanien" },
-  { code: "LK", label: "Sri Lanka" }, { code: "SD", label: "Sudan" }, { code: "SR", label: "Suriname" },
-  { code: "SE", label: "Schweden" }, { code: "CH", label: "Schweiz" }, { code: "SY", label: "Syrien" },
-  { code: "TW", label: "Taiwan" }, { code: "TJ", label: "Tadschikistan" }, { code: "TZ", label: "Tansania" },
-  { code: "TH", label: "Thailand" }, { code: "TL", label: "Osttimor" }, { code: "TG", label: "Togo" },
-  { code: "TO", label: "Tonga" }, { code: "TT", label: "Trinidad und Tobago" }, { code: "TN", label: "Tunesien" },
-  { code: "TR", label: "Türkei" }, { code: "TM", label: "Turkmenistan" }, { code: "TV", label: "Tuvalu" },
-  { code: "UG", label: "Uganda" }, { code: "UA", label: "Ukraine" }, { code: "AE", label: "Vereinigte Arabische Emirate" },
-  { code: "GB", label: "Vereinigtes Königreich" }, { code: "US", label: "USA" }, { code: "UY", label: "Uruguay" },
-  { code: "UZ", label: "Usbekistan" }, { code: "VU", label: "Vanuatu" }, { code: "VE", label: "Venezuela" },
-  { code: "VN", label: "Vietnam" }, { code: "YE", label: "Jemen" }, { code: "ZM", label: "Sambia" },
-  { code: "ZW", label: "Simbabwe" },
-].sort((a, b) => a.label.localeCompare(b.label, "de"));
 
 /* ── Country multi-select ────────────────────────────────────── */
 const COUNTRY_PICKER_STYLES = `
@@ -111,7 +47,7 @@ const COUNTRY_PICKER_STYLES = `
 .cp-item:hover { background:#f6f6f7; }
 `;
 
-function CountryPicker({ selected, onChange }) {
+function CountryPicker({ selected, onChange, countries, copy }) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [panelStyle, setPanelStyle] = useState({});
@@ -141,7 +77,7 @@ function CountryPicker({ selected, onChange }) {
   };
   const remove = (code) => onChange(selected.filter((c) => c !== code));
 
-  const filtered = ALL_COUNTRIES.filter(
+  const filtered = countries.filter(
     (c) => c.label.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -156,7 +92,7 @@ function CountryPicker({ selected, onChange }) {
         >
           <input
             style={{ border: "none", outline: "none", width: "100%", fontSize: 13, background: "transparent", color: "#202223" }}
-            placeholder="Land suchen…"
+            placeholder={copy.searchCountry}
             value={search}
             onChange={(e) => { setSearch(e.target.value); if (!open) openPanel(); }}
             onFocus={openPanel}
@@ -193,7 +129,7 @@ function CountryPicker({ selected, onChange }) {
               ))}
               {filtered.length > 80 && (
                 <div style={{ padding: "6px 14px", fontSize: 12, color: "#6d7175", borderTop: "1px solid #f1f1f1" }}>
-                  … {filtered.length - 80} weitere. Suche verfeinern.
+                  {copy.moreCountries(filtered.length - 80)}
                 </div>
               )}
             </div>
@@ -204,7 +140,7 @@ function CountryPicker({ selected, onChange }) {
         {selected.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
             {selected.map((code) => {
-              const country = ALL_COUNTRIES.find((c) => c.code === code);
+              const country = countries.find((c) => c.code === code);
               return (
                 <span key={code} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", background: "var(--p-color-bg-fill-secondary, #f3f4f6)", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, color: "#374151" }}>
                   <span style={{ fontWeight: 600, color: "#6d7175", fontSize: 11 }}>{code}</span>
@@ -223,7 +159,7 @@ function CountryPicker({ selected, onChange }) {
 /* ── Shipping groups section ─────────────────────────────────── */
 const EMPTY_GROUP_FORM = { name: "", carrier_id: "", selectedCountries: [], prices: {} };
 
-function ShippingGroupsSection({ carriers }) {
+function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -274,7 +210,7 @@ function ShippingGroupsSection({ carriers }) {
   };
 
   const handleSave = async () => {
-    if (!form.name) { setErr("Gruppenname ist erforderlich"); return; }
+    if (!form.name) { setErr(copy.groupNameRequired); return; }
     setSaving(true); setErr("");
     try {
       const client = getMedusaAdminClient();
@@ -302,12 +238,12 @@ function ShippingGroupsSection({ carriers }) {
       await loadGroups();
       setShowForm(false);
       setEditingId(null);
-    } catch (e) { setErr(e?.message || "Fehler beim Speichern"); }
+    } catch (e) { setErr(e?.message || copy.saveError); }
     setSaving(false);
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirmDelete("Versandgruppe löschen?"))) return;
+    if (!(await confirmDelete(copy.deleteGroupConfirm))) return;
     try {
       await getMedusaAdminClient().request(`/admin-hub/v1/shipping-groups/${id}`, { method: "DELETE" });
       setGroups((prev) => prev.filter((g) => g.id !== id));
@@ -315,25 +251,26 @@ function ShippingGroupsSection({ carriers }) {
   };
 
   const carrierOptions = [
-    { label: "— Kein Carrier —", value: "" },
+    { label: copy.noCarrier, value: "" },
     ...carriers.map((c) => ({ label: c.name, value: c.id })),
   ];
+  const moneyLocale = dateLocaleFor(locale);
 
   return (
     <BlockStack gap="400">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <BlockStack gap="100">
-          <Text variant="headingMd" as="h2">Versandgruppen</Text>
-          <Text variant="bodySm" tone="subdued">Versandpreise pro Land für Produktgruppen verwalten.</Text>
+          <Text variant="headingMd" as="h2">{copy.groupsTitle}</Text>
+          <Text variant="bodySm" tone="subdued">{copy.groupsSub}</Text>
         </BlockStack>
-        <Button onClick={openCreate}>+ Neue Gruppe</Button>
+        <Button onClick={openCreate}>{copy.newGroup}</Button>
       </div>
 
-      {loading && <Text tone="subdued">Laden…</Text>}
+      {loading && <Text tone="subdued">{ui.loading}</Text>}
 
       {!loading && groups.length === 0 && !showForm && (
         <Box padding="600" background="bg-surface-secondary" borderRadius="200">
-          <Text alignment="center" tone="subdued">Noch keine Versandgruppen. Erstelle deine erste Gruppe.</Text>
+          <Text alignment="center" tone="subdued">{copy.noGroups}</Text>
         </Box>
       )}
 
@@ -346,21 +283,21 @@ function ShippingGroupsSection({ carriers }) {
                 <InlineStack align="space-between" blockAlign="start" gap="400">
                   <BlockStack gap="200">
                     <Text variant="bodyMd" fontWeight="semibold">{g.name}</Text>
-                    {g.carrier_name && <Text variant="bodySm" tone="subdued">Carrier: {g.carrier_name}</Text>}
+                    {g.carrier_name && <Text variant="bodySm" tone="subdued">{copy.carrierLabel}: {g.carrier_name}</Text>}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
                       {(g.prices || []).filter(p => p.price_cents > 0).map((p) => {
-                        const country = ALL_COUNTRIES.find((c) => c.code === p.country_code);
+                        const country = countries.find((c) => c.code === p.country_code);
                         return (
                           <span key={p.country_code} style={{ fontSize: 11, background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 6, padding: "2px 8px", color: "#374151" }}>
-                            {country?.label || p.country_code}: {(p.price_cents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                            {country?.label || p.country_code}: {(p.price_cents / 100).toLocaleString(moneyLocale, { minimumFractionDigits: 2 })} €
                           </span>
                         );
                       })}
                     </div>
                   </BlockStack>
                   <InlineStack gap="200">
-                    <Button size="slim" onClick={() => openEdit(g)}>Bearbeiten</Button>
-                    <Button size="slim" tone="critical" onClick={() => handleDelete(g.id)}>Löschen</Button>
+                    <Button size="slim" onClick={() => openEdit(g)}>{ui.edit}</Button>
+                    <Button size="slim" tone="critical" onClick={() => handleDelete(g.id)}>{ui.delete}</Button>
                   </InlineStack>
                 </InlineStack>
               </div>
@@ -372,17 +309,17 @@ function ShippingGroupsSection({ carriers }) {
       {showForm && (
         <Card>
           <BlockStack gap="400">
-            <Text variant="headingSm" as="h3">{editingId ? "Versandgruppe bearbeiten" : "Neue Versandgruppe"}</Text>
+            <Text variant="headingSm" as="h3">{editingId ? copy.editGroup : copy.newGroupForm}</Text>
             <InlineGrid columns={2} gap="400">
               <TextField
-                label="Gruppenname"
+                label={copy.groupName}
                 value={form.name}
                 onChange={(v) => setForm((f) => ({ ...f, name: v }))}
-                placeholder="z.B. Standart Paket"
+                placeholder={copy.groupNamePlaceholder}
                 autoComplete="off"
               />
               <Select
-                label="Carrier"
+                label={copy.carrierLabel}
                 options={carrierOptions}
                 value={form.carrier_id}
                 onChange={(v) => setForm((f) => ({ ...f, carrier_id: v }))}
@@ -390,19 +327,21 @@ function ShippingGroupsSection({ carriers }) {
             </InlineGrid>
 
             <BlockStack gap="200">
-              <Text variant="bodySm" fontWeight="semibold">Lieferländer auswählen</Text>
+              <Text variant="bodySm" fontWeight="semibold">{copy.selectCountries}</Text>
               <CountryPicker
                 selected={form.selectedCountries}
                 onChange={handleCountriesChange}
+                countries={countries}
+                copy={copy}
               />
             </BlockStack>
 
             {form.selectedCountries.length > 0 && (
               <BlockStack gap="200">
-                <Text variant="bodySm" fontWeight="semibold">Versandpreise</Text>
+                <Text variant="bodySm" fontWeight="semibold">{copy.shippingPrices}</Text>
                 <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
                   {form.selectedCountries.map((code, i) => {
-                    const country = ALL_COUNTRIES.find((c) => c.code === code);
+                    const country = countries.find((c) => c.code === code);
                     return (
                       <div key={code} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", borderBottom: i < form.selectedCountries.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                         <span style={{ minWidth: 160, fontSize: 13, color: "#374151" }}>
@@ -421,7 +360,7 @@ function ShippingGroupsSection({ carriers }) {
                         <button
                           onClick={() => handleCountriesChange(form.selectedCountries.filter(c => c !== code))}
                           style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 18, lineHeight: 1, padding: "0 4px", flexShrink: 0 }}
-                          title="Land entfernen"
+                          title={copy.removeCountry}
                         >
                           ×
                         </button>
@@ -434,8 +373,8 @@ function ShippingGroupsSection({ carriers }) {
 
             {err && <Banner tone="critical"><p>{err}</p></Banner>}
             <InlineStack gap="200">
-              <Button onClick={() => { setShowForm(false); setEditingId(null); }}>Abbrechen</Button>
-              <Button variant="primary" onClick={handleSave} loading={saving}>Speichern</Button>
+              <Button onClick={() => { setShowForm(false); setEditingId(null); }}>{ui.cancel}</Button>
+              <Button variant="primary" onClick={handleSave} loading={saving}>{ui.save}</Button>
             </InlineStack>
           </BlockStack>
         </Card>
@@ -447,7 +386,7 @@ function ShippingGroupsSection({ carriers }) {
 /* ── Carrier modal ───────────────────────────────────────────── */
 const EMPTY_CARRIER_FORM = { name: "", tracking_url_template: "", api_key: "", api_secret: "", is_active: true };
 
-function CarrierModal({ mode, carrier, onClose, onSaved }) {
+function CarrierModal({ mode, carrier, onClose, onSaved, copy, ui }) {
   const [form, setForm] = useState(
     carrier
       ? { name: carrier.name || "", tracking_url_template: carrier.tracking_url_template || "", api_key: carrier.api_key || "", api_secret: carrier.api_secret || "", is_active: carrier.is_active !== false }
@@ -457,7 +396,7 @@ function CarrierModal({ mode, carrier, onClose, onSaved }) {
   const [err, setErr] = useState("");
 
   const handleSave = async () => {
-    if (!form.name) { setErr("Name ist erforderlich"); return; }
+    if (!form.name) { setErr(copy.nameRequired); return; }
     setSaving(true); setErr("");
     try {
       const client = getMedusaAdminClient();
@@ -466,7 +405,7 @@ function CarrierModal({ mode, carrier, onClose, onSaved }) {
         : await client.createCarrier(form);
       onSaved(res.carrier, mode);
       onClose();
-    } catch (e) { setErr(e?.message || "Fehler"); }
+    } catch (e) { setErr(e?.message || copy.genericError); }
     setSaving(false);
   };
 
@@ -474,32 +413,32 @@ function CarrierModal({ mode, carrier, onClose, onSaved }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 520, boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Text variant="headingMd" as="h3">{mode === "edit" ? "Carrier bearbeiten" : "Carrier hinzufügen"}</Text>
+          <Text variant="headingMd" as="h3">{mode === "edit" ? copy.editCarrier : copy.addCarrier}</Text>
           <Button variant="plain" onClick={onClose}>✕</Button>
         </div>
         <div style={{ padding: 20 }}>
           <BlockStack gap="400">
-            <TextField label="Name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="z.B. DHL" autoComplete="off" />
+            <TextField label={ui.colName} value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="DHL" autoComplete="off" />
             <TextField
-              label={<>Tracking-URL <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: 12 }}>({"{tracking}"} als Platzhalter)</span></>}
+              label={<>{copy.trackingUrl} <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: 12 }}>({copy.trackingHelp})</span></>}
               value={form.tracking_url_template}
               onChange={(v) => setForm((f) => ({ ...f, tracking_url_template: v }))}
               placeholder="https://carrier.com/track/{tracking}"
               autoComplete="off"
             />
-            <TextField label={<>API-Schlüssel <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: 12 }}>(optional)</span></>} value={form.api_key} onChange={(v) => setForm((f) => ({ ...f, api_key: v }))} type="password" autoComplete="off" />
-            <TextField label={<>API-Geheimnis <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: 12 }}>(optional)</span></>} value={form.api_secret} onChange={(v) => setForm((f) => ({ ...f, api_secret: v }))} type="password" autoComplete="off" />
+            <TextField label={<>{copy.apiKey} <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: 12 }}>({copy.optional})</span></>} value={form.api_key} onChange={(v) => setForm((f) => ({ ...f, api_key: v }))} type="password" autoComplete="off" />
+            <TextField label={<>{copy.apiSecret} <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: 12 }}>({copy.optional})</span></>} value={form.api_secret} onChange={(v) => setForm((f) => ({ ...f, api_secret: v }))} type="password" autoComplete="off" />
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} />
-              Aktiv
+              {copy.active}
             </label>
             {err && <Banner tone="critical"><p>{err}</p></Banner>}
           </BlockStack>
         </div>
         <div style={{ padding: "12px 20px", borderTop: "1px solid #e5e7eb" }}>
           <InlineStack gap="200" align="end">
-            <Button onClick={onClose}>Abbrechen</Button>
-            <Button variant="primary" onClick={handleSave} loading={saving}>Speichern</Button>
+            <Button onClick={onClose}>{ui.cancel}</Button>
+            <Button variant="primary" onClick={handleSave} loading={saving}>{ui.save}</Button>
           </InlineStack>
         </div>
       </div>
@@ -508,7 +447,7 @@ function CarrierModal({ mode, carrier, onClose, onSaved }) {
 }
 
 /* ── Sendcloud Config Section (superuser only) ───────────────── */
-function SendcloudSection() {
+function SendcloudSection({ copy, ui }) {
   const [cfg, setCfg] = useState({ public_key: "", secret_key: "", markup_pct: 5, is_active: true });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -541,15 +480,15 @@ function SendcloudSection() {
         public_key: cfg.public_key.trim(),
         secret_key: cfg.secret_key.trim(),
       });
-      setTestResult({ ok: true, message: `Verbunden — ${r.company || "Sendcloud"}` });
+      setTestResult({ ok: true, message: copy.connected(r.company) });
     } catch (e) {
-      setTestResult({ ok: false, message: e?.message || "Verbindung fehlgeschlagen" });
+      setTestResult({ ok: false, message: e?.message || copy.connectionFailed });
     }
     setTesting(false);
   };
 
   const handleSave = async () => {
-    if (!cfg.public_key.trim() || !cfg.secret_key.trim()) { setErr("Public Key und Secret Key sind Pflichtfelder."); return; }
+    if (!cfg.public_key.trim() || !cfg.secret_key.trim()) { setErr(copy.keysRequired); return; }
     setSaving(true); setErr(""); setSaved(false);
     try {
       await getMedusaAdminClient().saveSendcloudIntegration({
@@ -561,7 +500,7 @@ function SendcloudSection() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
-      setErr(e?.message || "Fehler beim Speichern");
+      setErr(e?.message || copy.saveError);
     }
     setSaving(false);
   };
@@ -575,13 +514,13 @@ function SendcloudSection() {
           <BlockStack gap="100">
             <InlineStack gap="200" blockAlign="center">
               <div style={{ width: 32, height: 32, borderRadius: 6, background: "#003087", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>SC</div>
-              <Text variant="headingSm" as="h3">Sendcloud — Plattform-Versandintegration</Text>
+              <Text variant="headingSm" as="h3">{copy.sendcloudTitle}</Text>
             </InlineStack>
-            <Text variant="bodySm" tone="subdued">API-Zugangsdaten für Etikett-Generierung. Satıcılar diese Versandlösung nutzen können, um Etiketten direkt aus Bestellungen zu erstellen.</Text>
+            <Text variant="bodySm" tone="subdued">{copy.sendcloudSub}</Text>
           </BlockStack>
           <InlineStack gap="200" blockAlign="center">
-            {saved && <Badge tone="success">Gespeichert ✓</Badge>}
-            <Badge tone={cfg.is_active ? "success" : undefined}>{cfg.is_active ? "Aktiv" : "Inaktiv"}</Badge>
+            {saved && <Badge tone="success">{copy.saved}</Badge>}
+            <Badge tone={cfg.is_active ? "success" : undefined}>{cfg.is_active ? copy.active : copy.inactive}</Badge>
           </InlineStack>
         </InlineStack>
 
@@ -589,7 +528,7 @@ function SendcloudSection() {
 
         <InlineGrid columns={2} gap="300">
           <TextField
-            label="Public Key"
+            label={copy.publicKey}
             value={cfg.public_key}
             onChange={(v) => { setCfg((c) => ({ ...c, public_key: v })); setTestResult(null); }}
             placeholder="sc-api-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
@@ -597,7 +536,7 @@ function SendcloudSection() {
             monospaced
           />
           <TextField
-            label="Secret Key"
+            label={copy.secretKey}
             type={showSecret ? "text" : "password"}
             value={cfg.secret_key}
             onChange={(v) => { setCfg((c) => ({ ...c, secret_key: v })); setTestResult(null); }}
@@ -606,7 +545,7 @@ function SendcloudSection() {
             monospaced
             suffix={
               <Button variant="plain" size="slim" onClick={() => setShowSecret((s) => !s)}>
-                {showSecret ? "Verstecken" : "Anzeigen"}
+                {showSecret ? copy.hide : copy.show}
               </Button>
             }
           />
@@ -614,19 +553,19 @@ function SendcloudSection() {
 
         <InlineGrid columns={2} gap="300">
           <TextField
-            label="Aufschlag (%)"
+            label={copy.markup}
             type="number"
             value={String(cfg.markup_pct)}
             onChange={(v) => setCfg((c) => ({ ...c, markup_pct: v }))}
             suffix="%"
-            helpText="Carrier-Preis × (1 + Aufschlag/100) = Verkaufspreis an Seller"
+            helpText={copy.markupHelp}
             min="0"
             max="50"
             autoComplete="off"
           />
           <div style={{ paddingTop: 24 }}>
             <Button onClick={() => setCfg((c) => ({ ...c, is_active: !c.is_active }))}>
-              {cfg.is_active ? "Deaktivieren" : "Aktivieren"}
+              {cfg.is_active ? copy.deactivate : copy.activate}
             </Button>
           </div>
         </InlineGrid>
@@ -640,20 +579,20 @@ function SendcloudSection() {
 
         <InlineStack gap="300">
           <Button onClick={handleTest} loading={testing} disabled={!cfg.public_key.trim() || !cfg.secret_key.trim()}>
-            Verbindung testen
+            {copy.testConnection}
           </Button>
           <Button variant="primary" onClick={handleSave} loading={saving}>
-            Speichern
+            {ui.save}
           </Button>
         </InlineStack>
 
         <Box padding="300" background="bg-surface-secondary" borderRadius="200">
           <BlockStack gap="100">
-            <Text variant="bodySm" fontWeight="semibold" tone="subdued">Webhook URL für Sendcloud</Text>
+            <Text variant="bodySm" fontWeight="semibold" tone="subdued">{copy.webhookTitle}</Text>
             <div style={{ fontFamily: "monospace", fontSize: 13, color: "#374151", background: "#f3f4f6", padding: "8px 12px", borderRadius: 6, userSelect: "all" }}>
               https://api.andertal.com/webhook/sendcloud
             </div>
-            <Text variant="bodySm" tone="subdued">Sendcloud → Settings → Webhooks → diese URL eintragen und "Webhook feedback" aktivieren.</Text>
+            <Text variant="bodySm" tone="subdued">{copy.webhookHelp}</Text>
           </BlockStack>
         </Box>
       </BlockStack>
@@ -676,6 +615,10 @@ const PRESET_CARRIERS = [
 /** Platform free-shipping thresholds live on `seller_id === 'default'` (same row the storefront reads). */
 
 export default function ShippingSettingsPage() {
+  const locale = useLocale();
+  const ui = useUI();
+  const copy = getShippingCopy(locale);
+  const countries = useMemo(() => getCountryList(locale), [locale]);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [carriers, setCarriers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -742,7 +685,7 @@ export default function ShippingSettingsPage() {
       setSavedThreshold(true);
       setTimeout(() => setSavedThreshold(false), 3000);
     } catch (e) {
-      setThresholdErr(e?.message || "Fehler beim Speichern");
+      setThresholdErr(e?.message || copy.saveError);
     }
     setSavingThreshold(false);
   };
@@ -756,7 +699,7 @@ export default function ShippingSettingsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirmDelete("Carrier löschen?"))) return;
+    if (!(await confirmDelete(copy.deleteCarrierConfirm))) return;
     await getMedusaAdminClient().deleteCarrier(id);
     setCarriers((prev) => prev.filter((c) => c.id !== id));
   };
@@ -777,25 +720,25 @@ export default function ShippingSettingsPage() {
     <div style={{ maxWidth: 1100 }}>
       <BlockStack gap="600">
         <div>
-          <Text variant="headingLg" as="h1">Versand & Lieferung</Text>
+          <Text variant="headingLg" as="h1">{copy.pageTitle}</Text>
         </div>
 
-        <ShippingGroupsSection carriers={carriers} />
+        <ShippingGroupsSection carriers={carriers} countries={countries} copy={copy} ui={ui} locale={locale} />
 
         {isSuperuser && <Card>
           <BlockStack gap="400">
             <InlineStack align="space-between" blockAlign="center">
               <BlockStack gap="100">
-                <Text variant="headingSm" as="h3">Versandkostenfrei ab</Text>
-                <Text variant="bodySm" tone="subdued">Mindestbestellwert für kostenlosen Versand pro Land — dieselben Daten wie im Shop.</Text>
+                <Text variant="headingSm" as="h3">{copy.freeShippingTitle}</Text>
+                <Text variant="bodySm" tone="subdued">{copy.freeShippingSub}</Text>
               </BlockStack>
-              {savedThreshold && <Badge tone="success">Gespeichert ✓</Badge>}
+              {savedThreshold && <Badge tone="success">{copy.saved}</Badge>}
             </InlineStack>
 
             {thresholdCountries.length > 0 && (
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
                 {thresholdCountries.map((code, i) => {
-                  const country = ALL_COUNTRIES.find((c) => c.code === code);
+                  const country = countries.find((c) => c.code === code);
                   return (
                     <div key={code} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", borderBottom: i < thresholdCountries.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                       <span style={{ minWidth: 160, fontSize: 13, color: "#374151" }}>
@@ -818,7 +761,7 @@ export default function ShippingSettingsPage() {
                           setThresholds((t) => { const n = { ...t }; delete n[code]; return n; });
                         }}
                         style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 18, lineHeight: 1, padding: "0 4px", flexShrink: 0 }}
-                        title="Entfernen"
+                        title={copy.remove}
                       >
                         ×
                       </button>
@@ -831,11 +774,11 @@ export default function ShippingSettingsPage() {
             <InlineStack gap="200" blockAlign="end">
               <div style={{ flex: 1 }}>
                 <Select
-                  label="Land hinzufügen"
+                  label={copy.addCountry}
                   labelHidden
                   options={[
-                    { label: "Land hinzufügen…", value: "" },
-                    ...ALL_COUNTRIES
+                    { label: copy.addCountryPlaceholder, value: "" },
+                    ...countries
                       .filter((c) => !thresholdCountries.includes(c.code))
                       .map((c) => ({ label: `${c.label} (${c.code})`, value: c.code })),
                   ]}
@@ -852,34 +795,34 @@ export default function ShippingSettingsPage() {
                   }
                 }}
               >
-                Hinzufügen
+                {ui.add}
               </Button>
             </InlineStack>
 
             {thresholdErr && <Text tone="critical">{thresholdErr}</Text>}
             <InlineStack>
               <Button variant="primary" onClick={handleSaveThresholds} loading={savingThreshold}>
-                Speichern
+                {ui.save}
               </Button>
             </InlineStack>
           </BlockStack>
         </Card>}
 
-        {isSuperuser && <SendcloudSection />}
+        {isSuperuser && <SendcloudSection copy={copy} ui={ui} />}
 
         <Divider />
 
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <BlockStack gap="100">
-            <Text variant="headingMd" as="h2">Versanddienstleister</Text>
-            <Text variant="bodySm" tone="subdued">Versanddienstleister verwalten und Tracking-URLs konfigurieren.</Text>
+            <Text variant="headingMd" as="h2">{copy.carriersTitle}</Text>
+            <Text variant="bodySm" tone="subdued">{copy.carriersSub}</Text>
           </BlockStack>
-          <Button variant="primary" onClick={() => setModal({ mode: "create" })}>+ Carrier hinzufügen</Button>
+          <Button variant="primary" onClick={() => setModal({ mode: "create" })}>{copy.addCarrierBtn}</Button>
         </div>
 
         <Card>
           <BlockStack gap="300">
-            <Text variant="bodySm" tone="subdued" fontWeight="semibold">Schnellstart — Vorkonfigurierte Carrier</Text>
+            <Text variant="bodySm" tone="subdued" fontWeight="semibold">{copy.quickStart}</Text>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {PRESET_CARRIERS.map((p) => (
                 <Button key={p.name} size="slim" onClick={() => setModal({ mode: "create", preset: p })}>+ {p.name}</Button>
@@ -889,9 +832,9 @@ export default function ShippingSettingsPage() {
         </Card>
 
         <Card padding="0">
-          {loading && <Box padding="800"><Text alignment="center" tone="subdued">Laden…</Text></Box>}
+          {loading && <Box padding="800"><Text alignment="center" tone="subdued">{ui.loading}</Text></Box>}
           {!loading && carriers.length === 0 && (
-            <Box padding="800"><Text alignment="center" tone="subdued">Noch keine Carrier konfiguriert.</Text></Box>
+            <Box padding="800"><Text alignment="center" tone="subdued">{copy.noCarriers}</Text></Box>
           )}
           {carriers.map((c, i) => (
             <div key={c.id}>
@@ -908,10 +851,10 @@ export default function ShippingSettingsPage() {
                     </BlockStack>
                   </InlineStack>
                   <InlineStack gap="200" blockAlign="center">
-                    <Badge tone={c.is_active ? "success" : undefined}>{c.is_active ? "Aktiv" : "Inaktiv"}</Badge>
-                    <Button size="slim" onClick={() => handleToggle(c)}>{c.is_active ? "Deaktivieren" : "Aktivieren"}</Button>
-                    <Button size="slim" onClick={() => setModal({ mode: "edit", carrier: c })}>Bearbeiten</Button>
-                    <Button size="slim" tone="critical" onClick={() => handleDelete(c.id)}>Löschen</Button>
+                    <Badge tone={c.is_active ? "success" : undefined}>{c.is_active ? copy.active : copy.inactive}</Badge>
+                    <Button size="slim" onClick={() => handleToggle(c)}>{c.is_active ? copy.deactivate : copy.activate}</Button>
+                    <Button size="slim" onClick={() => setModal({ mode: "edit", carrier: c })}>{ui.edit}</Button>
+                    <Button size="slim" tone="critical" onClick={() => handleDelete(c.id)}>{ui.delete}</Button>
                   </InlineStack>
                 </InlineStack>
               </div>
@@ -926,6 +869,8 @@ export default function ShippingSettingsPage() {
           carrier={getModalCarrier()}
           onClose={() => setModal(null)}
           onSaved={handleCarrierSaved}
+          copy={copy}
+          ui={ui}
         />
       )}
     </div>

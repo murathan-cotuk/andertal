@@ -11,6 +11,10 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
+import { useLocale } from "next-intl";
+import { getCategoryEditCopy } from "@/lib/category-edit-i18n";
+import { userError } from "@/lib/api-error-messages";
+import { statusLabel } from "@/lib/status-labels";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -116,6 +120,8 @@ function descriptionVisualToHtml(html) {
 
 export default function CategoryEditPage({ category: initialCategory, onReload }) {
   const router = useRouter();
+  const locale = useLocale();
+  const c = getCategoryEditCopy(locale);
   const client = getMedusaAdminClient();
   const [category, setCategory] = useState(initialCategory ?? null);
   const [error, setError] = useState(null);
@@ -246,7 +252,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
       unsaved?.setDirty(false);
       if (onReload) await onReload();
     } catch (e) {
-      setError(e?.message || "Failed to save category");
+      setError(userError(e, locale, c.saveError));
     } finally {
       setSaving(false);
     }
@@ -292,7 +298,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
       setAddProductSearch("");
       await refreshProducts();
     } catch (e) {
-      setError(e?.message || "Failed to add product");
+      setError(userError(e, locale, c.addProductError));
     } finally {
       setAddingProductId(null);
     }
@@ -319,7 +325,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
       }
       await refreshProducts();
     } catch (e) {
-      setError(e?.message || "Failed to remove product");
+      setError(userError(e, locale, c.removeProductError));
     } finally {
       setRemovingProductId(null);
     }
@@ -331,7 +337,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     .filter((p) => !addProductSearch || (p.title || "").toLowerCase().includes(addProductSearch.toLowerCase()));
 
   const parentOptions = [
-    { label: "— No parent (root) —", value: "" },
+    { label: c.noParent, value: "" },
     ...allCategories.map((c) => ({ label: c.name, value: String(c.id) })),
   ];
 
@@ -362,11 +368,11 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
 
   return (
     <Page
-      backAction={{ content: "Categories", url: "/content/categories" }}
-      title={form.name || initialCategory?.name || "Category"}
+      backAction={{ content: c.backCategories, url: "/content/categories" }}
+      title={form.name || initialCategory?.name || c.category}
       subtitle={`/${form.slug || initialCategory?.slug || ""}`}
-      primaryAction={{ content: "Save", onAction: handleSave, loading: saving, disabled: saving || !isDirty }}
-      secondaryActions={[{ content: "Discard", onAction: handleDiscard, disabled: !isDirty }]}
+      primaryAction={{ content: c.save, onAction: handleSave, loading: saving, disabled: saving || !isDirty }}
+      secondaryActions={[{ content: c.discard, onAction: handleDiscard, disabled: !isDirty }]}
     >
       <style>{`
         .category-richtext-editor { color: var(--p-color-text); }
@@ -395,43 +401,43 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
           <BlockStack gap="400">
             <Card>
               <BlockStack gap="400">
-                <Text as="h2" variant="headingMd">Category details</Text>
+                <Text as="h2" variant="headingMd">{c.categoryDetails}</Text>
                 <TextField
-                  label="Name"
+                  label={c.name}
                   value={form.name}
                   onChange={(v) => setForm((p) => ({ ...p, name: v, slug: slugManuallyEdited ? p.slug : slugFromName(v) }))}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Slug"
+                  label={c.slug}
                   value={form.slug}
                   onChange={(v) => { setSlugManuallyEdited(true); setForm((p) => ({ ...p, slug: v })); }}
                   autoComplete="off"
                   prefix="/"
-                  helpText="Used in the shop URL"
+                  helpText={c.slugHelp}
                 />
                 <BlockStack gap="100">
-                  <Text as="p" variant="bodySm" fontWeight="medium">Description</Text>
+                  <Text as="p" variant="bodySm" fontWeight="medium">{c.description}</Text>
                   <div style={{ border: "1px solid var(--p-color-border)", borderRadius: 12, overflow: "hidden", background: "var(--p-color-bg-surface)" }}>
                     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--p-color-bg-surface-secondary)", borderBottom: "1px solid var(--p-color-border)" }}>
                       {richtextMode === "visual" && (
                         <>
-                          <button type="button" style={{ width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent", color: "var(--p-color-text-subdued)", fontWeight: 700, fontSize: 14 }} onMouseDown={(e) => { e.preventDefault(); document.execCommand("bold"); }} title="Bold">B</button>
-                          <button type="button" style={{ width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent", color: "var(--p-color-text-subdued)", fontStyle: "italic", fontSize: 14 }} onMouseDown={(e) => { e.preventDefault(); document.execCommand("italic"); }} title="Italic">I</button>
-                          <button type="button" style={{ width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent", color: "var(--p-color-text-subdued)", fontSize: 16 }} onMouseDown={(e) => { e.preventDefault(); document.execCommand("insertUnorderedList"); }} title="List">•</button>
+                          <button type="button" style={{ width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent", color: "var(--p-color-text-subdued)", fontWeight: 700, fontSize: 14 }} onMouseDown={(e) => { e.preventDefault(); document.execCommand("bold"); }} title={c.bold}>B</button>
+                          <button type="button" style={{ width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent", color: "var(--p-color-text-subdued)", fontStyle: "italic", fontSize: 14 }} onMouseDown={(e) => { e.preventDefault(); document.execCommand("italic"); }} title={c.italic}>I</button>
+                          <button type="button" style={{ width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent", color: "var(--p-color-text-subdued)", fontSize: 16 }} onMouseDown={(e) => { e.preventDefault(); document.execCommand("insertUnorderedList"); }} title={c.list}>•</button>
                         </>
                       )}
-                      <button type="button" style={{ marginLeft: 8, width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: richtextMode === "html" ? "var(--p-color-bg-surface-selected)" : "transparent", color: "var(--p-color-text-subdued)", fontSize: 11 }} onClick={() => { if (richtextMode === "visual" && richtextEditorRef.current) setForm((prev) => ({ ...prev, long_content: descriptionVisualToHtml(richtextEditorRef.current.innerHTML || "") })); else if (richtextMode !== "visual" && richtextEditorRef.current) richtextEditorRef.current.innerHTML = form.long_content || ""; setRichtextMode(richtextMode === "html" ? "visual" : "html"); }} title="HTML">{"</>"}</button>
+                      <button type="button" style={{ marginLeft: 8, width: 32, height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: richtextMode === "html" ? "var(--p-color-bg-surface-selected)" : "transparent", color: "var(--p-color-text-subdued)", fontSize: 11 }} onClick={() => { if (richtextMode === "visual" && richtextEditorRef.current) setForm((prev) => ({ ...prev, long_content: descriptionVisualToHtml(richtextEditorRef.current.innerHTML || "") })); else if (richtextMode !== "visual" && richtextEditorRef.current) richtextEditorRef.current.innerHTML = form.long_content || ""; setRichtextMode(richtextMode === "html" ? "visual" : "html"); }} title={c.html}>{"</>"}</button>
                     </div>
                     {richtextMode === "html" ? (
-                      <textarea style={{ minHeight: 160, width: "100%", padding: 16, fontFamily: "ui-monospace, monospace", fontSize: 13, border: "none", resize: "vertical", boxSizing: "border-box" }} value={form.long_content || ""} onChange={(e) => setForm((prev) => ({ ...prev, long_content: e.target.value }))} placeholder="<h2>Heading</h2><p>…</p>" />
+                      <textarea style={{ minHeight: 160, width: "100%", padding: 16, fontFamily: "ui-monospace, monospace", fontSize: 13, border: "none", resize: "vertical", boxSizing: "border-box" }} value={form.long_content || ""} onChange={(e) => setForm((prev) => ({ ...prev, long_content: e.target.value }))} placeholder={c.htmlPlaceholder} />
                     ) : (
                       <div ref={richtextEditorRef} className="category-richtext-editor" contentEditable suppressContentEditableWarning style={{ minHeight: 160, padding: 16, outline: "none", fontSize: 14, lineHeight: 1.6 }} onBlur={() => { if (richtextEditorRef.current) setForm((prev) => ({ ...prev, long_content: descriptionVisualToHtml(richtextEditorRef.current.innerHTML || "") })); }} />
                     )}
                   </div>
                 </BlockStack>
                 <Select
-                  label="Parent category"
+                  label={c.parentCategory}
                   options={parentOptions}
                   value={form.parent_id || ""}
                   onChange={(v) => setForm((p) => ({ ...p, parent_id: v }))}
@@ -442,10 +448,10 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
             {/* SEO */}
             <Card>
               <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">SEO</Text>
-                <TextField label="Meta title" value={form.meta_title} onChange={(v) => setForm((p) => ({ ...p, meta_title: v }))} autoComplete="off" helpText={`${form.meta_title.length}/60`} />
-                <TextField label="Meta description" value={form.meta_description} onChange={(v) => setForm((p) => ({ ...p, meta_description: v }))} multiline={2} autoComplete="off" helpText={`${form.meta_description.length}/160`} />
-                <TextField label="Keywords" value={form.keywords} onChange={(v) => setForm((p) => ({ ...p, keywords: v }))} autoComplete="off" helpText="Comma separated" />
+                <Text as="h2" variant="headingMd">{c.seo}</Text>
+                <TextField label={c.metaTitle} value={form.meta_title} onChange={(v) => setForm((p) => ({ ...p, meta_title: v }))} autoComplete="off" helpText={`${form.meta_title.length}/60`} />
+                <TextField label={c.metaDescription} value={form.meta_description} onChange={(v) => setForm((p) => ({ ...p, meta_description: v }))} multiline={2} autoComplete="off" helpText={`${form.meta_description.length}/160`} />
+                <TextField label={c.keywords} value={form.keywords} onChange={(v) => setForm((p) => ({ ...p, keywords: v }))} autoComplete="off" helpText={c.keywordsHelp} />
               </BlockStack>
             </Card>
 
@@ -454,7 +460,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
               <BlockStack gap="400">
                 <InlineStack align="space-between" blockAlign="center">
                   <Text as="h2" variant="headingMd">
-                    Products <Text as="span" tone="subdued" variant="bodySm">({categoryProducts.length})</Text>
+                    {c.products} <Text as="span" tone="subdued" variant="bodySm">({categoryProducts.length})</Text>
                   </Text>
                 </InlineStack>
 
@@ -462,7 +468,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                 <TextField
                   label=""
                   labelHidden
-                  placeholder="Search products to add…"
+                  placeholder={c.searchProductsPlaceholder}
                   value={addProductSearch}
                   onChange={setAddProductSearch}
                   autoComplete="off"
@@ -488,7 +494,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                           loading={addingProductId === p.id}
                           disabled={!!addingProductId}
                         >
-                          Add
+                          {c.add}
                         </Button>
                       </div>
                     ))}
@@ -499,7 +505,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
 
                 {categoryProducts.length === 0 ? (
                   <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                    <Text as="p" tone="subdued" alignment="center">No products in this category</Text>
+                    <Text as="p" tone="subdued" alignment="center">{c.noProducts}</Text>
                   </Box>
                 ) : (
                   <BlockStack gap="200">
@@ -517,7 +523,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                         <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
                           {p.status && (
                             <Badge tone={p.status === "published" ? "success" : "attention"}>
-                              {p.status}
+                              {statusLabel(locale, p.status)}
                             </Badge>
                           )}
                           <Button
@@ -528,7 +534,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                             loading={removingProductId === p.id}
                             disabled={!!removingProductId}
                           >
-                            Remove
+                            {c.remove}
                           </Button>
                         </div>
                       </div>
@@ -542,12 +548,12 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
               <BlockStack gap="300">
                 <InlineStack align="space-between" blockAlign="center">
                   <Text as="h2" variant="headingMd">
-                    Category tree <Text as="span" tone="subdued" variant="bodySm">({categoryTreeRows.length} child)</Text>
+                    {c.categoryTree} <Text as="span" tone="subdued" variant="bodySm">({categoryTreeRows.length} {c.childSuffix})</Text>
                   </Text>
                 </InlineStack>
                 {categoryTreeRows.length === 0 ? (
                   <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                    <Text as="p" tone="subdued">No child category under this category.</Text>
+                    <Text as="p" tone="subdued">{c.noChildCategory}</Text>
                   </Box>
                 ) : (
                   <BlockStack gap="100">
@@ -557,7 +563,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                         <Text as="span" variant="bodySm">{row.name}</Text>
                         <Text as="span" tone="subdued" variant="bodySm">/{row.slug}</Text>
                         <div style={{ marginLeft: "auto" }}>
-                          <Button size="micro" url={`/content/categories/${row.id}`}>Open</Button>
+                          <Button size="micro" url={`/content/categories/${row.id}`}>{c.open}</Button>
                         </div>
                       </div>
                     ))}
@@ -573,19 +579,19 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
           <BlockStack gap="400">
             <Card>
               <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">Status</Text>
+                <Text as="h2" variant="headingMd">{c.status}</Text>
                 <Checkbox
-                  label="Active"
+                  label={c.active}
                   checked={form.active}
                   onChange={(v) => setForm((p) => ({ ...p, active: v }))}
                 />
                 <Checkbox
-                  label="Visible in shop"
+                  label={c.visibleInShop}
                   checked={form.is_visible}
                   onChange={(v) => setForm((p) => ({ ...p, is_visible: v }))}
                 />
                 {initialCategory?.has_collection && (
-                  <Badge tone="success">Linked collection</Badge>
+                  <Badge tone="success">{c.linkedCollection}</Badge>
                 )}
               </BlockStack>
             </Card>
@@ -593,12 +599,12 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
             {/* Main image */}
             <Card>
               <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">Category image</Text>
+                <Text as="h2" variant="headingMd">{c.categoryImage}</Text>
                 {form.image_url ? (
                   <div style={{ position: "relative" }}>
                     <img
                       src={resolveImageUrl(form.image_url)}
-                      alt="Category"
+                      alt={c.categoryAlt}
                       style={{ width: "100%", borderRadius: 8, objectFit: "cover", maxHeight: 180 }}
                     />
                     <Button
@@ -607,12 +613,12 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                       tone="critical"
                       onClick={() => setForm((p) => ({ ...p, image_url: "" }))}
                     >
-                      Remove
+                      {c.remove}
                     </Button>
                   </div>
                 ) : null}
                 <Button onClick={() => setMainImgPickerOpen(true)}>
-                  {form.image_url ? "Change image" : "Add image"}
+                  {form.image_url ? c.changeImage : c.addImage}
                 </Button>
               </BlockStack>
             </Card>
@@ -620,12 +626,12 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
             {/* Banner image / video */}
             <Card>
               <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">Banner</Text>
+                <Text as="h2" variant="headingMd">{c.banner}</Text>
                 {form.banner_image_url ? (
                   <div>
                     <img
                       src={resolveImageUrl(form.banner_image_url)}
-                      alt="Banner"
+                      alt={c.banner}
                       style={{ width: "100%", borderRadius: 8, objectFit: "cover", maxHeight: 120 }}
                     />
                     <Button
@@ -634,20 +640,20 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                       tone="critical"
                       onClick={() => setForm((p) => ({ ...p, banner_image_url: "" }))}
                     >
-                      Remove
+                      {c.remove}
                     </Button>
                   </div>
                 ) : null}
                 <Button onClick={() => setBannerImgPickerOpen(true)}>
-                  {form.banner_image_url ? "Change banner image" : "Add banner image"}
+                  {form.banner_image_url ? c.changeBannerImage : c.addBannerImage}
                 </Button>
                 <TextField
-                  label="Banner-Video URL (optional)"
+                  label={c.bannerVideoUrl}
                   value={form.banner_video_url || ""}
                   onChange={(v) => setForm((p) => ({ ...p, banner_video_url: v }))}
                   autoComplete="off"
-                  placeholder="https://…/banner.mp4"
-                  helpText="MP4/WebM Video — ersetzt das Bannerbild wenn gesetzt"
+                  placeholder={c.bannerVideoPlaceholder}
+                  helpText={c.bannerVideoHelp}
                 />
                 {form.banner_video_url ? (
                   <div>
@@ -663,7 +669,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                       tone="critical"
                       onClick={() => setForm((p) => ({ ...p, banner_video_url: "" }))}
                     >
-                      Remove video
+                      {c.removeVideo}
                     </Button>
                   </div>
                 ) : null}

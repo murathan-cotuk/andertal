@@ -8,6 +8,7 @@ import { getUI } from "@/lib/ui-strings";
 import { Modal, BlockStack, TextField, Text, Button, InlineStack } from "@shopify/polaris";
 import { EditIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { statusLabel } from "@/lib/status-labels";
 import { CustomerFormModal } from "@/components/CustomerFormModal";
 
 function fmtCents(c, locale) {
@@ -31,14 +32,16 @@ function fmtBirthDate(d, locale) {
   return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "long", year: "numeric" });
 }
 
-function bonusSourceLabel(source) {
+function bonusSourceLabel(source, locale) {
   const m = {
-    registration: "Registrierung",
-    order_earn: "Bestellung (Gutschrift)",
-    order_redeem: "Bestellung (Einlösung)",
-    manual: "Manuell",
+    en: { registration: "Registration", order_earn: "Order (credit)", order_redeem: "Order (redeem)", manual: "Manual" },
+    tr: { registration: "Kayıt", order_earn: "Sipariş (alacak)", order_redeem: "Sipariş (kullanım)", manual: "Manuel" },
+    fr: { registration: "Inscription", order_earn: "Commande (crédit)", order_redeem: "Commande (débit)", manual: "Manuel" },
+    es: { registration: "Registro", order_earn: "Pedido (abono)", order_redeem: "Pedido (débito)", manual: "Manual" },
+    it: { registration: "Registrazione", order_earn: "Ordine (credito)", order_redeem: "Ordine (debito)", manual: "Manuale" },
+    de: { registration: "Registrierung", order_earn: "Bestellung (Gutschrift)", order_redeem: "Bestellung (Einlösung)", manual: "Manuell" },
   };
-  return m[source] || source || "—";
+  return (m[locale] || m.de)[source] || source || "—";
 }
 
 const STATUS_COLORS = {
@@ -54,10 +57,11 @@ const STATUS_COLORS = {
   refunded: { bg: "#eff6ff", color: "#1d4ed8" },
 };
 function StatusBadge({ value }) {
+  const locale = useLocale();
   const s = STATUS_COLORS[value?.toLowerCase()] || { bg: "#f3f4f6", color: "#6b7280" };
   return (
     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: s.bg, color: s.color, fontWeight: 600 }}>
-      {value || "—"}
+      {value ? statusLabel(locale, value) : "—"}
     </span>
   );
 }
@@ -186,9 +190,9 @@ function DiscountModal({ customerId, onClose, onAdded, ui, locale }) {
         {err && <div style={{ margin: "0 24px 12px", color: "#ef4444", fontSize: 12 }}>{err}</div>}
         <div style={{ padding: "12px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end" }}>
           <InlineStack gap="200">
-            <Button onClick={onClose}>{ui ? ui.cancel : "Abbrechen"}</Button>
+            <Button onClick={onClose}>{ui.cancel}</Button>
             <Button variant="primary" onClick={handleSave} loading={saving}>
-              {ui ? ui.create : "Erstellen"}
+              {ui.create}
             </Button>
           </InlineStack>
         </div>
@@ -215,11 +219,11 @@ function BonusLedgerAddModal({ open, onClose, customerId, onAdded, locale }) {
     const desc = description.trim();
     const pts = parseInt(String(points).replace(/[^\d-]/g, ""), 10);
     if (!desc) {
-      setErr("Beschreibung ist erforderlich");
+      setErr(locale === "en" ? "Description is required" : locale === "tr" ? "Açıklama zorunludur" : locale === "fr" ? "La description est requise" : locale === "es" ? "La descripción es obligatoria" : locale === "it" ? "La descrizione è obbligatoria" : "Beschreibung ist erforderlich");
       return;
     }
     if (!Number.isFinite(pts) || pts === 0) {
-      setErr("Punkte müssen eine von 0 verschiedene ganze Zahl sein");
+      setErr(locale === "en" ? "Points must be a non-zero integer" : locale === "tr" ? "Puan sıfırdan farklı bir tam sayı olmalıdır" : locale === "fr" ? "Les points doivent être un entier non nul" : locale === "es" ? "Los puntos deben ser un número entero distinto de cero" : locale === "it" ? "I punti devono essere un intero diverso da zero" : "Punkte müssen eine von 0 verschiedene ganze Zahl sein");
       return;
     }
     setSaving(true);
@@ -235,7 +239,7 @@ function BonusLedgerAddModal({ open, onClose, customerId, onAdded, locale }) {
         onClose();
       }
     } catch (e) {
-      setErr(e?.message || "Fehler");
+      setErr(e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : locale === "fr" ? "Erreur" : locale === "es" ? "Error" : locale === "it" ? "Errore" : "Fehler"));
     }
     setSaving(false);
   };
@@ -255,22 +259,22 @@ function BonusLedgerAddModal({ open, onClose, customerId, onAdded, locale }) {
       <Modal.Section>
         <BlockStack gap="400">
           <Text as="p" tone="subdued">
-            Das Buchungsdatum ist automatisch der heutige Tag. Positive Zahlen gutschreiben, negative zum Abziehen.
+            {locale === "en" ? "The booking date is automatically today. Use positive numbers to add points, negative to deduct." : locale === "tr" ? "Kayıt tarihi otomatik olarak bugündür. Puan eklemek için pozitif, düşmek için negatif sayı girin." : locale === "fr" ? "La date de réservation est automatiquement aujourd'hui. Nombres positifs pour créditer, négatifs pour débiter." : locale === "es" ? "La fecha de registro es automáticamente hoy. Números positivos para acreditar, negativos para deducir." : locale === "it" ? "La data di registrazione è automaticamente oggi. Numeri positivi per accreditare, negativi per addebitare." : "Das Buchungsdatum ist automatisch der heutige Tag. Positive Zahlen gutschreiben, negative zum Abziehen."}
           </Text>
           <TextField
-            label="Beschreibung"
+            label={locale === "en" ? "Description" : locale === "tr" ? "Açıklama" : locale === "fr" ? "Description" : locale === "es" ? "Descripción" : locale === "it" ? "Descrizione" : "Beschreibung"}
             value={description}
             onChange={setDescription}
             autoComplete="off"
-            placeholder="z. B. Kulanz, Korrektur …"
+            placeholder={locale === "en" ? "e.g. Goodwill, correction…" : locale === "tr" ? "ör. İyi niyet, düzeltme…" : locale === "fr" ? "ex. Geste commercial, correction…" : locale === "es" ? "ej. Cortesía, corrección…" : locale === "it" ? "es. Omaggio, correzione…" : "z. B. Kulanz, Korrektur …"}
           />
           <TextField
-            label="Bonuspunkte"
+            label={locale === "en" ? "Bonus points" : locale === "tr" ? "Bonus puanı" : locale === "fr" ? "Points bonus" : locale === "es" ? "Puntos bonus" : locale === "it" ? "Punti bonus" : "Bonuspunkte"}
             value={points}
             onChange={setPoints}
             autoComplete="off"
-            placeholder="+50 oder −20"
-            helpText="Ganze Zahl, nicht 0"
+            placeholder={locale === "en" ? "+50 or −20" : locale === "tr" ? "+50 veya −20" : "+50 oder −20"}
+            helpText={locale === "en" ? "Non-zero integer" : locale === "tr" ? "Sıfırdan farklı tam sayı" : locale === "fr" ? "Entier non nul" : locale === "es" ? "Entero distinto de cero" : locale === "it" ? "Intero diverso da zero" : "Ganze Zahl, nicht 0"}
             inputMode="numeric"
           />
           {err ? (
@@ -335,7 +339,7 @@ export default function CustomerDetailPage() {
         r.customer_id === id
       ));
     } catch (e) {
-      setError(e?.message || "Fehler");
+      setError(e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : locale === "fr" ? "Erreur" : locale === "es" ? "Error" : locale === "it" ? "Errore" : "Fehler"));
     }
     setLoading(false);
   };
@@ -757,7 +761,7 @@ export default function CustomerDetailPage() {
                                 <div>
                                   <span style={{ color: "#111827" }}>{row.description}</span>
                                   {row.source && row.source !== "manual" && (
-                                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{bonusSourceLabel(row.source)}</div>
+                                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{bonusSourceLabel(row.source, locale)}</div>
                                   )}
                                 </div>
                               )}
@@ -779,7 +783,7 @@ export default function CustomerDetailPage() {
                               {isEdit ? (
                                 <InlineStack gap="200" blockAlign="center">
                                   <Button size="slim" variant="primary" onClick={handleSaveLedgerEdit} disabled={ledgerSaving} loading={ledgerSaving}>
-                                    Speichern
+                                    {ui.save}
                                   </Button>
                                   <Button size="slim" onClick={() => setLedgerEdit(null)}>
                                     Abbrechen
@@ -791,7 +795,7 @@ export default function CustomerDetailPage() {
                                   variant="plain"
                                   tone="subdued"
                                   icon={EditIcon}
-                                  accessibilityLabel="Bearbeiten"
+                                  accessibilityLabel={locale === "en" ? "Edit" : locale === "tr" ? "Düzenle" : locale === "fr" ? "Modifier" : locale === "es" ? "Editar" : locale === "it" ? "Modifica" : "Bearbeiten"}
                                   onClick={() =>
                                     setLedgerEdit({
                                       id: row.id,
@@ -876,7 +880,7 @@ export default function CustomerDetailPage() {
                     city={billingFromOrders.billing_city}
                     country={billingFromOrders.billing_country}
                   />
-                  <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 6 }}>Aus letzter Bestellung</p>
+                  <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 6 }}>{locale === "en" ? "From last order" : locale === "tr" ? "Son siparişten" : locale === "fr" ? "Dernière commande" : locale === "es" ? "Del último pedido" : locale === "it" ? "Dall'ultimo ordine" : "Aus letzter Bestellung"}</p>
                 </>
               ) : (customer.address_line1 || customer.city) ? (
                 <p style={{ fontSize: 13, color: "#6b7280", margin: "10px 0 4px", lineHeight: 1.5 }}>

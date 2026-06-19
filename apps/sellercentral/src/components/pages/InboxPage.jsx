@@ -6,6 +6,7 @@ import {
   Box, Divider, Spinner, TextField, Tabs, Select,
 } from "@shopify/polaris";
 import { useLocale } from "next-intl";
+import { dateLocaleFor } from "@/lib/locale-text";
 import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import FlowEmailBodyEditor, { htmlToPlainText } from "@/components/content/FlowEmailBodyEditor";
@@ -18,8 +19,7 @@ import {
 
 function fmtDate(d, locale) {
   if (!d) return "";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
-  return new Date(d).toLocaleString(loc, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(d).toLocaleString(dateLocaleFor(locale), { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function fmtCents(c) {
@@ -65,10 +65,6 @@ function getStatusLabel(status, locale) {
   };
   return map[status] || status;
 }
-const STATUS_LABEL = {
-  pending: "Ausstehend", processing: "In Bearbeitung", shipped: "Versendet",
-  delivered: "Geliefert", cancelled: "Storniert", refunded: "Erstattet", completed: "Abgeschlossen",
-};
 
 function groupByOrder(messages) {
   const map = {};
@@ -522,7 +518,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
                 </Text>
                 {selected.order_status && (
                   <Badge tone={STATUS_TONE[selected.order_status] || "new"}>
-                    {STATUS_LABEL[selected.order_status] || selected.order_status}
+                    {getStatusLabel(selected.order_status, locale) || selected.order_status}
                   </Badge>
                 )}
                 {selected.order_id && (

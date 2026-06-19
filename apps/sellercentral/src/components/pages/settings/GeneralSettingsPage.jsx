@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePathname } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
+import { userError } from "@/lib/api-error-messages";
 import {
   Card,
   Text,
@@ -180,7 +181,7 @@ export default function GeneralSettingsPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
-      setSaveError(e?.message || "Failed to save settings.");
+      setSaveError(userError(e, locale, "Failed to save settings."));
     } finally {
       setSaving(false);
     }
@@ -225,7 +226,7 @@ export default function GeneralSettingsPage() {
         setFormData((p) => ({ ...p, documents: [...(p.documents || []), ...uploaded] }));
       }
     } catch (e) {
-      setSaveError(e?.message || "Document upload failed.");
+      setSaveError(userError(e, locale, "Document upload failed."));
     } finally {
       setUploadingDocs(false);
     }

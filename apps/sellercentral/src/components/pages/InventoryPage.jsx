@@ -23,6 +23,9 @@ import {
   Select,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { userError } from "@/lib/api-error-messages";
+import { getUI } from "@/lib/ui-strings";
+import { lt } from "@/lib/locale-text";
 import { formatDecimal } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 import { Link as I18nLink } from "@/i18n/navigation";
@@ -324,9 +327,9 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
       });
       const updated = await medusaClient.updateAdminHubProduct(product.id, { variants: updatedVariants });
       if (updated) setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, variants: updatedVariants } : p));
-      setSavedMsg("Gespeichert ✓");
+      setSavedMsg((locale === "en" ? "Saved" : locale === "tr" ? "Kaydedildi" : locale === "fr" ? "Enregistré" : locale === "es" ? "Guardado" : locale === "it" ? "Salvato" : "Gespeichert") + " ✓");
     } catch (e) {
-      setSavedMsg("Fehler: " + (e?.message || ""));
+      setSavedMsg((locale === "en" ? "Error: " : locale === "tr" ? "Hata: " : locale === "fr" ? "Erreur : " : locale === "es" ? "Error: " : locale === "it" ? "Errore: " : "Fehler: ") + (e?.message || ""));
     } finally {
       setSaving(false);
     }
@@ -335,22 +338,22 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
   const shopBaseUrl = getDefaultShopUrl();
   const l = String(locale || "en").toLowerCase();
   const i18n = {
-    select: l === "tr" ? "Seç" : l === "de" ? "Ausw." : "Select",
-    status: l === "tr" ? "Durum" : l === "de" ? "Status" : "Status",
-    details: l === "tr" ? "Ürün detayları" : l === "de" ? "Produktdetails" : "Product details",
-    inventory: l === "tr" ? "Envanter" : l === "de" ? "Bestand" : "Inventory",
-    price: l === "tr" ? "Fiyat" : l === "de" ? "Preis" : "Price",
-    variations: l === "tr" ? "Varyasyonlar" : l === "de" ? "Variationen" : "Variations",
+    select: l === "tr" ? "Seç" : l === "de" ? "Ausw." : l === "fr" ? "Sél." : l === "es" ? "Sel." : l === "it" ? "Sel." : "Select",
+    status: l === "tr" ? "Durum" : l === "de" ? "Status" : l === "fr" ? "Statut" : l === "es" ? "Estado" : l === "it" ? "Stato" : "Status",
+    details: l === "tr" ? "Ürün detayları" : l === "de" ? "Produktdetails" : l === "fr" ? "Détails produit" : l === "es" ? "Detalles producto" : l === "it" ? "Dettagli prodotto" : "Product details",
+    inventory: l === "tr" ? "Envanter" : l === "de" ? "Bestand" : l === "fr" ? "Stock" : l === "es" ? "Inventario" : l === "it" ? "Inventario" : "Inventory",
+    price: l === "tr" ? "Fiyat" : l === "de" ? "Preis" : l === "fr" ? "Prix" : l === "es" ? "Precio" : l === "it" ? "Prezzo" : "Price",
+    variations: l === "tr" ? "Varyasyonlar" : l === "de" ? "Variationen" : l === "fr" ? "Variantes" : l === "es" ? "Variantes" : l === "it" ? "Varianti" : "Variations",
     sku: "SKU",
     ean: "EAN",
-    save: l === "tr" ? "Kaydet" : l === "de" ? "Speichern" : "Save",
-    saving: l === "tr" ? "Kaydediliyor…" : l === "de" ? "Speichern…" : "Saving…",
-    noVariations: l === "tr" ? "Varyasyon yok" : l === "de" ? "Keine Variationen" : "No variations",
+    save: l === "tr" ? "Kaydet" : l === "de" ? "Speichern" : l === "fr" ? "Enregistrer" : l === "es" ? "Guardar" : l === "it" ? "Salva" : "Save",
+    saving: l === "tr" ? "Kaydediliyor…" : l === "de" ? "Speichern…" : l === "fr" ? "Enregistrement…" : l === "es" ? "Guardando…" : l === "it" ? "Salvataggio…" : "Saving…",
+    noVariations: l === "tr" ? "Varyasyon yok" : l === "de" ? "Keine Variationen" : l === "fr" ? "Pas de variantes" : l === "es" ? "Sin variantes" : l === "it" ? "Nessuna variante" : "No variations",
   };
   const localizeStatus = (k) => {
-    if (k === "active") return l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : "Active";
-    if (k === "inactive") return l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : "Inactive";
-    return l === "tr" ? "Taslak" : l === "de" ? "Draft" : "Draft";
+    if (k === "active") return l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : l === "fr" ? "Actif" : l === "es" ? "Activo" : l === "it" ? "Attivo" : "Active";
+    if (k === "inactive") return l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : l === "fr" ? "Inactif" : l === "es" ? "Inactivo" : l === "it" ? "Inattivo" : "Inactive";
+    return l === "tr" ? "Taslak" : l === "de" ? "Entwurf" : l === "fr" ? "Brouillon" : l === "es" ? "Borrador" : l === "it" ? "Bozza" : "Draft";
   };
   if (matrixVariants.length === 0) {
     return <div style={{ padding: "8px 12px", fontSize: 13, color: "#6b7280" }}>{i18n.noVariations}</div>;
@@ -395,7 +398,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
               type="button"
               onClick={() => window.location.assign(`/products/${product.id}`)}
               style={{ marginTop: 1, padding: 0, background: "none", border: "none", cursor: "pointer", color: "#4b5563", fontSize: 12, textDecoration: "underline" }}
-              title="SKU üzerinden ürün düzenleme sayfasına git"
+              title={lt(locale, "Open product edit page via SKU", "SKU ile ürün düzenleme sayfasına git", "Ouvrir la page produit via SKU", "Abrir edición de producto vía SKU", "Apri modifica prodotto tramite SKU", "SKU üzerinden ürün düzenleme sayfasına git")}
             >
               {i18n.sku}: {matrixVariants[idx]?.sku || "—"}
             </button>
@@ -432,7 +435,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
         <Button type="button" onClick={save} loading={saving} variant="primary">
           {saving ? i18n.saving : i18n.save}
         </Button>
-        {savedMsg && <span style={{ fontSize: 12, color: savedMsg.startsWith("Fehler") ? "#dc2626" : "#16a34a" }}>{savedMsg}</span>}
+        {savedMsg && <span style={{ fontSize: 12, color: (savedMsg.startsWith("Fehler") || savedMsg.startsWith("Error") || savedMsg.startsWith("Erreur") || savedMsg.startsWith("Errore")) ? "#dc2626" : "#16a34a" }}>{savedMsg}</span>}
       </div>
     </div>
   );
@@ -451,6 +454,7 @@ function InventoryProductRow({
   setProducts,
   pendingChangeRequests,
   onOpenChangeRequests,
+  ui,
 }) {
   const [variantsOpen, setVariantsOpen] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
@@ -461,15 +465,15 @@ function InventoryProductRow({
   const i18n = {
     sku: "SKU",
     ean: "EAN",
-    status: l === "tr" ? "Durum" : l === "de" ? "Status" : "Status",
-    active: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : "Active",
-    draft: l === "tr" ? "Taslak" : "Draft",
-    inactive: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : "Inactive",
-    openVariants: l === "tr" ? "Varyasyonları aç" : l === "de" ? "Variationen öffnen" : "Open variations",
-    closeVariants: l === "tr" ? "Varyasyonları kapat" : l === "de" ? "Variationen schließen" : "Close variations",
-    noVariants: l === "tr" ? "Varyasyon yok" : l === "de" ? "Keine Variationen" : "No variations",
-    changeProposed: l === "tr" ? "Değişiklik önerildi" : l === "de" ? "Änderung vorgeschlagen" : "Change proposed",
-    changeProposedShort: l === "tr" ? "Öneri" : l === "de" ? "Vorschlag" : "Proposal",
+    status: l === "tr" ? "Durum" : l === "de" ? "Status" : l === "fr" ? "Statut" : l === "es" ? "Estado" : l === "it" ? "Stato" : "Status",
+    active: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : l === "fr" ? "Actif" : l === "es" ? "Activo" : l === "it" ? "Attivo" : "Active",
+    draft: l === "tr" ? "Taslak" : l === "de" ? "Entwurf" : l === "fr" ? "Brouillon" : l === "es" ? "Borrador" : l === "it" ? "Bozza" : "Draft",
+    inactive: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : l === "fr" ? "Inactif" : l === "es" ? "Inactivo" : l === "it" ? "Inattivo" : "Inactive",
+    openVariants: l === "tr" ? "Varyasyonları aç" : l === "de" ? "Variationen öffnen" : l === "fr" ? "Ouvrir les variantes" : l === "es" ? "Abrir variantes" : l === "it" ? "Apri varianti" : "Open variations",
+    closeVariants: l === "tr" ? "Varyasyonları kapat" : l === "de" ? "Variationen schließen" : l === "fr" ? "Fermer les variantes" : l === "es" ? "Cerrar variantes" : l === "it" ? "Chiudi varianti" : "Close variations",
+    noVariants: l === "tr" ? "Varyasyon yok" : l === "de" ? "Keine Variationen" : l === "fr" ? "Pas de variantes" : l === "es" ? "Sin variantes" : l === "it" ? "Nessuna variante" : "No variations",
+    changeProposed: l === "tr" ? "Değişiklik önerildi" : l === "de" ? "Änderung vorgeschlagen" : l === "fr" ? "Modification proposée" : l === "es" ? "Cambio propuesto" : l === "it" ? "Modifica proposta" : "Change proposed",
+    changeProposedShort: l === "tr" ? "Öneri" : l === "de" ? "Vorschlag" : l === "fr" ? "Proposition" : l === "es" ? "Propuesta" : l === "it" ? "Proposta" : "Proposal",
     activateProduct: l === "tr" ? "Ürünü aktifleştir" : l === "de" ? "Produkt aktivieren" : l === "fr" ? "Activer le produit" : l === "it" ? "Attiva prodotto" : l === "es" ? "Activar producto" : "Activate product",
     deactivateProduct: l === "tr" ? "Ürünü pasifleştir" : l === "de" ? "Produkt deaktivieren" : l === "fr" ? "Désactiver le produit" : l === "it" ? "Disattiva prodotto" : l === "es" ? "Desactivar producto" : "Deactivate product",
   };
@@ -484,6 +488,12 @@ function InventoryProductRow({
             ? "Değişiklik onaya gönderildi."
             : l === "de"
               ? "Änderung zur Freigabe eingereicht."
+              : l === "fr"
+              ? "Modification soumise pour approbation."
+              : l === "es"
+              ? "Cambio enviado para aprobación."
+              : l === "it"
+              ? "Modifica inviata per approvazione."
               : "Change submitted for approval.",
         );
         return;
@@ -498,6 +508,12 @@ function InventoryProductRow({
           ? "Durum güncellenemedi."
           : l === "de"
             ? "Status konnte nicht aktualisiert werden."
+            : l === "fr"
+            ? "Impossible de mettre à jour le statut."
+            : l === "es"
+            ? "No se pudo actualizar el estado."
+            : l === "it"
+            ? "Impossibile aggiornare lo stato."
             : "Could not update status.",
       );
     } finally {
@@ -598,7 +614,7 @@ function InventoryProductRow({
               type="button"
               onClick={() => router.push(`/products/${product.id}`)}
               style={{ marginTop: 2, padding: 0, background: "none", border: "none", cursor: "pointer", color: "#4b5563", fontSize: 12, textDecoration: "underline" }}
-              title="SKU üzerinden ürün düzenleme sayfasına git"
+              title={lt(locale, "Open product edit page via SKU", "SKU ile ürün düzenleme sayfasına git", "Ouvrir la page produit via SKU", "Abrir edición de producto vía SKU", "Apri modifica prodotto tramite SKU", "SKU üzerinden ürün düzenleme sayfasına git")}
             >
               {i18n.sku}: {sku}
             </button>
@@ -728,7 +744,7 @@ function InventoryProductRow({
                     color: "#111827",
                   }}
                 >
-                  Duplicate
+                  {ui.duplicate}
                 </button>
                 <button
                   type="button"
@@ -757,7 +773,7 @@ function InventoryProductRow({
                     color: "#b91c1c",
                   }}
                 >
-                  Delete
+                  {ui.delete}
                 </button>
               </div>
             )}
@@ -814,6 +830,7 @@ export default function InventoryPage() {
   const [exportFormat, setExportFormat] = useState("xlsx");
   const [exporting, setExporting] = useState(false);
   const medusaClient = getMedusaAdminClient();
+  const ui = getUI(locale);
   const l = String(locale || "en").toLowerCase();
 
   const [pendingChangeRequestsByProductId, setPendingChangeRequestsByProductId] = useState({});
@@ -821,12 +838,12 @@ export default function InventoryPage() {
   const [changeRequestsModalProductId, setChangeRequestsModalProductId] = useState(null);
   const [changeRequestsModalItems, setChangeRequestsModalItems] = useState([]);
   const rowHead = {
-    select: l === "tr" ? "Seç" : l === "de" ? "Ausw." : "Select",
-    status: l === "tr" ? "Durum" : l === "de" ? "Status" : "Status",
-    details: l === "tr" ? "Ürün detayları" : l === "de" ? "Produktdetails" : "Product details",
-    inventory: l === "tr" ? "Envanter" : l === "de" ? "Bestand" : "Inventory",
-    price: l === "tr" ? "Fiyat" : l === "de" ? "Preis" : "Price",
-    variations: l === "tr" ? "Varyasyonlar" : l === "de" ? "Variationen" : "Variations",
+    select: l === "tr" ? "Seç" : l === "de" ? "Ausw." : l === "fr" ? "Sél." : l === "es" ? "Sel." : l === "it" ? "Sel." : "Select",
+    status: l === "tr" ? "Durum" : l === "de" ? "Status" : l === "fr" ? "Statut" : l === "es" ? "Estado" : l === "it" ? "Stato" : "Status",
+    details: l === "tr" ? "Ürün detayları" : l === "de" ? "Produktdetails" : l === "fr" ? "Détails produit" : l === "es" ? "Detalles producto" : l === "it" ? "Dettagli prodotto" : "Product details",
+    inventory: l === "tr" ? "Envanter" : l === "de" ? "Bestand" : l === "fr" ? "Stock" : l === "es" ? "Inventario" : l === "it" ? "Inventario" : "Inventory",
+    price: l === "tr" ? "Fiyat" : l === "de" ? "Preis" : l === "fr" ? "Prix" : l === "es" ? "Precio" : l === "it" ? "Prezzo" : "Price",
+    variations: l === "tr" ? "Varyasyonlar" : l === "de" ? "Variationen" : l === "fr" ? "Variantes" : l === "es" ? "Variantes" : l === "it" ? "Varianti" : "Variations",
   };
   const renderInventoryHeader = () => (
     <div
@@ -856,7 +873,7 @@ export default function InventoryPage() {
       <div style={{ borderRight: EXCEL_BORDER, padding: "6px" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "6px" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px" }}>
-        <input value={detailsFilter} onChange={(e) => setDetailsFilter(e.target.value)} placeholder={l === "tr" ? "isim / sku / ean" : l === "de" ? "name / sku / ean" : "name / sku / ean"} style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 8px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+        <input value={detailsFilter} onChange={(e) => setDetailsFilter(e.target.value)} placeholder={l === "tr" ? "isim / sku / ean" : "name / sku / ean"} style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 8px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
         <input value={inventoryMin} onChange={(e) => setInventoryMin(e.target.value)} placeholder="min" style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 6px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
@@ -867,7 +884,7 @@ export default function InventoryPage() {
         <input value={priceMax} onChange={(e) => setPriceMax(e.target.value)} placeholder="max" style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 6px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px" }}>
-        <input value={variationFilter} onChange={(e) => setVariationFilter(e.target.value)} placeholder={l === "tr" ? "varyasyon" : l === "de" ? "variation" : "variation"} style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 8px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+        <input value={variationFilter} onChange={(e) => setVariationFilter(e.target.value)} placeholder={l === "tr" ? "varyasyon" : l === "fr" ? "variante" : l === "es" ? "variante" : l === "it" ? "variante" : "variation"} style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 8px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ padding: "6px" }} />
     </div>
@@ -917,7 +934,7 @@ export default function InventoryPage() {
       URL.revokeObjectURL(downloadUrl);
       setExportModalOpen(false);
     } catch (e) {
-      setError(e?.message || "Export failed");
+      setError(userError(e, locale, "Export failed"));
     } finally {
       setExporting(false);
     }
@@ -957,7 +974,7 @@ export default function InventoryPage() {
           medusaClient.getProductListingsMap().then((map) => setProductListingsMap(map || {})).catch(() => {});
         }
       } catch (err) {
-        setError(err?.message || "Failed to load products");
+        setError(userError(err, locale, "Failed to load products"));
       } finally {
         setLoading(false);
       }
@@ -1147,6 +1164,7 @@ export default function InventoryPage() {
         setMenuOpenId(null);
         openChangeRequestsModal(pid);
       }}
+      ui={ui}
     />
   );
 
@@ -1215,14 +1233,14 @@ export default function InventoryPage() {
 
   return (
     <Page
-      title="Inventory"
+      title={locale === "en" ? "Inventory" : locale === "tr" ? "Envanter" : locale === "fr" ? "Inventaire" : locale === "es" ? "Inventario" : locale === "it" ? "Inventario" : "Bestand"}
       primaryAction={{
-        content: "Add product",
+        content: locale === "en" ? "Add product" : locale === "tr" ? "Ürün ekle" : locale === "fr" ? "Ajouter un produit" : locale === "es" ? "Agregar producto" : locale === "it" ? "Aggiungi prodotto" : "Produkt hinzufügen",
         onAction: () => router.push("/products/new"),
       }}
       secondaryActions={[
-        { content: "Bulk upload", url: "/import-export" },
-        { content: "Export", onAction: () => setExportModalOpen(true) },
+        { content: locale === "en" ? "Bulk upload" : locale === "tr" ? "Toplu yükleme" : locale === "fr" ? "Import en masse" : locale === "es" ? "Carga masiva" : locale === "it" ? "Caricamento in blocco" : "Massenimport", url: "/import-export" },
+        { content: locale === "en" ? "Export" : locale === "tr" ? "Dışa aktar" : locale === "fr" ? "Exporter" : locale === "es" ? "Exportar" : locale === "it" ? "Esporta" : "Exportieren", onAction: () => setExportModalOpen(true) },
       ]}
     >
       <Layout>
@@ -1243,39 +1261,39 @@ export default function InventoryPage() {
                     label="Search products"
                     labelHidden
                     autoComplete="off"
-                    placeholder={l === "tr" ? "Ürün ara (isim, sku, ean, varyasyon)..." : l === "de" ? "Produkte suchen (Name, SKU, EAN, Variation)..." : "Search products (name, SKU, EAN, variation)..."}
+                    placeholder={l === "tr" ? "Ürün ara (isim, sku, ean, varyasyon)..." : l === "de" ? "Produkte suchen (Name, SKU, EAN, Variation)..." : l === "fr" ? "Rechercher produits (nom, SKU, EAN, variation)..." : l === "es" ? "Buscar productos (nombre, SKU, EAN, variación)..." : l === "it" ? "Cerca prodotti (nome, SKU, EAN, variazione)..." : "Search products (name, SKU, EAN, variation)..."}
                     value={productSearch}
                     onChange={setProductSearch}
                   />
                 </Box>
                 <Box minWidth="180px">
                   <Select
-                    label="Status filter"
+                    label={l === "tr" ? "Durum filtresi" : l === "de" ? "Statusfilter" : l === "fr" ? "Filtre statut" : l === "es" ? "Filtro estado" : l === "it" ? "Filtro stato" : "Status filter"}
                     labelHidden
                     value={statusFilter}
                     onChange={setStatusFilter}
                     options={[
-                      { label: l === "tr" ? "Tüm statüler" : l === "de" ? "Alle Status" : "All statuses", value: "all" },
-                      { label: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : "Active", value: "published" },
-                      { label: l === "tr" ? "Taslak" : "Draft", value: "draft" },
-                      { label: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : "Inactive", value: "inactive" },
-                      { label: l === "tr" ? "Arşiv" : l === "de" ? "Archiviert" : "Archived", value: "archived" },
+                      { label: l === "tr" ? "Tüm statüler" : l === "de" ? "Alle Status" : l === "fr" ? "Tous les statuts" : l === "es" ? "Todos los estados" : l === "it" ? "Tutti gli stati" : "All statuses", value: "all" },
+                      { label: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : l === "fr" ? "Actif" : l === "es" ? "Activo" : l === "it" ? "Attivo" : "Active", value: "published" },
+                      { label: l === "tr" ? "Taslak" : l === "de" ? "Entwurf" : l === "fr" ? "Brouillon" : l === "es" ? "Borrador" : l === "it" ? "Bozza" : "Draft", value: "draft" },
+                      { label: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : l === "fr" ? "Inactif" : l === "es" ? "Inactivo" : l === "it" ? "Inattivo" : "Inactive", value: "inactive" },
+                      { label: l === "tr" ? "Arşiv" : l === "de" ? "Archiviert" : l === "fr" ? "Archivé" : l === "es" ? "Archivado" : l === "it" ? "Archiviato" : "Archived", value: "archived" },
                     ]}
                   />
                 </Box>
                 <Box minWidth="200px">
                   <Select
-                    label="Sortierung"
+                    label={l === "tr" ? "Sıralama" : l === "de" ? "Sortierung" : l === "fr" ? "Tri" : l === "es" ? "Ordenar" : l === "it" ? "Ordina" : "Sort"}
                     labelHidden
                     options={[
                       { label: "Name A–Z", value: "title_asc" },
                       { label: "Name Z–A", value: "title_desc" },
-                      { label: l === "tr" ? "Stok (yüksek→düşük)" : l === "de" ? "Bestand (hoch→niedrig)" : "Inventory (high→low)", value: "inventory_desc" },
-                      { label: l === "tr" ? "Stok (düşük→yüksek)" : l === "de" ? "Bestand (niedrig→hoch)" : "Inventory (low→high)", value: "inventory_asc" },
-                      { label: l === "tr" ? "Fiyat (yüksek→düşük)" : l === "de" ? "Preis (hoch→niedrig)" : "Price (high→low)", value: "price_desc" },
-                      { label: l === "tr" ? "Fiyat (düşük→yüksek)" : l === "de" ? "Preis (niedrig→hoch)" : "Price (low→high)", value: "price_asc" },
-                      { label: "Neu zuerst", value: "created_desc" },
-                      { label: "Älteste zuerst", value: "created_asc" },
+                      { label: l === "tr" ? "Stok (yüksek→düşük)" : l === "de" ? "Bestand (hoch→niedrig)" : l === "fr" ? "Stock (haut→bas)" : l === "es" ? "Stock (alto→bajo)" : l === "it" ? "Stock (alto→basso)" : "Inventory (high→low)", value: "inventory_desc" },
+                      { label: l === "tr" ? "Stok (düşük→yüksek)" : l === "de" ? "Bestand (niedrig→hoch)" : l === "fr" ? "Stock (bas→haut)" : l === "es" ? "Stock (bajo→alto)" : l === "it" ? "Stock (basso→alto)" : "Inventory (low→high)", value: "inventory_asc" },
+                      { label: l === "tr" ? "Fiyat (yüksek→düşük)" : l === "de" ? "Preis (hoch→niedrig)" : l === "fr" ? "Prix (haut→bas)" : l === "es" ? "Precio (alto→bajo)" : l === "it" ? "Prezzo (alto→basso)" : "Price (high→low)", value: "price_desc" },
+                      { label: l === "tr" ? "Fiyat (düşük→yüksek)" : l === "de" ? "Preis (niedrig→hoch)" : l === "fr" ? "Prix (bas→haut)" : l === "es" ? "Precio (bajo→alto)" : l === "it" ? "Prezzo (basso→alto)" : "Price (low→high)", value: "price_asc" },
+                      { label: l === "tr" ? "Önce yeni" : l === "de" ? "Neu zuerst" : l === "fr" ? "Plus récent" : l === "es" ? "Más reciente" : l === "it" ? "Più recente" : "Newest first", value: "created_desc" },
+                      { label: l === "tr" ? "Önce eski" : l === "de" ? "Älteste zuerst" : l === "fr" ? "Plus ancien" : l === "es" ? "Más antiguo" : l === "it" ? "Più vecchio" : "Oldest first", value: "created_asc" },
                     ]}
                     value={inventorySort}
                     onChange={setInventorySort}
@@ -1289,14 +1307,14 @@ export default function InventoryPage() {
             <Card>
               <BlockStack gap="400">
                 <InlineStack align="space-between" blockAlign="center" wrap>
-                  <Text as="h2" variant="headingSm">All products</Text>
+                  <Text as="h2" variant="headingSm">{locale === "en" ? "All products" : locale === "tr" ? "Tüm ürünler" : locale === "fr" ? "Tous les produits" : locale === "es" ? "Todos los productos" : locale === "it" ? "Tutti i prodotti" : "Alle Produkte"}</Text>
                   <InlineStack gap="300" blockAlign="center" wrap>
                     <Box minWidth="260px">
                       <TextField
                         label="Search products"
                         labelHidden
                         autoComplete="off"
-                        placeholder={l === "tr" ? "Ürün ara (isim, sku, ean, varyasyon)..." : l === "de" ? "Produkte suchen (Name, SKU, EAN, Variation)..." : "Search products (name, SKU, EAN, variation)..."}
+                        placeholder={l === "tr" ? "Ürün ara (isim, sku, ean, varyasyon)..." : l === "de" ? "Produkte suchen (Name, SKU, EAN, Variation)..." : l === "fr" ? "Rechercher produits (nom, SKU, EAN, variation)..." : l === "es" ? "Buscar productos (nombre, SKU, EAN, variación)..." : l === "it" ? "Cerca prodotti (nome, SKU, EAN, variazione)..." : "Search products (name, SKU, EAN, variation)..."}
                         value={productSearch}
                         onChange={setProductSearch}
                       />
@@ -1308,34 +1326,34 @@ export default function InventoryPage() {
                         value={statusFilter}
                         onChange={setStatusFilter}
                         options={[
-                          { label: l === "tr" ? "Tüm statüler" : l === "de" ? "Alle Status" : "All statuses", value: "all" },
-                          { label: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : "Active", value: "published" },
-                          { label: l === "tr" ? "Taslak" : "Draft", value: "draft" },
-                          { label: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : "Inactive", value: "inactive" },
-                          { label: l === "tr" ? "Arşiv" : l === "de" ? "Archiviert" : "Archived", value: "archived" },
+                          { label: l === "tr" ? "Tüm statüler" : l === "de" ? "Alle Status" : l === "fr" ? "Tous les statuts" : l === "es" ? "Todos los estados" : l === "it" ? "Tutti gli stati" : "All statuses", value: "all" },
+                          { label: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : l === "fr" ? "Actif" : l === "es" ? "Activo" : l === "it" ? "Attivo" : "Active", value: "published" },
+                          { label: l === "tr" ? "Taslak" : l === "de" ? "Entwurf" : l === "fr" ? "Brouillon" : l === "es" ? "Borrador" : l === "it" ? "Bozza" : "Draft", value: "draft" },
+                          { label: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : l === "fr" ? "Inactif" : l === "es" ? "Inactivo" : l === "it" ? "Inattivo" : "Inactive", value: "inactive" },
+                          { label: l === "tr" ? "Arşiv" : l === "de" ? "Archiviert" : l === "fr" ? "Archivé" : l === "es" ? "Archivado" : l === "it" ? "Archiviato" : "Archived", value: "archived" },
                         ]}
                       />
                     </Box>
                     <Box minWidth="200px">
                       <Select
-                        label="Sortierung"
+                        label={l === "tr" ? "Sıralama" : l === "de" ? "Sortierung" : l === "fr" ? "Tri" : l === "es" ? "Ordenar" : l === "it" ? "Ordina" : "Sort"}
                         labelHidden
                         options={[
                           { label: "Name A–Z", value: "title_asc" },
                           { label: "Name Z–A", value: "title_desc" },
-                          { label: l === "tr" ? "Stok (yüksek→düşük)" : l === "de" ? "Bestand (hoch→niedrig)" : "Inventory (high→low)", value: "inventory_desc" },
-                          { label: l === "tr" ? "Stok (düşük→yüksek)" : l === "de" ? "Bestand (niedrig→hoch)" : "Inventory (low→high)", value: "inventory_asc" },
-                          { label: l === "tr" ? "Fiyat (yüksek→düşük)" : l === "de" ? "Preis (hoch→niedrig)" : "Price (high→low)", value: "price_desc" },
-                          { label: l === "tr" ? "Fiyat (düşük→yüksek)" : l === "de" ? "Preis (niedrig→hoch)" : "Price (low→high)", value: "price_asc" },
-                          { label: "Neu zuerst", value: "created_desc" },
-                          { label: "Älteste zuerst", value: "created_asc" },
+                          { label: l === "tr" ? "Stok (yüksek→düşük)" : l === "de" ? "Bestand (hoch→niedrig)" : l === "fr" ? "Stock (haut→bas)" : l === "es" ? "Stock (alto→bajo)" : l === "it" ? "Stock (alto→basso)" : "Inventory (high→low)", value: "inventory_desc" },
+                          { label: l === "tr" ? "Stok (düşük→yüksek)" : l === "de" ? "Bestand (niedrig→hoch)" : l === "fr" ? "Stock (bas→haut)" : l === "es" ? "Stock (bajo→alto)" : l === "it" ? "Stock (basso→alto)" : "Inventory (low→high)", value: "inventory_asc" },
+                          { label: l === "tr" ? "Fiyat (yüksek→düşük)" : l === "de" ? "Preis (hoch→niedrig)" : l === "fr" ? "Prix (haut→bas)" : l === "es" ? "Precio (alto→bajo)" : l === "it" ? "Prezzo (alto→basso)" : "Price (high→low)", value: "price_desc" },
+                          { label: l === "tr" ? "Fiyat (düşük→yüksek)" : l === "de" ? "Preis (niedrig→hoch)" : l === "fr" ? "Prix (bas→haut)" : l === "es" ? "Precio (bajo→alto)" : l === "it" ? "Prezzo (basso→alto)" : "Price (low→high)", value: "price_asc" },
+                          { label: l === "tr" ? "Önce yeni" : l === "de" ? "Neu zuerst" : l === "fr" ? "Plus récent" : l === "es" ? "Más reciente" : l === "it" ? "Più recente" : "Newest first", value: "created_desc" },
+                          { label: l === "tr" ? "Önce eski" : l === "de" ? "Älteste zuerst" : l === "fr" ? "Plus ancien" : l === "es" ? "Más antiguo" : l === "it" ? "Più vecchio" : "Oldest first", value: "created_asc" },
                         ]}
                         value={inventorySort}
                         onChange={setInventorySort}
                       />
                     </Box>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      {ownProducts.length} {ownProducts.length === 1 ? "product" : "products"}
+                      {ownProducts.length} {locale === "en" ? (ownProducts.length === 1 ? "product" : "products") : locale === "tr" ? "ürün" : locale === "fr" ? "produit(s)" : locale === "es" ? "producto(s)" : locale === "it" ? "prodotto/i" : (ownProducts.length === 1 ? "Produkt" : "Produkte")}
                     </Text>
                     {selectedIds.length > 0 && (
                       <Button
@@ -1348,7 +1366,7 @@ export default function InventoryPage() {
                           }
                         }}
                       >
-                        Bulk edit ({selectedIds.length})
+                        {locale === "en" ? `Bulk edit (${selectedIds.length})` : locale === "tr" ? `Toplu düzenle (${selectedIds.length})` : locale === "fr" ? `Modifier en masse (${selectedIds.length})` : locale === "es" ? `Edición masiva (${selectedIds.length})` : locale === "it" ? `Modifica in blocco (${selectedIds.length})` : `Massenbearbeitung (${selectedIds.length})`}
                       </Button>
                     )}
                   </InlineStack>
@@ -1357,10 +1375,10 @@ export default function InventoryPage() {
                 {ownProducts.length === 0 ? (
                   <Box paddingBlock="400">
                     <BlockStack gap="300">
-                      <Text as="p" tone="subdued">No products yet. Add your first product to get started.</Text>
+                      <Text as="p" tone="subdued">{locale === "en" ? "No products yet. Add your first product to get started." : locale === "tr" ? "Henüz ürün yok. Başlamak için ilk ürününüzü ekleyin." : locale === "fr" ? "Aucun produit pour l'instant. Ajoutez votre premier produit." : locale === "es" ? "Aún no hay productos. Agrega tu primer producto." : locale === "it" ? "Ancora nessun prodotto. Aggiungi il tuo primo prodotto." : "Noch keine Produkte. Fügen Sie Ihr erstes Produkt hinzu."}</Text>
                       <InlineStack gap="200">
-                        <Button variant="primary" url="/products/new">Add product</Button>
-                        <Button url="/import-export">Bulk upload</Button>
+                        <Button variant="primary" url="/products/new">{locale === "en" ? "Add product" : locale === "tr" ? "Ürün ekle" : locale === "fr" ? "Ajouter un produit" : locale === "es" ? "Agregar producto" : locale === "it" ? "Aggiungi prodotto" : "Produkt hinzufügen"}</Button>
+                        <Button url="/import-export">{locale === "en" ? "Bulk upload" : locale === "tr" ? "Toplu yükleme" : locale === "fr" ? "Import en masse" : locale === "es" ? "Carga masiva" : locale === "it" ? "Caricamento in blocco" : "Massenimport"}</Button>
                       </InlineStack>
                     </BlockStack>
                   </Box>
@@ -1380,9 +1398,9 @@ export default function InventoryPage() {
                 <BlockStack gap="400">
                   <InlineStack align="space-between" blockAlign="center" wrap>
                     <BlockStack gap="100">
-                      <Text as="h2" variant="headingSm">Ihr Superuser-Bereich</Text>
+                      <Text as="h2" variant="headingSm">{locale === "en" ? "Your superuser area" : locale === "tr" ? "Süper kullanıcı alanınız" : locale === "fr" ? "Votre espace super-utilisateur" : locale === "es" ? "Tu área de superusuario" : locale === "it" ? "La tua area superutente" : "Ihr Superuser-Bereich"}</Text>
                       <Text as="p" variant="bodySm" tone="subdued">
-                        Eigene Konto-Produkte und Einträge ohne Verkäufer-Zuordnung ({ownProducts.length})
+                        {locale === "en" ? `Own account products and entries without seller assignment (${ownProducts.length})` : locale === "tr" ? `Kendi hesap ürünleri ve satıcı ataması olmayan girişler (${ownProducts.length})` : locale === "fr" ? `Produits du compte propre et entrées sans vendeur assigné (${ownProducts.length})` : locale === "es" ? `Productos de cuenta propia y entradas sin vendedor asignado (${ownProducts.length})` : locale === "it" ? `Prodotti dell'account proprio e voci senza venditore assegnato (${ownProducts.length})` : `Eigene Konto-Produkte und Einträge ohne Verkäufer-Zuordnung (${ownProducts.length})`}
                       </Text>
                     </BlockStack>
                     {selectedIds.length > 0 && (
@@ -1393,13 +1411,13 @@ export default function InventoryPage() {
                           if (firstId) router.push(`/products/${products.find((p) => p.id === firstId)?.id || firstId}`);
                         }}
                       >
-                        Bulk edit ({selectedIds.length})
+                        {locale === "en" ? `Bulk edit (${selectedIds.length})` : locale === "tr" ? `Toplu düzenle (${selectedIds.length})` : locale === "fr" ? `Modifier en masse (${selectedIds.length})` : locale === "es" ? `Edición masiva (${selectedIds.length})` : locale === "it" ? `Modifica in blocco (${selectedIds.length})` : `Massenbearbeitung (${selectedIds.length})`}
                       </Button>
                     )}
                   </InlineStack>
                   <Divider />
                   {ownProducts.length === 0 ? (
-                    <Text as="p" tone="subdued">{l === "tr" ? "Bu bölümde ürün yok." : l === "de" ? "Keine Produkte in diesem Bereich." : "No products in this section."}</Text>
+                    <Text as="p" tone="subdued">{locale === "en" ? "No products in this section." : locale === "tr" ? "Bu bölümde ürün yok." : locale === "fr" ? "Aucun produit dans cette section." : locale === "es" ? "Sin productos en esta sección." : locale === "it" ? "Nessun prodotto in questa sezione." : "Keine Produkte in diesem Bereich."}</Text>
                   ) : (
                     <TableShell>
                       {renderInventoryHeader()}
@@ -1411,18 +1429,18 @@ export default function InventoryPage() {
 
               <Card>
                 <BlockStack gap="400">
-                  <Text as="h2" variant="headingSm">{l === "tr" ? "Satıcı ürünleri" : l === "de" ? "Verkäufer-Produkte" : "Seller products"}</Text>
+                  <Text as="h2" variant="headingSm">{locale === "en" ? "Seller products" : locale === "tr" ? "Satıcı ürünleri" : locale === "fr" ? "Produits des vendeurs" : locale === "es" ? "Productos de vendedores" : locale === "it" ? "Prodotti dei venditori" : "Verkäufer-Produkte"}</Text>
                   <TextField
                     label="Seller filter"
                     labelHidden
-                    placeholder={l === "tr" ? "Satıcı ara (Mağaza adı)…" : l === "de" ? "Verkäufer suchen (Store-Name)…" : "Search seller (store name)…"}
+                    placeholder={locale === "en" ? "Search seller (store name)…" : locale === "tr" ? "Satıcı ara (Mağaza adı)…" : locale === "fr" ? "Chercher vendeur (nom de boutique)…" : locale === "es" ? "Buscar vendedor (nombre de tienda)…" : locale === "it" ? "Cerca venditore (nome negozio)…" : "Verkäufer suchen (Store-Name)…"}
                     value={sellerSearchFilter}
                     onChange={setSellerSearchFilter}
                     autoComplete="off"
                   />
                   <Divider />
                   {filteredSellerGroups.length === 0 ? (
-                    <Text as="p" tone="subdued">{l === "tr" ? `Başka satıcı ürünü yok${sellerSearchFilter.trim() ? " (Filtre)" : ""}.` : l === "de" ? `Keine weiteren Verkäufer-Produkte${sellerSearchFilter.trim() ? " (Filter)" : ""}.` : `No more seller products${sellerSearchFilter.trim() ? " (filter)" : ""}.`}</Text>
+                    <Text as="p" tone="subdued">{locale === "en" ? `No more seller products${sellerSearchFilter.trim() ? " (filter)" : ""}.` : locale === "tr" ? `Başka satıcı ürünü yok${sellerSearchFilter.trim() ? " (Filtre)" : ""}.` : locale === "fr" ? `Aucun autre produit de vendeur${sellerSearchFilter.trim() ? " (filtre)" : ""}.` : locale === "es" ? `No hay más productos de vendedores${sellerSearchFilter.trim() ? " (filtro)" : ""}.` : locale === "it" ? `Nessun altro prodotto di venditori${sellerSearchFilter.trim() ? " (filtro)" : ""}.` : `Keine weiteren Verkäufer-Produkte${sellerSearchFilter.trim() ? " (Filter)" : ""}.`}</Text>
                   ) : (
                     <BlockStack gap="300">
                       {filteredSellerGroups.map(({ sellerId, items }) => {
@@ -1448,7 +1466,7 @@ export default function InventoryPage() {
                               }}
                             >
                               <Text as="span" variant="bodyMd" fontWeight="semibold">{label}</Text>
-                              <Text as="span" variant="bodySm" tone="subdued">{open ? "▾" : "▸"} {sortedItems.length} Produkte</Text>
+                              <Text as="span" variant="bodySm" tone="subdued">{open ? "▾" : "▸"} {sortedItems.length} {locale === "en" ? "products" : locale === "tr" ? "ürün" : locale === "fr" ? "produits" : locale === "es" ? "productos" : locale === "it" ? "prodotti" : "Produkte"}</Text>
                             </button>
                             {open && (
                               <Box paddingBlockStart="300">
@@ -1473,58 +1491,58 @@ export default function InventoryPage() {
       <Modal
         open={duplicateModalOpen}
         onClose={closeDuplicateModal}
-        title="Duplicate product"
+        title={locale === "en" ? "Duplicate product" : locale === "tr" ? "Ürünü kopyala" : locale === "fr" ? "Dupliquer le produit" : locale === "es" ? "Duplicar producto" : locale === "it" ? "Duplica prodotto" : "Produkt duplizieren"}
         primaryAction={{
-          content: "Create duplicate",
+          content: locale === "en" ? "Create duplicate" : locale === "tr" ? "Kopyayı oluştur" : locale === "fr" ? "Créer le doublon" : locale === "es" ? "Crear duplicado" : locale === "it" ? "Crea duplicato" : "Duplikat erstellen",
           onAction: runDuplicate,
           loading: duplicateSaving,
         }}
-        secondaryActions={[{ content: "Cancel", onAction: closeDuplicateModal }]}
+        secondaryActions={[{ content: ui.cancel, onAction: closeDuplicateModal }]}
       >
         <Modal.Section>
           <BlockStack gap="400">
             <Text as="p" tone="subdued">
-              Choose what to copy into the new product. <strong>SKU and EAN are never copied</strong> and must be set for the new product.
+              {locale === "en" ? <><span>Choose what to copy into the new product. </span><strong>SKU and EAN are never copied</strong><span> and must be set for the new product.</span></> : locale === "tr" ? <><span>Yeni ürüne kopyalanacakları seçin. </span><strong>SKU ve EAN hiçbir zaman kopyalanmaz</strong><span> ve yeni ürün için ayarlanmalıdır.</span></> : locale === "fr" ? <><span>Choisissez ce qui doit être copié dans le nouveau produit. </span><strong>SKU et EAN ne sont jamais copiés</strong><span> et doivent être définis pour le nouveau produit.</span></> : locale === "es" ? <><span>Elige qué copiar en el nuevo producto. </span><strong>SKU y EAN nunca se copian</strong><span> y deben definirse para el nuevo producto.</span></> : locale === "it" ? <><span>Scegli cosa copiare nel nuovo prodotto. </span><strong>SKU e EAN non vengono mai copiati</strong><span> e devono essere impostati per il nuovo prodotto.</span></> : <><span>Auswählen, was in das neue Produkt kopiert werden soll. </span><strong>SKU und EAN werden nie kopiert</strong><span> und müssen für das neue Produkt gesetzt werden.</span></>}
             </Text>
             {!duplicateFullProduct ? (
               <InlineStack gap="200" blockAlign="center">
                 <SkeletonBodyText lines={1} />
-                <Text as="span" tone="subdued">Loading product…</Text>
+                <Text as="span" tone="subdued">{locale === "en" ? "Loading product…" : locale === "tr" ? "Ürün yükleniyor…" : locale === "fr" ? "Chargement du produit…" : locale === "es" ? "Cargando producto…" : locale === "it" ? "Caricamento prodotto…" : "Produkt wird geladen…"}</Text>
               </InlineStack>
             ) : (
               <BlockStack gap="300">
                 <Checkbox
-                  label={'Titel kopieren'}
+                  label={locale === "en" ? "Copy title" : locale === "tr" ? "Başlığı kopyala" : locale === "fr" ? "Copier le titre" : locale === "es" ? "Copiar título" : locale === "it" ? "Copia titolo" : "Titel kopieren"}
                   checked={duplicateOptions.title}
                   onChange={(v) => setDuplicateOptions((o) => ({ ...o, title: v }))}
                 />
                 <Checkbox
-                  label="Description"
+                  label={locale === "en" ? "Description" : locale === "tr" ? "Açıklama" : locale === "fr" ? "Description" : locale === "es" ? "Descripción" : locale === "it" ? "Descrizione" : "Beschreibung"}
                   checked={duplicateOptions.description}
                   onChange={(v) => setDuplicateOptions((o) => ({ ...o, description: v }))}
                 />
                 <Checkbox
-                  label="Price"
+                  label={locale === "en" ? "Price" : locale === "tr" ? "Fiyat" : locale === "fr" ? "Prix" : locale === "es" ? "Precio" : locale === "it" ? "Prezzo" : "Preis"}
                   checked={duplicateOptions.price}
                   onChange={(v) => setDuplicateOptions((o) => ({ ...o, price: v }))}
                 />
                 <Checkbox
-                  label="Inventory quantity"
+                  label={locale === "en" ? "Inventory quantity" : locale === "tr" ? "Envanter miktarı" : locale === "fr" ? "Quantité en stock" : locale === "es" ? "Cantidad en inventario" : locale === "it" ? "Quantità inventario" : "Bestandsmenge"}
                   checked={duplicateOptions.inventory}
                   onChange={(v) => setDuplicateOptions((o) => ({ ...o, inventory: v }))}
                 />
                 <Checkbox
-                  label="Categories / collection"
+                  label={locale === "en" ? "Categories / collection" : locale === "tr" ? "Kategoriler / koleksiyon" : locale === "fr" ? "Catégories / collection" : locale === "es" ? "Categorías / colección" : locale === "it" ? "Categorie / collezione" : "Kategorien / Kollektion"}
                   checked={duplicateOptions.categories}
                   onChange={(v) => setDuplicateOptions((o) => ({ ...o, categories: v }))}
                 />
                 <Checkbox
-                  label="Images / media"
+                  label={locale === "en" ? "Images / media" : locale === "tr" ? "Görseller / medya" : locale === "fr" ? "Images / médias" : locale === "es" ? "Imágenes / medios" : locale === "it" ? "Immagini / media" : "Bilder / Medien"}
                   checked={duplicateOptions.media}
                   onChange={(v) => setDuplicateOptions((o) => ({ ...o, media: v }))}
                 />
                 <Checkbox
-                  label="Variants (option names and values; SKU/EAN never copied)"
+                  label={locale === "en" ? "Variants (option names and values; SKU/EAN never copied)" : locale === "tr" ? "Varyantlar (seçenek adları ve değerleri; SKU/EAN hiçbir zaman kopyalanmaz)" : locale === "fr" ? "Variantes (noms et valeurs d'options ; SKU/EAN jamais copiés)" : locale === "es" ? "Variantes (nombres y valores de opciones; SKU/EAN nunca se copian)" : locale === "it" ? "Varianti (nomi e valori delle opzioni; SKU/EAN mai copiati)" : "Varianten (Optionsnamen und -werte; SKU/EAN werden nie kopiert)"}
                   checked={duplicateOptions.variants}
                   onChange={(v) => setDuplicateOptions((o) => ({ ...o, variants: v }))}
                 />
@@ -1537,12 +1555,15 @@ export default function InventoryPage() {
       <Modal
         open={changeRequestsModalOpen}
         onClose={() => setChangeRequestsModalOpen(false)}
-        title={
-          changeRequestsModalProductId
-            ? `Proposed changes (${products.find((p) => String(p?.id || '') === String(changeRequestsModalProductId))?.title || 'Product'})`
-            : 'Proposed changes'
-        }
-        primaryAction={isSuperuser ? { content: 'Close', onAction: () => setChangeRequestsModalOpen(false) } : { content: 'Close', onAction: () => setChangeRequestsModalOpen(false) }}
+        title={(() => {
+          const label = locale === "en" ? "Proposed changes" : locale === "tr" ? "Önerilen değişiklikler" : locale === "fr" ? "Modifications proposées" : locale === "es" ? "Cambios propuestos" : locale === "it" ? "Modifiche proposte" : "Vorgeschlagene Änderungen";
+          if (changeRequestsModalProductId) {
+            const productTitle = products.find((p) => String(p?.id || '') === String(changeRequestsModalProductId))?.title || (locale === "en" ? "Product" : locale === "tr" ? "Ürün" : locale === "fr" ? "Produit" : locale === "es" ? "Producto" : locale === "it" ? "Prodotto" : "Produkt");
+            return `${label} (${productTitle})`;
+          }
+          return label;
+        })()}
+        primaryAction={{ content: ui.close, onAction: () => setChangeRequestsModalOpen(false) }}
         secondaryActions={[]}
       >
         <Modal.Section>
@@ -1553,17 +1574,13 @@ export default function InventoryPage() {
                   href={`/products/${changeRequestsModalProductId}`}
                   style={{ fontSize: 13, fontWeight: 600, color: "#0284c7", textDecoration: "none" }}
                 >
-                  {l === "tr"
-                    ? "Ürün düzenleme sayfasına git →"
-                    : l === "de"
-                      ? "Zur Produktbearbeitung →"
-                      : "Open product edit page →"}
+                  {locale === "en" ? "Open product edit page →" : locale === "tr" ? "Ürün düzenleme sayfasına git →" : locale === "fr" ? "Ouvrir la page de modification du produit →" : locale === "es" ? "Abrir página de edición del producto →" : locale === "it" ? "Apri pagina di modifica prodotto →" : "Zur Produktbearbeitung →"}
                 </I18nLink>
               </Box>
             ) : null}
             {changeRequestsModalItems.length === 0 ? (
               <Text as="p" tone="subdued">
-                No pending change proposals.
+                {locale === "en" ? "No pending change proposals." : locale === "tr" ? "Bekleyen değişiklik önerisi yok." : locale === "fr" ? "Aucune proposition de modification en attente." : locale === "es" ? "No hay propuestas de cambio pendientes." : locale === "it" ? "Nessuna proposta di modifica in sospeso." : "Keine ausstehenden Änderungsvorschläge."}
               </Text>
             ) : (
               changeRequestsModalItems.map((cr) => {
@@ -1577,7 +1594,7 @@ export default function InventoryPage() {
                       <Divider />
                       <BlockStack gap="100">
                         <Text as="p" variant="bodySm" tone="subdued">
-                          {l === "tr" ? "Mevcut değer" : l === "de" ? "Aktueller Wert" : "Current value"}
+                          {l === "tr" ? "Mevcut değer" : l === "de" ? "Aktueller Wert" : l === "fr" ? "Valeur actuelle" : l === "es" ? "Valor actual" : l === "it" ? "Valore attuale" : "Current value"}
                         </Text>
                         <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                           {formatChangeRequestValueForDisplay(cr.old_value)}
@@ -1585,7 +1602,7 @@ export default function InventoryPage() {
                       </BlockStack>
                       <BlockStack gap="100">
                         <Text as="p" variant="bodySm" tone="subdued">
-                          {l === "tr" ? "Önerilen değer" : l === "de" ? "Vorgeschlagener Wert" : "Proposed value"}
+                          {l === "tr" ? "Önerilen değer" : l === "de" ? "Vorgeschlagener Wert" : l === "fr" ? "Valeur proposée" : l === "es" ? "Valor propuesto" : l === "it" ? "Valore proposto" : "Proposed value"}
                         </Text>
                         <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word", fontWeight: 600 }}>
                           {formatChangeRequestValueForDisplay(cr.new_value)}
@@ -1599,7 +1616,7 @@ export default function InventoryPage() {
                             size="slim"
                             onClick={() => approveChangeRequest(cr.id)}
                           >
-                            Approve
+                            {locale === "en" ? "Approve" : locale === "tr" ? "Onayla" : locale === "fr" ? "Approuver" : locale === "es" ? "Aprobar" : locale === "it" ? "Approva" : "Genehmigen"}
                           </Button>
                           <Button
                             variant="secondary"
@@ -1607,7 +1624,7 @@ export default function InventoryPage() {
                             size="slim"
                             onClick={() => rejectChangeRequest(cr.id)}
                           >
-                            Reject
+                            {locale === "en" ? "Reject" : locale === "tr" ? "Reddet" : locale === "fr" ? "Refuser" : locale === "es" ? "Rechazar" : locale === "it" ? "Rifiuta" : "Ablehnen"}
                           </Button>
                         </InlineStack>
                       )}
@@ -1623,14 +1640,14 @@ export default function InventoryPage() {
       <Modal
         open={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
-        title={l === "tr" ? "Envanteri dışa aktar" : l === "de" ? "Inventar exportieren" : "Export inventory"}
+        title={l === "tr" ? "Envanteri dışa aktar" : l === "de" ? "Inventar exportieren" : l === "fr" ? "Exporter l'inventaire" : l === "es" ? "Exportar inventario" : l === "it" ? "Esporta inventario" : "Export inventory"}
         primaryAction={{
-          content: l === "tr" ? "Dışa aktar" : l === "de" ? "Exportieren" : "Export",
+          content: l === "tr" ? "Dışa aktar" : l === "de" ? "Exportieren" : l === "fr" ? "Exporter" : l === "es" ? "Exportar" : l === "it" ? "Esporta" : "Export",
           onAction: runQuickExport,
           loading: exporting,
         }}
         secondaryActions={[
-          { content: l === "tr" ? "İptal" : l === "de" ? "Abbrechen" : "Cancel", onAction: () => setExportModalOpen(false) },
+          { content: l === "tr" ? "İptal" : l === "de" ? "Abbrechen" : l === "fr" ? "Annuler" : l === "es" ? "Cancelar" : l === "it" ? "Annulla" : "Cancel", onAction: () => setExportModalOpen(false) },
         ]}
       >
         <Modal.Section>
@@ -1640,6 +1657,12 @@ export default function InventoryPage() {
                 ? "Filtrelenmiş ürünler dışa aktarılır: her ürün için bir parent satırı, her varyant için bir child satırı (ilk sütun: product_type)."
                 : l === "de"
                 ? "Gefilterte Produkte werden exportiert: pro Artikel eine Parent-Zeile, pro Variante eine Child-Zeile (erste Spalte: product_type)."
+                : l === "fr"
+                ? "Les produits filtrés sont exportés : une ligne parent par produit, une ligne enfant par variante (première colonne : product_type)."
+                : l === "es"
+                ? "Los productos filtrados se exportan: una fila padre por producto, una fila hijo por variante (primera columna: product_type)."
+                : l === "it"
+                ? "I prodotti filtrati vengono esportati: una riga padre per prodotto, una riga figlio per variante (prima colonna: product_type)."
                 : "Filtered products are exported: one parent row per product, one child row per variant (first column: product_type)."}
             </Text>
             <Select

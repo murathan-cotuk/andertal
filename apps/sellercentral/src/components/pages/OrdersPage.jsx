@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useLocale } from "next-intl";
+import { statusLabel } from "@/lib/status-labels";
 import styled from "styled-components";
 import { Card } from "@andertal/ui";
 import { Button, InlineStack } from "@shopify/polaris";
@@ -13,6 +14,7 @@ import ShipLabelModal from "@/components/orders/ShipLabelModal";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
+import { lt } from "@/lib/locale-text";
 import { resolveSellerFacingError, readSellerIsSuperuser } from "@/lib/seller-system-errors";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -65,10 +67,11 @@ const STATUS_COLORS = {
 };
 
 function StatusBadge({ value }) {
+  const locale = useLocale();
   const s = STATUS_COLORS[value] || { bg: "#f3f4f6", color: "#6b7280" };
   return (
     <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color, whiteSpace: "nowrap" }}>
-      {value || "—"}
+      {value ? statusLabel(locale, value) : "—"}
     </span>
   );
 }
@@ -279,10 +282,10 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
       <td colSpan={colCount} style={{ padding: 0, background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
         <div style={{ padding: "16px 24px 20px" }}>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            <Button url={getOrderPdfDownloadUrl(order.id, "invoice")} external variant="secondary" size="slim">
+            <Button url={getOrderPdfDownloadUrl(order.id, "invoice", locale)} external variant="secondary" size="slim">
               {ui.invoice}
             </Button>
-            <Button url={getOrderPdfDownloadUrl(order.id, "lieferschein")} external variant="secondary" size="slim">
+            <Button url={getOrderPdfDownloadUrl(order.id, "lieferschein", locale)} external variant="secondary" size="slim">
               {ui.deliveryNote}
             </Button>
             <Button url={`/inbox?order_id=${order.id}`} variant="secondary" size="slim">
@@ -398,7 +401,7 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
                           )}
                           {vat.rate > 0 && (
                             <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
-                              Netto: {fmtCents(Math.round((it.unit_price_cents || 0) / (1 + vat.rate / 100)))} · +{vat.label} {vat.rate}%: {fmtCents(Math.round((it.unit_price_cents || 0) - (it.unit_price_cents || 0) / (1 + vat.rate / 100)))}
+                              {ui.net}: {fmtCents(Math.round((it.unit_price_cents || 0) / (1 + vat.rate / 100)))} · +{vat.label} {vat.rate}%: {fmtCents(Math.round((it.unit_price_cents || 0) - (it.unit_price_cents || 0) / (1 + vat.rate / 100)))}
                             </div>
                           )}
                         </div>
@@ -600,7 +603,7 @@ function ManualOrderModal({ onClose, onCreated, locale = "de" }) {
       await client.createOrder(payload);
       onCreated();
       onClose();
-    } catch (e) { setErr(e?.message || "Fehler"); }
+    } catch (e) { setErr(e?.message || ui.error); }
     setSaving(false);
   };
 
@@ -657,19 +660,19 @@ function ManualOrderModal({ onClose, onCreated, locale = "de" }) {
             <div>
               <label style={lbl}>{ui.orderStatusLabel}</label>
               <select style={inp} value={form.order_status} onChange={e => setF("order_status", e.target.value)}>
-                {["offen","in_bearbeitung","abgeschlossen","storniert"].map(s => <option key={s} value={s}>{s}</option>)}
+                {["offen","in_bearbeitung","abgeschlossen","storniert"].map(s => <option key={s} value={s}>{statusLabel(locale, s)}</option>)}
               </select>
             </div>
             <div>
               <label style={lbl}>{ui.paymentStatusLabel}</label>
               <select style={inp} value={form.payment_status} onChange={e => setF("payment_status", e.target.value)}>
-                {["offen","bezahlt","teil_erstattet","erstattet"].map(s => <option key={s} value={s}>{s}</option>)}
+                {["offen","bezahlt","teil_erstattet","erstattet"].map(s => <option key={s} value={s}>{statusLabel(locale, s)}</option>)}
               </select>
             </div>
             <div>
               <label style={lbl}>{ui.deliveryStatusLabel}</label>
               <select style={inp} value={form.delivery_status} onChange={e => setF("delivery_status", e.target.value)}>
-                {["offen","versendet","zugestellt"].map(s => <option key={s} value={s}>{s}</option>)}
+                {["offen","versendet","zugestellt"].map(s => <option key={s} value={s}>{statusLabel(locale, s)}</option>)}
               </select>
             </div>
           </div>
@@ -1089,7 +1092,15 @@ export default function OrdersPage() {
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setReviewPopupOrderId(order.id); }}
                     style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                    title={`${orderReviews.length} Bewertung${orderReviews.length !== 1 ? "en" : ""}`}
+                    title={lt(
+                      locale,
+                      `${orderReviews.length} review${orderReviews.length !== 1 ? "s" : ""}`,
+                      `${orderReviews.length} yorum`,
+                      `${orderReviews.length} avis`,
+                      `${orderReviews.length} reseña${orderReviews.length !== 1 ? "s" : ""}`,
+                      `${orderReviews.length} recensione${orderReviews.length !== 1 ? "i" : ""}`,
+                      `${orderReviews.length} Bewertung${orderReviews.length !== 1 ? "en" : ""}`
+                    )}
                   >
                     <MiniStars rating={avg} />
                   </button>
@@ -1297,7 +1308,7 @@ export default function OrdersPage() {
             <FilterField>
               <FieldLabel>{ui.searchSeller}</FieldLabel>
               <FilterInput
-                placeholder="Name / ID…"
+                placeholder={lt(locale, "Name / ID…", "Ad / ID…", "Nom / ID…", "Nombre / ID…", "Nome / ID…", "Name / ID…")}
                 value={sellerSearchFilter}
                 onChange={(e) => setSellerSearchFilter(e.target.value)}
               />
@@ -1401,7 +1412,7 @@ export default function OrdersPage() {
                 {filteredSellerOrderGroups.length === 0 ? (
                   <tr>
                     <td colSpan={visibleColCount} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
-                      {ui.noSellerOrders}{sellerSearchFilter.trim() ? " (Filter)" : ""}.
+                      {ui.noSellerOrders}{sellerSearchFilter.trim() ? lt(locale, " (filter)", " (filtre)", " (filtre)", " (filtro)", " (filtro)", " (Filter)") : ""}.
                     </td>
                   </tr>
                 ) : (
@@ -1429,7 +1440,7 @@ export default function OrdersPage() {
                           >
                             <span style={{ fontWeight: 600, fontSize: 15, color: "#111827" }}>{label}</span>
                             <span style={{ fontSize: 13, color: "#6b7280" }}>
-                              {open ? "▾" : "▸"} {items.length} {ui.orders || "Bestellungen"}
+                              {open ? "▾" : "▸"} {items.length} {ui.orders}
                             </span>
                           </button>
                         </SellerGroupHeader>

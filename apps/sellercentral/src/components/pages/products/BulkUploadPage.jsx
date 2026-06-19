@@ -6,6 +6,7 @@ import styled from "styled-components";
 import { Card, Button } from "@andertal/ui";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getUI } from "@/lib/ui-strings";
+import { productCsvTemplateFilename } from "@/lib/download-names";
 
 const Container = styled.div`max-width: 1200px; margin: 0 auto;`;
 const Title = styled.h1`font-size: 32px; font-weight: 700; margin-bottom: 32px; color: #1f2937;`;
@@ -55,12 +56,22 @@ function parseCSV(text) {
   }).filter(r => Object.values(r).some(v => v));
 }
 
-function downloadTemplate() {
-  const csvContent = [CSV_COLUMNS.join(","), CSV_TEMPLATE_ROW.join(",")].join("\n");
+function csvTemplateRow(locale) {
+  if (locale === "en") {
+    return ["Sample product", "SKU-001", "Product description", "29.99", "100", "published", "Electronics", "Sample brand", "0.5", "4012345678901", "https://example.com/image1.jpg", "", ""];
+  }
+  if (locale === "tr") {
+    return ["Örnek ürün", "SKU-001", "Ürün açıklaması", "29.99", "100", "published", "Elektronik", "Örnek marka", "0.5", "4012345678901", "https://example.com/gorsel1.jpg", "", ""];
+  }
+  return CSV_TEMPLATE_ROW;
+}
+
+function downloadTemplate(locale) {
+  const csvContent = [CSV_COLUMNS.join(","), csvTemplateRow(locale).join(",")].join("\n");
   const blob = new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "andertal-produkt-vorlage.csv";
+  link.download = productCsvTemplateFilename(locale);
   link.click();
 }
 
@@ -152,7 +163,7 @@ export default function BulkUploadPage() {
               <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>{locale === "en" ? "Columns" : locale === "tr" ? "Sütunlar" : locale === "fr" ? "Colonnes" : locale === "es" ? "Columnas" : locale === "it" ? "Colonne" : "Spalten"}: {CSV_COLUMNS.join(", ")}</p>
             </div>
           </div>
-          <Button onClick={downloadTemplate}>
+          <Button onClick={() => downloadTemplate(locale)}>
             <i className="fas fa-download" style={{ marginRight: "8px" }} />{locale === "en" ? "Template" : locale === "tr" ? "Şablon" : locale === "fr" ? "Modèle" : locale === "es" ? "Plantilla" : locale === "it" ? "Modello" : "Vorlage"}
           </Button>
         </div>

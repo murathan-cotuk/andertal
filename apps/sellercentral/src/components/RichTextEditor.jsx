@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Text } from "@shopify/polaris";
+import { useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 
 function visualToHtml(html) {
   const s = (html || "").trim();
@@ -55,9 +57,12 @@ export default function RichTextEditor({
   value = "",
   onChange,
   minHeight = "160px",
-  placeholder = "Text eingeben…",
+  placeholder,
   helpText,
 }) {
+  const locale = useLocale();
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
+  const ph = placeholder ?? t("Enter text…", "Metin girin…", "Saisir le texte…", "Introducir texto…", "Inserisci testo…", "Text eingeben…");
   const [mode, setMode] = useState("visual");
   const editorRef = useRef(null);
   const mountedValueRef = useRef(null); // tracks last value we wrote into innerHTML
@@ -128,29 +133,29 @@ export default function RichTextEditor({
               {mode === "visual" && (
                 <>
                   {/* Bold */}
-                  <button type="button" className="rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("bold"); }} title="Fett">
+                  <button type="button" className="rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("bold"); }} title={t("Bold", "Kalın", "Gras", "Negrita", "Grassetto", "Fett")}>
                     <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2h4.5a3.501 3.501 0 0 1 2.852 5.53A3.499 3.499 0 0 1 9 14H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1m1 5.5h3.5a1.5 1.5 0 0 0 0-3H5zm0 2V12h4a1.5 1.5 0 0 0 0-3H5z"/></svg>
                   </button>
                   {/* Italic */}
-                  <button type="button" className="rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("italic"); }} title="Kursiv">
+                  <button type="button" className="rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("italic"); }} title={t("Italic", "İtalik", "Italique", "Cursiva", "Corsivo", "Kursiv")}>
                     <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 2.25a.75.75 0 0 1 .75-.75h6a.75.75 0 0 1 0 1.5H9.906l-2.273 10h2.117a.75.75 0 0 1 0 1.5h-6a.75.75 0 0 1 0-1.5h2.345l2.272-10H8.25a.75.75 0 0 1-.75-.75"/></svg>
                   </button>
                   {/* Underline */}
-                  <button type="button" className="rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("underline"); }} title="Unterstrichen">
+                  <button type="button" className="rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("underline"); }} title={t("Underline", "Altı çizili", "Souligné", "Subrayado", "Sottolineato", "Unterstrichen")}>
                     <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5.25 1.75a.75.75 0 0 0-1.5 0v6a4.25 4.25 0 0 0 8.5 0v-6a.75.75 0 0 0-1.5 0v6a2.75 2.75 0 1 1-5.5 0z"/><path d="M2.75 13.5a.75.75 0 0 0 0 1.5h10.5a.75.75 0 0 0 0-1.5z"/></svg>
                   </button>
                   <span className="rte-divider" aria-hidden />
                   {/* H2 */}
-                  <button type="button" className="rte-btn" style={{ width: 36, fontSize: 11 }} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "h2"); }} title="Überschrift 2">H2</button>
+                  <button type="button" className="rte-btn" style={{ width: 36, fontSize: 11 }} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "h2"); }} title={t("Heading 2", "Başlık 2", "Titre 2", "Encabezado 2", "Titolo 2", "Überschrift 2")}>H2</button>
                   {/* H3 */}
-                  <button type="button" className="rte-btn" style={{ width: 36, fontSize: 11 }} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "h3"); }} title="Überschrift 3">H3</button>
+                  <button type="button" className="rte-btn" style={{ width: 36, fontSize: 11 }} onMouseDown={(e) => { e.preventDefault(); exec("formatBlock", "h3"); }} title={t("Heading 3", "Başlık 3", "Titre 3", "Encabezado 3", "Titolo 3", "Überschrift 3")}>H3</button>
                   <span className="rte-divider" aria-hidden />
                   {/* Bullet list */}
-                  <button type="button" className="rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("insertUnorderedList"); }} title="Aufzählung">
+                  <button type="button" className="rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("insertUnorderedList"); }} title={t("Bullet list", "Madde işaretli liste", "Liste à puces", "Lista con viñetas", "Elenco puntato", "Aufzählung")}>
                     <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2"/><path d="M2 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2"/><path d="M3 13a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/><path d="M5.25 2.25a.75.75 0 0 0 0 1.5h9a.75.75 0 0 0 0-1.5z"/><path d="M4.5 8a.75.75 0 0 1 .75-.75h9a.75.75 0 0 1 0 1.5h-9A.75.75 0 0 1 4.5 8"/><path d="M5.25 12.25a.75.75 0 0 0 0 1.5h9a.75.75 0 0 0 0-1.5z"/></svg>
                   </button>
                   {/* Numbered list */}
-                  <button type="button" className="rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("insertOrderedList"); }} title="Nummerierte Liste">
+                  <button type="button" className="rte-btn" onMouseDown={(e) => { e.preventDefault(); exec("insertOrderedList"); }} title={t("Numbered list", "Numaralı liste", "Liste numérotée", "Lista numerada", "Elenco numerato", "Nummerierte Liste")}>
                     <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5.75 2.25a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5z"/><path d="M5.75 7.25a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5z"/><path d="M5 13a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 5 13"/><path d="M2.25 5.75a1.5 1.5 0 0 0-1.5 1.5.5.5 0 0 0 1 0 .5.5 0 0 1 1 0v.05a.5.5 0 0 1-.168.375l-1.423 1.264c-.515.459-.191 1.311.499 1.311h1.592a.5.5 0 0 0 0-1h-.935l.932-.828c.32-.285.503-.693.503-1.121v-.051a1.5 1.5 0 0 0-1.5-1.5"/></svg>
                   </button>
                 </>
@@ -161,7 +166,7 @@ export default function RichTextEditor({
               type="button"
               className={`rte-html-btn ${mode === "html" ? "active" : ""}`}
               onClick={toggleMode}
-              title={mode === "html" ? "Visuell anzeigen" : "HTML anzeigen"}
+              title={mode === "html" ? t("Visual mode", "Görsel mod", "Mode visuel", "Modo visual", "Modalità visuale", "Visuell anzeigen") : t("HTML mode", "HTML modu", "Mode HTML", "Modo HTML", "Modalità HTML", "HTML anzeigen")}
             >
               <svg viewBox="0 0 16 16" fill="currentColor"><path d="M10.221 2.956a.75.75 0 0 0-1.442-.412l-3 10.5a.75.75 0 0 0 1.442.412z"/><path d="M5.03 4.22a.75.75 0 0 1 0 1.06l-2.72 2.72 2.72 2.72a.749.749 0 1 1-1.06 1.06l-3.25-3.25a.75.75 0 0 1 0-1.06l3.25-3.25a.75.75 0 0 1 1.06 0"/><path d="M10.97 11.78a.75.75 0 0 1 0-1.06l2.72-2.72-2.72-2.72a.749.749 0 1 1 1.06-1.06l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0"/></svg>
             </button>
@@ -182,7 +187,7 @@ export default function RichTextEditor({
               className="rte-visual"
               contentEditable
               suppressContentEditableWarning
-              data-placeholder={placeholder}
+              data-placeholder={ph}
               onBlur={handleBlur}
             />
           )}

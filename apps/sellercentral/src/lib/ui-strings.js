@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "next-intl";
+
 /**
  * ui-strings.js
  * Centralised UI strings for all page components.
@@ -931,15 +933,11 @@ export function getUI(locale) {
 }
 
 /**
- * React hook — reads locale from localStorage (sellerLocale) or defaults to "de".
+ * React hook — reads locale from next-intl (URL / [locale] segment).
  * Call at top of component: const ui = useUI();
  */
 export function useUI() {
-  if (typeof window === "undefined") return getUI("de");
-  const locale =
-    (typeof localStorage !== "undefined" && localStorage.getItem("sellerLocale")) ||
-    document.documentElement.lang ||
-    "de";
+  const locale = useLocale();
   return getUI(locale);
 }
 
@@ -947,10 +945,6 @@ export function useUI() {
  * useUILocale — same as useUI but also returns the locale string.
  */
 export function useUILocale() {
-  if (typeof window === "undefined") return { ui: getUI("de"), locale: "de" };
-  const locale =
-    (typeof localStorage !== "undefined" && localStorage.getItem("sellerLocale")) ||
-    document.documentElement.lang ||
-    "de";
+  const locale = useLocale();
   return { ui: getUI(locale), locale };
 }

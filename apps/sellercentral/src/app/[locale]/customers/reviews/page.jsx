@@ -2,13 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
+import { useLt, dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import DashboardLayout from "@/components/DashboardLayout";
-
-function fmtDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
 
 const selStyle = {
   padding: "7px 10px",
@@ -30,12 +27,17 @@ function Stars({ rating }) {
   );
 }
 
-const COL_KEYS = ["customer", "product_sku", "rating", "comment", "created_at"];
-
 function CustomerReviewsPage() {
   const params = useParams();
   const router = useRouter();
-  const locale = params?.locale || "de";
+  const locale = useLocale();
+  const lt = useLt();
+  const routeLocale = params?.locale || locale;
+
+  const fmtDate = (d) => {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString(dateLocaleFor(locale), { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
 
   const [reviews, setReviews] = useState([]);
   const [stats, setStats] = useState(null);
@@ -73,7 +75,7 @@ function CustomerReviewsPage() {
           (r.customer_number || "").toLowerCase().includes(q) ||
           (r.product_sku || "").toLowerCase().includes(q) ||
           (r.product_title || "").toLowerCase().includes(q) ||
-          (r.comment || "").toLowerCase().includes(q)
+          (r.comment || "").toLowerCase().includes(q),
       );
     }
     if (filterRating) list = list.filter((r) => String(r.rating) === filterRating);
@@ -88,7 +90,7 @@ function CustomerReviewsPage() {
       return 0;
     });
     return list;
-  }, [reviews, search, filterRating, sort]);
+  }, [reviews, search, filterRating, sort, isSuperuser]);
 
   const avgRating = stats?.avg != null ? Number(stats.avg).toFixed(1) : (reviews.length ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1) : "—");
 
@@ -98,15 +100,34 @@ function CustomerReviewsPage() {
     return { n, cnt, pct: total ? Math.round((cnt / total) * 100) : 0 };
   });
 
+  const reviewCountLabel = (n) => lt(
+    `${n} review${n !== 1 ? "s" : ""}`,
+    `${n} değerlendirme`,
+    `${n} avis`,
+    `${n} reseña${n !== 1 ? "s" : ""}`,
+    `${n} recensione${n !== 1 ? "i" : ""}`,
+    `${n} Bewertung${n !== 1 ? "en" : ""}`,
+  );
+
+  const columns = [
+    { label: lt("Customer", "Müşteri", "Client", "Cliente", "Cliente", "Kunde"), col: "customer_name" },
+    { label: lt("SKU / Product", "SKU / Ürün", "SKU / Produit", "SKU / Producto", "SKU / Prodotto", "SKU / Produkt"), col: "product_sku" },
+    ...(isSuperuser ? [{ label: lt("Seller", "Satıcı", "Vendeur", "Vendedor", "Venditore", "Verkäufer"), col: "seller_store_name" }] : []),
+    { label: lt("Rating", "Puan", "Note", "Valoración", "Valutazione", "Bewertung"), col: "rating" },
+    { label: lt("Comment", "Yorum", "Commentaire", "Comentario", "Commento", "Kommentar"), col: "comment" },
+    { label: lt("Date", "Tarih", "Date", "Fecha", "Data", "Datum"), col: "created_at" },
+  ];
+
   return (
     <div style={{ padding: 24, background: "#fff", minHeight: "100%" }}>
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Kundenbewertungen</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
+          {lt("Customer reviews", "Müşteri değerlendirmeleri", "Avis clients", "Reseñas de clientes", "Recensioni clienti", "Kundenbewertungen")}
+        </h1>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           {!loading && (
             <>
-              <span style={{ fontSize: 13, color: "#6b7280" }}>{filtered.length} Bewertung{filtered.length !== 1 ? "en" : ""}</span>
+              <span style={{ fontSize: 13, color: "#6b7280" }}>{reviewCountLabel(filtered.length)}</span>
               {reviews.length > 0 && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", background: "#fef3c7", color: "#92400e", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
                   <span style={{ color: "#f59e0b" }}>★</span> {avgRating} Ø
@@ -117,18 +138,15 @@ function CustomerReviewsPage() {
         </div>
       </div>
 
-      {/* Rating summary cards */}
       {!loading && reviews.length > 0 && (
         <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-          {/* Score card */}
           <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "20px 28px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 120 }}>
             <div style={{ fontSize: 36, fontWeight: 800, color: "#92400e", lineHeight: 1 }}>{avgRating}</div>
             <div style={{ fontSize: 20, color: "#f59e0b", letterSpacing: 2, margin: "4px 0" }}>
-              {[1,2,3,4,5].map(n => <span key={n} style={{ color: Number(avgRating) >= n ? "#f59e0b" : "#d1d5db" }}>★</span>)}
+              {[1, 2, 3, 4, 5].map((n) => <span key={n} style={{ color: Number(avgRating) >= n ? "#f59e0b" : "#d1d5db" }}>★</span>)}
             </div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{reviews.length} Bewertungen</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{reviewCountLabel(reviews.length)}</div>
           </div>
-          {/* Distribution bars */}
           <div style={{ flex: 1, minWidth: 200, background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "14px 20px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 5 }}>
             {ratingDist.map(({ n, cnt, pct }) => (
               <div key={n} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
@@ -141,12 +159,11 @@ function CustomerReviewsPage() {
               </div>
             ))}
           </div>
-          {/* Quick stats */}
           <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "14px 20px", display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
             {[
-              { label: "Positiv (4-5★)", val: reviews.filter(r => r.rating >= 4).length, color: "#059669" },
-              { label: "Neutral (3★)", val: reviews.filter(r => r.rating === 3).length, color: "#d97706" },
-              { label: "Negativ (1-2★)", val: reviews.filter(r => r.rating <= 2).length, color: "#dc2626" },
+              { label: lt("Positive (4–5★)", "Olumlu (4–5★)", "Positif (4–5★)", "Positivo (4–5★)", "Positivo (4–5★)", "Positiv (4-5★)"), val: reviews.filter((r) => r.rating >= 4).length, color: "#059669" },
+              { label: lt("Neutral (3★)", "Nötr (3★)", "Neutre (3★)", "Neutral (3★)", "Neutro (3★)", "Neutral (3★)"), val: reviews.filter((r) => r.rating === 3).length, color: "#d97706" },
+              { label: lt("Negative (1–2★)", "Olumsuz (1–2★)", "Négatif (1–2★)", "Negativo (1–2★)", "Negativo (1–2★)", "Negativ (1-2★)"), val: reviews.filter((r) => r.rating <= 2).length, color: "#dc2626" },
             ].map(({ label, val, color }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, fontSize: 13 }}>
                 <span style={{ color: "#6b7280" }}>{label}</span>
@@ -157,16 +174,15 @@ function CustomerReviewsPage() {
         </div>
       )}
 
-      {/* Filters */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <input
-          placeholder="Suche nach Kunde, SKU, Kommentar…"
+          placeholder={lt("Search customer, SKU, comment…", "Müşteri, SKU, yorum ara…", "Rechercher client, SKU, commentaire…", "Buscar cliente, SKU, comentario…", "Cerca cliente, SKU, commento…", "Suche nach Kunde, SKU, Kommentar…")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ flex: 1, minWidth: 220, padding: "7px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13 }}
         />
         <select value={filterRating} onChange={(e) => setFilterRating(e.target.value)} style={selStyle}>
-          <option value="">Alle Sterne</option>
+          <option value="">{lt("All stars", "Tüm yıldızlar", "Toutes les étoiles", "Todas las estrellas", "Tutte le stelle", "Alle Sterne")}</option>
           {[5, 4, 3, 2, 1].map((n) => (
             <option key={n} value={n}>
               {"★".repeat(n)}{"☆".repeat(5 - n)} — {reviews.filter((r) => r.rating === n).length}×
@@ -175,19 +191,11 @@ function CustomerReviewsPage() {
         </select>
       </div>
 
-      {/* Table */}
       <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-              {[
-                { label: "Kunde", col: "customer_name" },
-                { label: "SKU / Produkt", col: "product_sku" },
-                ...(isSuperuser ? [{ label: "Seller", col: "seller_store_name" }] : []),
-                { label: "Bewertung", col: "rating" },
-                { label: "Kommentar", col: "comment" },
-                { label: "Datum", col: "created_at" },
-              ].map(({ label, col }) => (
+              {columns.map(({ label, col }) => (
                 <th
                   key={col}
                   onClick={() => handleSort(col)}
@@ -212,12 +220,16 @@ function CustomerReviewsPage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={isSuperuser ? 6 : 5} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Laden…</td>
+                <td colSpan={isSuperuser ? 6 : 5} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>
+                  {lt("Loading…", "Yükleniyor…", "Chargement…", "Cargando…", "Caricamento…", "Laden…")}
+                </td>
               </tr>
             )}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={isSuperuser ? 6 : 5} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Keine Bewertungen gefunden</td>
+                <td colSpan={isSuperuser ? 6 : 5} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>
+                  {lt("No reviews found", "Değerlendirme bulunamadı", "Aucun avis trouvé", "No se encontraron reseñas", "Nessuna recensione trovata", "Keine Bewertungen gefunden")}
+                </td>
               </tr>
             )}
             {filtered.map((r, i) => (
@@ -227,11 +239,10 @@ function CustomerReviewsPage() {
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#fafafa")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "")}
               >
-                {/* Kunde */}
                 <td style={{ padding: "10px 12px", minWidth: 180 }}>
                   {r.customer_id ? (
                     <button
-                      onClick={() => router.push(`/${locale}/customers/${r.customer_id}`)}
+                      onClick={() => router.push(`/${routeLocale}/customers/${r.customer_id}`)}
                       style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
                     >
                       {r.customer_number && (
@@ -248,7 +259,6 @@ function CustomerReviewsPage() {
                   )}
                 </td>
 
-                {/* SKU / Produkt */}
                 <td style={{ padding: "10px 12px", minWidth: 160 }}>
                   {r.product_sku && (
                     <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, monospace", marginBottom: 2 }}>{r.product_sku}</div>
@@ -256,24 +266,20 @@ function CustomerReviewsPage() {
                   <div style={{ color: "#374151" }}>{r.product_title || r.product_id || "—"}</div>
                 </td>
 
-                {/* Seller (superuser only) */}
                 {isSuperuser && (
                   <td style={{ padding: "10px 12px", minWidth: 120 }}>
                     <span style={{ fontSize: 12, color: "#6b7280" }}>{r.seller_store_name || r.seller_id || "—"}</span>
                   </td>
                 )}
 
-                {/* Bewertung */}
                 <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
                   <Stars rating={r.rating} />
                 </td>
 
-                {/* Kommentar */}
                 <td style={{ padding: "10px 12px", color: "#6b7280", maxWidth: 400 }}>
                   {r.comment || <span style={{ color: "#d1d5db" }}>—</span>}
                 </td>
 
-                {/* Datum */}
                 <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12, whiteSpace: "nowrap" }}>
                   {fmtDate(r.created_at)}
                 </td>

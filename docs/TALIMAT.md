@@ -1,4 +1,4 @@
-18.06.
+19.06.
 
 -- diller birbirine girmis ya her yerde. mesela simdi sellercentraldeyim. ingilizce dili secili. bi ingilizce
   icerik var bi almanca var. tüm sayfalarda her köselerde var bu sorun. sana tek tek izah etmem bile 3-4 saat   

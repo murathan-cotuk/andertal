@@ -30,7 +30,7 @@ const {
 const { enqueueFlowEvent, startFlowQueueWorker, getFlowQueueStatus } = require('./src/flow-queue')
 const { pingForHealth } = require('./src/redis')
 const { resolveSmtpSenderIdentity } = require('./src/smtp-sender-resolve')
-const { renderInvoicePdfDocument, renderProvisionsfakturPdfDocument } = require('./src/order-pdf-buffers')
+const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderProvisionsfakturPdfDocument, getOrderPdfFilename } = require('./src/order-pdf-buffers')
 const { resolveOrderPaidTotalCents } = require('./src/order-money')
 
 let backendLinkModulesPath
@@ -11531,8 +11531,9 @@ async function start() {
         }
         const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
         const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
+        const pdfLocale = String(req.query?.locale || 'de').slice(0, 2).toLowerCase()
         res.setHeader('Content-Type', 'application/pdf')
-        res.setHeader('Content-Disposition', `attachment; filename="Rechnung-${on}.pdf"`)
+        res.setHeader('Content-Disposition', `attachment; filename="${getOrderPdfFilename('invoice', on, pdfLocale)}"`)
         const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
         doc.pipe(res)
         renderInvoicePdfDocument(doc, {
@@ -11543,6 +11544,7 @@ async function start() {
           shopName,
           sellerInfo: sellerInfoHub,
           shopLogoBuffer,
+          locale: pdfLocale,
         })
         doc.end()
       } catch (e) {
@@ -11592,47 +11594,19 @@ async function start() {
         }
         const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
         const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
+        const pdfLocale = String(req.query?.locale || 'de').slice(0, 2).toLowerCase()
         res.setHeader('Content-Type', 'application/pdf')
-        res.setHeader('Content-Disposition', `attachment; filename="Lieferschein-${on}.pdf"`)
+        res.setHeader('Content-Disposition', `attachment; filename="${getOrderPdfFilename('lieferschein', on, pdfLocale)}"`)
         const doc = new PDFDocument({ margin: 48, size: 'A4' })
         doc.pipe(res)
-        const lsLeft = doc.page.margins.left
-        const lsRight = doc.page.width - doc.page.margins.right
-        const lsW = lsRight - lsLeft
-        if (lieferscheinLogoBuffer) {
-          try {
-            doc.image(lieferscheinLogoBuffer, lsLeft, doc.page.margins.top, { fit: [lsW, 50], align: 'center', valign: 'center' })
-            doc.y = doc.page.margins.top + 58
-          } catch (_) {}
-        }
-        doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Lieferschein'), { align: 'right' })
-        if (!lieferscheinLogoBuffer) { doc.moveDown(0.2); doc.fontSize(9).fillColor('#666').text(pdfDeLatin(shopName), { align: 'right' }) }
-        doc.fillColor('#111')
-        doc.moveDown(1.2)
-        doc.fontSize(10).text(`Lieferschein-Nr.: ${on}`)
-        doc.text(`Datum: ${pdfFmtDate(row.created_at)}`)
-        doc.moveDown(0.6)
-        doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Lieferadresse'))
-        doc.font('Helvetica').fontSize(9)
-        const custName = [row.first_name, row.last_name].filter(Boolean).join(' ')
-        ;[custName, row.address_line1, row.address_line2, [row.postal_code, row.city].filter(Boolean).join(' '), row.country].filter(Boolean).forEach((line) => doc.text(pdfDeLatin(line)))
-        doc.moveDown(0.8)
-        if (row.carrier_name || row.tracking_number) {
-          doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Versand'))
-          doc.font('Helvetica').fontSize(9)
-          if (row.carrier_name) doc.text(pdfDeLatin(String(row.carrier_name)))
-          if (row.tracking_number) doc.text(`Tracking: ${pdfDeLatin(String(row.tracking_number))}`)
-          doc.moveDown(0.6)
-        }
-        doc.fontSize(10).font('Helvetica-Bold').text(pdfDeLatin('Packstücke / Artikel'))
-        doc.font('Helvetica').fontSize(9)
-        itemRows.forEach((it) => {
-          const qty = Number(it.quantity || 1)
-          doc.text(`${qty} x ${pdfDeLatin(it.title || 'Artikel')}${it.product_handle ? ` (${pdfDeLatin(it.product_handle)})` : ''}`, { width: 500 })
+        renderLieferscheinPdfDocument(doc, {
+          row,
+          itemRows,
+          invoiceNumber: on,
+          shopName,
+          shopLogoBuffer: lieferscheinLogoBuffer,
+          locale: pdfLocale,
         })
-        doc.font('Helvetica').fontSize(8).fillColor('#666')
-        doc.moveDown(1)
-        doc.text(pdfDeLatin('Dieser Lieferschein dient der Zuordnung der Sendung. Keine Rechnung.'), { width: 480 })
         doc.end()
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}

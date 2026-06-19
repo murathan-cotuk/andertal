@@ -1,8 +1,10 @@
 ﻿"use client";
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useLocale } from "next-intl";
 import DashboardLayout from "@/components/DashboardLayout";
+import { productExcelTemplateFilename } from "@/lib/download-names";
+import { getImportExportCopy } from "@/lib/import-export-i18n";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import {
   Page, Layout, Card, Button, Text, BlockStack, InlineStack,
@@ -38,7 +40,7 @@ function collectAllSlugs(nodes, out = []) {
 }
 
 /** Amazon-style multi-select drilldown for categories */
-function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree }) {
+function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree, t }) {
   // Accordion path: only one open branch per depth.
   const [openPath, setOpenPath] = useState([]);
 
@@ -105,8 +107,8 @@ function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree
                   {node.name || node.slug}
                 </div>
               </div>
-              {hasKids && allSelected && <span style={{ marginLeft: "auto", fontSize: 11, color: "#16a34a", flexShrink: 0 }}>✓ alle</span>}
-              {hasKids && partial && <span style={{ marginLeft: "auto", fontSize: 11, color: "#f59e0b", flexShrink: 0 }}>teilweise</span>}
+              {hasKids && allSelected && <span style={{ marginLeft: "auto", fontSize: 11, color: "#16a34a", flexShrink: 0 }}>{t.allSelected}</span>}
+              {hasKids && partial && <span style={{ marginLeft: "auto", fontSize: 11, color: "#f59e0b", flexShrink: 0 }}>{t.partialSelected}</span>}
             </label>
             {hasKids ? (
               <div
@@ -142,7 +144,7 @@ function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree
     <div>
       <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", maxHeight: 460, overflowY: "auto" }}>
         {!Array.isArray(tree) || tree.length === 0 ? (
-          <div style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af" }}>Keine Unterkategorien.</div>
+          <div style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af" }}>{t.noSubcategories}</div>
         ) : (
           renderNodes(tree, 0)
         )}
@@ -215,24 +217,24 @@ function DropZone({ onFile, accept, label, hint }) {
 }
 
 // ── Import result panel ───────────────────────────────────────────────────
-function ImportResult({ result }) {
+function ImportResult({ result, t }) {
   if (!result) return null;
   const hasErrors = result.errors?.length > 0;
   return (
     <BlockStack gap="300">
       <Banner tone={result.failed === 0 ? "success" : result.created > 0 || result.updated > 0 ? "warning" : "critical"}>
         <Text as="p" variant="bodyMd">
-          <strong>{result.created}</strong> ürün oluşturuldu
-          {result.updated > 0 && <>, <strong>{result.updated}</strong> güncellendi</>}
-          {result.failed > 0 && <>, <strong>{result.failed}</strong> başarısız</>}
-          {" "}(Toplam: {result.total})
+          <strong>{result.created}</strong> {t.importResultCreatedSuffix}
+          {result.updated > 0 && <>, <strong>{result.updated}</strong> {t.importResultUpdatedSuffix}</>}
+          {result.failed > 0 && <>, <strong>{result.failed}</strong> {t.importResultFailedSuffix}</>}
+          {" "}{t.importResultTotal(result.total)}
         </Text>
       </Banner>
       {result.media && result.media.registered > 0 && (
         <div style={{ padding: "8px 12px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, fontSize: 12, color: "#15803d" }}>
-          📁 <strong>{result.media.registered}</strong> görsel medya kütüphanesine eklendi
-          {result.media.folder && <> — <em>"{result.media.folder.name}"</em> klasörüne</>}
-          {result.media.skipped > 0 && <>, {result.media.skipped} zaten mevcut</>}
+          📁 {t.mediaRegistered(result.media.registered)}
+          {result.media.folder && <> {t.mediaFolder(result.media.folder.name)}</>}
+          {result.media.skipped > 0 && <>, {t.mediaSkipped(result.media.skipped)}</>}
         </div>
       )}
       {hasErrors && (
@@ -251,8 +253,8 @@ function ImportResult({ result }) {
 // ══════════════════════════════════════════════════════════════════════════
 export default function ImportExportPage() {
   const [isSuperuser, setIsSuperuser] = useState(false);
-  const params = useParams();
-  const locale = typeof params?.locale === "string" ? params.locale.split("-")[0].toLowerCase() : "de";
+  const locale = useLocale();
+  const t = useMemo(() => getImportExportCopy(locale), [locale]);
 
   const [activeTab, setActiveTab] = useState(0);
   const [categoryTree, setCategoryTree] = useState([]);
@@ -326,7 +328,7 @@ export default function ImportExportPage() {
         const built = hasFlatItems ? buildTreeFromFlat(rawTree) : sortDeep(rawTree.map((n) => ({ ...n, children: n.children || [] })));
         if (!cancelled) setCategoryTree(built);
       } catch (e) {
-        if (!cancelled) setCategoriesError(e?.message || "Kategorien konnten nicht geladen werden.");
+        if (!cancelled) setCategoriesError(e?.message || t.categoriesLoadError);
       } finally {
         if (!cancelled) setCategoriesLoading(false);
       }
@@ -407,6 +409,7 @@ export default function ImportExportPage() {
       const fd = new FormData();
       fd.append("file", productFile);
       fd.append("sellerToken", sellerToken);
+      fd.append("locale", locale);
 
       setProgress(60);
       const res = await fetch("/api/import-export/import", { method: "POST", body: fd });
@@ -414,12 +417,12 @@ export default function ImportExportPage() {
       setProgress(100);
 
       if (!res.ok || data.error) {
-        setImportError(data.error || "Import fehlgeschlagen");
+        setImportError(data.error || t.importFailed);
       } else {
         setImportResult(data);
       }
     } catch (e) {
-      setImportError(e.message || "Import fehlgeschlagen");
+      setImportError(e.message || t.importFailed);
     } finally {
       setImporting(false);
       setTimeout(() => setProgress(0), 1500);
@@ -429,7 +432,7 @@ export default function ImportExportPage() {
   const downloadProductTemplate = async () => {
     setTemplateError(null);
     if (selectedSlugs.size === 0) {
-      setTemplateError("Bitte mindestens eine Kategorie auswählen.");
+      setTemplateError(t.selectCategoryError);
       return;
     }
     setTemplateDownloading(true);
@@ -446,20 +449,20 @@ export default function ImportExportPage() {
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
-        setTemplateError(errJson.error || `Download fehlgeschlagen (${res.status})`);
+        setTemplateError(errJson.error || t.downloadFailed(res.status));
         return;
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "andertal-produkte-template.xlsx";
+      a.download = productExcelTemplateFilename(locale);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      setTemplateError(e?.message || "Download fehlgeschlagen");
+      setTemplateError(e?.message || t.downloadFailed(""));
     } finally {
       setTemplateDownloading(false);
     }
@@ -477,6 +480,7 @@ export default function ImportExportPage() {
           sellerToken,
           datasets: [...exportDatasets],
           include_all_sellers: includeAllSellers,
+          locale,
           filters: {
             search: filterSearch,
             status: filterStatus,
@@ -487,14 +491,14 @@ export default function ImportExportPage() {
       });
       const data = await res.json();
       if (!res.ok || data.error) {
-        setExportError(data.error || "Spalten konnten nicht geladen werden.");
+        setExportError(data.error || t.columnsLoadError);
         return;
       }
       setExportInfo(data);
       setAvailableColumns(data.columns || []);
       setSelectedColumns(new Set(data.columns || []));
     } catch (e) {
-      setExportError(e?.message || "Spalten konnten nicht geladen werden.");
+      setExportError(e?.message || t.columnsLoadError);
     }
   };
 
@@ -514,6 +518,7 @@ export default function ImportExportPage() {
           format: exportFormat,
           include_all_sellers: includeAllSellers,
           group_by_seller: isSuperuser ? groupBySeller : false,
+          locale,
           filters: {
             search: filterSearch,
             status: filterStatus,
@@ -524,7 +529,7 @@ export default function ImportExportPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setExportError(data.error || `Export fehlgeschlagen (${res.status})`);
+        setExportError(data.error || t.downloadFailed(res.status));
         return;
       }
       const blob = await res.blob();
@@ -537,22 +542,22 @@ export default function ImportExportPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      setExportError(e?.message || "Export fehlgeschlagen.");
+      setExportError(e?.message || t.exportFailed);
     } finally {
       setExporting(false);
     }
   };
 
   const tabs = [
-    { id: "import", content: "Import", panelID: "import-panel" },
-    { id: "export", content: "Export", panelID: "export-panel" },
+    { id: "import", content: t.tabImport, panelID: "import-panel" },
+    { id: "export", content: t.tabExport, panelID: "export-panel" },
   ];
 
   return (
     <DashboardLayout>
       <Page
-        title="Import / Export"
-        subtitle="Produkte, Bestellungen und Kunden in großen Mengen importieren und exportieren"
+        title={t.pageTitle}
+        subtitle={t.pageSubtitle}
       >
         <Tabs tabs={tabs} selected={activeTab} onSelect={setActiveTab}>
           {activeTab === 0 ? (
@@ -561,13 +566,13 @@ export default function ImportExportPage() {
           <Layout.Section>
             <SectionCard
               icon="📋"
-              title="Templates herunterladen"
-              subtitle="Kategorien wählen, dann die Vorlage laden. Das zweite Blatt erklärt alle Spalten in Ihrer Shopsprache."
+              title={t.templatesTitle}
+              subtitle={t.templatesSubtitle}
             >
               {categoriesLoading && (
                 <InlineStack gap="200" blockAlign="center">
                   <Spinner size="small" />
-                  <Text as="span" variant="bodySm" tone="subdued">Kategorien werden geladen…</Text>
+                  <Text as="span" variant="bodySm" tone="subdued">{t.categoriesLoading}</Text>
                 </InlineStack>
               )}
               {categoriesError && (
@@ -577,12 +582,12 @@ export default function ImportExportPage() {
                 <BlockStack gap="300">
                   <InlineStack align="space-between" blockAlign="center">
                     <Text as="p" variant="bodySm" fontWeight="semibold">
-                      Kategorie auswählen (Pflicht für Download)
+                      {t.categorySelectLabel}
                     </Text>
                     {selectedSlugs.size > 0 && (
                       <InlineStack gap="200" blockAlign="center">
-                        <Text as="span" variant="bodySm" tone="subdued">{selectedSlugs.size} ausgewählt</Text>
-                        <Button size="slim" variant="plain" tone="critical" onClick={() => setSelectedSlugs(new Set())}>Zurücksetzen</Button>
+                        <Text as="span" variant="bodySm" tone="subdued">{t.selectedCount(selectedSlugs.size)}</Text>
+                        <Button size="slim" variant="plain" tone="critical" onClick={() => setSelectedSlugs(new Set())}>{t.reset}</Button>
                       </InlineStack>
                     )}
                   </InlineStack>
@@ -592,21 +597,22 @@ export default function ImportExportPage() {
                         tree={categoryTree}
                         selectedSlugs={selectedSlugs}
                         onToggle={toggleCategory}
+                        t={t}
                       />
                     </div>
                     <div style={{ flex: 1, minWidth: 260, border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", maxHeight: 460, overflowY: "auto" }}>
                       <div style={{ padding: "10px 12px", borderBottom: "1px solid #f1f2f4", background: "#fafafa" }}>
-                        <Text as="p" variant="bodySm" fontWeight="semibold">Seçilen kategoriler</Text>
+                        <Text as="p" variant="bodySm" fontWeight="semibold">{t.selectedCategories}</Text>
                       </div>
                       {selectedCategoryDetails.length === 0 ? (
                         <div style={{ padding: "10px 12px" }}>
-                          <Text as="p" variant="bodySm" tone="subdued">Henüz kategori seçilmedi.</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">{t.noCategorySelected}</Text>
                         </div>
                       ) : (
                         selectedCategoryDetails.map((row) => (
                           <div key={row.slug} style={{ padding: "8px 12px", borderBottom: "1px solid #f5f6f7" }}>
                             <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.2, marginBottom: 2 }}>
-                              {row.breadcrumb || "Parent"}
+                              {row.breadcrumb || t.parent}
                             </div>
                             <div style={{ fontSize: 13, color: "#111827", fontWeight: 600, lineHeight: 1.25 }}>
                               {row.name}
@@ -626,10 +632,10 @@ export default function ImportExportPage() {
               <Box paddingBlockStart="400">
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
                   {[
-                    { type: "products", label: "Produkte", desc: "Parent/Child, Varianten, Dropdowns, Kılavuz", icon: "📦", primary: true },
-                    { type: "collections", label: "Kollektionen", desc: "Kollektion-Titel und Beschreibungen", icon: "🗂" },
-                    { type: "customers", label: "Kunden", desc: "Kundendaten & Adressen", icon: "👥" },
-                    { type: "inventory", label: "Lagerbestand", desc: "Schnell-Update: SKU + Menge", icon: "📊" },
+                    { type: "products", label: t.templateProducts, desc: t.templateProductsDesc, icon: "📦", primary: true },
+                    { type: "collections", label: t.templateCollections, desc: t.templateCollectionsDesc, icon: "🗂" },
+                    { type: "customers", label: t.templateCustomers, desc: t.templateCustomersDesc, icon: "👥" },
+                    { type: "inventory", label: t.templateInventory, desc: t.templateInventoryDesc, icon: "📊" },
                   ]
                     .filter((item) => {
                       if (isSuperuser) return true;
@@ -661,10 +667,10 @@ export default function ImportExportPage() {
                         disabled={type !== "products" || categoriesLoading || selectedSlugs.size === 0}
                         loading={type === "products" && templateDownloading}
                       >
-                        .xlsx herunterladen
+                        {t.downloadXlsx}
                       </Button>
                       {type !== "products" && (
-                        <Text as="p" variant="bodySm" tone="subdued">Demnächst verfügbar</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">{t.comingSoon}</Text>
                       )}
                     </div>
                   ))}
@@ -674,13 +680,8 @@ export default function ImportExportPage() {
               <Box paddingBlockStart="300">
                 <Banner tone="info">
                   <BlockStack gap="100">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">Produkt-Template</Text>
-                    <Text as="p" variant="bodySm">
-                      Jede Zeile nutzt <strong>product_type</strong>{" "}
-                      <Badge>parent</Badge> oder <Badge>child</Badge>.
-                      Dropdowns (Kategorie, Marke, Versandgruppe, Status, …) beziehen sich auf die Listen im versteckten Excel-Blatt.
-                      URL-Handles werden automatisch erzeugt. Kollektionen sind im Excel-Import nicht setzbar.
-                    </Text>
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">{t.productTemplateInfo}</Text>
+                    <Text as="p" variant="bodySm">{t.productTemplateBody}</Text>
                   </BlockStack>
                 </Banner>
               </Box>
@@ -690,15 +691,15 @@ export default function ImportExportPage() {
           <Layout.Section>
             <SectionCard
               icon="📥"
-              title="Produkte importieren"
-              subtitle="Lade eine ausgefüllte .xlsx-Datei hoch, um Produkte in großen Mengen anzulegen."
+              title={t.importProductsTitle}
+              subtitle={t.importProductsSubtitle}
             >
               <BlockStack gap="400">
                 <DropZone
                   onFile={setProductFile}
                   accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  label="Excel-Datei hier ablegen oder klicken"
-                  hint=".xlsx • max. 10 MB • UTF-8 mit Sonderzeichen"
+                  label={t.dropLabel}
+                  hint={t.dropHint}
                 />
 
                 {importing && progress > 0 && (
@@ -711,7 +712,7 @@ export default function ImportExportPage() {
                   </Banner>
                 )}
 
-                <ImportResult result={importResult} />
+                <ImportResult result={importResult} t={t} />
 
                 <InlineStack gap="300" blockAlign="center">
                   <Button
@@ -721,11 +722,11 @@ export default function ImportExportPage() {
                     loading={importing}
                     disabled={!productFile || importing}
                   >
-                    {importing ? "Importiere…" : "Produkte importieren"}
+                    {importing ? t.importing : t.importProducts}
                   </Button>
                   {productFile && !importing && (
                     <Button variant="plain" onClick={() => { setProductFile(null); setImportResult(null); setImportError(null); }}>
-                      Datei entfernen
+                      {t.removeFile}
                     </Button>
                   )}
                 </InlineStack>
@@ -733,22 +734,8 @@ export default function ImportExportPage() {
                 <Divider />
 
                 <BlockStack gap="200">
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">Import-Regeln</Text>
-                  {[
-                    "Zeile 1–3: Gruppenüberschriften & Spaltenbezeichner (nicht löschen)",
-                    "Ab Zeile 4: Datenzeilen. Leere Zeilen werden übersprungen.",
-                    "Zeilen mit SKU beginnend mit # werden als Kommentar ignoriert.",
-                    "Parent-Zeilen müssen title_de (oder title_en) enthalten.",
-                    "Child-Zeilen benötigen parent_sku = SKU der zugehörigen Parent-Zeile.",
-                    "Marke und Versandgruppe müssen exakt den Namen aus dem System haben — sonst Fehlermeldung.",
-                    "Kategorie: slug muss existieren; am besten dieselbe Vorlage mit Kategorieauswahl verwenden.",
-                    "Kollektionen: nicht per Excel setzen.",
-                    "Handles (URL) werden automatisch vergeben — keine handle_*-Spalten nötig.",
-                    "Metafelder: Paare metafield_N_key / metafield_N_value; weitere Nummern als Spalten ergänzbar.",
-                    "Varianten: mindestens option1/2; option3… in der Vorlage — weitere optionN-Spalten in Excel möglich.",
-                    "Preise als Dezimalzahl: z.B. 29,99 (Komma als Trennzeichen).",
-                    "HTML in description_*: <p>, <b>, <ul>, <li> usw. werden übernommen.",
-                  ].map((rule, i) => (
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">{t.importRules}</Text>
+                  {t.importRulesList.map((rule, i) => (
                     <InlineStack key={i} gap="200" blockAlign="start">
                       <Text as="span" variant="bodySm" tone="subdued">•</Text>
                       <Text as="span" variant="bodySm">{rule}</Text>
@@ -765,13 +752,13 @@ export default function ImportExportPage() {
           <Layout.Section>
             <SectionCard
               icon="📤"
-              title="Daten exportieren"
-              subtitle="Datentyp wählen, Filter setzen, Spalten prüfen und als Datei exportieren."
+              title={t.exportTitle}
+              subtitle={t.exportSubtitle}
             >
               <BlockStack gap="400">
                 <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
                   <BlockStack gap="250">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">1) Datenumfang</Text>
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportScope}</Text>
                     <div style={{ maxWidth: 360 }}>
                       <select
                         value={exportPreset}
@@ -782,19 +769,19 @@ export default function ImportExportPage() {
                         }}
                         style={{ width: "100%", padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff" }}
                       >
-                        <option value="custom">Custom</option>
-                        <option value="basic_products">Preset: Ürün temel</option>
-                        <option value="sales_report">Preset: Satış raporu</option>
-                        <option value="full_export">Preset: Tam export</option>
+                        <option value="custom">{t.presetCustom}</option>
+                        <option value="basic_products">{t.presetBasicProducts}</option>
+                        <option value="sales_report">{t.presetSalesReport}</option>
+                        <option value="full_export">{t.presetFullExport}</option>
                       </select>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
                       {[
-                        ["products", "Ürünler (fiyat, görsel, metadata)"],
-                        ["orders", "Siparişler / satışlar"],
-                        ["customers", "Müşteriler"],
-                        ["transactions", "Transactions / ödeme hareketleri"],
-                        ["ranking", "Görüntülenme / tıklama / performans (ranking)"],
+                        ["products", t.datasetProducts],
+                        ["orders", t.datasetOrders],
+                        ["customers", t.datasetCustomers],
+                        ["transactions", t.datasetTransactions],
+                        ["ranking", t.datasetRanking],
                       ].map(([k, label]) => (
                         <div key={k} style={{ border: "1px solid #eef0f3", borderRadius: 8, padding: "8px 10px", background: "#fafbfc" }}>
                           <Checkbox
@@ -816,19 +803,19 @@ export default function ImportExportPage() {
 
                 <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
                   <BlockStack gap="250">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">2) Filter</Text>
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportFilters}</Text>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
-                      <input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder="Arama (SKU, ad, email...)" style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
-                      <input value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} placeholder="Status (optional)" style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                      <input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder={t.filterSearch} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                      <input value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} placeholder={t.filterStatus} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
                       <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
                       <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
                     </div>
                     <InlineStack gap="300">
                       {isSuperuser ? (
-                        <Checkbox label="Superuser: tüm seller verileri dahil" checked={includeAllSellers} onChange={setIncludeAllSellers} />
+                        <Checkbox label={t.includeAllSellers} checked={includeAllSellers} onChange={setIncludeAllSellers} />
                       ) : null}
                       {isSuperuser ? (
-                        <Checkbox label="XLSX exportta seller bazlı sheetlere ayır" checked={groupBySeller} onChange={setGroupBySeller} />
+                        <Checkbox label={t.groupBySeller} checked={groupBySeller} onChange={setGroupBySeller} />
                       ) : null}
                     </InlineStack>
                   </BlockStack>
@@ -837,20 +824,20 @@ export default function ImportExportPage() {
                 <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
                   <BlockStack gap="250">
                     <InlineStack align="space-between" blockAlign="center">
-                      <Text as="p" variant="bodyMd" fontWeight="semibold">3) Spalten</Text>
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportColumns}</Text>
                       <InlineStack gap="200">
-                        <Button variant="secondary" onClick={loadExportColumns}>Spalten laden</Button>
+                        <Button variant="secondary" onClick={loadExportColumns}>{t.loadColumns}</Button>
                         {availableColumns.length > 0 && (
                           <>
-                            <Button size="slim" onClick={() => setSelectedColumns(new Set(availableColumns))}>Tümünü seç</Button>
-                            <Button size="slim" onClick={() => setSelectedColumns(new Set())}>Temizle</Button>
+                            <Button size="slim" onClick={() => setSelectedColumns(new Set(availableColumns))}>{t.selectAll}</Button>
+                            <Button size="slim" onClick={() => setSelectedColumns(new Set())}>{t.clear}</Button>
                           </>
                         )}
                       </InlineStack>
                     </InlineStack>
                     <InlineStack gap="200">
-                      {exportInfo?.total != null ? <Badge tone="info">{exportInfo.total} satır eşleşti</Badge> : null}
-                      {availableColumns.length > 0 ? <Badge tone="success">{selectedColumns.size} sütun seçili</Badge> : null}
+                      {exportInfo?.total != null ? <Badge tone="info">{t.rowsMatched(exportInfo.total)}</Badge> : null}
+                      {availableColumns.length > 0 ? <Badge tone="success">{t.columnsSelected(selectedColumns.size)}</Badge> : null}
                     </InlineStack>
                     {availableColumns.length > 0 && (
                       <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
@@ -878,7 +865,7 @@ export default function ImportExportPage() {
 
                 <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
                   <BlockStack gap="250">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">4) Format & Download</Text>
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportFormat}</Text>
                     <div style={{ maxWidth: 260 }}>
                       <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)} style={{ width: "100%", padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff" }}>
                         <option value="xlsx">XLSX</option>
@@ -895,7 +882,7 @@ export default function ImportExportPage() {
                         loading={exporting}
                         disabled={exporting || exportDatasets.size === 0}
                       >
-                        {exporting ? "Export läuft..." : "Export starten"}
+                        {exporting ? t.exportRunning : t.startExport}
                       </Button>
                     </InlineStack>
                   </BlockStack>

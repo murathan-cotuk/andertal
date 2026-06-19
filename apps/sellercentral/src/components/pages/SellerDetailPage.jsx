@@ -73,27 +73,47 @@ function AdminSellerCardSection({ sellerId }) {
   );
 }
 
+import { getSellerApprovalStatus } from "@/lib/marketing-i18n";
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
-const STATUS_META = {
-  registered:          { label: "Kayıt Oldu",       tone: "info",      next: ["documents_submitted", "pending_approval"] },
-  documents_submitted: { label: "Evrak Gönderildi", tone: "attention", next: ["pending_approval", "rejected"] },
-  pending_approval:    { label: "Onay Bekliyor",     tone: "warning",   next: ["approved", "rejected"] },
-  approved:            { label: "Onaylandı",         tone: "success",   next: ["suspended"] },
-  rejected:            { label: "Reddedildi",        tone: "critical",  next: ["pending_approval"] },
-  suspended:           { label: "Askıya Alındı",     tone: "critical",  next: ["approved", "rejected"] },
+const STATUS_NEXT = {
+  registered: ["documents_submitted", "pending_approval"],
+  documents_submitted: ["pending_approval", "rejected"],
+  pending_approval: ["approved", "rejected"],
+  approved: ["suspended"],
+  rejected: ["pending_approval"],
+  suspended: ["approved", "rejected"],
 };
 
-const STATUS_LABELS = Object.entries(STATUS_META).map(([v, m]) => ({ value: v, label: m.label }));
+function statusMetaFor(locale, status) {
+  const tones = {
+    registered: "info",
+    documents_submitted: "attention",
+    pending_approval: "warning",
+    approved: "success",
+    rejected: "critical",
+    suspended: "critical",
+  };
+  return {
+    label: getSellerApprovalStatus(locale, status),
+    tone: tones[status] || "info",
+    next: STATUS_NEXT[status] || [],
+  };
+}
+
+function statusLabelsFor(locale) {
+  return Object.keys(STATUS_NEXT).map((v) => ({ value: v, label: getSellerApprovalStatus(locale, v) }));
+}
 
 function fmtCents(c, locale) {
   if (!c && c !== 0) return "€0,00";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "de-DE";
   return (c / 100).toLocaleString(loc, { style: "currency", currency: "EUR" });
 }
 
 function fmtDate(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "de-DE";
   return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
@@ -110,24 +130,24 @@ function parseDocuments(raw) {
 function detectDocTypeLabel(doc, locale) {
   const hay = `${doc?.name || ""} ${doc?.type || ""} ${doc?.kind || ""}`.toLowerCase();
   if (hay.includes("vertrag") || hay.includes("contract") || hay.includes("agreement"))
-    return locale === "en" ? "Contract / Agreement" : locale === "tr" ? "Sözleşme" : "Vertrag / Agreement";
+    return locale === "en" ? "Contract / Agreement" : locale === "tr" ? "Sözleşme" : locale === "fr" ? "Contrat / Accord" : locale === "es" ? "Contrato / Acuerdo" : locale === "it" ? "Contratto / Accordo" : "Vertrag / Agreement";
   if (hay.includes("sign") || hay.includes("imza") || hay.includes("signature"))
-    return locale === "en" ? "Signature" : locale === "tr" ? "İmza" : "Unterschrift / Signature";
+    return locale === "en" ? "Signature" : locale === "tr" ? "İmza" : locale === "fr" ? "Signature" : locale === "es" ? "Firma" : locale === "it" ? "Firma" : "Unterschrift / Signature";
   if (hay.includes("pass") || hay.includes("passport"))
-    return locale === "en" ? "Passport" : locale === "tr" ? "Pasaport" : "Pass / Passport";
+    return locale === "en" ? "Passport" : locale === "tr" ? "Pasaport" : locale === "fr" ? "Passeport" : locale === "es" ? "Pasaporte" : locale === "it" ? "Passaporto" : "Pass / Passport";
   if (hay.includes("id") || hay.includes("ausweis") || hay.includes("kimlik"))
-    return locale === "en" ? "ID / Identity card" : locale === "tr" ? "Kimlik" : "ID / Ausweis";
+    return locale === "en" ? "ID / Identity card" : locale === "tr" ? "Kimlik" : locale === "fr" ? "Pièce d'identité" : locale === "es" ? "DNI / Identificación" : locale === "it" ? "Documento d'identità" : "ID / Ausweis";
   if (hay.includes("handels") || hay.includes("register"))
-    return locale === "en" ? "Trade register" : locale === "tr" ? "Ticaret sicili" : "Handelsregister";
+    return locale === "en" ? "Trade register" : locale === "tr" ? "Ticaret sicili" : locale === "fr" ? "Registre du commerce" : locale === "es" ? "Registro mercantil" : locale === "it" ? "Registro commerciale" : "Handelsregister";
   if (hay.includes("steuer") || hay.includes("tax") || hay.includes("vat"))
-    return locale === "en" ? "Tax / VAT" : locale === "tr" ? "Vergi / KDV" : "Steuer / VAT";
-  return locale === "en" ? "Document" : locale === "tr" ? "Belge" : "Dokument";
+    return locale === "en" ? "Tax / VAT" : locale === "tr" ? "Vergi / KDV" : locale === "fr" ? "Taxe / TVA" : locale === "es" ? "Impuesto / IVA" : locale === "it" ? "Tasse / IVA" : "Steuer / VAT";
+  return locale === "en" ? "Document" : locale === "tr" ? "Belge" : locale === "fr" ? "Document" : locale === "es" ? "Documento" : locale === "it" ? "Documento" : "Dokument";
 }
 
 function fmtMonth(d, locale) {
   if (!d) return "";
   const dt = new Date(d);
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "de-DE";
   return dt.toLocaleDateString(loc, { month: "short", year: "2-digit" });
 }
 
@@ -205,7 +225,7 @@ function getPeriodMonth(period) {
 }
 
 function monthLabel(monthIdx, locale) {
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "de-DE";
   return new Date(2026, Number(monthIdx) || 0, 1).toLocaleDateString(loc, { month: "long" });
 }
 
@@ -350,7 +370,7 @@ export default function SellerDetailPage({ sellerId }) {
     try {
       const r = await client.approveSellerById(sellerId, newStatus, rejectReason || undefined);
       setSeller(r.seller);
-      setMsg({ tone: "success", text: locale === "en" ? `Status changed to "${STATUS_META[newStatus]?.label}".` : locale === "tr" ? `Durum "${STATUS_META[newStatus]?.label}" olarak değiştirildi.` : locale === "fr" ? `Statut changé en "${STATUS_META[newStatus]?.label}".` : locale === "es" ? `Estado cambiado a "${STATUS_META[newStatus]?.label}".` : locale === "it" ? `Stato cambiato in "${STATUS_META[newStatus]?.label}".` : `Status wurde auf "${STATUS_META[newStatus]?.label}" geändert.` });
+      setMsg({ tone: "success", text: locale === "en" ? `Status changed to "${getSellerApprovalStatus(locale, newStatus)}".` : locale === "tr" ? `Durum "${getSellerApprovalStatus(locale, newStatus)}" olarak değiştirildi.` : locale === "fr" ? `Statut changé en "${getSellerApprovalStatus(locale, newStatus)}".` : locale === "es" ? `Estado cambiado a "${getSellerApprovalStatus(locale, newStatus)}".` : locale === "it" ? `Stato cambiato in "${getSellerApprovalStatus(locale, newStatus)}".` : `Status wurde auf "${getSellerApprovalStatus(locale, newStatus)}" geändert.` });
       setApproveModal(false);
       setRejectReason("");
     } catch (e) {
@@ -428,27 +448,39 @@ export default function SellerDetailPage({ sellerId }) {
   // Generate invoice text (simple text-based)
   const generateInvoice = (payout) => {
     const s = seller;
-    const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+    const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "de-DE";
     const today = new Date().toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
-    const text = `PROVISIONSNOTE\n${"=".repeat(50)}\n
-Aussteller: Andertal GmbH
-Datum: ${today}
+    const t = {
+      title: locale === "en" ? "COMMISSION NOTE" : locale === "tr" ? "KOMİSYON NOTU" : locale === "fr" ? "NOTE DE COMMISSION" : locale === "es" ? "NOTA DE COMISIÓN" : locale === "it" ? "NOTA DI COMMISSIONE" : "PROVISIONSNOTE",
+      issuer: locale === "en" ? "Issuer" : locale === "tr" ? "Düzenleyen" : locale === "fr" ? "Émetteur" : locale === "es" ? "Emisor" : locale === "it" ? "Emittente" : "Aussteller",
+      date: locale === "en" ? "Date" : locale === "tr" ? "Tarih" : locale === "fr" ? "Date" : locale === "es" ? "Fecha" : locale === "it" ? "Data" : "Datum",
+      recipient: locale === "en" ? "Recipient" : locale === "tr" ? "Alıcı" : locale === "fr" ? "Destinataire" : locale === "es" ? "Destinatario" : locale === "it" ? "Destinatario" : "Empfänger",
+      vatId: locale === "en" ? "VAT ID" : locale === "tr" ? "KDV No." : locale === "fr" ? "N° TVA" : locale === "es" ? "N° IVA" : locale === "it" ? "N° IVA" : "USt-IdNr.",
+      period: locale === "en" ? "Billing period" : locale === "tr" ? "Fatura dönemi" : locale === "fr" ? "Période de facturation" : locale === "es" ? "Período de facturación" : locale === "it" ? "Periodo di fatturazione" : "Abrechnungszeitraum",
+      revenue: locale === "en" ? "Total revenue (gross)" : locale === "tr" ? "Toplam ciro (brüt)" : locale === "fr" ? "CA total (brut)" : locale === "es" ? "Ingresos totales (bruto)" : locale === "it" ? "Fatturato totale (lordo)" : "Gesamtumsatz (Brutto)",
+      commission: locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : locale === "fr" ? "Commission" : locale === "es" ? "Comisión" : locale === "it" ? "Commissione" : "Provision",
+      payout: locale === "en" ? "Payout amount" : locale === "tr" ? "Ödeme tutarı" : locale === "fr" ? "Montant du paiement" : locale === "es" ? "Monto del pago" : locale === "it" ? "Importo del pagamento" : "Auszahlungsbetrag",
+      notes: locale === "en" ? "Notes" : locale === "tr" ? "Notlar" : locale === "fr" ? "Notes" : locale === "es" ? "Notas" : locale === "it" ? "Note" : "Notizen",
+    };
+    const text = `${t.title}\n${"=".repeat(50)}\n
+${t.issuer}: Andertal GmbH
+${t.date}: ${today}
 
-Empfänger:
+${t.recipient}:
 ${s.company_name || s.store_name || s.email}
 ${s.business_address ? JSON.stringify(s.business_address) : ""}
-${s.tax_id ? `USt-IdNr.: ${s.tax_id}` : ""}
+${s.tax_id ? `${t.vatId}: ${s.tax_id}` : ""}
 
-Abrechnungszeitraum: ${fmtDate(payout.period_start, locale)} – ${fmtDate(payout.period_end, locale)}
+${t.period}: ${fmtDate(payout.period_start, locale)} – ${fmtDate(payout.period_end, locale)}
 
-Gesamtumsatz (Brutto):    ${fmtCents(payout.total_cents, locale)}
-Provision (${((seller.commission_rate || 0.12) * 100).toFixed(1)}%):       ${fmtCents(payout.commission_cents, locale)}
+${t.revenue}:    ${fmtCents(payout.total_cents, locale)}
+${t.commission} (${((seller.commission_rate || 0.12) * 100).toFixed(1)}%):       ${fmtCents(payout.commission_cents, locale)}
 ${"─".repeat(40)}
-Auszahlungsbetrag:        ${fmtCents(payout.payout_cents, locale)}
+${t.payout}:        ${fmtCents(payout.payout_cents, locale)}
 
 IBAN: ${payout.iban || s.iban || "—"}
 
-${payout.notes ? `Notizen: ${payout.notes}` : ""}
+${payout.notes ? `${t.notes}: ${payout.notes}` : ""}
 ${"=".repeat(50)}
     `.trim();
     const blob = new Blob([text], { type: "text/plain" });
@@ -488,7 +520,7 @@ ${"=".repeat(50)}
   if (!seller) return null;
 
   const status = seller.approval_status || "registered";
-  const statusMeta = STATUS_META[status] || { label: status, tone: "info" };
+  const statusMeta = statusMetaFor(locale, status);
   const commissionPct = ((parseFloat(seller.commission_rate) || 0.12) * 100).toFixed(1);
   const totalRevenue = (seller.monthly_revenue || []).reduce((a, m) => a + m.total_cents, 0);
   const totalOrders = (seller.monthly_revenue || []).reduce((a, m) => a + m.order_count, 0);
@@ -527,12 +559,12 @@ ${"=".repeat(50)}
       titleMetadata={<Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>}
       subtitle={seller.email}
       primaryAction={{
-        content: locale === "en" ? "Change status" : locale === "tr" ? "Durumu değiştir" : "Status ändern",
-        onAction: () => { setNewStatus(STATUS_META[status]?.next?.[0] || "approved"); setApproveModal(true); },
+        content: locale === "en" ? "Change status" : locale === "tr" ? "Durumu değiştir" : locale === "fr" ? "Changer le statut" : locale === "es" ? "Cambiar estado" : locale === "it" ? "Cambia stato" : "Status ändern",
+        onAction: () => { setNewStatus(statusMetaFor(locale, status)?.next?.[0] || "approved"); setApproveModal(true); },
       }}
       secondaryActions={[
-        { content: locale === "en" ? "Edit commission" : locale === "tr" ? "Komisyonu düzenle" : "Provision bearbeiten", onAction: () => setEditCommission(true) },
-        { content: locale === "en" ? "Create payout" : locale === "tr" ? "Ödeme oluştur" : "Auszahlung erstellen", onAction: () => setPayoutModal(true) },
+        { content: locale === "en" ? "Edit commission" : locale === "tr" ? "Komisyonu düzenle" : locale === "fr" ? "Modifier la commission" : locale === "es" ? "Editar comisión" : locale === "it" ? "Modifica commissione" : "Provision bearbeiten", onAction: () => setEditCommission(true) },
+        { content: locale === "en" ? "Create payout" : locale === "tr" ? "Ödeme oluştur" : locale === "fr" ? "Créer un paiement" : locale === "es" ? "Crear pago" : locale === "it" ? "Crea pagamento" : "Auszahlung erstellen", onAction: () => setPayoutModal(true) },
       ]}
     >
       <BlockStack gap="500">
@@ -693,7 +725,7 @@ ${"=".repeat(50)}
                                   type="button"
                                   disabled={!selectable}
                                   onClick={() => setPeriodKey(p.key)}
-                                  title={selectable ? p.label : (locale === "en" ? "Available from the 16th of the month" : locale === "tr" ? "Ayın 16'sından itibaren mevcut" : "Ab dem 16. des Monats verfügbar")}
+                                  title={selectable ? p.label : (locale === "en" ? "Available from the 16th of the month" : locale === "tr" ? "Ayın 16'sından itibaren mevcut" : locale === "fr" ? "Disponible à partir du 16 du mois" : locale === "es" ? "Disponible desde el 16 del mes" : locale === "it" ? "Disponibile dal 16 del mese" : "Ab dem 16. des Monats verfügbar")}
                                   style={{
                                     padding: "6px 10px",
                                     borderRadius: 8,
@@ -912,7 +944,7 @@ ${"=".repeat(50)}
                       <Text as="h3" variant="headingSm">{locale === "en" ? "Legal consent" : locale === "tr" ? "Yasal onay" : locale === "fr" ? "Consentement légal" : locale === "es" ? "Consentimiento legal" : locale === "it" ? "Consenso legale" : "Rechtliche Zustimmung"}</Text>
                       <InfoRow label={locale === "en" ? "Agreement accepted" : locale === "tr" ? "Sözleşme onaylandı" : locale === "fr" ? "Accord accepté" : locale === "es" ? "Acuerdo aceptado" : locale === "it" ? "Accordo accettato" : "Agreement akzeptiert"} value={seller.agreement_accepted ? ui.yes : ui.no} />
                       <InfoRow label={locale === "en" ? "Accepted on" : locale === "tr" ? "Onaylandı" : locale === "fr" ? "Accepté le" : locale === "es" ? "Aceptado el" : locale === "it" ? "Accettato il" : "Akzeptiert am"} value={fmtDate(seller.agreement_accepted_at, locale)} />
-                      <InfoRow label={locale === "en" ? "Version" : locale === "tr" ? "Versiyon" : "Version"} value={seller.agreement_version} />
+                      <InfoRow label={locale === "en" ? "Version" : locale === "tr" ? "Versiyon" : locale === "fr" ? "Version" : locale === "es" ? "Versión" : locale === "it" ? "Versione" : "Version"} value={seller.agreement_version} />
                       <InfoRow label="IP" value={seller.agreement_ip} />
                       <div style={{ marginTop: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
                         <Text as="h4" variant="headingSm">{locale === "en" ? "Handwritten signature" : locale === "tr" ? "El yazısı imza" : locale === "fr" ? "Signature manuscrite" : locale === "es" ? "Firma manuscrita" : locale === "it" ? "Firma autografa" : "Handschriftliche Unterschrift"}</Text>
@@ -1042,7 +1074,7 @@ ${"=".repeat(50)}
           <BlockStack gap="300">
             <Select
               label={locale === "en" ? "New status" : locale === "tr" ? "Yeni durum" : locale === "fr" ? "Nouveau statut" : locale === "es" ? "Nuevo estado" : locale === "it" ? "Nuovo stato" : "Neuer Status"}
-              options={STATUS_LABELS}
+              options={statusLabelsFor(locale)}
               value={newStatus}
               onChange={setNewStatus}
             />
@@ -1108,27 +1140,27 @@ ${"=".repeat(50)}
         open={payoutModal}
         onClose={() => setPayoutModal(false)}
         title={locale === "en" ? "Create payout" : locale === "tr" ? "Ödeme oluştur" : locale === "fr" ? "Créer un paiement" : locale === "es" ? "Crear pago" : locale === "it" ? "Crea pagamento" : "Neue Auszahlung erstellen"}
-        primaryAction={{ content: locale === "en" ? "Create" : locale === "tr" ? "Oluştur" : "Erstellen", onAction: handleCreatePayout, loading: savingPayout }}
+        primaryAction={{ content: locale === "en" ? "Create" : locale === "tr" ? "Oluştur" : locale === "fr" ? "Créer" : locale === "es" ? "Crear" : locale === "it" ? "Crea" : "Erstellen", onAction: handleCreatePayout, loading: savingPayout }}
         secondaryActions={[{ content: ui.cancel, onAction: () => setPayoutModal(false) }]}
       >
         <Modal.Section>
           <BlockStack gap="300">
             <InlineStack gap="300">
-              <TextField label={locale === "en" ? "Period from" : locale === "tr" ? "Dönem başlangıcı" : "Zeitraum von"} type="date" value={payoutForm.period_start}
+              <TextField label={locale === "en" ? "Period from" : locale === "tr" ? "Dönem başlangıcı" : locale === "fr" ? "Période du" : locale === "es" ? "Período desde" : locale === "it" ? "Periodo dal" : "Zeitraum von"} type="date" value={payoutForm.period_start}
                 onChange={(v) => setPayoutForm((p) => ({ ...p, period_start: v }))} autoComplete="off" />
-              <TextField label={locale === "en" ? "Period to" : locale === "tr" ? "Dönem bitişi" : "Zeitraum bis"} type="date" value={payoutForm.period_end}
+              <TextField label={locale === "en" ? "Period to" : locale === "tr" ? "Dönem bitişi" : locale === "fr" ? "Période au" : locale === "es" ? "Período hasta" : locale === "it" ? "Periodo al" : "Zeitraum bis"} type="date" value={payoutForm.period_end}
                 onChange={(v) => setPayoutForm((p) => ({ ...p, period_end: v }))} autoComplete="off" />
             </InlineStack>
-            <TextField label={locale === "en" ? "Total revenue (€)" : locale === "tr" ? "Toplam ciro (€)" : "Gesamtumsatz (€)"} value={payoutForm.total_cents}
+            <TextField label={locale === "en" ? "Total revenue (€)" : locale === "tr" ? "Toplam ciro (€)" : locale === "fr" ? "Chiffre d'affaires total (€)" : locale === "es" ? "Ingresos totales (€)" : locale === "it" ? "Fatturato totale (€)" : "Gesamtumsatz (€)"} value={payoutForm.total_cents}
               onChange={(v) => setPayoutForm((p) => ({ ...p, total_cents: v }))}
-              autoComplete="off" placeholder={locale === "en" ? "e.g. 1234.56" : locale === "tr" ? "örn. 1234.56" : "z.B. 1234.56"} />
-            <TextField label={`${locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : "Provision"} (${commissionPct}%)`} value={payoutForm.commission_cents}
+              autoComplete="off" placeholder={locale === "en" ? "e.g. 1234.56" : locale === "tr" ? "örn. 1234.56" : locale === "fr" ? "ex. 1234.56" : locale === "es" ? "ej. 1234.56" : locale === "it" ? "es. 1234.56" : "z.B. 1234.56"} />
+            <TextField label={`${locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : locale === "fr" ? "Commission" : locale === "es" ? "Comisión" : locale === "it" ? "Commissione" : "Provision"} (${commissionPct}%)`} value={payoutForm.commission_cents}
               onChange={(v) => setPayoutForm((p) => ({ ...p, commission_cents: v }))}
-              autoComplete="off" placeholder={locale === "en" ? "e.g. 123.46" : locale === "tr" ? "örn. 123.46" : "z.B. 123.46"} />
-            <TextField label={locale === "en" ? "Payout amount (€)" : locale === "tr" ? "Ödeme tutarı (€)" : "Auszahlungsbetrag (€)"} value={payoutForm.payout_cents}
+              autoComplete="off" placeholder={locale === "en" ? "e.g. 123.46" : locale === "tr" ? "örn. 123.46" : locale === "fr" ? "ex. 123.46" : locale === "es" ? "ej. 123.46" : locale === "it" ? "es. 123.46" : "z.B. 123.46"} />
+            <TextField label={locale === "en" ? "Payout amount (€)" : locale === "tr" ? "Ödeme tutarı (€)" : locale === "fr" ? "Montant du paiement (€)" : locale === "es" ? "Monto del pago (€)" : locale === "it" ? "Importo del pagamento (€)" : "Auszahlungsbetrag (€)"} value={payoutForm.payout_cents}
               onChange={(v) => setPayoutForm((p) => ({ ...p, payout_cents: v }))}
-              autoComplete="off" placeholder={locale === "en" ? "Empty = revenue − commission" : locale === "tr" ? "Boş = ciro − komisyon" : "Leer = Umsatz − Provision"} />
-            <TextField label={locale === "en" ? "Notes" : locale === "tr" ? "Notlar" : "Notizen"} value={payoutForm.notes}
+              autoComplete="off" placeholder={locale === "en" ? "Empty = revenue − commission" : locale === "tr" ? "Boş = ciro − komisyon" : locale === "fr" ? "Vide = CA − commission" : locale === "es" ? "Vacío = ingresos − comisión" : locale === "it" ? "Vuoto = fatturato − commissione" : "Leer = Umsatz − Provision"} />
+            <TextField label={locale === "en" ? "Notes" : locale === "tr" ? "Notlar" : locale === "fr" ? "Notes" : locale === "es" ? "Notas" : locale === "it" ? "Note" : "Notizen"} value={payoutForm.notes}
               onChange={(v) => setPayoutForm((p) => ({ ...p, notes: v }))}
               multiline={2} autoComplete="off" />
             {seller.iban && (

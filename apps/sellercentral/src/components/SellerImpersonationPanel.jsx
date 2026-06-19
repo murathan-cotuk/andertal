@@ -1,25 +1,33 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useLocale } from "next-intl";
 import { Badge, Button, Spinner, Text } from "@shopify/polaris";
 import { createImpersonationClient } from "@/lib/medusa-admin-client";
+import { getImpersonationCopy, getSellerApprovalStatus } from "@/lib/marketing-i18n";
+import { dateLocaleFor } from "@/lib/locale-text";
+import { statusLabel as localizeStatus } from "@/lib/status-labels";
 
-const STATUS_META = {
-  registered:          { label: "Kayıt Oldu",       tone: "info" },
-  documents_submitted: { label: "Evrak Gönderildi", tone: "attention" },
-  pending_approval:    { label: "Onay Bekliyor",     tone: "warning" },
-  approved:            { label: "Onaylandı",         tone: "success" },
-  rejected:            { label: "Reddedildi",        tone: "critical" },
-  suspended:           { label: "Askıya Alındı",     tone: "critical" },
-};
-
-function fmtCents(c) {
-  if (!c) return "€0,00";
-  return (c / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+function statusMetaFor(locale, status) {
+  const tones = {
+    registered: "info",
+    documents_submitted: "attention",
+    pending_approval: "warning",
+    approved: "success",
+    rejected: "critical",
+    suspended: "critical",
+  };
+  return { label: getSellerApprovalStatus(locale, status), tone: tones[status] || "info" };
 }
-function fmtDate(d) {
+
+function fmtCents(c, locale) {
+  const loc = dateLocaleFor(locale).replace(/-[A-Z]+$/, "") === "en" ? "en-GB" : dateLocaleFor(locale);
+  if (!c) return (0).toLocaleString(loc, { style: "currency", currency: "EUR" });
+  return (c / 100).toLocaleString(loc, { style: "currency", currency: "EUR" });
+}
+function fmtDate(d, locale) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(d).toLocaleDateString(dateLocaleFor(locale), { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 const TAB_STYLE = (active) => ({
@@ -35,6 +43,8 @@ const TAB_STYLE = (active) => ({
 });
 
 export default function SellerImpersonationPanel({ seller, token, onClose }) {
+  const locale = useLocale();
+  const imp = useMemo(() => getImpersonationCopy(locale), [locale]);
   const [tab, setTab] = useState("profil");
   const [profile, setProfile] = useState(null);
   const [products, setProducts] = useState([]);
@@ -99,7 +109,7 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
     if (tab === "orders") loadOrders();
   }, [tab]);
 
-  const statusMeta = STATUS_META[seller.approval_status] || { label: seller.approval_status || "—", tone: "info" };
+  const statusMeta = statusMetaFor(locale, seller.approval_status);
 
   return (
     <>
@@ -157,7 +167,7 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right" }}>
-              <div>Eingeloggt als Seller</div>
+              <div>{imp.loggedInAsSeller}</div>
               <div style={{ color: "#e5e7eb", fontWeight: 600 }}>{seller.store_name || seller.email}</div>
             </div>
             <button
@@ -180,9 +190,9 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
           overflowX: "auto", flexShrink: 0, background: "#f9fafb",
         }}>
           {[
-            { id: "profil", label: "Profil" },
-            { id: "products", label: "Produkte" },
-            { id: "orders", label: "Bestellungen" },
+            { id: "profil", label: imp.profile },
+            { id: "products", label: imp.products },
+            { id: "orders", label: imp.orders },
           ].map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)} style={TAB_STYLE(tab === t.id)}>
               {t.label}
@@ -201,14 +211,14 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
               <div style={{ maxWidth: 680 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
                   {[
-                    { label: "Shop-Name", value: seller.store_name || "—" },
-                    { label: "E-Mail", value: seller.email },
-                    { label: "Firma", value: seller.company_name || "—" },
+                    { label: imp.shopName, value: seller.store_name || "—" },
+                    { label: imp.email, value: seller.email },
+                    { label: imp.company, value: seller.company_name || "—" },
                     { label: "IBAN", value: seller.iban ? seller.iban.replace(/(.{4})/g, "$1 ").trim() : "—" },
-                    { label: "Beigetreten", value: fmtDate(seller.created_at) },
-                    { label: "Produkte", value: seller.product_count ?? "—" },
-                    { label: "Umsatz", value: fmtCents(seller.revenue_cents) },
-                    { label: "Provision", value: fmtCents(seller.commission_cents) },
+                    { label: imp.joined, value: fmtDate(seller.created_at, locale) },
+                    { label: imp.products, value: seller.product_count ?? "—" },
+                    { label: imp.revenue, value: fmtCents(seller.revenue_cents, locale) },
+                    { label: imp.commission, value: fmtCents(seller.commission_cents, locale) },
                   ].map((item) => (
                     <div key={item.label} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px" }}>
                       <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, marginBottom: 4 }}>{item.label}</div>
@@ -218,14 +228,14 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
                 </div>
                 {profile && (
                   <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 12 }}>Shop-Einstellungen</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 12 }}>{imp.shopSettings}</div>
                     {[
-                      ["Shop-Name", profile.store_name],
-                      ["Beschreibung", profile.store_description],
-                      ["E-Mail", profile.contact_email],
-                      ["Telefon", profile.contact_phone],
-                      ["Website", profile.website],
-                      ["Adresse", profile.store_address],
+                      [imp.shopName, profile.store_name],
+                      [imp.description, profile.store_description],
+                      [imp.email, profile.contact_email],
+                      [imp.phone, profile.contact_phone],
+                      [imp.website, profile.website],
+                      [imp.address, profile.store_address],
                     ].map(([k, v]) => v ? (
                       <div key={k} style={{ display: "flex", gap: 12, marginBottom: 8, fontSize: 13 }}>
                         <span style={{ color: "#6b7280", minWidth: 120 }}>{k}</span>
@@ -243,7 +253,7 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
             loadingProducts ? (
               <div style={{ textAlign: "center", padding: 40 }}><Spinner size="small" /></div>
             ) : products.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Keine Produkte</div>
+              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>{imp.noProducts}</div>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -290,13 +300,13 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
             loadingOrders ? (
               <div style={{ textAlign: "center", padding: 40 }}><Spinner size="small" /></div>
             ) : orders.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Keine Bestellungen</div>
+              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>{imp.noOrders}</div>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
-                      {["Bestellung", "Kunde", "Status", "Betrag", "Datum"].map((h) => (
+                      {[imp.order, imp.customer, imp.status, imp.amount, imp.date].map((h) => (
                         <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#6d7175" }}>{h}</th>
                       ))}
                     </tr>
@@ -307,10 +317,10 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
                         <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: 12 }}>#{o.display_id || o.id?.slice(-6)}</td>
                         <td style={{ padding: "8px 12px" }}>{o.shipping_address?.first_name} {o.shipping_address?.last_name}</td>
                         <td style={{ padding: "8px 12px" }}>
-                          <span style={{ background: "#f3f4f6", padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>{o.status}</span>
+                          <span style={{ background: "#f3f4f6", padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>{localizeStatus(locale, o.order_status || o.status)}</span>
                         </td>
-                        <td style={{ padding: "8px 12px" }}>{fmtCents(o.total)}</td>
-                        <td style={{ padding: "8px 12px", color: "#9ca3af" }}>{fmtDate(o.created_at)}</td>
+                        <td style={{ padding: "8px 12px" }}>{fmtCents(o.total, locale)}</td>
+                        <td style={{ padding: "8px 12px", color: "#9ca3af" }}>{fmtDate(o.created_at, locale)}</td>
                       </tr>
                     ))}
                   </tbody>

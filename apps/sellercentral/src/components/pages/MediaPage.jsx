@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
+import { useLt, dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { appendMediaFileToFormData } from "@/lib/media-upload";
 import { confirmDelete } from "@/lib/confirm-delete";
@@ -16,8 +17,7 @@ function fmtSize(bytes) {
 }
 function fmtDate(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
-  return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(d).toLocaleDateString(dateLocaleFor(locale), { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function isImage(mime) {
   return !mime || mime.startsWith("image/");
@@ -49,6 +49,8 @@ function sortMediaList(list, sortKey) {
 }
 
 function MediaTile({ item, onSelect }) {
+  const locale = useLocale();
+  const lt = useLt();
   return (
     <div
       onClick={() => onSelect(item)}
@@ -72,13 +74,13 @@ function MediaTile({ item, onSelect }) {
         onMouseLeave={(e) => { e.currentTarget.style.opacity = "0"; }}
         onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.url); }}
       >
-        <span style={{ color: "#fff", fontSize: 11, fontWeight: 600, background: "rgba(0,0,0,.4)", padding: "4px 10px", borderRadius: 20 }}>URL kopieren</span>
+        <span style={{ color: "#fff", fontSize: 11, fontWeight: 600, background: "rgba(0,0,0,.4)", padding: "4px 10px", borderRadius: 20 }}>{lt("Copy URL", "URL kopyala", "Copier l'URL", "Copiar URL", "Copia URL", "URL kopieren")}</span>
       </div>
       <div style={{ padding: "8px 10px" }}>
         <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151" }} title={item.filename}>
           {item.filename}
         </div>
-        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{fmtSize(item.size)} · {fmtDate(item.created_at)}</div>
+        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{fmtSize(item.size)} · {fmtDate(item.created_at, locale)}</div>
       </div>
     </div>
   );
@@ -86,6 +88,7 @@ function MediaTile({ item, onSelect }) {
 
 /* ───────── AddUrlModal ───────── */
 function AddUrlModal({ folders, onClose, onAdded }) {
+  const lt = useLt();
   const [url, setUrl] = useState("");
   const [alt, setAlt] = useState("");
   const [folderId, setFolderId] = useState("");
@@ -94,41 +97,41 @@ function AddUrlModal({ folders, onClose, onAdded }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!url.trim()) { setError("URL erforderlich"); return; }
+    if (!url.trim()) { setError(lt("URL required", "URL gerekli", "URL requis", "URL obligatoria", "URL obbligatorio", "URL erforderlich")); return; }
     setSaving(true);
     try {
       const client = getMedusaAdminClient();
       const res = await client.addMediaByUrl({ url: url.trim(), alt, folder_id: folderId || null });
       onAdded(res?.media);
       onClose();
-    } catch (err) { setError(err?.message || "Fehler"); }
+    } catch (err) { setError(err?.message || lt("Error", "Hata", "Erreur", "Error", "Errore", "Fehler")); }
     setSaving(false);
   };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
       <div style={{ background: "#fff", borderRadius: 12, width: 460, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,.2)" }} onClick={e => e.stopPropagation()}>
-        <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700 }}>Bild via URL hinzufügen</h2>
+        <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700 }}>{lt("Add image via URL", "URL ile görsel ekle", "Ajouter une image via URL", "Añadir imagen por URL", "Aggiungi immagine via URL", "Bild via URL hinzufügen")}</h2>
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 12 }}>
-            <label style={labelSt}>Bild-URL</label>
-            <input value={url} onChange={e => setUrl(e.target.value)} style={inputSt} placeholder="https://example.com/bild.jpg" />
+            <label style={labelSt}>{lt("Image URL", "Görsel URL", "URL de l'image", "URL de imagen", "URL immagine", "Bild-URL")}</label>
+            <input value={url} onChange={e => setUrl(e.target.value)} style={inputSt} placeholder="https://example.com/image.jpg" />
           </div>
           <div style={{ marginBottom: 12 }}>
-            <label style={labelSt}>Alt-Text (optional)</label>
-            <input value={alt} onChange={e => setAlt(e.target.value)} style={inputSt} placeholder="Beschreibung des Bildes" />
+            <label style={labelSt}>{lt("Alt text (optional)", "Alt metin (isteğe bağlı)", "Texte alt (facultatif)", "Texto alt (opcional)", "Testo alt (opzionale)", "Alt-Text (optional)")}</label>
+            <input value={alt} onChange={e => setAlt(e.target.value)} style={inputSt} placeholder={lt("Image description", "Görsel açıklaması", "Description de l'image", "Descripción de la imagen", "Descrizione immagine", "Beschreibung des Bildes")} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelSt}>Ordner (optional)</label>
+            <label style={labelSt}>{lt("Folder (optional)", "Klasör (isteğe bağlı)", "Dossier (facultatif)", "Carpeta (opcional)", "Cartella (opzionale)", "Ordner (optional)")}</label>
             <select value={folderId} onChange={e => setFolderId(e.target.value)} style={inputSt}>
-              <option value="">Kein Ordner</option>
+              <option value="">{lt("No folder", "Klasör yok", "Aucun dossier", "Sin carpeta", "Nessuna cartella", "Kein Ordner")}</option>
               {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </div>
           {error && <div style={{ color: "#b91c1c", fontSize: 12, marginBottom: 10 }}>{error}</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <button type="button" onClick={onClose} style={btnSecSt}>Abbrechen</button>
-            <button type="submit" disabled={saving} style={saving ? btnDisSt : btnPriSt}>{saving ? "Hinzufügen…" : "Hinzufügen"}</button>
+            <button type="button" onClick={onClose} style={btnSecSt}>{lt("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen")}</button>
+            <button type="submit" disabled={saving} style={saving ? btnDisSt : btnPriSt}>{saving ? lt("Adding…", "Ekleniyor…", "Ajout…", "Añadiendo…", "Aggiunta…", "Hinzufügen…") : lt("Add", "Ekle", "Ajouter", "Añadir", "Aggiungi", "Hinzufügen")}</button>
           </div>
         </form>
       </div>
@@ -138,33 +141,34 @@ function AddUrlModal({ folders, onClose, onAdded }) {
 
 /* ───────── CreateFolderModal ───────── */
 function CreateFolderModal({ onClose, onCreated }) {
+  const lt = useLt();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) { setError("Name erforderlich"); return; }
+    if (!name.trim()) { setError(lt("Name required", "Ad gerekli", "Nom requis", "Nombre obligatorio", "Nome obbligatorio", "Name erforderlich")); return; }
     setSaving(true);
     try {
       const client = getMedusaAdminClient();
       const res = await client.createMediaFolder(name.trim());
       onCreated(res?.folder);
       onClose();
-    } catch (err) { setError(err?.message || "Fehler"); }
+    } catch (err) { setError(err?.message || lt("Error", "Hata", "Erreur", "Error", "Errore", "Fehler")); }
     setSaving(false);
   };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
       <div style={{ background: "#fff", borderRadius: 12, width: 360, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,.2)" }} onClick={e => e.stopPropagation()}>
-        <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>Neuer Ordner</h2>
+        <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>{lt("New folder", "Yeni klasör", "Nouveau dossier", "Nueva carpeta", "Nuova cartella", "Neuer Ordner")}</h2>
         <form onSubmit={handleSubmit}>
-          <input value={name} onChange={e => setName(e.target.value)} style={{ ...inputSt, marginBottom: 14 }} placeholder="Ordnername" autoFocus />
+          <input value={name} onChange={e => setName(e.target.value)} style={{ ...inputSt, marginBottom: 14 }} placeholder={lt("Folder name", "Klasör adı", "Nom du dossier", "Nombre de carpeta", "Nome cartella", "Ordnername")} autoFocus />
           {error && <div style={{ color: "#b91c1c", fontSize: 12, marginBottom: 10 }}>{error}</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <button type="button" onClick={onClose} style={btnSecSt}>Abbrechen</button>
-            <button type="submit" disabled={saving} style={saving ? btnDisSt : btnPriSt}>{saving ? "Erstellen…" : "Erstellen"}</button>
+            <button type="button" onClick={onClose} style={btnSecSt}>{lt("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen")}</button>
+            <button type="submit" disabled={saving} style={saving ? btnDisSt : btnPriSt}>{saving ? lt("Creating…", "Oluşturuluyor…", "Création…", "Creando…", "Creazione…", "Erstellen…") : lt("Create", "Oluştur", "Créer", "Crear", "Crea", "Erstellen")}</button>
           </div>
         </form>
       </div>
@@ -174,6 +178,8 @@ function CreateFolderModal({ onClose, onCreated }) {
 
 /* ───────── DetailPanel ───────── */
 function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
+  const locale = useLocale();
+  const lt = useLt();
   const [alt, setAlt] = useState(item.alt || "");
   const [folderId, setFolderId] = useState(item.folder_id || "");
   const [saving, setSaving] = useState(false);
@@ -190,7 +196,7 @@ function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
   };
 
   const handleDelete = async () => {
-    if (!(await confirmDelete(`"${item.filename}" löschen?`))) return;
+    if (!(await confirmDelete(lt(`Delete "${item.filename}"?`, `"${item.filename}" silinsin mi?`, `Supprimer « ${item.filename} » ?`, `¿Eliminar «${item.filename}»?`, `Eliminare «${item.filename}»?`, `"${item.filename}" löschen?`)))) return;
     try {
       const client = getMedusaAdminClient();
       await client.deleteMediaItem(item.id);
@@ -224,17 +230,17 @@ function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
           <div style={{ background: "#f3f4f6", borderRadius: 8, padding: "8px 12px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
             <span style={{ fontSize: 11, fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151" }}>{item.url}</span>
             <button onClick={copyUrl} style={{ padding: "4px 10px", borderRadius: 6, background: copied ? "#f0fdf4" : "#fff", border: "1px solid #e5e7eb", cursor: "pointer", fontSize: 11, fontWeight: 600, color: copied ? "#15803d" : "#374151", flexShrink: 0 }}>
-              {copied ? "✓ Kopiert" : "Kopieren"}
+              {copied ? lt("✓ Copied", "✓ Kopyalandı", "✓ Copié", "✓ Copiado", "✓ Copiato", "✓ Kopiert") : lt("Copy", "Kopyala", "Copier", "Copiar", "Copia", "Kopieren")}
             </button>
           </div>
 
           {/* Meta info */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16, fontSize: 12 }}>
             {[
-              ["Typ", item.mime_type || "—"],
-              ["Größe", fmtSize(item.size)],
-              ["Hochgeladen", fmtDate(item.created_at)],
-              ["Ordner", item.folder_name || "Kein Ordner"],
+              [lt("Type", "Tür", "Type", "Tipo", "Tipo", "Typ"), item.mime_type || "—"],
+              [lt("Size", "Boyut", "Taille", "Tamaño", "Dimensione", "Größe"), fmtSize(item.size)],
+              [lt("Uploaded", "Yüklendi", "Téléversé", "Subido", "Caricato", "Hochgeladen"), fmtDate(item.created_at, locale)],
+              [lt("Folder", "Klasör", "Dossier", "Carpeta", "Cartella", "Ordner"), item.folder_name || lt("No folder", "Klasör yok", "Aucun dossier", "Sin carpeta", "Nessuna cartella", "Kein Ordner")],
             ].map(([k, v]) => (
               <div key={k}>
                 <div style={{ color: "#9ca3af", fontSize: 10, textTransform: "uppercase", letterSpacing: ".04em" }}>{k}</div>
@@ -245,18 +251,18 @@ function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
 
           {/* Edit fields */}
           <div style={{ marginBottom: 12 }}>
-            <label style={labelSt}>Alt-Text</label>
-            <input value={alt} onChange={e => setAlt(e.target.value)} style={inputSt} placeholder="Bildbeschreibung" />
+            <label style={labelSt}>{lt("Alt text", "Alt metin", "Texte alt", "Texto alt", "Testo alt", "Alt-Text")}</label>
+            <input value={alt} onChange={e => setAlt(e.target.value)} style={inputSt} placeholder={lt("Image description", "Görsel açıklaması", "Description de l'image", "Descripción de la imagen", "Descrizione immagine", "Bildbeschreibung")} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelSt}>Ordner</label>
+            <label style={labelSt}>{lt("Folder", "Klasör", "Dossier", "Carpeta", "Cartella", "Ordner")}</label>
             <select value={folderId} onChange={e => setFolderId(e.target.value)} style={inputSt}>
-              <option value="">Kein Ordner</option>
+              <option value="">{lt("No folder", "Klasör yok", "Aucun dossier", "Sin carpeta", "Nessuna cartella", "Kein Ordner")}</option>
               {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </div>
-          <button onClick={handleSave} disabled={saving} style={{ ...btnPriSt, width: "100%", marginBottom: 8 }}>{saving ? "Speichern…" : "Speichern"}</button>
-          <button onClick={handleDelete} style={{ ...btnSecSt, width: "100%", color: "#b91c1c", borderColor: "#fecaca" }}>Löschen</button>
+          <button onClick={handleSave} disabled={saving} style={{ ...btnPriSt, width: "100%", marginBottom: 8 }}>{saving ? lt("Saving…", "Kaydediliyor…", "Enregistrement…", "Guardando…", "Salvataggio…", "Speichern…") : lt("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern")}</button>
+          <button onClick={handleDelete} style={{ ...btnSecSt, width: "100%", color: "#b91c1c", borderColor: "#fecaca" }}>{lt("Delete", "Sil", "Supprimer", "Eliminar", "Elimina", "Löschen")}</button>
         </div>
       </div>
     </>
@@ -266,6 +272,7 @@ function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
 /* ───────── Main page ───────── */
 export default function MediaPage() {
   const locale = useLocale();
+  const lt = useLt();
   const ui = getUI(locale);
   const [media, setMedia] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -516,8 +523,15 @@ export default function MediaPage() {
           <div style={{ fontSize: 15, fontWeight: 700, color: "#111" }}>{folderLabel}</div>
           <span style={{ fontSize: 12, color: "#9ca3af" }}>
             {isSuperuser
-              ? `${ownMedia.length} eigene / Plattform · ${totalCount - ownMedia.length} Verkäufer (${totalCount} gesamt)`
-              : `${totalCount} Dateien`}
+              ? lt(
+                  `${ownMedia.length} own / platform · ${totalCount - ownMedia.length} sellers (${totalCount} total)`,
+                  `${ownMedia.length} kendi / platform · ${totalCount - ownMedia.length} satıcı (${totalCount} toplam)`,
+                  `${ownMedia.length} propres / plateforme · ${totalCount - ownMedia.length} vendeurs (${totalCount} au total)`,
+                  `${ownMedia.length} propios / plataforma · ${totalCount - ownMedia.length} vendedores (${totalCount} total)`,
+                  `${ownMedia.length} propri / piattaforma · ${totalCount - ownMedia.length} venditori (${totalCount} totale)`,
+                  `${ownMedia.length} eigene / Plattform · ${totalCount - ownMedia.length} Verkäufer (${totalCount} gesamt)`,
+                )
+              : lt(`${totalCount} files`, `${totalCount} dosya`, `${totalCount} fichiers`, `${totalCount} archivos`, `${totalCount} file`, `${totalCount} Dateien`)}
           </span>
           {isSuperuser && (
             <select
@@ -525,12 +539,12 @@ export default function MediaPage() {
               onChange={(e) => setMediaSort(e.target.value)}
               style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, color: "#374151", background: "#fff" }}
             >
-              <option value="date_desc">Datum: neu zuerst</option>
-              <option value="date_asc">Datum: alt zuerst</option>
-              <option value="name_asc">Name A–Z</option>
-              <option value="name_desc">Name Z–A</option>
-              <option value="size_desc">Größe ↓</option>
-              <option value="size_asc">Größe ↑</option>
+              <option value="date_desc">{lt("Date: newest first", "Tarih: en yeni", "Date : plus récent", "Fecha: más reciente", "Data: più recente", "Datum: neu zuerst")}</option>
+              <option value="date_asc">{lt("Date: oldest first", "Tarih: en eski", "Date : plus ancien", "Fecha: más antiguo", "Data: più vecchio", "Datum: alt zuerst")}</option>
+              <option value="name_asc">{lt("Name A–Z", "Ad A–Z", "Nom A–Z", "Nombre A–Z", "Nome A–Z", "Name A–Z")}</option>
+              <option value="name_desc">{lt("Name Z–A", "Ad Z–A", "Nom Z–A", "Nombre Z–A", "Nome Z–A", "Name Z–A")}</option>
+              <option value="size_desc">{lt("Size ↓", "Boyut ↓", "Taille ↓", "Tamaño ↓", "Dimensione ↓", "Größe ↓")}</option>
+              <option value="size_asc">{lt("Size ↑", "Boyut ↑", "Taille ↑", "Tamaño ↑", "Dimensione ↑", "Größe ↑")}</option>
             </select>
           )}
           <div style={{ flex: 1 }} />
@@ -539,14 +553,14 @@ export default function MediaPage() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Dateiname suchen…"
+              placeholder={lt("Search filename…", "Dosya adı ara…", "Rechercher un fichier…", "Buscar archivo…", "Cerca file…", "Dateiname suchen…")}
               style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: "6px 0 0 6px", fontSize: 13, outline: "none", width: 180 }}
             />
             <button type="submit" style={{ padding: "6px 12px", background: "#f9fafb", border: "1px solid #e5e7eb", borderLeft: "none", borderRadius: "0 6px 6px 0", cursor: "pointer", fontSize: 13, color: "#374151" }}>🔍</button>
           </form>
           {/* URL add */}
           <button onClick={() => setShowAddUrl(true)} style={{ padding: "7px 14px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#374151" }}>
-            🔗 URL hinzufügen
+            🔗 {lt("Add URL", "URL ekle", "Ajouter URL", "Añadir URL", "Aggiungi URL", "URL hinzufügen")}
           </button>
           {/* Upload */}
           <button
@@ -554,7 +568,7 @@ export default function MediaPage() {
             disabled={uploading}
             style={{ padding: "7px 16px", background: uploading ? "#9ca3af" : "#111827", color: "#fff", border: "none", borderRadius: 7, cursor: uploading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600 }}
           >
-            {uploading ? "Hochladen…" : "↑ Hochladen"}
+            {uploading ? lt("Uploading…", "Yükleniyor…", "Téléversement…", "Subiendo…", "Caricamento…", "Hochladen…") : `↑ ${lt("Upload", "Yükle", "Téléverser", "Subir", "Carica", "Hochladen")}`}
           </button>
           <input
             ref={fileInputRef}
@@ -569,13 +583,13 @@ export default function MediaPage() {
         {/* Grid */}
         <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
           {loading && (
-            <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>Laden…</div>
+            <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>{ui.loading}</div>
           )}
           {!loading && media.length === 0 && (
             <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>🖼</div>
-              <div style={{ fontSize: 15, marginBottom: 8 }}>Keine Medien</div>
-              <div style={{ fontSize: 13 }}>Bilder hochladen oder per URL hinzufügen</div>
+              <div style={{ fontSize: 15, marginBottom: 8 }}>{lt("No media", "Medya yok", "Aucun média", "Sin medios", "Nessun media", "Keine Medien")}</div>
+              <div style={{ fontSize: 13 }}>{lt("Upload images or add via URL", "Görsel yükleyin veya URL ile ekleyin", "Téléversez des images ou ajoutez via URL", "Suba imágenes o añada por URL", "Carica immagini o aggiungi via URL", "Bilder hochladen oder per URL hinzufügen")}</div>
             </div>
           )}
           {!loading && media.length > 0 && !isSuperuser && (
@@ -602,10 +616,10 @@ export default function MediaPage() {
                     letterSpacing: "0.04em",
                   }}
                 >
-                  Ihr Superuser-Bereich — eigene und plattformweite Medien ({ownMedia.length})
+                  {lt("Your superuser area — own and platform media", "Superuser alanınız — kendi ve platform medyası", "Votre espace superuser — médias propres et plateforme", "Su área superuser — medios propios y de plataforma", "Area superuser — media propri e piattaforma", "Ihr Superuser-Bereich — eigene und plattformweite Medien")} ({ownMedia.length})
                 </div>
                 {ownMedia.length === 0 ? (
-                  <div style={{ color: "#9ca3af", fontSize: 13, padding: "8px 4px" }}>Keine Medien in diesem Bereich.</div>
+                  <div style={{ color: "#9ca3af", fontSize: 13, padding: "8px 4px" }}>{lt("No media in this section.", "Bu bölümde medya yok.", "Aucun média dans cette section.", "Sin medios en esta sección.", "Nessun media in questa sezione.", "Keine Medien in diesem Bereich.")}</div>
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
                     {sortMediaList(ownMedia, mediaSort).map((item) => (
@@ -629,12 +643,12 @@ export default function MediaPage() {
                     letterSpacing: "0.04em",
                   }}
                 >
-                  Verkäufer-Medien
+                  {lt("Seller media", "Satıcı medyası", "Médias vendeurs", "Medios de vendedores", "Media venditori", "Verkäufer-Medien")}
                 </div>
                 <input
                   value={sellerSearchFilter}
                   onChange={(e) => setSellerSearchFilter(e.target.value)}
-                  placeholder="Verkäufer suchen (Store-Name)…"
+                  placeholder={lt("Search sellers (store name)…", "Satıcı ara (mağaza adı)…", "Rechercher vendeurs (nom boutique)…", "Buscar vendedores (nombre tienda)…", "Cerca venditori (nome negozio)…", "Verkäufer suchen (Store-Name)…")}
                   style={{
                     width: "100%", maxWidth: 360, padding: "8px 12px", marginBottom: 14,
                     border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, boxSizing: "border-box",
@@ -642,7 +656,7 @@ export default function MediaPage() {
                 />
                 {filteredSellerMediaGroups.length === 0 ? (
                   <div style={{ color: "#9ca3af", fontSize: 13 }}>
-                    Keine Verkäufer-Medien{sellerSearchFilter.trim() ? " (Filter)" : ""}.
+                    {lt("No seller media", "Satıcı medyası yok", "Aucun média vendeur", "Sin medios de vendedores", "Nessun media venditore", "Keine Verkäufer-Medien")}{sellerSearchFilter.trim() ? lt(" (filter)", " (filtre)", " (filtre)", " (filtro)", " (filtro)", " (Filter)") : ""}.
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>

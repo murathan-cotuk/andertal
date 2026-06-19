@@ -1,8 +1,23 @@
 ﻿import ExcelJS from "exceljs";
+import { getImportApiMessages, resolveRequestLocale } from "@/lib/import-export-i18n";
+import { lt } from "@/lib/locale-text";
+import { productExcelTemplateFilename } from "@/lib/download-names";
 
 const LANGS = ["de", "en", "tr", "fr", "it", "es"];
 
-const LANG_LABELS = { de: "German", en: "English", tr: "Turkish", fr: "French", it: "Italian", es: "Spanish" };
+
+function langLabelsFor(locale) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const x = (en, tr, fr, es, it, de) => lt(loc, en, tr, fr, es, it, de);
+  return {
+    de: x("German", "Almanca", "Allemand", "Alemán", "Tedesco", "Deutsch"),
+    en: x("English", "İngilizce", "Anglais", "Inglés", "Inglese", "Englisch"),
+    tr: x("Turkish", "Türkçe", "Turc", "Turco", "Turco", "Türkisch"),
+    fr: x("French", "Fransızca", "Français", "Francés", "Francese", "Französisch"),
+    it: x("Italian", "İtalyanca", "Italien", "Italiano", "Italiano", "Italienisch"),
+    es: x("Spanish", "İspanyolca", "Espagnol", "Español", "Spagnolo", "Spanisch"),
+  };
+}
 
 const DEFAULT_BACKEND = "https://api.andertal.com";
 
@@ -87,61 +102,64 @@ async function loadReferenceData(backendUrl, sellerToken) {
 }
 
 /** Column definitions — no collection_handles, no handle_*; shipping + extra options + metafields */
-function buildColumns() {
+function buildColumns(locale) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const x = (en, tr, fr, es, it, de) => lt(loc, en, tr, fr, es, it, de);
+  const LANG_LABELS = langLabelsFor(loc);
   const cols = [];
 
   const core = [
-    { key: "product_type", label: "product_type", note: "Dropdown: parent | child", width: 14, group: "core" },
-    { key: "sku", label: "sku", note: "Unique product SKU (required)", width: 20, group: "core" },
-    { key: "parent_sku", label: "parent_sku", note: "Child only: parent row SKU", width: 20, group: "core" },
-    { key: "status", label: "status", note: "Dropdown: draft | published", width: 13, group: "core" },
-    { key: "ean", label: "ean", note: "EAN / GTIN", width: 18, group: "core" },
-    { key: "inventory", label: "inventory", note: "Inventory quantity", width: 12, group: "core" },
-    { key: "brand", label: "brand", note: "Dropdown: brand name from list", width: 18, group: "core" },
-    { key: "type", label: "type", note: "Product type", width: 16, group: "core" },
-    { key: "category_slug", label: "category_slug", note: "Dropdown: exact category slug from list", width: 22, group: "core" },
-    { key: "shipping_group", label: "shipping_group", note: "Dropdown: shipping group name", width: 22, group: "core" },
-    { key: "manufacturer", label: "manufacturer", note: "GPSR: manufacturer (required)", width: 26, group: "core" },
-    { key: "manufacturer_information", label: "manufacturer_information", note: "GPSR: manufacturer information (required)", width: 42, group: "core" },
-    { key: "responsible_person_information", label: "responsible_person_information", note: "GPSR: responsible person in EU (required)", width: 42, group: "core" },
-    { key: "weight_grams", label: "weight_grams", note: "Weight in grams", width: 14, group: "core" },
-    { key: "dim_length_cm", label: "dim_length_cm", note: "Length in cm", width: 14, group: "core" },
-    { key: "dim_width_cm", label: "dim_width_cm", note: "Width in cm", width: 13, group: "core" },
-    { key: "dim_height_cm", label: "dim_height_cm", note: "Height in cm", width: 13, group: "core" },
-    { key: "image_url_1", label: "image_url_1", note: "Image URL 1 (main image)", width: 40, group: "core" },
-    { key: "image_url_2", label: "image_url_2", note: "Image URL 2", width: 40, group: "core" },
-    { key: "image_url_3", label: "image_url_3", note: "Image URL 3", width: 40, group: "core" },
-    { key: "image_url_4", label: "image_url_4", note: "Image URL 4", width: 40, group: "core" },
-    { key: "image_url_5", label: "image_url_5", note: "Image URL 5", width: 40, group: "core" },
-    { key: "swatch_image_url", label: "swatch_image_url", note: "Swatch image URL", width: 28, group: "core" },
-    { key: "option1_name", label: "variation1_name", note: "Parent: variation 1 name (e.g. color)", width: 18, group: "variations" },
-    { key: "option1_value", label: "variation1_value", note: "Child: variation 1 value (e.g. red)", width: 18, group: "variations" },
-    { key: "option2_name", label: "variation2_name", note: "Parent: variation 2 name (e.g. size)", width: 18, group: "variations" },
-    { key: "option2_value", label: "variation2_value", note: "Child: variation 2 value (e.g. M)", width: 18, group: "variations" },
-    { key: "option3_name", label: "variation3_name", note: "Parent: Variation 3 Name (optional)", width: 18, group: "variations" },
-    { key: "option3_value", label: "variation3_value", note: "Child: variation 3 value", width: 18, group: "variations" },
-    { key: "option4_name", label: "variation4_name", note: "Parent: Variation 4 Name (optional)", width: 18, group: "variations" },
-    { key: "option4_value", label: "variation4_value", note: "Child: variation 4 value", width: 18, group: "variations" },
-    { key: "option5_name", label: "variation5_name", note: "Parent: Variation 5 Name (optional)", width: 18, group: "variations" },
-    { key: "option5_value", label: "variation5_value", note: "Child: variation 5 value", width: 18, group: "variations" },
-    { key: "option6_name", label: "variation6_name", note: "Parent: Variation 6 Name (optional)", width: 18, group: "variations" },
-    { key: "option6_value", label: "variation6_value", note: "Child: variation 6 value", width: 18, group: "variations" },
-    { key: "unit_type", label: "unit_type", note: "Dropdown: kg | g | L | ml | piece", width: 12, group: "core" },
-    { key: "unit_value", label: "unit_value", note: "e.g. 200", width: 12, group: "core" },
-    { key: "per_unit", label: "per_unit", note: "Reference quantity for price per unit (g/ml => 1000, kg/l/piece => 1)", width: 12, group: "core" },
-    { key: "price", label: "price", note: "Verkaufspreis brutto in EUR (ein Preis für alle Märkte)", width: 14, group: "price_eur" },
-    { key: "price_uvp", label: "price_uvp", note: "UVP / Streichpreis in EUR (optional)", width: 14, group: "price_eur" },
-    { key: "price_sale", label: "price_sale", note: "Aktionspreis in EUR (optional)", width: 14, group: "price_eur" },
-    { key: "weee_number", label: "weee_number", note: "WEEE-Reg.-Nr. (Elektroaltgeräte-Registrierung)", width: 22, group: "core" },
-    { key: "eprel_number", label: "eprel_number", note: "EPREL-Reg.-Nr. (EU-Energielabel)", width: 22, group: "core" },
+    { key: "product_type", label: "product_type", note: x("Dropdown: parent | child", "Açılır liste: parent | child", "Liste: parent | child", "Lista: parent | child", "Elenco: parent | child", "Dropdown: parent | child"), width: 14, group: "core" },
+    { key: "sku", label: "sku", note: x("Unique product SKU (required)", "Benzersiz ürün SKU (zorunlu)", "SKU produit unique (obligatoire)", "SKU único del producto (obligatorio)", "SKU prodotto univoco (obbligatorio)", "Eindeutige Produkt-SKU (Pflicht)"), width: 20, group: "core" },
+    { key: "parent_sku", label: "parent_sku", note: x("Child only: parent row SKU", "Yalnızca child: üst satır SKU", "Enfant uniquement: SKU parent", "Solo child: SKU fila padre", "Solo child: SKU riga padre", "Nur Child: SKU der Parent-Zeile"), width: 20, group: "core" },
+    { key: "status", label: "status", note: x("Dropdown: draft | published", "Açılır liste: draft | published", "Liste: draft | published", "Lista: draft | published", "Elenco: draft | published", "Dropdown: draft | published"), width: 13, group: "core" },
+    { key: "ean", label: "ean", note: x("EAN / GTIN", "EAN / GTIN", "EAN / GTIN", "EAN / GTIN", "EAN / GTIN", "EAN / GTIN"), width: 18, group: "core" },
+    { key: "inventory", label: "inventory", note: x("Inventory quantity", "Stok adedi", "Quantité en stock", "Cantidad en inventario", "Quantità a magazzino", "Lagerbestand"), width: 12, group: "core" },
+    { key: "brand", label: "brand", note: x("Dropdown: brand name from list", "Açılır liste: listedeki marka adı", "Liste: nom de marque", "Lista: nombre de marca", "Elenco: nome marca", "Dropdown: Markenname aus Liste"), width: 18, group: "core" },
+    { key: "type", label: "type", note: x("Product type", "Ürün tipi", "Type de produit", "Tipo de producto", "Tipo prodotto", "Produkttyp"), width: 16, group: "core" },
+    { key: "category_slug", label: "category_slug", note: x("Dropdown: exact category slug from list", "Açılır liste: listedeki kategori slug", "Liste: slug catégorie exact", "Lista: slug de categoría exacto", "Elenco: slug categoria esatto", "Dropdown: exakter Kategorie-Slug aus Liste"), width: 22, group: "core" },
+    { key: "shipping_group", label: "shipping_group", note: x("Dropdown: shipping group name", "Açılır liste: kargo grubu adı", "Liste: nom groupe livraison", "Lista: nombre grupo envío", "Elenco: nome gruppo spedizione", "Dropdown: Versandgruppenname"), width: 22, group: "core" },
+    { key: "manufacturer", label: "manufacturer", note: x("GPSR: manufacturer (required)", "GPSR: üretici (zorunlu)", "GPSR: fabricant (obligatoire)", "GPSR: fabricante (obligatorio)", "GPSR: produttore (obbligatorio)", "GPSR: Hersteller (Pflicht)"), width: 26, group: "core" },
+    { key: "manufacturer_information", label: "manufacturer_information", note: x("GPSR: manufacturer information (required)", "GPSR: üretici bilgisi (zorunlu)", "GPSR: informations fabricant (obligatoire)", "GPSR: información fabricante (obligatorio)", "GPSR: informazioni produttore (obbligatorio)", "GPSR: Herstellerangaben (Pflicht)"), width: 42, group: "core" },
+    { key: "responsible_person_information", label: "responsible_person_information", note: x("GPSR: responsible person in EU (required)", "GPSR: AB sorumlu kişi (zorunlu)", "GPSR: personne responsable UE (obligatoire)", "GPSR: persona responsable UE (obligatorio)", "GPSR: persona responsabile UE (obbligatorio)", "GPSR: verantwortliche Person in der EU (Pflicht)"), width: 42, group: "core" },
+    { key: "weight_grams", label: "weight_grams", note: x("Weight in grams", "Ağırlık (gram)", "Poids en grammes", "Peso en gramos", "Peso in grammi", "Gewicht in Gramm"), width: 14, group: "core" },
+    { key: "dim_length_cm", label: "dim_length_cm", note: x("Length in cm", "Uzunluk (cm)", "Longueur en cm", "Longitud en cm", "Lunghezza in cm", "Länge in cm"), width: 14, group: "core" },
+    { key: "dim_width_cm", label: "dim_width_cm", note: x("Width in cm", "Genişlik (cm)", "Largeur en cm", "Ancho en cm", "Larghezza in cm", "Breite in cm"), width: 13, group: "core" },
+    { key: "dim_height_cm", label: "dim_height_cm", note: x("Height in cm", "Yükseklik (cm)", "Hauteur en cm", "Altura en cm", "Altezza in cm", "Höhe in cm"), width: 13, group: "core" },
+    { key: "image_url_1", label: "image_url_1", note: x("Image URL 1 (main image)", "Görsel URL 1 (ana görsel)", "URL image 1 (principale)", "URL imagen 1 (principal)", "URL immagine 1 (principale)", "Bild-URL 1 (Hauptbild)"), width: 40, group: "core" },
+    { key: "image_url_2", label: "image_url_2", note: x("Image URL 2", "Görsel URL 2", "URL image 2", "URL imagen 2", "URL immagine 2", "Bild-URL 2"), width: 40, group: "core" },
+    { key: "image_url_3", label: "image_url_3", note: x("Image URL 3", "Görsel URL 3", "URL image 3", "URL imagen 3", "URL immagine 3", "Bild-URL 3"), width: 40, group: "core" },
+    { key: "image_url_4", label: "image_url_4", note: x("Image URL 4", "Görsel URL 4", "URL image 4", "URL imagen 4", "URL immagine 4", "Bild-URL 4"), width: 40, group: "core" },
+    { key: "image_url_5", label: "image_url_5", note: x("Image URL 5", "Görsel URL 5", "URL image 5", "URL imagen 5", "URL immagine 5", "Bild-URL 5"), width: 40, group: "core" },
+    { key: "swatch_image_url", label: "swatch_image_url", note: x("Swatch image URL", "Swatch görsel URL", "URL image swatch", "URL imagen muestra", "URL immagine campione", "Swatch-Bild-URL"), width: 28, group: "core" },
+    { key: "option1_name", label: "variation1_name", note: x("Parent: variation 1 name (e.g. color)", "Parent: varyasyon 1 adı (örn. renk)", "Parent: nom variation 1 (ex. couleur)", "Parent: nombre variación 1 (ej. color)", "Parent: nome variante 1 (es. colore)", "Parent: Variante 1 Name (z. B. Farbe)"), width: 18, group: "variations" },
+    { key: "option1_value", label: "variation1_value", note: x("Child: variation 1 value (e.g. red)", "Child: varyasyon 1 değeri (örn. kırmızı)", "Enfant: valeur variation 1 (ex. rouge)", "Child: valor variación 1 (ej. rojo)", "Child: valore variante 1 (es. rosso)", "Child: Variante 1 Wert (z. B. rot)"), width: 18, group: "variations" },
+    { key: "option2_name", label: "variation2_name", note: x("Parent: variation 2 name (e.g. size)", "Parent: varyasyon 2 adı (örn. beden)", "Parent: nom variation 2 (ex. taille)", "Parent: nombre variación 2 (ej. talla)", "Parent: nome variante 2 (es. taglia)", "Parent: Variante 2 Name (z. B. Größe)"), width: 18, group: "variations" },
+    { key: "option2_value", label: "variation2_value", note: x("Child: variation 2 value (e.g. M)", "Child: varyasyon 2 değeri (örn. M)", "Enfant: valeur variation 2 (ex. M)", "Child: valor variación 2 (ej. M)", "Child: valore variante 2 (es. M)", "Child: Variante 2 Wert (z. B. M)"), width: 18, group: "variations" },
+    { key: "option3_name", label: "variation3_name", note: x("Parent: variation 3 name (optional)", "Parent: varyasyon 3 adı (isteğe bağlı)", "Parent: nom variation 3 (optionnel)", "Parent: nombre variación 3 (opcional)", "Parent: nome variante 3 (opzionale)", "Parent: Variante 3 Name (optional)"), width: 18, group: "variations" },
+    { key: "option3_value", label: "variation3_value", note: x("Child: variation 3 value", "Child: varyasyon 3 değeri", "Enfant: valeur variation 3", "Child: valor variación 3", "Child: valore variante 3", "Child: Variante 3 Wert"), width: 18, group: "variations" },
+    { key: "option4_name", label: "variation4_name", note: x("Parent: variation 4 name (optional)", "Parent: varyasyon 4 adı (isteğe bağlı)", "Parent: nom variation 4 (optionnel)", "Parent: nombre variación 4 (opcional)", "Parent: nome variante 4 (opzionale)", "Parent: Variante 4 Name (optional)"), width: 18, group: "variations" },
+    { key: "option4_value", label: "variation4_value", note: x("Child: variation 4 value", "Child: varyasyon 4 değeri", "Enfant: valeur variation 4", "Child: valor variación 4", "Child: valore variante 4", "Child: Variante 4 Wert"), width: 18, group: "variations" },
+    { key: "option5_name", label: "variation5_name", note: x("Parent: variation 5 name (optional)", "Parent: varyasyon 5 adı (isteğe bağlı)", "Parent: nom variation 5 (optionnel)", "Parent: nombre variación 5 (opcional)", "Parent: nome variante 5 (opzionale)", "Parent: Variante 5 Name (optional)"), width: 18, group: "variations" },
+    { key: "option5_value", label: "variation5_value", note: x("Child: variation 5 value", "Child: varyasyon 5 değeri", "Enfant: valeur variation 5", "Child: valor variación 5", "Child: valore variante 5", "Child: Variante 5 Wert"), width: 18, group: "variations" },
+    { key: "option6_name", label: "variation6_name", note: x("Parent: variation 6 name (optional)", "Parent: varyasyon 6 adı (isteğe bağlı)", "Parent: nom variation 6 (optionnel)", "Parent: nombre variación 6 (opcional)", "Parent: nome variante 6 (opzionale)", "Parent: Variante 6 Name (optional)"), width: 18, group: "variations" },
+    { key: "option6_value", label: "variation6_value", note: x("Child: variation 6 value", "Child: varyasyon 6 değeri", "Enfant: valeur variation 6", "Child: valor variación 6", "Child: valore variante 6", "Child: Variante 6 Wert"), width: 18, group: "variations" },
+    { key: "unit_type", label: "unit_type", note: x("Dropdown: kg | g | L | ml | piece", "Açılır liste: kg | g | L | ml | piece", "Liste: kg | g | L | ml | piece", "Lista: kg | g | L | ml | piece", "Elenco: kg | g | L | ml | piece", "Dropdown: kg | g | L | ml | piece"), width: 12, group: "core" },
+    { key: "unit_value", label: "unit_value", note: x("e.g. 200", "örn. 200", "ex. 200", "ej. 200", "es. 200", "z. B. 200"), width: 12, group: "core" },
+    { key: "per_unit", label: "per_unit", note: x("Reference quantity for price per unit (g/ml => 1000, kg/l/piece => 1)", "Birim fiyat referans miktarı (g/ml => 1000, kg/l/piece => 1)", "Quantité de référence prix unitaire", "Cantidad referencia precio unitario", "Quantità riferimento prezzo unitario", "Referenzmenge für Grundpreis (g/ml => 1000, kg/l/piece => 1)"), width: 12, group: "core" },
+    { key: "price", label: "price", note: x("Gross selling price in EUR (one price for all markets)", "Tüm pazarlar için EUR brüt satış fiyatı", "Prix de vente TTC en EUR (un prix pour tous les marchés)", "Precio de venta bruto en EUR (un precio para todos los mercados)", "Prezzo di vendita lordo in EUR (un prezzo per tutti i mercati)", "Verkaufspreis brutto in EUR (ein Preis für alle Märkte)"), width: 14, group: "price_eur" },
+    { key: "price_uvp", label: "price_uvp", note: x("RRP / list price in EUR (optional)", "EUR tavsiye edilen perakende fiyat (isteğe bağlı)", "Prix conseillé en EUR (optionnel)", "PVP / precio tachado en EUR (opcional)", "Prezzo di listino in EUR (opzionale)", "UVP / Streichpreis in EUR (optional)"), width: 14, group: "price_eur" },
+    { key: "price_sale", label: "price_sale", note: x("Sale price in EUR (optional)", "EUR indirimli fiyat (isteğe bağlı)", "Prix promo en EUR (optionnel)", "Precio de oferta en EUR (opcional)", "Prezzo promozionale in EUR (opzionale)", "Aktionspreis in EUR (optional)"), width: 14, group: "price_eur" },
+    { key: "weee_number", label: "weee_number", note: x("WEEE reg. no. (e-waste registration)", "WEEE kayıt no. (elektronik atık)", "N° enregistrement DEEE", "N.º registro RAEE", "N. registro RAEE", "WEEE-Reg.-Nr. (Elektroaltgeräte-Registrierung)"), width: 22, group: "core" },
+    { key: "eprel_number", label: "eprel_number", note: x("EPREL reg. no. (EU energy label)", "EPREL kayıt no. (AB enerji etiketi)", "N° enregistrement EPREL", "N.º registro EPREL", "N. registro EPREL", "EPREL-Reg.-Nr. (EU-Energielabel)"), width: 22, group: "core" },
   ];
   cols.push(...core);
 
   const FILE_SLOTS = 5;
   for (let i = 1; i <= FILE_SLOTS; i++) {
     cols.push(
-      { key: `file_${i}_url`, label: `file_${i}_url`, note: `Datei ${i} URL (PDF oder Bild)`, width: 44, group: "files", outline: 1 },
-      { key: `file_${i}_name`, label: `file_${i}_name`, note: `Datei ${i} Name (z.B. Produktdatenblatt.pdf)`, width: 30, group: "files", outline: 1 }
+      { key: `file_${i}_url`, label: `file_${i}_url`, note: x(`File ${i} URL (PDF or image)`, `Dosya ${i} URL (PDF veya görsel)`, `Fichier ${i} URL (PDF ou image)`, `Archivo ${i} URL (PDF o imagen)`, `File ${i} URL (PDF o immagine)`, `Datei ${i} URL (PDF oder Bild)`), width: 44, group: "files", outline: 1 },
+      { key: `file_${i}_name`, label: `file_${i}_name`, note: x(`File ${i} name (e.g. datasheet.pdf)`, `Dosya ${i} adı (örn. urun-fisi.pdf)`, `Nom fichier ${i} (ex. fiche.pdf)`, `Nombre archivo ${i} (ej. ficha.pdf)`, `Nome file ${i} (es. scheda.pdf)`, `Datei ${i} Name (z.B. Produktdatenblatt.pdf)`), width: 30, group: "files", outline: 1 }
     );
   }
 
@@ -150,7 +168,7 @@ function buildColumns() {
       {
         key: `metafield_${i}_key`,
         label: `metafield_${i}_key`,
-        note: `Metafield ${i} key — parent row → product; child row → that variant`,
+        note: x(`Metafield ${i} key — parent row → product; child row → that variant`, `Metafield ${i} anahtar — parent satır → ürün; child satır → varyant`, `Metafield ${i} clé — parent → produit; enfant → variante`, `Metafield ${i} clave — parent → producto; child → variante`, `Metafield ${i} chiave — parent → prodotto; child → variante`, `Metafield ${i} Schlüssel — Parent-Zeile → Produkt; Child-Zeile → Variante`),
         width: 22,
         group: "metafields",
         outline: 1,
@@ -158,7 +176,7 @@ function buildColumns() {
       {
         key: `metafield_${i}_value`,
         label: `metafield_${i}_value`,
-        note: `Metafield ${i} value — same row as SKU (parent or child)`,
+        note: x(`Metafield ${i} value — same row as SKU (parent or child)`, `Metafield ${i} değer — SKU ile aynı satır (parent veya child)`, `Metafield ${i} valeur — même ligne que SKU`, `Metafield ${i} valor — misma fila que SKU`, `Metafield ${i} valore — stessa riga dello SKU`, `Metafield ${i} Wert — gleiche Zeile wie SKU (Parent oder Child)`),
         width: 34,
         group: "metafields",
         outline: 1,
@@ -168,16 +186,16 @@ function buildColumns() {
 
   for (const lang of LANGS) {
     cols.push(
-      { key: `title_${lang}`, label: `title_${lang}`, note: `Titel (${LANG_LABELS[lang]})`, width: 36, group: `lang_${lang}`, outline: 1 },
-      { key: `description_${lang}`, label: `description_${lang}`, note: `Beschreibung HTML (${LANG_LABELS[lang]}) — Parent/Child`, width: 50, group: `lang_${lang}`, outline: 1 },
-      { key: `bullet1_${lang}`, label: `bullet1_${lang}`, note: `Stichpunkt 1`, width: 36, group: `lang_${lang}`, outline: 1 },
-      { key: `bullet2_${lang}`, label: `bullet2_${lang}`, note: `Stichpunkt 2`, width: 36, group: `lang_${lang}`, outline: 1 },
-      { key: `bullet3_${lang}`, label: `bullet3_${lang}`, note: `Stichpunkt 3`, width: 36, group: `lang_${lang}`, outline: 1 },
-      { key: `bullet4_${lang}`, label: `bullet4_${lang}`, note: `Stichpunkt 4`, width: 36, group: `lang_${lang}`, outline: 1 },
-      { key: `bullet5_${lang}`, label: `bullet5_${lang}`, note: `Stichpunkt 5`, width: 36, group: `lang_${lang}`, outline: 1 },
-      { key: `seo_title_${lang}`, label: `seo_title_${lang}`, note: `SEO Titel (${LANG_LABELS[lang]})`, width: 36, group: `lang_${lang}`, outline: 1 },
-      { key: `seo_description_${lang}`, label: `seo_description_${lang}`, note: `SEO Beschreibung (${LANG_LABELS[lang]})`, width: 50, group: `lang_${lang}`, outline: 1 },
-      { key: `seo_keywords_${lang}`, label: `seo_keywords_${lang}`, note: `SEO Keywords (${LANG_LABELS[lang]})`, width: 40, group: `lang_${lang}`, outline: 1 },
+      { key: `title_${lang}`, label: `title_${lang}`, note: x(`Title (${LANG_LABELS[lang]})`, `Başlık (${LANG_LABELS[lang]})`, `Titre (${LANG_LABELS[lang]})`, `Título (${LANG_LABELS[lang]})`, `Titolo (${LANG_LABELS[lang]})`, `Titel (${LANG_LABELS[lang]})`), width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `description_${lang}`, label: `description_${lang}`, note: x(`Description HTML (${LANG_LABELS[lang]}) — parent/child`, `Açıklama HTML (${LANG_LABELS[lang]}) — parent/child`, `Description HTML (${LANG_LABELS[lang]}) — parent/enfant`, `Descripción HTML (${LANG_LABELS[lang]}) — parent/child`, `Descrizione HTML (${LANG_LABELS[lang]}) — parent/child`, `Beschreibung HTML (${LANG_LABELS[lang]}) — Parent/Child`), width: 50, group: `lang_${lang}`, outline: 1 },
+      { key: `bullet1_${lang}`, label: `bullet1_${lang}`, note: x("Bullet point 1", "Madde 1", "Point 1", "Viñeta 1", "Punto 1", "Stichpunkt 1"), width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `bullet2_${lang}`, label: `bullet2_${lang}`, note: x("Bullet point 2", "Madde 2", "Point 2", "Viñeta 2", "Punto 2", "Stichpunkt 2"), width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `bullet3_${lang}`, label: `bullet3_${lang}`, note: x("Bullet point 3", "Madde 3", "Point 3", "Viñeta 3", "Punto 3", "Stichpunkt 3"), width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `bullet4_${lang}`, label: `bullet4_${lang}`, note: x("Bullet point 4", "Madde 4", "Point 4", "Viñeta 4", "Punto 4", "Stichpunkt 4"), width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `bullet5_${lang}`, label: `bullet5_${lang}`, note: x("Bullet point 5", "Madde 5", "Point 5", "Viñeta 5", "Punto 5", "Stichpunkt 5"), width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `seo_title_${lang}`, label: `seo_title_${lang}`, note: x(`SEO title (${LANG_LABELS[lang]})`, `SEO başlık (${LANG_LABELS[lang]})`, `Titre SEO (${LANG_LABELS[lang]})`, `Título SEO (${LANG_LABELS[lang]})`, `Titolo SEO (${LANG_LABELS[lang]})`, `SEO Titel (${LANG_LABELS[lang]})`), width: 36, group: `lang_${lang}`, outline: 1 },
+      { key: `seo_description_${lang}`, label: `seo_description_${lang}`, note: x(`SEO description (${LANG_LABELS[lang]})`, `SEO açıklama (${LANG_LABELS[lang]})`, `Description SEO (${LANG_LABELS[lang]})`, `Descripción SEO (${LANG_LABELS[lang]})`, `Descrizione SEO (${LANG_LABELS[lang]})`, `SEO Beschreibung (${LANG_LABELS[lang]})`), width: 50, group: `lang_${lang}`, outline: 1 },
+      { key: `seo_keywords_${lang}`, label: `seo_keywords_${lang}`, note: x(`SEO keywords (${LANG_LABELS[lang]})`, `SEO anahtar kelimeler (${LANG_LABELS[lang]})`, `Mots-clés SEO (${LANG_LABELS[lang]})`, `Palabras clave SEO (${LANG_LABELS[lang]})`, `Parole chiave SEO (${LANG_LABELS[lang]})`, `SEO Keywords (${LANG_LABELS[lang]})`), width: 40, group: `lang_${lang}`, outline: 1 },
     );
   }
 
@@ -210,10 +228,10 @@ function border() {
   return { top: thin, left: thin, bottom: thin, right: thin };
 }
 
-const INFO_SHEET_TITLES = { de: "Guide", en: "Guide", tr: "Guide", fr: "Guide", it: "Guide", es: "Guide" };
+const INFO_SHEET_TITLES = { de: "Anleitung", en: "Guide", tr: "Kılavuz", fr: "Guide", it: "Guida", es: "Guía" };
 
 function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipNames }) {
-  const loc = "en";
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
   const L = {
     de: {
       title: "ANDERTAL — Produkte per Excel importieren",
@@ -233,6 +251,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       comments: "Leere Datenzeilen werden übersprungen. Zeilen mit SKU beginnend mit # sind Kommentare.",
       skuUpdate:
         "Bestehende Produkte: Stimmt die Parent-SKU mit einer SKU im System überein, wird das Produkt aktualisiert — es wird nur überschrieben, was in der Excel-Zelle gefüllt ist; leere Zellen lassen die bisherigen Werte unverändert.",
+      brandsCount: (n) => `(${n} Marken im Dropdown verfügbar)`,
     },
     en: {
       title: "ANDERTAL — Import products via Excel",
@@ -252,6 +271,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       comments: "Empty rows are skipped. Rows with SKU starting with # are comments.",
       skuUpdate:
         "Existing products: If the parent row SKU matches a product SKU in the system, that product is updated — only cells you fill in Excel overwrite data; empty cells keep the previous values.",
+      brandsCount: (n) => `(${n} brands available in the dropdown)`,
     },
     tr: {
       title: "ANDERTAL — Excel ile ürün içe aktarma",
@@ -269,9 +289,69 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       noCollection: "Koleksiyonlar bu Excel ile atanmaz — gerekirse arayüzden ekleyin.",
       prices: "Fiyatlar yalnızca EUR: price, price_uvp, price_sale. Ülkeye göre fiyat sütunu yok. Virgül ondalık (örn. 29,99).",
       comments: "Boş satırlar atlanır. SKU # ile başlayan satırlar yorum sayılır.",
+      skuUpdate:
+        "Mevcut ürünler: Parent SKU sistemdeki bir SKU ile eşleşirse ürün güncellenir — yalnızca doldurduğunuz hücreler üzerine yazılır; boş hücreler önceki değeri korur.",
+      brandsCount: (n) => `(${n} marka açılır listede mevcut)`,
+    },
+    fr: {
+      title: "ANDERTAL — Importer des produits via Excel",
+      intro: 'Ce classeur comporte deux feuilles : « Products » (vos données) et « Guide » (aide colonnes). Les handles URL sont générés automatiquement à partir du titre — pas de colonnes handle_*.',
+      categoriesTitle: "Catégories sélectionnées pour ce modèle (category_slug exactement) :",
+      noCats: "(Aucun filtre — les listes déroulantes affichent toutes les catégories actives.)",
+      slugsHeader: "slug\tchemin",
+      brandsTitle: 'Marques (liste « brand ») — seuls ces noms exacts sont acceptés :',
+      shipTitle: 'Groupes d\'expédition (« shipping_group ») — noms comme dans Paramètres > Expédition :',
+      colsTitle: 'Colonnes clés (feuille « Products », à partir de la ligne 4)',
+      rowStructure: "Lignes 1–3 : en-tête de groupe, clé de colonne, courte aide — ne pas supprimer.",
+      parentChild: 'Lignes parent : textes, images, prix, catégorie, marque, groupe d\'expédition, optionN_name partagés. Lignes enfant : product_type = child, parent_sku, optionN_value, SKU, EAN, stock par variante. title, description et bullet1..bullet5 sont partagés.',
+      options: "Variantes : l'exemple utilise deux options ; option3…option6 possibles ; ajoutez option7_name / option7_value dans Excel si besoin.",
+      metafields: `Metachamps : metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Ligne parent → produit ; ligne enfant → variante. Pas de colonnes variant_metafield_* séparées.`,
+      noCollection: "Les collections ne sont pas définies via cet import Excel — assignez-les dans l'interface si nécessaire.",
+      prices: "Prix en EUR uniquement : price, price_uvp, price_sale. Virgule décimale (ex. 29,99).",
+      comments: "Les lignes vides sont ignorées. Les lignes dont le SKU commence par # sont des commentaires.",
+      skuUpdate: "Produits existants : si la SKU parent correspond, seules les cellules remplies écrasent les données ; les cellules vides conservent les valeurs précédentes.",
+      brandsCount: (n) => `(${n} marques disponibles dans la liste)`,
+    },
+    es: {
+      title: "ANDERTAL — Importar productos vía Excel",
+      intro: 'Este libro tiene dos hojas: "Products" (sus datos) y "Guide" (ayuda de columnas). Los handles URL se generan automáticamente del título — sin columnas handle_*.',
+      categoriesTitle: "Categorías seleccionadas para esta plantilla (category_slug exacto):",
+      noCats: "(Sin filtro — los desplegables listan todas las categorías activas.)",
+      slugsHeader: "slug\truta",
+      brandsTitle: 'Marcas (desplegable "brand") — solo estos nombres exactos:',
+      shipTitle: 'Grupos de envío ("shipping_group") — nombres como en Ajustes > Envío:',
+      colsTitle: 'Columnas clave (hoja "Products", desde fila 4)',
+      rowStructure: "Filas 1–3: cabecera de grupo, clave de columna, nota breve — no eliminar.",
+      parentChild: 'Filas parent: textos, imágenes, precios, categoría, marca, grupo de envío y optionN_name compartidos. Filas child: product_type = child, parent_sku, optionN_value, SKU, EAN, stock por variante.',
+      options: "Variantes: el ejemplo usa dos opciones; puede usar option3…option6; añada option7_name / option7_value en Excel si hace falta.",
+      metafields: `Metacampos: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Fila parent → producto; fila child → variante.`,
+      noCollection: "Las colecciones no se asignan con este Excel — asígnelas en la interfaz si es necesario.",
+      prices: "Precios solo en EUR: price, price_uvp, price_sale. Use coma decimal (ej. 29,99).",
+      comments: "Se omiten filas vacías. Las filas con SKU que empieza por # son comentarios.",
+      skuUpdate: "Productos existentes: si la SKU parent coincide, solo las celdas rellenas sobrescriben datos; las vacías conservan valores anteriores.",
+      brandsCount: (n) => `(${n} marcas disponibles en el desplegable)`,
+    },
+    it: {
+      title: "ANDERTAL — Importare prodotti via Excel",
+      intro: 'Questa cartella ha due fogli: "Products" (i tuoi dati) e "Guide" (aiuto colonne). Gli handle URL sono generati automaticamente dal titolo — nessuna colonna handle_*.',
+      categoriesTitle: "Categorie selezionate per questo modello (category_slug esatto):",
+      noCats: "(Nessun filtro — i menu a tendina elencano tutte le categorie attive.)",
+      slugsHeader: "slug\tpercorso",
+      brandsTitle: 'Marchi (menu "brand") — solo questi nomi esatti:',
+      shipTitle: 'Gruppi spedizione ("shipping_group") — nomi come in Impostazioni > Spedizione:',
+      colsTitle: 'Colonne chiave (foglio "Products", dalla riga 4)',
+      rowStructure: "Righe 1–3: intestazione gruppo, chiave colonna, nota breve — non eliminare.",
+      parentChild: 'Righe parent: testi, immagini, prezzi, categoria, marca, gruppo spedizione e optionN_name condivisi. Righe child: product_type = child, parent_sku, optionN_value, SKU, EAN, stock per variante.',
+      options: "Varianti: l'esempio usa due opzioni; è possibile usare option3…option6; aggiungere option7_name / option7_value in Excel se serve.",
+      metafields: `Metafield: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Riga parent → prodotto; riga child → variante.`,
+      noCollection: "Le collezioni non si impostano con questo Excel — assegnarle nell'interfaccia se necessario.",
+      prices: "Prezzi solo in EUR: price, price_uvp, price_sale. Usare la virgola decimale (es. 29,99).",
+      comments: "Le righe vuote vengono saltate. Le righe con SKU che inizia per # sono commenti.",
+      skuUpdate: "Prodotti esistenti: se la SKU parent corrisponde, solo le celle compilate sovrascrivono i dati; le vuote mantengono i valori precedenti.",
+      brandsCount: (n) => `(${n} marchi disponibili nel menu)`,
     },
   };
-  const pack = { de: L.de, en: L.en, tr: L.tr, fr: L.en, it: L.en, es: L.en }[loc] || L.de;
+  const pack = L[loc] || L.en;
 
   const lines = [];
   lines.push(["", pack.title]);
@@ -289,7 +369,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
   }
   lines.push(["", ""]);
   lines.push(["", pack.brandsTitle]);
-  lines.push(["", brandNames.length ? `(${brandNames.length} Marken im Dropdown verfügbar)` : "(—)"]);
+  lines.push(["", brandNames.length ? pack.brandsCount(brandNames.length) : "(—)"]);
   lines.push(["", ""]);
   lines.push(["", pack.shipTitle]);
   if (shipNames.length === 0) {
@@ -354,6 +434,8 @@ async function buildWorkbook({
   brands,
   shippingGroups,
 }) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const x = (en, tr, fr, es, it, de) => lt(loc, en, tr, fr, es, it, de);
   const wb = new ExcelJS.Workbook();
   wb.creator = "Andertal Sellercentral";
   wb.created = new Date();
@@ -367,7 +449,7 @@ async function buildWorkbook({
     views: [{ state: "frozen", ySplit: 3, xSplit: 0 }],
   });
 
-  const cols = buildColumns();
+  const cols = buildColumns(loc);
   cols.forEach((col, i) => {
     const exCol = ws.getColumn(i + 1);
     exCol.width = col.width;
@@ -388,15 +470,16 @@ async function buildWorkbook({
   // Column grouping/outline intentionally disabled.
 
   const groupMeta = {
-    core: { label: "Core", bg: COLORS.coreBg, fg: COLORS.core },
-    variations: { label: "Variations", bg: COLORS.coreBg, fg: COLORS.core },
+    core: { label: x("Core", "Temel", "Noyau", "Núcleo", "Nucleo", "Kern"), bg: COLORS.coreBg, fg: COLORS.core },
+    variations: { label: x("Variations", "Varyasyonlar", "Variantes", "Variaciones", "Varianti", "Varianten"), bg: COLORS.coreBg, fg: COLORS.core },
     seo: { label: "SEO", bg: COLORS.seoBg, fg: COLORS.seo },
-    metafields: { label: "Metafields (optional +)", bg: COLORS.metaBg, fg: COLORS.meta },
-    price_eur: { label: "💰 Preise (EUR)", bg: COLORS.price_eurBg, fg: COLORS.price_eur },
-    files: { label: "📁 Dateien (optional)", bg: COLORS.filesBg, fg: COLORS.files },
+    metafields: { label: x("Metafields (optional +)", "Metafield (isteğe bağlı +)", "Metachamps (optionnel +)", "Metacampos (opcional +)", "Metafield (opzionale +)", "Metafelder (optional +)"), bg: COLORS.metaBg, fg: COLORS.meta },
+    price_eur: { label: x("💰 Prices (EUR)", "💰 Fiyatlar (EUR)", "💰 Prix (EUR)", "💰 Precios (EUR)", "💰 Prezzi (EUR)", "💰 Preise (EUR)"), bg: COLORS.price_eurBg, fg: COLORS.price_eur },
+    files: { label: x("📁 Files (optional)", "📁 Dosyalar (isteğe bağlı)", "📁 Fichiers (optionnel)", "📁 Archivos (opcional)", "📁 File (opzionale)", "📁 Dateien (optional)"), bg: COLORS.filesBg, fg: COLORS.files },
   };
+  const uiLangLabels = langLabelsFor(loc);
   LANGS.forEach((l) => {
-    groupMeta[`lang_${l}`] = { label: `🌐 ${LANG_LABELS[l]}`, bg: COLORS.langBg, fg: COLORS.lang };
+    groupMeta[`lang_${l}`] = { label: `🌐 ${uiLangLabels[l]}`, bg: COLORS.langBg, fg: COLORS.lang };
   });
 
   const row1 = ws.getRow(1);
@@ -477,6 +560,12 @@ async function buildWorkbook({
   const exCat = categorySlugs[0] || "category-slug";
   const exShip = shipNames[0] || "";
 
+  const titleKey = loc === "de" ? "title_de" : `title_${loc === "en" ? "en" : loc}`;
+  const descKey = loc === "de" ? "description_de" : `description_${loc === "en" ? "en" : loc}`;
+  const bullet1Key = loc === "de" ? "bullet1_de" : `bullet1_${loc === "en" ? "en" : loc}`;
+  const bullet2Key = loc === "de" ? "bullet2_de" : `bullet2_${loc === "en" ? "en" : loc}`;
+  const bullet3Key = loc === "de" ? "bullet3_de" : `bullet3_${loc === "en" ? "en" : loc}`;
+
   setRow(4, {
     product_type: "parent",
     sku: "SHIRT-001",
@@ -492,13 +581,13 @@ async function buildWorkbook({
     per_unit: 1000,
     weight_grams: 200,
     image_url_1: "https://example.com/img/shirt-001.jpg",
-    option1_name: "Farbe",
-    option2_name: "Größe",
-    title_de: "T-Shirt Basic",
-    description_de: "<p>Hochwertiges Basic T-Shirt.</p>",
-    bullet1_de: "100% Baumwolle",
-    bullet2_de: "Maschinenwaschbar",
-    bullet3_de: "Regular Fit",
+    option1_name: x("Color", "Renk", "Couleur", "Color", "Colore", "Farbe"),
+    option2_name: x("Size", "Beden", "Taille", "Talla", "Taglia", "Größe"),
+    [titleKey]: x("Basic T-Shirt", "Basic Tişört", "T-shirt basique", "Camiseta básica", "T-shirt basic", "T-Shirt Basic"),
+    [descKey]: x("<p>High-quality basic t-shirt.</p>", "<p>Kaliteli basic tişört.</p>", "<p>T-shirt basique de qualité.</p>", "<p>Camiseta básica de calidad.</p>", "<p>T-shirt basic di qualità.</p>", "<p>Hochwertiges Basic T-Shirt.</p>"),
+    [bullet1Key]: x("100% cotton", "%100 pamuk", "100 % coton", "100 % algodón", "100% cotone", "100% Baumwolle"),
+    [bullet2Key]: x("Machine washable", "Makinede yıkanabilir", "Lavable en machine", "Lavable a máquina", "Lavabile in lavatrice", "Maschinenwaschbar"),
+    [bullet3Key]: x("Regular fit", "Regular fit", "Coupe regular", "Corte regular", "Vestibilità regular", "Regular Fit"),
     price: "29,99",
     price_uvp: "39,99",
   }, "FFFAFAFA");
@@ -511,7 +600,7 @@ async function buildWorkbook({
     inventory: 50,
     image_url_1: "https://example.com/img/shirt-001-rot.jpg",
     swatch_image_url: "https://example.com/img/swatch-rot.jpg",
-    option1_value: "Rot",
+    option1_value: x("Red", "Kırmızı", "Rouge", "Rojo", "Rosso", "Rot"),
     option2_value: "S",
   }, "FFEAF6FF");
 
@@ -523,12 +612,12 @@ async function buildWorkbook({
     inventory: 80,
     image_url_1: "https://example.com/img/shirt-001-rot.jpg",
     swatch_image_url: "https://example.com/img/swatch-rot.jpg",
-    option1_value: "Rot",
+    option1_value: x("Red", "Kırmızı", "Rouge", "Rojo", "Rosso", "Rot"),
     option2_value: "M",
   }, "FFEAF6FF");
 
   const categoryRowsForInfo = categoriesForList.slice().sort((a, b) => a.path.localeCompare(b.path));
-  const { lines: instrLines, sheetTitle } = buildLocalizedInstructions(locale, {
+  const { lines: instrLines, sheetTitle } = buildLocalizedInstructions(loc, {
     categoryRows: categoryRowsForInfo,
     brandNames,
     shipNames,
@@ -593,6 +682,7 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const rawLocale = typeof body.locale === "string" ? body.locale : "de";
     const locale = rawLocale.split("-")[0].toLowerCase();
+    const msg = getImportApiMessages(locale);
     const sellerToken = typeof body.sellerToken === "string" ? body.sellerToken : "";
     const selectedCategorySlugs = Array.isArray(body.selectedCategorySlugs)
       ? body.selectedCategorySlugs.map((s) => String(s).trim()).filter(Boolean)
@@ -600,7 +690,7 @@ export async function POST(request) {
 
     if (selectedCategorySlugs.length === 0) {
       return Response.json(
-        { error: "Bitte mindestens eine Kategorie wählen, bevor Sie die Vorlage laden." },
+        { error: msg.templateSelectCategory },
         { status: 400 }
       );
     }
@@ -613,8 +703,7 @@ export async function POST(request) {
     if (categoriesForList.length === 0) {
       return Response.json(
         {
-          error:
-            "Keine der gewählten Kategorien wurde im System gefunden. Bitte erneut auswählen oder Slugs prüfen.",
+          error: msg.templateCategoriesNotFound,
         },
         { status: 400 }
       );
@@ -631,21 +720,22 @@ export async function POST(request) {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": 'attachment; filename="andertal-produkte-template.xlsx"',
+        "Content-Disposition": `attachment; filename="${productExcelTemplateFilename(locale)}"`,
         "Cache-Control": "no-cache",
       },
     });
   } catch (e) {
     console.error("Template POST:", e);
-    return Response.json({ error: e.message || "Template failed" }, { status: 500 });
+    return Response.json({ error: e.message || msg.templateFailed }, { status: 500 });
   }
 }
 
-export async function GET() {
+export async function GET(request) {
+  const locale = resolveRequestLocale(request);
+  const msg = getImportApiMessages(locale);
   return Response.json(
     {
-      error:
-        "Bitte die Vorlage über die Import/Export-Seite herunterladen (POST mit Kategorieauswahl und Anmeldung).",
+      error: msg.templateGetHint,
     },
     { status: 405 }
   );

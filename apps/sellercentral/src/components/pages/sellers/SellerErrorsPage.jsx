@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Card, Text, BlockStack, InlineStack, Button, Box, TextField, Select, Spinner, Banner,
 } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-import { confirmDelete } from "@/lib/confirm-delete";
+import { getSellerErrorsCopy } from "@/lib/marketing-i18n";
 
 function getStatusOptions(locale) {
   return [
@@ -42,8 +42,9 @@ function StatusBadge({ status, locale = "de" }) {
   );
 }
 
-function ErrorDetailModal({ error, onClose, onUpdate, locale = "de" }) {
+function ErrorDetailModal({ error, onClose, onUpdate, locale = "en" }) {
   const ui = getUI(locale);
+  const sec = getSellerErrorsCopy(locale);
   const client = getMedusaAdminClient();
   const [resolution, setResolution] = useState(error.resolution || "");
   const [status, setStatus] = useState(error.status || "open");
@@ -59,7 +60,7 @@ function ErrorDetailModal({ error, onClose, onUpdate, locale = "de" }) {
       onUpdate();
       onClose();
     } catch (e) {
-      alert((locale === "en" ? "Error: " : locale === "tr" ? "Hata: " : "Fehler: ") + (e?.message || (locale === "en" ? "Unknown" : locale === "tr" ? "Bilinmiyor" : "Unbekannt")));
+      alert(sec.errorPrefix + (e?.message || sec.unknown));
     } finally {
       setSaving(false);
     }
@@ -75,9 +76,9 @@ function ErrorDetailModal({ error, onClose, onUpdate, locale = "de" }) {
         <div style={{ padding: "16px 22px 12px", background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", borderRadius: "12px 12px 0 0" }}>
           <InlineStack align="space-between" blockAlign="center">
             <BlockStack gap="050">
-              <Text variant="headingMd" as="h2" tone="text-inverse">Sorun Detayı</Text>
+              <Text variant="headingMd" as="h2" tone="text-inverse">{sec.issueDetail}</Text>
               <Text as="p" variant="bodySm" tone="text-inverse">
-                {error.store_name || error.seller_email || error.seller_id || (locale === "en" ? "Unknown seller" : locale === "tr" ? "Bilinmeyen satıcı" : "Unbekannter Verkäufer")} · {fmtDate(error.created_at, locale)}
+                {error.store_name || error.seller_email || error.seller_id || sec.unknownSeller} · {fmtDate(error.created_at, locale)}
               </Text>
             </BlockStack>
             <StatusBadge status={error.status} locale={locale} />
@@ -134,7 +135,7 @@ function ErrorDetailModal({ error, onClose, onUpdate, locale = "de" }) {
               value={resolution}
               onChange={setResolution}
               multiline={4}
-              placeholder="Sorunu nasıl çözdünüz? Notlarınızı buraya yazın…"
+              placeholder={sec.resolutionPlaceholder}
               autoComplete="off"
             />
           </BlockStack>
@@ -152,6 +153,7 @@ function ErrorDetailModal({ error, onClose, onUpdate, locale = "de" }) {
 export default function SellerErrorsPage() {
   const locale = useLocale();
   const ui = getUI(locale);
+  const sec = useMemo(() => getSellerErrorsCopy(locale), [locale]);
   const client = getMedusaAdminClient();
   const [errors, setErrors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -250,18 +252,18 @@ export default function SellerErrorsPage() {
           <InlineStack align="space-between" blockAlign="center">
             <BlockStack gap="100">
               <InlineStack gap="200" blockAlign="center">
-                <Text variant="headingMd" as="h1">Sorun Günlüğü</Text>
+                <Text variant="headingMd" as="h1">{sec.issueLog}</Text>
                 {unreadCount > 0 && (
                   <span style={{ background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 12 }}>
-                    {unreadCount} okunmamış
+                    {sec.unread(unreadCount)}
                   </span>
                 )}
               </InlineStack>
-              <Text as="p" tone="subdued" variant="bodySm">Satıcıların yaşadığı sorunların kaydı</Text>
+              <Text as="p" tone="subdued" variant="bodySm">{sec.issueLogSubtitle}</Text>
             </BlockStack>
             <InlineStack gap="200">
-              {unreadCount > 0 && <Button size="slim" onClick={handleMarkAllRead}>Tümünü Okundu İşaretle</Button>}
-              <Button size="slim" variant="primary" onClick={() => setAddOpen(true)}>+ Manuel Ekle</Button>
+              {unreadCount > 0 && <Button size="slim" onClick={handleMarkAllRead}>{sec.markAllRead}</Button>}
+              <Button size="slim" variant="primary" onClick={() => setAddOpen(true)}>{sec.addManual}</Button>
             </InlineStack>
           </InlineStack>
         </Card>
@@ -274,7 +276,7 @@ export default function SellerErrorsPage() {
             </Box>
             <Box minWidth="200px">
               <TextField
-                label="Satıcı ID ile filtrele"
+                label={sec.filterBySeller}
                 value={sellerFilter}
                 onChange={setSellerFilter}
                 clearButton
@@ -283,7 +285,7 @@ export default function SellerErrorsPage() {
                 autoComplete="off"
               />
             </Box>
-            <Text as="span" tone="subdued" variant="bodySm">{sorted.length} kayıt</Text>
+            <Text as="span" tone="subdued" variant="bodySm">{sec.records(sorted.length)}</Text>
           </InlineStack>
         </Card>
 

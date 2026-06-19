@@ -35,11 +35,13 @@ import {
   EditIcon,
 } from "@shopify/polaris-icons";
 import dynamic from "next/dynamic";
-import en from "@shopify/polaris/locales/en.json";
+import { polarisI18nFor } from "@/lib/polaris-locale";
 import "@shopify/polaris/build/esm/styles.css";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { LogoutButton } from "@andertal/ui";
 import { fieldNameDisplayLabel } from "@/lib/product-change-request-format";
+import { getNotificationsCopy } from "@/lib/notifications-i18n";
+import { statusLabel as localizeStatus } from "@/lib/status-labels";
 
 const discardBtnStyles = `
   .andertal-discard-topbar-btn,
@@ -244,7 +246,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       subNavigationItems: [
         { url: "/products/inventory", label: tx("inventory", "Inventory") },
         { url: "/products/collections", label: tx("collections", "Collections"), superuserOnly: true },
-        { url: "/products/product-groups", label: "Produktgruppen" },
+        { url: "/products/product-groups", label: tx("productGroups", "Product groups") },
       ],
     },
     {
@@ -267,7 +269,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       icon: StoreIcon,
       subNavigationItems: [
         { url: "/sellers", label: tx("view", "View"), superuserOnly: true },
-        { url: "/sellers/errors", label: "Sorun Günlüğü", superuserOnly: true },
+        { url: "/sellers/errors", label: tx("issueLog", "Issue log"), superuserOnly: true },
       ],
     });
   }
@@ -288,7 +290,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       icon: DiscountIcon,
       subNavigationItems: [
         { url: "/discounts/coupons", label: tx("coupons", "Coupons") },
-        { url: "/discounts/campaigns", label: "Aktionen" },
+        { url: "/discounts/campaigns", label: tx("promotions", "Promotions") },
       ],
     },
     {
@@ -314,7 +316,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       icon: ChartVerticalIcon,
       subNavigationItems: [
         { url: "/analytics/reports", label: tx("reports", "Reports") },
-        { url: "/analytics/transactions", label: "Transactions" },
+        { url: "/analytics/transactions", label: tx("transactions", "Transactions") },
         { url: "/analytics/live-view", label: tx("liveView", "Live View"), superuserOnly: true },
         { url: "/analytics/ranking", label: tx("ranking", "Ranking") },
       ],
@@ -429,6 +431,7 @@ export default function PolarisLayout({ children }) {
     }
   };
   const locale = useLocale();
+  const notifCopy = useMemo(() => getNotificationsCopy(locale), [locale]);
   const unsaved = useUnsavedChanges();
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -828,7 +831,7 @@ export default function PolarisLayout({ children }) {
           {langSelector}
 
           {/* Mail / Inbox */}
-          <Link href="/inbox" style={{ ...topBarIconStyle, textDecoration: "none" }} title="Nachrichten">
+          <Link href="/inbox" style={{ ...topBarIconStyle, textDecoration: "none" }} title={notifCopy.messagesTitle}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" width="20" height="20" aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
             </svg>
@@ -855,7 +858,7 @@ export default function PolarisLayout({ children }) {
                 }
               }}
               style={{ ...topBarIconStyle }}
-              title="Benachrichtigungen"
+              title={notifCopy.title}
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" width="20" height="20" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
@@ -868,19 +871,19 @@ export default function PolarisLayout({ children }) {
             </button>
             {notifOpen && (
               <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, background: "#fff", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", border: "1px solid #e5e7eb", zIndex: 9999 }}>
-                <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 13, fontWeight: 700, color: "#111827" }}>Benachrichtigungen</div>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 13, fontWeight: 700, color: "#111827" }}>{notifCopy.title}</div>
                 <div style={{ maxHeight: 340, overflowY: "auto" }}>
                   {(!notifData?.recent_orders?.length &&
                     !notifData?.recent_returns?.length &&
                     !notifData?.recent_verifications?.length &&
                     !notifData?.recent_product_change_requests?.length &&
                     !notifData?.recent_campaigns_submitted?.length) ? (
-                    <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Keine neuen Benachrichtigungen</div>
+                    <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>{notifCopy.empty}</div>
                   ) : (
                     <>
                       {(notifData?.recent_campaigns_submitted || []).length > 0 && (
                         <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                          Werbekampagnen
+                          {notifCopy.campaigns}
                         </div>
                       )}
                       {(notifData?.recent_campaigns_submitted || []).map((c) => (
@@ -892,28 +895,28 @@ export default function PolarisLayout({ children }) {
                         >
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📣</span>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{c.title || "Neue Werbekampagne"}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{c.title || notifCopy.newCampaign}</div>
                             <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.35, marginTop: 2 }}>{c.body || ""}</div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_verifications || []).length > 0 && (
                         <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                          Verifizierungen
+                          {notifCopy.verifications}
                         </div>
                       )}
                       {(notifData?.recent_verifications || []).map((v) => (
                         <Link key={v.id} href={v.seller_id ? `/sellers/${v.seller_id}` : "/sellers"} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📋</span>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{v.title || "Evrak Gönderildi"}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280" }}>{v.body || "Satıcı doğrulama evraklarını gönderdi."}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{v.title || notifCopy.docSubmitted}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>{v.body || notifCopy.docSubmittedBody}</div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_product_change_requests || []).length > 0 && (
                         <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                          Produktänderungen
+                          {notifCopy.productChanges}
                         </div>
                       )}
                       {(notifData?.recent_product_change_requests || []).map((cr) => (
@@ -942,39 +945,39 @@ export default function PolarisLayout({ children }) {
                           </span>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--p-color-text)" }}>
-                              Produktänderung ausstehend
+                              {notifCopy.productChangePending}
                             </div>
                             <div style={{ fontSize: 12, color: "var(--p-color-text-secondary)", lineHeight: 1.35, marginTop: 2 }}>
-                              {cr.product_title || "Produkt"} · {fieldNameDisplayLabel(cr.field_name, locale)}
+                              {cr.product_title || notifCopy.productFallback} · {fieldNameDisplayLabel(cr.field_name, locale)}
                             </div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_orders || []).length > 0 && (
                         <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                          Bestellungen
+                          {notifCopy.orders}
                         </div>
                       )}
                       {(notifData?.recent_orders || []).map((o) => (
                         <Link key={o.id} href={`/orders/${o.id}`} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📦</span>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Neue Bestellung #{o.order_number || "—"}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{notifCopy.newOrder(o.order_number || "—")}</div>
                             <div style={{ fontSize: 11, color: "#6b7280" }}>{o.first_name} {o.last_name} · {o.total_cents ? (o.total_cents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : ""}</div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_returns || []).length > 0 && (
                         <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                          Rückgaben
+                          {notifCopy.returns}
                         </div>
                       )}
                       {(notifData?.recent_returns || []).map((r) => (
                         <Link key={r.id} href="/orders/returns" onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>↩️</span>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Rückgabeanfrage R-{r.return_number || "—"}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280" }}>Bestellung #{r.order_number || "—"} · {r.status}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{notifCopy.returnRequest(r.return_number || "—")}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>{notifCopy.orderRef(r.order_number || "—")} · {localizeStatus(locale, r.status)}</div>
                           </div>
                         </Link>
                       ))}
@@ -983,7 +986,7 @@ export default function PolarisLayout({ children }) {
                 </div>
                 <div style={{ padding: "10px 16px", borderTop: "1px solid #f3f4f6" }}>
                   <Link href="/notifications" onClick={() => setNotifOpen(false)} style={{ fontSize: 12, color: "#0284c7", textDecoration: "none", fontWeight: 600 }}>
-                    Alle Benachrichtigungen →
+                    {notifCopy.viewAll} →
                   </Link>
                 </div>
               </div>
@@ -1143,23 +1146,26 @@ export default function PolarisLayout({ children }) {
         rejected: "hesabınız reddedildi. lütfen evrakları kontrol edip destek ile iletişime geçin.",
         docsSubmitted: "evraklar gönderildi. hesabınız inceleme altında.",
         pending: "hesabınız onay bekliyor. inceleme sonrası bilgilendirileceksiniz.",
+        accountStatus: (status) => `hesap durumu: ${status}`,
       }
     : locale === "de"
       ? {
           completeVerification: "Gehe zu den Verifizierungsschritten, um mit dem Verkauf zu starten",
           goVerification: "Zur Verifizierung",
-          suspended: "your account is suspended. please contact with support",
-          rejected: "your account was rejected. please review your documents and contact support.",
-          docsSubmitted: "documents submitted. your account is under review.",
-          pending: "your account is pending approval. you will be notified after review.",
+          suspended: "Ihr Konto wurde gesperrt. Bitte kontaktieren Sie den Support.",
+          rejected: "Ihr Konto wurde abgelehnt. Bitte prüfen Sie Ihre Unterlagen und kontaktieren Sie den Support.",
+          docsSubmitted: "Unterlagen eingereicht. Ihr Konto wird geprüft.",
+          pending: "Ihr Konto wartet auf Freigabe. Sie werden nach der Prüfung benachrichtigt.",
+          accountStatus: (status) => `Kontostatus: ${status}`,
         }
       : {
           completeVerification: "Go to verification steps to start selling",
           goVerification: "Go to verification",
-          suspended: "your account is suspended. please contact with support",
-          rejected: "your account was rejected. please review your documents and contact support.",
-          docsSubmitted: "documents submitted. your account is under review.",
-          pending: "your account is pending approval. you will be notified after review.",
+          suspended: "Your account is suspended. Please contact support.",
+          rejected: "Your account was rejected. Please review your documents and contact support.",
+          docsSubmitted: "Documents submitted. Your account is under review.",
+          pending: "Your account is pending approval. You will be notified after review.",
+          accountStatus: (status) => `Account status: ${status}`,
         };
   const approvalBanner = !isSuperuser ? (() => {
     const status = String(approvalStatus || "").toLowerCase();
@@ -1205,12 +1211,12 @@ export default function PolarisLayout({ children }) {
     return {
       background: "#4b5563",
       color: "#fff",
-      text: `account status: ${status}`,
+      text: bannerI18n.accountStatus(status),
     };
   })() : null;
 
   return (
-    <AppProvider i18n={en} linkComponent={linkComponent}>
+    <AppProvider i18n={polarisI18nFor(locale)} linkComponent={linkComponent}>
       <Frame
         navigation={navMarkup}
         topBar={topBarMarkup}

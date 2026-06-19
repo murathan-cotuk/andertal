@@ -14,6 +14,50 @@ const client = getMedusaAdminClient();
 /** Locales stored per automation email step (must match backend FLOW_SAVE_LOCALES). */
 const FLOW_TEMPLATE_LANGS = ["de", "en", "tr", "fr", "it", "es"];
 
+/** Locale-aware starter HTML for flow email template picker. */
+function flowEmailTemplateBodies(locale) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const bodies = {
+    en: {
+      greeting: `<p>Dear {FIRST_NAME},</p>\n<p>&nbsp;</p>\n<p>Best regards<br/>{STORE_NAME}</p>`,
+      order: `<p>Dear {FIRST_NAME},</p>\n<p>Thank you for your order <strong>#{ORDER_NUMBER}</strong>.</p>\n<p>Total: {ORDER_TOTAL}</p>\n<p>&nbsp;</p>\n<p>{STORE_NAME}</p>`,
+      cart: `<p>Dear {FIRST_NAME},</p>\n<p>You still have items in your cart — e.g. <strong>{PRODUCT_NAME}</strong>.</p>\n<p><a href="{CART_URL}">View cart</a></p>\n<p>{STORE_NAME}</p>`,
+      minimal: `<p>{LINE_ITEMS_SUMMARY}</p>`,
+    },
+    de: {
+      greeting: `<p>Hallo {FIRST_NAME},</p>\n<p>&nbsp;</p>\n<p>Viele Grüße<br/>{STORE_NAME}</p>`,
+      order: `<p>Hallo {FIRST_NAME},</p>\n<p>vielen Dank für Ihre Bestellung <strong>#{ORDER_NUMBER}</strong>.</p>\n<p>Gesamt: {ORDER_TOTAL}</p>\n<p>&nbsp;</p>\n<p>{STORE_NAME}</p>`,
+      cart: `<p>Hallo {FIRST_NAME},</p>\n<p>Sie haben noch Artikel im Warenkorb — z.&nbsp;B. <strong>{PRODUCT_NAME}</strong>.</p>\n<p><a href="{CART_URL}">Zum Warenkorb</a></p>\n<p>{STORE_NAME}</p>`,
+      minimal: `<p>{LINE_ITEMS_SUMMARY}</p>`,
+    },
+    tr: {
+      greeting: `<p>Merhaba {FIRST_NAME},</p>\n<p>&nbsp;</p>\n<p>Saygılarımızla<br/>{STORE_NAME}</p>`,
+      order: `<p>Merhaba {FIRST_NAME},</p>\n<p><strong>#{ORDER_NUMBER}</strong> numaralı siparişiniz için teşekkürler.</p>\n<p>Toplam: {ORDER_TOTAL}</p>\n<p>&nbsp;</p>\n<p>{STORE_NAME}</p>`,
+      cart: `<p>Merhaba {FIRST_NAME},</p>\n<p>Sepetinizde hâlâ ürünler var — örneğin <strong>{PRODUCT_NAME}</strong>.</p>\n<p><a href="{CART_URL}">Sepete git</a></p>\n<p>{STORE_NAME}</p>`,
+      minimal: `<p>{LINE_ITEMS_SUMMARY}</p>`,
+    },
+    fr: {
+      greeting: `<p>Bonjour {FIRST_NAME},</p>\n<p>&nbsp;</p>\n<p>Cordialement<br/>{STORE_NAME}</p>`,
+      order: `<p>Bonjour {FIRST_NAME},</p>\n<p>Merci pour votre commande <strong>#{ORDER_NUMBER}</strong>.</p>\n<p>Total : {ORDER_TOTAL}</p>\n<p>&nbsp;</p>\n<p>{STORE_NAME}</p>`,
+      cart: `<p>Bonjour {FIRST_NAME},</p>\n<p>Des articles sont encore dans votre panier — p. ex. <strong>{PRODUCT_NAME}</strong>.</p>\n<p><a href="{CART_URL}">Voir le panier</a></p>\n<p>{STORE_NAME}</p>`,
+      minimal: `<p>{LINE_ITEMS_SUMMARY}</p>`,
+    },
+    es: {
+      greeting: `<p>Hola {FIRST_NAME},</p>\n<p>&nbsp;</p>\n<p>Saludos cordiales<br/>{STORE_NAME}</p>`,
+      order: `<p>Hola {FIRST_NAME},</p>\n<p>Gracias por tu pedido <strong>#{ORDER_NUMBER}</strong>.</p>\n<p>Total: {ORDER_TOTAL}</p>\n<p>&nbsp;</p>\n<p>{STORE_NAME}</p>`,
+      cart: `<p>Hola {FIRST_NAME},</p>\n<p>Aún tienes artículos en el carrito — p. ej. <strong>{PRODUCT_NAME}</strong>.</p>\n<p><a href="{CART_URL}">Ver carrito</a></p>\n<p>{STORE_NAME}</p>`,
+      minimal: `<p>{LINE_ITEMS_SUMMARY}</p>`,
+    },
+    it: {
+      greeting: `<p>Ciao {FIRST_NAME},</p>\n<p>&nbsp;</p>\n<p>Cordiali saluti<br/>{STORE_NAME}</p>`,
+      order: `<p>Ciao {FIRST_NAME},</p>\n<p>Grazie per il tuo ordine <strong>#{ORDER_NUMBER}</strong>.</p>\n<p>Totale: {ORDER_TOTAL}</p>\n<p>&nbsp;</p>\n<p>{STORE_NAME}</p>`,
+      cart: `<p>Ciao {FIRST_NAME},</p>\n<p>Hai ancora articoli nel carrello — ad es. <strong>{PRODUCT_NAME}</strong>.</p>\n<p><a href="{CART_URL}">Vai al carrello</a></p>\n<p>{STORE_NAME}</p>`,
+      minimal: `<p>{LINE_ITEMS_SUMMARY}</p>`,
+    },
+  };
+  return bodies[loc] || bodies.en;
+}
+
 function emptyLocaleBundle() {
   const o = {};
   for (const loc of FLOW_TEMPLATE_LANGS) {
@@ -942,31 +986,15 @@ export default function FlowsPage() {
     return [...base, ...rows];
   }, [testFlowCustomers, t.testCustomerSampleOption]);
 
-  const flowEmailTemplates = useMemo(
-    () => [
-      {
-        id: "greeting",
-        label: t.emailTplGreeting,
-        html: `<p>Hallo {FIRST_NAME},</p>\n<p>&nbsp;</p>\n<p>Viele Grüße<br/>{STORE_NAME}</p>`,
-      },
-      {
-        id: "order",
-        label: t.emailTplOrder,
-        html: `<p>Hallo {FIRST_NAME},</p>\n<p>vielen Dank für Ihre Bestellung <strong>#{ORDER_NUMBER}</strong>.</p>\n<p>Gesamt: {ORDER_TOTAL}</p>\n<p>&nbsp;</p>\n<p>{STORE_NAME}</p>`,
-      },
-      {
-        id: "cart",
-        label: t.emailTplCart,
-        html: `<p>Hallo {FIRST_NAME},</p>\n<p>Sie haben noch Artikel im Warenkorb — z.&nbsp;B. <strong>{PRODUCT_NAME}</strong>.</p>\n<p><a href="{CART_URL}">Zum Warenkorb</a></p>\n<p>{STORE_NAME}</p>`,
-      },
-      {
-        id: "minimal",
-        label: t.emailTplMinimal,
-        html: `<p>{LINE_ITEMS_SUMMARY}</p>`,
-      },
-    ],
-    [t.emailTplGreeting, t.emailTplOrder, t.emailTplCart, t.emailTplMinimal],
-  );
+  const flowEmailTemplates = useMemo(() => {
+    const html = flowEmailTemplateBodies(locale);
+    return [
+      { id: "greeting", label: t.emailTplGreeting, html: html.greeting },
+      { id: "order", label: t.emailTplOrder, html: html.order },
+      { id: "cart", label: t.emailTplCart, html: html.cart },
+      { id: "minimal", label: t.emailTplMinimal, html: html.minimal },
+    ];
+  }, [locale, t.emailTplGreeting, t.emailTplOrder, t.emailTplCart, t.emailTplMinimal]);
 
   const [flows, setFlows]               = useState([]);
 

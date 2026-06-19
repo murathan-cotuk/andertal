@@ -25,74 +25,54 @@ import {
   normalizeButtonType,
   DEFAULT_BUTTON_COLORS,
   effectiveGradientEnabled,
-  TOPBAR_PRESET_LABELS,
-  HEADER_PRESET_LABELS,
-  SECOND_NAV_PRESET_LABELS,
-  SECOND_NAV_LINK_STYLE_OPTIONS,
-  SCROLL_UP_PRESET_LABELS,
 } from "@andertal/shop-theme";
 
-/** Deutsche Beschriftungen für Button-Farbfelder (Keys wie in DEFAULT_BUTTON_COLORS). */
-const TOPBAR_DISPLAY_MODE_OPTIONS = [
-  { label: "Alle nebeneinander", value: "inline" },
-  { label: "Karussell (je ein Eintrag, Auto + manuell)", value: "carousel" },
-];
-
-const MOBILE_HEADER_ON_SCROLL_OPTIONS = [
-  { label: "Kaydırınca buzlu beyaz + blur", value: "frosted_white" },
-  { label: "Tema / Landing-Rolle beibehalten", value: "inherit" },
-];
-
-const HEADER_GRADIENT_ANGLE_OPTIONS = [
-  { label: "Diagonal ↘ (135°)", value: "135" },
-  { label: "Nach unten (180°)", value: "180" },
-  { label: "Nach rechts (90°)", value: "90" },
-  { label: "Nach oben (0°)", value: "0" },
-  { label: "Nach links (270°)", value: "270" },
-  { label: "Diagonal ↗ (45°)", value: "45" },
-];
+/** Button color field labels (keys as in DEFAULT_BUTTON_COLORS). */
 
 const BUTTON_COLOR_LABELS = {
   add_to_cart: {
-    bg: "Hintergrund",
-    border: "Rahmen",
-    hover_bg: "Hover / aktiv Hintergrund",
-    icon_bg: "Icon-Streifen",
+    bg: "Background",
+    border: "Border",
+    hover_bg: "Hover / active background",
+    icon_bg: "Icon stripe",
     text: "Text",
-    icon_stroke: "Icon-Linie",
-    disabled_bg: "Deaktiviert: Hintergrund",
-    disabled_border: "Deaktiviert: Rahmen",
+    icon_stroke: "Icon line",
+    disabled_bg: "Disabled: background",
+    disabled_border: "Disabled: border",
   },
   primary: {
-    bg: "Hintergrund",
-    shine: "Glanz (Verlauf)",
+    bg: "Background",
+    shine: "Shine (gradient)",
     text: "Text",
-    border: "Rahmen",
-    shadow: "Schlagschatten",
-    hover_bg: "Hover Hintergrund",
-    hover_text: "Hover Text",
-    hover_border: "Hover Rahmen",
-    hover_shadow: "Hover Schatten",
+    border: "Border",
+    shadow: "Drop shadow",
+    hover_bg: "Hover background",
+    hover_text: "Hover text",
+    hover_border: "Hover border",
+    hover_shadow: "Hover shadow",
   },
   secondary: {
-    bg: "Hintergrund",
+    bg: "Background",
     text: "Text",
-    border: "Rahmen",
-    hover_bg: "Hover Hintergrund",
-    hover_text: "Hover Text",
+    border: "Border",
+    hover_bg: "Hover background",
+    hover_text: "Hover text",
   },
   ghost: {
     text: "Text",
-    hover_bg: "Hover Hintergrund",
-    hover_text: "Hover Text",
+    hover_bg: "Hover background",
+    hover_text: "Hover text",
   },
   outline: {
-    accent: "Rahmen & Text & Hover-Füllung",
-    hover_text: "Hover Text",
+    accent: "Border & text & hover fill",
+    hover_text: "Hover text",
   },
 };
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
+import { getStylesPageCopy } from "@/lib/styles-page-i18n";
 
 function normalizeHexForColorInput(val) {
   if (!val || typeof val !== "string") return "#ffffff";
@@ -347,9 +327,9 @@ function FontFamilyDropdown({ label, valueName, families, loading, onSelect, pre
       <Box padding="300" minWidth="320px">
         <BlockStack gap="200">
           <TextField
-            label="Suchen"
+            label="Search"
             labelHidden
-            placeholder="Schriftname filtern…"
+            placeholder="Filter font name…"
             value={q}
             onChange={setQ}
             autoComplete="off"
@@ -380,7 +360,7 @@ function FontFamilyDropdown({ label, valueName, families, loading, onSelect, pre
             </button>
             {loading ? (
               <Text as="p" tone="subdued" variant="bodySm">
-                Schriften werden geladen…
+                Loading fonts…
               </Text>
             ) : (
               orderedFiltered.map((f) => {
@@ -442,13 +422,13 @@ function FontFamilyDropdown({ label, valueName, families, loading, onSelect, pre
             )}
             {!loading && filtered.length === 0 ? (
               <Text as="p" tone="subdued" variant="bodySm">
-                Keine Treffer — Begriff kürzen oder ändern.
+                No results — try a shorter or different term.
               </Text>
             ) : null}
             {!loading && filtered.length > 0 ? (
               <Text as="p" variant="bodySm" tone="subdued">
-                {filtered.length} Schriften
-                {q.trim() ? " (gefiltert)" : ""}. Vorschau lädt in Blöcken nach (kurz warten).
+                {filtered.length} fonts
+                {q.trim() ? " (filtered)" : ""}. Preview loads in chunks (please wait a moment).
               </Text>
             ) : null}
           </div>
@@ -492,7 +472,7 @@ function TypographyLevelRow({ heading, levelKey, typo, families, familiesLoading
           onChange={(v) => onLevelChange(levelKey, "font_size", v)}
           autoComplete="off"
         />
-        <ColorField label="Farbe" value={b.color} onChange={(v) => onLevelChange(levelKey, "color", v)} />
+        <ColorField label="Color" value={b.color} onChange={(v) => onLevelChange(levelKey, "color", v)} />
         <TextField
           label="Letter spacing"
           value={b.letter_spacing || ""}
@@ -507,11 +487,11 @@ function TypographyLevelRow({ heading, levelKey, typo, families, familiesLoading
         />
         <div style={{ gridColumn: "1 / -1" }}>
           <TextField
-            label="Eigene font-family (CSS, optional)"
+            label="Custom font-family (CSS, optional)"
             value={b.font_family || ""}
             onChange={(v) => onLevelChange(levelKey, "font_family", v)}
             autoComplete="off"
-            helpText="Vollständiger CSS-Stack; ergänzt oder ersetzt die Auswahl oben (Systemschriften, Fallbacks)."
+            helpText="Full CSS stack; supplements or replaces the selection above (system fonts, fallbacks)."
           />
         </div>
       </div>
@@ -580,21 +560,21 @@ function ButtonVariantCard({ variant, onActivate, onCodeChange, onNameChange, on
               value={variant.name}
               onChange={onNameChange}
               autoComplete="off"
-              placeholder="Variantenname"
+              placeholder="Variant name"
             />
-            {variant.active && <Badge tone="success">Aktiv</Badge>}
+            {variant.active && <Badge tone="success">Active</Badge>}
           </InlineStack>
           <InlineStack gap="200">
             {!variant.active && (
               <Button size="slim" variant="primary" onClick={onActivate}>
-                Aktivieren
+                Activate
               </Button>
             )}
             <Button size="slim" onClick={() => setCodeOpen((v) => !v)}>
-              {codeOpen ? "Code schließen" : "Code bearbeiten"}
+              {codeOpen ? "Close code" : "Edit code"}
             </Button>
             <Button size="slim" tone="critical" onClick={onRemove}>
-              Entfernen
+              Remove
             </Button>
           </InlineStack>
         </InlineStack>
@@ -631,9 +611,9 @@ function ButtonColorFields({ typeKey, colors, onChangeColor }) {
 
   return (
     <BlockStack gap="300">
-      <Text as="h4" variant="headingSm">Farben</Text>
+      <Text as="h4" variant="headingSm">Colors</Text>
       <Text as="p" variant="bodySm" tone="subdued">
-        Diese Werte steuern die Standard-Buttons. Sie wirken zusammen mit dem CSS unter „Code bearbeiten" (Variablen haben Vorrang vor den Fallback-Farben im Code).
+        These values control the default buttons. They work together with the CSS under "Edit code" (variables take precedence over fallback colors in the code).
       </Text>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
         {Object.keys(schema).map((key) => {
@@ -646,7 +626,7 @@ function ButtonColorFields({ typeKey, colors, onChangeColor }) {
                 value={merged[key] || ""}
                 onChange={(v) => onChangeColor(key, v)}
                 autoComplete="off"
-                helpText="rgba(…) für leichte Fläche, oder Hex"
+                helpText="rgba(…) for a light surface, or hex"
               />
             );
           }
@@ -711,7 +691,7 @@ function ButtonTypeSection({ typeKey, typeData, onChange }) {
   };
 
   const addVariant = () => {
-    const next = [...variants, { name: "Neue Variante", code: "", active: variants.length === 0 }];
+    const next = [...variants, { name: "New variant", code: "", active: variants.length === 0 }];
     onChange({ ...typeData, variants: ensureActiveVariant(next) });
   };
 
@@ -729,7 +709,7 @@ function ButtonTypeSection({ typeKey, typeData, onChange }) {
         <ButtonColorFields typeKey={typeKey} colors={typeData.colors} onChangeColor={onChangeColor} />
         <Divider />
         {variants.length === 0 && (
-          <Text as="p" tone="subdued" variant="bodySm">Keine Varianten. Füge eine hinzu.</Text>
+          <Text as="p" tone="subdued" variant="bodySm">No variants. Add one.</Text>
         )}
         {variants.map((v, idx) => (
           <ButtonVariantCard
@@ -742,7 +722,7 @@ function ButtonTypeSection({ typeKey, typeData, onChange }) {
           />
         ))}
         <InlineStack>
-          <Button size="slim" onClick={addVariant}>+ Variante hinzufügen</Button>
+          <Button size="slim" onClick={addVariant}>+ Add variant</Button>
         </InlineStack>
       </BlockStack>
     </Card>
@@ -751,6 +731,9 @@ function ButtonTypeSection({ typeKey, typeData, onChange }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function StylesPage() {
+  const locale = useLocale();
+  const c = useMemo(() => getStylesPageCopy(locale), [locale]);
+  const ui = getUI(locale);
   const client = getMedusaAdminClient();
   const unsaved = useUnsavedChanges();
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -944,13 +927,13 @@ export default function StylesPage() {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("andertal-sellercentral-branding-refresh"));
       }
-      setSavedMsg("Stile gespeichert.");
+      setSavedMsg(c.stylesSaved);
       setTimeout(() => setSavedMsg(""), 4000);
     } catch (e) {
-      setErrMsg(e?.message || "Fehler beim Speichern");
+      setErrMsg(e?.message || ui.error);
     }
     setSaving(false);
-  }, [styles, branding, client]);
+  }, [styles, branding, client, c.stylesSaved]);
 
   const handleDiscard = useCallback(async () => {
     await loadStyles();
@@ -1048,7 +1031,7 @@ export default function StylesPage() {
 
   if (loading || !styles) {
     return (
-      <Page title="Website-Stile">
+      <Page title={c.pageTitle}>
         <Layout>
           <Layout.Section>
             <Card>
@@ -1060,7 +1043,7 @@ export default function StylesPage() {
                   justifyContent: "center",
                 }}
               >
-                <Text as="p" tone="subdued" alignment="center">Laden…</Text>
+                <Text as="p" tone="subdued" alignment="center">{ui.loading}</Text>
               </Box>
             </Card>
           </Layout.Section>
@@ -1071,10 +1054,10 @@ export default function StylesPage() {
 
   return (
     <Page
-      title="Website-Stile"
-      subtitle="Farben, Buttons und visuelle Stile deines Shops"
+      title={c.pageTitle}
+      subtitle={c.pageSubtitle}
       primaryAction={{
-        content: saving ? "Speichern…" : "Speichern",
+        content: saving ? ui.saving : ui.save,
         onAction: save,
         loading: saving,
         disabled: !isDirty,
@@ -1092,17 +1075,17 @@ export default function StylesPage() {
           </Layout.Section>
         )}
         {isSuperuser && (
-          <AccordionCard title="Homepage SEO (Meta)" subtitle="Browser-Titel und Meta-Beschreibung der Startseite">
+          <AccordionCard title="Homepage SEO (Meta)" subtitle={locale === "de" ? "Browser-Titel und Meta-Beschreibung der Startseite" : locale === "tr" ? "Ana sayfanın tarayıcı başlığı ve meta açıklaması" : locale === "fr" ? "Titre du navigateur et méta-description de la page d'accueil" : locale === "es" ? "Título del navegador y meta-descripción de la página de inicio" : locale === "it" ? "Titolo del browser e meta-descrizione della home page" : "Browser title and meta description of the home page"}>
             <BlockStack gap="300">
                 <Text as="p" tone="subdued">
-                  Hier kannst du den Browser-Titel und die Meta-Beschreibung der Startseite setzen.
+                  {locale === "de" ? "Hier kannst du den Browser-Titel und die Meta-Beschreibung der Startseite setzen." : locale === "tr" ? "Ana sayfanın tarayıcı başlığını ve meta açıklamasını buradan ayarlayabilirsin." : locale === "fr" ? "Vous pouvez définir ici le titre du navigateur et la méta-description de la page d'accueil." : locale === "es" ? "Aquí puedes configurar el título del navegador y la meta-descripción de la página de inicio." : locale === "it" ? "Qui puoi impostare il titolo del browser e la meta-descrizione della home page." : "Here you can set the browser title and meta description of the home page."}
                 </Text>
                 <TextField
                   label="Homepage Meta Title"
                   value={styles?.seo_home_title || ""}
                   onChange={(v) => setStyles((prev) => ({ ...prev, seo_home_title: v }))}
                   autoComplete="off"
-                  placeholder="z. B. Banzano - Your Marketplace"
+                  placeholder="e.g. Banzano - Your Marketplace"
                 />
                 <TextField
                   label="Homepage Meta Description"
@@ -1110,12 +1093,12 @@ export default function StylesPage() {
                   onChange={(v) => setStyles((prev) => ({ ...prev, seo_home_description: v }))}
                   autoComplete="off"
                   multiline={3}
-                  placeholder="Kurze Beschreibung fuer Suchergebnisse und Social Preview"
+                  placeholder={locale === "de" ? "Kurze Beschreibung fuer Suchergebnisse und Social Preview" : "Short description for search results and social preview"}
                 />
               </BlockStack>
           </AccordionCard>
         )}
-        <AccordionCard title="Branding (Shop &amp; Sellercentral)" subtitle="Logos, Favicons, Größe und Abstände — getrennt für Desktop, Tablet und Mobil">
+        <AccordionCard title="Branding (Shop &amp; Sellercentral)" subtitle={locale === "de" ? "Logos, Favicons, Größe und Abstände — getrennt für Desktop, Tablet und Mobil" : locale === "tr" ? "Logolar, faviconlar, boyut ve boşluklar — masaüstü, tablet ve mobil için ayrı" : locale === "fr" ? "Logos, favicons, taille et espacements — séparés pour bureau, tablette et mobile" : locale === "es" ? "Logos, favicons, tamaño y márgenes — separados para escritorio, tablet y móvil" : locale === "it" ? "Loghi, favicon, dimensione e spaziature — separati per desktop, tablet e mobile" : "Logos, favicons, size and spacing — separate for desktop, tablet and mobile"}>
             <BlockStack gap="500">
 
               {/* Device tabs */}
@@ -1133,7 +1116,7 @@ export default function StylesPage() {
                       marginBottom: -1,
                     }}
                   >
-                    {d === "desktop" ? "Desktop" : d === "tablet" ? "Tablet" : "Mobil"}
+                    {d === "desktop" ? "Desktop" : d === "tablet" ? "Tablet" : "Mobile"}
                   </button>
                 ))}
               </div>
@@ -1158,7 +1141,7 @@ export default function StylesPage() {
                 const pickerKey = `logo_${section}_${logoActiveDevice}`;
                 return (
                   <div key={section} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-                    <Text as="h3" variant="headingSm">{label} — {logoActiveDevice === "desktop" ? "Desktop" : logoActiveDevice === "tablet" ? "Tablet" : "Mobil"}</Text>
+                    <Text as="h3" variant="headingSm">{label} — {logoActiveDevice === "desktop" ? "Desktop" : logoActiveDevice === "tablet" ? "Tablet" : "Mobile"}</Text>
                     <div style={{ marginTop: 12 }}>
                       <InlineStack gap="200" blockAlign="end" wrap>
                         <div style={{ flex: 1, minWidth: 260 }}>
@@ -1166,13 +1149,13 @@ export default function StylesPage() {
                             label="URL"
                             value={dev.url || ""}
                             onChange={(v) => updateDev({ url: v })}
-                            placeholder="https://... veya /uploads/..."
+                            placeholder={c.urlPlaceholder}
                             autoComplete="off"
                           />
                         </div>
-                        <Button size="slim" onClick={() => setBrandingPickerTarget(pickerKey)}>Aus Medien</Button>
+                        <Button size="slim" onClick={() => setBrandingPickerTarget(pickerKey)}>{locale === "de" ? "Aus Medien" : locale === "tr" ? "Medyadan seç" : locale === "fr" ? "Depuis les médias" : locale === "es" ? "Desde medios" : locale === "it" ? "Da media" : "From media"}</Button>
                         {(dev.url || "").trim() ? (
-                          <Button size="slim" tone="critical" variant="plain" onClick={() => updateDev({ url: "" })}>Entfernen</Button>
+                          <Button size="slim" tone="critical" variant="plain" onClick={() => updateDev({ url: "" })}>{ui.remove}</Button>
                         ) : null}
                       </InlineStack>
                     </div>
@@ -1181,7 +1164,7 @@ export default function StylesPage() {
                       <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "start" }}>
                         <div>
                           <TextField
-                            label="Größe (px)"
+                            label={locale === "de" ? "Größe (px)" : "Size (px)"}
                             type="number"
                             value={String(logoSlotSize(dev, section === "shop" ? 34 : 30))}
                             onChange={(v) => {
@@ -1193,7 +1176,7 @@ export default function StylesPage() {
                               const clamped = clampLogoSize(cur, section === "shop" ? 34 : 30);
                               if (clamped !== cur) updateDev({ size: clamped, height: clamped });
                             }}
-                            helpText="Anzeigegröße des Logos; Breite passt sich proportional an."
+                            helpText={locale === "de" ? "Anzeigegröße des Logos; Breite passt sich proportional an." : locale === "tr" ? "Logonun görüntü boyutu; genişlik orantılı olarak uyum sağlar." : locale === "fr" ? "Taille d'affichage du logo ; la largeur s'adapte proportionnellement." : locale === "es" ? "Tamaño de visualización del logo; el ancho se adapta proporcionalmente." : locale === "it" ? "Dimensione di visualizzazione del logo; la larghezza si adatta proporzionalmente." : "Display size of the logo; width adapts proportionally."}
                             autoComplete="off"
                           />
                           <div style={{ marginTop: 8, marginBottom: 14 }}>
@@ -1208,17 +1191,17 @@ export default function StylesPage() {
                                 };
                                 img.src = dev.url;
                               }}
-                            >Originalgröße</button>
+                            >{locale === "de" ? "Originalgröße" : locale === "tr" ? "Orijinal boyut" : locale === "fr" ? "Taille originale" : locale === "es" ? "Tamaño original" : locale === "it" ? "Dimensione originale" : "Original size"}</button>
                           </div>
 
                           {/* Padding */}
                           <Text as="span" variant="bodySm" fontWeight="medium">Padding (px)</Text>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 6 }}>
                             {[
-                              { k: "pt", label: "Oben" },
-                              { k: "pr", label: "Rechts" },
-                              { k: "pb", label: "Unten" },
-                              { k: "pl", label: "Links" },
+                              { k: "pt", label: locale === "de" ? "Oben" : locale === "tr" ? "Üst" : locale === "fr" ? "Haut" : locale === "es" ? "Arriba" : locale === "it" ? "Alto" : "Top" },
+                              { k: "pr", label: locale === "de" ? "Rechts" : locale === "tr" ? "Sağ" : locale === "fr" ? "Droite" : locale === "es" ? "Derecha" : locale === "it" ? "Destra" : "Right" },
+                              { k: "pb", label: locale === "de" ? "Unten" : locale === "tr" ? "Alt" : locale === "fr" ? "Bas" : locale === "es" ? "Abajo" : locale === "it" ? "Basso" : "Bottom" },
+                              { k: "pl", label: locale === "de" ? "Links" : locale === "tr" ? "Sol" : locale === "fr" ? "Gauche" : locale === "es" ? "Izquierda" : locale === "it" ? "Sinistra" : "Left" },
                             ].map(({ k, label: pl }) => (
                               <div key={k}>
                                 <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 3 }}>{pl}</div>
@@ -1275,13 +1258,13 @@ export default function StylesPage() {
                         label={row.label}
                         value={branding[row.key] || ""}
                         onChange={(v) => setBranding((p) => ({ ...p, [row.key]: v }))}
-                        placeholder="https://... oder /uploads/..."
+                        placeholder={c.urlPlaceholder}
                         autoComplete="off"
                       />
                     </div>
-                    <Button size="slim" onClick={() => setBrandingPickerTarget(row.key)}>Aus Medien</Button>
+                    <Button size="slim" onClick={() => setBrandingPickerTarget(row.key)}>{locale === "de" ? "Aus Medien" : locale === "tr" ? "Medyadan seç" : locale === "fr" ? "Depuis les médias" : locale === "es" ? "Desde medios" : locale === "it" ? "Da media" : "From media"}</Button>
                     {(branding[row.key] || "").trim() ? (
-                      <Button size="slim" tone="critical" variant="plain" onClick={() => setBranding((p) => ({ ...p, [row.key]: "" }))}>Entfernen</Button>
+                      <Button size="slim" tone="critical" variant="plain" onClick={() => setBranding((p) => ({ ...p, [row.key]: "" }))}>{ui.remove}</Button>
                     ) : null}
                   </InlineStack>
                 </div>
@@ -1289,15 +1272,14 @@ export default function StylesPage() {
 
               {/* Bestseller Badge Image */}
               <Divider />
-              <Text as="h3" variant="headingSm">Bestseller-Abzeichen Bild</Text>
+              <Text as="h3" variant="headingSm">{locale === "de" ? "Bestseller-Abzeichen Bild" : locale === "tr" ? "Çok Satan Rozet Görseli" : locale === "fr" ? "Image du badge Bestseller" : locale === "es" ? "Imagen de insignia Bestseller" : locale === "it" ? "Immagine badge Bestseller" : "Bestseller Badge Image"}</Text>
               <Text as="p" variant="bodySm" tone="subdued">
-                Optionales Bild-Icon für das Bestseller-Etikett — ersetzt den ★-Stern.
-                Empfohlen: kleines transparentes PNG oder SVG (ca. 20×20 px).
+                {locale === "de" ? "Optionales Bild-Icon für das Bestseller-Etikett — ersetzt den ★-Stern. Empfohlen: kleines transparentes PNG oder SVG (ca. 20×20 px)." : locale === "tr" ? "Çok satan etiketi için isteğe bağlı görsel ikon — ★ yıldızının yerini alır. Öneri: küçük şeffaf PNG veya SVG (yakl. 20×20 px)." : locale === "fr" ? "Icône image optionnelle pour l'étiquette Bestseller — remplace l'étoile ★. Recommandé : petit PNG ou SVG transparent (environ 20×20 px)." : locale === "es" ? "Ícono de imagen opcional para la etiqueta Bestseller — reemplaza la estrella ★. Recomendado: PNG o SVG pequeño y transparente (aprox. 20×20 px)." : locale === "it" ? "Icona immagine opzionale per l'etichetta Bestseller — sostituisce la stella ★. Consigliato: PNG o SVG piccolo e trasparente (circa 20×20 px)." : "Optional image icon for the bestseller label — replaces the ★ star. Recommended: small transparent PNG or SVG (approx. 20×20 px)."}
               </Text>
               <InlineStack gap="200" blockAlign="end" wrap>
                 <div style={{ flex: 1, minWidth: 280 }}>
                   <TextField
-                    label="Bild-URL"
+                    label={locale === "de" ? "Bild-URL" : "Image URL"}
                     value={styles?.bestseller_badge?.image_url || ""}
                     onChange={(v) =>
                       setStyles((prev) => ({
@@ -1305,11 +1287,11 @@ export default function StylesPage() {
                         bestseller_badge: { ...(prev.bestseller_badge || {}), image_url: v },
                       }))
                     }
-                    placeholder="https://... oder /uploads/..."
+                    placeholder="https://..."
                     autoComplete="off"
                   />
                 </div>
-                <Button size="slim" onClick={() => setBrandingPickerTarget("bestseller_badge_image")}>Aus Medien</Button>
+                <Button size="slim" onClick={() => setBrandingPickerTarget("bestseller_badge_image")}>{locale === "de" ? "Aus Medien" : locale === "tr" ? "Medyadan seç" : locale === "fr" ? "Depuis les médias" : locale === "es" ? "Desde medios" : locale === "it" ? "Da media" : "From media"}</Button>
                 {(styles?.bestseller_badge?.image_url || "").trim() ? (
                   <Button
                     size="slim"
@@ -1322,7 +1304,7 @@ export default function StylesPage() {
                       }))
                     }
                   >
-                    Entfernen
+                    {ui.remove}
                   </Button>
                 ) : null}
               </InlineStack>
@@ -1339,15 +1321,15 @@ export default function StylesPage() {
         {isSuperuser && (
           <AccordionCard
             title="Made in Europe Badge (Shop)"
-            subtitle="Overlay auf der Produkt-Hauptbildfläche — nur bei verifiziertem EU-Ursprung"
+            subtitle={locale === "de" ? "Overlay auf der Produkt-Hauptbildfläche — nur bei verifiziertem EU-Ursprung" : locale === "tr" ? "Ürün ana görsel alanındaki overlay — yalnızca doğrulanmış AB menşeinde" : locale === "fr" ? "Superposition sur la surface d'image principale du produit — uniquement pour l'origine UE vérifiée" : locale === "es" ? "Superposición en la superficie de imagen principal del producto — solo con origen UE verificado" : locale === "it" ? "Overlay sulla superficie dell'immagine principale del prodotto — solo con origine UE verificata" : "Overlay on the product main image area — only for verified EU origin"}
           >
             <BlockStack gap="300">
               <Text as="p" tone="subdued">
-                Bild-URL, Größe und Abstand von links/unten auf der PDP-Galerie (Desktop &amp; Mobil).
+                {locale === "de" ? "Bild-URL, Größe und Abstand von links/unten auf der PDP-Galerie (Desktop & Mobil)." : locale === "tr" ? "PDP galerisinde (Masaüstü & Mobil) görsel URL'si, boyut ve sol/alt boşluk." : locale === "fr" ? "URL de l'image, taille et espacement depuis la gauche/bas dans la galerie PDP (Bureau & Mobile)." : locale === "es" ? "URL de imagen, tamaño y margen desde la izquierda/abajo en la galería PDP (Escritorio & Móvil)." : locale === "it" ? "URL immagine, dimensione e spazio da sinistra/basso nella galleria PDP (Desktop & Mobile)." : "Image URL, size and spacing from left/bottom in the PDP gallery (Desktop & Mobile)."}
               </Text>
               <InlineStack gap="200" blockAlign="center">
                 <Button size="slim" onClick={() => setBrandingPickerTarget("made_in_europe_badge_image")}>
-                  Badge-Bild aus Medien
+                  {locale === "de" ? "Badge-Bild aus Medien" : locale === "tr" ? "Rozet görselini medyadan seç" : locale === "fr" ? "Image du badge depuis les médias" : locale === "es" ? "Imagen de insignia desde medios" : locale === "it" ? "Immagine badge da media" : "Badge image from media"}
                 </Button>
                 {(styles?.made_in_europe_badge?.image_url || "").trim() ? (
                   <Button
@@ -1361,7 +1343,7 @@ export default function StylesPage() {
                       }))
                     }
                   >
-                    Entfernen
+                    {ui.remove}
                   </Button>
                 ) : null}
               </InlineStack>
@@ -1374,7 +1356,7 @@ export default function StylesPage() {
               ) : null}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
                 <TextField
-                  label="Breite (px)"
+                  label={locale === "de" ? "Breite (px)" : "Width (px)"}
                   type="number"
                   value={String(styles?.made_in_europe_badge?.width ?? 88)}
                   onChange={(v) =>
@@ -1386,7 +1368,7 @@ export default function StylesPage() {
                   autoComplete="off"
                 />
                 <TextField
-                  label="Höhe (px)"
+                  label={locale === "de" ? "Höhe (px)" : "Height (px)"}
                   type="number"
                   value={String(styles?.made_in_europe_badge?.height ?? 32)}
                   onChange={(v) =>
@@ -1398,7 +1380,7 @@ export default function StylesPage() {
                   autoComplete="off"
                 />
                 <TextField
-                  label="Abstand links (px)"
+                  label={locale === "de" ? "Abstand links (px)" : locale === "tr" ? "Sol boşluk (px)" : locale === "fr" ? "Marge gauche (px)" : locale === "es" ? "Margen izquierdo (px)" : locale === "it" ? "Margine sinistro (px)" : "Left offset (px)"}
                   type="number"
                   value={String(styles?.made_in_europe_badge?.offset_left ?? 10)}
                   onChange={(v) =>
@@ -1410,7 +1392,7 @@ export default function StylesPage() {
                   autoComplete="off"
                 />
                 <TextField
-                  label="Abstand unten (px)"
+                  label={locale === "de" ? "Abstand unten (px)" : locale === "tr" ? "Alt boşluk (px)" : locale === "fr" ? "Marge bas (px)" : locale === "es" ? "Margen inferior (px)" : locale === "it" ? "Margine inferiore (px)" : "Bottom offset (px)"}
                   type="number"
                   value={String(styles?.made_in_europe_badge?.offset_bottom ?? 10)}
                   onChange={(v) =>
@@ -1426,14 +1408,14 @@ export default function StylesPage() {
           </AccordionCard>
         )}
 
-        <AccordionCard title="Website-Farben">
+        <AccordionCard title={locale === "de" ? "Website-Farben" : locale === "tr" ? "Web Sitesi Renkleri" : locale === "fr" ? "Couleurs du site" : locale === "es" ? "Colores del sitio" : locale === "it" ? "Colori del sito" : "Website Colors"}>
             <BlockStack gap="400">
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-                <ColorField label="Primärfarbe" value={styles.colors.primary} onChange={(v) => updateColor("primary", v)} />
-                <ColorField label="Sekundärfarbe" value={styles.colors.secondary} onChange={(v) => updateColor("secondary", v)} />
-                <ColorField label="Akzentfarbe" value={styles.colors.accent} onChange={(v) => updateColor("accent", v)} />
-                <ColorField label="Textfarbe" value={styles.colors.text} onChange={(v) => updateColor("text", v)} />
-                <ColorField label="Hintergrundfarbe" value={styles.colors.background} onChange={(v) => updateColor("background", v)} />
+                <ColorField label={locale === "de" ? "Primärfarbe" : locale === "tr" ? "Birincil renk" : locale === "fr" ? "Couleur primaire" : locale === "es" ? "Color primario" : locale === "it" ? "Colore primario" : "Primary color"} value={styles.colors.primary} onChange={(v) => updateColor("primary", v)} />
+                <ColorField label={locale === "de" ? "Sekundärfarbe" : locale === "tr" ? "İkincil renk" : locale === "fr" ? "Couleur secondaire" : locale === "es" ? "Color secundario" : locale === "it" ? "Colore secondario" : "Secondary color"} value={styles.colors.secondary} onChange={(v) => updateColor("secondary", v)} />
+                <ColorField label={locale === "de" ? "Akzentfarbe" : locale === "tr" ? "Vurgu rengi" : locale === "fr" ? "Couleur d'accentuation" : locale === "es" ? "Color de acento" : locale === "it" ? "Colore accento" : "Accent color"} value={styles.colors.accent} onChange={(v) => updateColor("accent", v)} />
+                <ColorField label={locale === "de" ? "Textfarbe" : locale === "tr" ? "Metin rengi" : locale === "fr" ? "Couleur du texte" : locale === "es" ? "Color de texto" : locale === "it" ? "Colore testo" : "Text color"} value={styles.colors.text} onChange={(v) => updateColor("text", v)} />
+                <ColorField label={locale === "de" ? "Hintergrundfarbe" : locale === "tr" ? "Arka plan rengi" : locale === "fr" ? "Couleur d'arrière-plan" : locale === "es" ? "Color de fondo" : locale === "it" ? "Colore sfondo" : "Background color"} value={styles.colors.background} onChange={(v) => updateColor("background", v)} />
               </div>
 
               {/* Live preview swatches */}
@@ -1448,15 +1430,11 @@ export default function StylesPage() {
             </BlockStack>
         </AccordionCard>
 
-        <AccordionCard title="Typografie" subtitle="Schriftarten, Größen und Gewichte">
+        <AccordionCard title={locale === "de" ? "Typografie" : locale === "tr" ? "Tipografi" : locale === "fr" ? "Typographie" : locale === "es" ? "Tipografía" : locale === "it" ? "Tipografia" : "Typography"} subtitle={locale === "de" ? "Schriftarten, Größen und Gewichte" : locale === "tr" ? "Yazı tipleri, boyutlar ve ağırlıklar" : locale === "fr" ? "Polices, tailles et graisses" : locale === "es" ? "Fuentes, tamaños y pesos" : locale === "it" ? "Caratteri, dimensioni e pesi" : "Fonts, sizes and weights"}>
             <BlockStack gap="500">
               <Banner tone="info">
                 <p>
-                  Die Liste enthält Schriften aus <strong>Google Fonts</strong>. Schriften wie Arial, Calibri
-                  oder Helvetica sind <strong>Betriebssystem-/Office-Fonts</strong> und stehen dort nicht —
-                  sie können Sie pro Ebene unter „Eigene font-family (CSS)" eintragen, z. B.{" "}
-                  <code style={{ whiteSpace: "nowrap" }}>Calibri, Candara, sans-serif</code>. Eigenlizenzierte
-                  Webfonts (z. B. Aeonik) binden Sie per @font-face / Theme, nicht über diese Dropdown-Liste.
+                  {locale === "de" ? <>Die Liste enthält Schriften aus <strong>Google Fonts</strong>. Schriften wie Arial, Calibri oder Helvetica sind <strong>Betriebssystem-/Office-Fonts</strong> und stehen dort nicht — sie können Sie pro Ebene unter „Eigene font-family (CSS)" eintragen. Eigenlizenzierte Webfonts binden Sie per @font-face / Theme.</> : locale === "tr" ? <>Liste <strong>Google Fonts</strong> yazı tiplerini içerir. Arial, Calibri gibi fontlar <strong>sistem fontları</strong>dır — bunları "Özel font-family (CSS)" alanına girebilirsiniz.</> : locale === "fr" ? <>La liste contient des polices de <strong>Google Fonts</strong>. Les polices comme Arial ou Calibri sont des <strong>polices système</strong> — saisissez-les sous "Police personnalisée (CSS)".</> : locale === "es" ? <>La lista contiene fuentes de <strong>Google Fonts</strong>. Fuentes como Arial o Calibri son <strong>fuentes de sistema</strong> — introdúcelas en "Fuente personalizada (CSS)".</> : locale === "it" ? <>La lista contiene font da <strong>Google Fonts</strong>. Font come Arial o Calibri sono <strong>font di sistema</strong> — inseriscili in "Font-family personalizzato (CSS)".</> : <>The list contains fonts from <strong>Google Fonts</strong>. Fonts like Arial or Calibri are <strong>OS/Office fonts</strong> and are not listed there — enter them per level under "Custom font-family (CSS)".</>}
                 </p>
               </Banner>
               <Divider />
@@ -1534,7 +1512,7 @@ export default function StylesPage() {
                 }}
               >
                 <Text as="span" variant="headingSm">
-                  Katalog &amp; Navigation
+                  {locale === "de" ? "Katalog & Navigation" : locale === "tr" ? "Katalog & Navigasyon" : locale === "fr" ? "Catalogue & Navigation" : locale === "es" ? "Catálogo & Navegación" : locale === "it" ? "Catalogo & Navigazione" : "Catalog & Navigation"}
                 </Text>
                 <span
                   aria-hidden
@@ -1551,12 +1529,11 @@ export default function StylesPage() {
               {catalogNavOpen && (
                 <BlockStack id="catalog-navigation-settings" gap="400">
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Unabhängig von H1–H5 im Fließtext (Blog, Produktbeschreibung): Produktname, Listen-Überschriften
-                    und Kategorie-Menü separat steuern.
+                    {locale === "de" ? "Unabhängig von H1–H5 im Fließtext: Produktname, Listen-Überschriften und Kategorie-Menü separat steuern." : locale === "tr" ? "H1–H5'den bağımsız: Ürün adı, liste başlıkları ve kategori menüsünü ayrı ayrı kontrol edin." : locale === "fr" ? "Indépendant de H1–H5 dans le texte courant : contrôlez le nom du produit, les en-têtes de liste et le menu catégorie séparément." : locale === "es" ? "Independiente de H1–H5 en el texto: controla el nombre del producto, encabezados de lista y menú de categoría por separado." : locale === "it" ? "Indipendente da H1–H5 nel testo: controlla separatamente il nome del prodotto, le intestazioni di lista e il menu categorie." : "Independent of H1–H5 in body text: control product name, list headings and category menu separately."}
                   </Text>
                   <Divider />
                   <TypographyLevelRow
-                    heading="Produkttitel (Produktseite)"
+                    heading={locale === "de" ? "Produkttitel (Produktseite)" : "Product title (product page)"}
                     levelKey="product_title"
                     typo={styles.typography}
                     families={googleFontList || []}
@@ -1565,7 +1542,7 @@ export default function StylesPage() {
                   />
                   <Divider />
                   <TypographyLevelRow
-                    heading="Katalog-Titel (Kategorien, Kollektionen, Marken-Seiten)"
+                    heading={locale === "de" ? "Katalog-Titel (Kategorien, Kollektionen, Marken-Seiten)" : "Catalog title (categories, collections, brand pages)"}
                     levelKey="catalog_title"
                     typo={styles.typography}
                     families={googleFontList || []}
@@ -1574,7 +1551,7 @@ export default function StylesPage() {
                   />
                   <Divider />
                   <TypographyLevelRow
-                    heading="Menü: Kategorien-Dropdown"
+                    heading={locale === "de" ? "Menü: Kategorien-Dropdown" : "Menu: categories dropdown"}
                     levelKey="menu_catalog"
                     typo={styles.typography}
                     families={googleFontList || []}
@@ -1590,20 +1567,20 @@ export default function StylesPage() {
         <AccordionCard title="Layout: Top Bar">
           <BlockStack gap="400">
               <Checkbox
-                label="Top Bar im Shop anzeigen"
+                label={c.topBarShowInShop}
                 checked={!!styles.topbar.enabled}
                 onChange={(checked) => updateSection("topbar", "enabled", checked)}
               />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
                 <Select
-                  label="Einträge-Anzeige"
-                  options={TOPBAR_DISPLAY_MODE_OPTIONS}
+                  label={c.entriesDisplay}
+                  options={c.topbarDisplayModeOptions}
                   value={styles.topbar.display_mode === "carousel" ? "carousel" : "inline"}
                   onChange={(v) => updateSection("topbar", "display_mode", v)}
                   disabled={!styles.topbar.enabled}
                 />
                 <TextField
-                  label="Karussell: Wechsel alle (Sekunden)"
+                  label={c.carouselInterval}
                   type="number"
                   min={2}
                   max={120}
@@ -1613,26 +1590,22 @@ export default function StylesPage() {
                     updateSection("topbar", "carousel_interval_sec", n);
                   }}
                   disabled={!styles.topbar.enabled || styles.topbar.display_mode !== "carousel"}
-                  helpText="Nur bei Karussell. Zusätzlich: Wischen links/rechts und Pfeiltasten."
+                  helpText={c.carouselIntervalHelp}
                   autoComplete="off"
                 />
               </div>
               <Banner tone="info">
-                <p>
-                  Karussell: ein sichtbarer Eintrag, automatischer Wechsel in diesem Intervall, Pause bei Maus über der Leiste,
-                  manuell per Pfeilen oder Wisch-Geste (Touch).
-                  Nebeneinander: alle Links in einer Zeile (umbrechend auf schmalen Screens).
-                </p>
+                <p>{c.carouselBanner}</p>
               </Banner>
               <Divider />
-              <Text as="h3" variant="headingSm">Top-Bar-Einträge</Text>
+              <Text as="h3" variant="headingSm">{c.topBarEntries}</Text>
               <BlockStack gap="300">
                 {(styles.topbar.items || []).map((item, idx) => (
                   <div key={idx} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                     <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       <TextField
-                        label={idx === 0 ? "Text" : undefined}
-                        placeholder="z.B. Kostenloser Versand ab 50 €"
+                        label={idx === 0 ? c.text : undefined}
+                        placeholder={c.topBarTextPh}
                         value={item.text || ""}
                         disabled={!styles.topbar.enabled}
                         onChange={(v) => {
@@ -1643,8 +1616,8 @@ export default function StylesPage() {
                         autoComplete="off"
                       />
                       <TextField
-                        label={idx === 0 ? "Link (href)" : undefined}
-                        placeholder="z.B. /shipping"
+                        label={idx === 0 ? c.linkHref : undefined}
+                        placeholder={c.topBarHrefPh}
                         value={item.href || ""}
                         disabled={!styles.topbar.enabled}
                         onChange={(v) => {
@@ -1664,7 +1637,7 @@ export default function StylesPage() {
                           [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
                           setStyles((prev) => ({ ...prev, topbar: { ...prev.topbar, items: next } }));
                         }}
-                        title="Nach oben"
+                        title={c.moveUp}
                         style={{ padding: "4px 8px", cursor: idx === 0 ? "default" : "pointer", opacity: idx === 0 ? 0.3 : 1, border: "1px solid #d1d5db", borderRadius: 4, background: "#f9fafb" }}
                       >↑</button>
                       <button
@@ -1675,7 +1648,7 @@ export default function StylesPage() {
                           [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
                           setStyles((prev) => ({ ...prev, topbar: { ...prev.topbar, items: next } }));
                         }}
-                        title="Nach unten"
+                        title={c.moveDown}
                         style={{ padding: "4px 8px", cursor: idx === (styles.topbar.items || []).length - 1 ? "default" : "pointer", opacity: idx === (styles.topbar.items || []).length - 1 ? 0.3 : 1, border: "1px solid #d1d5db", borderRadius: 4, background: "#f9fafb" }}
                       >↓</button>
                       <button
@@ -1685,7 +1658,7 @@ export default function StylesPage() {
                           const next = (styles.topbar.items || []).filter((_, i) => i !== idx);
                           setStyles((prev) => ({ ...prev, topbar: { ...prev.topbar, items: next } }));
                         }}
-                        title="Entfernen"
+                        title={c.remove}
                         style={{ padding: "4px 8px", cursor: "pointer", border: "1px solid #fca5a5", borderRadius: 4, background: "#fef2f2", color: "#dc2626" }}
                       >✕</button>
                     </div>
@@ -1701,54 +1674,54 @@ export default function StylesPage() {
                     }}
                     style={{ padding: "6px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#f9fafb", cursor: styles.topbar.enabled ? "pointer" : "default", fontSize: 13, opacity: styles.topbar.enabled ? 1 : 0.5 }}
                   >
-                    + Eintrag hinzufügen
+                    {c.addEntry}
                   </button>
                 </div>
               </BlockStack>
               <Divider />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 <Select
-                  label="Stil-Vorlage"
-                  options={TOPBAR_PRESET_LABELS}
+                  label={c.stylePreset}
+                  options={c.topbarPresetOptions}
                   value={styles.topbar.variant || "default"}
                   onChange={(v) => updateSection("topbar", "variant", v)}
                 />
                 <ColorField
-                  label="Hintergrundfarbe"
+                  label={c.bgColor}
                   value={styles.topbar.bg_color}
                   onChange={(v) => updateSection("topbar", "bg_color", v)}
                 />
                 <ColorField
-                  label="Textfarbe"
+                  label={c.textColor}
                   value={styles.topbar.text_color}
                   onChange={(v) => updateSection("topbar", "text_color", v)}
                 />
                 <TextField
-                  label="Höhe (height)"
+                  label={c.height}
                   value={styles.topbar.height}
                   onChange={(v) => updateSection("topbar", "height", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Schriftgröße (font-size)"
+                  label={c.fontSize}
                   value={styles.topbar.font_size}
                   onChange={(v) => updateSection("topbar", "font_size", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Schriftgewicht (font-weight)"
+                  label={c.fontWeight}
                   value={styles.topbar.font_weight}
                   onChange={(v) => updateSection("topbar", "font_weight", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Schatten (box-shadow)"
+                  label={c.shadow}
                   value={styles.topbar.shadow || ""}
                   onChange={(v) => updateSection("topbar", "shadow", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Border unten (border-bottom)"
+                  label={c.borderBottom}
                   value={styles.topbar.border_bottom || ""}
                   onChange={(v) => updateSection("topbar", "border_bottom", v)}
                   autoComplete="off"
@@ -1762,40 +1735,39 @@ export default function StylesPage() {
           <BlockStack gap="400">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
               <Select
-                label="Stil-Vorlage"
-                options={HEADER_PRESET_LABELS}
+                label={c.stylePreset}
+                options={c.headerPresetOptions}
                 value={styles.header.variant || "default"}
                 onChange={(v) => updateSection("header", "variant", v)}
               />
               <ColorField
-                label="Hintergrundfarbe (Basis / Verlauf Start)"
+                label={c.headerBgColorGradientStart}
                 value={styles.header.bg_color}
                 onChange={(v) => updateSection("header", "bg_color", v)}
               />
               <div style={{ gridColumn: "1 / -1" }}>
                 <BlockStack gap="300">
                   <Text as="p" variant="bodySm" tone="subdued">
-                    <strong>Verlauf (Hintergrund)</strong> — pro Ansicht einzeln ein- oder ausschalten.
-                    Ziel-Farbe, Winkel und Stärke gelten für alle Ansichten, in denen der Verlauf eingeschaltet ist.
+                    <strong>{c.gradientBgHeading}</strong> {c.gradientBgDesc}
                   </Text>
                   <Checkbox
-                    label="Standard-Verlauf (Fallback, wenn kein gerätespezifischer Schalter gesetzt ist)"
+                    label={c.gradientFallback}
                     checked={!!styles.header.bg_gradient_enabled}
                     onChange={(v) => updateSection("header", "bg_gradient_enabled", v)}
                   />
                   <InlineStack gap="400" wrap blockAlign="center">
                     <Checkbox
-                      label="Desktop ≥1024px"
+                      label={c.desktopGte1024Short}
                       checked={effectiveGradientEnabled(styles.header, "desktop")}
                       onChange={(v) => updateSection("header", "bg_gradient_enabled_desktop", v)}
                     />
                     <Checkbox
-                      label="Tablet 768–1023px"
+                      label={c.tablet768Short}
                       checked={effectiveGradientEnabled(styles.header, "tablet")}
                       onChange={(v) => updateSection("header", "bg_gradient_enabled_tablet", v)}
                     />
                     <Checkbox
-                      label="Mobil ≤767px"
+                      label={c.mobileLte767Short}
                       checked={effectiveGradientEnabled(styles.header, "mobile")}
                       onChange={(v) => updateSection("header", "bg_gradient_enabled_mobile", v)}
                     />
@@ -1805,18 +1777,18 @@ export default function StylesPage() {
               {headerGradientAnyViewport ? (
                 <>
                   <ColorField
-                    label="Verlauf Ziel-Farbe"
+                    label={c.gradientTargetColor}
                     value={styles.header.bg_gradient_end || "#0f766e"}
                     onChange={(v) => updateSection("header", "bg_gradient_end", v)}
                   />
                   <Select
-                    label="Verlauf-Richtung (Winkel)"
-                    options={HEADER_GRADIENT_ANGLE_OPTIONS}
+                    label={c.gradientDirection}
+                    options={c.headerGradientAngleOptions}
                     value={String(styles.header.bg_gradient_angle ?? 135)}
                     onChange={(v) => updateSection("header", "bg_gradient_angle", Number(v))}
                   />
                   <TextField
-                    label="Verlauf-Stärke (0–100)"
+                    label={c.gradientIntensity}
                     type="number"
                     min={0}
                     max={100}
@@ -1825,7 +1797,7 @@ export default function StylesPage() {
                       const n = Math.min(100, Math.max(0, parseInt(v, 10) || 0));
                       updateSection("header", "bg_gradient_intensity", n);
                     }}
-                    helpText="0 = sanft (fast nur Basisfarbe), 100 = volle Mischung zur Ziel-Farbe"
+                    helpText={c.gradientIntensityHelp}
                     autoComplete="off"
                   />
                 </>
@@ -1833,50 +1805,50 @@ export default function StylesPage() {
               <div style={{ gridColumn: "1 / -1" }}>
                 <BlockStack gap="200">
                   <Text as="span" variant="bodySm" fontWeight="medium">
-                    Hintergrundbild (optional, unter Farbe/Verlauf)
+                    {c.bgImageOptional}
                   </Text>
                   <InlineStack gap="200" blockAlign="end" wrap>
                     <div style={{ flex: "1 1 280px", minWidth: 200 }}>
                       <TextField
-                        label="Bild-URL"
+                        label={c.imageUrl}
                         value={styles.header.bg_image_url || ""}
                         onChange={(v) => updateSection("header", "bg_image_url", v)}
                         placeholder="https://…"
                         autoComplete="off"
                       />
                     </div>
-                    <Button onClick={() => setHeaderBgPickerScope("global")}>Aus Mediathek</Button>
+                    <Button onClick={() => setHeaderBgPickerScope("global")}>{c.fromMediaLibrary}</Button>
                   </InlineStack>
                 </BlockStack>
               </div>
               <ColorField
-                label="Textfarbe"
+                label={c.textColor}
                 value={styles.header.text_color}
                 onChange={(v) => updateSection("header", "text_color", v)}
               />
               <div style={{ gridColumn: "1 / -1" }}>
                 <BlockStack gap="200">
-                  <Text as="span" variant="bodySm" fontWeight="medium">Normalhöhe</Text>
+                  <Text as="span" variant="bodySm" fontWeight="medium">{c.normalHeight}</Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Leer = nächstgrößeres Gerät als Fallback (Desktop → Tablet → Mobil → 72px).
+                    {c.normalHeightHelp}
                   </Text>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
                     <TextField
-                      label="Desktop (≥1024px)"
+                      label={c.desktopGte1024}
                       value={styles.header.height_desktop || ""}
                       onChange={(v) => updateSection("header", "height_desktop", v)}
                       placeholder={styles.header.height || "72px"}
                       autoComplete="off"
                     />
                     <TextField
-                      label="Tablet (768–1023px)"
+                      label={c.tablet768}
                       value={styles.header.height_tablet || ""}
                       onChange={(v) => updateSection("header", "height_tablet", v)}
                       placeholder={styles.header.height_desktop || styles.header.height || "72px"}
                       autoComplete="off"
                     />
                     <TextField
-                      label="Mobil (≤767px)"
+                      label={c.mobileLte767}
                       value={styles.header.height_mobile || ""}
                       onChange={(v) => updateSection("header", "height_mobile", v)}
                       placeholder={styles.header.height_tablet || styles.header.height_desktop || styles.header.height || "72px"}
@@ -1887,92 +1859,90 @@ export default function StylesPage() {
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <BlockStack gap="200">
-                  <Text as="span" variant="bodySm" fontWeight="medium">Compact-Höhe (beim Scrollen)</Text>
+                  <Text as="span" variant="bodySm" fontWeight="medium">{c.compactHeight}</Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Höhe nach dem Scrollen. Leer = keine Änderung (Header bleibt gleich groß).
-                    Kaskadiert: Tablet übernimmt Desktop-Wert wenn leer, Mobil übernimmt Tablet wenn leer.
+                    {c.compactHeightHelp}
                   </Text>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
                     <TextField
-                      label="Desktop (≥1024px)"
+                      label={c.desktopGte1024}
                       value={styles.header.compact_height_desktop || ""}
                       onChange={(v) => updateSection("header", "compact_height_desktop", v)}
-                      placeholder="leer = keine Änderung"
+                      placeholder={c.emptyNoChange}
                       autoComplete="off"
                     />
                     <TextField
-                      label="Tablet (768–1023px)"
+                      label={c.tablet768}
                       value={styles.header.compact_height_tablet || ""}
                       onChange={(v) => updateSection("header", "compact_height_tablet", v)}
-                      placeholder="leer = keine Änderung"
+                      placeholder={c.emptyNoChange}
                       autoComplete="off"
                     />
                     <TextField
-                      label="Mobil (≤767px)"
+                      label={c.mobileLte767}
                       value={styles.header.compact_height_mobile || ""}
                       onChange={(v) => updateSection("header", "compact_height_mobile", v)}
-                      placeholder="leer = keine Änderung"
+                      placeholder={c.emptyNoChange}
                       autoComplete="off"
                     />
                   </div>
                 </BlockStack>
               </div>
               <TextField
-                label="Schatten (box-shadow)"
+                label={c.shadow}
                 value={styles.header.shadow}
                 onChange={(v) => updateSection("header", "shadow", v)}
                 autoComplete="off"
               />
               <TextField
-                label="Unterer Rand (border-bottom)"
+                label={c.headerBottomBorder}
                 value={styles.header.border_bottom}
                 onChange={(v) => updateSection("header", "border_bottom", v)}
                 autoComplete="off"
               />
             </div>
             <Divider />
-            <Text as="h3" variant="headingSm">Seitenspezifischer Hintergrund (Optional)</Text>
+            <Text as="h3" variant="headingSm">{c.pageSpecificBg}</Text>
             <Text as="p" variant="bodySm" tone="subdued">
-              Für Kategorie- oder Kollektion-Seiten kann der Hintergrund hier abweichend gesetzt werden.
-              Leere Felder übernehmen den Standard oben. Höhe, Schatten und Rahmen sind immer global.
+              {c.pageSpecificBgHelp}
             </Text>
             <Select
-              label="Seite anpassen"
+              label={c.customizePage}
               options={[
-                { label: "Kategorie-Seiten (/category/…)", value: "category" },
-                { label: "Kollektion-Seiten (/collections/…)", value: "collection" },
+                { label: c.categoryPages, value: "category" },
+                { label: c.collectionPages, value: "collection" },
               ]}
               value={headerScopeTab}
               onChange={setHeaderScopeTab}
             />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
               <ColorField
-                label="Hintergrundfarbe"
+                label={c.bgColor}
                 value={headerScopeOverride.bg_color || ""}
                 onChange={(v) => updateHeaderScopeField("bg_color", v)}
-                helpText="Leer = Standard-Hintergrundfarbe"
+                helpText={c.emptyDefaultBg}
               />
               <div style={{ gridColumn: "1 / -1" }}>
                 <BlockStack gap="300">
-                  <Text as="p" variant="bodySm" tone="subdued">Verlauf für diese Seiten:</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">{c.gradientForPages}</Text>
                   <Checkbox
-                    label="Standard-Verlauf (Fallback)"
+                    label={c.gradientFallbackShort}
                     checked={!!headerScopeOverride.bg_gradient_enabled}
                     onChange={(v) => updateHeaderScopeField("bg_gradient_enabled", v)}
                   />
                   <InlineStack gap="400" wrap blockAlign="center">
                     <Checkbox
-                      label="Desktop"
+                      label={c.desktop}
                       checked={effectiveGradientEnabled(headerScopeOverride, "desktop")}
                       onChange={(v) => updateHeaderScopeField("bg_gradient_enabled_desktop", v)}
                     />
                     <Checkbox
-                      label="Tablet"
+                      label={c.tablet}
                       checked={effectiveGradientEnabled(headerScopeOverride, "tablet")}
                       onChange={(v) => updateHeaderScopeField("bg_gradient_enabled_tablet", v)}
                     />
                     <Checkbox
-                      label="Mobil"
+                      label={c.mobile}
                       checked={effectiveGradientEnabled(headerScopeOverride, "mobile")}
                       onChange={(v) => updateHeaderScopeField("bg_gradient_enabled_mobile", v)}
                     />
@@ -1982,19 +1952,19 @@ export default function StylesPage() {
               {headerScopeGradient ? (
                 <>
                   <ColorField
-                    label="Verlauf Ziel-Farbe"
+                    label={c.gradientTargetColor}
                     value={headerScopeOverride.bg_gradient_end || ""}
                     onChange={(v) => updateHeaderScopeField("bg_gradient_end", v)}
-                    helpText="Leer = Standard-Zielfarbe"
+                    helpText={c.emptyDefaultTarget}
                   />
                   <Select
-                    label="Verlauf-Richtung"
-                    options={HEADER_GRADIENT_ANGLE_OPTIONS}
+                    label={c.gradientDirectionShort}
+                    options={c.headerGradientAngleOptions}
                     value={String(headerScopeOverride.bg_gradient_angle ?? 135)}
                     onChange={(v) => updateHeaderScopeField("bg_gradient_angle", Number(v))}
                   />
                   <TextField
-                    label="Verlauf-Stärke (0–100)"
+                    label={c.gradientIntensity}
                     type="number"
                     min={0}
                     max={100}
@@ -2009,26 +1979,26 @@ export default function StylesPage() {
               ) : null}
               <div style={{ gridColumn: "1 / -1" }}>
                 <BlockStack gap="200">
-                  <Text as="span" variant="bodySm" fontWeight="medium">Hintergrundbild</Text>
+                  <Text as="span" variant="bodySm" fontWeight="medium">{c.bgImage}</Text>
                   <InlineStack gap="200" blockAlign="end" wrap>
                     <div style={{ flex: "1 1 280px", minWidth: 200 }}>
                       <TextField
-                        label="Bild-URL"
+                        label={c.imageUrl}
                         value={headerScopeOverride.bg_image_url || ""}
                         onChange={(v) => updateHeaderScopeField("bg_image_url", v)}
                         placeholder="https://…"
                         autoComplete="off"
                       />
                     </div>
-                    <Button onClick={() => setHeaderBgPickerScope(headerScopeTab)}>Aus Mediathek</Button>
+                    <Button onClick={() => setHeaderBgPickerScope(headerScopeTab)}>{c.fromMediaLibrary}</Button>
                   </InlineStack>
                 </BlockStack>
               </div>
               <ColorField
-                label="Textfarbe"
+                label={c.textColor}
                 value={headerScopeOverride.text_color || ""}
                 onChange={(v) => updateHeaderScopeField("text_color", v)}
-                helpText="Leer = Standard-Textfarbe"
+                helpText={c.emptyDefaultText}
               />
             </div>
           </BlockStack>
@@ -2039,147 +2009,141 @@ export default function StylesPage() {
           <BlockStack gap="400">
             <Banner tone="info">
                 <p>
-                  Der gemeinsame Header-Chrome (Farbe/Verlauf) steuern Sie unter <strong>Header</strong>.
-                  Die <strong>Second-Nav-Zeile</strong> darunter kann zusätzlich einen eigenen Hintergrund, Rahmen sowie Text-
-                  und Aktivfarbe <strong>je nach Gerät</strong> erhalten — siehe nächster Abschnitt.
-                  Ob Links als klassischer Text oder als Frostglas-Kachel erscheinen, legen Sie darunter
-                  <strong> je nach Gerät</strong> fest.
+                  {c.secondNavBanner1} <strong>Header</strong>.
+                  {" "}{c.secondNavBanner2}{" "}
+                  <strong>{c.secondNavBanner3}</strong> — {c.secondNavBanner4}{" "}
+                  <strong>{c.secondNavBanner3}</strong>.
                 </p>
               </Banner>
               <Divider />
-              <Text as="h3" variant="headingSm">Second-Nav-Zeile: Hintergrund & Rahmen je Gerät</Text>
+              <Text as="h3" variant="headingSm">{c.secondNavRowBgBorder}</Text>
               <Text as="p" variant="bodySm" tone="subdued">
-                Shop-Breakpoints: Mobil bis 767&nbsp;px, Tablet 768–1023&nbsp;px, Desktop ab 1024&nbsp;px.
-                Pro Gerät können Sie Hintergrund und Rahmen setzen oder leer lassen (transparent bzw. kein Rahmen),
-                sofern unten kein Fallback greift. Freie CSS-Werte sind möglich (z.&nbsp;B.{" "}
+                {c.secondNavBreakpoints}{" "}
                 <code style={{ fontSize: 12 }}>rgba(…)</code>,{" "}
                 <code style={{ fontSize: 12 }}>linear-gradient(…)</code>).
               </Text>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
                 <TextField
-                  label="Desktop: Hintergrund (CSS)"
+                  label={c.desktopBgCss}
                   value={styles.secondNav.bg_desktop ?? ""}
                   onChange={(v) => updateSection("secondNav", "bg_desktop", v)}
-                  placeholder="leer = Fallback bg_color oder transparent"
+                  placeholder={c.emptyFallbackBg}
                   autoComplete="off"
-                  helpText="z. B. transparent, #f9fafb, rgba(255,255,255,0.85)"
+                  helpText={c.bgExample}
                 />
                 <TextField
-                  label="Desktop: Rahmen (CSS border)"
+                  label={c.desktopBorderCss}
                   value={styles.secondNav.border_desktop ?? ""}
                   onChange={(v) => updateSection("secondNav", "border_desktop", v)}
-                  placeholder="leer = Fallback border"
+                  placeholder={c.emptyFallbackBorder}
                   autoComplete="off"
-                  helpText="z. B. none, 1px solid rgba(0,0,0,0.06)"
+                  helpText={c.borderExample}
                 />
                 <ColorField
-                  label="Desktop: Textfarbe"
+                  label={c.desktopTextColor}
                   value={styles.secondNav.text_color_desktop ?? ""}
                   onChange={(v) => updateSection("secondNav", "text_color_desktop", v)}
-                  helpText="Leer = globale Textfarbe darunter"
+                  helpText={c.emptyGlobalTextBelow}
                 />
                 <ColorField
-                  label="Desktop: Aktiv-Farbe"
+                  label={c.desktopActiveColor}
                   value={styles.secondNav.active_color_desktop ?? ""}
                   onChange={(v) => updateSection("secondNav", "active_color_desktop", v)}
-                  helpText="Leer = globale Aktiv-Farbe"
+                  helpText={c.emptyGlobalActive}
                 />
                 <TextField
-                  label="Tablet: Hintergrund (CSS)"
+                  label={c.tabletBgCss}
                   value={styles.secondNav.bg_tablet ?? ""}
                   onChange={(v) => updateSection("secondNav", "bg_tablet", v)}
-                  placeholder="leer = Fallback bg_color oder transparent"
+                  placeholder={c.emptyFallbackBg}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Tablet: Rahmen (CSS border)"
+                  label={c.tabletBorderCss}
                   value={styles.secondNav.border_tablet ?? ""}
                   onChange={(v) => updateSection("secondNav", "border_tablet", v)}
-                  placeholder="leer = Fallback border"
+                  placeholder={c.emptyFallbackBorder}
                   autoComplete="off"
                 />
                 <ColorField
-                  label="Tablet: Textfarbe"
+                  label={c.tabletTextColor}
                   value={styles.secondNav.text_color_tablet ?? ""}
                   onChange={(v) => updateSection("secondNav", "text_color_tablet", v)}
-                  helpText="Leer = globale Textfarbe"
+                  helpText={c.emptyGlobalText}
                 />
                 <ColorField
-                  label="Tablet: Aktiv-Farbe"
+                  label={c.tabletActiveColor}
                   value={styles.secondNav.active_color_tablet ?? ""}
                   onChange={(v) => updateSection("secondNav", "active_color_tablet", v)}
-                  helpText="Leer = globale Aktiv-Farbe"
+                  helpText={c.emptyGlobalActive}
                 />
                 <TextField
-                  label="Mobil: Hintergrund (CSS)"
+                  label={c.mobileBgCss}
                   value={styles.secondNav.bg_mobile ?? ""}
                   onChange={(v) => updateSection("secondNav", "bg_mobile", v)}
-                  placeholder="leer = Fallback bg_color oder transparent"
+                  placeholder={c.emptyFallbackBg}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Mobil: Rahmen (CSS border)"
+                  label={c.mobileBorderCss}
                   value={styles.secondNav.border_mobile ?? ""}
                   onChange={(v) => updateSection("secondNav", "border_mobile", v)}
-                  placeholder="leer = Fallback border"
+                  placeholder={c.emptyFallbackBorder}
                   autoComplete="off"
                 />
                 <ColorField
-                  label="Mobil: Textfarbe"
+                  label={c.mobileTextColor}
                   value={styles.secondNav.text_color_mobile ?? ""}
                   onChange={(v) => updateSection("secondNav", "text_color_mobile", v)}
-                  helpText="Leer = globale Textfarbe"
+                  helpText={c.emptyGlobalText}
                 />
                 <ColorField
-                  label="Mobil: Aktiv-Farbe"
+                  label={c.mobileActiveColor}
                   value={styles.secondNav.active_color_mobile ?? ""}
                   onChange={(v) => updateSection("secondNav", "active_color_mobile", v)}
-                  helpText="Leer = globale Aktiv-Farbe"
+                  helpText={c.emptyGlobalActive}
                 />
               </div>
               <Text as="p" variant="bodySm" tone="subdued">
-                Fallback für alle Geräte, wenn ein gerätespezifisches Feld leer bleibt (nicht ausgefüllt):
+                {c.fallbackAllDevices}
               </Text>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
                 <TextField
-                  label="Hintergrund-Fallback (bg_color)"
+                  label={c.bgFallback}
                   value={styles.secondNav.bg_color ?? ""}
                   onChange={(v) => updateSection("secondNav", "bg_color", v)}
                   autoComplete="off"
-                  helpText="Stil-Vorlagen setzen das oft; leer = durchgehend transparent wenn keine bg_* pro Gerät gesetzt sind."
+                  helpText={c.bgFallbackHelp}
                 />
                 <TextField
-                  label="Rahmen-Fallback (border)"
+                  label={c.borderFallback}
                   value={styles.secondNav.border ?? ""}
                   onChange={(v) => updateSection("secondNav", "border", v)}
                   autoComplete="off"
-                  helpText="Standard: none"
+                  helpText={c.borderFallbackDefault}
                 />
               </div>
               <Divider />
-              <Text as="h3" variant="headingSm">Link-Darstellung nach Gerät</Text>
+              <Text as="h3" variant="headingSm">{c.linkStylePerDevice}</Text>
               <Text as="p" variant="bodySm" tone="subdued">
-                Shop-Breakpoints: Mobil bis 767&nbsp;px, Tablet 768–1023&nbsp;px, Desktop ab 1024&nbsp;px.
-                Unter „Menü-Kacheln" steuern Sie nur die Pill-/Kachel-Optik (sichtbar, wenn hier „Kachel / Frostglas" gewählt ist).
-                In einer Landing-Page kann die Option „Second-Navigation auf Desktop klassisch" die <strong>Desktop</strong>-Einstellung
-                hier noch überschreiben und immer klassisch erzwingen.
+                {c.linkStylePerDeviceHelp}
               </Text>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
                 <Select
-                  label="Desktop (≥1024px)"
-                  options={SECOND_NAV_LINK_STYLE_OPTIONS}
+                  label={c.desktopGte1024}
+                  options={c.secondNavLinkStyleOptions}
                   value={styles.secondNav.link_style_desktop || "classic"}
                   onChange={(v) => updateSection("secondNav", "link_style_desktop", v)}
                 />
                 <Select
-                  label="Tablet (768–1023px)"
-                  options={SECOND_NAV_LINK_STYLE_OPTIONS}
+                  label={c.tablet768}
+                  options={c.secondNavLinkStyleOptions}
                   value={styles.secondNav.link_style_tablet || "pill"}
                   onChange={(v) => updateSection("secondNav", "link_style_tablet", v)}
                 />
                 <Select
-                  label="Mobil (≤767px)"
-                  options={SECOND_NAV_LINK_STYLE_OPTIONS}
+                  label={c.mobileLte767}
+                  options={c.secondNavLinkStyleOptions}
                   value={styles.secondNav.link_style_mobile || "pill"}
                   onChange={(v) => updateSection("secondNav", "link_style_mobile", v)}
                 />
@@ -2187,41 +2151,41 @@ export default function StylesPage() {
               <Divider />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 <Select
-                  label="Stil-Vorlage"
-                  options={SECOND_NAV_PRESET_LABELS}
+                  label={c.stylePreset}
+                  options={c.secondNavPresetOptions}
                   value={styles.secondNav.variant || "default"}
                   onChange={(v) => updateSection("secondNav", "variant", v)}
                 />
                 <ColorField
-                  label="Textfarbe"
+                  label={c.textColor}
                   value={styles.secondNav.text_color}
                   onChange={(v) => updateSection("secondNav", "text_color", v)}
                 />
                 <ColorField
-                  label="Aktiv-Farbe"
+                  label={c.activeColor}
                   value={styles.secondNav.active_color}
                   onChange={(v) => updateSection("secondNav", "active_color", v)}
                 />
                 <div style={{ gridColumn: "1 / -1" }}>
                   <BlockStack gap="200">
-                    <Text as="span" variant="bodySm" fontWeight="medium">Höhe (height)</Text>
+                    <Text as="span" variant="bodySm" fontWeight="medium">{c.height}</Text>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
                       <TextField
-                        label="Desktop (≥1024px)"
+                        label={c.desktopGte1024}
                         value={styles.secondNav.height_desktop || ""}
                         onChange={(v) => updateSection("secondNav", "height_desktop", v)}
                         placeholder={styles.secondNav.height || "44px"}
                         autoComplete="off"
                       />
                       <TextField
-                        label="Tablet (768–1023px)"
+                        label={c.tablet768}
                         value={styles.secondNav.height_tablet || ""}
                         onChange={(v) => updateSection("secondNav", "height_tablet", v)}
                         placeholder={styles.secondNav.height_desktop || styles.secondNav.height || "44px"}
                         autoComplete="off"
                       />
                       <TextField
-                        label="Mobil (≤767px)"
+                        label={c.mobileLte767}
                         value={styles.secondNav.height_mobile || ""}
                         onChange={(v) => updateSection("secondNav", "height_mobile", v)}
                         placeholder={styles.secondNav.height_desktop || styles.secondNav.height || "44px"}
@@ -2231,13 +2195,13 @@ export default function StylesPage() {
                   </BlockStack>
                 </div>
                 <TextField
-                  label="Schriftgröße (font-size)"
+                  label={c.fontSize}
                   value={styles.secondNav.font_size}
                   onChange={(v) => updateSection("secondNav", "font_size", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Schriftgewicht (font-weight)"
+                  label={c.fontWeight}
                   value={styles.secondNav.font_weight}
                   onChange={(v) => updateSection("secondNav", "font_weight", v)}
                   autoComplete="off"
@@ -2245,15 +2209,15 @@ export default function StylesPage() {
                 <div style={{ gridColumn: "1 / -1" }}>
                   <BlockStack gap="300">
                     <Checkbox
-                      label="Second Nav beim Scrollen ausblenden"
-                      helpText="Ausgeschaltet: Second Nav bleibt immer sichtbar, auch beim Scrollen."
+                      label={c.hideSecondNavOnScroll}
+                      helpText={c.hideSecondNavOnScrollHelp}
                       checked={styles.secondNav.hide_on_scroll !== false}
                       onChange={(v) => updateSection("secondNav", "hide_on_scroll", v)}
                     />
                     {styles.secondNav.hide_on_scroll !== false && (
                       <Checkbox
-                        label="Header-Chrome beim Scrollen hinter Second Nav beibehalten"
-                        helpText="Eingeschaltet: Der Header-Hintergrund bleibt hinter dem Second-Nav-Bereich sichtbar, auch wenn der Inhalt ausblendet. Ausgeschaltet (Standard): Hintergrund schrumpft gemeinsam mit dem Second Nav."
+                        label={c.chromeCoversOnScroll}
+                        helpText={c.chromeCoversOnScrollHelp}
                         checked={styles.secondNav.chrome_covers_on_scroll === true}
                         onChange={(v) => updateSection("secondNav", "chrome_covers_on_scroll", v)}
                       />
@@ -2262,53 +2226,51 @@ export default function StylesPage() {
                 </div>
               </div>
               <Divider />
-              <Text as="h3" variant="headingSm">Menü-Kacheln (Second Nav Links)</Text>
+              <Text as="h3" variant="headingSm">{c.menuTiles}</Text>
               <Text as="p" variant="bodySm" tone="subdued">
-                Gilt nur, wenn für das jeweilige Gerät oben „Kachel / Frostglas" aktiv ist.
-                Jeder Eintrag sitzt auf einem abgerundeten <strong>Rechteck</strong>: Eckenradius in{" "}
-                <code style={{ fontSize: 12 }}>px</code> — keine hohen Prozentwerte, die auf breiten Labels wie Zylinder wirken.
+                {c.menuTilesHelp}
               </Text>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
                 <ColorField
-                  label="Kachel-Hintergrund (CSS)"
+                  label={c.tileBgCss}
                   value={styles.secondNav.pill_background ?? ""}
                   onChange={(v) => updateSection("secondNav", "pill_background", v)}
                   preserveAlphaFromRgba
-                  helpText="Klick auf die Farbvorschau öffnet den System-Farbdialog. Bei rgba(…) bleibt die Transparenz erhalten; freier CSS-Text bleibt editierbar."
+                  helpText={c.tileBgHelp}
                 />
                 <TextField
-                  label="Rand (border)"
+                  label={c.border}
                   value={styles.secondNav.pill_border ?? ""}
                   onChange={(v) => updateSection("secondNav", "pill_border", v)}
-                  helpText="z.B. 1px solid rgba(255,255,255,0.2) oder none"
+                  helpText={c.tileBorderHelp}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Unschärfe (backdrop-filter)"
+                  label={c.blurBackdrop}
                   value={styles.secondNav.pill_backdrop ?? ""}
                   onChange={(v) => updateSection("secondNav", "pill_backdrop", v)}
-                  helpText="z.B. blur(12px)"
+                  helpText={c.blurExample}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Eckenradius"
+                  label={c.cornerRadius}
                   value={styles.secondNav.pill_border_radius ?? ""}
                   onChange={(v) => updateSection("secondNav", "pill_border_radius", v)}
-                  helpText="Nur Ecken runden: z.B. 8px oder 12px (kein 20% / 9999px — sonst Pillen-Look)"
+                  helpText={c.cornerRadiusHelp}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Innenabstand (padding)"
+                  label={c.padding}
                   value={styles.secondNav.pill_padding ?? ""}
                   onChange={(v) => updateSection("secondNav", "pill_padding", v)}
-                  helpText="z.B. 6px 14px"
+                  helpText={c.paddingExample}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Schatten (box-shadow)"
+                  label={c.shadow}
                   value={styles.secondNav.pill_shadow ?? ""}
                   onChange={(v) => updateSection("secondNav", "pill_shadow", v)}
-                  helpText="Meist none"
+                  helpText={c.shadowMostlyNone}
                   autoComplete="off"
                 />
               </div>
@@ -2319,17 +2281,17 @@ export default function StylesPage() {
         <AccordionCard title="Layout: Footer">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
             <ColorField
-              label="Hintergrundfarbe"
+              label={c.bgColor}
               value={styles.footer.bg_color}
               onChange={(v) => updateSection("footer", "bg_color", v)}
             />
             <ColorField
-              label="Textfarbe"
+              label={c.textColor}
               value={styles.footer.text_color}
               onChange={(v) => updateSection("footer", "text_color", v)}
             />
             <TextField
-              label="Oberer Rand (border-top)"
+              label={c.footerBorderTop}
               value={styles.footer.border_top}
               onChange={(v) => updateSection("footer", "border_top", v)}
               autoComplete="off"
@@ -2337,67 +2299,67 @@ export default function StylesPage() {
           </div>
         </AccordionCard>
 
-        {/* Mobil kaydırma + alt menü (≤1023px) */}
-        <AccordionCard title="Mobil: Kaydırma & untere Leiste" subtitle="Gilt für schmale/tablet Ansicht (≤1023px). Header beim Scrollen; untere Tab-Leiste (fest oder am Seitenende).">
+        {/* Mobile scroll + bottom bar (≤1023px) */}
+        <AccordionCard title={c.mobileScrollTitle} subtitle={c.mobileScrollSubtitle}>
           <BlockStack gap="400">
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
                 <Select
-                  label="Header nach dem Hochscrollen"
-                  options={MOBILE_HEADER_ON_SCROLL_OPTIONS}
+                  label={c.headerOnScrollUp}
+                  options={c.mobileHeaderOnScrollOptions}
                   value={styles.mobileChrome?.header_on_scroll ?? "frosted_white"}
                   onChange={(v) => updateSection("mobileChrome", "header_on_scroll", v)}
                 />
                 <TextField
-                  label="Frosted — Hintergrund (CSS)"
+                  label={c.frostedBg}
                   value={styles.mobileChrome?.frosted_bg ?? "rgba(255,255,255,0.92)"}
                   onChange={(v) => updateSection("mobileChrome", "frosted_bg", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Frosted — Unschärfe (blur)"
+                  label={c.frostedBlur}
                   value={styles.mobileChrome?.frosted_blur ?? "16px"}
                   onChange={(v) => updateSection("mobileChrome", "frosted_blur", v)}
                   autoComplete="off"
-                  helpText="z. B. 16px oder blur(20px)"
+                  helpText={c.frostedBlurHelp}
                 />
                 <Checkbox
-                  label="Header oben fixieren (≤1023px)"
+                  label={c.pinHeaderTop}
                   checked={styles.mobileChrome?.header_sticky !== false}
                   onChange={(v) => updateSection("mobileChrome", "header_sticky", v)}
-                  helpText="Aus = Header scrollt mit der Seite (kein Overlay)."
+                  helpText={c.pinHeaderHelp}
                 />
                 <Checkbox
-                  label="Untere Leiste am Viewport-Boden fixieren"
+                  label={c.pinBottomBar}
                   checked={styles.mobileChrome?.bottom_nav_sticky !== false}
                   onChange={(v) => updateSection("mobileChrome", "bottom_nav_sticky", v)}
-                  helpText="Aus = Leiste unter dem Seiteninhalt (nach dem Footer)."
+                  helpText={c.pinBottomBarHelp}
                 />
                 <Checkbox
-                  label="Untere Leiste beim Runterscrollen einziehen"
+                  label={c.recessBottomBar}
                   checked={styles.mobileChrome?.bottom_nav_recess_on_scroll === true}
                   onChange={(v) => updateSection("mobileChrome", "bottom_nav_recess_on_scroll", v)}
-                  helpText="Standard: aus — Leiste bleibt am unteren Rand. Nur wenn die Leiste fixiert ist."
+                  helpText={c.recessBottomBarHelp}
                 />
                 <TextField
-                  label="Untere Leiste — Hintergrund"
+                  label={c.bottomBarBg}
                   value={styles.mobileChrome?.bottom_nav_bg ?? "rgba(255,255,255,0.97)"}
                   onChange={(v) => updateSection("mobileChrome", "bottom_nav_bg", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Untere Leiste — oberer Rand (border-top)"
+                  label={c.bottomBarBorderTop}
                   value={styles.mobileChrome?.bottom_nav_border_top ?? "1px solid rgba(229,231,235,0.9)"}
                   onChange={(v) => updateSection("mobileChrome", "bottom_nav_border_top", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Untere Leiste — Unschärfe"
+                  label={c.bottomBarBlur}
                   value={styles.mobileChrome?.bottom_nav_blur ?? "12px"}
                   onChange={(v) => updateSection("mobileChrome", "bottom_nav_blur", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Untere Leiste — Schatten"
+                  label={c.bottomBarShadow}
                   value={styles.mobileChrome?.bottom_nav_shadow ?? "0 -2px 12px rgba(0,0,0,0.07)"}
                   onChange={(v) => updateSection("mobileChrome", "bottom_nav_shadow", v)}
                   autoComplete="off"
@@ -2407,45 +2369,45 @@ export default function StylesPage() {
         </AccordionCard>
 
         {/* Scroll-up Button */}
-        <AccordionCard title="Scroll-up Button">
+        <AccordionCard title={c.scrollUpTitle}>
           <BlockStack gap="400">
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 <Select
-                  label="Stil-Vorlage"
-                  options={SCROLL_UP_PRESET_LABELS}
+                  label={c.stylePreset}
+                  options={c.scrollUpPresetOptions}
                   value={styles.scrollUpButton.variant || "default"}
                   onChange={(v) => updateSection("scrollUpButton", "variant", v)}
                 />
                 <ColorField
-                  label="Hintergrundfarbe"
+                  label={c.bgColor}
                   value={styles.scrollUpButton.bg_color}
                   onChange={(v) => updateSection("scrollUpButton", "bg_color", v)}
                 />
                 <ColorField
-                  label="Icon-Farbe"
+                  label={c.iconColor}
                   value={styles.scrollUpButton.icon_color}
                   onChange={(v) => updateSection("scrollUpButton", "icon_color", v)}
                 />
                 <TextField
-                  label="Randradius (border-radius)"
+                  label={c.borderRadius}
                   value={styles.scrollUpButton.border_radius}
                   onChange={(v) => updateSection("scrollUpButton", "border_radius", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Größe (size)"
+                  label={c.size}
                   value={styles.scrollUpButton.size}
                   onChange={(v) => updateSection("scrollUpButton", "size", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Schatten (box-shadow)"
+                  label={c.shadow}
                   value={styles.scrollUpButton.shadow}
                   onChange={(v) => updateSection("scrollUpButton", "shadow", v)}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Rahmen (border)"
+                  label={c.border}
                   value={styles.scrollUpButton.border || ""}
                   onChange={(v) => updateSection("scrollUpButton", "border", v)}
                   autoComplete="off"
@@ -2453,7 +2415,7 @@ export default function StylesPage() {
               </div>
               {/* Live preview */}
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8 }}>
-                <Text variant="bodySm" tone="subdued">Vorschau:</Text>
+                <Text variant="bodySm" tone="subdued">{c.preview}</Text>
                 <div style={{
                   width: styles.scrollUpButton.size || "44px",
                   height: styles.scrollUpButton.size || "44px",
@@ -2473,7 +2435,7 @@ export default function StylesPage() {
         </AccordionCard>
 
         {/* Button styles */}
-        <AccordionCard title="Button-Stile">
+        <AccordionCard title={c.buttonStylesTitle}>
           {Object.entries(styles.buttons).map(([key, typeData]) => (
             <ButtonTypeSection
               key={key}
@@ -2520,7 +2482,7 @@ export default function StylesPage() {
           setBrandingPickerTarget(null);
         }}
         multiple={false}
-        title="Branding-Medien waehlen"
+        title={c.brandingMediaPickerTitle}
       />
       <MediaPickerModal
         open={headerBgPickerScope !== null}
@@ -2542,7 +2504,7 @@ export default function StylesPage() {
           setHeaderBgPickerScope(null);
         }}
         multiple={false}
-        title="Header-Hintergrundbild"
+        title={c.headerBgPickerTitle}
       />
     </Page>
   );

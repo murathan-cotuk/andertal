@@ -3,6 +3,7 @@
  */
 
 const { resolveOrderPaidTotalCents, orderBonusDiscountCents, orderCouponDiscountCents } = require('./order-money')
+const { getOrderPdfStrings, getOrderPdfFilename } = require('./order-pdf-i18n')
 
 const pdfDeLatin = (s) => {
   if (s == null || s === undefined) return ''
@@ -16,20 +17,25 @@ const pdfDeLatin = (s) => {
     .replace(/ß/g, 'ss')
 }
 
-const pdfFmtDate = (d) => {
+const pdfFmtDate = (d, locale = 'de') => {
   if (!d) return '—'
+  const s = getOrderPdfStrings(locale)
   try {
-    return new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return new Date(d).toLocaleDateString(s.dateLocale, { day: '2-digit', month: '2-digit', year: 'numeric' })
   } catch (_) {
     return '—'
   }
 }
 
-const pdfCents = (c) => (Number(c || 0) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' EUR'
+const pdfCents = (c, locale = 'de') => {
+  const s = getOrderPdfStrings(locale)
+  return (Number(c || 0) / 100).toLocaleString(s.dateLocale, { minimumFractionDigits: 2 }) + s.currencySuffix
+}
 
 /** Vendor info block: store_name / company_name / first+last, address, vat_id. */
-function resolveSellerDisplayLines(sellerInfo) {
+function resolveSellerDisplayLines(sellerInfo, locale = 'de') {
   if (!sellerInfo) return []
+  const s = getOrderPdfStrings(locale)
   const name =
     String(sellerInfo.store_name || '').trim() ||
     String(sellerInfo.company_name || '').trim() ||
@@ -44,7 +50,7 @@ function resolveSellerDisplayLines(sellerInfo) {
     if (zip || city) lines.push([zip, city].filter(Boolean).join(' '))
   }
   if (addr.country) lines.push(String(addr.country).trim())
-  if (sellerInfo.vat_id) lines.push(`USt-IdNr.: ${String(sellerInfo.vat_id).trim()}`)
+  if (sellerInfo.vat_id) lines.push(`${s.vatIdPrefix}: ${String(sellerInfo.vat_id).trim()}`)
   return lines.filter(Boolean)
 }
 
@@ -53,7 +59,8 @@ function resolveSellerDisplayLines(sellerInfo) {
  * @param {object} sellerInfo - optional, from seller_users row
  * @param {Buffer|null} shopLogoBuffer - optional logo image buffer for header
  */
-function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, shopName, sellerInfo, shopLogoBuffer }) {
+function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, shopName, sellerInfo, shopLogoBuffer, locale = 'de' }) {
+  const s = getOrderPdfStrings(locale)
   const left = doc.page.margins.left
   const right = doc.page.width - doc.page.margins.right
   const contentWidth = right - left
@@ -99,14 +106,14 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
       .text(pdfDeLatin(shopName || 'Andertal'), left + 14, 49, { width: contentWidth - 28, align: 'left' })
   }
 
-  doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(25).text('RECHNUNG', left, 94)
-  doc.font('Helvetica').fontSize(10).fillColor('#4b5563').text(`Rechnungs-Nr.: ${invoiceNumber}`, right - invoiceMetaWidth, 96, {
+  doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(25).text(s.invoiceTitle, left, 94)
+  doc.font('Helvetica').fontSize(10).fillColor('#4b5563').text(`${s.invoiceNoLabel}: ${invoiceNumber}`, right - invoiceMetaWidth, 96, {
     width: invoiceMetaWidth,
     align: 'right',
   })
-  doc.text(`Datum: ${pdfFmtDate(row.created_at)}`, right - invoiceMetaWidth, 111, { width: invoiceMetaWidth, align: 'right' })
+  doc.text(`${s.dateLabel}: ${pdfFmtDate(row.created_at, locale)}`, right - invoiceMetaWidth, 111, { width: invoiceMetaWidth, align: 'right' })
 
-  doc.fillColor('#111827').font('Helvetica-Bold').fontSize(10).text('KUNDE', left, 152)
+  doc.fillColor('#111827').font('Helvetica-Bold').fontSize(10).text(s.customerLabel, left, 152)
   doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
   ;[customerName || '—', row.email || null].filter(Boolean).forEach((line) => {
     doc.text(pdfDeLatin(line), left, doc.y + 1)
@@ -114,7 +121,7 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
 
   const addressTop = 152
   const rightColumnX = left + Math.round(contentWidth / 2) + 8
-  doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text('LIEFERADRESSE', rightColumnX, addressTop)
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text(s.deliveryAddressLabel, rightColumnX, addressTop)
   doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
   ;[customerName, row.address_line1, row.address_line2, [row.postal_code, row.city].filter(Boolean).join(' '), row.country]
     .filter(Boolean)
@@ -122,7 +129,7 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
 
   if (billingAddressDifferent) {
     const nextY = Math.max(doc.y, 216)
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text('RECHNUNGSADRESSE', rightColumnX, nextY)
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text(s.billingAddressLabel, rightColumnX, nextY)
     doc.font('Helvetica').fontSize(10).fillColor('#1f2937')
     ;[
       [row.first_name, row.last_name].filter(Boolean).join(' '),
@@ -138,17 +145,17 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   ensureY(tableTop)
   doc.rect(left, tableTop, contentWidth, 22).fill('#f3f4f6')
   doc.fillColor('#111827').font('Helvetica-Bold').fontSize(9)
-  doc.text('ARTIKEL', left + 8, tableTop + 7, { width: tableTitleW - 16 })
-  doc.text('MENGE', left + tableTitleW + 4, tableTop + 7, { width: tableQtyW - 8, align: 'right' })
-  doc.text('EINZELPREIS', tableUnitX + 4, tableTop + 7, { width: tableUnitW - 8, align: 'right' })
-  doc.text('GESAMT', tableTotalX + 4, tableTop + 7, { width: tableTotalW - 8, align: 'right' })
+  doc.text(s.itemLabel, left + 8, tableTop + 7, { width: tableTitleW - 16 })
+  doc.text(s.qtyLabel, left + tableTitleW + 4, tableTop + 7, { width: tableQtyW - 8, align: 'right' })
+  doc.text(s.unitPriceLabel, tableUnitX + 4, tableTop + 7, { width: tableUnitW - 8, align: 'right' })
+  doc.text(s.totalLabel, tableTotalX + 4, tableTop + 7, { width: tableTotalW - 8, align: 'right' })
   doc.y = tableTop + 27
 
   const drawItemRow = (it) => {
     const qty = Number(it.quantity || 1)
     const unit = Number(it.unit_price_cents || 0)
     const lineTotal = unit * qty
-    const title = pdfDeLatin(it.title || 'Artikel')
+    const title = pdfDeLatin(it.title || s.itemFallback)
     const titleHeight = doc.heightOfString(title, { width: tableTitleW - 16, align: 'left' })
     const rowHeight = Math.max(20, titleHeight + 8)
     const y = doc.y
@@ -156,23 +163,23 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
       doc.addPage()
       doc.rect(left, doc.page.margins.top, contentWidth, 22).fill('#f3f4f6')
       doc.fillColor('#111827').font('Helvetica-Bold').fontSize(9)
-      doc.text('ARTIKEL', left + 8, doc.page.margins.top + 7, { width: tableTitleW - 16 })
-      doc.text('MENGE', left + tableTitleW + 4, doc.page.margins.top + 7, { width: tableQtyW - 8, align: 'right' })
-      doc.text('EINZELPREIS', tableUnitX + 4, doc.page.margins.top + 7, { width: tableUnitW - 8, align: 'right' })
-      doc.text('GESAMT', tableTotalX + 4, doc.page.margins.top + 7, { width: tableTotalW - 8, align: 'right' })
+      doc.text(s.itemLabel, left + 8, doc.page.margins.top + 7, { width: tableTitleW - 16 })
+      doc.text(s.qtyLabel, left + tableTitleW + 4, doc.page.margins.top + 7, { width: tableQtyW - 8, align: 'right' })
+      doc.text(s.unitPriceLabel, tableUnitX + 4, doc.page.margins.top + 7, { width: tableUnitW - 8, align: 'right' })
+      doc.text(s.totalLabel, tableTotalX + 4, doc.page.margins.top + 7, { width: tableTotalW - 8, align: 'right' })
       doc.y = doc.page.margins.top + 27
     }
     const rowY = doc.y
     doc.font('Helvetica').fontSize(10).fillColor('#111827').text(title, left + 8, rowY + 4, { width: tableTitleW - 16 })
     doc.text(String(qty), left + tableTitleW + 4, rowY + 4, { width: tableQtyW - 8, align: 'right' })
-    doc.text(pdfCents(unit), tableUnitX + 4, rowY + 4, { width: tableUnitW - 8, align: 'right' })
-    doc.text(pdfCents(lineTotal), tableTotalX + 4, rowY + 4, { width: tableTotalW - 8, align: 'right' })
+    doc.text(pdfCents(unit, locale), tableUnitX + 4, rowY + 4, { width: tableUnitW - 8, align: 'right' })
+    doc.text(pdfCents(lineTotal, locale), tableTotalX + 4, rowY + 4, { width: tableTotalW - 8, align: 'right' })
     doc.moveTo(left, rowY + rowHeight).lineTo(right, rowY + rowHeight).lineWidth(0.5).strokeColor('#e5e7eb').stroke()
     doc.y = rowY + rowHeight + 2
   }
 
   if (!itemRows.length) {
-    drawItemRow({ title: 'Keine Artikel', quantity: 1, unit_price_cents: 0 })
+    drawItemRow({ title: s.noItems, quantity: 1, unit_price_cents: 0 })
   } else {
     itemRows.forEach(drawItemRow)
   }
@@ -188,17 +195,17 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
     doc.y = y + (bold ? 18 : 16)
   }
   doc.moveDown(0.4)
-  drawTotalLine('Zwischensumme', pdfCents(subtotal))
-  drawTotalLine('Versand', shipping > 0 ? pdfCents(shipping) : '0,00 EUR (kostenlos)')
+  drawTotalLine(s.subtotal, pdfCents(subtotal, locale))
+  drawTotalLine(s.shipping, shipping > 0 ? pdfCents(shipping, locale) : s.freeShipping)
   const pts = Number(row.bonus_points_redeemed || 0)
-  if (bonusDisc > 0) drawTotalLine(`Bonuspunkte (${pts} Pkt.)`, `-${pdfCents(bonusDisc)}`)
+  if (bonusDisc > 0) drawTotalLine(s.bonusPoints(pts), `-${pdfCents(bonusDisc, locale)}`)
   const cc = row.coupon_code ? String(row.coupon_code).trim() : ''
-  if (couponDisc > 0) drawTotalLine(cc ? `Gutschein (${pdfDeLatin(cc)})` : 'Gutschein', `-${pdfCents(couponDisc)}`)
+  if (couponDisc > 0) drawTotalLine(cc ? `${s.coupon} (${pdfDeLatin(cc)})` : s.coupon, `-${pdfCents(couponDisc, locale)}`)
   const remainder = Math.max(0, discount - bonusDisc - couponDisc)
-  if (remainder > 0) drawTotalLine('Rabatt', `-${pdfCents(remainder)}`)
+  if (remainder > 0) drawTotalLine(s.discount, `-${pdfCents(remainder, locale)}`)
   doc.moveTo(totalsX, doc.y).lineTo(right, doc.y).lineWidth(1).strokeColor('#d1d5db').stroke()
   doc.y += 4
-  drawTotalLine('Gesamt (Brutto)', pdfCents(grandTotal), true)
+  drawTotalLine(s.grandTotal, pdfCents(grandTotal, locale), true)
 
   // VAT breakdown (extracted from gross price)
   doc.y += 4
@@ -206,12 +213,12 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   if (sellerVatId) {
     const vatCents = Math.round(grandTotal * 19 / 119)
     const netCents = grandTotal - vatCents
-    drawTotalLine('darin enthaltene 19% MwSt.', pdfCents(vatCents), false, '#6b7280')
-    drawTotalLine('Nettobetrag', pdfCents(netCents), false, '#6b7280')
+    drawTotalLine(s.vatIncluded, pdfCents(vatCents, locale), false, '#6b7280')
+    drawTotalLine(s.netAmount, pdfCents(netCents, locale), false, '#6b7280')
   } else {
     doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
     doc.text(
-      pdfDeLatin('Gemaess §19 UStG wird keine Umsatzsteuer ausgewiesen (Kleinunternehmerregelung).'),
+      pdfDeLatin(s.vatExempt),
       totalsX,
       doc.y,
       { width: totalsWidth, align: 'left' },
@@ -220,14 +227,14 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   }
 
   // Seller info block
-  const sellerLines = resolveSellerDisplayLines(sellerInfo)
+  const sellerLines = resolveSellerDisplayLines(sellerInfo, locale)
   if (sellerLines.length) {
     doc.y += 10
     const sellerBlockY = doc.y
     if (sellerBlockY + sellerLines.length * 13 + 40 > doc.page.height - doc.page.margins.bottom) {
       doc.addPage()
     }
-    doc.font('Helvetica-Bold').fontSize(9).fillColor('#374151').text('VERKAEUFER', left, doc.y)
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#374151').text(s.sellerLabel, left, doc.y)
     doc.font('Helvetica').fontSize(9).fillColor('#4b5563')
     sellerLines.forEach((line) => {
       doc.text(pdfDeLatin(line), left, doc.y + 2)
@@ -235,7 +242,7 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
     doc.y += 6
     doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
     doc.text(
-      pdfDeLatin('Der Kaufvertrag wird ausschliesslich zwischen dem Kaeufer und dem oben genannten Verkaeufer geschlossen. Andertal Marktplatz handelt als technischer Vermittler und ist nicht Vertragspartei.'),
+      pdfDeLatin(s.sellerDisclaimer),
       left,
       doc.y,
       { width: contentWidth, align: 'left' },
@@ -245,7 +252,7 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   // Footer
   doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
   doc.text(
-    pdfDeLatin('Bei Fragen zu Ihrer Bestellung wenden Sie sich bitte direkt an den Verkaeufer. Andertal ist Marktplatzbetreiber und nicht Verkaeufer der Ware.'),
+    pdfDeLatin(s.invoiceFooter),
     left,
     doc.page.height - doc.page.margins.bottom - 22,
     { width: contentWidth, align: 'left' },
@@ -383,7 +390,8 @@ function renderProvisionsfakturPdfDocument(doc, { order, sellerInfo, shopName, c
   )
 }
 
-function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shopName, shopLogoBuffer }) {
+function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shopName, shopLogoBuffer, locale = 'de' }) {
+  const s = getOrderPdfStrings(locale)
   const on = invoiceNumber
   const left = doc.page.margins.left
   const right = doc.page.width - doc.page.margins.right
@@ -405,16 +413,16 @@ function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shop
       .text(pdfDeLatin(shopName || 'Andertal'), left + 14, 48, { width: 180 })
   }
   doc.fillColor('#94a3b8').font('Helvetica').fontSize(8)
-    .text('LIEFERSCHEIN', right - 120, 42, { width: 120, align: 'right' })
+    .text(s.deliveryTitle, right - 120, 42, { width: 120, align: 'right' })
   doc.fillColor('#fff').font('Helvetica-Bold').fontSize(11)
     .text(pdfDeLatin(`Nr. ${on}`), right - 120, 54, { width: 120, align: 'right' })
 
   // ── Meta strip ──────────────────────────────────────────────────────────
   doc.rect(left, 30 + headerH, contentWidth, 22).fill('#f1f5f9')
   doc.fillColor('#374151').font('Helvetica').fontSize(8.5)
-  doc.text(`Datum: ${pdfFmtDate(row.created_at)}`, left + 8, 30 + headerH + 7)
-  if (row.carrier_name) doc.text(pdfDeLatin(`Carrier: ${row.carrier_name}`), left + 130, 30 + headerH + 7)
-  if (row.tracking_number) doc.text(`Tracking: ${pdfDeLatin(String(row.tracking_number))}`, left + 280, 30 + headerH + 7)
+  doc.text(`${s.dateLabel}: ${pdfFmtDate(row.created_at, locale)}`, left + 8, 30 + headerH + 7)
+  if (row.carrier_name) doc.text(pdfDeLatin(`${s.shippingSection}: ${row.carrier_name}`), left + 130, 30 + headerH + 7)
+  if (row.tracking_number) doc.text(`${s.trackingLabel}: ${pdfDeLatin(String(row.tracking_number))}`, left + 280, 30 + headerH + 7)
 
   // ── Two-column address block ─────────────────────────────────────────────
   const blockTop = 30 + headerH + 34
@@ -424,7 +432,7 @@ function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shop
   // Left: delivery address
   doc.rect(left, blockTop, colW, 110).fill('#f8fafc').stroke('#e2e8f0')
   doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7.5)
-    .text('LIEFERADRESSE', left + 10, blockTop + 10, { width: colW - 20, characterSpacing: 0.5 })
+    .text(s.deliveryAddressLabel, left + 10, blockTop + 10, { width: colW - 20, characterSpacing: 0.5 })
   doc.fillColor('#111827').font('Helvetica-Bold').fontSize(10)
     .text(pdfDeLatin(custName || '—'), left + 10, blockTop + 24)
   doc.font('Helvetica').fontSize(9.5).fillColor('#374151')
@@ -435,10 +443,10 @@ function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shop
   // Right: order info
   doc.rect(col2X, blockTop, colW, 110).fill('#f8fafc').stroke('#e2e8f0')
   doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7.5)
-    .text('BESTELLINFO', col2X + 10, blockTop + 10, { width: colW - 20, characterSpacing: 0.5 })
+    .text(s.orderInfoLabel, col2X + 10, blockTop + 10, { width: colW - 20, characterSpacing: 0.5 })
   const infoLines = [
-    row.email ? `E-Mail: ${pdfDeLatin(row.email)}` : null,
-    row.phone ? `Tel.: ${pdfDeLatin(String(row.phone))}` : null,
+    row.email ? `${s.emailLabel}: ${pdfDeLatin(row.email)}` : null,
+    row.phone ? `${s.phoneLabel}: ${pdfDeLatin(String(row.phone))}` : null,
   ].filter(Boolean)
   doc.fillColor('#374151').font('Helvetica').fontSize(9.5)
   let infoY = blockTop + 24
@@ -449,23 +457,23 @@ function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shop
   doc.rect(left, tableTop, contentWidth, 20).fill('#1e293b')
   doc.fillColor('#fff').font('Helvetica-Bold').fontSize(8.5)
   const qW = 48, prW = 100
-  doc.text('ARTIKEL', left + 8, tableTop + 6, { width: contentWidth - qW - prW - 16 })
-  doc.text('MENGE', right - qW - prW, tableTop + 6, { width: qW, align: 'right' })
-  doc.text('EINZELPREIS', right - prW, tableTop + 6, { width: prW - 4, align: 'right' })
+  doc.text(s.itemLabel, left + 8, tableTop + 6, { width: contentWidth - qW - prW - 16 })
+  doc.text(s.qtyLabel, right - qW - prW, tableTop + 6, { width: qW, align: 'right' })
+  doc.text(s.unitPriceLabel, right - prW, tableTop + 6, { width: prW - 4, align: 'right' })
   doc.y = tableTop + 24
 
-  const rows2 = itemRows.length ? itemRows : [{ title: 'Keine Artikel', quantity: 1, unit_price_cents: 0 }]
+  const rows2 = itemRows.length ? itemRows : [{ title: s.noItems, quantity: 1, unit_price_cents: 0 }]
   rows2.forEach((it, idx) => {
     const qty = Number(it.quantity || 1)
     const unit = Number(it.unit_price_cents || 0)
-    const title = pdfDeLatin(it.title || 'Artikel')
+    const title = pdfDeLatin(it.title || s.itemFallback)
     const h = Math.max(18, doc.heightOfString(title, { width: contentWidth - qW - prW - 20 }) + 8)
     const y = doc.y
     if (idx % 2 === 1) doc.rect(left, y, contentWidth, h).fill('#f8fafc')
     doc.fillColor('#111827').font('Helvetica').fontSize(9.5)
       .text(title, left + 8, y + 4, { width: contentWidth - qW - prW - 16 })
     doc.text(String(qty), right - qW - prW, y + 4, { width: qW, align: 'right' })
-    doc.text(pdfCents(unit), right - prW, y + 4, { width: prW - 4, align: 'right' })
+    doc.text(pdfCents(unit, locale), right - prW, y + 4, { width: prW - 4, align: 'right' })
     doc.moveTo(left, y + h).lineTo(right, y + h).lineWidth(0.4).strokeColor('#e2e8f0').stroke()
     doc.y = y + h
   })
@@ -474,7 +482,7 @@ function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shop
   doc.y += 12
   doc.rect(left, doc.y, contentWidth, 26).fill('#f1f5f9')
   doc.fillColor('#64748b').font('Helvetica').fontSize(8)
-    .text(pdfDeLatin('Dieser Lieferschein dient der Zuordnung der Sendung. Keine Rechnung.'), left + 8, doc.y + 9, { width: contentWidth - 16 })
+    .text(pdfDeLatin(s.deliveryFooter), left + 8, doc.y + 9, { width: contentWidth - 16 })
 }
 
 function pdfDocToBuffer(renderFn) {
@@ -547,7 +555,7 @@ async function _querySellerInfo(pgClient, sellerId) {
   }
 }
 
-async function buildInvoicePdfBuffer(pgClient, orderId) {
+async function buildInvoicePdfBuffer(pgClient, orderId, locale = 'de') {
   const id = String(orderId || '').trim()
   const oRes = await pgClient.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
   const row = oRes.rows && oRes.rows[0]
@@ -569,12 +577,13 @@ async function buildInvoicePdfBuffer(pgClient, orderId) {
       shopName,
       sellerInfo,
       shopLogoBuffer,
+      locale,
     }),
   )
-  return { filename: `Rechnung-${on}.pdf`, content: buf }
+  return { filename: getOrderPdfFilename('invoice', on, locale), content: buf }
 }
 
-async function buildLieferscheinPdfBuffer(pgClient, orderId) {
+async function buildLieferscheinPdfBuffer(pgClient, orderId, locale = 'de') {
   const id = String(orderId || '').trim()
   const oRes = await pgClient.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
   const row = oRes.rows && oRes.rows[0]
@@ -587,9 +596,9 @@ async function buildLieferscheinPdfBuffer(pgClient, orderId) {
     .then((r) => r.rows?.[0]?.shop_logo_url || '').catch(() => '')
   const shopLogoBuffer = logoUrl ? await _fetchImageBuffer(logoUrl) : null
   const buf = await lieferscheinDocToBuffer((doc) =>
-    renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber: on, shopName, shopLogoBuffer }),
+    renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber: on, shopName, shopLogoBuffer, locale }),
   )
-  return { filename: `Lieferschein-${on}.pdf`, content: buf }
+  return { filename: getOrderPdfFilename('lieferschein', on, locale), content: buf }
 }
 
 /**
@@ -671,5 +680,7 @@ module.exports = {
   buildLieferscheinPdfBuffer,
   buildProvisionsfakturPdfBuffer,
   renderInvoicePdfDocument,
+  renderLieferscheinPdfDocument,
   renderProvisionsfakturPdfDocument,
+  getOrderPdfFilename,
 }

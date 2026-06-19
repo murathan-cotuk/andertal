@@ -104,7 +104,13 @@
     "sellers": "Satıcılar",
     "coupons": "Kuponlar",
     "landingPage": "Açılış sayfası",
-    "styles": "Stiller"
+    "styles": "Stiller",
+    "promotions": "Promosyonlar",
+    "flows": "Akışlar",
+    "newsletter": "Bülten",
+    "productGroups": "Ürün grupları",
+    "issueLog": "Sorun günlüğü",
+    "transactions": "İşlemler"
   },
   "rankingPage": {
     "title": "Mağazada ürün sıralaması",

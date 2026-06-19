@@ -16,47 +16,16 @@ import {
   Box,
   Spinner,
 } from "@shopify/polaris";
+import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
-
-const PM_LABELS = {
-  card:               "Kredit- / Debitkarte",
-  paypal:             "PayPal",
-  klarna:             "Klarna",
-  sepa_debit:         "SEPA-Lastschrift",
-  ideal:              "iDEAL",
-  bancontact:         "Bancontact",
-  eps:                "EPS",
-  p24:                "Przelewy24",
-  giropay:            "Giropay",
-  sofort:             "Sofort",
-  link:               "Link (Stripe)",
-  affirm:             "Affirm",
-  afterpay_clearpay:  "Afterpay / Clearpay",
-  blik:               "BLIK",
-  cashapp:            "Cash App Pay",
-  mobilepay:          "MobilePay",
-  multibanco:         "Multibanco",
-  oxxo:               "OXXO",
-  paynow:             "PayNow",
-  pix:                "Pix",
-  promptpay:          "PromptPay",
-  revolut_pay:        "Revolut Pay",
-  swish:              "Swish",
-  twint:              "TWINT",
-  us_bank_account:    "US Bank Account (ACH)",
-  wechat_pay:         "WeChat Pay",
-  zip:                "Zip",
-  amazon_pay:         "Amazon Pay",
-  au_becs_debit:      "AU BECS Debit",
-  bacs_debit:         "BACS Debit",
-  boleto:             "Boleto",
-  fpx:                "FPX",
-  konbini:            "Konbini",
-  acss_debit:         "ACSS Debit",
-};
+import { useUI } from "@/lib/ui-strings";
+import { getCheckoutCopy, paymentMethodLabel } from "@/lib/checkout-i18n";
 
 export default function SettingsCheckoutPage() {
+  const locale = useLocale();
+  const ui = useUI();
+  const copy = getCheckoutCopy(locale);
   const unsaved = useUnsavedChanges();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,9 +38,8 @@ export default function SettingsCheckoutPage() {
   const [paypalSecret, setPaypalSecret] = useState("");
   const [paymentMethodLayout, setPaymentMethodLayout] = useState("grid");
 
-  // Dynamic Stripe payment methods
-  const [stripeMethods, setStripeMethods] = useState([]);     // available in Stripe
-  const [selectedMethods, setSelectedMethods] = useState(["card"]); // checked = shown in shop
+  const [stripeMethods, setStripeMethods] = useState([]);
+  const [selectedMethods, setSelectedMethods] = useState(["card"]);
   const [stripeMethodsLoading, setStripeMethodsLoading] = useState(false);
   const [stripeMethodsErr, setStripeMethodsErr] = useState("");
 
@@ -86,18 +54,17 @@ export default function SettingsCheckoutPage() {
     try {
       const d = await getMedusaAdminClient().getStripePaymentMethods();
       setStripeMethods(Array.isArray(d.available) ? d.available : []);
-      // Use the already-selected methods from DB, not the ones Stripe returns as "selected"
       if (currentSelected !== undefined) {
         setSelectedMethods(currentSelected);
       } else if (Array.isArray(d.selected) && d.selected.length > 0) {
         setSelectedMethods(d.selected);
       }
     } catch (e) {
-      setStripeMethodsErr(e?.message || "Stripe-Zahlmethoden konnten nicht geladen werden.");
+      setStripeMethodsErr(e?.message || copy.methodsLoadError);
     } finally {
       setStripeMethodsLoading(false);
     }
-  }, []);
+  }, [copy.methodsLoadError]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,7 +78,6 @@ export default function SettingsCheckoutPage() {
       setPaymentMethodLayout(d.payment_method_layout === "list" ? "list" : "grid");
       setMeta(d);
 
-      // Determine current selected methods from DB
       const currentSelected = Array.isArray(d.payment_method_types_json) && d.payment_method_types_json.length > 0
         ? d.payment_method_types_json
         : [
@@ -129,14 +95,13 @@ export default function SettingsCheckoutPage() {
         selectedMethods: [...currentSelected].sort(),
       }));
 
-      // Load available Stripe methods in background
       loadStripeMethods(currentSelected);
     } catch (e) {
-      setErr(e?.message || "Laden fehlgeschlagen");
+      setErr(e?.message || copy.loadError);
     } finally {
       setLoading(false);
     }
-  }, [loadStripeMethods]);
+  }, [loadStripeMethods, copy.loadError]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -144,7 +109,7 @@ export default function SettingsCheckoutPage() {
     setSelectedMethods((prev) => {
       if (prev.includes(pmType)) {
         const next = prev.filter((m) => m !== pmType);
-        return next.length > 0 ? next : prev; // mind. eine Methode
+        return next.length > 0 ? next : prev;
       }
       return [...prev, pmType];
     });
@@ -161,15 +126,14 @@ export default function SettingsCheckoutPage() {
       if (sk) payload.stripe_secret_key = sk;
       const r = await getMedusaAdminClient().testPlatformStripeConnection(payload);
       if (r?.ok) {
-        const extra = r.mode ? ` (${r.mode === "test" ? "Testmodus" : "Live"})` : "";
-        setStripeTestBanner({ tone: "success", text: `${r.message || "Verbindung erfolgreich."}${extra}` });
-        // Reload Stripe methods after successful key test
+        const extra = r.mode ? ` (${r.mode === "test" ? copy.testMode : copy.liveMode})` : "";
+        setStripeTestBanner({ tone: "success", text: `${r.message || copy.connectionOk}${extra}` });
         loadStripeMethods(undefined);
       } else {
-        setStripeTestBanner({ tone: "critical", text: r?.message || "Stripe-Verbindung fehlgeschlagen." });
+        setStripeTestBanner({ tone: "critical", text: r?.message || copy.connectionFailed });
       }
     } catch (e) {
-      setStripeTestBanner({ tone: "critical", text: e?.message || "Anfrage fehlgeschlagen." });
+      setStripeTestBanner({ tone: "critical", text: e?.message || copy.requestFailed });
     } finally {
       setTestLoading(false);
     }
@@ -183,9 +147,7 @@ export default function SettingsCheckoutPage() {
       const prevPk = (meta?.stripe_publishable_key || "").trim();
       const pkChanged = stripePk.trim() !== prevPk;
       if (pkChanged && !stripeSk.trim()) {
-        setErr(
-          "Publishable Key wurde geändert, aber das Secret-Feld ist leer — der alte Secret Key in der Datenbank bleibt aktiv. Tragen Sie das neue Secret Key (sk_…) ein und speichern Sie erneut.",
-        );
+        setErr(copy.pkChangedNoSk);
         setSaving(false);
         return;
       }
@@ -198,12 +160,12 @@ export default function SettingsCheckoutPage() {
       if (stripeSk.trim()) body.stripe_secret_key = stripeSk.trim();
       if (paypalSecret.trim()) body.paypal_client_secret = paypalSecret.trim();
       await getMedusaAdminClient().updatePlatformCheckoutSettings(body);
-      setOk("Gespeichert.");
+      setOk(copy.saved);
       setStripeSk("");
       setPaypalSecret("");
       await load();
     } catch (e) {
-      setErr(e?.message || "Speichern fehlgeschlagen");
+      setErr(e?.message || copy.saveError);
     } finally {
       setSaving(false);
     }
@@ -253,26 +215,22 @@ export default function SettingsCheckoutPage() {
 
   if (loading) {
     return (
-      <Page title="Checkout & Zahlungen (Shop)">
-        <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
+      <Page title={copy.pageTitle}>
+        <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>
       </Page>
     );
   }
 
   return (
-    <Page title="Checkout & Zahlungen (Shop)">
+    <Page title={copy.pageTitle}>
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
-            <Text as="p" tone="subdued">
-              Stripe-Schlüssel und aktivierte Zahlarten für den Shop-Checkout. Nur Superuser.
-            </Text>
+            <Text as="p" tone="subdued">{copy.pageIntro}</Text>
 
             {(meta?.env_stripe_secret || meta?.env_stripe_publishable) ? (
               <Banner tone="info">
-                <Text as="p" variant="bodySm">
-                  Auf Render/Vercel gesetzte STRIPE_* Umgebungsvariablen werden für den Shop-Checkout nicht verwendet. Maßgeblich sind ausschließlich die in Sellercentral gespeicherten Schlüssel (Datenbank).
-                </Text>
+                <Text as="p" variant="bodySm">{copy.envBanner}</Text>
               </Banner>
             ) : null}
 
@@ -283,24 +241,21 @@ export default function SettingsCheckoutPage() {
               <Banner tone="success" onDismiss={() => setOk("")}><Text>{ok}</Text></Banner>
             ) : null}
 
-            {/* Stripe Keys */}
             <Card>
               <BlockStack gap="400">
-                <Text variant="headingMd" as="h2">Stripe</Text>
-                <Text tone="subdued" variant="bodySm">
-                  Publishable (pk_…) und Secret (sk_…) müssen zum selben Stripe-Konto gehören. Leeres Secret-Feld beim Speichern lässt den bisherigen Secret Key unverändert.
-                </Text>
-                <TextField label="Stripe Publishable Key" value={stripePk} onChange={setStripePk} autoComplete="off" />
+                <Text variant="headingMd" as="h2">{copy.stripeTitle}</Text>
+                <Text tone="subdued" variant="bodySm">{copy.stripeHelp}</Text>
+                <TextField label={copy.stripePk} value={stripePk} onChange={setStripePk} autoComplete="off" />
                 <TextField
-                  label="Stripe Secret Key (neu setzen)"
+                  label={copy.stripeSk}
                   type="password"
                   value={stripeSk}
                   onChange={setStripeSk}
                   autoComplete="new-password"
                   helpText={
                     meta?.stripe_secret_key_set
-                      ? `In DB gespeichert (${meta.stripe_secret_key_hint || "****"})`
-                      : "Noch kein Secret in der Datenbank"
+                      ? copy.secretInDb(meta.stripe_secret_key_hint)
+                      : copy.noSecretInDb
                   }
                 />
                 {stripeTestBanner ? (
@@ -311,17 +266,14 @@ export default function SettingsCheckoutPage() {
               </BlockStack>
             </Card>
 
-            {/* Dynamic payment methods from Stripe */}
             <Card>
               <BlockStack gap="400">
                 <InlineStack align="space-between" blockAlign="center">
-                  <Text variant="headingMd" as="h2">Zahlarten im Checkout</Text>
+                  <Text variant="headingMd" as="h2">{copy.methodsTitle}</Text>
                   {stripeMethodsLoading && <Spinner size="small" />}
                 </InlineStack>
 
-                <Text tone="subdued" variant="bodySm">
-                  Im Stripe-Dashboard aktivierte Zahlmethoden werden hier aufgelistet. Nur angehakte Methoden erscheinen im Shop-Checkout.
-                </Text>
+                <Text tone="subdued" variant="bodySm">{copy.methodsHelp}</Text>
 
                 {stripeMethodsErr ? (
                   <Banner tone="warning">
@@ -330,9 +282,7 @@ export default function SettingsCheckoutPage() {
                 ) : null}
 
                 {!stripeMethodsLoading && stripeMethods.length === 0 && !stripeMethodsErr ? (
-                  <Text tone="subdued" variant="bodySm">
-                    Keine Zahlmethoden gefunden. Stellen Sie sicher, dass der Stripe Secret Key gespeichert ist, und testen Sie die Verbindung.
-                  </Text>
+                  <Text tone="subdued" variant="bodySm">{copy.noMethods}</Text>
                 ) : null}
 
                 {stripeMethods.length > 0 && (
@@ -340,7 +290,7 @@ export default function SettingsCheckoutPage() {
                     {stripeMethods.map((pmType) => (
                       <Checkbox
                         key={pmType}
-                        label={PM_LABELS[pmType] || pmType}
+                        label={paymentMethodLabel(locale, pmType)}
                         checked={selectedMethods.includes(pmType)}
                         onChange={() => toggleMethod(pmType)}
                       />
@@ -349,18 +299,18 @@ export default function SettingsCheckoutPage() {
                 )}
 
                 <BlockStack gap="200">
-                  <Text variant="bodyMd" fontWeight="medium">Darstellung im Shop</Text>
+                  <Text variant="bodyMd" fontWeight="medium">{copy.displayTitle}</Text>
                   <RadioButton
-                    label="Tabs (nebeneinander)"
-                    helpText="Zahlmethoden als horizontale Tabs anzeigen."
+                    label={copy.layoutTabs}
+                    helpText={copy.layoutTabsHelp}
                     checked={paymentMethodLayout === "grid"}
                     id="layout-grid"
                     name="paymentMethodLayout"
                     onChange={() => setPaymentMethodLayout("grid")}
                   />
                   <RadioButton
-                    label="Liste (untereinander)"
-                    helpText="Zahlmethoden als vertikale Accordion-Liste anzeigen."
+                    label={copy.layoutList}
+                    helpText={copy.layoutListHelp}
                     checked={paymentMethodLayout === "list"}
                     id="layout-list"
                     name="paymentMethodLayout"
@@ -370,40 +320,31 @@ export default function SettingsCheckoutPage() {
               </BlockStack>
             </Card>
 
-            {/* PayPal API */}
             <Card>
               <BlockStack gap="400">
-                <Text variant="headingMd" as="h2">PayPal API (optional)</Text>
-                <Text tone="subdued" variant="bodySm">
-                  Zusätzliche Hinterlegung für spätere Integrationen; Live-Zahlung läuft primär über Stripe PaymentElement.
-                </Text>
-                <TextField label="PayPal Client ID" value={paypalClientId} onChange={setPaypalClientId} autoComplete="off" />
+                <Text variant="headingMd" as="h2">{copy.paypalTitle}</Text>
+                <Text tone="subdued" variant="bodySm">{copy.paypalHelp}</Text>
+                <TextField label={copy.paypalClientId} value={paypalClientId} onChange={setPaypalClientId} autoComplete="off" />
                 <TextField
-                  label="PayPal Client Secret (neu setzen)"
+                  label={copy.paypalSecret}
                   type="password"
                   value={paypalSecret}
                   onChange={setPaypalSecret}
                   autoComplete="new-password"
                   helpText={
                     meta?.paypal_client_secret_set
-                      ? `Secret in DB (${meta.paypal_client_secret_hint || "****"})`
-                      : "Optional"
+                      ? copy.secretInDb(meta.paypal_client_secret_hint)
+                      : copy.optional
                   }
                 />
               </BlockStack>
             </Card>
 
             <InlineStack gap="300" blockAlign="center">
-              <Button variant="primary" onClick={save} loading={saving}>
-                Speichern
-              </Button>
-              <Button onClick={testStripe} loading={testLoading} disabled={saving}>
-                Stripe-Verbindung testen
-              </Button>
+              <Button variant="primary" onClick={save} loading={saving}>{ui.save}</Button>
+              <Button onClick={testStripe} loading={testLoading} disabled={saving}>{copy.testStripe}</Button>
             </InlineStack>
-            <Text as="p" tone="subdued" variant="bodySm">
-              „Stripe-Verbindung testen" ruft balance.retrieve auf und lädt danach die verfügbaren Zahlmethoden neu.
-            </Text>
+            <Text as="p" tone="subdued" variant="bodySm">{copy.testStripeHint}</Text>
           </BlockStack>
         </Layout.Section>
       </Layout>

@@ -1,4 +1,5 @@
 ﻿import ExcelJS from "exceljs";
+import { getImportApiMessages, resolveRequestLocale } from "@/lib/import-export-i18n";
 
 const LANGS = ["de", "en", "tr", "fr", "it", "es"];
 /** Legacy per-country Excel columns — still read on import for old templates */
@@ -832,7 +833,7 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
   return out;
 }
 
-function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
+function buildProductPayload(parentRow, childRows, headers, idx, get, lookups, msg) {
   const G = (key) => get(parentRow, key);
   const { slugToId, brandByLowerName, shipByLowerName } = lookups;
 
@@ -923,17 +924,17 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
     const cBrand = str(cGet("brand"));
     const cBrandRef = cBrand ? brandByLowerName.get(cBrand.toLowerCase()) : null;
     if (cBrand && !cBrandRef) {
-      return { error: `Unbekannte Marke (child row): "${cBrand}"` };
+      return { error: msg.unknownBrandChild(cBrand) };
     }
     const cCatSlug = str(cGet("category_slug"));
     const cCatId = cCatSlug ? slugToId.get(cCatSlug.toLowerCase()) : null;
     if (cCatSlug && !cCatId) {
-      return { error: `Unbekannte Kategorie (child row): "${cCatSlug}"` };
+      return { error: msg.unknownCategoryChild(cCatSlug) };
     }
     const cShip = str(cGet("shipping_group"));
     const cShipRef = cShip ? shipByLowerName.get(cShip.toLowerCase()) : null;
     if (cShip && !cShipRef) {
-      return { error: `Unbekannte Versandgruppe (child row): "${cShip}"` };
+      return { error: msg.unknownShippingChild(cShip) };
     }
     const cPrices = collectEurPriceBlock(cGet);
     if (cBrandRef?.id) variantMeta.brand_id = cBrandRef.id;
@@ -1027,7 +1028,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
   if (brandName) {
     const b = brandByLowerName.get(brandName.toLowerCase());
     if (!b) {
-      return { error: `Unbekannte Marke (nicht im System): "${brandName}"` };
+      return { error: msg.unknownBrand(brandName) };
     }
     payload.metadata.brand_id = b.id;
   }
@@ -1036,7 +1037,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
   if (catSlug) {
     const id = slugToId.get(catSlug.toLowerCase());
     if (!id) {
-      return { error: `Unbekannte Kategorie (slug): "${catSlug}"` };
+      return { error: msg.unknownCategory(catSlug) };
     }
     payload.metadata.category_id = id;
     payload.metadata.category_slug = catSlug;
@@ -1046,7 +1047,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups) {
   if (shipN) {
     const g = shipByLowerName.get(shipN.toLowerCase());
     if (!g) {
-      return { error: `Unbekannte Versandgruppe: "${shipN}"` };
+      return { error: msg.unknownShipping(shipN) };
     }
     payload.metadata.shipping_group_id = g.id;
   }
@@ -1091,10 +1092,15 @@ export async function POST(request) {
     const formData = await request.formData();
     const file = formData.get("file");
     const sellerToken = formData.get("sellerToken") || "";
+    const localeRaw = formData.get("locale");
+    const locale = localeRaw
+      ? String(localeRaw).slice(0, 2).toLowerCase()
+      : resolveRequestLocale(request);
+    const msg = getImportApiMessages(locale);
     const backendUrl = getBackendBase();
 
     if (!file || typeof file === "string") {
-      return Response.json({ error: "No file provided" }, { status: 400 });
+      return Response.json({ error: msg.noFile }, { status: 400 });
     }
 
     const buf = Buffer.from(await file.arrayBuffer());
@@ -1108,7 +1114,7 @@ export async function POST(request) {
     await wb.xlsx.load(buf);
 
     const ws = wb.getWorksheet("Products") || wb.worksheets[0];
-    if (!ws) return Response.json({ error: "Sheet 'Products' not found" }, { status: 400 });
+    if (!ws) return Response.json({ error: msg.sheetNotFound }, { status: 400 });
 
     const headerRow = ws.getRow(2);
     const headers = [];
@@ -1124,16 +1130,16 @@ export async function POST(request) {
     const dataRows = normalizeDataRows(ws, headers.length);
 
     if (dataRows.length === 0) {
-      return Response.json({ error: "No data rows found (rows must start from row 4)" }, { status: 400 });
+      return Response.json({ error: msg.noDataRows }, { status: 400 });
     }
 
     const { parents, children, idx, get, errors: groupErrors } = groupRows(dataRows, headers);
 
     if (parents.size === 0) {
-      return Response.json({ error: "No parent rows found. Add rows with product_type='parent'." }, { status: 400 });
+      return Response.json({ error: msg.noParentRows }, { status: 400 });
     }
     if (groupErrors.length) {
-      return Response.json({ error: "Excel validation failed", errors: groupErrors }, { status: 400 });
+      return Response.json({ error: msg.validationFailed, errors: groupErrors }, { status: 400 });
     }
 
     const lookups = await loadImportLookups(backendUrl, sellerToken);
@@ -1145,7 +1151,7 @@ export async function POST(request) {
 
     for (const [sku, parentRow] of parents) {
       const childRows = children.get(sku) || [];
-      const built = buildProductPayload(parentRow, childRows, headers, idx, get, lookups);
+      const built = buildProductPayload(parentRow, childRows, headers, idx, get, lookups, msg);
       if (built.error) {
         results.failed++;
         results.errors.push({ sku, error: built.error });
@@ -1203,7 +1209,7 @@ export async function POST(request) {
                 });
                 if (vRes.ok) {
                   results.updated++;
-                  results.errors.push({ sku, error: `Warnung: Varianten aktualisiert, aber GPSR-Felder fehlen noch: ${err.message}` });
+                  results.errors.push({ sku, error: msg.gpsrWarning(err.message) });
                   continue;
                 }
               } catch (_) {}
@@ -1222,7 +1228,7 @@ export async function POST(request) {
 
       if (!payload.title) {
         results.failed++;
-        results.errors.push({ sku, error: "Missing title (or title_de/title_en)" });
+        results.errors.push({ sku, error: msg.missingTitle });
         continue;
       }
 
@@ -1283,6 +1289,6 @@ export async function POST(request) {
     });
   } catch (e) {
     console.error("Import error:", e);
-    return Response.json({ error: e.message || "Import failed" }, { status: 500 });
+    return Response.json({ error: e.message || msg.importFailed }, { status: 500 });
   }
 }

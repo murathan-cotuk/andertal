@@ -1,0 +1,155 @@
+const LOCALES = ['de', 'en', 'tr', 'fr', 'es', 'it']
+
+function resolvePdfLocale(locale) {
+  const loc = String(locale || 'de').slice(0, 2).toLowerCase()
+  return LOCALES.includes(loc) ? loc : 'de'
+}
+
+const STRINGS = {
+  de: {
+    fileInvoice: 'Rechnung',
+    fileDelivery: 'Lieferschein',
+    invoiceTitle: 'RECHNUNG',
+    deliveryTitle: 'LIEFERSCHEIN',
+    invoiceNoLabel: 'Rechnungs-Nr.',
+    deliveryNoLabel: 'Lieferschein-Nr.',
+    dateLabel: 'Datum',
+    customerLabel: 'KUNDE',
+    deliveryAddressLabel: 'LIEFERADRESSE',
+    billingAddressLabel: 'RECHNUNGSADRESSE',
+    orderInfoLabel: 'BESTELLINFO',
+    itemLabel: 'ARTIKEL',
+    qtyLabel: 'MENGE',
+    unitPriceLabel: 'EINZELPREIS',
+    totalLabel: 'GESAMT',
+    itemFallback: 'Artikel',
+    noItems: 'Keine Artikel',
+    subtotal: 'Zwischensumme',
+    shipping: 'Versand',
+    freeShipping: '0,00 EUR (kostenlos)',
+    bonusPoints: (pts) => `Bonuspunkte (${pts} Pkt.)`,
+    coupon: 'Gutschein',
+    discount: 'Rabatt',
+    grandTotal: 'Gesamt (Brutto)',
+    vatIncluded: 'darin enthaltene 19% MwSt.',
+    netAmount: 'Nettobetrag',
+    vatExempt: 'Gemaess §19 UStG wird keine Umsatzsteuer ausgewiesen (Kleinunternehmerregelung).',
+    sellerLabel: 'VERKAUFER',
+    sellerDisclaimer: 'Der Kaufvertrag wird ausschliesslich zwischen dem Kaeufer und dem oben genannten Verkaeufer geschlossen. Andertal Marktplatz handelt als technischer Vermittler und ist nicht Vertragspartei.',
+    invoiceFooter: 'Bei Fragen zu Ihrer Bestellung wenden Sie sich bitte direkt an den Verkaeufer. Andertal ist Marktplatzbetreiber und nicht Verkaeufer der Ware.',
+    deliveryFooter: 'Dieser Lieferschein dient der Zuordnung der Sendung. Keine Rechnung.',
+    shippingSection: 'Versand',
+    packagesItems: 'Packstuecke / Artikel',
+    trackingLabel: 'Tracking',
+    emailLabel: 'E-Mail',
+    phoneLabel: 'Tel.',
+    vatIdPrefix: 'USt-IdNr.',
+    dateLocale: 'de-DE',
+    currencySuffix: ' EUR',
+  },
+  en: {
+    fileInvoice: 'Invoice',
+    fileDelivery: 'Delivery-note',
+    invoiceTitle: 'INVOICE',
+    deliveryTitle: 'DELIVERY NOTE',
+    invoiceNoLabel: 'Invoice no.',
+    deliveryNoLabel: 'Delivery note no.',
+    dateLabel: 'Date',
+    customerLabel: 'CUSTOMER',
+    deliveryAddressLabel: 'DELIVERY ADDRESS',
+    billingAddressLabel: 'BILLING ADDRESS',
+    orderInfoLabel: 'ORDER INFO',
+    itemLabel: 'ITEM',
+    qtyLabel: 'QTY',
+    unitPriceLabel: 'UNIT PRICE',
+    totalLabel: 'TOTAL',
+    itemFallback: 'Item',
+    noItems: 'No items',
+    subtotal: 'Subtotal',
+    shipping: 'Shipping',
+    freeShipping: '0.00 EUR (free)',
+    bonusPoints: (pts) => `Bonus points (${pts} pts)`,
+    coupon: 'Coupon',
+    discount: 'Discount',
+    grandTotal: 'Total (gross)',
+    vatIncluded: 'incl. 19% VAT',
+    netAmount: 'Net amount',
+    vatExempt: 'No VAT shown pursuant to §19 UStG (small business regulation).',
+    sellerLabel: 'SELLER',
+    sellerDisclaimer: 'The purchase contract is concluded exclusively between the buyer and the seller named above. Andertal marketplace acts as a technical intermediary and is not a party to the contract.',
+    invoiceFooter: 'For questions about your order, please contact the seller directly. Andertal is the marketplace operator, not the seller of the goods.',
+    deliveryFooter: 'This delivery note is for shipment identification only. Not an invoice.',
+    shippingSection: 'Shipping',
+    packagesItems: 'Packages / items',
+    trackingLabel: 'Tracking',
+    emailLabel: 'Email',
+    phoneLabel: 'Phone',
+    vatIdPrefix: 'VAT ID',
+    dateLocale: 'en-GB',
+    currencySuffix: ' EUR',
+  },
+  tr: {
+    fileInvoice: 'Fatura',
+    fileDelivery: 'Irsaliye',
+    invoiceTitle: 'FATURA',
+    deliveryTitle: 'İRSALİYE',
+    invoiceNoLabel: 'Fatura no.',
+    deliveryNoLabel: 'İrsaliye no.',
+    dateLabel: 'Tarih',
+    customerLabel: 'MÜŞTERİ',
+    deliveryAddressLabel: 'TESLİMAT ADRESİ',
+    billingAddressLabel: 'FATURA ADRESİ',
+    orderInfoLabel: 'SİPARİŞ BİLGİSİ',
+    itemLabel: 'ÜRÜN',
+    qtyLabel: 'ADET',
+    unitPriceLabel: 'BİRİM FİYAT',
+    totalLabel: 'TOPLAM',
+    itemFallback: 'Ürün',
+    noItems: 'Ürün yok',
+    subtotal: 'Ara toplam',
+    shipping: 'Kargo',
+    freeShipping: '0,00 EUR (ücretsiz)',
+    bonusPoints: (pts) => `Bonus puan (${pts} puan)`,
+    coupon: 'Kupon',
+    discount: 'İndirim',
+    grandTotal: 'Toplam (brüt)',
+    vatIncluded: 'içinde %19 KDV',
+    netAmount: 'Net tutar',
+    vatExempt: '§19 UStG kapsamında KDV gösterilmemektedir.',
+    sellerLabel: 'SATICI',
+    sellerDisclaimer: 'Satın alma sözleşmesi yalnızca alıcı ile yukarıdaki satıcı arasında kurulur. Andertal teknik aracıdır.',
+    invoiceFooter: 'Siparişiniz hakkında sorularınız için doğrudan satıcıya başvurun.',
+    deliveryFooter: 'Bu irsaliye yalnızca sevkiyat tanımlaması içindir. Fatura değildir.',
+    shippingSection: 'Kargo',
+    packagesItems: 'Paketler / ürünler',
+    trackingLabel: 'Takip',
+    emailLabel: 'E-posta',
+    phoneLabel: 'Tel.',
+    vatIdPrefix: 'KDV no.',
+    dateLocale: 'tr-TR',
+    currencySuffix: ' EUR',
+  },
+}
+
+// fr / es / it fall back to English labels
+;['fr', 'es', 'it'].forEach((loc) => {
+  STRINGS[loc] = { ...STRINGS.en }
+})
+
+function getOrderPdfStrings(locale) {
+  return STRINGS[resolvePdfLocale(locale)] || STRINGS.de
+}
+
+function getOrderPdfFilename(kind, orderNumber, locale) {
+  const s = getOrderPdfStrings(locale)
+  const n = orderNumber != null ? String(orderNumber) : '—'
+  if (kind === 'invoice') return `${s.fileInvoice}-${n}.pdf`
+  if (kind === 'lieferschein') return `${s.fileDelivery}-${n}.pdf`
+  return `${kind}-${n}.pdf`
+}
+
+module.exports = {
+  resolvePdfLocale,
+  getOrderPdfStrings,
+  getOrderPdfFilename,
+}

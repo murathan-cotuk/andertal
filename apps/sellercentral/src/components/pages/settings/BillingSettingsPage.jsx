@@ -39,11 +39,11 @@ const DOC_TYPE_KEYS = [
   { key: "retoure",     uiKey: "returnDoc" },
 ];
 
-function DocBtn({ orderId, kind, label, available }) {
+function DocBtn({ orderId, kind, label, available, locale = "de" }) {
   if (!available) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
   return (
     <a
-      href={getOrderPdfDownloadUrl(orderId, kind)}
+      href={getOrderPdfDownloadUrl(orderId, kind, locale)}
       target="_blank"
       rel="noreferrer"
       style={{
@@ -104,8 +104,8 @@ function exportCSV(rows, filename = "order-documents.csv", ui = {}, locale = "de
     fmtDate(o.created_at, locale),
     customerName(o),
     (orderTotal(o) / 100).toFixed(2),
-    getOrderPdfDownloadUrl(o.id, "invoice"),
-    getOrderPdfDownloadUrl(o.id, "lieferschein"),
+    getOrderPdfDownloadUrl(o.id, "invoice", locale),
+    getOrderPdfDownloadUrl(o.id, "lieferschein", locale),
   ]);
   const csv = [headers, ...lines]
     .map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
@@ -182,16 +182,16 @@ function OrderDocRow({ order, selected, onToggle, returnsSet, locale, ui }) {
         {fmtCents(orderTotal(order), locale)}
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
-        <DocBtn orderId={order.id} kind="invoice" label={ui.invoiceDoc} available />
+        <DocBtn orderId={order.id} kind="invoice" label={ui.invoiceDoc} available locale={locale} />
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
-        <DocBtn orderId={order.id} kind="lieferschein" label={ui.deliveryNoteDoc} available />
+        <DocBtn orderId={order.id} kind="lieferschein" label={ui.deliveryNoteDoc} available locale={locale} />
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
-        <DocBtn orderId={order.id} kind="versandlabel" label={ui.shippingLabel} available={hasTracking} />
+        <DocBtn orderId={order.id} kind="versandlabel" label={ui.shippingLabel} available={hasTracking} locale={locale} />
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
-        <DocBtn orderId={order.id} kind="retoure" label={ui.returnDoc} available={hasReturn} />
+        <DocBtn orderId={order.id} kind="retoure" label={ui.returnDoc} available={hasReturn} locale={locale} />
       </td>
     </tr>
   );
@@ -385,7 +385,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
         ? filteredOrders.filter((o) => selected.has(o.id))
         : filteredOrders.slice(0, 10);
     for (const o of targets) {
-      window.open(getOrderPdfDownloadUrl(o.id, "invoice"), "_blank");
+      window.open(getOrderPdfDownloadUrl(o.id, "invoice", locale), "_blank");
     }
   };
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
@@ -19,16 +19,17 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 import {
   PLATFORM_OPTIONS,
+  adStatusLabelForLocale,
+  campaignStatusLabelForLocale,
   fmtBudget,
   fmtDate,
   AD_STATUS_TONE,
-  AD_STATUS_LABEL,
   CAMPAIGN_STATUS_TONE,
-  CAMPAIGN_STATUS_LABEL,
   getActivePlatformLabels,
   parseJsonIdArray,
 } from "@/components/pages/marketing/ppcCampaignShared";
 import { useLocale } from "next-intl";
+import { getMarketingPpcEditorCopy } from "@/lib/marketing-i18n";
 import { getUI } from "@/lib/ui-strings";
 
 function buildGoogleAdsUrl(customerId, externalIds) {
@@ -42,25 +43,25 @@ function buildGoogleAdsUrl(customerId, externalIds) {
   return base;
 }
 
-function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPause, onResume, actionLoading, googleAdsCustomerId, locale, ui }) {
+function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPause, onResume, actionLoading, googleAdsCustomerId, locale, ui, mc }) {
   const adStatus = campaign.ad_status || "draft";
   const customerStatus = campaign.status || "draft";
   const platforms = parseJsonIdArray(campaign.ad_platforms);
-  const budget = fmtBudget(campaign.budget_daily_cents);
+  const budget = fmtBudget(campaign.budget_daily_cents, locale);
 
   const hasGoogleAds = platforms.includes("google_ads");
   const externalIds = (() => { try { return typeof campaign.external_campaign_ids === "string" ? JSON.parse(campaign.external_campaign_ids) : (campaign.external_campaign_ids || {}); } catch { return {}; } })();
   const activePlatformLabels = getActivePlatformLabels(externalIds);
 
-  let myStatusLabel = AD_STATUS_LABEL[adStatus] || adStatus;
+  let myStatusLabel = adStatusLabelForLocale(locale, adStatus) || adStatus;
   let myStatusTone = AD_STATUS_TONE[adStatus] || "info";
   if ((adStatus === "published" || adStatus === "partial") && activePlatformLabels.length > 0) {
-    myStatusLabel = `${locale === "de" ? "Aktiv auf" : locale === "tr" ? "Aktif:" : locale === "fr" ? "Actif sur" : locale === "es" ? "Activo en" : locale === "it" ? "Attivo su" : "Active on"}: ${activePlatformLabels.join(", ")}`;
+    myStatusLabel = `${mc.activeOn}: ${activePlatformLabels.join(", ")}`;
     myStatusTone = adStatus === "partial" ? "attention" : "success";
   }
 
-  const createdLabel = locale === "de" ? "Erstellt" : locale === "tr" ? "Oluşturuldu" : locale === "fr" ? "Créé" : locale === "es" ? "Creado" : locale === "it" ? "Creato" : "Created";
-  const focusLabel = locale === "de" ? "Fokus: Sichtbarkeit & Sponsored im Shop" : locale === "tr" ? "Odak: Mağazada görünürlük & sponsorlu" : locale === "fr" ? "Focus : Visibilité & sponsorisé dans la boutique" : locale === "es" ? "Enfoque: Visibilidad & patrocinado en la tienda" : locale === "it" ? "Focus: Visibilità & sponsorizzato nel negozio" : "Focus: Visibility & Sponsored in shop";
+  const createdLabel = mc.created;
+  const focusLabel = mc.focusShop;
 
   return (
     <div style={{ borderTop: "1px solid #f1f2f4", padding: "14px 0" }}>
@@ -69,7 +70,7 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
           <InlineStack gap="200" blockAlign="center" wrap>
             <Text as="span" fontWeight="semibold">{campaign.name}</Text>
             <Badge tone={CAMPAIGN_STATUS_TONE[customerStatus] || "info"}>
-              {CAMPAIGN_STATUS_LABEL[customerStatus] || customerStatus}
+              {campaignStatusLabelForLocale(locale, customerStatus) || customerStatus}
             </Badge>
             {isSuperuser && (
               <Badge tone={myStatusTone}>{myStatusLabel}</Badge>
@@ -80,9 +81,9 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
           )}
           <Text tone="subdued" as="span" variant="bodySm">
             Budget: {budget}
-            {campaign.created_at ? ` · ${createdLabel}: ${fmtDate(campaign.created_at)}` : ""}
+            {campaign.created_at ? ` · ${createdLabel}: ${fmtDate(campaign.created_at, locale)}` : ""}
             {!isSuperuser ? ` · ${focusLabel}` : ""}
-            {campaign.start_at || campaign.end_at ? ` · ${fmtDate(campaign.start_at)} – ${fmtDate(campaign.end_at)}` : ""}
+            {campaign.start_at || campaign.end_at ? ` · ${fmtDate(campaign.start_at, locale)} – ${fmtDate(campaign.end_at, locale)}` : ""}
           </Text>
         </BlockStack>
         <InlineStack gap="200" wrap>
@@ -93,12 +94,12 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
           )}
           {isSuperuser && adStatus === "published" && (
             <Button size="slim" onClick={() => onPause(campaign.id)} loading={actionLoading === campaign.id + "_pause"}>
-              {locale === "de" ? "Pausieren" : locale === "tr" ? "Duraklat" : locale === "fr" ? "Mettre en pause" : locale === "es" ? "Pausar" : locale === "it" ? "Metti in pausa" : "Pause"}
+              {mc.pause}
             </Button>
           )}
           {isSuperuser && adStatus === "paused" && (
             <Button size="slim" tone="success" onClick={() => onResume(campaign.id)} loading={actionLoading === campaign.id + "_resume"}>
-              {locale === "de" ? "Fortsetzen" : locale === "tr" ? "Devam et" : locale === "fr" ? "Reprendre" : locale === "es" ? "Reanudar" : locale === "it" ? "Riprendi" : "Resume"}
+              {mc.resume}
             </Button>
           )}
           {isSuperuser && hasGoogleAds && (
@@ -121,6 +122,7 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
 export default function MarketingCampaignsPage() {
   const locale = useLocale();
   const ui = getUI(locale);
+  const mc = useMemo(() => getMarketingPpcEditorCopy(locale), [locale]);
   const router = useRouter();
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -442,6 +444,7 @@ export default function MarketingCampaignsPage() {
                       googleAdsCustomerId={googleAdsCustomerId}
                       locale={locale}
                       ui={ui}
+                      mc={mc}
                     />
                   ))}
                 </BlockStack>
@@ -472,6 +475,7 @@ export default function MarketingCampaignsPage() {
                           googleAdsCustomerId={googleAdsCustomerId}
                           locale={locale}
                           ui={ui}
+                          mc={mc}
                         />
                       ))}
                     </BlockStack>

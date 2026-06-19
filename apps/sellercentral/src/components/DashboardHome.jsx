@@ -2,6 +2,9 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
+import { getUI } from "@/lib/ui-strings";
+import { statusLabel } from "@/lib/status-labels";
 import { Page, Banner, Button, Spinner } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import LiveVisitorsPanel from "@/components/dashboard/LiveVisitorsPanel";
@@ -109,7 +112,7 @@ function Panel({ title, subtitle, action, children, noPad }) {
   );
 }
 
-function StatusBars({ counts }) {
+function StatusBars({ counts, locale }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   return (
@@ -133,52 +136,60 @@ function StatusBars({ counts }) {
           </div>
         </div>
       ))}
-      {entries.length === 0 && <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>Noch keine Bestellungen</p>}
+      {entries.length === 0 && <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>{locale === "en" ? "No orders yet" : locale === "tr" ? "Henüz sipariş yok" : locale === "fr" ? "Aucune commande" : locale === "es" ? "Sin pedidos" : locale === "it" ? "Nessun ordine" : "Noch keine Bestellungen"}</p>}
     </div>
   );
 }
 
-const QUICK_SECTIONS = [
-  {
-    title: "Verkauf",
-    items: [
-      { label: "Bestellungen", href: "/orders", icon: "📦" },
-      { label: "Retouren", href: "/orders/returns", icon: "↩️" },
-      { label: "Kunden", href: "/customers", icon: "👥" },
-      { label: "Nachrichten", href: "/inbox", icon: "💬" },
-    ],
-  },
-  {
-    title: "Katalog",
-    items: [
-      { label: "Produkt anlegen", href: "/products/single-upload", icon: "➕" },
-      { label: "Produkte", href: "/products", icon: "🏷️" },
-      { label: "Inventar", href: "/products/inventory", icon: "📊" },
-      { label: "Kollektionen", href: "/content/collections", icon: "🗂️" },
-    ],
-  },
-  {
-    title: "Marketing & Inhalt",
-    items: [
-      { label: "Werben", href: "/advertise", icon: "📣" },
-      { label: "Rabatte", href: "/discounts", icon: "🏷️" },
-      { label: "Landing Page", href: "/content/landing-page", icon: "🎨" },
-      { label: "Menüs", href: "/content/menus", icon: "☰" },
-    ],
-  },
-  {
-    title: "Analyse & Berichte",
-    items: [
-      { label: "Berichte", href: "/analytics/reports", icon: "📈" },
-      { label: "Ranking", href: "/analytics/ranking", icon: "🏆" },
-      { label: "Transaktionen", href: "/analytics/transactions", icon: "💳" },
-      { label: "Live View", href: "/analytics/live-view", icon: "🟢", superuserOnly: true },
-    ],
-  },
-];
+function getQuickSections(locale) {
+  const t = (en, tr, fr, es, it, de) =>
+    locale === "en" ? en : locale === "tr" ? tr : locale === "fr" ? fr : locale === "es" ? es : locale === "it" ? it : de;
+  return [
+    {
+      title: t("Sales", "Satış", "Ventes", "Ventas", "Vendite", "Verkauf"),
+      items: [
+        { label: t("Orders", "Siparişler", "Commandes", "Pedidos", "Ordini", "Bestellungen"), href: "/orders", icon: "📦" },
+        { label: t("Returns", "İadeler", "Retours", "Devoluciones", "Resi", "Retouren"), href: "/orders/returns", icon: "↩️" },
+        { label: t("Customers", "Müşteriler", "Clients", "Clientes", "Clienti", "Kunden"), href: "/customers", icon: "👥" },
+        { label: t("Messages", "Mesajlar", "Messages", "Mensajes", "Messaggi", "Nachrichten"), href: "/inbox", icon: "💬" },
+      ],
+    },
+    {
+      title: t("Catalog", "Katalog", "Catalogue", "Catálogo", "Catalogo", "Katalog"),
+      items: [
+        { label: t("Add product", "Ürün ekle", "Ajouter produit", "Agregar producto", "Aggiungi prodotto", "Produkt anlegen"), href: "/products/single-upload", icon: "➕" },
+        { label: t("Products", "Ürünler", "Produits", "Productos", "Prodotti", "Produkte"), href: "/products", icon: "🏷️" },
+        { label: t("Inventory", "Envanter", "Inventaire", "Inventario", "Inventario", "Inventar"), href: "/products/inventory", icon: "📊" },
+        { label: t("Collections", "Koleksiyonlar", "Collections", "Colecciones", "Collezioni", "Kollektionen"), href: "/content/collections", icon: "🗂️" },
+      ],
+    },
+    {
+      title: t("Marketing & Content", "Pazarlama & İçerik", "Marketing & Contenu", "Marketing & Contenido", "Marketing & Contenuto", "Marketing & Inhalt"),
+      items: [
+        { label: t("Advertise", "Reklam ver", "Publicité", "Publicidad", "Pubblicità", "Werben"), href: "/advertise", icon: "📣" },
+        { label: t("Discounts", "İndirimler", "Remises", "Descuentos", "Sconti", "Rabatte"), href: "/discounts", icon: "🏷️" },
+        { label: t("Landing Page", "Landing Page", "Landing Page", "Landing Page", "Landing Page", "Landing Page"), href: "/content/landing-page", icon: "🎨" },
+        { label: t("Menus", "Menüler", "Menus", "Menús", "Menu", "Menüs"), href: "/content/menus", icon: "☰" },
+      ],
+    },
+    {
+      title: t("Analytics & Reports", "Analiz & Raporlar", "Analytique & Rapports", "Análisis & Informes", "Analisi & Report", "Analyse & Berichte"),
+      items: [
+        { label: t("Reports", "Raporlar", "Rapports", "Informes", "Report", "Berichte"), href: "/analytics/reports", icon: "📈" },
+        { label: t("Ranking", "Sıralama", "Classement", "Ranking", "Classifica", "Ranking"), href: "/analytics/ranking", icon: "🏆" },
+        { label: t("Transactions", "İşlemler", "Transactions", "Transacciones", "Transazioni", "Transaktionen"), href: "/analytics/transactions", icon: "💳" },
+        { label: t("Live View", "Canlı Görünüm", "Vue en direct", "Vista en vivo", "Vista live", "Live View"), href: "/analytics/live-view", icon: "🟢", superuserOnly: true },
+      ],
+    },
+  ];
+}
 
 export default function DashboardHome() {
   const router = useRouter();
+  const locale = useLocale();
+  const ui = getUI(locale);
+  const t = (en, tr, fr, es, it, de) =>
+    locale === "en" ? en : locale === "tr" ? tr : locale === "fr" ? fr : locale === "es" ? es : locale === "it" ? it : de;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -228,7 +239,7 @@ export default function DashboardHome() {
         setAllReturns(allReturnsList);
         setPendingReturns(allReturnsList.filter((r) => r.status === "offen"));
       } catch (e) {
-        setError(e?.message || "Dashboard konnte nicht geladen werden");
+        setError(e?.message || t("Dashboard could not be loaded", "Dashboard yüklenemedi", "Impossible de charger le tableau de bord", "No se pudo cargar el panel", "Impossibile caricare la dashboard", "Dashboard konnte nicht geladen werden"));
       } finally {
         setLoading(false);
       }
@@ -283,10 +294,10 @@ export default function DashboardHome() {
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
-    if (h < 12) return "Guten Morgen";
-    if (h < 18) return "Guten Tag";
-    return "Guten Abend";
-  }, []);
+    if (h < 12) return t("Good morning", "Günaydın", "Bonjour", "Buenos días", "Buongiorno", "Guten Morgen");
+    if (h < 18) return t("Good afternoon", "İyi günler", "Bonne journée", "Buenas tardes", "Buon pomeriggio", "Guten Tag");
+    return t("Good evening", "İyi akşamlar", "Bonsoir", "Buenas noches", "Buona sera", "Guten Abend");
+  }, [locale]);
 
   if (loading) {
     return (
@@ -301,8 +312,8 @@ export default function DashboardHome() {
   return (
     <Page
       title="Dashboard"
-      primaryAction={{ content: "Produkt anlegen", onAction: () => router.push("/products/single-upload") }}
-      secondaryActions={[{ content: "Bestellungen", onAction: () => router.push("/orders") }]}
+      primaryAction={{ content: t("Add product", "Ürün ekle", "Ajouter produit", "Agregar producto", "Aggiungi prodotto", "Produkt anlegen"), onAction: () => router.push("/products/single-upload") }}
+      secondaryActions={[{ content: ui.orders, onAction: () => router.push("/orders") }]}
     >
       {error && (
         <div style={{ marginBottom: 16 }}>
@@ -319,7 +330,7 @@ export default function DashboardHome() {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
           <label htmlFor="dashboard-period" style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Abrechnungszeitraum
+            {t("Billing period", "Dönem", "Période", "Período", "Periodo", "Abrechnungszeitraum")}
           </label>
           <select
             id="dashboard-period"
@@ -341,7 +352,7 @@ export default function DashboardHome() {
               <option key={p.key} value={p.key}>{p.label}</option>
             ))}
           </select>
-          <Button variant="plain" onClick={() => router.push("/settings/payments")}>Zahlungen</Button>
+          <Button variant="plain" onClick={() => router.push("/settings/payments")}>{ui.settingsPayments}</Button>
         </div>
       </div>
 
@@ -356,36 +367,36 @@ export default function DashboardHome() {
           marginBottom: 20,
         }}
       >
-        <KpiCard icon="💰" label="Umsatz" value={fmtEuro(stats.revenueCents)} sub={periodLabel} accent="#008060" onClick={() => router.push("/settings/payments")} />
-        <KpiCard icon="📦" label="Bestellungen" value={stats.orderCount} sub={`Ø ${fmtEuro(stats.avg)} · ${periodLabel}`} accent="#2563eb" onClick={() => router.push("/orders")} />
-        <KpiCard icon="↩️" label="Retouren" value={stats.returnsInPeriod} sub={stats.returnsOpenInPeriod > 0 ? `${stats.returnsOpenInPeriod} offen in dieser Periode` : periodLabel} accent="#ef4444" onClick={() => router.push("/orders/returns")} />
-        <KpiCard icon="⏳" label="Offen" value={stats.pending} sub="Alle offenen Bestellungen" accent="#f59e0b" onClick={() => router.push("/orders")} />
-        <KpiCard icon="🚚" label="Versand offen" value={stats.toShip} sub="Lieferstatus offen (gesamt)" accent="#6366f1" onClick={() => router.push("/orders")} />
-        <KpiCard icon="🏷️" label="Produkte" value={stats.productCount} sub="Aktiv (ohne Entwurf)" accent="#7c3aed" onClick={() => router.push("/products")} />
+        <KpiCard icon="💰" label={t("Revenue", "Ciro", "Revenus", "Ingresos", "Fatturato", "Umsatz")} value={fmtEuro(stats.revenueCents)} sub={periodLabel} accent="#008060" onClick={() => router.push("/settings/payments")} />
+        <KpiCard icon="📦" label={ui.orders} value={stats.orderCount} sub={`Ø ${fmtEuro(stats.avg)} · ${periodLabel}`} accent="#2563eb" onClick={() => router.push("/orders")} />
+        <KpiCard icon="↩️" label={t("Returns", "İadeler", "Retours", "Devoluciones", "Resi", "Retouren")} value={stats.returnsInPeriod} sub={stats.returnsOpenInPeriod > 0 ? `${stats.returnsOpenInPeriod} ${t("open in this period", "bu dönemde açık", "ouverts dans cette période", "abiertos en este período", "aperti in questo periodo", "offen in dieser Periode")}` : periodLabel} accent="#ef4444" onClick={() => router.push("/orders/returns")} />
+        <KpiCard icon="⏳" label={ui.statusOpen} value={stats.pending} sub={t("All open orders", "Tüm açık siparişler", "Toutes les commandes ouvertes", "Todos los pedidos abiertos", "Tutti gli ordini aperti", "Alle offenen Bestellungen")} accent="#f59e0b" onClick={() => router.push("/orders")} />
+        <KpiCard icon="🚚" label={t("Pending shipping", "Kargo bekliyor", "Expédition en attente", "Envío pendiente", "Spedizione in attesa", "Versand offen")} value={stats.toShip} sub={t("Open delivery status (total)", "Açık teslimat durumu (toplam)", "Statut de livraison ouvert (total)", "Estado de entrega abierto (total)", "Stato consegna aperto (totale)", "Lieferstatus offen (gesamt)")} accent="#6366f1" onClick={() => router.push("/orders")} />
+        <KpiCard icon="🏷️" label={ui.products} value={stats.productCount} sub={t("Active (excl. drafts)", "Aktif (taslak hariç)", "Actif (hors brouillons)", "Activo (excl. borradores)", "Attivo (escluse bozze)", "Aktiv (ohne Entwurf)")} accent="#7c3aed" onClick={() => router.push("/products")} />
       </div>
 
       {/* Charts row */}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", gap: 16, marginBottom: 20, alignItems: "stretch" }}>
-        <Panel title="Umsatz · Tagesverlauf" subtitle={periodLabel}>
+        <Panel title={t("Revenue · Daily", "Ciro · Günlük", "Revenus · Quotidien", "Ingresos · Diario", "Fatturato · Giornaliero", "Umsatz · Tagesverlauf")} subtitle={periodLabel}>
           <RevenueAreaChart data={chartData} accent="#008060" height={220} />
         </Panel>
-        <Panel title="Bestellstatus" subtitle={periodLabel}>
-          <StatusBars counts={statusCounts} />
+        <Panel title={t("Order status", "Sipariş durumu", "Statut des commandes", "Estado de pedidos", "Stato ordini", "Bestellstatus")} subtitle={periodLabel}>
+          <StatusBars counts={statusCounts} locale={locale} />
         </Panel>
       </div>
 
       {/* Orders + Quick actions */}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(0, 1fr)", gap: 16, marginBottom: 20, alignItems: "start" }}>
         <Panel
-          title="Letzte Bestellungen"
+          title={t("Recent orders", "Son siparişler", "Commandes récentes", "Pedidos recientes", "Ordini recenti", "Letzte Bestellungen")}
           subtitle={periodLabel}
-          action={<Button variant="plain" onClick={() => router.push("/orders")}>Alle anzeigen</Button>}
+          action={<Button variant="plain" onClick={() => router.push("/orders")}>{ui.viewAll}</Button>}
           noPad
         >
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#f9fafb", textAlign: "left" }}>
-                {["Nr.", "Kunde", "Betrag", "Status", "Datum", ""].map((h) => (
+                {[ui.colNumber, ui.colCustomer, ui.colAmount, ui.colStatus, ui.colDate, ""].map((h) => (
                   <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>{h}</th>
                 ))}
               </tr>
@@ -393,7 +404,7 @@ export default function DashboardHome() {
             <tbody>
               {recentOrders.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: 32, textAlign: "center", color: "#9ca3af" }}>Noch keine Bestellungen</td>
+                  <td colSpan={6} style={{ padding: 32, textAlign: "center", color: "#9ca3af" }}>{ui.noOrders}</td>
                 </tr>
               )}
               {recentOrders.map((o) => {
@@ -407,12 +418,12 @@ export default function DashboardHome() {
                     <td style={{ padding: "12px 16px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtEuro(orderTotalCents(o))}</td>
                     <td style={{ padding: "12px 16px" }}>
                       <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: `${STATUS_COLORS[st] || "#9ca3af"}22`, color: STATUS_COLORS[st] || "#6b7280" }}>
-                        {st}
+                        {statusLabel(locale, st)}
                       </span>
                     </td>
                     <td style={{ padding: "12px 16px", color: "#6b7280", fontSize: 12 }}>{fmtDate(o.created_at)}</td>
                     <td style={{ padding: "12px 16px" }}>
-                      <Button size="slim" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${o.id}`); }}>Öffnen</Button>
+                      <Button size="slim" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${o.id}`); }}>{ui.viewDetails}</Button>
                     </td>
                   </tr>
                 );
@@ -421,9 +432,9 @@ export default function DashboardHome() {
           </table>
         </Panel>
 
-        <Panel title="Schnellzugriff" subtitle="Nach Bereich sortiert">
+        <Panel title={t("Quick access", "Hızlı erişim", "Accès rapide", "Acceso rápido", "Accesso rapido", "Schnellzugriff")} subtitle={t("Sorted by area", "Alana göre sıralandı", "Classé par zone", "Ordenado por área", "Ordinato per area", "Nach Bereich sortiert")}>
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            {QUICK_SECTIONS.map((section) => (
+            {getQuickSections(locale).map((section) => (
               <div key={section.title}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
                   {section.title}
@@ -474,18 +485,18 @@ export default function DashboardHome() {
       {/* Monitoring */}
       {(pendingReturns.length > 0 || stats.toShip > 0) && (
         <div style={{ marginBottom: 20 }}>
-          <Panel title="Überwachung" subtitle="Aktion erforderlich">
+          <Panel title={t("Monitoring", "İzleme", "Surveillance", "Monitoreo", "Monitoraggio", "Überwachung")} subtitle={t("Action required", "İşlem gerekli", "Action requise", "Acción requerida", "Azione richiesta", "Aktion erforderlich")}>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {stats.toShip > 0 && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: "#eff6ff", borderRadius: 10, border: "1px solid #bfdbfe" }}>
-                  <span style={{ fontSize: 13, color: "#1e40af" }}>🚚 <strong>{stats.toShip}</strong> Bestellung(en) warten auf Versand</span>
-                  <Button size="slim" onClick={() => router.push("/orders")}>Bearbeiten</Button>
+                  <span style={{ fontSize: 13, color: "#1e40af" }}>🚚 <strong>{stats.toShip}</strong> {t("order(s) waiting to ship", "sipariş kargoya verilmeyi bekliyor", "commande(s) en attente d'expédition", "pedido(s) esperando envío", "ordine/i in attesa di spedizione", "Bestellung(en) warten auf Versand")}</span>
+                  <Button size="slim" onClick={() => router.push("/orders")}>{ui.edit}</Button>
                 </div>
               )}
               {pendingReturns.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: "#fef2f2", borderRadius: 10, border: "1px solid #fecaca" }}>
-                  <span style={{ fontSize: 13, color: "#b91c1c" }}>↩️ <strong>{stats.returnsOpenAll}</strong> Retourenanfrage(n) offen (gesamt)</span>
-                  <Button size="slim" tone="critical" onClick={() => router.push("/orders/returns")}>Öffnen</Button>
+                  <span style={{ fontSize: 13, color: "#b91c1c" }}>↩️ <strong>{stats.returnsOpenAll}</strong> {t("return request(s) open (total)", "iade talebi açık (toplam)", "demande(s) de retour ouverte(s) (total)", "solicitud(es) de devolución abierta(s) (total)", "richiesta/e di reso aperta/e (totale)", "Retourenanfrage(n) offen (gesamt)")}</span>
+                  <Button size="slim" tone="critical" onClick={() => router.push("/orders/returns")}>{ui.viewAll}</Button>
                 </div>
               )}
             </div>
@@ -495,11 +506,11 @@ export default function DashboardHome() {
 
       {/* Returns table if any */}
       {pendingReturns.length > 0 && (
-        <Panel title="Offene Retouren" subtitle="Kurzübersicht" action={<Button variant="plain" onClick={() => router.push("/orders/returns")}>Alle</Button>} noPad>
+        <Panel title={t("Open returns", "Açık iadeler", "Retours ouverts", "Devoluciones abiertas", "Resi aperti", "Offene Retouren")} subtitle={t("Overview", "Özet", "Aperçu", "Resumen", "Panoramica", "Kurzübersicht")} action={<Button variant="plain" onClick={() => router.push("/orders/returns")}>{ui.viewAll}</Button>} noPad>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#f9fafb" }}>
-                {["Retoure", "Bestellung", "Kunde", "Grund"].map((h) => (
+                {[t("Return", "İade", "Retour", "Devolución", "Reso", "Retoure"), ui.orders, ui.colCustomer, t("Reason", "Neden", "Raison", "Motivo", "Motivo", "Grund")].map((h) => (
                   <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#6b7280" }}>{h}</th>
                 ))}
               </tr>

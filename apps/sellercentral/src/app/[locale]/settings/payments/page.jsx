@@ -5,23 +5,21 @@ import {
   Page, Layout, Card, Text, BlockStack, InlineStack,
   Button, Banner, Badge, Box, Select, TextField, Divider,
 } from "@shopify/polaris";
+import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import SellerCreditCardSection from "@/components/SellerCreditCardSection";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { fmtDateShort, fmtDateTimeShort, fmtMoney } from "@/lib/locale-text";
+import { getPaymentsCopy, payoutStatusLabel } from "@/lib/payments-i18n";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const DEFAULT_COMMISSION_RATE = 0.12;
 
-// ── Formatters ────────────────────────────────────────────────────────────────
-const fmt = (cents) =>
-  ((cents || 0) / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-
-const fmtDate = (d) =>
-  d ? new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
-
-const fmtDateTime = (d) =>
-  d ? new Date(d).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+// ── Formatters (locale-aware via component locale) ───────────────────────────
+const fmt = (cents, locale = "de") => fmtMoney(cents, locale);
+const fmtDate = (d, locale = "de") => fmtDateShort(d, locale);
+const fmtDateTime = (d, locale = "de") => fmtDateTimeShort(d, locale);
 
 const csvEscape = (v) => {
   const s = v == null ? "" : String(v);
@@ -78,16 +76,7 @@ const statusTone = (s) => {
   if (s === "failed") return "critical";
   return "new";
 };
-const statusLabel = (s) => {
-  const map = {
-    bezahlt: "Bezahlt", paid: "Bezahlt",
-    ausstehend: "Ausstehend", pending: "Ausstehend",
-    processing: "In Verarbeitung", verarbeitung: "In Verarbeitung",
-    failed: "Fehlgeschlagen", skipped: "Übersprungen",
-    not_applicable: "—",
-  };
-  return map[s] || s || "Offen";
-};
+const statusLabel = (s, locale) => payoutStatusLabel(locale, s);
 
 // ── IBAN helpers ──────────────────────────────────────────────────────────────
 /** ISO 13616 MOD-97 — SEPA uses standard IBAN. */
@@ -105,14 +94,14 @@ function ibanMod97(iban) {
   return rem === 1;
 }
 
-function validateIban(raw) {
+function validateIban(raw, ibanErrors) {
   const v = raw.replace(/\s/g, "").toUpperCase();
-  if (!v) return { ok: false, error: "IBAN darf nicht leer sein." };
+  if (!v) return { ok: false, error: ibanErrors.empty };
   if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,}$/.test(v))
-    return { ok: false, error: "Ungültiges IBAN-Format (z.B. DE89 3704 0044 0532 0130 00)." };
+    return { ok: false, error: ibanErrors.format };
   if (v.length < 15 || v.length > 34)
-    return { ok: false, error: "IBAN-Länge ungültig." };
-  if (!ibanMod97(v)) return { ok: false, error: "IBAN-Prüfziffer ungültig." };
+    return { ok: false, error: ibanErrors.length };
+  if (!ibanMod97(v)) return { ok: false, error: ibanErrors.checksum };
   return { ok: true, error: null };
 }
 function maskIban(iban) {
@@ -178,6 +167,8 @@ function SortTh({ label, col, sortCol, sortDir, onSort, style }) {
 
 // ── IBAN Management Section ──────────────────────────────────────────────────
 function IbanSection({ commissionRate }) {
+  const locale = useLocale();
+  const txt = getPaymentsCopy(locale);
   const client = getMedusaAdminClient();
   const unsaved = useUnsavedChanges();
   const sellerPct = Math.round((1 - (commissionRate ?? DEFAULT_COMMISSION_RATE)) * 100);
@@ -225,7 +216,7 @@ function IbanSection({ commissionRate }) {
     setErr(""); setOk(""); setIbanError("");
     const trimmed = iban.replace(/\s/g, "").toUpperCase();
     if (trimmed) {
-      const { ok: valid, error: ie } = validateIban(trimmed);
+      const { ok: valid, error: ie } = validateIban(trimmed, txt.ibanErrors);
       if (!valid) { setIbanError(ie); return; }
     }
     setSaving(true);
@@ -246,10 +237,10 @@ function IbanSection({ commissionRate }) {
         bic: bic.replace(/\s/g, "").toUpperCase() || "",
         bankName: bankName.trim() || "",
       }));
-      setOk("Bankdaten gespeichert."); setEditing(false);
-    } catch (e) { setErr(e?.message || "Fehler beim Speichern."); }
+      setOk(txt.bankSaved); setEditing(false);
+    } catch (e) { setErr(e?.message || txt.saveError); }
     finally { setSaving(false); }
-  }, [client, iban, holder, bic, bankName]);
+  }, [client, iban, holder, bic, bankName, txt.bankSaved, txt.saveError, txt.ibanErrors]);
 
   const handleCancel = useCallback(() => {
     setIban(savedIban); setHolder(savedHolder); setBic(savedBic); setBankName(savedBankName);
@@ -286,12 +277,12 @@ function IbanSection({ commissionRate }) {
       <Box paddingBlockEnd="400">
         <div style={{ background: "#f8fafc", borderRadius: 12, border: "1px solid #e2e8f0", padding: "20px 24px" }}>
           <BlockStack gap="300">
-            <Text as="p" variant="bodyMd" fontWeight="semibold">So funktionieren Auszahlungen</Text>
+            <Text as="p" variant="bodyMd" fontWeight="semibold">{txt.howPayoutsWork}</Text>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
               {[
-                { n: "1", label: "Kunde kauft", desc: "Zahlung geht sicher über Stripe ein." },
-                { n: "2", label: "Sperrfrist 14 Tage", desc: "Nach Lieferbestätigung beginnt die 14-tägige Auszahlungssperrfrist." },
-                { n: "3", label: `Auszahlung (${sellerPct}%)`, desc: "Nach Ablauf der Sperrfrist wird der Betrag automatisch auf die hinterlegte IBAN überwiesen." },
+                { n: "1", label: txt.step1Label, desc: txt.step1Desc },
+                { n: "2", label: txt.step2Label, desc: txt.step2Desc },
+                { n: "3", label: txt.step3Label(sellerPct), desc: txt.step3Desc },
               ].map(({ n, label, desc }) => (
                 <div key={n} style={{ background: "#fff", borderRadius: 8, padding: "12px 14px", border: "1px solid #e5e7eb" }}>
                   <InlineStack gap="200" blockAlign="center">
@@ -313,12 +304,12 @@ function IbanSection({ commissionRate }) {
         <BlockStack gap="400">
           <InlineStack align="space-between" blockAlign="center">
             <BlockStack gap="050">
-              <Text as="h2" variant="headingMd">Bankkonto für Auszahlungen</Text>
-              <Text as="p" tone="subdued" variant="bodySm">An dieses Konto werden deine Verkaufserlöse überwiesen.</Text>
+              <Text as="h2" variant="headingMd">{txt.bankAccountTitle}</Text>
+              <Text as="p" tone="subdued" variant="bodySm">{txt.bankAccountSub}</Text>
             </BlockStack>
             {!editing && (
               <Button onClick={() => setEditing(true)} size="slim">
-                {savedIban ? "Bearbeiten" : "Hinzufügen"}
+                {savedIban ? txt.edit : txt.add}
               </Button>
             )}
           </InlineStack>
@@ -333,7 +324,7 @@ function IbanSection({ commissionRate }) {
                   </BlockStack>
                   {savedHolder && (
                     <BlockStack gap="050">
-                      <Text as="p" variant="bodySm" tone="subdued">Kontoinhaber</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">{txt.accountHolder}</Text>
                       <Text as="p" variant="bodyMd">{savedHolder}</Text>
                     </BlockStack>
                   )}
@@ -345,7 +336,7 @@ function IbanSection({ commissionRate }) {
                   )}
                   {savedBankName && (
                     <BlockStack gap="050">
-                      <Text as="p" variant="bodySm" tone="subdued">Bank</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">{txt.bank}</Text>
                       <Text as="p" variant="bodyMd">{savedBankName}</Text>
                     </BlockStack>
                   )}
@@ -353,7 +344,7 @@ function IbanSection({ commissionRate }) {
                 <Box paddingBlockStart="200">
                   <InlineStack gap="150" blockAlign="center">
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", flexShrink: 0, display: "inline-block" }} />
-                    <Text as="p" variant="bodySm" tone="success">Bankkonto hinterlegt — bereit für Auszahlungen</Text>
+                    <Text as="p" variant="bodySm" tone="success">{txt.bankReady}</Text>
                   </InlineStack>
                 </Box>
               </div>
@@ -362,9 +353,9 @@ function IbanSection({ commissionRate }) {
                 <InlineStack gap="300" blockAlign="center">
                   <Text as="span" variant="headingLg">⚠️</Text>
                   <BlockStack gap="050">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">Kein Bankkonto hinterlegt</Text>
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">{txt.noBankTitle}</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Ohne IBAN können keine Auszahlungen an dich verarbeitet werden.
+                      {txt.noBankDesc}
                     </Text>
                   </BlockStack>
                 </InlineStack>
@@ -377,25 +368,25 @@ function IbanSection({ commissionRate }) {
               <Box borderBlockStartWidth="025" borderColor="border-subdued" paddingBlockStart="300">
                 <BlockStack gap="300">
                   <TextField
-                    label="IBAN *"
+                    label={txt.ibanRequired}
                     value={formatIbanInput(iban)}
                     onChange={(v) => { setIban(v.replace(/\s/g, "").toUpperCase()); setIbanError(""); }}
                     error={ibanError}
                     placeholder="DE89 3704 0044 0532 0130 00"
-                    helpText="Internationale Bankkontonummer — Leerzeichen werden automatisch formatiert"
+                    helpText={txt.ibanHelp}
                     autoComplete="off"
                   />
                   <TextField
-                    label="Kontoinhaber"
+                    label={txt.accountHolder}
                     value={holder}
                     onChange={setHolder}
-                    placeholder="Max Mustermann oder Musterfirma GmbH"
+                    placeholder={txt.holderPlaceholder}
                     autoComplete="off"
                   />
                   <InlineStack gap="300">
                     <div style={{ flex: 1 }}>
                       <TextField
-                        label="BIC / SWIFT (optional)"
+                        label={txt.bicOptional}
                         value={bic}
                         onChange={(v) => setBic(v.toUpperCase())}
                         placeholder="COBADEFFXXX"
@@ -404,7 +395,7 @@ function IbanSection({ commissionRate }) {
                     </div>
                     <div style={{ flex: 1 }}>
                       <TextField
-                        label="Bankname (optional)"
+                        label={txt.bankNameOptional}
                         value={bankName}
                         onChange={setBankName}
                         placeholder="Commerzbank AG"
@@ -415,8 +406,8 @@ function IbanSection({ commissionRate }) {
                 </BlockStack>
               </Box>
               <InlineStack align="end" gap="200">
-                <Button onClick={handleCancel} disabled={saving}>Abbrechen</Button>
-                <Button variant="primary" onClick={handleSave} loading={saving}>Bankdaten speichern</Button>
+                <Button onClick={handleCancel} disabled={saving}>{txt.cancel}</Button>
+                <Button variant="primary" onClick={handleSave} loading={saving}>{txt.saveBank}</Button>
               </InlineStack>
             </BlockStack>
           )}
@@ -428,6 +419,8 @@ function IbanSection({ commissionRate }) {
 
 // ── Seller Payments View ──────────────────────────────────────────────────────
 function SellerPaymentsView() {
+  const locale = useLocale();
+  const txt = getPaymentsCopy(locale);
   const [periodKey, setPeriodKey]     = useState(() => initialPeriodKeyForToday(PERIODS));
   const [summary, setSummary]         = useState(null);
   const [history, setHistory]         = useState([]);
@@ -476,11 +469,11 @@ function SellerPaymentsView() {
       if (txRes.status === "fulfilled") setTransactions(Array.isArray(txRes.value?.transactions) ? txRes.value.transactions : []);
       else setTransactions([]);
     } catch (e) {
-      setErr(e?.message || "Fehler beim Laden");
+      setErr(e?.message || txt.loadError);
     } finally {
       setLoading(false);
     }
-  }, [selectedPeriod.startDate, selectedPeriod.endDate]);
+  }, [selectedPeriod.startDate, selectedPeriod.endDate, txt.loadError]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -547,17 +540,17 @@ function SellerPaymentsView() {
 
   const exportCsv = () => {
     const rows = [
-      ["Bestellnr.", "Datum", "Lieferdatum", "Kunde", "Brutto (€)", "Provision (€)", "Versand (€)", "Netto (€)", "Auszahl-Status"],
+      [txt.colOrderNo, txt.colDate, txt.colDeliveryDate, txt.colCustomer, `${txt.colGross} (€)`, `${txt.commission} (€)`, `${txt.colShipping} (€)`, `${txt.colNet} (€)`, txt.colStatus],
       ...displayTransactions.map((t) => [
         t.order_number || "",
-        fmtDateTime(t.created_at),
-        fmtDate(t.delivery_date),
+        fmtDateTime(t.created_at, locale),
+        fmtDate(t.delivery_date, locale),
         [t.first_name, t.last_name].filter(Boolean).join(" ").trim(),
         ((t.total_cents || 0) / 100).toFixed(2),
         ((t.commission_cents || 0) / 100).toFixed(2),
         ((t.shipping_cents || 0) / 100).toFixed(2),
         ((t.payout_cents || 0) / 100).toFixed(2),
-        t.payout_eligible ? "Freigegeben" : "Ausstehend",
+        t.payout_eligible ? txt.eligible : txt.pending,
       ]),
     ];
     const csv = rows.map((r) => r.map(csvEscape).join(";")).join("\n");
@@ -565,7 +558,7 @@ function SellerPaymentsView() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `transaktionen-${selectedPeriod.key}.csv`;
+    a.download = `${txt.csvFilenamePrefix}-${selectedPeriod.key}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   };
@@ -576,10 +569,7 @@ function SellerPaymentsView() {
   const isSelectedCurrentPeriod = periodKey === currentPeriodKeyToday;
 
   return (
-    <Page
-      title="Zahlungen & Auszahlungen"
-      subtitle="Marktplatz-Abrechnung: Alle Beträge im gewählten 15-Tage-Zeitraum nach Lieferdatum — ohne Lieferdatum nach Bestelldatum."
-    >
+    <Page title={txt.pageTitle} subtitle={txt.pageSubtitle}>
       <Layout>
         <Layout.Section>
           {err && (
@@ -592,10 +582,10 @@ function SellerPaymentsView() {
             <Banner tone="info">
               <BlockStack gap="150">
                 <Text as="p" variant="bodySm">
-                  <strong>Sperrfrist:</strong> Auszahlung erst ca. <strong>14 Tage nach Lieferdatum</strong> (Status „Zugestellt“ mit Datum). Bis dahin zeigt die Liste „Ausstehend“ — Beträge sind aber bereits im Umsatz sichtbar.
+                  <strong>{txt.holdTitle}</strong> {txt.holdBody}
                 </Text>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  Der Dropdown-Zeitraum entspricht halben Kalendermonaten (wie bei großen Marktplätzen). Standard ist automatisch die Periode, in der sich das heutige Datum befindet.
+                  {txt.periodHint}
                 </Text>
               </BlockStack>
             </Banner>
@@ -606,17 +596,17 @@ function SellerPaymentsView() {
             <InlineStack align="space-between" blockAlign="center" wrap>
               <BlockStack gap="150">
                 <InlineStack gap="200" blockAlign="center" wrap>
-                  <Text variant="headingMd" as="h2">Abrechnungszeitraum</Text>
+                  <Text variant="headingMd" as="h2">{txt.periodTitle}</Text>
                   {isSelectedCurrentPeriod ? (
-                    <Badge tone="success">Aktuelle Periode</Badge>
+                    <Badge tone="success">{txt.currentPeriod}</Badge>
                   ) : (
-                    <Badge tone="info">Vergangenheit / Vorschau</Badge>
+                    <Badge tone="info">{txt.pastPeriod}</Badge>
                   )}
                 </InlineStack>
                 <Text variant="bodySm" tone="subdued">
                   {selectedPeriod.monthLabel}: {selectedPeriod.startDate === selectedPeriod.endDate
                     ? selectedPeriod.startDate
-                    : `${selectedPeriod.startDate} → ${selectedPeriod.endDate}`} (Kalendertage)
+                    : `${selectedPeriod.startDate} → ${selectedPeriod.endDate}`} ({txt.calendarDays})
                 </Text>
               </BlockStack>
               <InlineStack gap="300" blockAlign="center" wrap={false}>
@@ -629,7 +619,7 @@ function SellerPaymentsView() {
                     onChange={(v) => { setPeriodKey(v); setPage(0); }}
                   />
                 </div>
-                <Button onClick={loadData} loading={loading} size="slim">Aktualisieren</Button>
+                <Button onClick={loadData} loading={loading} size="slim">{txt.refresh}</Button>
               </InlineStack>
             </InlineStack>
           </Card>
@@ -640,56 +630,55 @@ function SellerPaymentsView() {
               <BlockStack gap="400">
                 <InlineStack align="space-between" blockAlign="center">
                   <BlockStack gap="050">
-                    <Text variant="headingMd" as="h2">Finanzübersicht</Text>
+                    <Text variant="headingMd" as="h2">{txt.financeOverview}</Text>
                     <Text variant="bodySm" tone="subdued">{selectedPeriod.label}</Text>
                   </BlockStack>
-                  {payoutStatus && <Badge tone={statusTone(payoutStatus)}>{statusLabel(payoutStatus)}</Badge>}
+                  {payoutStatus && <Badge tone={statusTone(payoutStatus)}>{statusLabel(payoutStatus, locale)}</Badge>}
                 </InlineStack>
 
                 {loading ? (
-                  <Text tone="subdued">Daten werden geladen…</Text>
+                  <Text tone="subdued">{txt.loading}</Text>
                 ) : (
                   <>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                       <KpiCard
                         icon="📦"
-                        label="Warenumsatz (Seller-Basis)"
-                        value={fmt(revenue)}
-                        sub={`${summary?.paid_count ?? periodTransactions.length} bezahlte Positionen · ${eligibleCount} auszahlungsreif · ${pendingPayCount} Sperrfrist`}
+                        label={txt.revenue}
+                        value={fmt(revenue, locale)}
+                        sub={`${summary?.paid_count ?? periodTransactions.length} · ${eligibleCount} ${txt.statusEligible} · ${pendingPayCount} ${txt.statusPending}`}
                       />
                       <KpiCard
                         icon="💸"
-                        label={`Provision (${(commissionRate * 100).toFixed(1).replace(/\.0$/, "")} %)`}
-                        value={`– ${fmt(commission)}`}
+                        label={`${txt.commission} (${(commissionRate * 100).toFixed(1).replace(/\.0$/, "")} %)`}
+                        value={`– ${fmt(commission, locale)}`}
                         tone="critical"
-                        sub="Plattformgebühr"
+                        sub={txt.platformFee}
                       />
                       <KpiCard
                         icon="📣"
-                        label="Werbekosten"
-                        value={adSpend > 0 ? `– ${fmt(adSpend)}` : "–"}
+                        label={txt.adSpend}
+                        value={adSpend > 0 ? `– ${fmt(adSpend, locale)}` : "–"}
                         tone={adSpend > 0 ? "critical" : undefined}
-                        sub="Reklam giderleri"
                       />
                       <KpiCard
                         icon="↩️"
-                        label="Rückerstattungen"
-                        value={refunds > 0 ? `– ${fmt(refunds)}` : fmt(0)}
+                        label={txt.refunds}
+                        value={refunds > 0 ? `– ${fmt(refunds, locale)}` : fmt(0, locale)}
                         tone={refunds > 0 ? "critical" : undefined}
                       />
                       <KpiCard
                         icon="🚚"
-                        label="Versandkostenbeteiligung"
-                        value={fmt(shipping)}
+                        label={txt.shippingShare}
+                        value={fmt(shipping, locale)}
                         tone="info"
                       />
                       <KpiCard
                         icon="✅"
-                        label="Netto-Auszahlung"
-                        value={fmt(Math.max(0, net))}
+                        label={txt.netPayout}
+                        value={fmt(Math.max(0, net), locale)}
                         tone="success"
                         highlight
-                        sub="Nach 14-Tage-Sperrfrist"
+                        sub={txt.afterHold}
                       />
                     </div>
 
@@ -697,23 +686,21 @@ function SellerPaymentsView() {
                     {revenue > 0 && (
                       <div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 18px", border: "1px solid #e2e8f0" }}>
                         <BlockStack gap="150">
-                          <Text variant="bodySm" fontWeight="semibold" tone="subdued">Berechnungsgrundlage</Text>
+                          <Text variant="bodySm" fontWeight="semibold" tone="subdued">{txt.calcBasis}</Text>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 32px", fontSize: 13 }}>
-                            <span>{fmt(revenue)} <span style={{ color: "#6b7280" }}>Umsatz</span></span>
-                            {commission > 0 && <span style={{ color: "#dc2626" }}>– {fmt(commission)} <span style={{ color: "#6b7280" }}>Provision</span></span>}
-                            {adSpend > 0  && <span style={{ color: "#dc2626" }}>– {fmt(adSpend)} <span style={{ color: "#6b7280" }}>Werbekosten</span></span>}
-                            {refunds > 0  && <span style={{ color: "#dc2626" }}>– {fmt(refunds)} <span style={{ color: "#6b7280" }}>Erstattungen</span></span>}
-                            {shipping > 0 && <span style={{ color: "#059669" }}>+ {fmt(shipping)} <span style={{ color: "#6b7280" }}>Versand</span></span>}
-                            <span style={{ fontWeight: 700, color: "#059669" }}>= {fmt(Math.max(0, net))} <span style={{ color: "#6b7280", fontWeight: 400 }}>Netto</span></span>
+                            <span>{fmt(revenue, locale)} <span style={{ color: "#6b7280" }}>{txt.revenueLabel}</span></span>
+                            {commission > 0 && <span style={{ color: "#dc2626" }}>– {fmt(commission, locale)} <span style={{ color: "#6b7280" }}>{txt.commission}</span></span>}
+                            {adSpend > 0  && <span style={{ color: "#dc2626" }}>– {fmt(adSpend, locale)} <span style={{ color: "#6b7280" }}>{txt.adSpend}</span></span>}
+                            {refunds > 0  && <span style={{ color: "#dc2626" }}>– {fmt(refunds, locale)} <span style={{ color: "#6b7280" }}>{txt.refunds}</span></span>}
+                            {shipping > 0 && <span style={{ color: "#059669" }}>+ {fmt(shipping, locale)} <span style={{ color: "#6b7280" }}>{txt.shippingShare}</span></span>}
+                            <span style={{ fontWeight: 700, color: "#059669" }}>= {fmt(Math.max(0, net), locale)} <span style={{ color: "#6b7280", fontWeight: 400 }}>{txt.netLabel}</span></span>
                           </div>
                         </BlockStack>
                       </div>
                     )}
 
                     {!loading && periodTransactions.length === 0 && (
-                      <Banner tone="info">
-                        Für diesen Abrechnungszeitraum gibt es keine bezahlten Bestellungen (nach Liefer-/Bestelldatum). Prüfe einen anderen Halbmonat oder ob die Bestellungen auf „bezahlt“ stehen.
-                      </Banner>
+                      <Banner tone="info">{txt.noOrdersPeriod}</Banner>
                     )}
                   </>
                 )}
@@ -728,10 +715,10 @@ function SellerPaymentsView() {
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
                 <InlineStack align="space-between" blockAlign="center">
                   <BlockStack gap="050">
-                    <Text variant="headingMd" as="h2">Transaktionen</Text>
+                    <Text variant="headingMd" as="h2">{txt.transactions}</Text>
                     <Text variant="bodySm" tone="subdued">
-                      {totalFiltered} Einträge{hasActiveFilters ? " (gefiltert)" : ""}
-                      {totalFiltered !== periodTransactions.length && ` von ${periodTransactions.length} gesamt`}
+                      {totalFiltered} {txt.entries}{hasActiveFilters ? ` (${txt.filtered})` : ""}
+                      {totalFiltered !== periodTransactions.length && ` ${txt.of} ${periodTransactions.length} ${txt.totalWord}`}
                     </Text>
                   </BlockStack>
                   <InlineStack gap="200">
@@ -742,11 +729,11 @@ function SellerPaymentsView() {
                         variant="plain"
                         onClick={() => { setFilterSearch(""); setFilterType("all"); setFilterStatus("all"); setPage(0); }}
                       >
-                        Filter zurücksetzen
+                        {txt.resetFilters}
                       </Button>
                     )}
                     <Button size="slim" onClick={exportCsv} disabled={displayTransactions.length === 0}>
-                      CSV Export
+                      {txt.csvExport}
                     </Button>
                   </InlineStack>
                 </InlineStack>
@@ -756,11 +743,11 @@ function SellerPaymentsView() {
               <div style={{ padding: "12px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
                 <div style={{ flex: "1 1 200px", minWidth: 180 }}>
                   <TextField
-                    label="Suche"
+                    label={txt.search}
                     labelHidden
                     value={filterSearch}
                     onChange={(v) => { setFilterSearch(v); setPage(0); }}
-                    placeholder="Bestellnr. oder Kundenname…"
+                    placeholder={txt.searchPlaceholder}
                     clearButton
                     onClearButtonClick={() => { setFilterSearch(""); setPage(0); }}
                     autoComplete="off"
@@ -768,12 +755,12 @@ function SellerPaymentsView() {
                 </div>
                 <div style={{ width: 160 }}>
                   <Select
-                    label="Typ"
+                    label={txt.typeAll}
                     labelHidden
                     options={[
-                      { label: "Alle Typen", value: "all" },
-                      { label: "Bestellungen", value: "sale" },
-                      { label: "Rückerstattungen", value: "refund" },
+                      { label: txt.typeAll, value: "all" },
+                      { label: txt.typeOrders, value: "sale" },
+                      { label: txt.typeRefund, value: "refund" },
                     ]}
                     value={filterType}
                     onChange={(v) => { setFilterType(v); setPage(0); }}
@@ -781,12 +768,12 @@ function SellerPaymentsView() {
                 </div>
                 <div style={{ width: 160 }}>
                   <Select
-                    label="Auszahl-Status"
+                    label={txt.statusAll}
                     labelHidden
                     options={[
-                      { label: "Alle Status", value: "all" },
-                      { label: "Freigegeben", value: "eligible" },
-                      { label: "Ausstehend", value: "pending" },
+                      { label: txt.statusAll, value: "all" },
+                      { label: txt.statusEligible, value: "eligible" },
+                      { label: txt.statusPending, value: "pending" },
                     ]}
                     value={filterStatus}
                     onChange={(v) => { setFilterStatus(v); setPage(0); }}
@@ -794,13 +781,13 @@ function SellerPaymentsView() {
                 </div>
                 <div style={{ width: 140 }}>
                   <Select
-                    label="Einträge"
+                    label={txt.entriesLabel}
                     labelHidden
                     options={[
-                      { label: "20 pro Seite", value: "20" },
-                      { label: "50 pro Seite", value: "50" },
-                      { label: "100 pro Seite", value: "100" },
-                      { label: "Alle anzeigen", value: "0" },
+                      { label: `20 ${txt.perPage}`, value: "20" },
+                      { label: `50 ${txt.perPage}`, value: "50" },
+                      { label: `100 ${txt.perPage}`, value: "100" },
+                      { label: txt.showAll, value: "0" },
                     ]}
                     value={pageSize}
                     onChange={(v) => { setPageSize(v); setPage(0); }}
@@ -810,11 +797,11 @@ function SellerPaymentsView() {
 
               {/* Table */}
               {loading ? (
-                <Box padding="500"><Text tone="subdued" alignment="center">Transaktionen werden geladen…</Text></Box>
+                <Box padding="500"><Text tone="subdued" alignment="center">{txt.loadingTransactions}</Text></Box>
               ) : displayTransactions.length === 0 ? (
                 <Box padding="500">
                   <Text tone="subdued" alignment="center">
-                    {hasActiveFilters ? "Keine Transaktionen für die gewählten Filter." : "Keine Transaktionen in diesem Zeitraum."}
+                    {hasActiveFilters ? txt.noTransactionsFilter : txt.noTransactionsPeriod}
                   </Text>
                 </Box>
               ) : (
@@ -828,14 +815,14 @@ function SellerPaymentsView() {
                     fontSize: 11, fontWeight: 600, color: "#6b7280",
                     background: "#fafafa",
                   }}>
-                    <SortTh label="Datum" col="created_at" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                    <div>Bestellnr.</div>
-                    <div>Kunde</div>
-                    <SortTh label="Brutto" col="total_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
-                    <SortTh label="Provision" col="commission_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
-                    <div style={{ textAlign: "right" }}>Versand</div>
-                    <SortTh label="Netto" col="payout_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
-                    <SortTh label="Status" col="delivery_date" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "center" }} />
+                    <SortTh label={txt.colDate} col="created_at" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                    <div>{txt.colOrderNo}</div>
+                    <div>{txt.colCustomer}</div>
+                    <SortTh label={txt.colGross} col="total_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
+                    <SortTh label={txt.commission} col="commission_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
+                    <div style={{ textAlign: "right" }}>{txt.colShipping}</div>
+                    <SortTh label={txt.colNet} col="payout_cents" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "flex-end" }} />
+                    <SortTh label={txt.colStatus} col="delivery_date" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} style={{ justifyContent: "center" }} />
                   </div>
 
                   {/* Rows */}
@@ -852,9 +839,9 @@ function SellerPaymentsView() {
                       }}
                     >
                       <div style={{ color: "#374151" }}>
-                        <div>{fmtDate(t.created_at)}</div>
+                        <div>{fmtDate(t.created_at, locale)}</div>
                         {t.delivery_date && (
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>Lief.: {fmtDate(t.delivery_date)}</div>
+                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{txt.deliveryShort}: {fmtDate(t.delivery_date, locale)}</div>
                         )}
                       </div>
                       <div>
@@ -863,13 +850,13 @@ function SellerPaymentsView() {
                       <div style={{ color: "#374151" }}>
                         {[t.first_name, t.last_name].filter(Boolean).join(" ") || "—"}
                       </div>
-                      <div style={{ textAlign: "right", fontWeight: 500 }}>{fmt(t.total_cents)}</div>
-                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(t.commission_cents)}</div>
-                      <div style={{ textAlign: "right", color: "#2563eb" }}>{fmt(t.shipping_cents)}</div>
-                      <div style={{ textAlign: "right", fontWeight: 700, color: "#059669" }}>{fmt(t.payout_cents)}</div>
+                      <div style={{ textAlign: "right", fontWeight: 500 }}>{fmt(t.total_cents, locale)}</div>
+                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(t.commission_cents, locale)}</div>
+                      <div style={{ textAlign: "right", color: "#2563eb" }}>{fmt(t.shipping_cents, locale)}</div>
+                      <div style={{ textAlign: "right", fontWeight: 700, color: "#059669" }}>{fmt(t.payout_cents, locale)}</div>
                       <div style={{ textAlign: "center" }}>
                         <Badge tone={t.payout_eligible ? "success" : "warning"}>
-                          {t.payout_eligible ? "Freigegeben" : "Ausstehend"}
+                          {t.payout_eligible ? txt.eligible : txt.pending}
                         </Badge>
                       </div>
                     </div>
@@ -886,13 +873,13 @@ function SellerPaymentsView() {
                       background: "#f9fafb",
                     }}>
                       <div style={{ color: "#6b7280", fontSize: 11 }}>
-                        Summe ({displayTransactions.length}{totalFiltered !== periodTransactions.length ? ` von ${periodTransactions.length}` : ""})
+                        {txt.sum} ({displayTransactions.length}{totalFiltered !== periodTransactions.length ? ` ${txt.of} ${periodTransactions.length}` : ""})
                       </div>
                       <div /><div />
-                      <div style={{ textAlign: "right" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.total_cents || 0), 0))}</div>
-                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(displayTransactions.reduce((s, t) => s + (t.commission_cents || 0), 0))}</div>
-                      <div style={{ textAlign: "right", color: "#2563eb" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.shipping_cents || 0), 0))}</div>
-                      <div style={{ textAlign: "right", color: "#059669" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.payout_cents || 0), 0))}</div>
+                      <div style={{ textAlign: "right" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.total_cents || 0), 0), locale)}</div>
+                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(displayTransactions.reduce((s, t) => s + (t.commission_cents || 0), 0), locale)}</div>
+                      <div style={{ textAlign: "right", color: "#2563eb" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.shipping_cents || 0), 0), locale)}</div>
+                      <div style={{ textAlign: "right", color: "#059669" }}>{fmt(displayTransactions.reduce((s, t) => s + (t.payout_cents || 0), 0), locale)}</div>
                       <div />
                     </div>
                   )}
@@ -901,12 +888,12 @@ function SellerPaymentsView() {
                   {ps > 0 && totalPages > 1 && (
                     <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <Text variant="bodySm" tone="subdued">
-                        {page * ps + 1}–{Math.min((page + 1) * ps, totalFiltered)} von {totalFiltered}
+                        {page * ps + 1}–{Math.min((page + 1) * ps, totalFiltered)} {txt.of} {totalFiltered}
                       </Text>
                       <InlineStack gap="200">
-                        <Button size="slim" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>← Zurück</Button>
-                        <Text variant="bodySm" tone="subdued">Seite {page + 1} / {totalPages}</Text>
-                        <Button size="slim" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>Weiter →</Button>
+                        <Button size="slim" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>← {txt.back}</Button>
+                        <Text variant="bodySm" tone="subdued">{txt.page} {page + 1} / {totalPages}</Text>
+                        <Button size="slim" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>{txt.next} →</Button>
                       </InlineStack>
                     </div>
                   )}
@@ -919,34 +906,34 @@ function SellerPaymentsView() {
           <Box paddingBlockStart="400">
             <Card padding="0">
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
-                <Text variant="headingMd" as="h2">Auszahlungsverlauf</Text>
+                <Text variant="headingMd" as="h2">{txt.payoutHistory}</Text>
               </div>
               {history.length === 0 ? (
                 <Box padding="500">
-                  <Text tone="subdued" alignment="center">Noch keine Auszahlungen vorhanden.</Text>
+                  <Text tone="subdued" alignment="center">{txt.noPayoutsYet}</Text>
                 </Box>
               ) : (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "1.5fr 110px 110px 120px 100px", gap: 8, padding: "10px 20px", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#fafafa" }}>
-                    <div>Zeitraum</div>
-                    <div style={{ textAlign: "right" }}>Umsatz</div>
-                    <div style={{ textAlign: "right" }}>Provision</div>
-                    <div style={{ textAlign: "right" }}>Auszahlung</div>
-                    <div style={{ textAlign: "center" }}>Status</div>
+                    <div>{txt.periodCol}</div>
+                    <div style={{ textAlign: "right" }}>{txt.revenueLabel}</div>
+                    <div style={{ textAlign: "right" }}>{txt.commission}</div>
+                    <div style={{ textAlign: "right" }}>{txt.payoutCol}</div>
+                    <div style={{ textAlign: "center" }}>{txt.statusAll}</div>
                   </div>
-                  {history.map((p, i) => (
-                    <div key={p.id || i} style={{ display: "grid", gridTemplateColumns: "1.5fr 110px 110px 120px 100px", gap: 8, padding: "12px 20px", borderBottom: "1px solid #f3f4f6", fontSize: 13, alignItems: "center" }}>
+                  {history.map((row, i) => (
+                    <div key={row.id || i} style={{ display: "grid", gridTemplateColumns: "1.5fr 110px 110px 120px 100px", gap: 8, padding: "12px 20px", borderBottom: "1px solid #f3f4f6", fontSize: 13, alignItems: "center" }}>
                       <div>
-                        <div style={{ color: "#111827", fontWeight: 500 }}>{fmtDate(p.period_start)} – {fmtDate(p.period_end)}</div>
-                        {p.reference && (
-                          <div style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{p.reference}</div>
+                        <div style={{ color: "#111827", fontWeight: 500 }}>{fmtDate(row.period_start, locale)} – {fmtDate(row.period_end, locale)}</div>
+                        {row.reference && (
+                          <div style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{row.reference}</div>
                         )}
                       </div>
-                      <div style={{ textAlign: "right" }}>{fmt(p.total_cents || 0)}</div>
-                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(p.commission_cents != null ? p.commission_cents : Math.round((p.total_cents || 0) * commissionRate))}</div>
-                      <div style={{ textAlign: "right", fontWeight: 700, color: "#059669" }}>{fmt(p.payout_cents || 0)}</div>
+                      <div style={{ textAlign: "right" }}>{fmt(row.total_cents || 0, locale)}</div>
+                      <div style={{ textAlign: "right", color: "#dc2626" }}>– {fmt(row.commission_cents != null ? row.commission_cents : Math.round((row.total_cents || 0) * commissionRate), locale)}</div>
+                      <div style={{ textAlign: "right", fontWeight: 700, color: "#059669" }}>{fmt(row.payout_cents || 0, locale)}</div>
                       <div style={{ textAlign: "center" }}>
-                        <Badge tone={statusTone(p.status)}>{statusLabel(p.status)}</Badge>
+                        <Badge tone={statusTone(row.status)}>{statusLabel(row.status, locale)}</Badge>
                       </div>
                     </div>
                   ))}
@@ -960,8 +947,8 @@ function SellerPaymentsView() {
             <Card>
               <BlockStack gap="300">
                 <BlockStack gap="050">
-                  <Text as="h2" variant="headingMd">Bankverbindung</Text>
-                  <Text as="p" tone="subdued" variant="bodySm">Hinterlegte IBAN für automatische Auszahlungen</Text>
+                  <Text as="h2" variant="headingMd">{txt.bankDetails}</Text>
+                  <Text as="p" tone="subdued" variant="bodySm">{txt.bankDetailsSub}</Text>
                 </BlockStack>
                 <Divider />
               </BlockStack>
@@ -985,6 +972,8 @@ function SellerPaymentsView() {
 
 // ── Admin / Superuser Payments View ──────────────────────────────────────────
 function AdminPaymentsView() {
+  const locale = useLocale();
+  const txt = getPaymentsCopy(locale);
   const [periodKey, setPeriodKey] = useState(() => initialPeriodKeyForToday(PERIODS));
   const [sellers, setSellers]     = useState([]);
   const [txRows, setTxRows]       = useState([]);
@@ -1017,17 +1006,17 @@ function AdminPaymentsView() {
       setSellers(overview?.sellers || []);
       setTxRows(tx?.transactions || []);
     } catch (e) {
-      setErr(e?.message || "Fehler beim Laden");
+      setErr(e?.message || txt.loadError);
     } finally {
       setLoading(false);
     }
-  }, [selectedPeriod.startDate, selectedPeriod.endDate]);
+  }, [selectedPeriod.startDate, selectedPeriod.endDate, txt.loadError]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleMarkPaid = async (seller) => {
     if (!(await confirmDelete(
-      `Auszahlung für "${seller.store_name || seller.email}" als überwiesen markieren?\n\nBitte stelle sicher, dass die tatsächliche Überweisung bereits erfolgt ist.`
+      txt.markPaidConfirm(seller.store_name || seller.email)
     ))) return;
     setPaying(seller.seller_id);
     try {
@@ -1040,7 +1029,7 @@ function AdminPaymentsView() {
       });
       await loadData();
     } catch (e) {
-      alert(e?.message || "Fehler");
+      alert(e?.message || txt.genericError);
     } finally {
       setPaying(null);
     }
@@ -1090,7 +1079,7 @@ function AdminPaymentsView() {
   const periodOptions = PERIODS.map((p) => ({ label: p.label, value: p.key }));
 
   return (
-    <Page title="Zahlungen & Auszahlungen (Admin)">
+    <Page title={txt.adminPageTitle}>
       <Layout>
         <Layout.Section>
           {err && (
@@ -1103,14 +1092,14 @@ function AdminPaymentsView() {
           <Card>
             <InlineStack align="space-between" blockAlign="center" wrap={false}>
               <BlockStack gap="100">
-                <Text variant="headingMd" as="h2">Abrechnungszeitraum</Text>
-                <Text variant="bodySm" tone="subdued">Plattform-Übersicht für alle Seller</Text>
+                <Text variant="headingMd" as="h2">{txt.periodTitle}</Text>
+                <Text variant="bodySm" tone="subdued">{txt.adminPeriodSub}</Text>
               </BlockStack>
               <InlineStack gap="300" blockAlign="center">
                 <div style={{ width: 300 }}>
                   <Select label="" labelHidden options={periodOptions} value={periodKey} onChange={setPeriodKey} />
                 </div>
-                <Button onClick={loadData} loading={loading} size="slim">Aktualisieren</Button>
+                <Button onClick={loadData} loading={loading} size="slim">{txt.refresh}</Button>
               </InlineStack>
             </InlineStack>
           </Card>
@@ -1120,15 +1109,15 @@ function AdminPaymentsView() {
             <Card>
               <BlockStack gap="400">
                 <BlockStack gap="050">
-                  <Text variant="headingMd" as="h2">Plattform-Finanzen</Text>
+                  <Text variant="headingMd" as="h2">{txt.platformFinance}</Text>
                   <Text variant="bodySm" tone="subdued">{selectedPeriod.label}</Text>
                 </BlockStack>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                  <KpiCard icon="📦" label="Plattform-Umsatz (gesamt)" value={fmt(totalRevenue)} sub={`${sellers.length} aktive Seller`} />
-                  <KpiCard icon="💰" label="Provision (geschätzt)" value={fmt(totalCommission)} tone="success" sub="Einnahmen der Plattform" highlight />
-                  <KpiCard icon="💸" label="Auszuzahlen (gesamt)" value={fmt(totalPayout)} tone="critical" />
-                  <KpiCard icon="✅" label="Bereits bezahlt" value={fmt(totalPaid)} tone="success" />
-                  <KpiCard icon="⏳" label="Noch ausstehend" value={fmt(totalPending)} tone={totalPending > 0 ? "critical" : undefined} />
+                  <KpiCard icon="📦" label={txt.platformRevenue} value={fmt(totalRevenue, locale)} sub={`${sellers.length} ${txt.activeSellers}`} />
+                  <KpiCard icon="💰" label={txt.commissionEst} value={fmt(totalCommission, locale)} tone="success" sub={txt.platformIncome} highlight />
+                  <KpiCard icon="💸" label={txt.toPayoutTotal} value={fmt(totalPayout, locale)} tone="critical" />
+                  <KpiCard icon="✅" label={txt.alreadyPaid} value={fmt(totalPaid, locale)} tone="success" />
+                  <KpiCard icon="⏳" label={txt.stillPending} value={fmt(totalPending, locale)} tone={totalPending > 0 ? "critical" : undefined} />
                 </div>
               </BlockStack>
             </Card>
@@ -1138,21 +1127,21 @@ function AdminPaymentsView() {
           <Box paddingBlockStart="400">
             <Card padding="0">
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
-                <Text variant="headingMd" as="h2">Seller-Auszahlungen ({sellers.length})</Text>
+                <Text variant="headingMd" as="h2">{txt.adminSellerPayouts(sellers.length)}</Text>
               </div>
               {loading ? (
-                <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
+                <Box padding="400"><Text tone="subdued">{txt.loading}</Text></Box>
               ) : sellers.length === 0 ? (
-                <Box padding="500"><Text tone="subdued" alignment="center">Für diesen Zeitraum liegen keine Daten vor.</Text></Box>
+                <Box padding="500"><Text tone="subdued" alignment="center">{txt.noDataPeriod}</Text></Box>
               ) : (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "1.8fr 100px 100px 120px 130px 100px auto", gap: 8, padding: "10px 20px", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#fafafa" }}>
-                    <div>Seller</div>
-                    <div style={{ textAlign: "right" }}>Umsatz</div>
-                    <div style={{ textAlign: "right" }}>Provision</div>
-                    <div style={{ textAlign: "right" }}>Auszahlung</div>
-                    <div>Verwendungszweck</div>
-                    <div style={{ textAlign: "center" }}>Status</div>
+                    <div>{txt.sellerCol}</div>
+                    <div style={{ textAlign: "right" }}>{txt.revenueLabel}</div>
+                    <div style={{ textAlign: "right" }}>{txt.commission}</div>
+                    <div style={{ textAlign: "right" }}>{txt.payoutCol}</div>
+                    <div>{txt.referenceCol}</div>
+                    <div style={{ textAlign: "center" }}>{txt.colStatus}</div>
                     <div></div>
                   </div>
                   {sellers.map((seller, i) => {
@@ -1164,12 +1153,12 @@ function AdminPaymentsView() {
                         <div>
                           <Text variant="bodyMd" fontWeight="semibold">{seller.store_name || seller.email}</Text>
                           {seller.store_name && <Text variant="bodySm" tone="subdued">{seller.email}</Text>}
-                          <Text variant="bodySm" tone="subdued">{seller.order_count || 0} Bestellungen</Text>
+                          <Text variant="bodySm" tone="subdued">{txt.ordersCount(seller.order_count || 0)}</Text>
                         </div>
-                        <div style={{ textAlign: "right", fontSize: 13 }}>{fmt(seller.total_cents || 0)}</div>
-                        <div style={{ textAlign: "right", fontSize: 13, color: "#059669", fontWeight: 600 }}>+{fmt(comm)}</div>
+                        <div style={{ textAlign: "right", fontSize: 13 }}>{fmt(seller.total_cents || 0, locale)}</div>
+                        <div style={{ textAlign: "right", fontSize: 13, color: "#059669", fontWeight: 600 }}>+{fmt(comm, locale)}</div>
                         <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: isPaid ? "#6b7280" : "#dc2626" }}>
-                          {fmt(seller.payout_cents || 0)}
+                          {fmt(seller.payout_cents || 0, locale)}
                         </div>
                         <div>
                           <code style={{ fontSize: 11, background: "#f3f4f6", padding: "2px 5px", borderRadius: 4, color: "#374151", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1177,17 +1166,17 @@ function AdminPaymentsView() {
                           </code>
                         </div>
                         <div style={{ textAlign: "center" }}>
-                          <Badge tone={statusTone(seller.status)}>{statusLabel(seller.status)}</Badge>
+                          <Badge tone={statusTone(seller.status)}>{statusLabel(seller.status, locale)}</Badge>
                         </div>
                         <div>
                           {!isPaid && (seller.payout_cents || 0) > 0 ? (
                             <Button size="slim" variant="primary" onClick={() => handleMarkPaid(seller)} loading={paying === seller.seller_id}>
-                              Als bezahlt markieren
+                              {txt.markPaid}
                             </Button>
                           ) : isPaid ? (
-                            <Text variant="bodySm" tone="success">✓ {seller.paid_at ? fmtDate(seller.paid_at) : "Bezahlt"}</Text>
+                            <Text variant="bodySm" tone="success">✓ {seller.paid_at ? fmtDate(seller.paid_at, locale) : txt.paidLabel}</Text>
                           ) : (
-                            <Text variant="bodySm" tone="subdued">Kein Betrag</Text>
+                            <Text variant="bodySm" tone="subdued">{txt.noAmount}</Text>
                           )}
                         </div>
                       </div>
@@ -1204,15 +1193,15 @@ function AdminPaymentsView() {
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
                 <InlineStack align="space-between" blockAlign="center">
                   <BlockStack gap="050">
-                    <Text variant="headingMd" as="h2">IBAN Auszahlungsmonitor</Text>
-                    <Text variant="bodySm" tone="subdued">Automatische Auszahlungsstatus aller Bestellungen</Text>
+                    <Text variant="headingMd" as="h2">{txt.ibanMonitorTitle}</Text>
+                    <Text variant="bodySm" tone="subdued">{txt.ibanMonitorSub}</Text>
                   </BlockStack>
                   <InlineStack gap="200" wrap={false}>
                     {[
-                      { k: "paid",    t: "success",   l: "Bezahlt" },
-                      { k: "pending", t: "warning",   l: "Ausstehend" },
-                      { k: "processing", t: "info",   l: "In Verarbeitung" },
-                      { k: "failed",  t: "critical",  l: "Fehlgeschlagen" },
+                      { k: "paid",    t: "success",   l: txt.paidLabel },
+                      { k: "pending", t: "warning",   l: txt.pending },
+                      { k: "processing", t: "info",   l: payoutStatusLabel(locale, "processing") },
+                      { k: "failed",  t: "critical",  l: payoutStatusLabel(locale, "failed") },
                     ].map(({ k, t, l }) => (payoutStatusCounts[k] || 0) > 0 ? (
                       <Badge key={k} tone={t}>{l}: {payoutStatusCounts[k]}</Badge>
                     ) : null)}
@@ -1224,11 +1213,11 @@ function AdminPaymentsView() {
               <div style={{ padding: "12px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
                 <div style={{ flex: "1 1 200px", minWidth: 180 }}>
                   <TextField
-                    label="Suche"
+                    label={txt.search}
                     labelHidden
                     value={monitorSearch}
                     onChange={setMonitorSearch}
-                    placeholder="Bestellnr. oder Seller…"
+                    placeholder={txt.adminSearchPlaceholder}
                     clearButton
                     onClearButtonClick={() => setMonitorSearch("")}
                     autoComplete="off"
@@ -1236,14 +1225,14 @@ function AdminPaymentsView() {
                 </div>
                 <div style={{ width: 180 }}>
                   <Select
-                    label="Status"
+                    label={txt.colStatus}
                     labelHidden
                     options={[
-                      { label: "Alle Status", value: "all" },
-                      { label: "Ausstehend", value: "pending" },
-                      { label: "In Verarbeitung", value: "processing" },
-                      { label: "Bezahlt", value: "paid" },
-                      { label: "Fehlgeschlagen", value: "failed" },
+                      { label: txt.statusAll, value: "all" },
+                      { label: txt.pending, value: "pending" },
+                      { label: payoutStatusLabel(locale, "processing"), value: "processing" },
+                      { label: txt.paidLabel, value: "paid" },
+                      { label: payoutStatusLabel(locale, "failed"), value: "failed" },
                     ]}
                     value={monitorStatus}
                     onChange={setMonitorStatus}
@@ -1252,31 +1241,31 @@ function AdminPaymentsView() {
               </div>
 
               {txRows.length === 0 ? (
-                <Box padding="500"><Text tone="subdued" alignment="center">Keine Daten im Zeitraum.</Text></Box>
+                <Box padding="500"><Text tone="subdued" alignment="center">{txt.noDataInPeriod}</Text></Box>
               ) : (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "160px 1.2fr 1fr 100px 120px 1.2fr", gap: 8, padding: "10px 20px", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#fafafa" }}>
-                    <SortTh label="Datum" col="created_at" sortCol={monitorSort} sortDir={monitorDir} onSort={handleMonitorSort} />
-                    <div>Bestellung</div>
-                    <div>Seller</div>
-                    <SortTh label="Auszahlung" col="payout_cents" sortCol={monitorSort} sortDir={monitorDir} onSort={handleMonitorSort} style={{ justifyContent: "flex-end" }} />
-                    <div style={{ textAlign: "center" }}>Status</div>
-                    <div>Payout-ID</div>
+                    <SortTh label={txt.colDate} col="created_at" sortCol={monitorSort} sortDir={monitorDir} onSort={handleMonitorSort} />
+                    <div>{txt.orderCol}</div>
+                    <div>{txt.sellerCol}</div>
+                    <SortTh label={txt.payoutCol} col="payout_cents" sortCol={monitorSort} sortDir={monitorDir} onSort={handleMonitorSort} style={{ justifyContent: "flex-end" }} />
+                    <div style={{ textAlign: "center" }}>{txt.colStatus}</div>
+                    <div>{txt.payoutIdCol}</div>
                   </div>
                   {displayMonitor.map((t, i) => (
                     <div key={`${t.id || ""}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 1.2fr 1fr 100px 120px 1.2fr", gap: 8, padding: "11px 20px", borderBottom: "1px solid #f3f4f6", fontSize: 13, alignItems: "center" }}>
                       <div style={{ color: "#374151" }}>
-                        <div>{fmtDate(t.created_at)}</div>
-                        {t.delivery_date && <div style={{ fontSize: 11, color: "#9ca3af" }}>Lief.: {fmtDate(t.delivery_date)}</div>}
+                        <div>{fmtDate(t.created_at, locale)}</div>
+                        {t.delivery_date && <div style={{ fontSize: 11, color: "#9ca3af" }}>{txt.deliveryShort}: {fmtDate(t.delivery_date, locale)}</div>}
                       </div>
                       <div>
                         <div style={{ fontWeight: 600 }}>#{t.order_number || t.id}</div>
                       </div>
                       <div style={{ color: "#374151" }}>{t.store_name || t.seller_id}</div>
-                      <div style={{ textAlign: "right", fontWeight: 600 }}>{fmt(t.payout_cents || 0)}</div>
+                      <div style={{ textAlign: "right", fontWeight: 600 }}>{fmt(t.payout_cents || 0, locale)}</div>
                       <div style={{ textAlign: "center" }}>
                         <Badge tone={statusTone(t.stripe_payout_status)}>
-                          {statusLabel(t.stripe_payout_status || "pending")}
+                          {statusLabel(t.stripe_payout_status || "pending", locale)}
                         </Badge>
                       </div>
                       <div>
@@ -1292,7 +1281,7 @@ function AdminPaymentsView() {
                   ))}
                   {displayMonitor.length === 200 && (
                     <Box padding="300">
-                      <Text variant="bodySm" tone="subdued" alignment="center">Maximal 200 Einträge angezeigt. Nutze die Filter um spezifische Ergebnisse zu sehen.</Text>
+                      <Text variant="bodySm" tone="subdued" alignment="center">{txt.monitorHint}</Text>
                     </Box>
                   )}
                 </>
@@ -1308,6 +1297,8 @@ function AdminPaymentsView() {
 
 // ── Entry Point ───────────────────────────────────────────────────────────────
 export default function PaymentsSettingsPage() {
+  const locale = useLocale();
+  const txt = getPaymentsCopy(locale);
   const [isSuperuser, setIsSuperuser] = useState(null);
 
   useEffect(() => {
@@ -1317,8 +1308,8 @@ export default function PaymentsSettingsPage() {
 
   if (isSuperuser === null) {
     return (
-      <Page title="Zahlungen">
-        <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
+      <Page title={txt.paymentsTitle}>
+        <Box padding="400"><Text tone="subdued">{txt.loading}</Text></Box>
       </Page>
     );
   }

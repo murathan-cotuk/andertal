@@ -1,38 +1,16 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useLocale } from "next-intl";
+import { useLt, dateLocaleFor, fmtMoney } from "@/lib/locale-text";
 
 const DEFAULT_ACCENT = "#008060";
-
-function fmtEuroCents(cents) {
-  return (Number(cents || 0) / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-}
-
-function fmtAxisEuro(cents) {
-  const euro = Number(cents || 0) / 100;
-  if (euro >= 1000) {
-    return `€${(euro / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })}k`;
-  }
-  return `€${euro.toLocaleString("de-DE", { maximumFractionDigits: 0 })}`;
-}
 
 function niceMaxCents(cents) {
   const euro = cents / 100;
   if (euro <= 0) return 10000;
   const magnitude = 10 ** Math.floor(Math.log10(euro));
   return Math.ceil(euro / magnitude) * magnitude * 100;
-}
-
-function formatFullDate(key) {
-  if (!key) return "—";
-  const [y, m, d] = key.split("-");
-  return `${d}.${m}.${y}`;
-}
-
-function formatDayMonth(key) {
-  if (!key) return "";
-  const [, m, d] = key.split("-");
-  return `${d}.${m}`;
 }
 
 /**
@@ -43,9 +21,38 @@ export default function RevenueAreaChart({
   data = [],
   height = 220,
   accent = DEFAULT_ACCENT,
-  emptyLabel = "Keine Daten",
+  emptyLabel,
   showClicksLine = false,
 }) {
+  const locale = useLocale();
+  const lt = useLt();
+  const dateLoc = dateLocaleFor(locale);
+  const resolvedEmptyLabel = emptyLabel ?? lt("No data", "Veri yok", "Aucune donnée", "Sin datos", "Nessun dato", "Keine Daten");
+
+  const fmtEuroCents = (cents) => fmtMoney(cents, locale);
+
+  const fmtAxisEuro = (cents) => {
+    const euro = Number(cents || 0) / 100;
+    if (euro >= 1000) {
+      return `€${(euro / 1000).toLocaleString(dateLoc, { maximumFractionDigits: 1 })}k`;
+    }
+    return `€${euro.toLocaleString(dateLoc, { maximumFractionDigits: 0 })}`;
+  };
+
+  const formatFullDate = (key) => {
+    if (!key) return "—";
+    const [y, m, d] = key.split("-");
+    const dt = new Date(Number(y), Number(m) - 1, Number(d));
+    return dt.toLocaleDateString(dateLoc, { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+
+  const formatDayMonth = (key) => {
+    if (!key) return "";
+    const [y, m, d] = key.split("-");
+    const dt = new Date(Number(y), Number(m) - 1, Number(d));
+    return dt.toLocaleDateString(dateLoc, { day: "2-digit", month: "2-digit" });
+  };
+
   const [hoverIdx, setHoverIdx] = useState(null);
 
   const W = 800;
@@ -109,7 +116,7 @@ export default function RevenueAreaChart({
   const labelStep = Math.max(1, Math.ceil(data.length / 10));
 
   if (data.length === 0) {
-    return <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>{emptyLabel}</p>;
+    return <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>{resolvedEmptyLabel}</p>;
   }
 
   return (
@@ -127,16 +134,16 @@ export default function RevenueAreaChart({
       >
         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 16, height: 3, background: accent, borderRadius: 2 }} />
-          Umsatz
+          {lt("Revenue", "Gelir", "Chiffre d'affaires", "Ingresos", "Ricavi", "Umsatz")}
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 16, height: 0, borderTop: `2px dashed ${accent}` }} />
-          Verlauf
+          {lt("Trend", "Trend", "Tendance", "Tendencia", "Andamento", "Verlauf")}
         </span>
         {showClicksLine && (
           <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ width: 16, height: 0, borderTop: "2px solid #6366f1" }} />
-            Klicks
+            {lt("Clicks", "Tıklamalar", "Clics", "Clics", "Clic", "Klicks")}
           </span>
         )}
       </div>
@@ -146,7 +153,7 @@ export default function RevenueAreaChart({
         style={{ width: "100%", height: "auto", display: "block" }}
         onMouseLeave={() => setHoverIdx(null)}
         role="img"
-        aria-label="Umsatzdiagramm"
+        aria-label={lt("Revenue chart", "Gelir grafiği", "Graphique des revenus", "Gráfico de ingresos", "Grafico ricavi", "Umsatzdiagramm")}
       >
         {Array.from({ length: yTicks + 1 }, (_, i) => {
           const valCents = (maxRevenue * i) / yTicks;
@@ -278,25 +285,25 @@ export default function RevenueAreaChart({
         >
           <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>{formatFullDate(hover.key)}</div>
           <div>
-            <span style={{ color: "#9ca3af" }}>Umsatz: </span>
+            <span style={{ color: "#9ca3af" }}>{lt("Revenue:", "Gelir:", "Chiffre d'affaires :", "Ingresos:", "Ricavi:", "Umsatz: ")}</span>
             <strong>{fmtEuroCents(hover.revenue)}</strong>
           </div>
           {hover.orders != null && (
             <div>
-              <span style={{ color: "#9ca3af" }}>Bestellungen: </span>
+              <span style={{ color: "#9ca3af" }}>{lt("Orders:", "Siparişler:", "Commandes :", "Pedidos:", "Ordini:", "Bestellungen: ")}</span>
               <strong>{hover.orders}</strong>
             </div>
           )}
           {hover.impressions != null && hover.impressions > 0 && (
             <div>
-              <span style={{ color: "#9ca3af" }}>Impressions: </span>
-              <strong>{hover.impressions.toLocaleString("de-DE")}</strong>
+              <span style={{ color: "#9ca3af" }}>{lt("Impressions:", "Gösterimler:", "Impressions :", "Impresiones:", "Impressioni:", "Impressions: ")}</span>
+              <strong>{hover.impressions.toLocaleString(dateLoc)}</strong>
             </div>
           )}
           {hover.clicks != null && hover.clicks > 0 && (
             <div>
-              <span style={{ color: "#9ca3af" }}>Klicks: </span>
-              <strong>{hover.clicks.toLocaleString("de-DE")}</strong>
+              <span style={{ color: "#9ca3af" }}>{lt("Clicks:", "Tıklamalar:", "Clics :", "Clics:", "Clic:", "Klicks: ")}</span>
+              <strong>{hover.clicks.toLocaleString(dateLoc)}</strong>
               {hover.impressions > 0 && (
                 <span style={{ color: "#9ca3af", marginLeft: 6 }}>
                   CTR {((hover.clicks / hover.impressions) * 100).toFixed(1)} %
@@ -306,7 +313,7 @@ export default function RevenueAreaChart({
           )}
           {deltaPct != null && (
             <div style={{ marginTop: 4, color: deltaPct >= 0 ? "#6ee7b7" : "#fca5a5" }}>
-              {deltaPct >= 0 ? "▲" : "▼"} {Math.abs(deltaPct)} % vs. Vortag
+              {deltaPct >= 0 ? "▲" : "▼"} {Math.abs(deltaPct)} % {lt("vs. previous day", "önceki güne göre", "vs. jour précédent", "vs. día anterior", "vs. giorno precedente", "vs. Vortag")}
             </div>
           )}
         </div>

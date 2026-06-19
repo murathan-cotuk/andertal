@@ -2,22 +2,176 @@
 
 import DashboardLayout from "@/components/DashboardLayout";
 import { useState, useEffect, useCallback } from "react";
+import { useLocale } from "next-intl";
 import {
-  Page, Layout, Card, Text, BlockStack, InlineStack,
-  Badge, Button, Banner, Box, Select, Divider,
+  Page, Layout, Card, Text, BlockStack,
+  Badge, Button, Banner, Box, Select,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { lt, dateLocaleFor } from "@/lib/locale-text";
+import { payoutStatusLabel } from "@/lib/payments-i18n";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-const fmt = (cents, currency = "EUR") =>
-  ((cents || 0) / 100).toLocaleString("de-DE", { style: "currency", currency });
+function txT(locale, en, tr, fr, es, it, de) {
+  return lt(locale, en, tr, fr, es, it, de);
+}
 
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+function getTransactionsCopy(locale) {
+  const t = (en, tr, fr, es, it, de) => txT(locale, en, tr, fr, es, it, de);
+  return {
+    loadError: t("Error loading", "Yükleme hatası", "Erreur de chargement", "Error al cargar", "Errore di caricamento", "Fehler beim Laden"),
+    loading: t("Loading…", "Yükleniyor…", "Chargement…", "Cargando…", "Caricamento…", "Laden…"),
+    pageTitle: t("Transactions", "İşlemler", "Transactions", "Transacciones", "Transazioni", "Transaktionen"),
+    pageSubtitleSeller: t(
+      "Your revenue, commissions and payouts",
+      "Cirolarınız, komisyonlar ve ödemeler",
+      "Vos revenus, commissions et versements",
+      "Sus ingresos, comisiones y pagos",
+      "I vostri ricavi, commissioni e pagamenti",
+      "Ihre Umsätze, Provisionen und Auszahlungen"
+    ),
+    pageSubtitleAdmin: t(
+      "Seller revenue, commissions and payout management",
+      "Satıcı cirosu, komisyonlar ve ödeme yönetimi",
+      "Revenus vendeurs, commissions et gestion des versements",
+      "Ingresos de vendedores, comisiones y gestión de pagos",
+      "Ricavi venditori, commissioni e gestione pagamenti",
+      "Seller-Umsätze, Provisionen und Auszahlungsverwaltung"
+    ),
+    pageTitleAdmin: t("Transactions (Admin)", "İşlemler (Admin)", "Transactions (Admin)", "Transacciones (Admin)", "Transazioni (Admin)", "Transaktionen (Admin)"),
+    settlementPeriod: t("Settlement period", "Abrechnungszeitraum", "Période de règlement", "Periodo de liquidación", "Periodo di regolamento", "Abrechnungszeitraum"),
+    refresh: t("Refresh", "Yenile", "Actualiser", "Actualizar", "Aggiorna", "Aktualisieren"),
+    selectPeriod: t("Select period", "Dönem seç", "Sélectionner la période", "Seleccionar periodo", "Seleziona periodo", "Zeitraum auswählen"),
+    overview: t("Overview", "Özet", "Aperçu", "Resumen", "Panoramica", "Übersicht"),
+    totalRevenue: t("Total revenue", "Toplam ciro", "Chiffre d'affaires total", "Ingresos totales", "Ricavi totali", "Gesamtumsatz"),
+    ordersCount: (n) => t(`${n} orders`, `${n} sipariş`, `${n} commandes`, `${n} pedidos`, `${n} ordini`, `${n} Bestellungen`),
+    commission: (pct) => t(`Commission (${pct}%)`, `Komisyon (${pct}%)`, `Commission (${pct}%)`, `Comisión (${pct}%)`, `Commissione (${pct}%)`, `Provision (${pct}%)`),
+    commissionNote: t("Eligible only", "Yalnızca uygun olanlar", "Éligibles uniquement", "Solo elegibles", "Solo idonei", "Nur freigegebene"),
+    refunds: t("Refunds", "İadeler", "Remboursements", "Reembolsos", "Rimborsi", "Rückerstattungen"),
+    shippingShare: t("Shipping (share)", "Kargo (pay)", "Expédition (part)", "Envío (cuota)", "Spedizione (quota)", "Versand (Beteiligung)"),
+    eligibleNet: t("Eligible (net)", "Uygun (net)", "Éligible (net)", "Elegible (neto)", "Idoneo (netto)", "Freigegeben (netto)"),
+    eligibleNote: (n) => t(
+      `${n} orders (14 days after delivery)`,
+      `${n} sipariş (teslimattan 14 gün sonra)`,
+      `${n} commandes (14 jours après livraison)`,
+      `${n} pedidos (14 días tras entrega)`,
+      `${n} ordini (14 giorni dopo consegna)`,
+      `${n} Bestellungen (14 Tage nach Lieferung)`
+    ),
+    paidOut: t("Paid out", "Ödendi", "Versé", "Pagado", "Pagato", "Ausgezahlt"),
+    viaStripe: t("via Stripe", "Stripe ile", "via Stripe", "vía Stripe", "via Stripe", "via Stripe"),
+    stillPending: t("Still pending", "Hâlâ bekliyor", "Toujours en attente", "Aún pendiente", "Ancora in sospeso", "Noch ausstehend"),
+    pendingPayout: t("Pending payout:", "Bekleyen ödeme:", "Versement en attente :", "Pago pendiente:", "Pagamento in sospeso:", "Ausstehende Auszahlung:"),
+    pendingPayoutBody: t(
+      "will be transferred via Stripe. Reference:",
+      "Stripe ile aktarılacak. Referans:",
+      "sera viré via Stripe. Référence :",
+      "se transferirá vía Stripe. Referencia:",
+      "verrà trasferito via Stripe. Riferimento:",
+      "wird über Stripe überwiesen. Verwendungszweck:"
+    ),
+    tabEligible: t("Eligible", "Uygun", "Éligible", "Elegible", "Idoneo", "Freigegeben"),
+    tabPending: t("Pending", "Beklemede", "En attente", "Pendiente", "In sospeso", "Ausstehend"),
+    tabPayouts: t("Payouts", "Ödemeler", "Versements", "Pagos", "Pagamenti", "Auszahlungen"),
+    tabPayoutHistory: t("Payout history", "Ödeme geçmişi", "Historique versements", "Historial pagos", "Storico pagamenti", "Auszahlungshistorie"),
+    eligibleBannerSeller: t(
+      "These orders were delivered more than 14 days ago — they qualify for payout.",
+      "Bu siparişler teslim edildi ve 14 günden eski — ödemeye uygundur.",
+      "Ces commandes ont été livrées il y a plus de 14 jours — éligibles au versement.",
+      "Estos pedidos se entregaron hace más de 14 días — aptos para pago.",
+      "Questi ordini sono stati consegnati da più di 14 giorni — idonei al pagamento.",
+      "Diese Bestellungen wurden geliefert und sind älter als 14 Tage — sie kommen für die Auszahlung infrage."
+    ),
+    pendingBannerSeller: t(
+      "These orders are not yet eligible for payout (delivered less than 14 days ago or not yet delivered).",
+      "Bu siparişler henüz ödemeye uygun değil (teslimattan 14 günden az veya henüz teslim edilmedi).",
+      "Ces commandes ne sont pas encore éligibles (livraison < 14 jours ou pas encore livrées).",
+      "Estos pedidos aún no son elegibles (entrega < 14 días o aún no entregados).",
+      "Questi ordini non sono ancora idonei (consegna < 14 giorni o non ancora consegnati).",
+      "Diese Bestellungen sind noch nicht für eine Auszahlung freigegeben (Lieferung vor weniger als 14 Tagen oder noch nicht geliefert)."
+    ),
+    periodLabel: t("Period", "Dönem", "Période", "Periodo", "Periodo", "Zeitraum"),
+    allSellers: t("All sellers", "Tüm satıcılar", "Tous les vendeurs", "Todos los vendedores", "Tutti i venditori", "Alle Seller"),
+    seller: t("Seller", "Satıcı", "Vendeur", "Vendedor", "Venditore", "Seller"),
+    globalOverview: t("Global overview", "Genel özet", "Aperçu global", "Resumen global", "Panoramica globale", "Gesamtübersicht"),
+    platformRevenue: t("Platform revenue", "Platform cirosu", "Chiffre d'affaires plateforme", "Ingresos plataforma", "Ricavi piattaforma", "Plattform-Umsatz"),
+    totalOrders: (n) => t(`${n} orders total`, `${n} sipariş toplam`, `${n} commandes au total`, `${n} pedidos en total`, `${n} ordini totali`, `${n} Bestellungen gesamt`),
+    commissionIncome: t("Commission (income)", "Komisyon (gelir)", "Commission (revenus)", "Comisión (ingresos)", "Commissione (ricavi)", "Provision (Einnahmen)"),
+    qualified: (n) => t(`${n} qualified`, `${n} uygun`, `${n} qualifiés`, `${n} calificados`, `${n} qualificati`, `${n} qualifiziert`),
+    toPayoutTotal: t("To pay out (total)", "Ödenecek (toplam)", "À verser (total)", "A pagar (total)", "Da pagare (totale)", "Auszuzahlen (gesamt)"),
+    toAllSellers: t("To all sellers", "Tüm satıcılara", "À tous les vendeurs", "A todos los vendedores", "A tutti i venditori", "An alle Seller"),
+    stillPendingAmount: t("Still pending", "Hâlâ bekliyor", "Toujours en attente", "Aún pendiente", "Ancora in sospeso", "Noch ausstehend"),
+    sellerOverview: t("Seller overview", "Satıcı özeti", "Aperçu vendeurs", "Resumen vendedores", "Panoramica venditori", "Seller-Übersicht"),
+    revenue: t("Revenue", "Ciro", "Chiffre d'affaires", "Ingresos", "Ricavi", "Umsatz"),
+    payout: t("Payout", "Ödeme", "Versement", "Pago", "Pagamento", "Auszahlung"),
+    status: t("Status", "Durum", "Statut", "Estado", "Stato", "Status"),
+    ordersShort: (total, eligible) => t(
+      `${total} ord. · ${eligible} eligible`,
+      `${total} sip. · ${eligible} uygun`,
+      `${total} cmd. · ${eligible} éligibles`,
+      `${total} ped. · ${eligible} elegibles`,
+      `${total} ord. · ${eligible} idonei`,
+      `${total} Best. · ${eligible} freigegeben`
+    ),
+    paid: t("Paid", "Ödendi", "Payé", "Pagado", "Pagato", "Bezahlt"),
+    open: t("Open", "Açık", "Ouvert", "Abierto", "Aperto", "Offen"),
+    paidViaStripe: t("Paid via Stripe", "Stripe ile ödendi", "Payé via Stripe", "Pagado vía Stripe", "Pagato via Stripe", "Bezahlt via Stripe"),
+    markPaidConfirm: (name, amount) => t(
+      `Mark payout for "${name}" as paid? Amount: ${amount}`,
+      `"${name}" için ödemeyi ödendi olarak işaretle? Tutar: ${amount}`,
+      `Marquer le versement pour « ${name} » comme payé ? Montant : ${amount}`,
+      `¿Marcar pago de "${name}" como pagado? Importe: ${amount}`,
+      `Segnare pagamento per "${name}" come pagato? Importo: ${amount}`,
+      `Auszahlung für „${name}" als bezahlt markieren? Betrag: ${amount}`
+    ),
+    error: t("Error", "Hata", "Erreur", "Error", "Errore", "Fehler"),
+    eligibleBannerAdmin: t(
+      "Orders delivered more than 14 days ago — ready for payout.",
+      "14 günden eski teslim edilmiş siparişler — ödemeye hazır.",
+      "Commandes livrées il y a plus de 14 jours — prêtes pour versement.",
+      "Pedidos entregados hace más de 14 días — listos para pago.",
+      "Ordini consegnati da più di 14 giorni — pronti per pagamento.",
+      "Bestellungen, die geliefert und älter als 14 Tage sind — auszahlungsbereit."
+    ),
+    pendingBannerAdmin: t(
+      "Not yet eligible for payout (delivery < 14 days or not yet delivered).",
+      "Henüz ödemeye uygun değil (teslim < 14 gün veya henüz teslim edilmedi).",
+      "Pas encore éligible (livraison < 14 jours ou pas encore livrée).",
+      "Aún no elegible (entrega < 14 días o aún no entregado).",
+      "Non ancora idoneo (consegna < 14 giorni o non ancora consegnato).",
+      "Noch nicht auszahlungsbereit (Lieferung < 14 Tage oder noch nicht geliefert)."
+    ),
+    noTransactions: t("No transactions in this period.", "Bu dönemde işlem yok.", "Aucune transaction sur cette période.", "No hay transacciones en este periodo.", "Nessuna transazione in questo periodo.", "Keine Transaktionen in diesem Zeitraum."),
+    colOrder: t("Order", "Sipariş", "Commande", "Pedido", "Ordine", "Bestellung"),
+    colShipping: t("Shipping", "Kargo", "Expédition", "Envío", "Spedizione", "Versand"),
+    colCommission: t("Commission", "Komisyon", "Commission", "Comisión", "Commissione", "Provision"),
+    colNet: t("Net", "Net", "Net", "Neto", "Netto", "Netto"),
+    colDelivery: t("Delivery", "Teslimat", "Livraison", "Entrega", "Consegna", "Lieferung"),
+    periodReference: t("Period / reference", "Dönem / referans", "Période / référence", "Periodo / referencia", "Periodo / riferimento", "Zeitraum / Referenz"),
+    paidOn: t("Paid on", "Ödeme tarihi", "Payé le", "Pagado el", "Pagato il", "Bezahlt am"),
+    noPayoutsYet: t("No payouts yet.", "Henüz ödeme yok.", "Aucun versement pour l'instant.", "Aún no hay pagos.", "Ancora nessun pagamento.", "Noch keine Auszahlungen vorhanden."),
+    markTransferredConfirm: t(
+      "Mark this entry as externally transferred? (This does not send an actual payment)",
+      "Bu kaydı harici olarak aktarıldı olarak işaretle? (Gerçek ödeme göndermez)",
+      "Marquer cette entrée comme virée externement ? (N'envoie pas de paiement réel)",
+      "¿Marcar esta entrada como transferida externamente? (No envía un pago real)",
+      "Segnare questa voce come trasferita esternamente? (Non invia un pagamento reale)",
+      "Diesen Eintrag als extern überwiesen markieren? (Bu işlem gerçek ödeme göndermez)"
+    ),
+    markTransferred: t("Mark as transferred", "Aktarıldı olarak işaretle", "Marquer comme viré", "Marcar como transferido", "Segna come trasferito", "Als überwiesen markieren"),
+  };
+}
+
+function fmtCents(cents, currency = "EUR", locale = "de") {
+  return ((cents || 0) / 100).toLocaleString(dateLocaleFor(locale), { style: "currency", currency });
+}
+
+function fmtDate(d, locale = "de") {
+  return d ? new Date(d).toLocaleDateString(dateLocaleFor(locale), { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+}
 
 const COMMISSION_RATE = 0.12;
 
-/** Generate 15-day settlement periods, newest first */
 function generatePeriods(count = 14) {
   const periods = [];
   let year = new Date().getFullYear();
@@ -44,7 +198,6 @@ function generatePeriods(count = 14) {
 
 const PERIODS = generatePeriods(14);
 
-// ── Stat Box ──────────────────────────────────────────────────────────────────
 function StatBox({ label, value, note, color }) {
   return (
     <div style={{
@@ -59,10 +212,13 @@ function StatBox({ label, value, note, color }) {
   );
 }
 
-// ── SELLER VIEW ───────────────────────────────────────────────────────────────
 function SellerTransactionsView({ sellerId }) {
+  const locale = useLocale();
+  const copy = getTransactionsCopy(locale);
+  const fmt = (cents, currency) => fmtCents(cents, currency, locale);
+
   const [periodKey, setPeriodKey] = useState(PERIODS[0].key);
-  const [tab, setTab] = useState("eligible"); // eligible | pending | payouts
+  const [tab, setTab] = useState("eligible");
   const [allTx, setAllTx] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -81,15 +237,14 @@ function SellerTransactionsView({ sellerId }) {
       if (txRes.status === "fulfilled") setAllTx(txRes.value?.transactions || []);
       if (poRes.status === "fulfilled") setPayouts(poRes.value?.payouts || []);
     } catch (e) {
-      setErr(e?.message || "Fehler beim Laden");
+      setErr(e?.message || copy.loadError);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [copy.loadError]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Filter by period (order date in period)
   const inPeriod = (tx) => {
     const d = new Date(tx.created_at);
     return d >= new Date(selectedPeriod.start) && d <= new Date(selectedPeriod.end);
@@ -99,7 +254,6 @@ function SellerTransactionsView({ sellerId }) {
   const eligible = periodTx.filter((tx) => tx.payout_eligible);
   const pending = periodTx.filter((tx) => !tx.payout_eligible);
 
-  // Summary
   const totalRevenue = periodTx.reduce((s, t) => s + (t.total_cents || 0), 0);
   const totalCommission = eligible.reduce((s, t) => s + (t.commission_cents || 0), 0);
   const totalRefunds = periodTx.reduce((s, t) => s + (t.refund_cents || 0), 0);
@@ -132,21 +286,20 @@ function SellerTransactionsView({ sellerId }) {
   );
 
   return (
-    <Page title="Transaktionen" subtitle="Ihre Umsätze, Provisionen und Auszahlungen">
+    <Page title={copy.pageTitle} subtitle={copy.pageSubtitleSeller}>
       <Layout>
         <Layout.Section>
           {err && <Banner tone="critical" onDismiss={() => setErr("")}><Text>{err}</Text></Banner>}
 
-          {/* Period + refresh */}
           <Card>
             <BlockStack gap="400">
               <InlineStack align="space-between" blockAlign="center">
-                <Text variant="headingMd" as="h2">Abrechnungszeitraum</Text>
-                <Button onClick={loadData} loading={loading} size="slim">Aktualisieren</Button>
+                <Text variant="headingMd" as="h2">{copy.settlementPeriod}</Text>
+                <Button onClick={loadData} loading={loading} size="slim">{copy.refresh}</Button>
               </InlineStack>
               <div style={{ maxWidth: 340 }}>
                 <Select
-                  label="Zeitraum auswählen"
+                  label={copy.selectPeriod}
                   options={periodOptions}
                   value={periodKey}
                   onChange={setPeriodKey}
@@ -155,26 +308,25 @@ function SellerTransactionsView({ sellerId }) {
             </BlockStack>
           </Card>
 
-          {/* Summary stats */}
           <Box paddingBlockStart="400">
             <Card>
               <BlockStack gap="400">
-                <Text variant="headingMd" as="h2">Übersicht — {selectedPeriod.label}</Text>
+                <Text variant="headingMd" as="h2">{copy.overview} — {selectedPeriod.label}</Text>
                 {loading ? (
-                  <Text tone="subdued">Laden…</Text>
+                  <Text tone="subdued">{copy.loading}</Text>
                 ) : (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                    <StatBox label="Gesamtumsatz" value={fmt(totalRevenue)} note={`${periodTx.length} Bestellungen`} />
-                    <StatBox label={`Provision (${(COMMISSION_RATE * 100).toFixed(0)}%)`} value={`– ${fmt(totalCommission)}`} color="#dc2626" note="Nur freigegebene" />
-                    <StatBox label="Rückerstattungen" value={totalRefunds > 0 ? `– ${fmt(totalRefunds)}` : fmt(0)} color={totalRefunds > 0 ? "#dc2626" : undefined} />
-                    <StatBox label="Versand (Beteiligung)" value={fmt(totalShipping)} />
-                    <StatBox label="Freigegeben (netto)" value={fmt(netPayout)} color="#059669"
-                      note={`${eligible.length} Bestellungen (14 Tage nach Lieferung)`} />
+                    <StatBox label={copy.totalRevenue} value={fmt(totalRevenue)} note={copy.ordersCount(periodTx.length)} />
+                    <StatBox label={copy.commission((COMMISSION_RATE * 100).toFixed(0))} value={`– ${fmt(totalCommission)}`} color="#dc2626" note={copy.commissionNote} />
+                    <StatBox label={copy.refunds} value={totalRefunds > 0 ? `– ${fmt(totalRefunds)}` : fmt(0)} color={totalRefunds > 0 ? "#dc2626" : undefined} />
+                    <StatBox label={copy.shippingShare} value={fmt(totalShipping)} />
+                    <StatBox label={copy.eligibleNet} value={fmt(netPayout)} color="#059669"
+                      note={copy.eligibleNote(eligible.length)} />
                     <StatBox
-                      label="Ausgezahlt"
+                      label={copy.paidOut}
                       value={paidAmount > 0 ? fmt(paidAmount) : "—"}
                       color="#059669"
-                      note={paidAmount > 0 ? "via Stripe" : "Noch ausstehend"}
+                      note={paidAmount > 0 ? copy.viaStripe : copy.stillPending}
                     />
                   </div>
                 )}
@@ -182,8 +334,8 @@ function SellerTransactionsView({ sellerId }) {
                 {!loading && netPayout > paidAmount && (
                   <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px" }}>
                     <Text variant="bodySm">
-                      <strong>Ausstehende Auszahlung:</strong> {fmt(netPayout - paidAmount)} — wird über Stripe überwiesen.{" "}
-                      Verwendungszweck: <code style={{ background: "#fef9c3", padding: "1px 5px", borderRadius: 3, fontSize: 11 }}>
+                      <strong>{copy.pendingPayout}</strong> {fmt(netPayout - paidAmount)} — {copy.pendingPayoutBody}{" "}
+                      <code style={{ background: "#fef9c3", padding: "1px 5px", borderRadius: 3, fontSize: 11 }}>
                         {sellerId}-{periodKey}
                       </code>
                     </Text>
@@ -193,39 +345,34 @@ function SellerTransactionsView({ sellerId }) {
             </Card>
           </Box>
 
-          {/* Tabs */}
           <Box paddingBlockStart="400">
             <div style={{ display: "flex", gap: 0, marginBottom: 16 }}>
-              {tabBtn("eligible", "Freigegeben", eligible.length)}
-              {tabBtn("pending", "Ausstehend", pending.length)}
-              {tabBtn("payouts", "Auszahlungen", payouts.length)}
+              {tabBtn("eligible", copy.tabEligible, eligible.length)}
+              {tabBtn("pending", copy.tabPending, pending.length)}
+              {tabBtn("payouts", copy.tabPayouts, payouts.length)}
             </div>
 
             {tab === "eligible" && (
               <Card padding="0">
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", background: "#f0fdf4" }}>
-                  <Text variant="bodySm" tone="success">
-                    Diese Bestellungen wurden geliefert und sind älter als 14 Tage — sie kommen für die Auszahlung infrage.
-                  </Text>
+                  <Text variant="bodySm" tone="success">{copy.eligibleBannerSeller}</Text>
                 </div>
-                <TxTable rows={eligible} loading={loading} isSuperuser={false} />
+                <TxTable rows={eligible} loading={loading} isSuperuser={false} locale={locale} copy={copy} />
               </Card>
             )}
 
             {tab === "pending" && (
               <Card padding="0">
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", background: "#fefce8" }}>
-                  <Text variant="bodySm" tone="caution">
-                    Diese Bestellungen sind noch nicht für eine Auszahlung freigegeben (Lieferung vor weniger als 14 Tagen oder noch nicht geliefert).
-                  </Text>
+                  <Text variant="bodySm" tone="caution">{copy.pendingBannerSeller}</Text>
                 </div>
-                <TxTable rows={pending} loading={loading} isSuperuser={false} />
+                <TxTable rows={pending} loading={loading} isSuperuser={false} locale={locale} copy={copy} />
               </Card>
             )}
 
             {tab === "payouts" && (
               <Card padding="0">
-                <PayoutsTable payouts={payouts} loading={loading} isSuperuser={false} />
+                <PayoutsTable payouts={payouts} loading={loading} isSuperuser={false} locale={locale} copy={copy} />
               </Card>
             )}
           </Box>
@@ -235,8 +382,11 @@ function SellerTransactionsView({ sellerId }) {
   );
 }
 
-// ── SUPERUSER VIEW ────────────────────────────────────────────────────────────
 function AdminTransactionsView() {
+  const locale = useLocale();
+  const copy = getTransactionsCopy(locale);
+  const fmt = (cents, currency) => fmtCents(cents, currency, locale);
+
   const [periodKey, setPeriodKey] = useState(PERIODS[0].key);
   const [tab, setTab] = useState("eligible");
   const [filterSeller, setFilterSeller] = useState("");
@@ -263,11 +413,11 @@ function AdminTransactionsView() {
       }
       if (poRes.status === "fulfilled") setPayouts(poRes.value?.payouts || []);
     } catch (e) {
-      setErr(e?.message || "Fehler");
+      setErr(e?.message || copy.error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [copy.error]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -280,12 +430,10 @@ function AdminTransactionsView() {
   const eligible = periodTx.filter((tx) => tx.payout_eligible);
   const pending = periodTx.filter((tx) => !tx.payout_eligible);
 
-  // Aggregate stats
   const totalRevenue = periodTx.reduce((s, t) => s + (t.total_cents || 0), 0);
   const totalCommission = eligible.reduce((s, t) => s + (t.commission_cents || 0), 0);
   const totalPayout = eligible.reduce((s, t) => s + (t.payout_cents || 0), 0);
 
-  // Per-seller summary for this period
   const perSeller = {};
   periodTx.forEach((tx) => {
     if (!perSeller[tx.seller_id]) {
@@ -303,14 +451,14 @@ function AdminTransactionsView() {
   const sellerList = Object.values(perSeller);
 
   const sellerOptions = [
-    { label: "Alle Seller", value: "" },
+    { label: copy.allSellers, value: "" },
     ...summary.map((s) => ({ label: s.store_name || s.seller_id, value: s.seller_id })),
   ];
 
   const periodOptions = PERIODS.map((p) => ({ label: p.label, value: p.key }));
 
   const handleMarkPaid = async (s) => {
-    if (!(await confirmDelete(`Auszahlung für "${s.store_name}" als bezahlt markieren? Betrag: ${fmt(s.payout)}`))) return;
+    if (!(await confirmDelete(copy.markPaidConfirm(s.store_name, fmt(s.payout))))) return;
     setMarkingPaid(s.seller_id);
     try {
       await getMedusaAdminClient().createPayout({
@@ -324,13 +472,12 @@ function AdminTransactionsView() {
       });
       await loadData();
     } catch (e) {
-      alert(e?.message || "Fehler");
+      alert(e?.message || copy.error);
     } finally {
       setMarkingPaid(null);
     }
   };
 
-  // Is this seller already paid for this period?
   const isPaidForPeriod = (sellerId) =>
     payouts.some((p) => {
       const matches = p.seller_id === sellerId && (p.status === "bezahlt" || p.status === "paid");
@@ -355,59 +502,56 @@ function AdminTransactionsView() {
   );
 
   return (
-    <Page title="Transaktionen (Admin)" subtitle="Seller-Umsätze, Provisionen und Auszahlungsverwaltung">
+    <Page title={copy.pageTitleAdmin} subtitle={copy.pageSubtitleAdmin}>
       <Layout>
         <Layout.Section>
           {err && <Banner tone="critical" onDismiss={() => setErr("")}><Text>{err}</Text></Banner>}
 
-          {/* Period + Seller filter */}
           <Card>
             <BlockStack gap="400">
               <InlineStack align="space-between" blockAlign="center">
-                <Text variant="headingMd" as="h2">Abrechnungszeitraum</Text>
-                <Button onClick={loadData} loading={loading} size="slim">Aktualisieren</Button>
+                <Text variant="headingMd" as="h2">{copy.settlementPeriod}</Text>
+                <Button onClick={loadData} loading={loading} size="slim">{copy.refresh}</Button>
               </InlineStack>
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                 <div style={{ flex: "1 1 260px", maxWidth: 340 }}>
-                  <Select label="Zeitraum" options={periodOptions} value={periodKey} onChange={setPeriodKey} />
+                  <Select label={copy.periodLabel} options={periodOptions} value={periodKey} onChange={setPeriodKey} />
                 </div>
                 <div style={{ flex: "1 1 200px", maxWidth: 280 }}>
-                  <Select label="Seller" options={sellerOptions} value={filterSeller} onChange={setFilterSeller} />
+                  <Select label={copy.seller} options={sellerOptions} value={filterSeller} onChange={setFilterSeller} />
                 </div>
               </div>
             </BlockStack>
           </Card>
 
-          {/* Global summary */}
           <Box paddingBlockStart="400">
             <Card>
               <BlockStack gap="400">
-                <Text variant="headingMd" as="h2">Gesamtübersicht — {selectedPeriod.label}</Text>
-                {loading ? <Text tone="subdued">Laden…</Text> : (
+                <Text variant="headingMd" as="h2">{copy.globalOverview} — {selectedPeriod.label}</Text>
+                {loading ? <Text tone="subdued">{copy.loading}</Text> : (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                    <StatBox label="Plattform-Umsatz" value={fmt(totalRevenue)} note={`${periodTx.length} Bestellungen gesamt`} />
-                    <StatBox label="Provision (Einnahmen)" value={fmt(totalCommission)} color="#059669" note={`${eligible.length} qualifiziert`} />
-                    <StatBox label="Auszuzahlen (gesamt)" value={fmt(totalPayout)} color="#dc2626" note="An alle Seller" />
-                    <StatBox label="Noch ausstehend" value={fmt(pending.reduce((s, t) => s + (t.total_cents || 0), 0))} note={`${pending.length} Bestellungen`} />
+                    <StatBox label={copy.platformRevenue} value={fmt(totalRevenue)} note={copy.totalOrders(periodTx.length)} />
+                    <StatBox label={copy.commissionIncome} value={fmt(totalCommission)} color="#059669" note={copy.qualified(eligible.length)} />
+                    <StatBox label={copy.toPayoutTotal} value={fmt(totalPayout)} color="#dc2626" note={copy.toAllSellers} />
+                    <StatBox label={copy.stillPendingAmount} value={fmt(pending.reduce((s, t) => s + (t.total_cents || 0), 0))} note={copy.ordersCount(pending.length)} />
                   </div>
                 )}
               </BlockStack>
             </Card>
           </Box>
 
-          {/* Per-seller breakdown */}
           {!filterSeller && sellerList.length > 0 && (
             <Box paddingBlockStart="400">
               <Card padding="0">
                 <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6" }}>
-                  <Text variant="headingMd" as="h2">Seller-Übersicht — {selectedPeriod.label}</Text>
+                  <Text variant="headingMd" as="h2">{copy.sellerOverview} — {selectedPeriod.label}</Text>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 110px 80px auto", gap: 8, padding: "9px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
-                  <div>Seller</div>
-                  <div style={{ textAlign: "right" }}>Umsatz</div>
-                  <div style={{ textAlign: "right" }}>Provision</div>
-                  <div style={{ textAlign: "right" }}>Auszahlung</div>
-                  <div style={{ textAlign: "center" }}>Status</div>
+                  <div>{copy.seller}</div>
+                  <div style={{ textAlign: "right" }}>{copy.revenue}</div>
+                  <div style={{ textAlign: "right" }}>{copy.colCommission}</div>
+                  <div style={{ textAlign: "right" }}>{copy.payout}</div>
+                  <div style={{ textAlign: "center" }}>{copy.status}</div>
                   <div></div>
                 </div>
                 {sellerList.map((s, i) => {
@@ -416,7 +560,7 @@ function AdminTransactionsView() {
                     <div key={s.seller_id} style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 110px 80px auto", gap: 8, padding: "11px 16px", borderBottom: i < sellerList.length - 1 ? "1px solid #f9fafb" : "none", alignItems: "center" }}>
                       <div>
                         <Text variant="bodyMd" fontWeight="semibold">{s.store_name}</Text>
-                        <Text variant="bodySm" tone="subdued">{s.orders} Best. · {s.eligibleOrders} freigegeben</Text>
+                        <Text variant="bodySm" tone="subdued">{copy.ordersShort(s.orders, s.eligibleOrders)}</Text>
                         <div style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{s.seller_id}-{periodKey}</div>
                       </div>
                       <div style={{ textAlign: "right", fontSize: 13 }}>{fmt(s.total)}</div>
@@ -424,14 +568,14 @@ function AdminTransactionsView() {
                       <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: paid ? "#6b7280" : "#dc2626" }}>{fmt(s.payout)}</div>
                       <div style={{ textAlign: "center" }}>
                         <Badge tone={paid ? "success" : s.payout > 0 ? "warning" : "new"}>
-                          {paid ? "Bezahlt" : s.payout > 0 ? "Offen" : "—"}
+                          {paid ? copy.paid : s.payout > 0 ? copy.open : "—"}
                         </Badge>
                       </div>
                       <div>
                         {!paid && s.payout > 0 && (
                           <Button size="slim" variant="primary" loading={markingPaid === s.seller_id}
                             onClick={() => handleMarkPaid(s)}>
-                            Bezahlt via Stripe
+                            {copy.paidViaStripe}
                           </Button>
                         )}
                       </div>
@@ -442,37 +586,32 @@ function AdminTransactionsView() {
             </Box>
           )}
 
-          {/* Tabs: transactions list + payouts */}
           <Box paddingBlockStart="400">
             <div style={{ display: "flex", gap: 0, marginBottom: 16 }}>
-              {tabBtn("eligible", "Freigegeben", eligible.length)}
-              {tabBtn("pending", "Ausstehend", pending.length)}
-              {tabBtn("payouts", "Auszahlungshistorie", payouts.length)}
+              {tabBtn("eligible", copy.tabEligible, eligible.length)}
+              {tabBtn("pending", copy.tabPending, pending.length)}
+              {tabBtn("payouts", copy.tabPayoutHistory, payouts.length)}
             </div>
 
             {tab === "eligible" && (
               <Card padding="0">
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", background: "#f0fdf4" }}>
-                  <Text variant="bodySm" tone="success">
-                    Bestellungen, die geliefert und älter als 14 Tage sind — auszahlungsbereit.
-                  </Text>
+                  <Text variant="bodySm" tone="success">{copy.eligibleBannerAdmin}</Text>
                 </div>
-                <TxTable rows={eligible} loading={loading} isSuperuser />
+                <TxTable rows={eligible} loading={loading} isSuperuser locale={locale} copy={copy} />
               </Card>
             )}
             {tab === "pending" && (
               <Card padding="0">
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", background: "#fefce8" }}>
-                  <Text variant="bodySm" tone="caution">
-                    Noch nicht auszahlungsbereit (Lieferung &lt; 14 Tage oder noch nicht geliefert).
-                  </Text>
+                  <Text variant="bodySm" tone="caution">{copy.pendingBannerAdmin}</Text>
                 </div>
-                <TxTable rows={pending} loading={loading} isSuperuser />
+                <TxTable rows={pending} loading={loading} isSuperuser locale={locale} copy={copy} />
               </Card>
             )}
             {tab === "payouts" && (
               <Card padding="0">
-                <PayoutsTable payouts={payouts} loading={loading} isSuperuser onRefresh={loadData} />
+                <PayoutsTable payouts={payouts} loading={loading} isSuperuser onRefresh={loadData} locale={locale} copy={copy} />
               </Card>
             )}
           </Box>
@@ -482,12 +621,14 @@ function AdminTransactionsView() {
   );
 }
 
-// ── Shared transaction rows table ─────────────────────────────────────────────
-function TxTable({ rows, loading, isSuperuser }) {
-  if (loading) return <Box padding="500"><Text tone="subdued" alignment="center">Laden…</Text></Box>;
+function TxTable({ rows, loading, isSuperuser, locale, copy }) {
+  const fmt = (cents, currency) => fmtCents(cents, currency, locale);
+  const fmtD = (d) => fmtDate(d, locale);
+
+  if (loading) return <Box padding="500"><Text tone="subdued" alignment="center">{copy.loading}</Text></Box>;
   if (!rows.length) return (
     <Box padding="500">
-      <Text tone="subdued" alignment="center">Keine Transaktionen in diesem Zeitraum.</Text>
+      <Text tone="subdued" alignment="center">{copy.noTransactions}</Text>
     </Box>
   );
 
@@ -498,13 +639,13 @@ function TxTable({ rows, loading, isSuperuser }) {
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "9px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
-        <div>Bestellung</div>
-        {isSuperuser && <div>Seller</div>}
-        <div style={{ textAlign: "right" }}>Umsatz</div>
-        <div style={{ textAlign: "right" }}>Versand</div>
-        <div style={{ textAlign: "right" }}>Provision</div>
-        <div style={{ textAlign: "right" }}>Netto</div>
-        <div style={{ textAlign: "right" }}>Lieferung</div>
+        <div>{copy.colOrder}</div>
+        {isSuperuser && <div>{copy.seller}</div>}
+        <div style={{ textAlign: "right" }}>{copy.revenue}</div>
+        <div style={{ textAlign: "right" }}>{copy.colShipping}</div>
+        <div style={{ textAlign: "right" }}>{copy.colCommission}</div>
+        <div style={{ textAlign: "right" }}>{copy.colNet}</div>
+        <div style={{ textAlign: "right" }}>{copy.colDelivery}</div>
       </div>
       {rows.map((tx) => (
         <div key={tx.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "10px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center" }}>
@@ -517,24 +658,25 @@ function TxTable({ rows, loading, isSuperuser }) {
           <div style={{ textAlign: "right", color: "#6b7280" }}>{fmt(tx.shipping_cents || 0, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#ef4444" }}>−{fmt(tx.commission_cents, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#10b981", fontWeight: 600 }}>{fmt(tx.payout_cents, tx.currency)}</div>
-          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtDate(tx.delivery_date)}</div>
+          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtD(tx.delivery_date)}</div>
         </div>
       ))}
     </div>
   );
 }
 
-// ── Shared payouts table ──────────────────────────────────────────────────────
-function PayoutsTable({ payouts, loading, isSuperuser, onRefresh }) {
+function PayoutsTable({ payouts, loading, isSuperuser, onRefresh, locale, copy }) {
+  const fmt = (cents, currency) => fmtCents(cents, currency, locale);
+  const fmtD = (d) => fmtDate(d, locale);
   const [markingPaid, setMarkingPaid] = useState(null);
 
   const doMarkPaid = async (p) => {
-    if (!(await confirmDelete("Diesen Eintrag als extern überwiesen markieren? (Bu işlem gerçek ödeme göndermez)"))) return;
+    if (!(await confirmDelete(copy.markTransferredConfirm))) return;
     setMarkingPaid(p.id);
     try {
       await getMedusaAdminClient().updatePayout(p.id, { status: "bezahlt" });
       onRefresh?.();
-    } catch (e) { alert(e?.message || "Fehler"); }
+    } catch (e) { alert(e?.message || copy.error); }
     finally { setMarkingPaid(null); }
   };
 
@@ -543,42 +685,41 @@ function PayoutsTable({ payouts, loading, isSuperuser, onRefresh }) {
     if (s === "offen" || s === "pending") return "warning";
     return "info";
   };
-  const label = (s) => ({ bezahlt: "Bezahlt", paid: "Bezahlt", offen: "Offen", pending: "Offen" }[s] || s || "—");
 
-  if (loading) return <Box padding="500"><Text tone="subdued" alignment="center">Laden…</Text></Box>;
+  if (loading) return <Box padding="500"><Text tone="subdued" alignment="center">{copy.loading}</Text></Box>;
   if (!payouts.length) return (
     <Box padding="500">
-      <Text tone="subdued" alignment="center">Noch keine Auszahlungen vorhanden.</Text>
+      <Text tone="subdued" alignment="center">{copy.noPayoutsYet}</Text>
     </Box>
   );
 
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: isSuperuser ? "1.4fr 100px 110px 110px 80px 90px auto" : "1.4fr 110px 110px 80px", gap: 8, padding: "9px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
-        <div>Zeitraum / Referenz</div>
-        {isSuperuser && <div>Seller</div>}
-        <div style={{ textAlign: "right" }}>Umsatz</div>
-        <div style={{ textAlign: "right" }}>Auszahlung</div>
-        <div style={{ textAlign: "center" }}>Status</div>
-        {isSuperuser && <div style={{ textAlign: "right" }}>Bezahlt am</div>}
+        <div>{copy.periodReference}</div>
+        {isSuperuser && <div>{copy.seller}</div>}
+        <div style={{ textAlign: "right" }}>{copy.revenue}</div>
+        <div style={{ textAlign: "right" }}>{copy.payout}</div>
+        <div style={{ textAlign: "center" }}>{copy.status}</div>
+        {isSuperuser && <div style={{ textAlign: "right" }}>{copy.paidOn}</div>}
         {isSuperuser && <div></div>}
       </div>
       {payouts.map((p, i) => (
         <div key={p.id || i} style={{ display: "grid", gridTemplateColumns: isSuperuser ? "1.4fr 100px 110px 110px 80px 90px auto" : "1.4fr 110px 110px 80px", gap: 8, padding: "11px 16px", borderBottom: "1px solid #f9fafb", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 12, color: "#374151" }}>{fmtDate(p.period_start)} – {fmtDate(p.period_end)}</div>
+            <div style={{ fontSize: 12, color: "#374151" }}>{fmtD(p.period_start)} – {fmtD(p.period_end)}</div>
             {p.notes && <code style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{p.notes}</code>}
           </div>
           {isSuperuser && <div style={{ fontSize: 12, color: "#374151" }}>{p.store_name || p.seller_id || "—"}</div>}
           <div style={{ textAlign: "right", fontSize: 13 }}>{fmt(p.total_cents)}</div>
           <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: "#059669" }}>{fmt(p.payout_cents)}</div>
-          <div style={{ textAlign: "center" }}><Badge tone={tone(p.status)}>{label(p.status)}</Badge></div>
-          {isSuperuser && <div style={{ textAlign: "right", fontSize: 12, color: "#6b7280" }}>{p.paid_at ? fmtDate(p.paid_at) : "—"}</div>}
+          <div style={{ textAlign: "center" }}><Badge tone={tone(p.status)}>{payoutStatusLabel(locale, p.status)}</Badge></div>
+          {isSuperuser && <div style={{ textAlign: "right", fontSize: 12, color: "#6b7280" }}>{p.paid_at ? fmtD(p.paid_at) : "—"}</div>}
           {isSuperuser && (
             <div>
               {(p.status !== "bezahlt" && p.status !== "paid") && (
                 <Button size="slim" variant="primary" loading={markingPaid === p.id} onClick={() => doMarkPaid(p)}>
-                  Als überwiesen markieren
+                  {copy.markTransferred}
                 </Button>
               )}
             </div>
@@ -589,8 +730,9 @@ function PayoutsTable({ payouts, loading, isSuperuser, onRefresh }) {
   );
 }
 
-// ── Entry Point ───────────────────────────────────────────────────────────────
 export default function TransactionsPageWrapper() {
+  const locale = useLocale();
+  const copy = getTransactionsCopy(locale);
   const [isSuperuser, setIsSuperuser] = useState(null);
   const [sellerId, setSellerId] = useState("");
 
@@ -604,8 +746,8 @@ export default function TransactionsPageWrapper() {
   if (isSuperuser === null) {
     return (
       <DashboardLayout>
-        <Page title="Transaktionen">
-          <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
+        <Page title={copy.pageTitle}>
+          <Box padding="400"><Text tone="subdued">{copy.loading}</Text></Box>
         </Page>
       </DashboardLayout>
     );

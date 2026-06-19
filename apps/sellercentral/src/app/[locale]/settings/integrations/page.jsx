@@ -1,29 +1,22 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Page, Text, BlockStack, InlineStack, TextField,
   Button, Banner, Badge, Modal, EmptyState, Divider, Box,
 } from "@shopify/polaris";
 import { ChevronDownIcon } from "@shopify/polaris-icons";
+import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import MarketingAccountsSection from "@/components/settings/MarketingAccountsSection";
 import BillbeeSettingsPage from "@/components/pages/settings/BillbeeSettingsPage";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { useUI } from "@/lib/ui-strings";
+import { getIntegrationsCopy, getSmtpProviders } from "@/lib/integrations-i18n";
 
 const client = getMedusaAdminClient();
 
-// ─── SMTP ───────────────────────────────────────────────────────────────────
-
-const SMTP_PROVIDERS = [
-  { value: "gmail",   label: "Gmail / Google Workspace", host: "smtp.gmail.com",      port: 587, secure: false, hint: "Google Hesabı → Güvenlik → 2FA açık → Uygulama Şifreleri → Mail için şifre oluştur" },
-  { value: "outlook", label: "Outlook / Microsoft 365",  host: "smtp.office365.com",  port: 587, secure: false, hint: "Microsoft 365 hesabı — SMTP-Auth etkin olmalı" },
-  { value: "yahoo",   label: "Yahoo Mail",               host: "smtp.mail.yahoo.com", port: 587, secure: false, hint: "Yahoo Hesabı → Güvenlik → Uygulama Şifreleri" },
-  { value: "sendgrid",label: "SendGrid",                 host: "smtp.sendgrid.net",   port: 587, secure: false, hint: "Kullanıcı adı: apikey — Şifre: SendGrid API Key" },
-  { value: "custom",  label: "Özel SMTP Sunucusu",      host: "",                    port: 587, secure: false, hint: "" },
-];
-
-function SmtpSection() {
+function SmtpSection({ copy, ui, smtpProviders }) {
   const [form, setForm] = useState({
     provider: "gmail", host: "smtp.gmail.com", port: 587, secure: false,
     username: "", password: "", from_name: "", from_email: "",
@@ -55,7 +48,7 @@ function SmtpSection() {
   }, []);
 
   const handleProvider = (value) => {
-    const p = SMTP_PROVIDERS.find((p) => p.value === value);
+    const p = smtpProviders.find((p) => p.value === value);
     if (p) setForm((f) => ({ ...f, provider: value, host: p.host, port: p.port, secure: p.secure }));
   };
 
@@ -66,7 +59,7 @@ function SmtpSection() {
       setSaved(true);
       setTestResult(null);
       setTimeout(() => setSaved(false), 3000);
-    } catch (e) { setErr(e?.message || "Kaydetme hatası"); }
+    } catch (e) { setErr(e?.message || copy.smtpSaveError); }
     setSaving(false);
   };
 
@@ -74,24 +67,23 @@ function SmtpSection() {
     setTesting(true); setTestResult(null);
     try {
       const r = await client.testSmtpSettings();
-      setTestResult({ ok: true, msg: r?.message || "Bağlantı başarılı ✓" });
+      setTestResult({ ok: true, msg: r?.message || copy.smtpTestOk });
     } catch (e) {
-      setTestResult({ ok: false, msg: e?.message || "Bağlantı başarısız" });
+      setTestResult({ ok: false, msg: e?.message || copy.smtpTestFail });
     }
     setTesting(false);
   };
 
-  const selectedProvider = SMTP_PROVIDERS.find((p) => p.value === form.provider);
+  const selectedProvider = smtpProviders.find((p) => p.value === form.provider);
 
-  if (loading) return <Box padding="400"><Text tone="subdued">Yükleniyor…</Text></Box>;
+  if (loading) return <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>;
 
   return (
     <BlockStack gap="400">
-      {/* Provider selection */}
       <BlockStack gap="200">
-        <Text as="h3" variant="headingSm">E-posta sağlayıcısı</Text>
+        <Text as="h3" variant="headingSm">{copy.smtpProvider}</Text>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
-          {SMTP_PROVIDERS.map((p) => (
+          {smtpProviders.map((p) => (
             <button
               key={p.value}
               type="button"
@@ -121,13 +113,12 @@ function SmtpSection() {
 
       <Divider />
 
-      {/* Server settings */}
       <BlockStack gap="300">
-        <Text as="h3" variant="headingSm">Sunucu ayarları</Text>
+        <Text as="h3" variant="headingSm">{copy.smtpServer}</Text>
         <InlineStack gap="300" blockAlign="end" wrap={false}>
           <div style={{ flex: 1 }}>
             <TextField
-              label="SMTP Host"
+              label={copy.smtpHost}
               value={form.host}
               onChange={(v) => setForm((f) => ({ ...f, host: v }))}
               placeholder="smtp.gmail.com"
@@ -136,7 +127,7 @@ function SmtpSection() {
           </div>
           <div style={{ width: 90 }}>
             <TextField
-              label="Port"
+              label={copy.smtpPort}
               type="number"
               value={String(form.port)}
               onChange={(v) => setForm((f) => ({ ...f, port: Number(v) }))}
@@ -150,46 +141,45 @@ function SmtpSection() {
             checked={!!form.secure}
             onChange={(e) => setForm((f) => ({ ...f, secure: e.target.checked }))}
           />
-          SSL/TLS kullan (Port 465)
+          {copy.smtpSsl}
         </label>
         <TextField
-          label="Kullanıcı adı / E-posta"
+          label={copy.smtpUsername}
           value={form.username}
           onChange={(v) => setForm((f) => ({ ...f, username: v }))}
-          placeholder="senin@domain.com"
+          placeholder="you@domain.com"
           type="email"
           autoComplete="off"
         />
         <TextField
-          label="Şifre / Uygulama şifresi"
+          label={copy.smtpPassword}
           value={form.password}
           onChange={(v) => setForm((f) => ({ ...f, password: v }))}
-          placeholder="Boş bırakırsan mevcut şifre korunur"
+          placeholder={copy.smtpPasswordPlaceholder}
           type="password"
-          helpText="Gmail / Yahoo kullanıyorsanız normal hesap şifresi değil, Uygulama Şifresi kullanın."
+          helpText={copy.smtpPasswordHelp}
           autoComplete="off"
         />
       </BlockStack>
 
       <Divider />
 
-      {/* From details */}
       <BlockStack gap="300">
-        <Text as="h3" variant="headingSm">Gönderen bilgileri</Text>
+        <Text as="h3" variant="headingSm">{copy.smtpFrom}</Text>
         <TextField
-          label="Gönderen adı"
+          label={copy.smtpFromName}
           value={form.from_name}
           onChange={(v) => setForm((f) => ({ ...f, from_name: v }))}
           placeholder="Andertal Shop"
           autoComplete="off"
         />
         <TextField
-          label="Gönderen e-posta"
+          label={copy.smtpFromEmail}
           value={form.from_email}
           onChange={(v) => setForm((f) => ({ ...f, from_email: v }))}
           placeholder="noreply@andertal.de"
           type="email"
-          helpText="Tüm otomatik e-postalar ve akışlar (flows) bu adresten gönderilir."
+          helpText={copy.smtpFromEmailHelp}
           autoComplete="off"
         />
       </BlockStack>
@@ -203,10 +193,10 @@ function SmtpSection() {
 
       <InlineStack gap="300">
         <Button variant="primary" onClick={handleSave} loading={saving}>
-          {saved ? "Kaydedildi ✓" : "Kaydet"}
+          {saved ? copy.smtpSaved : ui.save}
         </Button>
         <Button onClick={handleTest} loading={testing}>
-          Bağlantıyı test et
+          {copy.smtpTest}
         </Button>
       </InlineStack>
     </BlockStack>
@@ -214,7 +204,7 @@ function SmtpSection() {
 }
 
 /** Manage From identities (same SMTP credentials); test each; one is default / main. */
-function SmtpSendersSection({ onToast }) {
+function SmtpSendersSection({ onToast, copy, ui }) {
   const [senders, setSenders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [testForId, setTestForId] = useState(null);
@@ -244,17 +234,17 @@ function SmtpSendersSection({ onToast }) {
     const to = testTo.trim();
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!testForId || !to || !emailRe.test(to)) {
-      onToast?.({ tone: "critical", text: "Geçerli bir test alıcı e-postası girin." });
+      onToast?.({ tone: "critical", text: copy.testEmailInvalid });
       return;
     }
     setTestingId(testForId);
     try {
       await client.testSmtpSender(testForId, { to });
-      onToast?.({ tone: "success", text: "Test e-postası gönderildi." });
+      onToast?.({ tone: "success", text: copy.testEmailSent });
       setTestForId(null);
       await load();
     } catch (e) {
-      onToast?.({ tone: "critical", text: e?.message || "Test başarısız." });
+      onToast?.({ tone: "critical", text: e?.message || copy.testFailed });
       await load();
     } finally {
       setTestingId(null);
@@ -264,51 +254,51 @@ function SmtpSendersSection({ onToast }) {
   const setMain = async (id) => {
     try {
       await client.setDefaultSmtpSender(id);
-      onToast?.({ tone: "success", text: "Ana gönderen güncellendi." });
+      onToast?.({ tone: "success", text: copy.mainUpdated });
       await load();
     } catch (e) {
-      onToast?.({ tone: "critical", text: e?.message || "Kaydedilemedi." });
+      onToast?.({ tone: "critical", text: e?.message || copy.saveFailed });
     }
   };
 
   const removeSender = async (row) => {
-    if (!(await confirmDelete(`„${row.from_email}" gönderenini silmek istiyor musunuz?`))) return;
+    if (!(await confirmDelete(copy.deleteSenderConfirm(row.from_email)))) return;
     try {
       await client.deleteSmtpSender(row.id);
-      onToast?.({ tone: "success", text: "Silindi." });
+      onToast?.({ tone: "success", text: copy.deletedShort });
       await load();
     } catch (e) {
-      onToast?.({ tone: "critical", text: e?.message || "Silinemedi." });
+      onToast?.({ tone: "critical", text: e?.message || copy.deleteFailed });
     }
   };
 
   const addSender = async () => {
     const fe = newEmail.trim();
     if (!fe) {
-      onToast?.({ tone: "critical", text: "E-posta adresi gerekli." });
+      onToast?.({ tone: "critical", text: copy.emailRequired });
       return;
     }
     setAdding(true);
     try {
       await client.createSmtpSender({ from_email: fe, from_name: newName.trim() || undefined });
-      onToast?.({ tone: "success", text: "Gönderen eklendi." });
+      onToast?.({ tone: "success", text: copy.senderAdded });
       setAddOpen(false);
       setNewEmail("");
       setNewName("");
       await load();
     } catch (e) {
-      onToast?.({ tone: "critical", text: e?.message || "Eklenemedi." });
+      onToast?.({ tone: "critical", text: e?.message || copy.addFailed });
     }
     setAdding(false);
   };
 
-  if (loading) return <Box padding="400"><Text tone="subdued">Gönderenler yükleniyor…</Text></Box>;
+  if (loading) return <Box padding="400"><Text tone="subdued">{copy.sendersLoading}</Text></Box>;
 
   return (
     <BlockStack gap="400">
-      <Text as="h3" variant="headingSm">Gönderen e-postalar</Text>
+      <Text as="h3" variant="headingSm">{copy.sendersTitle}</Text>
       <Text as="p" variant="bodySm" tone="subdued">
-        Her satır aynı SMTP hesabıyla farklı bir Gönderen (Kimden) adresidir. Flow ve otomatik maillerde varsayılan olarak <strong>ana</strong> gönderen kullanılır; tek adımda başka bir gönderen seçebilirsiniz.
+        {copy.sendersSub}
       </Text>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {senders.map((row) => (
@@ -330,7 +320,7 @@ function SmtpSendersSection({ onToast }) {
               <span style={{ color: "#4b5563", fontSize: 13 }}>{row.from_name}</span>
             )}
             {row.is_default && (
-              <Badge tone="success">Ana</Badge>
+              <Badge tone="success">{copy.mainSender}</Badge>
             )}
             <span
               title={row.last_test_message || ""}
@@ -342,25 +332,25 @@ function SmtpSendersSection({ onToast }) {
               {row.last_test_ok === true ? "✓" : row.last_test_ok === false ? "✗" : "—"}
             </span>
             {!row.is_default && (
-              <Button size="slim" onClick={() => setMain(row.id)}>Ana yap</Button>
+              <Button size="slim" onClick={() => setMain(row.id)}>{copy.setMain}</Button>
             )}
             <Button size="slim" onClick={() => openTest(row.id)}>Test</Button>
-            <Button size="slim" tone="critical" variant="plain" onClick={() => removeSender(row)}>Sil</Button>
+            <Button size="slim" tone="critical" variant="plain" onClick={() => removeSender(row)}>{ui.delete}</Button>
           </div>
         ))}
       </div>
-      <Button onClick={() => setAddOpen(true)}>Gönderen ekle</Button>
+      <Button onClick={() => setAddOpen(true)}>{copy.addSender}</Button>
 
       <Modal
         open={!!testForId}
         onClose={() => setTestForId(null)}
-        title="Göndereni test et"
-        primaryAction={{ content: "Gönder", onAction: runTest, loading: testingId != null }}
-        secondaryActions={[{ content: "İptal", onAction: () => setTestForId(null) }]}
+        title={copy.testSender}
+        primaryAction={{ content: ui.send, onAction: runTest, loading: testingId != null }}
+        secondaryActions={[{ content: ui.cancel, onAction: () => setTestForId(null) }]}
       >
         <Modal.Section>
           <TextField
-            label="Test e-postası gönderilecek adres"
+            label={copy.testEmailLabel}
             type="email"
             value={testTo}
             onChange={setTestTo}
@@ -372,14 +362,14 @@ function SmtpSendersSection({ onToast }) {
       <Modal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        title="Gönderen ekle"
-        primaryAction={{ content: "Ekle", onAction: addSender, loading: adding }}
-        secondaryActions={[{ content: "İptal", onAction: () => setAddOpen(false) }]}
+        title={copy.addSender}
+        primaryAction={{ content: ui.add, onAction: addSender, loading: adding }}
+        secondaryActions={[{ content: ui.cancel, onAction: () => setAddOpen(false) }]}
       >
         <Modal.Section>
           <BlockStack gap="300">
-            <TextField label="Gönderen e-posta" type="email" value={newEmail} onChange={setNewEmail} autoComplete="off" />
-            <TextField label="Gönderen adı (isteğe bağlı)" value={newName} onChange={setNewName} autoComplete="off" />
+            <TextField label={copy.senderEmail} type="email" value={newEmail} onChange={setNewEmail} autoComplete="off" />
+            <TextField label={copy.senderNameOptional} value={newName} onChange={setNewName} autoComplete="off" />
           </BlockStack>
         </Modal.Section>
       </Modal>
@@ -389,7 +379,7 @@ function SmtpSendersSection({ onToast }) {
 
 // ─── Trustpilot (superuser — storefront TrustBox) ─────────────────────────────
 
-function TrustpilotSuperuserSection({ onToast }) {
+function TrustpilotSuperuserSection({ onToast, copy, ui }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [businessUnitId, setBusinessUnitId] = useState("");
@@ -415,7 +405,7 @@ function TrustpilotSuperuserSection({ onToast }) {
   const save = async () => {
     const bu = businessUnitId.trim();
     if (!bu) {
-      onToast?.({ tone: "critical", text: "Business Unit ID eingeben (von Trustpilot Business)." });
+      onToast?.({ tone: "critical", text: copy.trustpilotBuRequired });
       return;
     }
     setSaving(true);
@@ -426,62 +416,59 @@ function TrustpilotSuperuserSection({ onToast }) {
         evaluate_url: evaluateUrl.trim(),
         is_active: active,
       });
-      onToast?.({ tone: "success", text: "Trustpilot gespeichert. Shop-Widget lädt die Konfiguration automatisch." });
+      onToast?.({ tone: "success", text: copy.trustpilotSaved });
     } catch (e) {
-      onToast?.({ tone: "critical", text: e?.message || "Speichern fehlgeschlagen." });
+      onToast?.({ tone: "critical", text: e?.message || copy.saveFailed });
     }
     setSaving(false);
   };
 
   if (loading) {
     return (
-      <Box padding="400"><Text tone="subdued">Trustpilot laden…</Text></Box>
+      <Box padding="400"><Text tone="subdued">{copy.trustpilotLoading}</Text></Box>
     );
   }
 
   return (
     <BlockStack gap="400">
       <Text as="p" variant="bodySm" tone="subdued">
-        Verbindet das öffentliche TrustBox-Widget auf der Shop-Produktseite mit eurem Trustpilot Business-Konto.
-        Die Business Unit ID ist dieselbe wie im TrustBox-Embed-Code bei Trustpilot (öffentlich).
+        {copy.trustpilotIntro}
       </Text>
       <TextField
-        label="Business Unit ID"
+        label={copy.businessUnitId}
         value={businessUnitId}
         onChange={setBusinessUnitId}
         autoComplete="off"
-        placeholder="z. B. a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-        helpText="Trustpilot Business → Integrationen / Showcase → TrustBox einrichten — dort steht die Business Unit ID im Embed-Code (data-businessunit-id)."
+        placeholder="e.g. a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        helpText={copy.businessUnitHelp}
       />
       <TextField
-        label="Template-ID (optional)"
+        label={copy.templateId}
         value={templateId}
         onChange={setTemplateId}
         autoComplete="off"
-        placeholder="Standard, wenn leer"
-        helpText="TrustBox-Vorlage aus dem Trustpilot-Generator; Standard aus dem Backend wenn leer."
+        placeholder={copy.templatePlaceholder}
+        helpText={copy.templateHelp}
       />
       <TextField
-        label="Trustpilot-Bewertungs-Link (optional, https)"
+        label={copy.evaluateUrl}
         value={evaluateUrl}
         onChange={setEvaluateUrl}
         autoComplete="off"
-        placeholder="https://de.trustpilot.com/evaluate/ihre-domain.de"
-        helpText="Nach einer Shop-Bewertung erscheint im Kundenkonto ein Link hierher. Öffentliche Trustpilot-„Bewerten“-URL (nicht die Einladungs-JS). Leer lassen = kein Link."
+        placeholder="https://www.trustpilot.com/evaluate/your-domain.com"
+        helpText={copy.evaluateHelp}
       />
       <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14 }}>
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-        Widget auf dem Shop aktivieren
+        {copy.widgetActive}
       </label>
       <InlineStack gap="300">
         <Button variant="primary" onClick={save} loading={saving}>
-          Speichern
+          {ui.save}
         </Button>
       </InlineStack>
       <Banner tone="info">
-        Invitation-JavaScript: Schlüssel als{" "}
-        <Text as="span" variant="bodySm" fontWeight="semibold">NEXT_PUBLIC_TRUSTPILOT_INVITE_REGISTER_KEY</Text>{" "}
-        im Shop (.env). Automatische E-Mails zusätzlich in Trustpilot (Integrationen / Zapier). Shop-Bewertungen werden nicht automatisch als Trustpilot-Text importiert — der optionale Link lädt Kunden ein, dort selbst zu bewerten.
+        {copy.trustpilotBanner}
       </Banner>
     </BlockStack>
   );
@@ -659,7 +646,7 @@ function LogoApi() {
   );
 }
 
-function IntegrationCard({ integration, onEdit, onToggle, onDelete, onRotateSecret }) {
+function IntegrationCard({ integration, onEdit, onToggle, onDelete, onRotateSecret, copy, ui }) {
   const initials = (integration.name || "?").split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   return (
     <div style={{
@@ -681,28 +668,28 @@ function IntegrationCard({ integration, onEdit, onToggle, onDelete, onRotateSecr
         <InlineStack align="space-between" blockAlign="start">
           <Text as="span" fontWeight="semibold" variant="bodyMd">{integration.name}</Text>
           <Badge tone={integration.is_active ? "success" : "new"}>
-            {integration.is_active ? "Aktiv" : "Inaktiv"}
+            {integration.is_active ? copy.activeBadge : copy.inactiveBadge}
           </Badge>
         </InlineStack>
         <div style={{ marginTop: 8, padding: "8px 12px", background: "#f9fafb", borderRadius: 6, fontSize: 12, color: "#6b7280", display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}>
           {integration.api_key && (
             <>
-              <span style={{ fontWeight: 600, color: "#374151" }}>Zugangs-ID</span>
+              <span style={{ fontWeight: 600, color: "#374151" }}>{copy.accessId}</span>
               <span style={{ fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {maskKey(integration.api_key)}
               </span>
             </>
           )}
-          <span style={{ fontWeight: 600, color: "#374151" }}>Sicherheitsschlüssel</span>
-          <span style={{ color: "#9ca3af" }}>Gespeichert — bei Bedarf neu erzeugen</span>
+          <span style={{ fontWeight: 600, color: "#374151" }}>{copy.securityKey}</span>
+          <span style={{ color: "#9ca3af" }}>{copy.keyStored}</span>
         </div>
         <InlineStack gap="200" blockAlign="center" style={{ marginTop: 10 }}>
-          <Button size="slim" onClick={() => onEdit(integration)}>Bearbeiten</Button>
+          <Button size="slim" onClick={() => onEdit(integration)}>{ui.edit}</Button>
           <Button size="slim" onClick={() => onToggle(integration)}>
-            {integration.is_active ? "Deaktivieren" : "Aktivieren"}
+            {integration.is_active ? copy.deactivate : copy.activate}
           </Button>
-          <Button size="slim" onClick={() => onRotateSecret(integration)}>Neuer Schlüssel</Button>
-          <Button size="slim" tone="critical" variant="plain" onClick={() => onDelete(integration)}>Löschen</Button>
+          <Button size="slim" onClick={() => onRotateSecret(integration)}>{copy.newKey}</Button>
+          <Button size="slim" tone="critical" variant="plain" onClick={() => onDelete(integration)}>{ui.delete}</Button>
         </InlineStack>
       </div>
     </div>
@@ -712,6 +699,10 @@ function IntegrationCard({ integration, onEdit, onToggle, onDelete, onRotateSecr
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function IntegrationsSettingsPage() {
+  const locale = useLocale();
+  const ui = useUI();
+  const copy = useMemo(() => getIntegrationsCopy(locale), [locale]);
+  const smtpProviders = useMemo(() => getSmtpProviders(locale), [locale]);
   const [openSection, setOpenSection] = useState(null);
   const toggleSection = (key) => {
     setOpenSection((prev) => (prev === key ? null : key));
@@ -733,7 +724,7 @@ export default function IntegrationsSettingsPage() {
       const data = await client.getIntegrations();
       setIntegrations(data.integrations || []);
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Integrationen konnten nicht geladen werden." });
+      setMsg({ tone: "critical", text: e?.message || copy.loadError });
     } finally { setLoading(false); }
   }, []);
 
@@ -748,12 +739,12 @@ export default function IntegrationsSettingsPage() {
   const closeModal = () => { setModalOpen(false); setEditingId(null); setFormName(""); setCreatedCreds(null); };
 
   const save = async () => {
-    if (!formName.trim()) { setMsg({ tone: "warning", text: "Bitte einen Namen eingeben." }); return; }
+    if (!formName.trim()) { setMsg({ tone: "warning", text: copy.enterName }); return; }
     setSaving(true); setMsg(null);
     try {
       if (editingId) {
         await client.updateIntegration(editingId, { name: formName.trim(), is_active: true });
-        setMsg({ tone: "success", text: "Integration aktualisiert." });
+        setMsg({ tone: "success", text: copy.updated });
         closeModal(); await load();
       } else {
         const data = await client.saveIntegration({ name: formName.trim(), category: "custom", is_active: true });
@@ -761,15 +752,15 @@ export default function IntegrationsSettingsPage() {
         if (integ?.api_key && integ?.api_secret) {
           setCreatedCreds({ name: integ.name, zugang: integ.api_key, secret: integ.api_secret });
         }
-        setMsg({ tone: "success", text: "Zugangsdaten wurden erzeugt." });
+        setMsg({ tone: "success", text: copy.credentialsCreated });
         await load();
       }
-    } catch (e) { setMsg({ tone: "critical", text: e?.message || "Fehler beim Speichern." }); }
+    } catch (e) { setMsg({ tone: "critical", text: e?.message || copy.saveError }); }
     finally { setSaving(false); }
   };
 
   const rotateSecret = async (integration) => {
-    if (!(await confirmDelete("Neuen Sicherheitsschlüssel erzeugen? Der alte Wert verliert sofort die Gültigkeit."))) return;
+    if (!(await confirmDelete(copy.rotateConfirm))) return;
     try {
       const data = await client.updateIntegration(integration.id, { regenerate_secret: true });
       const sec = data?.integration?.api_secret;
@@ -777,34 +768,34 @@ export default function IntegrationsSettingsPage() {
         setCreatedCreds({ name: integration.name, zugang: data.integration?.api_key || integration.api_key, secret: sec });
         setModalOpen(true); setEditingId(null); setFormName("");
       }
-      setMsg({ tone: "success", text: "Neuer Sicherheitsschlüssel gespeichert. Bitte kopieren." });
+      setMsg({ tone: "success", text: copy.rotateSaved });
       await load();
-    } catch (e) { setMsg({ tone: "critical", text: e?.message || "Konnte nicht erneuern." }); }
+    } catch (e) { setMsg({ tone: "critical", text: e?.message || copy.rotateError }); }
   };
 
   const toggleActive = async (integration) => {
     try {
       await client.updateIntegration(integration.id, { is_active: !integration.is_active });
       setIntegrations((prev) => prev.map((i) => i.id === integration.id ? { ...i, is_active: !i.is_active } : i));
-    } catch (e) { setMsg({ tone: "critical", text: e?.message || "Status konnte nicht geändert werden." }); }
+    } catch (e) { setMsg({ tone: "critical", text: e?.message || copy.statusError }); }
   };
 
   const remove = async (integration) => {
-    if (!(await confirmDelete(`„${integration.name}" wirklich löschen?`))) return;
+    if (!(await confirmDelete(copy.deleteConfirm(integration.name)))) return;
     try {
       await client.deleteIntegration(integration.id);
       setIntegrations((prev) => prev.filter((i) => i.id !== integration.id));
-      setMsg({ tone: "success", text: "Integration gelöscht." });
-    } catch (e) { setMsg({ tone: "critical", text: e?.message || "Fehler beim Löschen." }); }
+      setMsg({ tone: "success", text: copy.deleted });
+    } catch (e) { setMsg({ tone: "critical", text: e?.message || copy.deleteError }); }
   };
 
-  const copy = (text) => { if (text) navigator.clipboard.writeText(String(text)); };
+  const copyText = (text) => { if (text) navigator.clipboard.writeText(String(text)); };
 
   const active   = integrations.filter((i) => i.is_active);
   const inactive = integrations.filter((i) => !i.is_active);
 
   return (
-    <Page title="Apps & Integrationen" primaryAction={{ content: "Integration anlegen", onAction: openCreate }}>
+    <Page title={copy.pageTitle} primaryAction={{ content: copy.createIntegration, onAction: openCreate }}>
       <BlockStack gap="400">
         {msg && <Banner tone={msg.tone} onDismiss={() => setMsg(null)}>{msg.text}</Banner>}
 
@@ -814,13 +805,13 @@ export default function IntegrationsSettingsPage() {
             open={openSection === "email"}
             onToggle={() => toggleSection("email")}
             logo={<LogoMail />}
-            title="E-Posta"
-            subtitle="SMTP ve gönderen adresleri — otomatik e-postalar ve Flow"
+            title={copy.emailTitle}
+            subtitle={copy.emailSub}
           >
             <BlockStack gap="400">
-              <SmtpSection />
+              <SmtpSection copy={copy} ui={ui} smtpProviders={smtpProviders} />
               <Divider />
-              <SmtpSendersSection onToast={setMsg} />
+              <SmtpSendersSection onToast={setMsg} copy={copy} ui={ui} />
             </BlockStack>
           </IntegrationsAccordion>
         )}
@@ -831,10 +822,10 @@ export default function IntegrationsSettingsPage() {
             open={openSection === "trustpilot"}
             onToggle={() => toggleSection("trustpilot")}
             logo={<LogoTrustpilot />}
-            title="Trustpilot"
-            subtitle="Shop TrustBox — Trustpilot Business (nur Superuser)"
+            title={copy.trustpilotTitle}
+            subtitle={copy.trustpilotSub}
           >
-            <TrustpilotSuperuserSection onToast={setMsg} />
+            <TrustpilotSuperuserSection onToast={setMsg} copy={copy} ui={ui} />
           </IntegrationsAccordion>
         )}
 
@@ -844,8 +835,8 @@ export default function IntegrationsSettingsPage() {
             open={openSection === "marketing"}
             onToggle={() => toggleSection("marketing")}
             logo={<LogoMarketing />}
-            title="Marketing-Konten"
-            subtitle="Meta · Google Ads · TikTok · Snapchat"
+            title={copy.marketingTitle}
+            subtitle={copy.marketingSub}
           >
             <MarketingAccountsSection hideFooterHint />
           </IntegrationsAccordion>
@@ -856,8 +847,8 @@ export default function IntegrationsSettingsPage() {
           open={openSection === "billbee"}
           onToggle={() => toggleSection("billbee")}
           logo={<LogoBillbee />}
-          title="Billbee"
-          subtitle="Auftragsabwicklung und Versand — Shop-Kanal (Marketplace-API)"
+          title={copy.billbeeTitle}
+          subtitle={copy.billbeeSub}
         >
           <BillbeeSettingsPage embedded />
         </IntegrationsAccordion>
@@ -867,8 +858,8 @@ export default function IntegrationsSettingsPage() {
           open={openSection === "api"}
           onToggle={() => toggleSection("api")}
           logo={<LogoApi />}
-          title="API-Integrationen"
-          subtitle="Zugangs-ID und Sicherheitsschlüssel — eigene Tools und Schnittstellen"
+          title={copy.apiTitle}
+          subtitle={copy.apiSub}
           headerExtra={
             !loading && integrations.length > 0 ? (
               <Badge tone="info">{integrations.length}</Badge>
@@ -876,33 +867,33 @@ export default function IntegrationsSettingsPage() {
           }
         >
           {loading ? (
-            <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
+            <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>
           ) : integrations.length === 0 ? (
-            <EmptyState heading="Noch keine Integrationen">
-              <p>Eine Integration anlegen: nur den Namen eingeben — Zugangsdaten werden automatisch generiert.</p>
-              <Button variant="primary" onClick={openCreate}>Integration anlegen</Button>
+            <EmptyState heading={copy.noIntegrations}>
+              <p>{copy.noIntegrationsBody}</p>
+              <Button variant="primary" onClick={openCreate}>{copy.createIntegration}</Button>
             </EmptyState>
           ) : (
             <BlockStack gap="400">
               {active.length > 0 && (
                 <BlockStack gap="300">
                   <InlineStack align="space-between" blockAlign="center">
-                    <Text as="h3" variant="headingSm">Aktiv ({active.length})</Text>
-                    <Button size="slim" onClick={load} loading={loading}>Aktualisieren</Button>
+                    <Text as="h3" variant="headingSm">{copy.active(active.length)}</Text>
+                    <Button size="slim" onClick={load} loading={loading}>{ui.refresh}</Button>
                   </InlineStack>
                   <div style={{ display: "grid", gap: 10 }}>
                     {active.map((i) => (
-                      <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} />
+                      <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} copy={copy} ui={ui} />
                     ))}
                   </div>
                 </BlockStack>
               )}
               {inactive.length > 0 && (
                 <BlockStack gap="300">
-                  <Text as="h3" variant="headingSm">Inaktiv ({inactive.length})</Text>
+                  <Text as="h3" variant="headingSm">{copy.inactive(inactive.length)}</Text>
                   <div style={{ display: "grid", gap: 10 }}>
                     {inactive.map((i) => (
-                      <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} />
+                      <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} copy={copy} ui={ui} />
                     ))}
                   </div>
                 </BlockStack>
@@ -915,39 +906,39 @@ export default function IntegrationsSettingsPage() {
       <Modal
         open={modalOpen}
         onClose={closeModal}
-        title={createdCreds ? "Zugangsdaten" : editingId ? "Integration bearbeiten" : "Integration anlegen"}
+        title={createdCreds ? copy.modalCredentials : editingId ? copy.modalEdit : copy.modalCreate}
         primaryAction={
           createdCreds
-            ? { content: "Schließen", onAction: closeModal }
-            : { content: "Speichern", onAction: save, loading: saving }
+            ? { content: ui.close, onAction: closeModal }
+            : { content: ui.save, onAction: save, loading: saving }
         }
-        secondaryActions={createdCreds ? [] : [{ content: "Abbrechen", onAction: closeModal }]}
+        secondaryActions={createdCreds ? [] : [{ content: ui.cancel, onAction: closeModal }]}
       >
         <Modal.Section>
           {createdCreds ? (
             <BlockStack gap="400">
               <Banner tone="warning">
-                Einmalig anzeigen: notiere den Sicherheitsschlüssel sicher. Bei Verlust kannst du einen neuen erzeugen.
+                {copy.oneTimeWarning}
               </Banner>
               <Text as="p" variant="bodyMd"><strong>{createdCreds.name}</strong></Text>
-              <TextField label="Zugangs-ID" value={createdCreds.zugang} readOnly autoComplete="off" multiline={2} />
-              <Button onClick={() => copy(createdCreds.zugang)}>Zugangs-ID kopieren</Button>
-              <TextField label="Sicherheitsschlüssel" value={createdCreds.secret} readOnly autoComplete="off" multiline={3} />
-              <Button onClick={() => copy(createdCreds.secret)}>Sicherheitsschlüssel kopieren</Button>
+              <TextField label={copy.accessId} value={createdCreds.zugang} readOnly autoComplete="off" multiline={2} />
+              <Button onClick={() => copyText(createdCreds.zugang)}>{copy.copyAccessId}</Button>
+              <TextField label={copy.securityKey} value={createdCreds.secret} readOnly autoComplete="off" multiline={3} />
+              <Button onClick={() => copyText(createdCreds.secret)}>{copy.copySecurityKey}</Button>
             </BlockStack>
           ) : (
             <BlockStack gap="400">
               <TextField
-                label="Name"
+                label={ui.colName}
                 value={formName}
                 onChange={setFormName}
                 autoComplete="off"
-                placeholder="z. B. Warenwirtschaft XY, Eigenes Tool…"
-                helpText="Andertal erzeugt Zugangs-ID und Sicherheitsschlüssel automatisch nach dem Speichern."
+                placeholder={copy.namePlaceholder}
+                helpText={copy.nameHelp}
               />
               {editingId && (
                 <Text as="p" tone="subdued" variant="bodySm">
-                  Der Name kann geändert werden. Zugangs-ID bleibt gleich.
+                  {copy.nameEditHint}
                 </Text>
               )}
             </BlockStack>

@@ -21,6 +21,8 @@ import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
+import { useLocale } from "next-intl";
+import { userError } from "@/lib/api-error-messages";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -58,6 +60,7 @@ function isProductInCollection(product, collectionId) {
 
 export default function CollectionEditPage({ collection: initialCollection, isNew, onReload }) {
   const router = useRouter();
+  const locale = useLocale();
   const client = getMedusaAdminClient();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
   const [collection, setCollection] = useState(initialCollection ?? null);
@@ -182,7 +185,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
       setAllProducts((all.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft"));
       setAddProductSearch("");
     } catch (e) {
-      setError(e?.message || "Failed to add product to collection");
+      setError(userError(e, locale, "Failed to add product to collection"));
     } finally {
       setAddingProductId(null);
     }
@@ -205,7 +208,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
       const all = await client.getAdminHubProducts({ limit: 200 });
       setAllProducts((all.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft"));
     } catch (e) {
-      setError(e?.message || "Failed to remove product from collection");
+      setError(userError(e, locale, "Failed to remove product from collection"));
     } finally {
       setRemovingProductId(null);
     }
@@ -297,7 +300,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
         unsaved?.setDirty(false);
       }
     } catch (err) {
-      setError(err?.message || (isNew ? "Failed to create collection" : "Failed to update collection"));
+      setError(userError(err, locale, isNew ? "Failed to create collection" : "Failed to update collection"));
     } finally {
       setSaving(false);
     }

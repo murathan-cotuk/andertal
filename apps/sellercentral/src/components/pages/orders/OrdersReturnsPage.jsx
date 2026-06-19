@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
+import { lt, dateLocaleFor } from "@/lib/locale-text";
+import { statusLabel as localizeStatus } from "@/lib/status-labels";
+import { returnSlipFilename } from "@/lib/download-names";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 /* ───────── helpers ───────── */
@@ -30,21 +33,39 @@ const REFUND_STATUS_COLORS = {
 };
 
 /* ───────── Badge ───────── */
-function Badge({ value, map }) {
+function Badge({ value, map, locale }) {
   const s = (map || STATUS_COLORS)[value] || { bg: "#f3f4f6", color: "#6b7280", dot: "#9ca3af" };
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color }}>
       {s.dot && <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />}
-      {value || "—"}
+      {value ? localizeStatus(locale, value) : "—"}
     </span>
   );
 }
 
 /* ───────── Return label HTML builder ───────── */
-function buildReturnLabelHtml(ret) {
-  const customerName = [ret.first_name, ret.last_name].filter(Boolean).join(" ") || ret.email || "Kunde";
-  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
-<title>Retoureschein #${ret.return_number || ret.id?.slice(0, 8)}</title>
+function buildReturnLabelHtml(ret, locale) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const customerName = [ret.first_name, ret.last_name].filter(Boolean).join(" ") || ret.email || lt(loc, "Customer", "Müşteri", "Client", "Cliente", "Cliente", "Kunde");
+  const title = lt(loc, "Return slip", "İade fişi", "Bon de retour", "Albarán de devolución", "Bolla di reso", "Retoureschein");
+  const subtitle = lt(loc, "Please include this slip in the package.", "Lütfen bu fişi pakete ekleyin.", "Veuillez joindre ce bon au colis.", "Incluya este albarán en el paquete.", "Inserire questa bolla nel pacco.", "Bitte legen Sie diesen Schein dem Paket bei.");
+  const returnNo = lt(loc, "Return no.", "İade no.", "N° retour", "N° devolución", "N° reso", "Retoure-Nr.");
+  const dateLabel = lt(loc, "Date", "Tarih", "Date", "Fecha", "Data", "Datum");
+  const statusFieldLabel = lt(loc, "Status", "Durum", "Statut", "Estado", "Stato", "Status");
+  const customerLabel = lt(loc, "Customer", "Müşteri", "Client", "Cliente", "Cliente", "Kunde");
+  const emailLabel = lt(loc, "Email", "E-posta", "E-mail", "Correo", "E-mail", "E-Mail");
+  const orderLabel = lt(loc, "Order", "Sipariş", "Commande", "Pedido", "Ordine", "Bestellung");
+  const returnNumHint = lt(loc, "Return number — attach visibly to the package", "İade numarası — pakete görünür şekilde yapıştırın", "Numéro de retour — à coller visiblement sur le colis", "Número de devolución — pegar visiblemente al paquete", "Numero reso — attaccare in modo visibile al pacco", "Retoure-Nummer – bitte gut sichtbar auf das Paket kleben");
+  const reasonTitle = lt(loc, "Return reason", "İade nedeni", "Motif du retour", "Motivo de devolución", "Motivo reso", "Rückgabegrund");
+  const noReason = lt(loc, "No reason given", "Neden belirtilmedi", "Aucun motif indiqué", "Sin motivo indicado", "Nessun motivo indicato", "Kein Grund angegeben");
+  const itemsTitle = lt(loc, "Items", "Ürünler", "Articles", "Artículos", "Articoli", "Artikel");
+  const itemCol = lt(loc, "Item", "Ürün", "Article", "Artículo", "Articolo", "Artikel");
+  const qtyCol = lt(loc, "Qty", "Adet", "Qté", "Cant.", "Qtà", "Menge");
+  const returnTo = lt(loc, "Return to:", "İade adresi:", "Retour à :", "Devolución a:", "Reso a:", "Rücksendung an:");
+  const returnAddress = lt(loc, "Your company name · Street · Postal code City · Country", "Firma adınız · Sokak · Posta kodu Şehir · Ülke", "Votre société · Rue · Code postal Ville · Pays", "Su empresa · Calle · CP Ciudad · País", "Ragione sociale · Via · CAP Città · Paese", "Ihr Firmenname · Straße · PLZ Stadt · Deutschland");
+  const createdOn = lt(loc, "Created on", "Oluşturulma", "Créé le", "Creado el", "Creato il", "Erstellt am");
+  return `<!DOCTYPE html><html lang="${loc}"><head><meta charset="UTF-8">
+<title>${title} #${ret.return_number || ret.id?.slice(0, 8)}</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 40px; color: #111; }
   h1 { font-size: 22px; margin-bottom: 4px; }
@@ -61,46 +82,46 @@ function buildReturnLabelHtml(ret) {
   .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; }
 </style>
 </head><body>
-<h1>Retoureschein</h1>
-<div class="subtitle">Bitte legen Sie diesen Schein dem Paket bei.</div>
+<h1>${title}</h1>
+<div class="subtitle">${subtitle}</div>
 <div class="grid">
   <div class="section">
-    <label>Retoure-Nr.</label><p>R-${ret.return_number || "—"}</p>
-    <label>Datum</label><p>${fmtDate(ret.created_at)}</p>
-    <label>Status</label><p>${ret.status}</p>
+    <label>${returnNo}</label><p>R-${ret.return_number || "—"}</p>
+    <label>${dateLabel}</label><p>${fmtDate(ret.created_at, locale)}</p>
+    <label>${statusFieldLabel}</label><p>${localizeStatus(loc, ret.status)}</p>
   </div>
   <div class="section">
-    <label>Kunde</label><p>${customerName}</p>
-    <label>E-Mail</label><p>${ret.email || "—"}</p>
-    <label>Bestellung</label><p>${ret.order_number ? "#" + ret.order_number : "—"}</p>
+    <label>${customerLabel}</label><p>${customerName}</p>
+    <label>${emailLabel}</label><p>${ret.email || "—"}</p>
+    <label>${orderLabel}</label><p>${ret.order_number ? "#" + ret.order_number : "—"}</p>
   </div>
 </div>
 <div class="box">
   <div class="big">R-${ret.return_number || ret.id?.slice(0, 8)}</div>
-  <small>Retoure-Nummer – bitte gut sichtbar auf das Paket kleben</small>
+  <small>${returnNumHint}</small>
 </div>
-<h3 style="margin-bottom:8px;font-size:14px;">Rückgabegrund</h3>
-<p style="font-size:13px;color:#374151;margin-bottom:20px;">${ret.reason || "Kein Grund angegeben"}${ret.notes ? "<br><span style='color:#6b7280;font-size:12px;'>" + ret.notes + "</span>" : ""}</p>
+<h3 style="margin-bottom:8px;font-size:14px;">${reasonTitle}</h3>
+<p style="font-size:13px;color:#374151;margin-bottom:20px;">${ret.reason || noReason}${ret.notes ? "<br><span style='color:#6b7280;font-size:12px;'>" + ret.notes + "</span>" : ""}</p>
 ${ret.items && ret.items.length ? `
-<h3 style="margin-bottom:8px;font-size:14px;">Artikel</h3>
+<h3 style="margin-bottom:8px;font-size:14px;">${itemsTitle}</h3>
 <table>
-  <thead><tr><th>Artikel</th><th>Menge</th></tr></thead>
+  <thead><tr><th>${itemCol}</th><th>${qtyCol}</th></tr></thead>
   <tbody>${ret.items.map(i => `<tr><td>${i.title || i.name || "—"}</td><td>${i.quantity || 1}</td></tr>`).join("")}</tbody>
 </table>` : ""}
 <div class="footer">
-  <strong>Rücksendung an:</strong> Ihr Firmenname · Straße · PLZ Stadt · Deutschland<br>
-  Retoure-Nr. R-${ret.return_number || "—"} · Erstellt am ${fmtDate(ret.created_at)}
+  <strong>${returnTo}</strong> ${returnAddress}<br>
+  ${returnNo} R-${ret.return_number || "—"} · ${createdOn} ${fmtDate(ret.created_at, locale)}
 </div>
 </body></html>`;
 }
 
-function downloadRetourenschein(ret) {
-  const html = buildReturnLabelHtml(ret);
+function downloadRetourenschein(ret, locale) {
+  const html = buildReturnLabelHtml(ret, locale);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Retoureschein-R${ret.return_number || ret.id?.slice(0, 8)}.html`;
+  a.download = returnSlipFilename(ret.return_number || ret.id?.slice(0, 8), locale);
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -285,8 +306,8 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
             <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, fontSize: 20, color: "#6b7280" }}>✕</button>
           </div>
           <div style={{ marginTop: 12 }}>
-            <Badge value={ret.status} />
-            {ret.refund_status && <Badge value={ret.refund_status} map={REFUND_STATUS_COLORS} />}
+            <Badge value={ret.status} locale={locale} />
+            {ret.refund_status && <Badge value={ret.refund_status} map={REFUND_STATUS_COLORS} locale={locale} />}
           </div>
         </div>
 
@@ -315,7 +336,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                 <button
-                  onClick={() => downloadRetourenschein(ret)}
+                  onClick={() => downloadRetourenschein(ret, locale)}
                   style={{ flex: 1, padding: "10px 0", background: "#111827", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
                 >
                   {downloadLabelText}
@@ -407,7 +428,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
               <div style={{ fontSize: 11, color: "#1e40af", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>{refundLabel}</div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 15, fontWeight: 700, color: "#1d4ed8" }}>{fmtMoney(ret.refund_amount_cents, locale)}</span>
-                <Badge value={ret.refund_status} map={REFUND_STATUS_COLORS} />
+                <Badge value={ret.refund_status} map={REFUND_STATUS_COLORS} locale={locale} />
               </div>
               {ret.refund_note && <div style={{ fontSize: 12, color: "#3b82f6", marginTop: 4 }}>{ret.refund_note}</div>}
             </div>
@@ -665,11 +686,11 @@ export default function OrdersReturnsPage() {
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ret.reason || "—"}</div>
                   </td>
                   <td style={{ padding: "10px 12px" }}>
-                    <Badge value={ret.status} />
+                    <Badge value={ret.status} locale={locale} />
                   </td>
                   <td style={{ padding: "10px 12px" }}>
                     {ret.refund_status
-                      ? <><Badge value={ret.refund_status} map={REFUND_STATUS_COLORS} /><div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{fmtMoney(ret.refund_amount_cents, locale)}</div></>
+                      ? <><Badge value={ret.refund_status} map={REFUND_STATUS_COLORS} locale={locale} /><div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{fmtMoney(ret.refund_amount_cents, locale)}</div></>
                       : <span style={{ color: "#d1d5db" }}>—</span>}
                   </td>
                   <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>{fmtDate(ret.created_at, locale)}</td>

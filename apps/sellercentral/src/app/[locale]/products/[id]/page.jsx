@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { Box, Banner, SkeletonBodyText, SkeletonDisplayText, Card, BlockStack, Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { userError } from "@/lib/api-error-messages";
 import DashboardLayout from "@/components/DashboardLayout";
 import ProductEditPage from "@/components/pages/products/ProductEditPage";
 
@@ -30,7 +31,7 @@ export default function ProductDetailRoute() {
       setSellerListings(seller_listings || []);
       if (!data) setError("Product not found");
     } catch (err) {
-      setError(err?.message || "Failed to load product");
+      setError(userError(err, null, "Failed to load product"));
       setProduct(null);
       setSellerListings([]);
     } finally {

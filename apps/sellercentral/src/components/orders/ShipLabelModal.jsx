@@ -1,20 +1,23 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Button, Banner, Spinner } from "@shopify/polaris";
+import React, { useState, useRef, useCallback } from "react";
+import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { readSellerIsSuperuser, resolveSellerFacingError, sellerTechnicalMessage } from "@/lib/seller-system-errors";
+import { lt, dateLocaleFor } from "@/lib/locale-text";
 
-/* ── Standard carrier-compatible package sizes ───────────────── */
-const PRESETS = [
-  { id: "xs",  label: "XS",  desc: "Briefpaket",  weight_kg: 0.5,  length_cm: 25, width_cm: 18, height_cm: 5,  note: "bis 500g · Warensendung" },
-  { id: "s",   label: "S",   desc: "Päckchen S",  weight_kg: 1,    length_cm: 35, width_cm: 25, height_cm: 10, note: "bis 1 kg · DHL / DPD / GLS" },
-  { id: "m",   label: "M",   desc: "Päckchen M",  weight_kg: 2,    length_cm: 60, width_cm: 30, height_cm: 15, note: "bis 2 kg · DHL / DPD / GLS" },
-  { id: "l",   label: "L",   desc: "Paket S",     weight_kg: 5,    length_cm: 60, width_cm: 30, height_cm: 20, note: "bis 5 kg · alle Carrier" },
-  { id: "xl",  label: "XL",  desc: "Paket M",     weight_kg: 10,   length_cm: 60, width_cm: 40, height_cm: 40, note: "bis 10 kg · alle Carrier" },
-  { id: "xxl", label: "XXL", desc: "Paket L",     weight_kg: 20,   length_cm: 80, width_cm: 60, height_cm: 40, note: "bis 20 kg · DHL / DPD" },
-  { id: "3xl", label: "3XL", desc: "Paket XL",    weight_kg: 31.5, length_cm: 120,width_cm: 60, height_cm: 60, note: "bis 31,5 kg · Spedition" },
-];
+function getPresets(locale) {
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
+  return [
+    { id: "xs",  label: "XS",  desc: t("Letter packet", "Mektup paketi", "Petit paquet", "Paquete carta", "Pacco lettera", "Briefpaket"),  weight_kg: 0.5,  length_cm: 25, width_cm: 18, height_cm: 5,  note: t("up to 500g · goods shipment", "500g'a kadar · mal gönderisi", "jusqu'à 500g · envoi de marchandises", "hasta 500g · envío de mercancías", "fino a 500g · spedizione merci", "bis 500g · Warensendung") },
+    { id: "s",   label: "S",   desc: t("Small parcel S", "Küçük paket S", "Petit colis S", "Paquete pequeño S", "Pacco piccolo S", "Päckchen S"),  weight_kg: 1,    length_cm: 35, width_cm: 25, height_cm: 10, note: t("up to 1 kg · DHL / DPD / GLS", "1 kg'a kadar · DHL / DPD / GLS", "jusqu'à 1 kg · DHL / DPD / GLS", "hasta 1 kg · DHL / DPD / GLS", "fino a 1 kg · DHL / DPD / GLS", "bis 1 kg · DHL / DPD / GLS") },
+    { id: "m",   label: "M",   desc: t("Small parcel M", "Küçük paket M", "Petit colis M", "Paquete pequeño M", "Pacco piccolo M", "Päckchen M"),  weight_kg: 2,    length_cm: 60, width_cm: 30, height_cm: 15, note: t("up to 2 kg · DHL / DPD / GLS", "2 kg'a kadar · DHL / DPD / GLS", "jusqu'à 2 kg · DHL / DPD / GLS", "hasta 2 kg · DHL / DPD / GLS", "fino a 2 kg · DHL / DPD / GLS", "bis 2 kg · DHL / DPD / GLS") },
+    { id: "l",   label: "L",   desc: t("Parcel S", "Paket S", "Colis S", "Paquete S", "Pacco S", "Paket S"),     weight_kg: 5,    length_cm: 60, width_cm: 30, height_cm: 20, note: t("up to 5 kg · all carriers", "5 kg'a kadar · tüm kargo", "jusqu'à 5 kg · tous transporteurs", "hasta 5 kg · todos transportistas", "fino a 5 kg · tutti i corrieri", "bis 5 kg · alle Carrier") },
+    { id: "xl",  label: "XL",  desc: t("Parcel M", "Paket M", "Colis M", "Paquete M", "Pacco M", "Paket M"),     weight_kg: 10,   length_cm: 60, width_cm: 40, height_cm: 40, note: t("up to 10 kg · all carriers", "10 kg'a kadar · tüm kargo", "jusqu'à 10 kg · tous transporteurs", "hasta 10 kg · todos transportistas", "fino a 10 kg · tutti i corrieri", "bis 10 kg · alle Carrier") },
+    { id: "xxl", label: "XXL", desc: t("Parcel L", "Paket L", "Colis L", "Paquete L", "Pacco L", "Paket L"),     weight_kg: 20,   length_cm: 80, width_cm: 60, height_cm: 40, note: t("up to 20 kg · DHL / DPD", "20 kg'a kadar · DHL / DPD", "jusqu'à 20 kg · DHL / DPD", "hasta 20 kg · DHL / DPD", "fino a 20 kg · DHL / DPD", "bis 20 kg · DHL / DPD") },
+    { id: "3xl", label: "3XL", desc: t("Parcel XL", "Paket XL", "Colis XL", "Paquete XL", "Pacco XL", "Paket XL"),    weight_kg: 31.5, length_cm: 120,width_cm: 60, height_cm: 60, note: t("up to 31.5 kg · freight", "31,5 kg'a kadar · nakliye", "jusqu'à 31,5 kg · fret", "hasta 31,5 kg · transporte", "fino a 31,5 kg · spedizione", "bis 31,5 kg · Spedition") },
+  ];
+}
 
 const CARRIER_LOGOS = {
   dhl:     { color: "#FFCC00", text: "#000", label: "DHL" },
@@ -55,9 +58,12 @@ function DimInput({ label, value, onChange, suffix }) {
   );
 }
 
-function RateCard({ rate, selected, onClick }) {
+function RateCard({ rate, selected, onClick, locale }) {
   const badge = carrierBadge(rate.carrier);
   const hasWeight = rate.min_weight != null || rate.max_weight != null;
+  const numLoc = dateLocaleFor(locale);
+  const upTo = lt(locale, "up to", "en fazla", "jusqu'à", "hasta", "fino a", "bis");
+  const inclVat = lt(locale, "incl. VAT", "KDV dahil", "TVA incl.", "IVA incl.", "IVA incl.", "inkl. MwSt.");
   return (
     <button
       onClick={onClick}
@@ -70,32 +76,35 @@ function RateCard({ rate, selected, onClick }) {
         transition: "all 0.15s",
       }}
     >
-      {/* Carrier badge */}
       <div style={{ width: 44, height: 44, borderRadius: 8, background: badge.color, color: badge.text, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 11, flexShrink: 0, letterSpacing: "-0.5px" }}>
         {badge.label}
       </div>
-      {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rate.name}</div>
         {(hasWeight || rate.delivery_days) && (
           <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-            {hasWeight && <span>{rate.max_weight != null ? `bis ${(rate.max_weight / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })} kg` : ""}</span>}
+            {hasWeight && <span>{rate.max_weight != null ? `${upTo} ${(rate.max_weight / 1000).toLocaleString(numLoc, { maximumFractionDigits: 1 })} kg` : ""}</span>}
             {rate.delivery_days && <span style={{ marginLeft: hasWeight ? 8 : 0 }}>· {rate.delivery_days}</span>}
           </div>
         )}
       </div>
-      {/* Price */}
       <div style={{ textAlign: "right", flexShrink: 0 }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: selected ? "#2563eb" : "#111827" }}>
-          {rate.price_eur.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+          {rate.price_eur.toLocaleString(numLoc, { minimumFractionDigits: 2 })} €
         </div>
-        <div style={{ fontSize: 10, color: "#9ca3af" }}>inkl. MwSt.</div>
+        <div style={{ fontSize: 10, color: "#9ca3af" }}>{inclVat}</div>
       </div>
     </button>
   );
 }
 
-export default function ShipLabelModal({ order, onClose, locale = "de" }) {
+export default function ShipLabelModal({ order, onClose, locale: localeProp = "de" }) {
+  const localeFromHook = useLocale();
+  const locale = localeFromHook || localeProp || "de";
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
+  const numLoc = dateLocaleFor(locale);
+  const PRESETS = getPresets(locale);
+
   const isSuperuser = readSellerIsSuperuser();
   const [selectedPreset, setSelectedPreset] = useState(null);
   const [dims, setDims] = useState({ weight_kg: "1", length_cm: "35", width_cm: "25", height_cm: "10" });
@@ -105,14 +114,12 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
   const [selectedRate, setSelectedRate] = useState(null);
   const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState("dims"); // "dims" | "rates" | "confirm"
   const debounceRef = useRef(null);
 
   const setDim = (k, v) => {
     setDims(d => ({ ...d, [k]: v }));
     setDimsChanged(true);
     setSelectedRate(null);
-    // Debounce auto-fetch
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       if (rates) fetchRates({ ...dims, [k]: v });
@@ -143,11 +150,18 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
       });
       if (!data?.rates?.length) {
         setError(isSuperuser
-          ? "Keine Versandoptionen gefunden. Sendcloud-Konfiguration oder Gewicht/Maße prüfen."
+          ? lt(
+              locale,
+              "No shipping options found. Check Sendcloud configuration or weight/dimensions.",
+              "Kargo seçeneği bulunamadı. Sendcloud yapılandırmasını veya ağırlık/ölçüleri kontrol edin.",
+              "Aucune option d'expédition. Vérifiez Sendcloud ou poids/dimensions.",
+              "No se encontraron opciones de envío. Revise Sendcloud o peso/dimensiones.",
+              "Nessuna opzione di spedizione. Controllare Sendcloud o peso/dimensioni.",
+              "Keine Versandoptionen gefunden. Sendcloud-Konfiguration oder Gewicht/Maße prüfen."
+            )
           : sellerTechnicalMessage(locale));
       } else {
         setRates(data.rates);
-        setStep("rates");
       }
     } catch (e) {
       setError(resolveSellerFacingError(e, locale, isSuperuser));
@@ -175,7 +189,9 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
       if (data?.checkout_url) {
         window.location.href = data.checkout_url;
       } else {
-        setError(isSuperuser ? "Kein Checkout-Link erhalten." : sellerTechnicalMessage(locale));
+        setError(isSuperuser
+          ? lt(locale, "No checkout link received.", "Ödeme bağlantısı alınamadı.", "Aucun lien de paiement reçu.", "No se recibió enlace de pago.", "Nessun link di checkout ricevuto.", "Kein Checkout-Link erhalten.")
+          : sellerTechnicalMessage(locale));
         setCheckingOut(false);
       }
     } catch (e) {
@@ -184,19 +200,19 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
     }
   };
 
-  // Existing label
   const hasLabel = !!(order.sendcloud_label_url || order.tracking_number);
+  const platformFee = t("5% platform fee", "%5 platform ücreti", "5 % frais plateforme", "5 % comisión plataforma", "5% commissione piattaforma", "5% Plattformgebühr");
+  const destCountry = order.country || "DE";
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}>
       <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 640, boxShadow: "0 24px 80px rgba(0,0,0,0.25)", margin: "auto" }}>
 
-        {/* Header */}
         <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>Versandetikett kaufen</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>{t("Buy shipping label", "Kargo etiketi satın al", "Acheter une étiquette", "Comprar etiqueta de envío", "Acquista etichetta spedizione", "Versandetikett kaufen")}</div>
             <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-              Bestellung <strong>#{order.order_number || "—"}</strong>
+              {t("Order", "Sipariş", "Commande", "Pedido", "Ordine", "Bestellung")} <strong>#{order.order_number || "—"}</strong>
             </div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1, padding: "0 4px" }}>×</button>
@@ -204,29 +220,40 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
 
         <div style={{ padding: "20px 24px" }}>
 
-          {/* Delivery address */}
           <div style={{ background: "#f9fafb", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 13 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Lieferadresse</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>{t("Delivery address", "Teslimat adresi", "Adresse de livraison", "Dirección de entrega", "Indirizzo di consegna", "Lieferadresse")}</div>
             <div style={{ fontWeight: 600, color: "#111827" }}>{[order.first_name, order.last_name].filter(Boolean).join(" ") || "—"}</div>
             {order.address_line1 && <div style={{ color: "#374151" }}>{order.address_line1}</div>}
             {order.address_line2 && <div style={{ color: "#374151" }}>{order.address_line2}</div>}
             <div style={{ color: "#374151" }}>{[order.postal_code, order.city].filter(Boolean).join(" ")}</div>
-            <div style={{ color: "#374151", fontWeight: 600 }}>{order.country || "DE"}</div>
+            <div style={{ color: "#374151", fontWeight: 600 }}>{destCountry}</div>
           </div>
 
-          {/* Existing label notice */}
           {hasLabel && (
             <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 8, padding: "10px 14px", marginBottom: 20, fontSize: 13, color: "#854d0e" }}>
-              ⚠ Diese Bestellung hat bereits ein Etikett{order.tracking_number ? ` (${order.tracking_number})` : ""}. Du kannst ein weiteres kaufen, z. B. für Ersatzlieferung.
+              ⚠ {t(
+                "This order already has a label",
+                "Bu siparişin zaten bir etiketi var",
+                "Cette commande a déjà une étiquette",
+                "Este pedido ya tiene una etiqueta",
+                "Questo ordine ha già un'etichetta",
+                "Diese Bestellung hat bereits ein Etikett"
+              )}{order.tracking_number ? ` (${order.tracking_number})` : ""}. {t(
+                "You can buy another, e.g. for a replacement shipment.",
+                "Başka bir tane satın alabilirsiniz, örn. yedek gönderi için.",
+                "Vous pouvez en acheter une autre, p.ex. pour un renvoi.",
+                "Puede comprar otra, p. ej. para un envío de reemplazo.",
+                "Puoi acquistarne un'altra, ad es. per una spedizione sostitutiva.",
+                "Du kannst ein weiteres kaufen, z. B. für Ersatzlieferung."
+              )}
               {order.sendcloud_label_url && (
-                <a href={order.sendcloud_label_url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 8, fontWeight: 600, color: "#92400e" }}>Vorheriges Etikett ↗</a>
+                <a href={order.sendcloud_label_url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 8, fontWeight: 600, color: "#92400e" }}>{t("Previous label ↗", "Önceki etiket ↗", "Étiquette précédente ↗", "Etiqueta anterior ↗", "Etichetta precedente ↗", "Vorheriges Etikett ↗")}</a>
               )}
             </div>
           )}
 
-          {/* Paketgröße — Schnellauswahl */}
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Paketgröße — Schnellauswahl</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>{t("Package size — quick select", "Paket boyutu — hızlı seçim", "Taille colis — sélection rapide", "Tamaño paquete — selección rápida", "Dimensione pacco — selezione rapida", "Paketgröße — Schnellauswahl")}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {PRESETS.map(p => (
                 <button
@@ -253,18 +280,16 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
             )}
           </div>
 
-          {/* Manuelle Maße */}
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Maße anpassen</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>{t("Adjust dimensions", "Ölçüleri ayarla", "Ajuster dimensions", "Ajustar dimensiones", "Regola dimensioni", "Maße anpassen")}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
-              <DimInput label="Gewicht" value={dims.weight_kg} onChange={v => setDim("weight_kg", v)} suffix="kg" />
-              <DimInput label="Länge" value={dims.length_cm} onChange={v => setDim("length_cm", v)} suffix="cm" />
-              <DimInput label="Breite" value={dims.width_cm} onChange={v => setDim("width_cm", v)} suffix="cm" />
-              <DimInput label="Höhe" value={dims.height_cm} onChange={v => setDim("height_cm", v)} suffix="cm" />
+              <DimInput label={t("Weight", "Ağırlık", "Poids", "Peso", "Peso", "Gewicht")} value={dims.weight_kg} onChange={v => setDim("weight_kg", v)} suffix="kg" />
+              <DimInput label={t("Length", "Uzunluk", "Longueur", "Largo", "Lunghezza", "Länge")} value={dims.length_cm} onChange={v => setDim("length_cm", v)} suffix="cm" />
+              <DimInput label={t("Width", "Genişlik", "Largeur", "Ancho", "Larghezza", "Breite")} value={dims.width_cm} onChange={v => setDim("width_cm", v)} suffix="cm" />
+              <DimInput label={t("Height", "Yükseklik", "Hauteur", "Alto", "Altezza", "Höhe")} value={dims.height_cm} onChange={v => setDim("height_cm", v)} suffix="cm" />
             </div>
           </div>
 
-          {/* Fetch rates button */}
           <div style={{ marginBottom: 20 }}>
             <button
               onClick={() => fetchRates()}
@@ -279,9 +304,9 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
               }}
             >
               {loadingRates ? (
-                <><span style={{ width: 16, height: 16, border: "2px solid #9ca3af", borderTopColor: "#374151", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> Lade Versandoptionen…</>
+                <><span style={{ width: 16, height: 16, border: "2px solid #9ca3af", borderTopColor: "#374151", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> {t("Loading shipping options…", "Kargo seçenekleri yükleniyor…", "Chargement des options…", "Cargando opciones de envío…", "Caricamento opzioni spedizione…", "Lade Versandoptionen…")}</>
               ) : (
-                <>{dimsChanged ? "⟳ Preise aktualisieren" : "Versandoptionen abrufen"}</>
+                <>{dimsChanged ? t("⟳ Update prices", "⟳ Fiyatları güncelle", "⟳ Mettre à jour les prix", "⟳ Actualizar precios", "⟳ Aggiorna prezzi", "⟳ Preise aktualisieren") : t("Fetch shipping options", "Kargo seçeneklerini getir", "Obtenir options d'expédition", "Obtener opciones de envío", "Recupera opzioni spedizione", "Versandoptionen abrufen")}</>
               )}
             </button>
           </div>
@@ -292,14 +317,13 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
             </div>
           )}
 
-          {/* Rate list */}
           {rates && rates.length > 0 && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  {rates.length} Versandoptionen — sortiert nach Preis
+                  {rates.length} {t("shipping options — sorted by price", "kargo seçeneği — fiyata göre sıralı", "options d'expédition — triées par prix", "opciones de envío — ordenadas por precio", "opzioni spedizione — ordinate per prezzo", "Versandoptionen — sortiert nach Preis")}
                 </div>
-                {selectedRate && <div style={{ fontSize: 12, color: "#2563eb", fontWeight: 600 }}>✓ Ausgewählt</div>}
+                {selectedRate && <div style={{ fontSize: 12, color: "#2563eb", fontWeight: 600 }}>✓ {t("Selected", "Seçildi", "Sélectionné", "Seleccionado", "Selezionato", "Ausgewählt")}</div>}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {rates.map(rate => (
@@ -308,44 +332,47 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
                     rate={rate}
                     selected={selectedRate?.service_id === rate.service_id}
                     onClick={() => setSelectedRate(r => r?.service_id === rate.service_id ? null : rate)}
+                    locale={locale}
                   />
                 ))}
               </div>
               <div style={{ marginTop: 8, fontSize: 11, color: "#9ca3af" }}>
-                Preise inkl. {dims.weight_kg} kg, {dims.length_cm}×{dims.width_cm}×{dims.height_cm} cm · Zielland {order.country || "DE"} · inkl. {
-                  // derive markup from rate if available
-                  "5% Plattformgebühr"
-                }
+                {t("Prices incl.", "Fiyatlar dahil", "Prix incl.", "Precios incl.", "Prezzi incl.", "Preise inkl.")} {dims.weight_kg} kg, {dims.length_cm}×{dims.width_cm}×{dims.height_cm} cm · {t("destination", "varış ülkesi", "pays de destination", "país destino", "paese destinazione", "Zielland")} {destCountry} · {t("incl.", "dahil", "incl.", "incl.", "incl.", "inkl.")} {platformFee}
               </div>
             </div>
           )}
 
-          {/* Checkout summary */}
           {selectedRate && (
             <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "16px 18px", marginBottom: 4 }}>
-              <div style={{ fontSize: 12, color: "#1e40af", fontWeight: 600, marginBottom: 8 }}>Zusammenfassung</div>
+              <div style={{ fontSize: 12, color: "#1e40af", fontWeight: 600, marginBottom: 8 }}>{t("Summary", "Özet", "Résumé", "Resumen", "Riepilogo", "Zusammenfassung")}</div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
                 <span style={{ color: "#374151" }}>{selectedRate.name}</span>
-                <span style={{ fontWeight: 600 }}>{selectedRate.price_eur.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+                <span style={{ fontWeight: 600 }}>{selectedRate.price_eur.toLocaleString(numLoc, { minimumFractionDigits: 2 })} €</span>
               </div>
               <div style={{ fontSize: 11, color: "#6b7280" }}>
-                {dims.weight_kg} kg · {dims.length_cm}×{dims.width_cm}×{dims.height_cm} cm → {order.country || "DE"}
+                {dims.weight_kg} kg · {dims.length_cm}×{dims.width_cm}×{dims.height_cm} cm → {destCountry}
               </div>
               <div style={{ marginTop: 10, borderTop: "1px solid #bfdbfe", paddingTop: 10, display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 14 }}>
-                <span>Gesamt (inkl. MwSt.)</span>
-                <span style={{ color: "#1d4ed8" }}>{selectedRate.price_eur.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+                <span>{t("Total (incl. VAT)", "Toplam (KDV dahil)", "Total (TVA incl.)", "Total (IVA incl.)", "Totale (IVA incl.)", "Gesamt (inkl. MwSt.)")}</span>
+                <span style={{ color: "#1d4ed8" }}>{selectedRate.price_eur.toLocaleString(numLoc, { minimumFractionDigits: 2 })} €</span>
               </div>
               <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>
-                Zahlung via Stripe · Etikett wird sofort nach Zahlung generiert und als PDF bereitgestellt.
+                {t(
+                  "Payment via Stripe · Label is generated immediately after payment and provided as PDF.",
+                  "Stripe ile ödeme · Etiket ödeme sonrası hemen oluşturulur ve PDF olarak sunulur.",
+                  "Paiement via Stripe · L'étiquette est générée immédiatement après paiement en PDF.",
+                  "Pago vía Stripe · La etiqueta se genera inmediatamente tras el pago en PDF.",
+                  "Pagamento via Stripe · L'etichetta viene generata subito dopo il pagamento in PDF.",
+                  "Zahlung via Stripe · Etikett wird sofort nach Zahlung generiert und als PDF bereitgestellt."
+                )}
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer */}
         <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb", borderBottomLeftRadius: 14, borderBottomRightRadius: 14 }}>
           <button onClick={onClose} style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", color: "#374151", fontWeight: 500 }}>
-            Abbrechen
+            {t("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen")}
           </button>
           <button
             onClick={handleCheckout}
@@ -360,11 +387,11 @@ export default function ShipLabelModal({ order, onClose, locale = "de" }) {
             }}
           >
             {checkingOut ? (
-              <><span style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> Weiterleitung…</>
+              <><span style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> {t("Redirecting…", "Yönlendiriliyor…", "Redirection…", "Redirigiendo…", "Reindirizzamento…", "Weiterleitung…")}</>
             ) : selectedRate ? (
-              `Jetzt kaufen — ${selectedRate.price_eur.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`
+              `${t("Buy now —", "Şimdi satın al —", "Acheter —", "Comprar —", "Acquista —", "Jetzt kaufen —")} ${selectedRate.price_eur.toLocaleString(numLoc, { minimumFractionDigits: 2 })} €`
             ) : (
-              "Bitte Versandoption wählen"
+              t("Please select a shipping option", "Lütfen bir kargo seçeneği seçin", "Veuillez choisir une option d'expédition", "Seleccione una opción de envío", "Seleziona un'opzione di spedizione", "Bitte Versandoption wählen")
             )}
           </button>
         </div>

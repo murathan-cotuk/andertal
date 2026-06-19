@@ -103,8 +103,14 @@
     "reviews": "Reviews",
     "sellers": "Sellers",
     "coupons": "Coupons",
+    "promotions": "Promotions",
     "landingPage": "Landing Page",
-    "styles": "Styles"
+    "styles": "Styles",
+    "flows": "Flows",
+    "newsletter": "Newsletter",
+    "productGroups": "Product groups",
+    "issueLog": "Issue log",
+    "transactions": "Transactions"
   },
   "rankingPage": {
     "title": "Product ranking in the shop",

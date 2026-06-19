@@ -104,7 +104,13 @@
     "sellers": "Verkäufer",
     "coupons": "Coupons",
     "landingPage": "Landing Page",
-    "styles": "Stile"
+    "styles": "Stile",
+    "promotions": "Aktionen",
+    "flows": "Flows",
+    "newsletter": "Newsletter",
+    "productGroups": "Produktgruppen",
+    "issueLog": "Issue-Log",
+    "transactions": "Transaktionen"
   },
   "rankingPage": {
     "title": "Produkt-Sortierung im Shop",

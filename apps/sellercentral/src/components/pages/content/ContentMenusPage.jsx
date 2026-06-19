@@ -29,25 +29,8 @@ import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import { confirmDelete } from "@/lib/confirm-delete";
-
-const LINK_TYPES = [
-  { label: "Category", value: "category" },
-  { label: "Collection", value: "collection" },
-  { label: "Product", value: "product" },
-  { label: "Page", value: "page" },
-  { label: "Blog", value: "blog" },
-  { label: "Blog post", value: "blog_post" },
-  { label: "Policy", value: "policy" },
-  { label: "API", value: "api" },
-  { label: "URL", value: "url" },
-];
-
-const API_FUNCTION_OPTIONS = [
-  { label: "Marke", value: "brand" },
-  { label: "Sales", value: "sales" },
-  { label: "Neuheiten", value: "neuheiten" },
-  { label: "Bestsellers", value: "bestsellers" },
-];
+import { useLocale } from "next-intl";
+import { getContentMenusCopy, linkTypesForLocale, apiFunctionOptionsForLocale } from "@/lib/content-menus-i18n";
 
 const TAB_SIZE = 28;
 const NEST_BOUNDARY_PX = 20 + 3 * TAB_SIZE;
@@ -215,6 +198,7 @@ function MenuEditorPanel(props) {
     pages,
     LINK_TYPES,
     API_FUNCTION_OPTIONS,
+    menusCopy,
     getLinkDisplay,
     TAB_SIZE,
     buildMenuTree,
@@ -417,7 +401,7 @@ function MenuEditorPanel(props) {
                 onChange={setLocalMenuLocation}
               />
               <span style={{ display: "block", marginTop: 4, fontSize: 12, color: "var(--p-color-text-subdued)" }}>
-                {localMenuLocation === "second" ? "→ Shown in shop navbar (grey bar under main nav)" : localMenuLocation === "main" ? "→ Shown in shop as Kategorien dropdown" : "→ Other locations (e.g. footer)"}
+                {localMenuLocation === "second" ? menusCopy.locationSecond : localMenuLocation === "main" ? menusCopy.locationMain : menusCopy.locationOther}
               </span>
             </div>
             <InlineStack gap="200" blockAlign="center">
@@ -813,6 +797,10 @@ function InlineItemRow({ itemForm, setItemForm, collections, categories, product
 }
 
 export default function ContentMenusPage({ panelMode = null, panelMenuId = null }) {
+  const locale = useLocale();
+  const c = getContentMenusCopy(locale);
+  const LINK_TYPES = linkTypesForLocale(locale);
+  const API_FUNCTION_OPTIONS = apiFunctionOptionsForLocale(locale);
   const router = useRouter();
   const unsaved = useUnsavedChanges();
   const menuSaveRef = useRef(null);
@@ -1471,6 +1459,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
               pages={pages}
               LINK_TYPES={LINK_TYPES}
               API_FUNCTION_OPTIONS={API_FUNCTION_OPTIONS}
+              menusCopy={c}
               getLinkDisplay={getLinkDisplay}
               TAB_SIZE={TAB_SIZE}
               buildMenuTree={buildMenuTree}
@@ -1594,9 +1583,9 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   // List page: /content/menus – only Menus list + Menu items placeholder
   return (
     <Page
-      title="Menus"
+      title={c.pageTitle}
       primaryAction={{
-        content: "Create menu",
+        content: c.createMenu,
         icon: PlusIcon,
         onAction: openAddMenu,
       }}
@@ -1611,15 +1600,15 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
         <Layout.Section>
           <Card>
             <BlockStack gap="600">
-              <Text as="h2" variant="headingMd" fontWeight="bold">Menus</Text>
+              <Text as="h2" variant="headingMd" fontWeight="bold">{c.pageTitle}</Text>
               {loading ? (
                 <Box paddingBlock="400">
-                  <Text as="p" tone="subdued">Loading…</Text>
+                  <Text as="p" tone="subdued">{c.loading}</Text>
                 </Box>
               ) : menus.length === 0 ? (
                 <EmptyState
-                  heading="Create your first menu"
-                  action={{ content: "Create menu", onAction: openAddMenu }}
+                  heading={c.noMenus}
+                  action={{ content: c.createMenu, onAction: openAddMenu }}
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                 >
                   <p>Menus group navigation links. Create a menu, then click it to add items and submenus.</p>

@@ -2,14 +2,6 @@
 
 /**
  * MediaPickerModal — shared media picker used everywhere in sellercentral.
- *
- * Props:
- *   open        boolean
- *   onClose     () => void
- *   onSelect    (urls: string[]) => void   — called with selected URL(s) when "Apply" is clicked
- *   multiple    boolean  default false — allow multiple selection
- *   title       string   modal title
- *   uploadPurpose  optional "product" — server: square crop, min 1000px, WebP output (JPEG/PNG only)
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -18,12 +10,11 @@ import {
   Text,
   Button,
   TextField,
-  BlockStack,
   Box,
   Divider,
-  Thumbnail,
   DropZone,
 } from "@shopify/polaris";
+import { useLt } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { appendMediaFileToFormData } from "@/lib/media-upload";
 
@@ -67,7 +58,6 @@ async function inspectProductImageFile(file) {
   const minSizeOk = width >= 1000 && height >= 1000;
   const squareOk = width === height;
 
-  // Simple white-background heuristic from corners.
   let whiteCornersOk = false;
   try {
     const canvas = document.createElement("canvas");
@@ -102,21 +92,23 @@ export default function MediaPickerModal({
   onClose,
   onSelect,
   multiple = false,
-  title = "Select media",
+  title,
   onUploadingChange,
   uploadPurpose,
 }) {
+  const lt = useLt();
   const client = getMedusaAdminClient();
+
+  const resolvedTitle = title ?? lt("Select media", "Medya seç", "Sélectionner un média", "Seleccionar medio", "Seleziona media", "Medien auswählen");
 
   const [library, setLibrary] = useState([]);
   const [loadingLib, setLoadingLib] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploadWarnings, setUploadWarnings] = useState([]);
-  const [selected, setSelected] = useState(new Set()); // Set of resolved URLs
+  const [selected, setSelected] = useState(new Set());
   const [urlInput, setUrlInput] = useState("");
 
-  // Load library when opened (always refetch so visibility matches current user)
   useEffect(() => {
     if (!open) return;
     setSelected(new Set());
@@ -163,9 +155,9 @@ export default function MediaPickerModal({
             const analysis = await inspectProductImageFile(file).catch(() => null);
             if (analysis) {
               const warns = [];
-              if (!analysis.squareOk) warns.push("not square");
-              if (!analysis.minSizeOk) warns.push("below 1000x1000");
-              if (!analysis.whiteCornersOk) warns.push("background may not be pure white (#ffffff)");
+              if (!analysis.squareOk) warns.push(lt("not square", "kare değil", "pas carré", "no cuadrado", "non quadrato", "nicht quadratisch"));
+              if (!analysis.minSizeOk) warns.push(lt("below 1000×1000", "1000×1000 altında", "moins de 1000×1000", "menos de 1000×1000", "sotto 1000×1000", "unter 1000×1000"));
+              if (!analysis.whiteCornersOk) warns.push(lt("background may not be pure white (#ffffff)", "arka plan saf beyaz olmayabilir (#ffffff)", "fond peut ne pas être blanc pur (#ffffff)", "fondo puede no ser blanco puro (#ffffff)", "sfondo potrebbe non essere bianco puro (#ffffff)", "Hintergrund evtl. nicht reinweiß (#ffffff)"));
               if (warns.length) {
                 setUploadWarnings((prev) => [
                   ...prev,
@@ -177,7 +169,7 @@ export default function MediaPickerModal({
           const fd = new FormData();
           appendMediaFileToFormData(fd, file);
           return client.uploadMedia(fd, uploadOpts).then((r) => r.url || null);
-        })
+        }),
       )
         .then((urls) => {
           const valid = urls.filter(Boolean);
@@ -187,7 +179,6 @@ export default function MediaPickerModal({
             filename: u.split("/").pop(),
           }));
           setLibrary((prev) => [...newItems, ...prev]);
-          // Auto-select first uploaded
           if (valid.length) {
             const resolved = resolveUrl(valid[0]);
             setSelected((prev) => {
@@ -201,18 +192,17 @@ export default function MediaPickerModal({
           }
         })
         .catch((e) => {
-          setUploadError(e?.message || "Upload fehlgeschlagen");
+          setUploadError(e?.message || lt("Upload failed", "Yükleme başarısız", "Échec du téléchargement", "Error al subir", "Caricamento non riuscito", "Upload fehlgeschlagen"));
         })
         .finally(() => {
           setUploading(false);
           onUploadingChange?.(false);
         });
     },
-    [client, multiple, uploadPurpose]
+    [client, multiple, uploadPurpose, lt, onUploadingChange],
   );
 
   const handleApply = () => {
-    // Merge URL input with grid selections
     const urlLines = urlInput
       .split(/[\n,]/)
       .map((s) => s.trim())
@@ -230,7 +220,7 @@ export default function MediaPickerModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={title}
+      title={resolvedTitle}
       size="large"
     >
       <Modal.Section>
@@ -243,23 +233,26 @@ export default function MediaPickerModal({
           }}
         >
           <div style={{ minWidth: 0 }}>
-            {/* URL input (search-like) */}
             <TextField
-              label={multiple ? "URL ile ekle (birden fazla için alt alta gir)" : "URL ile ekle"}
+              label={multiple
+                ? lt("Add via URL (one per line)", "URL ile ekle (her satıra bir)", "Ajouter via URL (une par ligne)", "Añadir por URL (una por línea)", "Aggiungi via URL (una per riga)", "Per URL hinzufügen (eine pro Zeile)")
+                : lt("Add via URL", "URL ile ekle", "Ajouter via URL", "Añadir por URL", "Aggiungi via URL", "Per URL hinzufügen")}
               value={urlInput}
               onChange={setUrlInput}
               placeholder="https://..."
               multiline={multiple ? 3 : 1}
               autoComplete="off"
-              helpText={multiple ? "Her satıra bir URL, veya virgülle ayrılmış" : undefined}
+              helpText={multiple
+                ? lt("One URL per line, or comma-separated", "Her satıra bir URL veya virgülle ayrılmış", "Une URL par ligne ou séparées par des virgules", "Una URL por línea o separadas por comas", "Un URL per riga o separati da virgola", "Eine URL pro Zeile oder kommagetrennt")
+                : undefined}
             />
           </div>
           <div style={{ alignSelf: "end", display: "flex", gap: 8, paddingBottom: 2 }}>
             <Button variant="primary" onClick={handleApply} disabled={!canApply || uploading}>
-              Save
+              {lt("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern")}
             </Button>
             <Button onClick={onClose} disabled={uploading}>
-              Discard
+              {lt("Discard", "İptal", "Annuler", "Descartar", "Annulla", "Verwerfen")}
             </Button>
           </div>
         </div>
@@ -268,12 +261,19 @@ export default function MediaPickerModal({
         {uploadPurpose === "product" && (
           <Box paddingBlockEnd="200">
             <Text as="p" variant="bodySm" tone="subdued">
-              Produktbilder: JPEG oder PNG, mindestens 1000×1000 px; Upload wird als quadratisches WebP (1000×1000) gespeichert.
+              {lt(
+                "Product images: JPEG or PNG, at least 1000×1000 px; upload is saved as square WebP (1000×1000).",
+                "Ürün görselleri: JPEG veya PNG, en az 1000×1000 px; yükleme kare WebP (1000×1000) olarak kaydedilir.",
+                "Images produit : JPEG ou PNG, min. 1000×1000 px ; enregistrées en WebP carré (1000×1000).",
+                "Imágenes de producto: JPEG o PNG, mín. 1000×1000 px; se guardan como WebP cuadrado (1000×1000).",
+                "Immagini prodotto: JPEG o PNG, min. 1000×1000 px; salvate come WebP quadrato (1000×1000).",
+                "Produktbilder: JPEG oder PNG, mindestens 1000×1000 px; Upload wird als quadratisches WebP (1000×1000) gespeichert.",
+              )}
             </Text>
           </Box>
         )}
         <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">
-          Medya kütüphanesinden seç
+          {lt("Select from media library", "Medya kütüphanesinden seç", "Choisir dans la bibliothèque", "Seleccionar de la biblioteca", "Seleziona dalla libreria", "Aus Medienbibliothek wählen")}
         </Text>
       </Modal.Section>
 
@@ -286,7 +286,7 @@ export default function MediaPickerModal({
         {uploadWarnings.length > 0 && (
           <Box paddingBlockEnd="300">
             <Text as="p" variant="bodySm" tone="critical">
-              Image criteria warning:
+              {lt("Image criteria warning:", "Görsel kriter uyarısı:", "Avertissement critères image :", "Advertencia de criterios de imagen:", "Avviso criteri immagine:", "Hinweis Bildkriterien:")}
             </Text>
             <div style={{ marginTop: 6 }}>
               {uploadWarnings.map((w, i) => (
@@ -296,13 +296,22 @@ export default function MediaPickerModal({
               ))}
             </div>
             <Text as="p" variant="bodySm" tone="subdued">
-              Main image should be square, at least 1000x1000, and white background (#ffffff).
+              {lt(
+                "Main image should be square, at least 1000×1000, and white background (#ffffff).",
+                "Ana görsel kare, en az 1000×1000 ve beyaz arka plan (#ffffff) olmalı.",
+                "L'image principale doit être carrée, min. 1000×1000, fond blanc (#ffffff).",
+                "La imagen principal debe ser cuadrada, mín. 1000×1000 y fondo blanco (#ffffff).",
+                "L'immagine principale deve essere quadrata, min. 1000×1000 e sfondo bianco (#ffffff).",
+                "Hauptbild sollte quadratisch, mindestens 1000×1000 und weißer Hintergrund (#ffffff) sein.",
+              )}
             </Text>
           </Box>
         )}
         {uploading && (
           <Box paddingBlockEnd="300">
-            <Text as="p" variant="bodySm" tone="subdued">Yükleniyor…</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              {lt("Uploading…", "Yükleniyor…", "Téléchargement…", "Subiendo…", "Caricamento…", "Wird hochgeladen…")}
+            </Text>
           </Box>
         )}
         <div
@@ -312,7 +321,6 @@ export default function MediaPickerModal({
             gap: 10,
           }}
         >
-          {/* Upload tile */}
           <DropZone
             accept={uploadPurpose === "product" ? "image/jpeg,image/png" : "image/*,video/mp4,video/webm,video/quicktime,video/ogg"}
             type={uploadPurpose === "product" ? "image" : "file"}
@@ -336,11 +344,12 @@ export default function MediaPickerModal({
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 16 16" fill="var(--p-color-icon-subdued)">
                 <path d="M8.75 3.75a.75.75 0 0 0-1.5 0v3.5h-3.5a.75.75 0 0 0 0 1.5h3.5v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5z" />
               </svg>
-              <span style={{ fontSize: 10, color: "var(--p-color-text-subdued)" }}>Yükle</span>
+              <span style={{ fontSize: 10, color: "var(--p-color-text-subdued)" }}>
+                {lt("Upload", "Yükle", "Téléverser", "Subir", "Carica", "Hochladen")}
+              </span>
             </div>
           </DropZone>
 
-          {/* Library items */}
           {loadingLib
             ? Array.from({ length: 6 }).map((_, i) => (
                 <div
@@ -414,7 +423,14 @@ export default function MediaPickerModal({
         {library.length === 0 && !loadingLib && (
           <Box paddingBlockStart="300">
             <Text as="p" tone="subdued">
-              Henüz medya yok. Yukarıdaki + kutusuna görsel sürükle ya da tıkla.
+              {lt(
+                "No media yet. Drag an image onto the + box above or click it.",
+                "Henüz medya yok. Görseli yukarıdaki + kutusuna sürükleyin veya tıklayın.",
+                "Aucun média. Glissez une image sur la case + ou cliquez.",
+                "Sin medios. Arrastre una imagen al cuadro + o haga clic.",
+                "Nessun media. Trascina un'immagine sul riquadro + o clicca.",
+                "Noch keine Medien. Bild auf das + Feld ziehen oder klicken.",
+              )}
             </Text>
           </Box>
         )}

@@ -7,6 +7,7 @@ import {
 } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
+import { defaultCountryName } from "@/lib/countries";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 
@@ -31,13 +32,13 @@ function getTypeLabel(type, locale) {
 
 const TYPE_COLORS = { warehouse: "#0070f3", store: "#10b981", office: "#f59e0b", other: "#6b7280" };
 
-const EMPTY = {
+const getEmpty = (locale) => ({
   name: "", type: "warehouse", address_line1: "", address_line2: "",
-  city: "", postal_code: "", country: "Deutschland", phone: "", email: "", is_primary: false,
-};
+  city: "", postal_code: "", country: defaultCountryName(locale), phone: "", email: "", is_primary: false,
+});
 
 function LocationModal({ location, onSave, onClose, locale, ui }) {
-  const [form, setForm] = useState(location ? { ...EMPTY, ...location } : { ...EMPTY });
+  const [form, setForm] = useState(location ? { ...getEmpty(locale), ...location } : { ...getEmpty(locale) });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const client = getMedusaAdminClient();

@@ -5,6 +5,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
+import { statusLabel } from "@/lib/status-labels";
 import {
   Page,
   Layout,
@@ -28,6 +29,7 @@ import {
   PersonIcon,
 } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { useLt, dateLocaleFor } from "@/lib/locale-text";
 import RevenueAreaChart from "@/components/dashboard/RevenueAreaChart";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -46,26 +48,26 @@ const DATE_RANGE_VALUES = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmtEur(cents) {
-  const val = (Number(cents || 0) / 100).toLocaleString("de-DE", {
+function fmtEur(cents, locale) {
+  const val = (Number(cents || 0) / 100).toLocaleString(dateLocaleFor(locale), {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
   return `€ ${val}`;
 }
 
-function fmtDate(d) {
+function fmtDate(d, locale) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", {
+  return new Date(d).toLocaleDateString(dateLocaleFor(locale), {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
 }
 
-function fmtShortDate(d) {
+function fmtShortDate(d, locale) {
   if (!d) return "";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+  return new Date(d).toLocaleDateString(dateLocaleFor(locale), { day: "2-digit", month: "2-digit" });
 }
 
 function getDateRange(rangeKey) {
@@ -146,14 +148,14 @@ function trendPct(curr, prev) {
   return Math.round(((curr - prev) / Math.abs(prev)) * 100);
 }
 
-function groupByDay(orders, start, end) {
+function groupByDay(orders, start, end, locale) {
   const days = [];
   const d = new Date(start);
   const endTs = new Date(end.getTime() + 86399999);
   while (d <= endTs) {
     days.push({
       date: new Date(d),
-      label: fmtShortDate(d),
+      label: fmtShortDate(d, locale),
       revenue: 0,
       orders: 0,
     });
@@ -210,7 +212,7 @@ function statusTonePayment(value) {
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
-function TrendInline({ pct, locale }) {
+function TrendInline({ pct, vsPrevLabel }) {
   if (pct === null || pct === undefined) {
     return (
       <Text as="span" variant="bodySm" tone="subdued">
@@ -219,13 +221,7 @@ function TrendInline({ pct, locale }) {
     );
   }
   const positive = pct >= 0;
-  const vsPrev =
-    locale === "en" ? "vs. prev. period" :
-    locale === "tr" ? "önceki dönem" :
-    locale === "fr" ? "vs. période préc." :
-    locale === "es" ? "vs. período ant." :
-    locale === "it" ? "vs. periodo prec." :
-    "vs. Vorperiode";
+  const vsPrev = vsPrevLabel;
   return (
     <InlineStack gap="200" blockAlign="center" wrap>
       <Text as="span" variant="bodySm" fontWeight="semibold" tone={positive ? "success" : "critical"}>
@@ -238,7 +234,7 @@ function TrendInline({ pct, locale }) {
   );
 }
 
-function KpiCardPolaris({ label, value, trend, source, locale }) {
+function KpiCardPolaris({ label, value, trend, source, vsPrevLabel }) {
   return (
     <Card padding="400">
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
@@ -249,7 +245,7 @@ function KpiCardPolaris({ label, value, trend, source, locale }) {
           <Text as="p" variant="headingLg">
             {value}
           </Text>
-          <TrendInline pct={trend} locale={locale} />
+          <TrendInline pct={trend} vsPrevLabel={vsPrevLabel} />
         </BlockStack>
         <Box
           background="bg-surface-secondary"
@@ -295,14 +291,14 @@ function MarketingKpiCard({ label, value, sub }) {
   );
 }
 
-function fmtPctRatio(ratio) {
+function fmtPctRatio(ratio, locale) {
   if (ratio == null || Number.isNaN(ratio)) return "—";
-  return `${(ratio * 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %`;
+  return `${(ratio * 100).toLocaleString(dateLocaleFor(locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %`;
 }
 
-function fmtRoas(ratio) {
+function fmtRoas(ratio, locale) {
   if (ratio == null || Number.isNaN(ratio)) return "—";
-  return `${Number(ratio).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×`;
+  return `${Number(ratio).toLocaleString(dateLocaleFor(locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×`;
 }
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
@@ -311,6 +307,8 @@ export default function AnalyticsPage() {
   const t = useTranslations("nav");
   const router = useRouter();
   const locale = useLocale();
+  const lt = useLt();
+  const dateLoc = dateLocaleFor(locale);
   const ui = getUI(locale);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [range, setRange] = useState("last_30");
@@ -319,45 +317,14 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Locale-aware date range labels
   const dateRangeLabels = useMemo(() => ({
-    this_week:
-      locale === "en" ? "This week" :
-      locale === "tr" ? "Bu hafta" :
-      locale === "fr" ? "Cette semaine" :
-      locale === "es" ? "Esta semana" :
-      locale === "it" ? "Questa settimana" :
-      "Diese Woche",
-    last_7:
-      locale === "en" ? "Last 7 days" :
-      locale === "tr" ? "Son 7 gün" :
-      locale === "fr" ? "7 derniers jours" :
-      locale === "es" ? "Últimos 7 días" :
-      locale === "it" ? "Ultimi 7 giorni" :
-      "Letzten 7 Tage",
-    this_month:
-      locale === "en" ? "This month" :
-      locale === "tr" ? "Bu ay" :
-      locale === "fr" ? "Ce mois-ci" :
-      locale === "es" ? "Este mes" :
-      locale === "it" ? "Questo mese" :
-      "Diesen Monat",
-    last_30:
-      locale === "en" ? "Last 30 days" :
-      locale === "tr" ? "Son 30 gün" :
-      locale === "fr" ? "30 derniers jours" :
-      locale === "es" ? "Últimos 30 días" :
-      locale === "it" ? "Ultimi 30 giorni" :
-      "Letzten 30 Tage",
-    last_year:
-      locale === "en" ? "Last year" :
-      locale === "tr" ? "Geçen yıl" :
-      locale === "fr" ? "L'année dernière" :
-      locale === "es" ? "El año pasado" :
-      locale === "it" ? "L'anno scorso" :
-      "Letztes Jahr",
+    this_week: lt("This week", "Bu hafta", "Cette semaine", "Esta semana", "Questa settimana", "Diese Woche"),
+    last_7: lt("Last 7 days", "Son 7 gün", "7 derniers jours", "Últimos 7 días", "Ultimi 7 giorni", "Letzten 7 Tage"),
+    this_month: lt("This month", "Bu ay", "Ce mois-ci", "Este mes", "Questo mese", "Diesen Monat"),
+    last_30: lt("Last 30 days", "Son 30 gün", "30 derniers jours", "Últimos 30 días", "Ultimi 30 giorni", "Letzten 30 Tage"),
+    last_year: lt("Last year", "Geçen yıl", "L'année dernière", "El año pasado", "L'anno scorso", "Letztes Jahr"),
     all: ui.all,
-  }), [locale, ui]);
+  }), [lt, ui.all]);
 
   const DATE_RANGES = useMemo(
     () => DATE_RANGE_VALUES.map((value) => ({ value, label: dateRangeLabels[value] })),
@@ -399,18 +366,11 @@ export default function AnalyticsPage() {
       setAllOrders(Array.isArray(ordersData?.orders) ? ordersData.orders : []);
       setMarketing(marketingData);
     } catch (e) {
-      setError(e?.message || (
-        locale === "en" ? "Error loading orders" :
-        locale === "tr" ? "Siparişler yüklenirken hata oluştu" :
-        locale === "fr" ? "Erreur lors du chargement des commandes" :
-        locale === "es" ? "Error al cargar los pedidos" :
-        locale === "it" ? "Errore durante il caricamento degli ordini" :
-        "Fehler beim Laden der Bestellungen"
-      ));
+      setError(e?.message || lt("Error loading orders", "Siparişler yüklenirken hata oluştu", "Erreur lors du chargement des commandes", "Error al cargar los pedidos", "Errore durante il caricamento degli ordini", "Fehler beim Laden der Bestellungen"));
     } finally {
       setLoading(false);
     }
-  }, [rangeBounds, locale]);
+  }, [rangeBounds, lt]);
 
   useEffect(() => {
     loadOrders();
@@ -449,9 +409,9 @@ export default function AnalyticsPage() {
       minDate.setHours(0, 0, 0, 0);
       const maxDate = new Date();
       maxDate.setHours(0, 0, 0, 0);
-      base = groupByDay(allOrders, minDate, maxDate);
+      base = groupByDay(allOrders, minDate, maxDate, locale);
     } else if (start && end) {
-      base = groupByDay(currentOrders, start, end);
+      base = groupByDay(currentOrders, start, end, locale);
     }
     const marketingByDate = new Map((marketing?.daily || []).map((d) => [String(d.date).slice(0, 10), d]));
     return base.map((row) => {
@@ -466,7 +426,7 @@ export default function AnalyticsPage() {
         clicks: m?.clicks ?? 0,
       };
     });
-  }, [currentOrders, range, allOrders, start, end, marketing]);
+  }, [currentOrders, range, allOrders, start, end, marketing, locale]);
 
   const marketingTotals = marketing?.totals || {};
   const marketingDerived = marketing?.derived || {};
@@ -501,254 +461,51 @@ export default function AnalyticsPage() {
 
   const selectedRangeLabel = DATE_RANGES.find((r) => r.value === range)?.label || "";
 
-  // Locale-aware KPI labels
-  const labelRevenue =
-    locale === "en" ? "Revenue" :
-    locale === "tr" ? "Ciro" :
-    locale === "fr" ? "Chiffre d'affaires" :
-    locale === "es" ? "Ingresos" :
-    locale === "it" ? "Fatturato" :
-    "Umsatz";
-
-  const labelOrders = ui.orders;
-
-  const labelAvgOrder =
-    locale === "en" ? "Avg. order value" :
-    locale === "tr" ? "Ort. sipariş değeri" :
-    locale === "fr" ? "Valeur moy. commande" :
-    locale === "es" ? "Valor medio de pedido" :
-    locale === "it" ? "Valore medio ordine" :
-    "Ø Bestellwert";
-
-  const labelCustomers =
-    locale === "en" ? "Customers (Emails)" :
-    locale === "tr" ? "Müşteriler (E-postalar)" :
-    locale === "fr" ? "Clients (E-mails)" :
-    locale === "es" ? "Clientes (Correos)" :
-    locale === "it" ? "Clienti (Email)" :
-    "Kunden (E-Mails)";
-
-  const labelImpressions = "Impressions";
-
-  const labelClicks =
-    locale === "en" ? "Clicks" :
-    locale === "tr" ? "Tıklamalar" :
-    locale === "fr" ? "Clics" :
-    locale === "es" ? "Clics" :
-    locale === "it" ? "Clic" :
-    "Klicks";
-
-  const labelConversion = "Conversion";
-
-  const labelCart =
-    locale === "en" ? "Cart" :
-    locale === "tr" ? "Sepet" :
-    locale === "fr" ? "Panier" :
-    locale === "es" ? "Carrito" :
-    locale === "it" ? "Carrello" :
-    "Warenkorb";
-
-  const labelRevenueMarketing =
-    locale === "en" ? "Revenue (Marketing)" :
-    locale === "tr" ? "Ciro (Pazarlama)" :
-    locale === "fr" ? "Chiffre d'affaires (Marketing)" :
-    locale === "es" ? "Ingresos (Marketing)" :
-    locale === "it" ? "Fatturato (Marketing)" :
-    "Umsatz (Marketing)";
-
-  const labelNoAdSpend =
-    locale === "en" ? "No ad spend recorded" :
-    locale === "tr" ? "Reklam harcaması yok" :
-    locale === "fr" ? "Aucune dépense publicitaire enregistrée" :
-    locale === "es" ? "Sin gasto publicitario registrado" :
-    locale === "it" ? "Nessuna spesa pubblicitaria registrata" :
-    "Keine Werbeausgaben erfasst";
-
-  const labelAdSpend =
-    locale === "en" ? "Ad spend" :
-    locale === "tr" ? "Reklam harcaması" :
-    locale === "fr" ? "Dépenses publicitaires" :
-    locale === "es" ? "Gasto publicitario" :
-    locale === "it" ? "Spesa pubblicitaria" :
-    "Ausgaben";
-
-  const labelPaidOrders =
-    locale === "en" ? "Paid orders" :
-    locale === "tr" ? "Ödenen siparişler" :
-    locale === "fr" ? "Commandes payées" :
-    locale === "es" ? "Pedidos pagados" :
-    locale === "it" ? "Ordini pagati" :
-    "Bezahlte Bestellungen";
-
-  const labelChartLoading =
-    locale === "en" ? "Loading chart…" :
-    locale === "tr" ? "Grafik yükleniyor…" :
-    locale === "fr" ? "Chargement du graphique…" :
-    locale === "es" ? "Cargando gráfico…" :
-    locale === "it" ? "Caricamento grafico…" :
-    "Diagramm wird geladen…";
-
-  const labelRevenueHistory =
-    locale === "en" ? "Revenue history" :
-    locale === "tr" ? "Ciro geçmişi" :
-    locale === "fr" ? "Historique du chiffre d'affaires" :
-    locale === "es" ? "Historial de ingresos" :
-    locale === "it" ? "Storico fatturato" :
-    "Umsatzverlauf";
-
-  const labelNoDataPeriod =
-    locale === "en" ? "No data for the selected period" :
-    locale === "tr" ? "Seçili dönem için veri yok" :
-    locale === "fr" ? "Aucune donnée pour la période sélectionnée" :
-    locale === "es" ? "Sin datos para el período seleccionado" :
-    locale === "it" ? "Nessun dato per il periodo selezionato" :
-    "Keine Daten für den gewählten Zeitraum";
-
-  const labelDailyRevenue =
-    locale === "en" ? "Daily revenue" :
-    locale === "tr" ? "Günlük ciro" :
-    locale === "fr" ? "Chiffre d'affaires journalier" :
-    locale === "es" ? "Ingresos diarios" :
-    locale === "it" ? "Fatturato giornaliero" :
-    "Tagesumsatz";
-
-  const labelRecentOrders =
-    locale === "en" ? "Recent orders" :
-    locale === "tr" ? "Son siparişler" :
-    locale === "fr" ? "Dernières commandes" :
-    locale === "es" ? "Pedidos recientes" :
-    locale === "it" ? "Ordini recenti" :
-    "Letzte Bestellungen";
-
-  const labelTotal =
-    locale === "en" ? "total" :
-    locale === "tr" ? "toplam" :
-    locale === "fr" ? "total" :
-    locale === "es" ? "total" :
-    locale === "it" ? "totale" :
-    "gesamt";
-
-  const labelNoOrdersPeriod =
-    locale === "en" ? "No orders in the selected period" :
-    locale === "tr" ? "Seçili dönemde sipariş yok" :
-    locale === "fr" ? "Aucune commande dans la période sélectionnée" :
-    locale === "es" ? "Sin pedidos en el período seleccionado" :
-    locale === "it" ? "Nessun ordine nel periodo selezionato" :
-    "Keine Bestellungen im gewählten Zeitraum";
-
-  const labelOpen =
-    locale === "en" ? "Open" :
-    locale === "tr" ? "Aç" :
-    locale === "fr" ? "Ouvrir" :
-    locale === "es" ? "Abrir" :
-    locale === "it" ? "Apri" :
-    "Öffnen";
-
-  const labelTopCustomers =
-    locale === "en" ? "Top Customers" :
-    locale === "tr" ? "En iyi müşteriler" :
-    locale === "fr" ? "Meilleurs clients" :
-    locale === "es" ? "Mejores clientes" :
-    locale === "it" ? "Migliori clienti" :
-    "Top Kunden";
-
-  const labelByRevenuePeriod =
-    locale === "en" ? "By revenue in period" :
-    locale === "tr" ? "Dönemdeki ciroya göre" :
-    locale === "fr" ? "Par chiffre d'affaires sur la période" :
-    locale === "es" ? "Por ingresos en el período" :
-    locale === "it" ? "Per fatturato nel periodo" :
-    "Nach Umsatz im Zeitraum";
-
-  const labelNoDataAvailable =
-    locale === "en" ? "No data available" :
-    locale === "tr" ? "Veri mevcut değil" :
-    locale === "fr" ? "Aucune donnée disponible" :
-    locale === "es" ? "Sin datos disponibles" :
-    locale === "it" ? "Nessun dato disponibile" :
-    "Keine Daten verfügbar";
-
-  const labelOrder =
-    locale === "en" ? "order" :
-    locale === "tr" ? "sipariş" :
-    locale === "fr" ? "commande" :
-    locale === "es" ? "pedido" :
-    locale === "it" ? "ordine" :
-    "Bestellung";
-
-  const labelOrders2 =
-    locale === "en" ? "orders" :
-    locale === "tr" ? "sipariş" :
-    locale === "fr" ? "commandes" :
-    locale === "es" ? "pedidos" :
-    locale === "it" ? "ordini" :
-    "Bestellungen";
-
-  const labelPeriod =
-    locale === "en" ? "Period" :
-    locale === "tr" ? "Dönem" :
-    locale === "fr" ? "Période" :
-    locale === "es" ? "Período" :
-    locale === "it" ? "Periodo" :
-    "Zeitraum";
-
-  const labelOrdersLoaded =
-    locale === "en" ? "Orders loaded" :
-    locale === "tr" ? "Yüklenen siparişler" :
-    locale === "fr" ? "Commandes chargées" :
-    locale === "es" ? "Pedidos cargados" :
-    locale === "it" ? "Ordini caricati" :
-    "Bestellungen geladen";
-
-  const labelInFilter =
-    locale === "en" ? "In filter" :
-    locale === "tr" ? "Filtrede" :
-    locale === "fr" ? "Dans le filtre" :
-    locale === "es" ? "En el filtro" :
-    locale === "it" ? "Nel filtro" :
-    "Im Filter";
-
-  const labelRevenuePaidActive =
-    locale === "en" ? "Revenue (paid/active)" :
-    locale === "tr" ? "Ciro (ödendi/aktif)" :
-    locale === "fr" ? "Chiffre d'affaires (payé/actif)" :
-    locale === "es" ? "Ingresos (pagado/activo)" :
-    locale === "it" ? "Fatturato (pagato/attivo)" :
-    "Umsatz (bezahlt/aktiv)";
-
-  const labelMarketingTitle =
-    locale === "en" ? "Marketing & Performance" :
-    locale === "tr" ? "Pazarlama & Performans" :
-    locale === "fr" ? "Marketing & Performance" :
-    locale === "es" ? "Marketing & Rendimiento" :
-    locale === "it" ? "Marketing & Performance" :
-    "Marketing & Performance";
-
-  const labelMarketingSubtitle =
-    locale === "en" ? "Impressions, clicks, conversion and ROAS for the selected period" :
-    locale === "tr" ? "Seçili dönem için gösterimler, tıklamalar, dönüşüm ve ROAS" :
-    locale === "fr" ? "Impressions, clics, conversion et ROAS pour la période sélectionnée" :
-    locale === "es" ? "Impresiones, clics, conversión y ROAS para el período seleccionado" :
-    locale === "it" ? "Impressioni, clic, conversione e ROAS nel periodo selezionato" :
-    "Impressions, Klicks, Conversion und ROAS im gewählten Zeitraum";
+  const labels = useMemo(() => ({
+    vsPrev: lt("vs. prev. period", "önceki dönem", "vs. période préc.", "vs. período ant.", "vs. periodo prec.", "vs. Vorperiode"),
+    revenue: lt("Revenue", "Ciro", "Chiffre d'affaires", "Ingresos", "Fatturato", "Umsatz"),
+    avgOrder: lt("Avg. order value", "Ort. sipariş değeri", "Valeur moy. commande", "Valor medio de pedido", "Valore medio ordine", "Ø Bestellwert"),
+    customers: lt("Customers (Emails)", "Müşteriler (E-postalar)", "Clients (E-mails)", "Clientes (Correos)", "Clienti (Email)", "Kunden (E-Mails)"),
+    impressions: lt("Impressions", "Gösterimler", "Impressions", "Impresiones", "Impressioni", "Impressions"),
+    clicks: lt("Clicks", "Tıklamalar", "Clics", "Clics", "Clic", "Klicks"),
+    conversion: lt("Conversion", "Dönüşüm", "Conversion", "Conversión", "Conversione", "Conversion"),
+    cart: lt("Cart", "Sepet", "Panier", "Carrito", "Carrello", "Warenkorb"),
+    addToCartEvents: lt("Add-to-cart events", "Sepete ekleme olayları", "Événements ajout au panier", "Eventos de añadir al carrito", "Eventi aggiungi al carrello", "Add-to-cart Events"),
+    revenueMarketing: lt("Revenue (Marketing)", "Ciro (Pazarlama)", "Chiffre d'affaires (Marketing)", "Ingresos (Marketing)", "Fatturato (Marketing)", "Umsatz (Marketing)"),
+    noAdSpend: lt("No ad spend recorded", "Reklam harcaması yok", "Aucune dépense publicitaire enregistrée", "Sin gasto publicitario registrado", "Nessuna spesa pubblicitaria registrata", "Keine Werbeausgaben erfasst"),
+    adSpend: lt("Ad spend", "Reklam harcaması", "Dépenses publicitaires", "Gasto publicitario", "Spesa pubblicitaria", "Ausgaben"),
+    paidOrders: lt("Paid orders", "Ödenen siparişler", "Commandes payées", "Pedidos pagados", "Ordini pagati", "Bezahlte Bestellungen"),
+    chartLoading: lt("Loading chart…", "Grafik yükleniyor…", "Chargement du graphique…", "Cargando gráfico…", "Caricamento grafico…", "Diagramm wird geladen…"),
+    revenueHistory: lt("Revenue history", "Ciro geçmişi", "Historique du chiffre d'affaires", "Historial de ingresos", "Storico fatturato", "Umsatzverlauf"),
+    noDataPeriod: lt("No data for the selected period", "Seçili dönem için veri yok", "Aucune donnée pour la période sélectionnée", "Sin datos para el período seleccionado", "Nessun dato per il periodo selezionato", "Keine Daten für den gewählten Zeitraum"),
+    dailyRevenue: lt("Daily revenue", "Günlük ciro", "Chiffre d'affaires journalier", "Ingresos diarios", "Fatturato giornaliero", "Tagesumsatz"),
+    recentOrders: lt("Recent orders", "Son siparişler", "Dernières commandes", "Pedidos recientes", "Ordini recenti", "Letzte Bestellungen"),
+    total: lt("total", "toplam", "total", "total", "totale", "gesamt"),
+    noOrdersPeriod: lt("No orders in the selected period", "Seçili dönemde sipariş yok", "Aucune commande dans la période sélectionnée", "Sin pedidos en el período seleccionado", "Nessun ordine nel periodo selezionato", "Keine Bestellungen im gewählten Zeitraum"),
+    open: lt("Open", "Aç", "Ouvrir", "Abrir", "Apri", "Öffnen"),
+    topCustomers: lt("Top Customers", "En iyi müşteriler", "Meilleurs clients", "Mejores clientes", "Migliori clienti", "Top Kunden"),
+    byRevenuePeriod: lt("By revenue in period", "Dönemdeki ciroya göre", "Par chiffre d'affaires sur la période", "Por ingresos en el período", "Per fatturato nel periodo", "Nach Umsatz im Zeitraum"),
+    noDataAvailable: lt("No data available", "Veri mevcut değil", "Aucune donnée disponible", "Sin datos disponibles", "Nessun dato disponibile", "Keine Daten verfügbar"),
+    order: lt("order", "sipariş", "commande", "pedido", "ordine", "Bestellung"),
+    orders2: lt("orders", "sipariş", "commandes", "pedidos", "ordini", "Bestellungen"),
+    period: lt("Period", "Dönem", "Période", "Período", "Periodo", "Zeitraum"),
+    ordersLoaded: lt("Orders loaded", "Yüklenen siparişler", "Commandes chargées", "Pedidos cargados", "Ordini caricati", "Bestellungen geladen"),
+    inFilter: lt("In filter", "Filtrede", "Dans le filtre", "En el filtro", "Nel filtro", "Im Filter"),
+    revenuePaidActive: lt("Revenue (paid/active)", "Ciro (ödendi/aktif)", "Chiffre d'affaires (payé/actif)", "Ingresos (pagado/activo)", "Fatturato (pagato/attivo)", "Umsatz (bezahlt/aktiv)"),
+    marketingTitle: lt("Marketing & Performance", "Pazarlama & Performans", "Marketing & Performance", "Marketing & Rendimiento", "Marketing & Performance", "Marketing & Performance"),
+    marketingSubtitle: lt("Impressions, clicks, conversion and ROAS for the selected period", "Seçili dönem için gösterimler, tıklamalar, dönüşüm ve ROAS", "Impressions, clics, conversion et ROAS pour la période sélectionnée", "Impresiones, clics, conversión y ROAS para el período seleccionado", "Impressioni, clic, conversione e ROAS nel periodo selezionato", "Impressions, Klicks, Conversion und ROAS im gewählten Zeitraum"),
+    colOrder: lt("Order", "Sipariş", "Commande", "Pedido", "Ordine", "Auftrag"),
+    colPayment: lt("Payment", "Ödeme", "Paiement", "Pago", "Pagamento", "Zahlung"),
+    rate: lt("Rate", "Oran", "Taux", "Tasa", "Tasso", "Rate"),
+  }), [lt]);
 
   const orderTableHeadings = [
     ui.colNumber,
     ui.colDate,
     ui.colCustomer,
     ui.colAmount,
-    locale === "en" ? "Order" :
-    locale === "tr" ? "Sipariş" :
-    locale === "fr" ? "Commande" :
-    locale === "es" ? "Pedido" :
-    locale === "it" ? "Ordine" :
-    "Auftrag",
-    locale === "en" ? "Payment" :
-    locale === "tr" ? "Ödeme" :
-    locale === "fr" ? "Paiement" :
-    locale === "es" ? "Pago" :
-    locale === "it" ? "Pagamento" :
-    "Zahlung",
+    labels.colOrder,
+    labels.colPayment,
     "",
   ];
 
@@ -760,22 +517,22 @@ export default function AnalyticsPage() {
       const name = [o.first_name, o.last_name].filter(Boolean).join(" ") || o.email || "—";
       return [
         `#${o.order_number || o.id?.slice(-6) || "—"}`,
-        fmtDate(o.created_at),
+        fmtDate(o.created_at, locale),
         name,
-        fmtEur(o.total_cents),
-        <Badge key={`os-${o.id}`} tone={statusToneOrder(o.order_status)}>{o.order_status || "—"}</Badge>,
-        <Badge key={`ps-${o.id}`} tone={statusTonePayment(o.payment_status)}>{o.payment_status || "—"}</Badge>,
+        fmtEur(o.total_cents, locale),
+        <Badge key={`os-${o.id}`} tone={statusToneOrder(o.order_status)}>{o.order_status ? statusLabel(locale, o.order_status) : "—"}</Badge>,
+        <Badge key={`ps-${o.id}`} tone={statusTonePayment(o.payment_status)}>{o.payment_status ? statusLabel(locale, o.payment_status) : "—"}</Badge>,
         <Button
           key={`ac-${o.id}`}
           variant="plain"
           size="slim"
           onClick={() => o.id && router.push(`/orders/${o.id}`)}
         >
-          {labelOpen}
+          {labels.open}
         </Button>,
       ];
     });
-  }, [recentOrders, router, labelOpen]);
+  }, [recentOrders, router, labels.open, locale]);
 
   if (loading && allOrders.length === 0) {
     return (
@@ -864,32 +621,32 @@ export default function AnalyticsPage() {
               ) : (
                 <>
                   <KpiCardPolaris
-                    label={labelRevenue}
-                    value={fmtEur(currStats.revenue)}
+                    label={labels.revenue}
+                    value={fmtEur(currStats.revenue, locale)}
                     trend={trends.revenue}
                     source={MoneyIcon}
-                    locale={locale}
+                    vsPrevLabel={labels.vsPrev}
                   />
                   <KpiCardPolaris
-                    label={labelOrders}
-                    value={currStats.count.toLocaleString("de-DE")}
+                    label={ui.orders}
+                    value={currStats.count.toLocaleString(dateLoc)}
                     trend={trends.count}
                     source={OrderIcon}
-                    locale={locale}
+                    vsPrevLabel={labels.vsPrev}
                   />
                   <KpiCardPolaris
-                    label={labelAvgOrder}
-                    value={fmtEur(currStats.avg)}
+                    label={labels.avgOrder}
+                    value={fmtEur(currStats.avg, locale)}
                     trend={trends.avg}
                     source={ChartLineIcon}
-                    locale={locale}
+                    vsPrevLabel={labels.vsPrev}
                   />
                   <KpiCardPolaris
-                    label={labelCustomers}
-                    value={currStats.customers.toLocaleString("de-DE")}
+                    label={labels.customers}
+                    value={currStats.customers.toLocaleString(dateLoc)}
                     trend={trends.customers}
                     source={PersonIcon}
-                    locale={locale}
+                    vsPrevLabel={labels.vsPrev}
                   />
                 </>
               )}
@@ -900,10 +657,10 @@ export default function AnalyticsPage() {
         <Layout.Section>
           <BlockStack gap="300">
             <Text as="h2" variant="headingMd">
-              {labelMarketingTitle}
+              {labels.marketingTitle}
             </Text>
             <Text as="p" variant="bodySm" tone="subdued">
-              {labelMarketingSubtitle}
+              {labels.marketingSubtitle}
             </Text>
             <div
               style={{
@@ -924,37 +681,37 @@ export default function AnalyticsPage() {
               ) : (
                 <>
                   <MarketingKpiCard
-                    label={labelImpressions}
-                    value={hasMarketingData ? (marketingTotals.impressions || 0).toLocaleString("de-DE") : "—"}
+                    label={labels.impressions}
+                    value={hasMarketingData ? (marketingTotals.impressions || 0).toLocaleString(dateLoc) : "—"}
                   />
                   <MarketingKpiCard
-                    label={labelClicks}
-                    value={hasMarketingData ? (marketingTotals.clicks || 0).toLocaleString("de-DE") : "—"}
-                    sub={marketingDerived.ctr != null ? `CTR ${fmtPctRatio(marketingDerived.ctr)}` : undefined}
+                    label={labels.clicks}
+                    value={hasMarketingData ? (marketingTotals.clicks || 0).toLocaleString(dateLoc) : "—"}
+                    sub={marketingDerived.ctr != null ? `CTR ${fmtPctRatio(marketingDerived.ctr, locale)}` : undefined}
                   />
                   <MarketingKpiCard
-                    label={labelConversion}
-                    value={hasMarketingData ? (marketingTotals.orders || 0).toLocaleString("de-DE") : "—"}
-                    sub={marketingDerived.conversion_rate != null ? `Rate ${fmtPctRatio(marketingDerived.conversion_rate)}` : undefined}
+                    label={labels.conversion}
+                    value={hasMarketingData ? (marketingTotals.orders || 0).toLocaleString(dateLoc) : "—"}
+                    sub={marketingDerived.conversion_rate != null ? `${labels.rate} ${fmtPctRatio(marketingDerived.conversion_rate, locale)}` : undefined}
                   />
                   <MarketingKpiCard
                     label="ROAS"
-                    value={marketingDerived.roas != null ? fmtRoas(marketingDerived.roas) : "—"}
+                    value={marketingDerived.roas != null ? fmtRoas(marketingDerived.roas, locale) : "—"}
                     sub={
                       marketingTotals.spend_cents > 0
-                        ? `${labelAdSpend} ${fmtEur(marketingTotals.spend_cents)}`
-                        : labelNoAdSpend
+                        ? `${labels.adSpend} ${fmtEur(marketingTotals.spend_cents, locale)}`
+                        : labels.noAdSpend
                     }
                   />
                   <MarketingKpiCard
-                    label={labelCart}
-                    value={hasMarketingData ? (marketingTotals.add_to_cart || 0).toLocaleString("de-DE") : "—"}
-                    sub="Add-to-cart Events"
+                    label={labels.cart}
+                    value={hasMarketingData ? (marketingTotals.add_to_cart || 0).toLocaleString(dateLoc) : "—"}
+                    sub={labels.addToCartEvents}
                   />
                   <MarketingKpiCard
-                    label={labelRevenueMarketing}
-                    value={hasMarketingData ? fmtEur(marketingTotals.revenue_cents) : "—"}
-                    sub={labelPaidOrders}
+                    label={labels.revenueMarketing}
+                    value={hasMarketingData ? fmtEur(marketingTotals.revenue_cents, locale) : "—"}
+                    sub={labels.paidOrders}
                   />
                 </>
               )}
@@ -967,18 +724,18 @@ export default function AnalyticsPage() {
             {loading ? (
               <div style={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Text as="p" tone="subdued" variant="bodySm">
-                  {labelChartLoading}
+                  {labels.chartLoading}
                 </Text>
               </div>
             ) : chartData.length === 0 ? (
               <BlockStack gap="200">
-                <Text as="h2" variant="headingMd">{labelRevenueHistory}</Text>
-                <Text as="p" tone="subdued">{labelNoDataPeriod}</Text>
+                <Text as="h2" variant="headingMd">{labels.revenueHistory}</Text>
+                <Text as="p" tone="subdued">{labels.noDataPeriod}</Text>
               </BlockStack>
             ) : (
               <BlockStack gap="300">
                 <Text as="h2" variant="headingMd">
-                  {`${labelDailyRevenue} — ${selectedRangeLabel}`}
+                  {`${labels.dailyRevenue} — ${selectedRangeLabel}`}
                 </Text>
                 <RevenueAreaChart
                   data={chartData}
@@ -1003,13 +760,13 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="400">
                 <InlineStack blockAlign="center" align="space-between" wrap>
-                  <Text as="h2" variant="headingMd">{labelRecentOrders}</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">{currentOrders.length} {labelTotal}</Text>
+                  <Text as="h2" variant="headingMd">{labels.recentOrders}</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">{currentOrders.length} {labels.total}</Text>
                 </InlineStack>
                 {loading ? (
                   <SkeletonBodyText lines={6} />
                 ) : recentOrders.length === 0 ? (
-                  <Text as="p" tone="subdued" alignment="center">{labelNoOrdersPeriod}</Text>
+                  <Text as="p" tone="subdued" alignment="center">{labels.noOrdersPeriod}</Text>
                 ) : (
                   <DataTable
                     columnContentTypes={["text", "text", "text", "numeric", "text", "text", "text"]}
@@ -1023,13 +780,13 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="400">
                 <BlockStack gap="100">
-                  <Text as="h2" variant="headingMd">{labelTopCustomers}</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">{labelByRevenuePeriod}</Text>
+                  <Text as="h2" variant="headingMd">{labels.topCustomers}</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">{labels.byRevenuePeriod}</Text>
                 </BlockStack>
                 {loading ? (
                   <SkeletonBodyText lines={5} />
                 ) : topByRevenue.length === 0 ? (
-                  <Text as="p" tone="subdued" alignment="center">{labelNoDataAvailable}</Text>
+                  <Text as="p" tone="subdued" alignment="center">{labels.noDataAvailable}</Text>
                 ) : (
                   <BlockStack gap="300">
                     {topByRevenue.map((item, idx) => {
@@ -1061,10 +818,10 @@ export default function AnalyticsPage() {
                             </InlineStack>
                             <BlockStack gap="100" inlineAlign="end">
                               <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                {fmtEur(item.revenue)}
+                                {fmtEur(item.revenue, locale)}
                               </Text>
                               <Text as="p" variant="bodySm" tone="subdued">
-                                {item.count} {item.count !== 1 ? labelOrders2 : labelOrder}
+                                {item.count} {item.count !== 1 ? labels.orders2 : labels.order}
                               </Text>
                             </BlockStack>
                           </InlineStack>
@@ -1101,16 +858,16 @@ export default function AnalyticsPage() {
             <Box background="bg-surface-secondary" padding="400" borderRadius="300">
               <InlineStack gap="400" wrap blockAlign="center">
                 <Text as="p" variant="bodySm" tone="subdued">
-                  <Text as="span" fontWeight="semibold" tone="subdued">{labelPeriod}:</Text> {selectedRangeLabel}
+                  <Text as="span" fontWeight="semibold" tone="subdued">{labels.period}:</Text> {selectedRangeLabel}
                 </Text>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  <Text as="span" fontWeight="semibold" tone="subdued">{labelOrdersLoaded}:</Text> {allOrders.length}
+                  <Text as="span" fontWeight="semibold" tone="subdued">{labels.ordersLoaded}:</Text> {allOrders.length}
                 </Text>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  <Text as="span" fontWeight="semibold" tone="subdued">{labelInFilter}:</Text> {currentOrders.length}
+                  <Text as="span" fontWeight="semibold" tone="subdued">{labels.inFilter}:</Text> {currentOrders.length}
                 </Text>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  <Text as="span" fontWeight="semibold" tone="subdued">{labelRevenuePaidActive}:</Text> {fmtEur(currStats.revenue)}
+                  <Text as="span" fontWeight="semibold" tone="subdued">{labels.revenuePaidActive}:</Text> {fmtEur(currStats.revenue, locale)}
                 </Text>
                 {isSuperuser && <Badge tone="info">Superuser</Badge>}
               </InlineStack>

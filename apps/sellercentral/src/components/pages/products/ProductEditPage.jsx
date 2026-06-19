@@ -27,6 +27,7 @@ import {
 } from "@shopify/polaris";
 import { ProductIcon, MenuHorizontalIcon, ViewIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { getUI } from "@/lib/ui-strings";
 import { titleToHandle, sanitizeSeoHandleInput } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
@@ -309,6 +310,7 @@ function changeRequestSellerLabel(cr) {
 export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, sellerListings = [] }) {
   const router = useRouter();
   const locale = useLocale();
+  const ui = getUI(locale);
   const client = getMedusaAdminClient();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
   const shopBaseUrl = getDefaultShopUrl();
@@ -562,7 +564,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     return () => { cancelled = true; };
   }, [client]);
 
-  // Başka ürüne geçince “ek satır” seçimlerini sıfırla
+  // Başka ürüne geçince "ek satır" seçimlerini sıfırla
   useEffect(() => {
     setExtraVisibleMetaDefKeys({});
   }, [product?.id, product?.handle]);
@@ -841,12 +843,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       if (res?.product) setProduct(res.product);
       const st = res?.eu_origin?.eu_origin_status || res?.status;
       if (st === EU_ORIGIN_STATUS.VERIFIED) {
-        setEuOriginNotice("EU-Herkunft verifiziert — Badge erscheint im Shop nach Speichern der Stile.");
+        setEuOriginNotice(locale === "en" ? "EU origin verified — badge appears in shop after saving." : locale === "tr" ? "AB kökeni doğrulandı — kayıt sonrası mağazada rozet görünür." : locale === "fr" ? "Origine UE vérifiée — le badge apparaît dans la boutique après enregistrement." : locale === "es" ? "Origen UE verificado — el badge aparece en la tienda tras guardar." : locale === "it" ? "Origine UE verificata — il badge appare nel negozio dopo il salvataggio." : "EU-Herkunft verifiziert — Badge erscheint im Shop nach Speichern der Stile.");
       } else {
-        setEuOriginNotice(res?.message || "Prüfung ausstehend (Warteschlange / Superuser).");
+        setEuOriginNotice(res?.message || (locale === "en" ? "Verification pending (queue / superuser)." : locale === "tr" ? "Doğrulama beklemede (kuyruk / süper kullanıcı)." : locale === "fr" ? "Vérification en attente (file d'attente / superuser)." : locale === "es" ? "Verificación pendiente (cola / superusuario)." : locale === "it" ? "Verifica in sospeso (coda / superuser)." : "Prüfung ausstehend (Warteschlange / Superuser)."));
       }
     } catch (e) {
-      setEuOriginNotice(e?.message || "Verifizierung fehlgeschlagen");
+      setEuOriginNotice(e?.message || (locale === "en" ? "Verification failed." : locale === "tr" ? "Doğrulama başarısız." : locale === "fr" ? "Échec de la vérification." : locale === "es" ? "Error en la verificación." : locale === "it" ? "Verifica fallita." : "Verifizierung fehlgeschlagen"));
     } finally {
       setEuOriginVerifying(false);
     }
@@ -1000,9 +1002,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         const res = await client.createAdminHubProductRaw(payload);
         const created = res?.product ?? res;
         if (res?.deduplicated) {
-          setMessage({ type: "success", text: "Vorhandenes Produkt gefunden — alle Felder wurden automatisch befüllt." });
+          setMessage({ type: "success", text: locale === "en" ? "Existing product found — all fields pre-filled automatically." : locale === "tr" ? "Mevcut ürün bulundu — tüm alanlar otomatik dolduruldu." : locale === "fr" ? "Produit existant trouvé — tous les champs ont été pré-remplis automatiquement." : locale === "es" ? "Producto existente encontrado — todos los campos se rellenaron automáticamente." : locale === "it" ? "Prodotto esistente trovato — tutti i campi sono stati compilati automaticamente." : "Vorhandenes Produkt gefunden — alle Felder wurden automatisch befüllt." });
         } else {
-          setMessage({ type: "success", text: "Produkt erstellt." });
+          setMessage({ type: "success", text: locale === "en" ? "Product created." : locale === "tr" ? "Ürün oluşturuldu." : locale === "fr" ? "Produit créé." : locale === "es" ? "Producto creado." : locale === "it" ? "Prodotto creato." : "Produkt erstellt." });
         }
         onReload?.();
         if (created?.id) router.push(`/products/${created.id}`);
@@ -1012,7 +1014,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
       // Handle suggestion_submitted (superuser review needed for shared catalog changes)
       if (updatedRaw?.suggestion_submitted) {
-        setMessage({ type: "success", text: "Dein Änderungsvorschlag wurde eingereicht. Ein Superuser wird ihn prüfen." });
+        setMessage({ type: "success", text: locale === "en" ? "Your change suggestion has been submitted. A superuser will review it." : locale === "tr" ? "Değişiklik öneriniz gönderildi. Bir süper kullanıcı inceleyecek." : locale === "fr" ? "Votre suggestion de modification a été soumise. Un superuser va l'examiner." : locale === "es" ? "Tu sugerencia de cambio ha sido enviada. Un superusuario la revisará." : locale === "it" ? "Il tuo suggerimento di modifica è stato inviato. Un superuser lo esaminerà." : "Dein Änderungsvorschlag wurde eingereicht. Ein Superuser wird ihn prüfen." });
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("andertal-notifications-refresh"));
         }
@@ -1044,7 +1046,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setProduct(savedProduct);
       setBaselineSnapshot(productSnapshot(savedProduct));
       unsaved?.setDirty(false);
-      setMessage({ type: "success", text: updatedRaw?.listing_saved ? "Preis, Bestand und eigene Daten gespeichert." : "Saved" });
+      setMessage({ type: "success", text: updatedRaw?.listing_saved ? (locale === "en" ? "Price, inventory and own data saved." : locale === "tr" ? "Fiyat, stok ve özel veriler kaydedildi." : locale === "fr" ? "Prix, stock et données propres enregistrés." : locale === "es" ? "Precio, inventario y datos propios guardados." : locale === "it" ? "Prezzo, inventario e dati propri salvati." : "Preis, Bestand und eigene Daten gespeichert.") : ui.saved });
       await refetchPendingChangeRequests(savedProduct.id);
       onReload?.();
       return true;
@@ -1135,20 +1137,20 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     const label = newCatalogMetaLabel.trim();
     const value = newCatalogMetaValue.trim();
     if (!label) {
-      setNewCatalogMetaErr("Bitte Titel / Anzeigename angeben.");
+      setNewCatalogMetaErr(locale === "en" ? "Please enter a title / display name." : locale === "tr" ? "Lütfen bir başlık / görünen ad girin." : locale === "fr" ? "Veuillez saisir un titre / nom d'affichage." : locale === "es" ? "Por favor ingrese un título / nombre de visualización." : locale === "it" ? "Inserire un titolo / nome di visualizzazione." : "Bitte Titel / Anzeigename angeben.");
       return;
     }
     if (!value) {
-      setNewCatalogMetaErr("Bitte Inhalt / Wert angeben.");
+      setNewCatalogMetaErr(locale === "en" ? "Please enter a value." : locale === "tr" ? "Lütfen bir değer girin." : locale === "fr" ? "Veuillez saisir une valeur." : locale === "es" ? "Por favor ingrese un valor." : locale === "it" ? "Inserire un valore." : "Bitte Inhalt / Wert angeben.");
       return;
     }
     const key = normalizeCatalogMetaKey(newCatalogMetaKey, label);
     if (!key) {
-      setNewCatalogMetaErr("Ungültiger Key.");
+      setNewCatalogMetaErr(locale === "en" ? "Invalid key." : locale === "tr" ? "Geçersiz anahtar." : locale === "fr" ? "Clé invalide." : locale === "es" ? "Clave inválida." : locale === "it" ? "Chiave non valida." : "Ungültiger Key.");
       return;
     }
     if (EXCLUDED_CATALOG_METAFIELD_KEYS.has(key)) {
-      setNewCatalogMetaErr("Dieser Key ist für die Kategorie-Zuordnung reserviert und kann nicht als Metafeld angelegt werden.");
+      setNewCatalogMetaErr(locale === "en" ? "This key is reserved for category assignment and cannot be used as a metafield." : locale === "tr" ? "Bu anahtar kategori atama için ayrılmıştır ve metafield olarak kullanılamaz." : locale === "fr" ? "Cette clé est réservée à l'attribution de catégorie et ne peut pas être utilisée comme métachamp." : locale === "es" ? "Esta clave está reservada para la asignación de categoría y no puede usarse como metacampo." : locale === "it" ? "Questa chiave è riservata all'assegnazione di categoria e non può essere usata come metacampo." : "Dieser Key ist für die Kategorie-Zuordnung reserviert und kann nicht als Metafeld angelegt werden.");
       return;
     }
     setNewCatalogMetaSaving(true);
@@ -1170,11 +1172,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setMessage({
         type: "success",
         text: isSuperuser
-          ? "Metafeld wurde im Katalog gespeichert."
-          : "Vorschlag eingereicht — ein Superuser kann ihn unter Content → Metaobjects freigeben. Bitte Produkt speichern.",
+          ? (locale === "en" ? "Metafield saved in catalog." : locale === "tr" ? "Metafield katalogda kaydedildi." : locale === "fr" ? "Métachamp enregistré dans le catalogue." : locale === "es" ? "Metacampo guardado en el catálogo." : locale === "it" ? "Metacampo salvato nel catalogo." : "Metafeld wurde im Katalog gespeichert.")
+          : (locale === "en" ? "Suggestion submitted — a superuser can approve it under Content → Metaobjects. Please save the product." : locale === "tr" ? "Öneri gönderildi — bir süper kullanıcı İçerik → Metaobjects altında onaylayabilir. Lütfen ürünü kaydedin." : locale === "fr" ? "Suggestion soumise — un superuser peut l'approuver sous Contenu → Metaobjects. Veuillez enregistrer le produit." : locale === "es" ? "Sugerencia enviada — un superusuario puede aprobarla en Contenido → Metaobjetos. Por favor, guarda el producto." : locale === "it" ? "Suggerimento inviato — un superuser può approvarlo in Contenuto → Metaoggetti. Salva il prodotto." : "Vorschlag eingereicht — ein Superuser kann ihn unter Content → Metaobjects freigeben. Bitte Produkt speichern."),
       });
     } catch (e) {
-      setNewCatalogMetaErr(e?.message || "Fehler");
+      setNewCatalogMetaErr(e?.message || (locale === "en" ? "Error." : locale === "tr" ? "Hata." : locale === "fr" ? "Erreur." : locale === "es" ? "Error." : locale === "it" ? "Errore." : "Fehler"));
     } finally {
       setNewCatalogMetaSaving(false);
     }
@@ -1242,11 +1244,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const classificationChips = [];
   if (categorySummaryPath) classificationChips.push({ key: "cat", text: categorySummaryPath });
   if (brandSummaryLabel) classificationChips.push({ key: "brand", text: brandSummaryLabel });
-  if (shipSummaryLabel) classificationChips.push({ key: "ship", text: `Versand: ${shipSummaryLabel}` });
+  if (shipSummaryLabel) classificationChips.push({ key: "ship", text: `${locale === "en" ? "Shipping" : locale === "tr" ? "Kargo" : locale === "fr" ? "Expédition" : locale === "es" ? "Envío" : locale === "it" ? "Spedizione" : "Versand"}: ${shipSummaryLabel}` });
   if (isSuperuser && collectionIds.length > 0) {
     classificationChips.push({
       key: "coll",
-      text: `${collectionIds.length} Kollektion${collectionIds.length !== 1 ? "en" : ""}`,
+      text: locale === "en" ? `${collectionIds.length} collection${collectionIds.length !== 1 ? "s" : ""}` : locale === "tr" ? `${collectionIds.length} koleksiyon` : locale === "fr" ? `${collectionIds.length} collection${collectionIds.length !== 1 ? "s" : ""}` : locale === "es" ? `${collectionIds.length} colección${collectionIds.length !== 1 ? "es" : ""}` : locale === "it" ? `${collectionIds.length} collezione${collectionIds.length !== 1 ? "i" : ""}` : `${collectionIds.length} Kollektion${collectionIds.length !== 1 ? "en" : ""}`,
     });
   }
 
@@ -1572,10 +1574,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         const updated = [...productFiles, { name: "", url: result.url }];
         updateMeta("product_files", updated);
       } else {
-        setFileUploadErr("Upload fehlgeschlagen.");
+        setFileUploadErr(locale === "en" ? "Upload failed." : locale === "tr" ? "Yükleme başarısız." : locale === "fr" ? "Échec du téléchargement." : locale === "es" ? "Error al subir." : locale === "it" ? "Caricamento fallito." : "Upload fehlgeschlagen.");
       }
     } catch (err) {
-      setFileUploadErr(err?.message || "Upload fehlgeschlagen.");
+      setFileUploadErr(err?.message || (locale === "en" ? "Upload failed." : locale === "tr" ? "Yükleme başarısız." : locale === "fr" ? "Échec du téléchargement." : locale === "es" ? "Error al subir." : locale === "it" ? "Caricamento fallito." : "Upload fehlgeschlagen."));
     } finally {
       setFileUploading(false);
       if (e.target) e.target.value = "";
@@ -1742,11 +1744,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           <Banner tone="warning">
             <BlockStack gap="300">
               <Text as="p" variant="bodySm">
-                {locale === "tr"
-                  ? "Onay bekleyen alan değişiklikleri var. İlgili alanların yanındaki kırmızı işarete tıklayarak mevcut ve önerilen değerleri görebilirsiniz."
-                  : locale === "de"
-                    ? "Ausstehende Feldänderungen: Klicken Sie auf das rote Symbol neben dem Feld für aktuelle und vorgeschlagene Werte."
-                    : "Pending field changes: click the red marker beside a field to see current and proposed values."}
+                {locale === "tr" ? "Onay bekleyen alan değişiklikleri var. İlgili alanların yanındaki kırmızı işarete tıklayarak mevcut ve önerilen değerleri görebilirsiniz." : locale === "fr" ? "Modifications de champ en attente : cliquez sur le marqueur rouge à côté d'un champ pour voir les valeurs actuelles et proposées." : locale === "es" ? "Cambios de campo pendientes: haz clic en el marcador rojo junto a un campo para ver los valores actuales y propuestos." : locale === "it" ? "Modifiche di campo in sospeso: clicca sul marcatore rosso accanto a un campo per vedere i valori attuali e proposti." : locale === "de" ? "Ausstehende Feldänderungen: Klicken Sie auf das rote Symbol neben dem Feld für aktuelle und vorgeschlagene Werte." : "Pending field changes: click the red marker beside a field to see current and proposed values."}
               </Text>
               {isSuperuser && (
                 <BlockStack gap="200">
@@ -1760,22 +1758,18 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             {formatChangeRequestValuePreview(cr.new_value, 80)}
                           </Text>
                           <Text as="p" variant="bodyXs" tone="subdued">
-                            {locale === "tr"
-                              ? `Satıcı: ${changeRequestSellerLabel(cr)}`
-                              : locale === "de"
-                                ? `Verkäufer: ${changeRequestSellerLabel(cr)}`
-                                : `Seller: ${changeRequestSellerLabel(cr)}`}
+                            {`${locale === "tr" ? "Satıcı" : locale === "fr" ? "Vendeur" : locale === "es" ? "Vendedor" : locale === "it" ? "Venditore" : locale === "de" ? "Verkäufer" : "Seller"}: ${changeRequestSellerLabel(cr)}`}
                           </Text>
                         </BlockStack>
                         <InlineStack gap="200">
                           <Button size="slim" tone="success" onClick={() => approveChangeRequest(cr.id)} loading={busy} disabled={busy}>
-                            {locale === "tr" ? "Onayla" : locale === "de" ? "Freigeben" : "Approve"}
+                            {locale === "tr" ? "Onayla" : locale === "fr" ? "Approuver" : locale === "es" ? "Aprobar" : locale === "it" ? "Approva" : locale === "de" ? "Freigeben" : "Approve"}
                           </Button>
                           <Button size="slim" onClick={() => editAndApproveChangeRequest(cr)} disabled={busy}>
-                            {locale === "tr" ? "Düzelt + Onayla" : locale === "de" ? "Bearbeiten + Freigeben" : "Edit + Approve"}
+                            {locale === "tr" ? "Düzelt + Onayla" : locale === "fr" ? "Modifier + Approuver" : locale === "es" ? "Editar + Aprobar" : locale === "it" ? "Modifica + Approva" : locale === "de" ? "Bearbeiten + Freigeben" : "Edit + Approve"}
                           </Button>
                           <Button size="slim" tone="critical" variant="secondary" onClick={() => rejectChangeRequest(cr.id)} loading={busy} disabled={busy}>
-                            {locale === "tr" ? "Reddet" : locale === "de" ? "Ablehnen" : "Reject"}
+                            {locale === "tr" ? "Reddet" : locale === "fr" ? "Rejeter" : locale === "es" ? "Rechazar" : locale === "it" ? "Rifiuta" : locale === "de" ? "Ablehnen" : "Reject"}
                           </Button>
                         </InlineStack>
                       </InlineStack>
@@ -1793,7 +1787,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           <Card>
             <BlockStack gap="200">
               <Text as="h2" variant="bodyMd" fontWeight="semibold">
-                {locale === "tr" ? "Bu ürünü listeleyen satıcılar" : locale === "de" ? "Anbieter die dieses Produkt listen" : "Sellers listing this product"}
+                {locale === "en" ? "Sellers listing this product" : locale === "tr" ? "Bu ürünü listeleyen satıcılar" : locale === "fr" ? "Vendeurs listant ce produit" : locale === "es" ? "Vendedores que listan este producto" : locale === "it" ? "Venditori che elencano questo prodotto" : "Anbieter die dieses Produkt listen"}
               </Text>
               <Divider />
               {sellerListings.map((sl) => (
@@ -1808,7 +1802,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     {sl.price_cents != null ? `${(sl.price_cents / 100).toFixed(2)} €` : "—"}
                   </Text>
                   <Text as="span" variant="bodyXs" tone="subdued">
-                    {locale === "tr" ? `Stok: ${sl.inventory ?? 0}` : locale === "de" ? `Bestand: ${sl.inventory ?? 0}` : `Stock: ${sl.inventory ?? 0}`}
+                    {`${locale === "en" ? "Stock" : locale === "tr" ? "Stok" : locale === "fr" ? "Stock" : locale === "es" ? "Stock" : locale === "it" ? "Stock" : "Bestand"}: ${sl.inventory ?? 0}`}
                   </Text>
                   <Text as="span" variant="bodyXs" tone={sl.status === "active" ? "success" : "subdued"}>
                     {sl.status ?? "—"}
@@ -1878,7 +1872,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                         <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.ean" />
                         {isSecondSeller && (
                           <span style={{ fontSize: 10, color: "#6b7280", fontWeight: 400, marginLeft: 4 }}>
-                            (gesperrt — nur Erstanbieter kann ändern)
+                            ({locale === "en" ? "locked — only first seller can change" : locale === "tr" ? "kilitli — yalnızca ilk satıcı değiştirebilir" : locale === "fr" ? "verrouillé — seul le premier vendeur peut modifier" : locale === "es" ? "bloqueado — solo el primer vendedor puede cambiar" : locale === "it" ? "bloccato — solo il primo venditore può modificare" : "gesperrt — nur Erstanbieter kann ändern"})
                           </span>
                         )}
                       </InlineStack>
@@ -1892,8 +1886,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     suffix={
                       isSecondSeller ? "🔒" :
                       eanLookupState === "loading" ? "⏳" :
-                      eanLookupState === "found" ? "✓ Produktdaten geladen" :
-                      eanLookupState === "not_found" ? "— Neu" : undefined
+                      eanLookupState === "found" ? (locale === "en" ? "✓ Product data loaded" : locale === "tr" ? "✓ Ürün verileri yüklendi" : locale === "fr" ? "✓ Données produit chargées" : locale === "es" ? "✓ Datos del producto cargados" : locale === "it" ? "✓ Dati prodotto caricati" : "✓ Produktdaten geladen") :
+                      eanLookupState === "not_found" ? (locale === "en" ? "— New" : locale === "tr" ? "— Yeni" : locale === "fr" ? "— Nouveau" : locale === "es" ? "— Nuevo" : locale === "it" ? "— Nuovo" : "— Neu") : undefined
                     }
                   />
                 </Box>
@@ -1903,15 +1897,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               {isSuperuser && (
                 <>
                   <ProductSectionHeading badge={<ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.badge" />}>
-                    Produkt-Etikett
+                    {locale === "en" ? "Product badge" : locale === "tr" ? "Ürün etiketi" : locale === "fr" ? "Badge produit" : locale === "es" ? "Etiqueta de producto" : locale === "it" ? "Etichetta prodotto" : "Produkt-Etikett"}
                   </ProductSectionHeading>
                   <Select
-                    label="Badge / Etikett"
+                    label={locale === "en" ? "Badge / Label" : locale === "tr" ? "Rozet / Etiket" : locale === "fr" ? "Badge / Étiquette" : locale === "es" ? "Badge / Etiqueta" : locale === "it" ? "Badge / Etichetta" : "Badge / Etikett"}
                     labelHidden
                     options={[
-                      { label: "Kein Etikett", value: "" },
+                      { label: locale === "en" ? "No badge" : locale === "tr" ? "Etiket yok" : locale === "fr" ? "Aucun badge" : locale === "es" ? "Sin etiqueta" : locale === "it" ? "Nessun badge" : "Kein Etikett", value: "" },
                       { label: "⭐ Bestseller", value: "bestseller" },
-                      { label: "🆕 Neu", value: "new" },
+                      { label: locale === "en" ? "🆕 New" : locale === "tr" ? "🆕 Yeni" : locale === "fr" ? "🆕 Nouveau" : locale === "es" ? "🆕 Nuevo" : locale === "it" ? "🆕 Nuovo" : "🆕 Neu", value: "new" },
                       { label: "🔥 Sale", value: "sale" },
                     ]}
                     value={getMeta(product, "badge") || ""}
@@ -1925,9 +1919,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 <BlockStack gap="300">
                   <InlineStack align="space-between" blockAlign="start" gap="400" wrap>
                     <BlockStack gap="150">
-                      <ProductSectionHeading>Shop-Zuordnung</ProductSectionHeading>
+                      <ProductSectionHeading>{locale === "en" ? "Shop assignment" : locale === "tr" ? "Mağaza ataması" : locale === "fr" ? "Attribution boutique" : locale === "es" ? "Asignación de tienda" : locale === "it" ? "Assegnazione negozio" : "Shop-Zuordnung"}</ProductSectionHeading>
                       <Text as="p" variant="bodySm" tone="subdued">
-                        Kategorie, Marke, Versandgruppe{isSuperuser ? " und Kollektionen" : ""} — steuern Katalog und Shop-Navigation.
+                        {locale === "en" ? `Category, brand, shipping group${isSuperuser ? " and collections" : ""} — control catalog and shop navigation.` : locale === "tr" ? `Kategori, marka, kargo grubu${isSuperuser ? " ve koleksiyonlar" : ""} — katalog ve mağaza navigasyonunu yönetir.` : locale === "fr" ? `Catégorie, marque, groupe d'expédition${isSuperuser ? " et collections" : ""} — gèrent le catalogue et la navigation boutique.` : locale === "es" ? `Categoría, marca, grupo de envío${isSuperuser ? " y colecciones" : ""} — controlan el catálogo y la navegación de la tienda.` : locale === "it" ? `Categoria, marca, gruppo di spedizione${isSuperuser ? " e collezioni" : ""} — gestiscono il catalogo e la navigazione del negozio.` : `Kategorie, Marke, Versandgruppe${isSuperuser ? " und Kollektionen" : ""} — steuern Katalog und Shop-Navigation.`}
                       </Text>
                       {!classificationOpen && (
                         classificationChips.length > 0 ? (
@@ -1937,7 +1931,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             ))}
                           </InlineStack>
                         ) : (
-                          <Text as="p" variant="bodySm" tone="subdued">Noch nicht zugeordnet — „Bearbeiten“ öffnen.</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "Not yet assigned — open \"Edit\"." : locale === "tr" ? "Henüz atanmadı — \"Düzenle\"yi açın." : locale === "fr" ? "Pas encore attribué — ouvrir \"Modifier\"." : locale === "es" ? "Aún no asignado — abrir \"Editar\"." : locale === "it" ? "Non ancora assegnato — aprire \"Modifica\"." : 'Noch nicht zugeordnet — „Bearbeiten" öffnen.'}</Text>
                         )
                       )}
                     </BlockStack>
@@ -1947,7 +1941,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                         disclosure={classificationOpen ? "up" : "down"}
                         variant={classificationOpen ? "plain" : "primary"}
                       >
-                        {classificationOpen ? "Einklappen" : "Bearbeiten"}
+                        {classificationOpen ? (locale === "en" ? "Collapse" : locale === "tr" ? "Daralt" : locale === "fr" ? "Réduire" : locale === "es" ? "Colapsar" : locale === "it" ? "Comprimi" : "Einklappen") : (locale === "en" ? "Edit" : locale === "tr" ? "Düzenle" : locale === "fr" ? "Modifier" : locale === "es" ? "Editar" : locale === "it" ? "Modifica" : "Bearbeiten")}
                       </Button>
                     </Box>
                   </InlineStack>
@@ -1961,31 +1955,31 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       <Divider />
                       <InlineStack gap="500" wrap>
                         <Box minWidth="240px" flex="1">
-                          <Text as="p" variant="bodySm" fontWeight="semibold">Kategorie</Text>
+                          <Text as="p" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}</Text>
                           <Box paddingBlockStart="150">
                             <CategoryDrilldownSelect
-                              label="Category"
+                              label={locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}
                               labelHidden
                               categories={categories || []}
                               value={getMeta(product, "category_id")}
                               onChange={updateCategoryWithParents}
-                              placeholder="Kategorie wählen"
+                              placeholder={locale === "en" ? "Select category" : locale === "tr" ? "Kategori seç" : locale === "fr" ? "Choisir une catégorie" : locale === "es" ? "Seleccionar categoría" : locale === "it" ? "Seleziona categoria" : "Kategorie wählen"}
                             />
                           </Box>
                         </Box>
                         <Box minWidth="240px" flex="1">
                           <Select
-                            label="Marke"
-                            options={[{ label: "— Keine —", value: "" }, ...(brands || []).map((b) => ({ label: b.name, value: b.id }))]}
+                            label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
+                            options={[{ label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucune —" : locale === "es" ? "— Ninguna —" : locale === "it" ? "— Nessuna —" : "— Keine —", value: "" }, ...(brands || []).map((b) => ({ label: b.name, value: b.id }))]}
                             value={getMeta(product, "brand_id") || ""}
                             onChange={(v) => updateMeta("brand_id", v || undefined)}
                           />
                         </Box>
                         <Box minWidth="240px" flex="1">
                           <Select
-                            label="Versandgruppe"
+                            label={locale === "en" ? "Shipping group" : locale === "tr" ? "Kargo grubu" : locale === "fr" ? "Groupe d'expédition" : locale === "es" ? "Grupo de envío" : locale === "it" ? "Gruppo di spedizione" : "Versandgruppe"}
                             options={[
-                              { label: "— Keine —", value: "" },
+                              { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucun —" : locale === "es" ? "— Ninguno —" : locale === "it" ? "— Nessuno —" : "— Keine —", value: "" },
                               ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
                             ]}
                             value={meta.shipping_group_id ?? ""}
@@ -1998,17 +1992,17 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                         <>
                           <Divider />
                           <BlockStack gap="300">
-                            <Text as="p" variant="bodySm" fontWeight="semibold">Kollektionen</Text>
-                            <Text as="p" variant="bodySm" tone="subdued">Produkt kann mehreren Kollektionen zugeordnet werden (z. B. Sale, Saison).</Text>
+                            <Text as="p" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Collections" : locale === "tr" ? "Koleksiyonlar" : locale === "fr" ? "Collections" : locale === "es" ? "Colecciones" : locale === "it" ? "Collezioni" : "Kollektionen"}</Text>
+                            <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "Product can be assigned to multiple collections (e.g. Sale, Season)." : locale === "tr" ? "Ürün birden fazla koleksiyona atanabilir (örn. İndirim, Sezon)." : locale === "fr" ? "Le produit peut être assigné à plusieurs collections (ex. Soldes, Saison)." : locale === "es" ? "El producto puede asignarse a varias colecciones (ej. Rebajas, Temporada)." : locale === "it" ? "Il prodotto può essere assegnato a più collezioni (es. Saldo, Stagione)." : "Produkt kann mehreren Kollektionen zugeordnet werden (z. B. Sale, Saison)."}</Text>
                             <div className={`collection-dropdown-card-wrap ${collectionPopoverOpen ? "collections-open" : ""}`} style={{ position: "relative", zIndex: collectionPopoverOpen ? 10000 : undefined, overflow: "visible", maxWidth: "100%" }}>
                               <div className="collection-dropdown-wrap">
                                 <TextField
-                                  label="Kollektionen durchsuchen"
+                                  label={locale === "en" ? "Search collections" : locale === "tr" ? "Koleksiyon ara" : locale === "fr" ? "Rechercher des collections" : locale === "es" ? "Buscar colecciones" : locale === "it" ? "Cerca collezioni" : "Kollektionen durchsuchen"}
                                   labelHidden
                                   value={collectionSearch}
                                   onChange={setCollectionSearch}
                                   onFocus={() => setCollectionPopoverOpen(true)}
-                                  placeholder="Kollektion suchen…"
+                                  placeholder={locale === "en" ? "Search collection…" : locale === "tr" ? "Koleksiyon ara…" : locale === "fr" ? "Rechercher une collection…" : locale === "es" ? "Buscar colección…" : locale === "it" ? "Cerca collezione…" : "Kollektion suchen…"}
                                   autoComplete="off"
                                 />
                                 <div className={`collection-dropdown-panel ${collectionPopoverOpen ? "open" : ""}`}>
@@ -2142,7 +2136,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <ProductSectionRule />
               <ProductSectionHeading>Media</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
-                Neue Bild-Uploads: JPEG oder PNG, mindestens 1000×1000 px; der Server speichert quadratisches WebP (1000×1000) für den Shop.
+                {locale === "en" ? "New image uploads: JPEG or PNG, minimum 1000×1000 px; the server saves square WebP (1000×1000) for the shop." : locale === "tr" ? "Yeni görsel yüklemeleri: JPEG veya PNG, minimum 1000×1000 px; sunucu mağaza için kare WebP (1000×1000) kaydeder." : locale === "fr" ? "Nouveaux téléchargements d'images : JPEG ou PNG, minimum 1000×1000 px ; le serveur enregistre du WebP carré (1000×1000) pour la boutique." : locale === "es" ? "Nuevas subidas de imágenes: JPEG o PNG, mínimo 1000×1000 px; el servidor guarda WebP cuadrado (1000×1000) para la tienda." : locale === "it" ? "Nuovi caricamenti di immagini: JPEG o PNG, minimo 1000×1000 px; il server salva WebP quadrato (1000×1000) per il negozio." : "Neue Bild-Uploads: JPEG oder PNG, mindestens 1000×1000 px; der Server speichert quadratisches WebP (1000×1000) für den Shop."}
               </Text>
               {locale !== "de" && (
                 <Text as="p" variant="bodySm" tone="subdued">
@@ -2164,11 +2158,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   >
                     <img src={url.startsWith("http") || url.startsWith("data:") ? url : `${baseUrl}${url}`} alt="" />
                     <button type="button" className="product-media-remove" onClick={() => removeMedia(i)} aria-label="Remove image">×</button>
-                    {mediaUrls.length > 1 && <span className="product-media-drag-hint">⠿ Ziehen</span>}
+                    {mediaUrls.length > 1 && <span className="product-media-drag-hint">⠿ {locale === "en" ? "Drag" : locale === "tr" ? "Sürükle" : locale === "fr" ? "Glisser" : locale === "es" ? "Arrastrar" : locale === "it" ? "Trascina" : "Ziehen"}</span>}
                   </div>
                 ))}
                 {mediaUrls.length < 6 && (
-                  <div className="product-media-add" role="button" tabIndex={0} title="Görsel ekle" onClick={() => setMediaPickerOpen(true)}>
+                  <div className="product-media-add" role="button" tabIndex={0} title={locale === "en" ? "Add image" : locale === "tr" ? "Görsel ekle" : locale === "fr" ? "Ajouter une image" : locale === "es" ? "Agregar imagen" : locale === "it" ? "Aggiungi immagine" : "Bild hinzufügen"} onClick={() => setMediaPickerOpen(true)}>
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8.75 3.75a.75.75 0 0 0-1.5 0v3.5h-3.5a.75.75 0 0 0 0 1.5h3.5v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5z" /></svg>
                   </div>
                 )}
@@ -2177,7 +2171,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <MediaPickerModal
                 open={mediaPickerOpen}
                 onClose={() => setMediaPickerOpen(false)}
-                title="Görsel seç"
+                title={locale === "en" ? "Select image" : locale === "tr" ? "Görsel seç" : locale === "fr" ? "Sélectionner une image" : locale === "es" ? "Seleccionar imagen" : locale === "it" ? "Seleziona immagine" : "Bild auswählen"}
                 multiple
                 uploadPurpose="product"
                 onSelect={(urls) => {
@@ -2195,8 +2189,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 onClose={() => setVariantImgPickerTarget(null)}
                 title={
                   variantImgPickerTarget
-                    ? `Görseller — ${variantImgPickerTarget.join(" / ")}`
-                    : "Varyant görselleri"
+                    ? `${locale === "en" ? "Images" : locale === "tr" ? "Görseller" : locale === "fr" ? "Images" : locale === "es" ? "Imágenes" : locale === "it" ? "Immagini" : "Bilder"} — ${variantImgPickerTarget.join(" / ")}`
+                    : (locale === "en" ? "Variant images" : locale === "tr" ? "Varyant görselleri" : locale === "fr" ? "Images variante" : locale === "es" ? "Imágenes de variante" : locale === "it" ? "Immagini variante" : "Variantenbilder")
                 }
                 multiple={true}
                 uploadPurpose="product"
@@ -2223,7 +2217,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 onClose={() => setSwatchPickerTarget(null)}
                 title={swatchPickerTarget
                   ? `Swatch — "${variantGroups[swatchPickerTarget.gi]?.options?.[swatchPickerTarget.oi]?.value || "option"}"`
-                  : "Swatch görseli"}
+                  : (locale === "en" ? "Swatch image" : locale === "tr" ? "Swatch görseli" : locale === "fr" ? "Image swatch" : locale === "es" ? "Imagen swatch" : locale === "it" ? "Immagine swatch" : "Swatch-Bild")}
                 multiple={false}
                 onSelect={(urls) => {
                   if (swatchPickerTarget && urls[0]) {
@@ -2234,9 +2228,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               />
 
               <ProductSectionRule />
-              <ProductSectionHeading>Produktdokumente &amp; Compliance</ProductSectionHeading>
+              <ProductSectionHeading>{locale === "en" ? "Product documents & compliance" : locale === "tr" ? "Ürün belgeleri ve uyumluluk" : locale === "fr" ? "Documents produit & conformité" : locale === "es" ? "Documentos de producto y cumplimiento" : locale === "it" ? "Documenti prodotto e conformità" : "Produktdokumente & Compliance"}</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
-                WEEE-Reg.-Nummer, EPREL-Nummer und Produktdateien (z. B. Produktdatenblatt, EEK-Label). Dateien werden im Shop unter der Produktbeschreibung angezeigt.
+                {locale === "en" ? "WEEE registration number, EPREL number and product files (e.g. product data sheet, energy label). Files are shown in the shop below the product description." : locale === "tr" ? "WEEE kayıt numarası, EPREL numarası ve ürün dosyaları (örn. ürün veri sayfası, enerji etiketi). Dosyalar mağazada ürün açıklamasının altında gösterilir." : locale === "fr" ? "Numéro d'enregistrement WEEE, numéro EPREL et fichiers produit (ex. fiche technique, étiquette énergétique). Les fichiers sont affichés dans la boutique sous la description du produit." : locale === "es" ? "Número de registro WEEE, número EPREL y archivos de producto (ej. ficha técnica, etiqueta energética). Los archivos se muestran en la tienda debajo de la descripción del producto." : locale === "it" ? "Numero di registrazione WEEE, numero EPREL e file prodotto (es. scheda tecnica, etichetta energetica). I file vengono mostrati nel negozio sotto la descrizione del prodotto." : "WEEE-Reg.-Nummer, EPREL-Nummer und Produktdateien (z. B. Produktdatenblatt, EEK-Label). Dateien werden im Shop unter der Produktbeschreibung angezeigt."}
               </Text>
               <InlineStack gap="300" wrap>
                 <Box minWidth="240px" flex="1">
@@ -2245,7 +2239,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     value={getMeta(product, "weee_number") || ""}
                     onChange={(v) => updateMeta("weee_number", v || null)}
                     placeholder="DE12345678"
-                    helpText="Elektroaltgeräte-Registrierungsnummer (ElektroG)"
+                    helpText={locale === "en" ? "Electrical waste registration number (ElektroG)" : locale === "tr" ? "Elektronik atık kayıt numarası (ElektroG)" : locale === "fr" ? "Numéro d'enregistrement déchets électroniques (ElektroG)" : locale === "es" ? "Número de registro de residuos eléctricos (ElektroG)" : locale === "it" ? "Numero di registrazione rifiuti elettrici (ElektroG)" : "Elektroaltgeräte-Registrierungsnummer (ElektroG)"}
                     autoComplete="off"
                   />
                 </Box>
@@ -2255,14 +2249,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     value={getMeta(product, "eprel_number") || ""}
                     onChange={(v) => updateMeta("eprel_number", v || null)}
                     placeholder="123456"
-                    helpText="EU-Energielabel-Registrierungsnummer"
+                    helpText={locale === "en" ? "EU energy label registration number" : locale === "tr" ? "AB enerji etiketi kayıt numarası" : locale === "fr" ? "Numéro d'enregistrement étiquette énergie UE" : locale === "es" ? "Número de registro etiqueta energética UE" : locale === "it" ? "Numero di registrazione etichetta energetica UE" : "EU-Energielabel-Registrierungsnummer"}
                     autoComplete="off"
                   />
                 </Box>
               </InlineStack>
 
               {/* Product files */}
-              <Text as="h3" variant="bodySm" fontWeight="semibold">Produktdateien</Text>
+              <Text as="h3" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Product files" : locale === "tr" ? "Ürün dosyaları" : locale === "fr" ? "Fichiers produit" : locale === "es" ? "Archivos de producto" : locale === "it" ? "File prodotto" : "Produktdateien"}</Text>
               {productFiles.length > 0 && (
                 <BlockStack gap="150">
                   {productFiles.map((file, i) => {
@@ -2282,7 +2276,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             type="text"
                             value={file.name || ""}
                             onChange={(e) => updateProductFileName(i, e.target.value)}
-                            placeholder="Anzeigename im Shop"
+                            placeholder={locale === "en" ? "Display name in shop" : locale === "tr" ? "Mağazada görünen ad" : locale === "fr" ? "Nom d'affichage dans la boutique" : locale === "es" ? "Nombre a mostrar en la tienda" : locale === "it" ? "Nome visualizzato nel negozio" : "Anzeigename im Shop"}
                             style={{
                               width: "100%", border: "1px solid #d1d5db", borderRadius: 6,
                               padding: "4px 8px", fontSize: 13, background: "#fff",
@@ -2306,7 +2300,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                           type="button"
                           onClick={() => removeProductFile(i)}
                           style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 16, lineHeight: 1, padding: "2px 4px" }}
-                          title="Entfernen"
+                          title={locale === "en" ? "Remove" : locale === "tr" ? "Kaldır" : locale === "fr" ? "Supprimer" : locale === "es" ? "Eliminar" : locale === "it" ? "Rimuovi" : "Entfernen"}
                         >✕</button>
                       </div>
                     );
@@ -2316,22 +2310,22 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               {addingFile && (
                 <BlockStack gap="200">
                   <TextField
-                    label="Datei-URL"
+                    label={locale === "en" ? "File URL" : locale === "tr" ? "Dosya URL'si" : locale === "fr" ? "URL du fichier" : locale === "es" ? "URL del archivo" : locale === "it" ? "URL file" : "Datei-URL"}
                     value={newFileUrl}
                     onChange={setNewFileUrl}
                     placeholder="https://example.com/produktdatenblatt.pdf"
                     autoComplete="off"
                   />
                   <TextField
-                    label="Anzeigename im Shop"
+                    label={locale === "en" ? "Display name in shop" : locale === "tr" ? "Mağazada görünen ad" : locale === "fr" ? "Nom d'affichage dans la boutique" : locale === "es" ? "Nombre a mostrar en la tienda" : locale === "it" ? "Nome visualizzato nel negozio" : "Anzeigename im Shop"}
                     value={newFileName}
                     onChange={setNewFileName}
-                    placeholder="Produktdatenblatt"
+                    placeholder={locale === "en" ? "Product data sheet" : locale === "tr" ? "Ürün veri sayfası" : locale === "fr" ? "Fiche produit" : locale === "es" ? "Ficha técnica" : locale === "it" ? "Scheda tecnica" : "Produktdatenblatt"}
                     autoComplete="off"
                   />
                   <InlineStack gap="200">
-                    <Button onClick={handleAddFileUrl} disabled={!newFileUrl.trim()} size="slim" variant="primary">Hinzufügen</Button>
-                    <Button onClick={() => { setAddingFile(false); setNewFileUrl(""); setNewFileName(""); }} size="slim">Abbrechen</Button>
+                    <Button onClick={handleAddFileUrl} disabled={!newFileUrl.trim()} size="slim" variant="primary">{ui.add}</Button>
+                    <Button onClick={() => { setAddingFile(false); setNewFileUrl(""); setNewFileName(""); }} size="slim">{ui.cancel}</Button>
                   </InlineStack>
                 </BlockStack>
               )}
@@ -2345,11 +2339,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   onChange={handleFileUpload}
                 />
                 <Button size="slim" onClick={() => { setFileUploadErr(""); fileInputRef.current?.click(); }} loading={fileUploading}>
-                  Datei hochladen
+                  {locale === "en" ? "Upload file" : locale === "tr" ? "Dosya yükle" : locale === "fr" ? "Télécharger un fichier" : locale === "es" ? "Subir archivo" : locale === "it" ? "Carica file" : "Datei hochladen"}
                 </Button>
                 {!addingFile && (
                   <Button size="slim" onClick={() => setAddingFile(true)}>
-                    URL hinzufügen
+                    {locale === "en" ? "Add URL" : locale === "tr" ? "URL ekle" : locale === "fr" ? "Ajouter une URL" : locale === "es" ? "Agregar URL" : locale === "it" ? "Aggiungi URL" : "URL hinzufügen"}
                   </Button>
                 )}
               </InlineStack>
@@ -2364,7 +2358,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               {/* Netto / Brutto with lock — currency shown beside field (Polaris prefix + controlled value breaks multi-char typing). */}
               <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
                 <Box minWidth="130px" flex="1">
-                  <div className="product-edit-label">Netto (exkl. {currentCountryConf.taxLabel})</div>
+                  <div className="product-edit-label">{locale === "en" ? `Net (excl. ${currentCountryConf.taxLabel})` : locale === "tr" ? `Net (${currentCountryConf.taxLabel} hariç)` : locale === "fr" ? `Net (hors ${currentCountryConf.taxLabel})` : locale === "es" ? `Neto (excl. ${currentCountryConf.taxLabel})` : locale === "it" ? `Netto (escl. ${currentCountryConf.taxLabel})` : `Netto (exkl. ${currentCountryConf.taxLabel})`}</div>
                   <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
                     <span style={{ flexShrink: 0, alignSelf: "center", fontSize: 14, fontWeight: 600, color: "var(--p-color-text-subdued)", minWidth: "1.25em" }} aria-hidden>{currentCountryConf.symbol}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -2407,7 +2401,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   <button
                     type="button"
                     onClick={toggleCountryPriceLock}
-                    title={cpLinked ? "Netto und Brutto entkoppeln" : "Netto und Brutto koppeln"}
+                    title={cpLinked ? (locale === "en" ? "Unlink net and gross" : locale === "tr" ? "Net ve brüt bağlantısını kes" : locale === "fr" ? "Dissocier net et brut" : locale === "es" ? "Desconectar neto y bruto" : locale === "it" ? "Scollega netto e lordo" : "Netto und Brutto entkoppeln") : (locale === "en" ? "Link net and gross" : locale === "tr" ? "Net ve brütü bağla" : locale === "fr" ? "Associer net et brut" : locale === "es" ? "Conectar neto y bruto" : locale === "it" ? "Collega netto e lordo" : "Netto und Brutto koppeln")}
                     style={{
                       width: 32, height: 32, borderRadius: 6, border: "1px solid #d1d5db",
                       background: cpLinked ? "#f0fdf4" : "#fafafa", cursor: "pointer",
@@ -2418,7 +2412,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   </button>
                 </div>
                 <Box minWidth="130px" flex="1">
-                  <div className="product-edit-label">Brutto (inkl. {currentCountryConf.taxLabel} {currentCountryConf.vatRate > 0 ? currentCountryConf.vatRate + "%" : ""})</div>
+                  <div className="product-edit-label">{locale === "en" ? `Gross (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : locale === "tr" ? `Brüt (${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""} dahil)` : locale === "fr" ? `Brut (${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""} incl.)` : locale === "es" ? `Bruto (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : locale === "it" ? `Lordo (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : `Brutto (inkl. ${currentCountryConf.taxLabel} ${currentCountryConf.vatRate > 0 ? currentCountryConf.vatRate + "%" : ""})`}</div>
                   <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
                     <span style={{ flexShrink: 0, alignSelf: "center", fontSize: 14, fontWeight: 600, color: "var(--p-color-text-subdued)", minWidth: "1.25em" }} aria-hidden>{currentCountryConf.symbol}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -2494,7 +2488,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   </div>
                 </Box>
                 <Box minWidth="130px" flex="1">
-                  <div className="product-edit-label">Sale-Preis</div>
+                  <div className="product-edit-label">{locale === "en" ? "Sale price" : locale === "tr" ? "İndirimli fiyat" : locale === "fr" ? "Prix soldé" : locale === "es" ? "Precio de oferta" : locale === "it" ? "Prezzo scontato" : "Sale-Preis"}</div>
                   <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
                     <span style={{ flexShrink: 0, alignSelf: "center", fontSize: 14, fontWeight: 600, color: "var(--p-color-text-subdued)", minWidth: "1.25em" }} aria-hidden>{currentCountryConf.symbol}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -2532,7 +2526,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               </div>
 
               <ProductSectionRule />
-              <ProductSectionHeading>Bullet points (max 5, je max. 120 Zeichen)</ProductSectionHeading>
+              <ProductSectionHeading>Bullet points (max 5{locale === "en" ? ", max. 120 chars each" : locale === "tr" ? ", her biri max. 120 karakter" : locale === "fr" ? ", max. 120 caractères chacun" : locale === "es" ? ", máx. 120 caracteres cada uno" : locale === "it" ? ", max. 120 caratteri ciascuno" : ", je max. 120 Zeichen"})</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">Short selling points shown on the product page.</Text>
               {[0, 1, 2, 3, 4].map((i) => {
                 const val = editingBullets[i] ?? "";
@@ -2863,22 +2857,22 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <ProductSectionRule />
               <BlockStack gap="400">
                 <BlockStack gap="150">
-                  <ProductSectionHeading>Metafelder (Katalog)</ProductSectionHeading>
+                  <ProductSectionHeading>{locale === "en" ? "Metafields (catalog)" : locale === "tr" ? "Metafield'lar (katalog)" : locale === "fr" ? "Métachamps (catalogue)" : locale === "es" ? "Metacampos (catálogo)" : locale === "it" ? "Metacampi (catalogo)" : "Metafelder (Katalog)"}</ProductSectionHeading>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen“ ausgewählte — werden angezeigt (nicht der gesamte Katalog).
+                    {locale === "en" ? "Only metafields with set values — or those selected via \"Add metafield\" — are shown (not the entire catalog)." : locale === "tr" ? "Yalnızca değer atanmış metafield'lar — veya \"Metafield ekle\" ile seçilenler — gösterilir (tüm katalog değil)." : locale === "fr" ? "Seuls les métachamps avec des valeurs définies — ou sélectionnés via \"Ajouter un métachamp\" — sont affichés (pas l'ensemble du catalogue)." : locale === "es" ? "Solo se muestran los metacampos con valores establecidos — o los seleccionados mediante \"Agregar metacampo\" — (no el catálogo completo)." : locale === "it" ? "Vengono mostrati solo i metacampi con valori impostati — o quelli selezionati tramite \"Aggiungi metacampo\" — (non l'intero catalogo)." : 'Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen" ausgewählte — werden angezeigt (nicht der gesamte Katalog).'}
                   </Text>
                 </BlockStack>
                 {Object.keys(metaDefs).length === 0 ? (
                   <Box padding="400" background="bg-surface-secondary" borderRadius="200">
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Noch keine Katalog-Definitionen — du kannst mit „Neues Metafeld (Katalog)“ Titel und Wert anlegen (Superuser: sofort aktiv; Verkäufer: Freigabe nötig).
+                      {locale === "en" ? "No catalog definitions yet — use \"New metafield (catalog)\" to create title and value (superuser: immediately active; seller: approval required)." : locale === "tr" ? "Henüz katalog tanımı yok — başlık ve değer oluşturmak için \"Yeni metafield (katalog)\" kullanın (süper kullanıcı: hemen aktif; satıcı: onay gerekli)." : locale === "fr" ? "Aucune définition de catalogue — utilisez \"Nouveau métachamp (catalogue)\" pour créer titre et valeur (superuser : immédiatement actif ; vendeur : approbation requise)." : locale === "es" ? "Aún no hay definiciones de catálogo — usa \"Nuevo metacampo (catálogo)\" para crear título y valor (superusuario: activo inmediatamente; vendedor: se requiere aprobación)." : locale === "it" ? "Nessuna definizione di catalogo ancora — usa \"Nuovo metacampo (catalogo)\" per creare titolo e valore (superuser: immediatamente attivo; venditore: approvazione richiesta)." : 'Noch keine Katalog-Definitionen — du kannst mit „Neues Metafeld (Katalog)" Titel und Wert anlegen (Superuser: sofort aktiv; Verkäufer: Freigabe nötig).'}
                     </Text>
                   </Box>
                 ) : (
                   <Box padding="400" background="bg-surface-secondary" borderRadius="300">
                     <BlockStack gap="400">
                       {visibleMetaDefEntries.length === 0 && (
-                        <Text as="p" variant="bodySm" tone="subdued">Keine Metafelder für dieses Produkt. Unten kannst du welche hinzufügen.</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No metafields for this product. You can add some below." : locale === "tr" ? "Bu ürün için metafield yok. Aşağıdan ekleyebilirsiniz." : locale === "fr" ? "Aucun métachamp pour ce produit. Vous pouvez en ajouter ci-dessous." : locale === "es" ? "No hay metacampos para este producto. Puedes agregar algunos abajo." : locale === "it" ? "Nessun metacampo per questo prodotto. Puoi aggiungerne qui sotto." : "Keine Metafelder für dieses Produkt. Unten kannst du welche hinzufügen."}</Text>
                       )}
                       {visibleMetaDefEntries.map(([defKey, def]) => {
                         const selected = metafieldsList.filter(m => m.key === defKey).map(m => m.value).filter(Boolean);
@@ -2925,16 +2919,16 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                 onClose={() => setMetaDefPopover(p => ({ ...p, [defKey]: false }))}
                                 activator={
                                   <Button size="slim" variant="secondary" onClick={() => setMetaDefPopover(p => ({ ...p, [defKey]: !p[defKey] }))}>
-                                    + Wert wählen
+                                    + {locale === "en" ? "Select value" : locale === "tr" ? "Değer seç" : locale === "fr" ? "Choisir une valeur" : locale === "es" ? "Seleccionar valor" : locale === "it" ? "Seleziona valore" : "Wert wählen"}
                                   </Button>
                                 }
                               >
                                 <Box padding="300" minWidth="220px">
                                   <BlockStack gap="200">
                                     <TextField
-                                      label="Suchen"
+                                      label={locale === "en" ? "Search" : locale === "tr" ? "Ara" : locale === "fr" ? "Rechercher" : locale === "es" ? "Buscar" : locale === "it" ? "Cerca" : "Suchen"}
                                       labelHidden
-                                      placeholder="Suchen oder eingeben…"
+                                      placeholder={locale === "en" ? "Search or enter…" : locale === "tr" ? "Ara veya gir…" : locale === "fr" ? "Rechercher ou saisir…" : locale === "es" ? "Buscar o ingresar…" : locale === "it" ? "Cerca o inserisci…" : "Suchen oder eingeben…"}
                                       value={search}
                                       onChange={v => setMetaDefSearch(p => ({ ...p, [defKey]: v }))}
                                       autoComplete="off"
@@ -2970,10 +2964,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                             setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
                                             setMetaDefPopover(p => ({ ...p, [defKey]: false }));
                                           }}
-                                        >"{search.trim()}" hinzufügen</div>
+                                        >"{search.trim()}" {locale === "en" ? "add" : locale === "tr" ? "ekle" : locale === "fr" ? "ajouter" : locale === "es" ? "agregar" : locale === "it" ? "aggiungi" : "hinzufügen"}</div>
                                       )}
                                       {availableVals.length === 0 && !canAddCustom && (
-                                        <div style={{ padding: "8px 10px", fontSize: 13, color: "var(--p-color-text-subdued)" }}>Keine weiteren Optionen</div>
+                                        <div style={{ padding: "8px 10px", fontSize: 13, color: "var(--p-color-text-subdued)" }}>{locale === "en" ? "No more options" : locale === "tr" ? "Başka seçenek yok" : locale === "fr" ? "Aucune autre option" : locale === "es" ? "No hay más opciones" : locale === "it" ? "Nessun'altra opzione" : "Keine weiteren Optionen"}</div>
                                       )}
                                     </div>
                                   </BlockStack>
@@ -2992,7 +2986,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             onClose={() => setAddMetaDefPopoverOpen(false)}
                             activator={
                               <Button size="slim" variant="secondary" onClick={() => setAddMetaDefPopoverOpen((o) => !o)}>
-                                + Metafeld hinzufügen
+                                + {locale === "en" ? "Add metafield" : locale === "tr" ? "Metafield ekle" : locale === "fr" ? "Ajouter un métachamp" : locale === "es" ? "Agregar metacampo" : locale === "it" ? "Aggiungi metacampo" : "Metafeld hinzufügen"}
                               </Button>
                             }
                           >
@@ -3007,10 +3001,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                               <BlockStack gap="400">
                                 <BlockStack gap="150">
                                   <Text variant="headingSm" as="h3">
-                                    Metafeld auswählen
+                                    {locale === "en" ? "Select metafield" : locale === "tr" ? "Metafield seç" : locale === "fr" ? "Sélectionner un métachamp" : locale === "es" ? "Seleccionar metacampo" : locale === "it" ? "Seleziona metacampo" : "Metafeld auswählen"}
                                   </Text>
                                   <Text variant="bodySm" tone="subdued">
-                                    Wähle ein Feld aus dem Katalog. Es erscheint darunter als eigene Zeile zum Bearbeiten.
+                                    {locale === "en" ? "Choose a field from the catalog. It will appear below as its own row for editing." : locale === "tr" ? "Katalogdan bir alan seçin. Aşağıda düzenleme için kendi satırı olarak görünecektir." : locale === "fr" ? "Choisissez un champ du catalogue. Il apparaîtra ci-dessous comme une ligne à part pour l'édition." : locale === "es" ? "Elige un campo del catálogo. Aparecerá abajo como su propia fila para edición." : locale === "it" ? "Scegli un campo dal catalogo. Apparirà sotto come riga propria per la modifica." : "Wähle ein Feld aus dem Katalog. Es erscheint darunter als eigene Zeile zum Bearbeiten."}
                                   </Text>
                                 </BlockStack>
                                 <div
@@ -3049,7 +3043,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 )}
                 <InlineStack gap="300" blockAlign="center" wrap>
                   <Button size="slim" variant="primary" onClick={() => { setNewCatalogMetaErr(""); setNewCatalogMetaOpen(true); }}>
-                    + Neues Metafeld (Katalog)
+                    + {locale === "en" ? "New metafield (catalog)" : locale === "tr" ? "Yeni metafield (katalog)" : locale === "fr" ? "Nouveau métachamp (catalogue)" : locale === "es" ? "Nuevo metacampo (catálogo)" : locale === "it" ? "Nuovo metacampo (catalogo)" : "Neues Metafeld (Katalog)"}
                   </Button>
                 </InlineStack>
               </BlockStack>
@@ -3057,36 +3051,36 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <Modal
                 open={newCatalogMetaOpen}
                 onClose={() => { if (!newCatalogMetaSaving) setNewCatalogMetaOpen(false); }}
-                title="Neues Katalog-Metafeld"
+                title={locale === "en" ? "New catalog metafield" : locale === "tr" ? "Yeni katalog metafield'ı" : locale === "fr" ? "Nouveau métachamp de catalogue" : locale === "es" ? "Nuevo metacampo de catálogo" : locale === "it" ? "Nuovo metacampo catalogo" : "Neues Katalog-Metafeld"}
                 primaryAction={{
-                  content: isSuperuser ? "Im Katalog speichern" : "Zur Freigabe einreichen",
+                  content: isSuperuser ? (locale === "en" ? "Save in catalog" : locale === "tr" ? "Katalogda kaydet" : locale === "fr" ? "Enregistrer dans le catalogue" : locale === "es" ? "Guardar en catálogo" : locale === "it" ? "Salva nel catalogo" : "Im Katalog speichern") : (locale === "en" ? "Submit for approval" : locale === "tr" ? "Onay için gönder" : locale === "fr" ? "Soumettre pour approbation" : locale === "es" ? "Enviar para aprobación" : locale === "it" ? "Invia per approvazione" : "Zur Freigabe einreichen"),
                   onAction: submitNewCatalogMetafield,
                   loading: newCatalogMetaSaving,
                 }}
-                secondaryActions={[{ content: "Abbrechen", onAction: () => { if (!newCatalogMetaSaving) setNewCatalogMetaOpen(false); } }]}
+                secondaryActions={[{ content: ui.cancel, onAction: () => { if (!newCatalogMetaSaving) setNewCatalogMetaOpen(false); } }]}
               >
                 <Modal.Section>
                   <BlockStack gap="400">
                     {newCatalogMetaErr ? <Banner tone="critical" onDismiss={() => setNewCatalogMetaErr("")}>{newCatalogMetaErr}</Banner> : null}
                     <TextField
-                      label="Titel (Anzeigename)"
+                      label={locale === "en" ? "Title (display name)" : locale === "tr" ? "Başlık (görünen ad)" : locale === "fr" ? "Titre (nom d'affichage)" : locale === "es" ? "Título (nombre de visualización)" : locale === "it" ? "Titolo (nome di visualizzazione)" : "Titel (Anzeigename)"}
                       value={newCatalogMetaLabel}
                       onChange={setNewCatalogMetaLabel}
-                      placeholder="z.B. Material, Zertifikat, Pflegehinweis"
+                      placeholder={locale === "en" ? "e.g. Material, Certificate, Care instructions" : locale === "tr" ? "örn. Malzeme, Sertifika, Bakım talimatları" : locale === "fr" ? "ex. Matière, Certificat, Instructions d'entretien" : locale === "es" ? "ej. Material, Certificado, Instrucciones de cuidado" : locale === "it" ? "es. Materiale, Certificato, Istruzioni per la cura" : "z.B. Material, Zertifikat, Pflegehinweis"}
                       autoComplete="off"
                     />
                     <TextField
-                      label="Inhalt (Wert)"
+                      label={locale === "en" ? "Content (value)" : locale === "tr" ? "İçerik (değer)" : locale === "fr" ? "Contenu (valeur)" : locale === "es" ? "Contenido (valor)" : locale === "it" ? "Contenuto (valore)" : "Inhalt (Wert)"}
                       value={newCatalogMetaValue}
                       onChange={setNewCatalogMetaValue}
-                      placeholder="z.B. Baumwolle, OEKO-TEX, Maschinenwäsche 40°"
+                      placeholder={locale === "en" ? "e.g. Cotton, OEKO-TEX, Machine wash 40°" : locale === "tr" ? "örn. Pamuk, OEKO-TEX, Makinede yıkama 40°" : locale === "fr" ? "ex. Coton, OEKO-TEX, Lavage machine 40°" : locale === "es" ? "ej. Algodón, OEKO-TEX, Lavado a máquina 40°" : locale === "it" ? "es. Cotone, OEKO-TEX, Lavaggio in lavatrice 40°" : "z.B. Baumwolle, OEKO-TEX, Maschinenwäsche 40°"}
                       autoComplete="off"
                     />
                     <TextField
-                      label="Key (optional)"
+                      label={locale === "en" ? "Key (optional)" : locale === "tr" ? "Anahtar (isteğe bağlı)" : locale === "fr" ? "Clé (optionnel)" : locale === "es" ? "Clave (opcional)" : locale === "it" ? "Chiave (opzionale)" : "Key (optional)"}
                       value={newCatalogMetaKey}
                       onChange={(v) => setNewCatalogMetaKey(v.toLowerCase())}
-                      helpText="Leer lassen: wird aus dem Titel erzeugt (kleinbuchstaben, Unterstriche)."
+                      helpText={locale === "en" ? "Leave empty: generated from title (lowercase, underscores)." : locale === "tr" ? "Boş bırakın: başlıktan oluşturulur (küçük harf, alt çizgi)." : locale === "fr" ? "Laisser vide : généré à partir du titre (minuscules, tirets bas)." : locale === "es" ? "Dejar vacío: se genera desde el título (minúsculas, guiones bajos)." : locale === "it" ? "Lascia vuoto: generato dal titolo (minuscolo, trattini bassi)." : "Leer lassen: wird aus dem Titel erzeugt (kleinbuchstaben, Unterstriche)."}
                       autoComplete="off"
                     />
                   </BlockStack>
@@ -3094,7 +3088,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               </Modal>
 
               <ProductSectionRule />
-              <ProductSectionHeading>Produktsicherheitsinformationen (GPSR)</ProductSectionHeading>
+              <ProductSectionHeading>{locale === "en" ? "Product safety information (GPSR)" : locale === "tr" ? "Ürün güvenlik bilgileri (GPSR)" : locale === "fr" ? "Informations de sécurité produit (GPSR)" : locale === "es" ? "Información de seguridad del producto (GPSR)" : locale === "it" ? "Informazioni di sicurezza prodotto (GPSR)" : "Produktsicherheitsinformationen (GPSR)"}</ProductSectionHeading>
               <TextField
                 label={
                   <InlineStack gap="200" blockAlign="center" wrap={false}>
@@ -3136,10 +3130,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               />
 
               <ProductSectionRule />
-              <ProductSectionHeading>Made in Europe (optional)</ProductSectionHeading>
+              <ProductSectionHeading>Made in Europe ({locale === "en" ? "optional" : locale === "tr" ? "isteğe bağlı" : locale === "fr" ? "optionnel" : locale === "es" ? "opcional" : locale === "it" ? "opzionale" : "optional"})</ProductSectionHeading>
               <Text as="p" tone="subdued">
-                Registry-ID und Nachweisdokument optional. Nach Speichern mit geänderten Angaben: Status „pending“.
-                Im Shop erscheint das Badge nur bei Status „verified“ (Superuser oder spätere Registry-Prüfung).
+                {locale === "en" ? "Registry ID and proof document are optional. After saving with changed details: status \"pending\". The badge appears in the shop only when status is \"verified\" (superuser or later registry check)." : locale === "tr" ? "Registry ID ve kanıt belgesi isteğe bağlıdır. Değiştirilen bilgilerle kaydedildikten sonra: durum \"beklemede\". Mağazada rozet yalnızca durum \"doğrulandı\" olduğunda görünür (süper kullanıcı veya sonraki registry kontrolü)." : locale === "fr" ? "L'ID de registre et le document justificatif sont optionnels. Après enregistrement avec des informations modifiées : statut \"en attente\". Le badge n'apparaît dans la boutique qu'avec le statut \"vérifié\" (superuser ou vérification ultérieure du registre)." : locale === "es" ? "El ID de registro y el documento de prueba son opcionales. Tras guardar con datos modificados: estado \"pendiente\". El badge aparece en la tienda solo con estado \"verificado\" (superusuario o verificación posterior del registro)." : locale === "it" ? "L'ID registro e il documento di prova sono opzionali. Dopo il salvataggio con dati modificati: stato \"in sospeso\". Il badge appare nel negozio solo quando lo stato è \"verificato\" (superuser o controllo registro successivo)." : 'Registry-ID und Nachweisdokument optional. Nach Speichern mit geänderten Angaben: Status „pending". Im Shop erscheint das Badge nur bei Status „verified" (Superuser oder spätere Registry-Prüfung).'}
               </Text>
               {euOriginNotice ? (
                 <Banner tone="info" onDismiss={() => setEuOriginNotice("")}>{euOriginNotice}</Banner>
@@ -3147,13 +3140,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <TextField
                 label={
                   <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Herkunftsland (EU)</span>
+                    <span>{locale === "en" ? "Country of origin (EU)" : locale === "tr" ? "Menşe ülke (AB)" : locale === "fr" ? "Pays d'origine (UE)" : locale === "es" ? "País de origen (UE)" : locale === "it" ? "Paese di origine (UE)" : "Herkunftsland (EU)"}</span>
                     <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.eu_origin_country" />
                   </InlineStack>
                 }
                 value={meta.eu_origin_country ?? ""}
                 onChange={(v) => updateMeta("eu_origin_country", v || undefined)}
-                placeholder="z. B. DE, FR, IT"
+                placeholder={locale === "en" ? "e.g. DE, FR, IT" : locale === "tr" ? "örn. DE, FR, IT" : "z. B. DE, FR, IT"}
                 autoComplete="off"
               />
               <TextField
@@ -3165,7 +3158,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 }
                 value={meta.eu_origin_registry_id ?? ""}
                 onChange={(v) => updateMeta("eu_origin_registry_id", v || undefined)}
-                placeholder="EU-Registry / Zertifikatsnummer"
+                placeholder={locale === "en" ? "EU registry / certificate number" : locale === "tr" ? "AB kayıt / sertifika numarası" : locale === "fr" ? "Registre UE / numéro de certificat" : locale === "es" ? "Registro UE / número de certificado" : locale === "it" ? "Registro UE / numero di certificato" : "EU-Registry / Zertifikatsnummer"}
                 autoComplete="off"
               />
               <TextField
@@ -3181,9 +3174,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 autoComplete="off"
               />
               <Select
-                label="Registry-Provider"
+                label={locale === "en" ? "Registry provider" : locale === "tr" ? "Registry sağlayıcısı" : locale === "fr" ? "Fournisseur de registre" : locale === "es" ? "Proveedor de registro" : locale === "it" ? "Provider registro" : "Registry-Provider"}
                 options={[
-                  { label: "Stub (manuelle Prüfung)", value: "stub" },
+                  { label: locale === "en" ? "Stub (manual check)" : locale === "tr" ? "Stub (manuel kontrol)" : locale === "fr" ? "Stub (vérification manuelle)" : locale === "es" ? "Stub (verificación manual)" : locale === "it" ? "Stub (verifica manuale)" : "Stub (manuelle Prüfung)", value: "stub" },
                 ]}
                 value={meta.eu_origin_provider || "stub"}
                 onChange={(v) => updateMeta("eu_origin_provider", v || "stub")}
@@ -3195,8 +3188,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 autoComplete="off"
                 helpText={
                   meta.eu_origin_verified_at
-                    ? `Verifiziert am: ${meta.eu_origin_verified_at}`
-                    : "Nur Backend/Superuser setzt „verified“."
+                    ? `${locale === "en" ? "Verified at:" : locale === "tr" ? "Doğrulandı:" : locale === "fr" ? "Vérifié le :" : locale === "es" ? "Verificado el:" : locale === "it" ? "Verificato il:" : "Verifiziert am:"} ${meta.eu_origin_verified_at}`
+                    : (locale === "en" ? "Only backend/superuser sets \"verified\"." : locale === "tr" ? "Yalnızca backend/süper kullanıcı \"doğrulandı\" olarak ayarlar." : locale === "fr" ? "Seul le backend/superuser définit \"vérifié\"." : locale === "es" ? "Solo backend/superusuario establece \"verificado\"." : locale === "it" ? "Solo backend/superuser imposta \"verificato\"." : 'Nur Backend/Superuser setzt „verified".')
                 }
               />
               <InlineStack gap="200">
@@ -3205,7 +3198,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   loading={euOriginVerifying}
                   disabled={!product?.id || euOriginVerifying}
                 >
-                  Registry prüfen (Stub)
+                  {locale === "en" ? "Check registry (stub)" : locale === "tr" ? "Registry kontrol et (stub)" : locale === "fr" ? "Vérifier le registre (stub)" : locale === "es" ? "Verificar registro (stub)" : locale === "it" ? "Controlla registro (stub)" : "Registry prüfen (Stub)"}
                 </Button>
                 {isSuperuser ? (
                   <Button
@@ -3214,7 +3207,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     loading={euOriginVerifying}
                     disabled={!product?.id || euOriginVerifying}
                   >
-                    Manuell verifizieren
+                    {locale === "en" ? "Verify manually" : locale === "tr" ? "Manuel doğrula" : locale === "fr" ? "Vérifier manuellement" : locale === "es" ? "Verificar manualmente" : locale === "it" ? "Verifica manualmente" : "Manuell verifizieren"}
                   </Button>
                 ) : null}
               </InlineStack>
@@ -3334,7 +3327,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   <Select label="Status" labelHidden options={STATUS_OPTIONS} value={product.status || "draft"} onChange={(v) => update({ status: v })} />
                 </BlockStack>
                 <BlockStack gap="200">
-                  <ProductSectionHeading>Yayın tarihi (opsiyonel)</ProductSectionHeading>
+                  <ProductSectionHeading>{locale === "en" ? "Publish date (optional)" : locale === "tr" ? "Yayın tarihi (isteğe bağlı)" : locale === "fr" ? "Date de publication (optionnel)" : locale === "es" ? "Fecha de publicación (opcional)" : locale === "it" ? "Data di pubblicazione (opzionale)" : "Veröffentlichungsdatum (optional)"}</ProductSectionHeading>
                   <TextField
                     label=""
                     labelHidden
@@ -3361,21 +3354,21 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       updateMeta("publish_date", d.toISOString());
                     }}
                     placeholder="YYYY-MM-DDTHH:mm"
-                    helpText="İleri tarih + saat seçilirse shop’ta “Pek yakında” gösterilir."
+                    helpText={locale === "en" ? "If a future date + time is set, the shop shows \"Coming soon\"." : locale === "tr" ? "İleri tarih + saat seçilirse shop’ta \"Pek yakında\" gösterilir." : locale === "fr" ? "Si une date + heure future est sélectionnée, la boutique affiche \"Bientôt disponible\"." : locale === "es" ? "Si se selecciona una fecha + hora futura, la tienda muestra \"Próximamente\"." : locale === "it" ? "Se si seleziona una data + ora futura, il negozio mostra \"Presto disponibile\"." : "Bei zukünftigem Datum + Uhrzeit zeigt der Shop \"Demnächst verfügbar\"."}
                   />
                 </BlockStack>
 
                 <div style={{ position: "relative", zIndex: relatedProductPopoverOpen ? 10000 : undefined, overflow: "visible" }}>
                   <BlockStack gap="200">
-                    <ProductSectionHeading>Related products (Kunden kauften auch)</ProductSectionHeading>
-                    <Text as="p" variant="bodySm" tone="subdued">Ürün sayfasında &quot;Kunden, die diesen Artikel gekauft haben, kauften auch&quot; bölümünde gösterilecek ürünler.</Text>
+                    <ProductSectionHeading>{locale === "en" ? "Related products (customers also bought)" : locale === "tr" ? "İlgili ürünler (müşteriler de satın aldı)" : locale === "fr" ? "Produits associés (les clients ont aussi acheté)" : locale === "es" ? "Productos relacionados (los clientes también compraron)" : locale === "it" ? "Prodotti correlati (i clienti hanno anche acquistato)" : "Verwandte Produkte (Kunden kauften auch)"}</ProductSectionHeading>
+                    <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "Products shown in the \"Customers who bought this item also bought\" section on the product page." : locale === "tr" ? "Ürün sayfasında \"Bu ürünü satın alanlar bunları da satın aldı\" bölümünde gösterilecek ürünler." : locale === "fr" ? "Produits affichés dans la section \"Les clients qui ont acheté cet article ont aussi acheté\" sur la page produit." : locale === "es" ? "Productos mostrados en la sección \"Los clientes que compraron este artículo también compraron\" en la página del producto." : locale === "it" ? "Prodotti mostrati nella sezione \"I clienti che hanno acquistato questo articolo hanno anche acquistato\" nella pagina prodotto." : "Produkte die im Bereich \"Kunden, die diesen Artikel gekauft haben, kauften auch\" auf der Produktseite angezeigt werden."}</Text>
                     <TextField
                       label=""
                       labelHidden
                       value={relatedProductSearch}
                       onChange={setRelatedProductSearch}
                       onFocus={() => setRelatedProductPopoverOpen(true)}
-                      placeholder="Ürün ara…"
+                      placeholder={locale === "en" ? "Search product…" : locale === "tr" ? "Ürün ara…" : locale === "fr" ? "Rechercher un produit…" : locale === "es" ? "Buscar producto…" : locale === "it" ? "Cerca prodotto…" : "Produkt suchen…"}
                       autoComplete="off"
                     />
                     <div style={{ position: "relative" }}>
@@ -3509,7 +3502,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             </Text>
             <BlockStack gap="300">
               <Checkbox
-                label="Title (with “(Copy)” suffix)"
+                label={'Title (with "(Copy)" suffix)'}
                 checked={duplicateOptions.title}
                 onChange={(v) => setDuplicateOptions((o) => ({ ...o, title: v }))}
               />

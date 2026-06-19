@@ -104,7 +104,13 @@
     "sellers": "Vendedores",
     "coupons": "Cupones",
     "landingPage": "Página de destino",
-    "styles": "Estilos"
+    "styles": "Estilos",
+    "promotions": "Promociones",
+    "flows": "Flujos",
+    "newsletter": "Newsletter",
+    "productGroups": "Grupos de productos",
+    "issueLog": "Registro de incidencias",
+    "transactions": "Transacciones"
   },
   "rankingPage": {
     "title": "Clasificación de productos en la tienda",

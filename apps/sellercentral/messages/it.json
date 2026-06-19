@@ -104,7 +104,13 @@
     "sellers": "Venditori",
     "coupons": "Coupon",
     "landingPage": "Landing page",
-    "styles": "Stili"
+    "styles": "Stili",
+    "promotions": "Promozioni",
+    "flows": "Flussi",
+    "newsletter": "Newsletter",
+    "productGroups": "Gruppi di prodotti",
+    "issueLog": "Registro problemi",
+    "transactions": "Transazioni"
   },
   "rankingPage": {
     "title": "Posizionamento prodotti in negozio",

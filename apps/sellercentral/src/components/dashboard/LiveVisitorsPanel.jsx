@@ -1,28 +1,18 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocale } from "next-intl";
+import { useLt, dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
-const SORT_OPTIONS = [
-  { value: "last_seen_desc", label: "Zuletzt aktiv (neu)" },
-  { value: "last_seen_asc", label: "Zuletzt aktiv (alt)" },
-  { value: "country_asc", label: "Land A–Z" },
-  { value: "page_asc", label: "Seite A–Z" },
-  { value: "ip_asc", label: "IP A–Z" },
-];
-
-function fmtTime(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-}
-
-function countryLabel(code) {
-  if (!code) return "—";
-  try {
-    return new Intl.DisplayNames(["de"], { type: "region" }).of(code) || code;
-  } catch {
-    return code;
-  }
+function getSortOptions(lt) {
+  return [
+    { value: "last_seen_desc", label: lt("Last active (newest)", "Son aktif (yeni)", "Dernière activité (récent)", "Última actividad (reciente)", "Ultima attività (recente)", "Zuletzt aktiv (neu)") },
+    { value: "last_seen_asc", label: lt("Last active (oldest)", "Son aktif (eski)", "Dernière activité (ancien)", "Última actividad (antigua)", "Ultima attività (vecchia)", "Zuletzt aktiv (alt)") },
+    { value: "country_asc", label: lt("Country A–Z", "Ülke A–Z", "Pays A–Z", "País A–Z", "Paese A–Z", "Land A–Z") },
+    { value: "page_asc", label: lt("Page A–Z", "Sayfa A–Z", "Page A–Z", "Página A–Z", "Pagina A–Z", "Seite A–Z") },
+    { value: "ip_asc", label: lt("IP A–Z", "IP A–Z", "IP A–Z", "IP A–Z", "IP A–Z", "IP A–Z") },
+  ];
 }
 
 function deviceIcon(type) {
@@ -32,6 +22,31 @@ function deviceIcon(type) {
 }
 
 export default function LiveVisitorsPanel({ defaultExpanded = false }) {
+  const locale = useLocale();
+  const lt = useLt();
+  const sortOptions = useMemo(() => getSortOptions(lt), [lt]);
+  const dateLoc = dateLocaleFor(locale);
+
+  const fmtTime = useCallback(
+    (d) => {
+      if (!d) return "—";
+      return new Date(d).toLocaleTimeString(dateLoc, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    },
+    [dateLoc],
+  );
+
+  const countryLabel = useCallback(
+    (code) => {
+      if (!code) return "—";
+      try {
+        return new Intl.DisplayNames([dateLoc], { type: "region" }).of(code) || code;
+      } catch {
+        return code;
+      }
+    },
+    [dateLoc],
+  );
+
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [count, setCount] = useState(0);
   const [visitors, setVisitors] = useState([]);
@@ -49,11 +64,11 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
       if (expanded) setVisitors(data?.visitors || []);
       setError(null);
     } catch (e) {
-      setError(e?.message || "Live-Daten nicht verfügbar");
+      setError(e?.message || lt("Live data unavailable", "Canlı veri kullanılamıyor", "Données en direct indisponibles", "Datos en vivo no disponibles", "Dati live non disponibili", "Live-Daten nicht verfügbar"));
     } finally {
       setLoading(false);
     }
-  }, [sort, country, q, expanded]);
+  }, [sort, country, q, expanded, lt]);
 
   useEffect(() => {
     load();
@@ -65,6 +80,17 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
     const set = new Set(visitors.map((v) => v.country_code).filter(Boolean));
     return [...set].sort();
   }, [visitors]);
+
+  const tableHeaders = useMemo(
+    () => [
+      lt("Device", "Cihaz", "Appareil", "Dispositivo", "Dispositivo", "Gerät"),
+      "IP",
+      lt("Location", "Konum", "Lieu", "Ubicación", "Posizione", "Ort"),
+      lt("Page", "Sayfa", "Page", "Página", "Pagina", "Seite"),
+      lt("Active", "Aktif", "Actif", "Activo", "Attivo", "Aktiv"),
+    ],
+    [lt],
+  );
 
   return (
     <div
@@ -95,13 +121,15 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
       >
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.75, marginBottom: 6 }}>
-            Live · Shop-Besucher
+            {lt("Live · Shop visitors", "Canlı · Mağaza ziyaretçileri", "En direct · Visiteurs boutique", "En vivo · Visitantes de la tienda", "Live · Visitatori negozio", "Live · Shop-Besucher")}
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
             <span style={{ fontSize: 42, fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
               {loading ? "…" : count}
             </span>
-            <span style={{ fontSize: 14, opacity: 0.85 }}>aktuell auf der Website</span>
+            <span style={{ fontSize: 14, opacity: 0.85 }}>
+              {lt("currently on the website", "şu anda sitede", "actuellement sur le site", "actualmente en el sitio", "attualmente sul sito", "aktuell auf der Website")}
+            </span>
           </div>
         </div>
         <span
@@ -126,7 +154,7 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14, alignItems: "center" }}>
             <input
               type="search"
-              placeholder="IP, Ort, Seite filtern…"
+              placeholder={lt("Filter IP, location, page…", "IP, konum, sayfa filtrele…", "Filtrer IP, lieu, page…", "Filtrar IP, ubicación, página…", "Filtra IP, posizione, pagina…", "IP, Ort, Seite filtern…")}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               style={{
@@ -152,7 +180,7 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
                 fontSize: 13,
               }}
             >
-              <option value="">Alle Länder</option>
+              <option value="">{lt("All countries", "Tüm ülkeler", "Tous les pays", "Todos los países", "Tutti i paesi", "Alle Länder")}</option>
               {countries.map((c) => (
                 <option key={c} value={c}>{countryLabel(c)} ({c})</option>
               ))}
@@ -169,7 +197,7 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
                 fontSize: 13,
               }}
             >
-              {SORT_OPTIONS.map((o) => (
+              {sortOptions.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
@@ -179,7 +207,7 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 640 }}>
               <thead>
                 <tr style={{ background: "rgba(0,0,0,0.25)", textAlign: "left" }}>
-                  {["Gerät", "IP", "Ort", "Seite", "Aktiv"].map((h) => (
+                  {tableHeaders.map((h) => (
                     <th key={h} style={{ padding: "10px 12px", fontWeight: 600, opacity: 0.85 }}>{h}</th>
                   ))}
                 </tr>
@@ -188,7 +216,7 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
                 {visitors.length === 0 && !loading && (
                   <tr>
                     <td colSpan={5} style={{ padding: 24, textAlign: "center", opacity: 0.7 }}>
-                      Keine aktiven Besucher in den letzten 3 Minuten
+                      {lt("No active visitors in the last 3 minutes", "Son 3 dakikada aktif ziyaretçi yok", "Aucun visiteur actif dans les 3 dernières minutes", "Sin visitantes activos en los últimos 3 minutos", "Nessun visitatore attivo negli ultimi 3 minuti", "Keine aktiven Besucher in den letzten 3 Minuten")}
                     </td>
                   </tr>
                 )}
@@ -211,7 +239,14 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
             </table>
           </div>
           <p style={{ margin: "10px 0 0", fontSize: 11, opacity: 0.65 }}>
-            Aktualisierung alle 10 s · Sitzungen ohne Ping &gt; 3 Min. werden entfernt
+            {lt(
+              "Updates every 10 s · Sessions without ping > 3 min are removed",
+              "Her 10 sn güncellenir · 3 dk ping yoksa oturumlar kaldırılır",
+              "Mise à jour toutes les 10 s · Sessions sans ping > 3 min supprimées",
+              "Actualización cada 10 s · Sesiones sin ping > 3 min se eliminan",
+              "Aggiornamento ogni 10 s · Sessioni senza ping > 3 min rimosse",
+              "Aktualisierung alle 10 s · Sitzungen ohne Ping > 3 Min. werden entfernt",
+            )}
           </p>
         </div>
       )}

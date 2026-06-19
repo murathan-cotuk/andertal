@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
+import { useLocale } from "next-intl";
 import { useSellerImpersonation } from "@/context/SellerImpersonationContext";
+import { getImpersonationCopy } from "@/lib/marketing-i18n";
 
 const BAR_HEIGHT = 44;
 const PURPLE = "#7c3aed";
@@ -10,6 +12,8 @@ const PURPLE_ACTIVE = "#a78bfa";
 const ORANGE_BORDER = "4px solid #f97316";
 
 export default function SellerImperBar() {
+  const locale = useLocale();
+  const imp = useMemo(() => getImpersonationCopy(locale), [locale]);
   const { tabs, expandedId, isExpanded, activeTab, openTab, closeTab, switchTab, collapseAll, expandTab } = useSellerImpersonation();
   const [visible, setVisible] = useState(false);
 
@@ -60,7 +64,7 @@ export default function SellerImperBar() {
         {/* Superuser return button */}
         <button
           onClick={collapseAll}
-          title="Zurück zum Superuser-Modus"
+          title={imp.backToSuperuser}
           style={{
             background: isExpanded ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.22)",
             border: "1px solid rgba(255,255,255,0.25)",
@@ -122,7 +126,7 @@ export default function SellerImperBar() {
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                 }}
-                title={isActive ? "Össefalten" : `Als ${tab.storeName} öffnen`}
+                title={isActive ? imp.collapse : imp.openAs(tab.storeName || tab.email || "Seller")}
               >
                 <span
                   style={{
@@ -161,7 +165,7 @@ export default function SellerImperBar() {
                   alignItems: "center",
                   flexShrink: 0,
                 }}
-                title="Schließen"
+                title={imp.close}
               >
                 ×
               </button>
@@ -183,7 +187,7 @@ export default function SellerImperBar() {
               maxWidth: 200,
             }}
           >
-            Angemeldet als: {activeTab.storeName || activeTab.email}
+            {imp.sellerMode(activeTab.storeName || activeTab.email)}
           </div>
         )}
       </div>

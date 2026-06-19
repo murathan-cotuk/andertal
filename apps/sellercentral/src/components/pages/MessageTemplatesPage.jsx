@@ -16,6 +16,8 @@ import {
   Select,
 } from "@shopify/polaris";
 import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
+import { useLocale } from "next-intl";
+import { useLt } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import FlowEmailBodyEditor, { htmlToPlainText } from "@/components/content/FlowEmailBodyEditor";
 import {
@@ -23,6 +25,8 @@ import {
 } from "@/lib/message-template-placeholders";
 
 export default function MessageTemplatesPage() {
+  const locale = useLocale();
+  const lt = useLt();
   const client = getMedusaAdminClient();
   const editorRef = useRef(null);
 
@@ -37,7 +41,6 @@ export default function MessageTemplatesPage() {
   const [busyDeleteId, setBusyDeleteId] = useState(null);
   const [placeholderPick, setPlaceholderPick] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [editorKey, setEditorKey] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,11 +49,11 @@ export default function MessageTemplatesPage() {
       const data = await client.getMessageTemplates();
       setTemplates(data?.templates || []);
     } catch (e) {
-      setError(e?.message || "Vorlagen konnten nicht geladen werden");
+      setError(e?.message || lt("Templates could not be loaded", "Şablonlar yüklenemedi", "Impossible de charger les modèles", "No se pudieron cargar las plantillas", "Impossibile caricare i modelli", "Vorlagen konnten nicht geladen werden"));
       setTemplates([]);
     }
     setLoading(false);
-  }, [client]);
+  }, [client, lt]);
 
   useEffect(() => {
     load();
@@ -61,7 +64,6 @@ export default function MessageTemplatesPage() {
     setFormName("");
     setFormBody("");
     setPlaceholderPick("");
-    setEditorKey((k) => k + 1);
     setModalOpen(true);
   };
 
@@ -70,7 +72,6 @@ export default function MessageTemplatesPage() {
     setFormName(t.name || "");
     setFormBody(t.body || "");
     setPlaceholderPick("");
-    setEditorKey((k) => k + 1);
     setModalOpen(true);
   };
 
@@ -86,7 +87,7 @@ export default function MessageTemplatesPage() {
     const name = formName.trim();
     const body = String(bodyHtml || "").trim();
     if (!name || !body) {
-      setError("Name und Text sind erforderlich");
+      setError(lt("Name and body are required", "Ad ve metin gereklidir", "Le nom et le texte sont requis", "El nombre y el texto son obligatorios", "Nome e testo sono obbligatori", "Name und Text sind erforderlich"));
       return;
     }
     setSaving(true);
@@ -100,7 +101,7 @@ export default function MessageTemplatesPage() {
       await load();
       closeModal();
     } catch (e) {
-      setError(e?.message || "Speichern fehlgeschlagen");
+      setError(e?.message || lt("Save failed", "Kaydetme başarısız", "Échec de l'enregistrement", "Error al guardar", "Salvataggio non riuscito", "Speichern fehlgeschlagen"));
     }
     setSaving(false);
   };
@@ -113,7 +114,7 @@ export default function MessageTemplatesPage() {
       setConfirmDeleteId(null);
       await load();
     } catch (e) {
-      setError(e?.message || "Löschen fehlgeschlagen");
+      setError(e?.message || lt("Delete failed", "Silme başarısız", "Échec de la suppression", "Error al eliminar", "Eliminazione non riuscita", "Löschen fehlgeschlagen"));
     }
     setBusyDeleteId(null);
   };
@@ -125,10 +126,17 @@ export default function MessageTemplatesPage() {
 
   return (
     <Page
-      title="Nachrichtenvorlagen"
-      subtitle="Text-, HTML- und Platzhalter wie {customer_name} für Antworten und E-Mails."
-      primaryAction={{ content: "Vorlage hinzufügen", onAction: openCreate }}
-      secondaryActions={[{ content: "Zum Posteingang", url: "/inbox" }]}
+      title={lt("Message templates", "Mesaj şablonları", "Modèles de message", "Plantillas de mensaje", "Modelli di messaggio", "Nachrichtenvorlagen")}
+      subtitle={lt(
+        "Text, HTML and placeholders like {customer_name} for replies and emails.",
+        "Yanıtlar ve e-postalar için {customer_name} gibi metin, HTML ve yer tutucular.",
+        "Texte, HTML et variables comme {customer_name} pour les réponses et e-mails.",
+        "Texto, HTML y variables como {customer_name} para respuestas y correos.",
+        "Testo, HTML e segnaposto come {customer_name} per risposte ed e-mail.",
+        "Text-, HTML- und Platzhalter wie {customer_name} für Antworten und E-Mails.",
+      )}
+      primaryAction={{ content: lt("Add template", "Şablon ekle", "Ajouter un modèle", "Añadir plantilla", "Aggiungi modello", "Vorlage hinzufügen"), onAction: openCreate }}
+      secondaryActions={[{ content: lt("Go to inbox", "Gelen kutusuna git", "Aller à la boîte de réception", "Ir a la bandeja de entrada", "Vai alla posta in arrivo", "Zum Posteingang"), url: `/${locale}/inbox` }]}
     >
       <BlockStack gap="400">
         {error && (
@@ -147,7 +155,14 @@ export default function MessageTemplatesPage() {
           ) : templates.length === 0 ? (
             <Box padding="600">
               <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                Noch keine Vorlagen. „Vorlage hinzufügen“ legt die erste an.
+                {lt(
+                  "No templates yet. Use “Add template” to create the first one.",
+                  "Henüz şablon yok. İlk şablonu oluşturmak için “Şablon ekle”yi kullanın.",
+                  "Aucun modèle. Utilisez « Ajouter un modèle » pour en créer un.",
+                  "Sin plantillas. Use « Añadir plantilla » para crear la primera.",
+                  "Nessun modello. Usa « Aggiungi modello » per crearne uno.",
+                  "Noch keine Vorlagen. „Vorlage hinzufügen“ legt die erste an.",
+                )}
               </Text>
             </Box>
           ) : (
@@ -173,14 +188,14 @@ export default function MessageTemplatesPage() {
                         icon={EditIcon}
                         variant="plain"
                         tone="subdued"
-                        accessibilityLabel="Bearbeiten"
+                        accessibilityLabel={lt("Edit", "Düzenle", "Modifier", "Editar", "Modifica", "Bearbeiten")}
                         onClick={() => openEdit(t)}
                       />
                       <Button
                         icon={DeleteIcon}
                         variant="plain"
                         tone="critical"
-                        accessibilityLabel="Löschen"
+                        accessibilityLabel={lt("Delete", "Sil", "Supprimer", "Eliminar", "Elimina", "Löschen")}
                         loading={busyDeleteId === t.id}
                         onClick={() => setConfirmDeleteId(t.id)}
                       />
@@ -196,26 +211,26 @@ export default function MessageTemplatesPage() {
       <Modal
         open={modalOpen}
         onClose={closeModal}
-        title={editingId ? "Vorlage bearbeiten" : "Neue Vorlage"}
+        title={editingId ? lt("Edit template", "Şablonu düzenle", "Modifier le modèle", "Editar plantilla", "Modifica modello", "Vorlage bearbeiten") : lt("New template", "Yeni şablon", "Nouveau modèle", "Nueva plantilla", "Nuovo modello", "Neue Vorlage")}
         primaryAction={{
-          content: editingId ? "Speichern" : "Anlegen",
+          content: editingId ? lt("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern") : lt("Create", "Oluştur", "Créer", "Crear", "Crea", "Anlegen"),
           onAction: handleSave,
           loading: saving,
         }}
-        secondaryActions={[{ content: "Abbrechen", onAction: closeModal, disabled: saving }]}
+        secondaryActions={[{ content: lt("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen"), onAction: closeModal, disabled: saving }]}
       >
         <Modal.Section>
           <BlockStack gap="400">
             <TextField
-              label="Name"
+              label={lt("Name", "Ad", "Nom", "Nombre", "Nome", "Name")}
               value={formName}
               onChange={setFormName}
               autoComplete="off"
-              placeholder="z. B. Versandbestätigung"
+              placeholder={lt("e.g. Shipping confirmation", "örn. Kargo onayı", "p. ex. Confirmation d'expédition", "p. ej. Confirmación de envío", "es. Conferma spedizione", "z. B. Versandbestätigung")}
             />
             <BlockStack gap="200">
               <Select
-                label="Platzhalter einfügen"
+                label={lt("Insert placeholder", "Yer tutucu ekle", "Insérer une variable", "Insertar variable", "Inserisci segnaposto", "Platzhalter einfügen")}
                 options={MESSAGE_TEMPLATE_PLACEHOLDER_OPTIONS}
                 value={placeholderPick}
                 onChange={(v) => {
@@ -228,12 +243,16 @@ export default function MessageTemplatesPage() {
             <FlowEmailBodyEditor
               ref={editorRef}
               key={editingId != null ? `e-${editingId}` : "new"}
-              label="Inhalt"
+              label={lt("Content", "İçerik", "Contenu", "Contenido", "Contenuto", "Inhalt")}
               value={formBody}
               onChange={setFormBody}
               minHeight="220px"
-              placeholder="Nachricht oder HTML…"
-              modes={{ visual: "Visuell", html: "HTML", text: "Text" }}
+              placeholder={lt("Message or HTML…", "Mesaj veya HTML…", "Message ou HTML…", "Mensaje o HTML…", "Messaggio o HTML…", "Nachricht oder HTML…")}
+              modes={{
+                visual: lt("Visual", "Görsel", "Visuel", "Visual", "Visuale", "Visuell"),
+                html: "HTML",
+                text: lt("Text", "Metin", "Texte", "Texto", "Testo", "Text"),
+              }}
             />
           </BlockStack>
         </Modal.Section>
@@ -242,16 +261,16 @@ export default function MessageTemplatesPage() {
       <Modal
         open={confirmDeleteId != null}
         onClose={() => !busyDeleteId && setConfirmDeleteId(null)}
-        title="Vorlage löschen?"
+        title={lt("Delete template?", "Şablon silinsin mi?", "Supprimer le modèle ?", "¿Eliminar plantilla?", "Eliminare il modello?", "Vorlage löschen?")}
         primaryAction={{
-          content: "Löschen",
+          content: lt("Delete", "Sil", "Supprimer", "Eliminar", "Elimina", "Löschen"),
           tone: "critical",
           loading: busyDeleteId === confirmDeleteId,
           onAction: () => confirmDeleteId && handleDelete(confirmDeleteId),
         }}
         secondaryActions={[
           {
-            content: "Abbrechen",
+            content: lt("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen"),
             onAction: () => setConfirmDeleteId(null),
             disabled: !!busyDeleteId,
           },
@@ -259,7 +278,14 @@ export default function MessageTemplatesPage() {
       >
         <Modal.Section>
           <Text as="p" variant="bodySm">
-            Diese Vorlage wird unwiderruflich entfernt.
+            {lt(
+              "This template will be permanently removed.",
+              "Bu şablon kalıcı olarak silinecek.",
+              "Ce modèle sera définitivement supprimé.",
+              "Esta plantilla se eliminará permanentemente.",
+              "Questo modello verrà rimosso definitivamente.",
+              "Diese Vorlage wird unwiderruflich entfernt.",
+            )}
           </Text>
         </Modal.Section>
       </Modal>

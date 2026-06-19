@@ -1,20 +1,24 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useLocale } from "next-intl";
+import { useLt, dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 
-const STATUS_META = {
-  versendet: { label: "Versendet", color: "#1d4ed8", bg: "#eff6ff", icon: "🚚" },
-  in_transit: { label: "Unterwegs", color: "#7c3aed", bg: "#f5f3ff", icon: "📦" },
-  zugestellt: { label: "Zugestellt", color: "#15803d", bg: "#f0fdf4", icon: "✅" },
-  exception: { label: "Ausnahme", color: "#b91c1c", bg: "#fef2f2", icon: "⚠️" },
-  retour: { label: "Retour", color: "#c2410c", bg: "#fff7ed", icon: "↩️" },
-  manual: { label: "Manuell", color: "#6b7280", bg: "#f9fafb", icon: "📝" },
-};
+function getStatusMeta(lt) {
+  return {
+    versendet: { label: lt("Shipped", "Gönderildi", "Expédié", "Enviado", "Spedito", "Versendet"), color: "#1d4ed8", bg: "#eff6ff", icon: "🚚" },
+    in_transit: { label: lt("In transit", "Yolda", "En transit", "En tránsito", "In transito", "Unterwegs"), color: "#7c3aed", bg: "#f5f3ff", icon: "📦" },
+    zugestellt: { label: lt("Delivered", "Teslim edildi", "Livré", "Entregado", "Consegnato", "Zugestellt"), color: "#15803d", bg: "#f0fdf4", icon: "✅" },
+    exception: { label: lt("Exception", "İstisna", "Exception", "Excepción", "Eccezione", "Ausnahme"), color: "#b91c1c", bg: "#fef2f2", icon: "⚠️" },
+    retour: { label: lt("Return", "İade", "Retour", "Devolución", "Reso", "Retour"), color: "#c2410c", bg: "#fff7ed", icon: "↩️" },
+    manual: { label: lt("Manual", "Manuel", "Manuel", "Manual", "Manuale", "Manuell"), color: "#6b7280", bg: "#f9fafb", icon: "📝" },
+  };
+}
 
-function EventBadge({ status }) {
-  const m = STATUS_META[status] || STATUS_META.manual;
+function EventBadge({ status, statusMeta }) {
+  const m = statusMeta[status] || statusMeta.manual;
   return (
     <span style={{ padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: m.bg, color: m.color }}>
       {m.icon} {m.label}
@@ -22,16 +26,28 @@ function EventBadge({ status }) {
   );
 }
 
-function fmtDateTime(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
 export default function TrackingSection({ orderId, order, onOrderStatusChanged }) {
+  const locale = useLocale();
+  const lt = useLt();
+  const statusMeta = useMemo(() => getStatusMeta(lt), [lt]);
+
+  const fmtDateTime = useCallback(
+    (d) => {
+      if (!d) return "—";
+      return new Date(d).toLocaleString(dateLocaleFor(locale), {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    },
+    [locale],
+  );
+
   const [events, setEvents] = useState([]);
   const [trackingUrl, setTrackingUrl] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [addingEvent, setAddingEvent] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMsg, setRefreshMsg] = useState("");
@@ -49,10 +65,10 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
       setEvents(data?.events || []);
       setTrackingUrl(data?.trackingUrl || null);
     } catch (e) {
-      setError(e?.message || "Fehler beim Laden");
+      setError(e?.message || lt("Error loading", "Yükleme hatası", "Erreur de chargement", "Error al cargar", "Errore di caricamento", "Fehler beim Laden"));
     }
     setLoading(false);
-  }, [orderId]);
+  }, [orderId, lt]);
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
@@ -72,7 +88,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
       await loadEvents();
       if (onOrderStatusChanged) onOrderStatusChanged();
     } catch (e) {
-      setError(e?.message || "Fehler beim Speichern");
+      setError(e?.message || lt("Error saving", "Kaydetme hatası", "Erreur d'enregistrement", "Error al guardar", "Errore di salvataggio", "Fehler beim Speichern"));
     }
     setSaving(false);
   };
@@ -87,8 +103,16 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
       setRefreshMsg("");
       if (data?.inserted > 0) {
         setError("");
+        const n = data.inserted;
         setRefreshMsg(
-          `${data.inserted} neue${data.inserted === 1 ? "s" : ""} Ereignis${data.inserted === 1 ? "" : "se"} von der Versand-API importiert`
+          lt(
+            `${n} new event${n !== 1 ? "s" : ""} imported from shipping API`,
+            `${n} yeni olay gönderi API'sinden içe aktarıldı`,
+            `${n} nouvel${n !== 1 ? "s" : ""} événement${n !== 1 ? "s" : ""} importé${n !== 1 ? "s" : ""} depuis l'API d'expédition`,
+            `${n} nuevo${n !== 1 ? "s" : ""} evento${n !== 1 ? "s" : ""} importado${n !== 1 ? "s" : ""} desde la API de envío`,
+            `${n} nuov${n !== 1 ? "i" : "o"} evento importato dalla API di spedizione`,
+            `${n} neue${n === 1 ? "s" : ""} Ereignis${n === 1 ? "" : "se"} von der Versand-API importiert`,
+          ),
         );
       } else if (data?.message) {
         setError(data.message);
@@ -97,20 +121,20 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
       if (data?.trackingUrl) setTrackingUrl(data.trackingUrl);
       if (onOrderStatusChanged) onOrderStatusChanged();
     } catch (e) {
-      setError(e?.message || "Fehler beim Abrufen der Tracking-Daten");
+      setError(e?.message || lt("Error fetching tracking data", "Takip verileri alınamadı", "Erreur lors de la récupération du suivi", "Error al obtener datos de seguimiento", "Errore nel recupero del tracciamento", "Fehler beim Abrufen der Tracking-Daten"));
     }
     setRefreshing(false);
   };
 
   const handleDelete = async (eventId) => {
-    if (!(await confirmDelete("Ereignis löschen?"))) return;
+    if (!(await confirmDelete(lt("Delete event?", "Olay silinsin mi?", "Supprimer l'événement ?", "¿Eliminar evento?", "Eliminare l'evento?", "Ereignis löschen?")))) return;
     setDeletingId(eventId);
     try {
       const client = getMedusaAdminClient();
       await client.deleteShipmentEvent(eventId);
-      setEvents(ev => ev.filter(e => e.id !== eventId));
+      setEvents((ev) => ev.filter((e) => e.id !== eventId));
     } catch (e) {
-      setError(e?.message || "Fehler beim Löschen");
+      setError(e?.message || lt("Error deleting", "Silme hatası", "Erreur de suppression", "Error al eliminar", "Errore di eliminazione", "Fehler beim Löschen"));
     }
     setDeletingId(null);
   };
@@ -121,7 +145,9 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111827" }}>Sendungsverfolgung</h3>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111827" }}>
+          {lt("Shipment tracking", "Gönderi takibi", "Suivi d'expédition", "Seguimiento de envío", "Tracciamento spedizione", "Sendungsverfolgung")}
+        </h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {order?.tracking_number && (
             <button
@@ -129,7 +155,9 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
               disabled={refreshing}
               style={{ fontSize: 11, fontWeight: 600, color: "#374151", padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#f9fafb", cursor: "pointer", opacity: refreshing ? 0.6 : 1 }}
             >
-              {refreshing ? "Wird abgerufen…" : "↻ Aktualisieren"}
+              {refreshing
+                ? lt("Fetching…", "Alınıyor…", "Récupération…", "Obteniendo…", "Recupero…", "Wird abgerufen…")
+                : lt("↻ Refresh", "↻ Yenile", "↻ Actualiser", "↻ Actualizar", "↻ Aggiorna", "↻ Aktualisieren")}
             </button>
           )}
           {trackingUrl && (
@@ -139,7 +167,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
               rel="noopener noreferrer"
               style={{ fontSize: 12, fontWeight: 600, color: "#1d4ed8", textDecoration: "none", padding: "5px 12px", border: "1px solid #bfdbfe", borderRadius: 6, background: "#eff6ff", display: "flex", alignItems: "center", gap: 5 }}
             >
-              🔗 Paket verfolgen
+              🔗 {lt("Track package", "Paketi takip et", "Suivre le colis", "Rastrear paquete", "Traccia pacco", "Paket verfolgen")}
             </a>
           )}
         </div>
@@ -148,14 +176,17 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
         <div style={{ marginBottom: 10, padding: "6px 12px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, fontSize: 12, color: "#15803d" }}>{refreshMsg}</div>
       )}
 
-      {/* Carrier + Tracking info */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16, padding: "10px 14px", background: "#f9fafb", borderRadius: 8, fontSize: 13 }}>
         <div>
-          <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>Versanddienstleister</div>
+          <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>
+            {lt("Carrier", "Kargo firması", "Transporteur", "Transportista", "Corriere", "Versanddienstleister")}
+          </div>
           <div style={{ fontWeight: 600 }}>{carrierName || "—"}</div>
         </div>
         <div>
-          <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>Trackingnummer</div>
+          <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>
+            {lt("Tracking number", "Takip numarası", "Numéro de suivi", "Número de seguimiento", "Numero di tracciamento", "Trackingnummer")}
+          </div>
           <div style={{ fontWeight: 600, fontFamily: "monospace" }}>
             {hasTracking ? (
               trackingUrl
@@ -166,35 +197,38 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
         </div>
         {order?.shipped_at && (
           <div>
-            <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>Versanddatum</div>
+            <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>
+              {lt("Ship date", "Gönderim tarihi", "Date d'expédition", "Fecha de envío", "Data spedizione", "Versanddatum")}
+            </div>
             <div>{fmtDateTime(order.shipped_at)}</div>
           </div>
         )}
         {order?.delivery_date && (
           <div>
-            <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>Lieferdatum</div>
+            <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>
+              {lt("Delivery date", "Teslimat tarihi", "Date de livraison", "Fecha de entrega", "Data di consegna", "Lieferdatum")}
+            </div>
             <div>{fmtDateTime(order.delivery_date)}</div>
           </div>
         )}
       </div>
 
-      {/* Timeline */}
       {loading ? (
-        <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "12px 0" }}>Wird geladen…</div>
+        <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "12px 0" }}>
+          {lt("Loading…", "Yükleniyor…", "Chargement…", "Cargando…", "Caricamento…", "Wird geladen…")}
+        </div>
       ) : events.length === 0 ? (
         <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "12px 0", fontStyle: "italic" }}>
-          Noch keine Sendungsereignisse vorhanden.
+          {lt("No shipment events yet.", "Henüz gönderi olayı yok.", "Aucun événement d'expédition pour le moment.", "Aún no hay eventos de envío.", "Nessun evento di spedizione ancora.", "Noch keine Sendungsereignisse vorhanden.")}
         </div>
       ) : (
         <div style={{ position: "relative", paddingLeft: 24 }}>
-          {/* Timeline line */}
           <div style={{ position: "absolute", left: 7, top: 4, bottom: 4, width: 2, background: "#e5e7eb", borderRadius: 2 }} />
           {events.map((ev, i) => {
-            const m = STATUS_META[ev.status] || STATUS_META.manual;
+            const m = statusMeta[ev.status] || statusMeta.manual;
             const isLast = i === events.length - 1;
             return (
               <div key={ev.id} style={{ position: "relative", marginBottom: isLast ? 0 : 16 }}>
-                {/* Dot */}
                 <div style={{
                   position: "absolute", left: -24, top: 3,
                   width: 16, height: 16, borderRadius: "50%",
@@ -206,7 +240,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
-                      <EventBadge status={ev.status} />
+                      <EventBadge status={ev.status} statusMeta={statusMeta} />
                       {ev.location && <span style={{ fontSize: 11, color: "#6b7280" }}>📍 {ev.location}</span>}
                       <span style={{ fontSize: 11, color: "#9ca3af" }}>{fmtDateTime(ev.event_time)}</span>
                       {ev.source === "auto" && <span style={{ fontSize: 10, color: "#9ca3af", fontStyle: "italic" }}>auto</span>}
@@ -230,43 +264,49 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div style={{ marginTop: 10, padding: "8px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#b91c1c" }}>{error}</div>
       )}
 
-      {/* Add event */}
       {showAddForm ? (
         <div style={{ marginTop: 16, padding: "14px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Ereignis hinzufügen</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+            {lt("Add event", "Olay ekle", "Ajouter un événement", "Añadir evento", "Aggiungi evento", "Ereignis hinzufügen")}
+          </div>
           <div style={{ display: "grid", gap: 8 }}>
             <div>
-              <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>Status</label>
+              <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>
+                {lt("Status", "Durum", "Statut", "Estado", "Stato", "Status")}
+              </label>
               <select
                 value={form.status}
-                onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
                 style={{ width: "100%", padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}
               >
-                {Object.entries(STATUS_META).map(([k, v]) => (
+                {Object.entries(statusMeta).map(([k, v]) => (
                   <option key={k} value={k}>{v.icon} {v.label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>Beschreibung (optional)</label>
+              <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>
+                {lt("Description (optional)", "Açıklama (isteğe bağlı)", "Description (facultatif)", "Descripción (opcional)", "Descrizione (opzionale)", "Beschreibung (optional)")}
+              </label>
               <input
                 value={form.description}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                placeholder="z.B. Im Zustellfahrzeug geladen"
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder={lt("e.g. Loaded onto delivery vehicle", "örn. Teslimat aracına yüklendi", "ex. Chargé sur le véhicule de livraison", "p. ej. Cargado en vehículo de reparto", "es. Caricato sul veicolo di consegna", "z.B. Im Zustellfahrzeug geladen")}
                 style={{ width: "100%", padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
               />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>Standort (optional)</label>
+              <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>
+                {lt("Location (optional)", "Konum (isteğe bağlı)", "Lieu (facultatif)", "Ubicación (opcional)", "Posizione (opzionale)", "Standort (optional)")}
+              </label>
               <input
                 value={form.location}
-                onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                placeholder="z.B. Frankfurt am Main"
+                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                placeholder={lt("e.g. Frankfurt am Main", "örn. Frankfurt am Main", "ex. Francfort-sur-le-Main", "p. ej. Fráncfort del Meno", "es. Francoforte sul Meno", "z.B. Frankfurt am Main")}
                 style={{ width: "100%", padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
               />
             </div>
@@ -276,13 +316,15 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
                 disabled={saving}
                 style={{ padding: "7px 16px", background: "#111827", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.6 : 1 }}
               >
-                {saving ? "Speichern…" : "Speichern"}
+                {saving
+                  ? lt("Saving…", "Kaydediliyor…", "Enregistrement…", "Guardando…", "Salvataggio…", "Speichern…")
+                  : lt("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern")}
               </button>
               <button
                 onClick={() => { setShowAddForm(false); setError(""); }}
                 style={{ padding: "7px 14px", background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, cursor: "pointer" }}
               >
-                Abbrechen
+                {lt("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen")}
               </button>
             </div>
           </div>
@@ -293,7 +335,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
             onClick={() => setShowAddForm(true)}
             style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, background: "#f9fafb", cursor: "pointer" }}
           >
-            + Ereignis hinzufügen
+            + {lt("Add event", "Olay ekle", "Ajouter un événement", "Añadir evento", "Aggiungi evento", "Ereignis hinzufügen")}
           </button>
         </div>
       )}

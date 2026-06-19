@@ -5,8 +5,17 @@ import {
   Page, Layout, Card, Text, BlockStack, InlineStack,
   Button, Badge, Banner, Box, TextField, Modal, Checkbox,
 } from "@shopify/polaris";
+import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { useUI } from "@/lib/ui-strings";
+import { dateLocaleFor } from "@/lib/locale-text";
+import {
+  approvalStatusLabel,
+  getPermissionsList,
+  getUsersCopy,
+  DEFAULT_SELLER_PERMS,
+} from "@/lib/users-i18n";
 
 const approvalStatusTone = (s) => {
   const v = String(s || "registered").toLowerCase();
@@ -16,69 +25,9 @@ const approvalStatusTone = (s) => {
   return "info";
 };
 
-const approvalStatusLabel = (s) => {
-  const v = String(s || "registered").toLowerCase();
-  const map = {
-    registered: "Registriert",
-    documents_submitted: "Docs eingereicht",
-    pending_approval: "Wartet",
-    pending: "Wartet",
-    approved: "Genehmigt",
-    active: "Aktiv",
-    rejected: "Abgelehnt",
-    suspended: "Gesperrt",
-  };
-  return map[v] || v;
-};
+const DEFAULT_PERMS = DEFAULT_SELLER_PERMS;
 
-// All available menu routes with labels
-const ALL_PERMISSIONS = [
-  { group: "Genel", items: [
-    { key: "/dashboard", label: "Dashboard" },
-    { key: "/inbox", label: "Nachrichten" },
-  ]},
-  { group: "Bestellungen", items: [
-    { key: "/orders", label: "Bestellungen" },
-    { key: "/orders/returns", label: "Retouren" },
-  ]},
-  { group: "Produkte", items: [
-    { key: "/products", label: "Produkte" },
-    { key: "/products/inventory", label: "Inventar" },
-    { key: "/products/gift-cards", label: "Geschenkkarten" },
-  ]},
-  { group: "Kunden", items: [
-    { key: "/customers", label: "Kundenliste" },
-    { key: "/customers/reviews", label: "Bewertungen" },
-  ]},
-  { group: "Marketing & Rabatte", items: [
-    { key: "/marketing", label: "Marketing" },
-    { key: "/discounts", label: "Rabatte" },
-  ]},
-  { group: "Content", items: [
-    { key: "/content/media", label: "Medien" },
-    { key: "/content/brands", label: "Marken" },
-    { key: "/content/metaobjects", label: "Metaobjekte" },
-  ]},
-  { group: "Analytics", items: [
-    { key: "/analytics/reports", label: "Berichte" },
-    { key: "/analytics/ranking", label: "Ranking" },
-    { key: "/analytics/transactions", label: "Transaktionen" },
-  ]},
-  { group: "Einstellungen", items: [
-    { key: "/settings", label: "Einstellungen" },
-    { key: "/settings/payments", label: "Zahlungen & IBAN" },
-    { key: "/settings/users-permissions", label: "Benutzer & Rechte" },
-  ]},
-];
-
-const DEFAULT_PERMS = [
-  "/dashboard", "/inbox", "/orders", "/orders/returns", "/products", "/products/inventory",
-  "/products/gift-cards", "/customers", "/customers/reviews", "/marketing", "/discounts",
-  "/content/media", "/content/brands", "/content/metaobjects",
-  "/analytics/reports", "/analytics/ranking", "/analytics/transactions", "/settings", "/settings/payments",
-];
-
-function PermissionsSelector({ value, onChange }) {
+function PermissionsSelector({ value, onChange, permissionsList }) {
   const allowed = value || DEFAULT_PERMS;
   const toggle = (key) => {
     if (allowed.includes(key)) onChange(allowed.filter((k) => k !== key));
@@ -93,7 +42,7 @@ function PermissionsSelector({ value, onChange }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {ALL_PERMISSIONS.map((group) => {
+      {permissionsList.map((group) => {
         const allOn = group.items.every((i) => allowed.includes(i.key));
         return (
           <div key={group.group}>
@@ -122,7 +71,7 @@ function PermissionsSelector({ value, onChange }) {
 }
 
 // ── Invite Modal (for sellers) ────────────────────────────────────────────────
-function InviteModal({ onClose, onSaved }) {
+function InviteModal({ onClose, onSaved, copy, ui, permissionsList }) {
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -135,8 +84,8 @@ function InviteModal({ onClose, onSaved }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleSend = async () => {
-    if (!form.email.trim()) { setErr("E-Mail ist ein Pflichtfeld"); return; }
-    if (!form.first_name.trim() || !form.last_name.trim()) { setErr("Vor- und Nachname sind Pflichtfelder"); return; }
+    if (!form.email.trim()) { setErr(copy.emailRequired); return; }
+    if (!form.first_name.trim() || !form.last_name.trim()) { setErr(copy.namesRequired); return; }
     setSaving(true); setErr("");
     try {
       await getMedusaAdminClient().inviteUser({
@@ -147,7 +96,7 @@ function InviteModal({ onClose, onSaved }) {
       });
       onSaved();
     } catch (e) {
-      setErr(e?.message || "Fehler beim Senden der Einladung");
+      setErr(e?.message || copy.inviteError);
       setSaving(false);
     }
   };
@@ -156,28 +105,29 @@ function InviteModal({ onClose, onSaved }) {
     <Modal
       open
       onClose={onClose}
-      title="Benutzer einladen"
-      primaryAction={{ content: "Einladung senden", onAction: handleSend, loading: saving }}
-      secondaryActions={[{ content: "Abbrechen", onAction: onClose }]}
+      title={copy.inviteModalTitle}
+      primaryAction={{ content: copy.sendInvite, onAction: handleSend, loading: saving }}
+      secondaryActions={[{ content: ui.cancel, onAction: onClose }]}
       large
     >
       <Modal.Section>
         <BlockStack gap="400">
           {err && <Banner tone="critical" onDismiss={() => setErr("")}><Text>{err}</Text></Banner>}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <TextField label="Vorname *" value={form.first_name}
+            <TextField label={copy.firstName} value={form.first_name}
               onChange={(v) => set("first_name", v)} autoComplete="off" />
-            <TextField label="Nachname *" value={form.last_name}
+            <TextField label={copy.lastName} value={form.last_name}
               onChange={(v) => set("last_name", v)} autoComplete="off" />
           </div>
-          <TextField label="E-Mail *" type="email" value={form.email}
+          <TextField label={`${ui.colEmail} *`} type="email" value={form.email}
             onChange={(v) => set("email", v)} autoComplete="off" />
           <div>
-            <Text variant="headingSm" as="h3">Zugriffsrechte</Text>
+            <Text variant="headingSm" as="h3">{copy.accessRights}</Text>
             <Box paddingBlockStart="300">
               <PermissionsSelector
                 value={form.permissions}
                 onChange={(v) => set("permissions", v)}
+                permissionsList={permissionsList}
               />
             </Box>
           </div>
@@ -188,7 +138,7 @@ function InviteModal({ onClose, onSaved }) {
 }
 
 // ── Edit Permissions Modal (for sellers, editing existing sub-user) ────────────
-function EditPermissionsModal({ user, onClose, onSaved }) {
+function EditPermissionsModal({ user, onClose, onSaved, copy, ui, permissionsList }) {
   const [permissions, setPermissions] = useState(user.permissions || DEFAULT_PERMS);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -199,7 +149,7 @@ function EditPermissionsModal({ user, onClose, onSaved }) {
       await getMedusaAdminClient().updateSubuser(user.id, { permissions });
       onSaved();
     } catch (e) {
-      setErr(e?.message || "Fehler");
+      setErr(e?.message || copy.genericError);
       setSaving(false);
     }
   };
@@ -208,78 +158,22 @@ function EditPermissionsModal({ user, onClose, onSaved }) {
     <Modal
       open
       onClose={onClose}
-      title={`Rechte bearbeiten — ${user.first_name || ""} ${user.last_name || ""} (${user.email})`}
-      primaryAction={{ content: "Speichern", onAction: handleSave, loading: saving }}
-      secondaryActions={[{ content: "Abbrechen", onAction: onClose }]}
+      title={copy.editPermissionsTitle(`${user.first_name || ""} ${user.last_name || ""}`.trim(), user.email)}
+      primaryAction={{ content: ui.save, onAction: handleSave, loading: saving }}
+      secondaryActions={[{ content: ui.cancel, onAction: onClose }]}
       large
     >
       <Modal.Section>
         <BlockStack gap="400">
           {err && <Banner tone="critical" onDismiss={() => setErr("")}><Text>{err}</Text></Banner>}
-          <PermissionsSelector value={permissions} onChange={setPermissions} />
+          <PermissionsSelector value={permissions} onChange={setPermissions} permissionsList={permissionsList} />
         </BlockStack>
       </Modal.Section>
     </Modal>
   );
 }
 
-// ── Superuser full management modal ──────────────────────────────────────────
-const ALL_PERMISSIONS_SUPER = [
-  { group: "Genel", items: [
-    { key: "/dashboard", label: "Dashboard" },
-    { key: "/inbox", label: "Posteingang / Nachrichten" },
-  ]},
-  { group: "Bestellungen", items: [
-    { key: "/orders", label: "Bestellungen (Ansicht)" },
-    { key: "/orders/returns", label: "Retouren" },
-    { key: "/orders/abandoned-checkouts", label: "Abgebrochene Checkouts" },
-  ]},
-  { group: "Produkte", items: [
-    { key: "/products", label: "Produkte" },
-    { key: "/products/inventory", label: "Inventar" },
-    { key: "/products/collections", label: "Kollektionen" },
-    { key: "/products/gift-cards", label: "Geschenkkarten" },
-  ]},
-  { group: "Kunden", items: [
-    { key: "/customers", label: "Kundenliste" },
-    { key: "/customers/reviews", label: "Bewertungen" },
-  ]},
-  { group: "Marketing & Rabatte", items: [
-    { key: "/marketing", label: "Marketing" },
-    { key: "/discounts", label: "Rabatte" },
-  ]},
-  { group: "Content", items: [
-    { key: "/content/media", label: "Medien" },
-    { key: "/content/menus", label: "Menüs" },
-    { key: "/content/categories", label: "Kategorien" },
-    { key: "/content/landing-page", label: "Landing Page" },
-    { key: "/content/styles", label: "Styles" },
-    { key: "/content/pages", label: "Seiten" },
-    { key: "/content/blog-posts", label: "Blog-Beiträge" },
-    { key: "/content/brands", label: "Marken" },
-    { key: "/content/metaobjects", label: "Metaobjekte" },
-  ]},
-  { group: "Analytics", items: [
-    { key: "/analytics/reports", label: "Berichte" },
-    { key: "/analytics/ranking", label: "Ranking" },
-    { key: "/analytics/transactions", label: "Transaktionen" },
-    { key: "/analytics/live-view", label: "Live-Ansicht" },
-  ]},
-  { group: "Einstellungen", items: [
-    { key: "/settings", label: "Einstellungen (allgemein)" },
-    { key: "/settings/payments", label: "Zahlungen & IBAN" },
-    { key: "/settings/users-permissions", label: "Benutzer & Rechte" },
-  ]},
-];
-
-const DEFAULT_SELLER_PERMS = [
-  "/dashboard", "/inbox", "/orders", "/orders/returns", "/products", "/products/inventory",
-  "/products/gift-cards", "/customers", "/customers/reviews", "/marketing", "/discounts",
-  "/content/media", "/content/brands", "/content/metaobjects",
-  "/analytics/reports", "/analytics/ranking", "/analytics/transactions", "/settings", "/settings/payments",
-];
-
-function PermissionsSelectorFull({ value, onChange, isSuperuserTarget }) {
+function PermissionsSelectorFull({ value, onChange, permissionsList }) {
   const allowed = value || DEFAULT_SELLER_PERMS;
   const toggle = (key) => {
     if (allowed.includes(key)) onChange(allowed.filter((k) => k !== key));
@@ -294,7 +188,7 @@ function PermissionsSelectorFull({ value, onChange, isSuperuserTarget }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {ALL_PERMISSIONS_SUPER.map((group) => {
+      {permissionsList.map((group) => {
         const allOn = group.items.every((i) => allowed.includes(i.key));
         return (
           <div key={group.group}>
@@ -322,7 +216,7 @@ function PermissionsSelectorFull({ value, onChange, isSuperuserTarget }) {
   );
 }
 
-function SuperUserModal({ user, onClose, onSaved }) {
+function SuperUserModal({ user, onClose, onSaved, copy, ui, permissionsList }) {
   const isEdit = !!user?.id;
   const [form, setForm] = useState({
     store_name: user?.store_name || "",
@@ -338,7 +232,7 @@ function SuperUserModal({ user, onClose, onSaved }) {
 
   const handleSave = async () => {
     if (!isEdit && (!form.email.trim() || !form.password.trim())) {
-      setErr("E-Mail und Passwort sind Pflichtfelder"); return;
+      setErr(copy.emailPasswordRequired); return;
     }
     setSaving(true); setErr("");
     try {
@@ -357,7 +251,7 @@ function SuperUserModal({ user, onClose, onSaved }) {
       }
       onSaved();
     } catch (e) {
-      setErr(e?.message || "Fehler");
+      setErr(e?.message || copy.genericError);
       setSaving(false);
     }
   };
@@ -366,9 +260,9 @@ function SuperUserModal({ user, onClose, onSaved }) {
     <Modal
       open
       onClose={onClose}
-      title={isEdit ? `Benutzer bearbeiten — ${user.email}` : "Neuen Benutzer erstellen"}
-      primaryAction={{ content: isEdit ? "Speichern" : "Erstellen", onAction: handleSave, loading: saving }}
-      secondaryActions={[{ content: "Abbrechen", onAction: onClose }]}
+      title={isEdit ? copy.editUserTitle(user.email) : copy.createUserTitle}
+      primaryAction={{ content: isEdit ? ui.save : ui.create, onAction: handleSave, loading: saving }}
+      secondaryActions={[{ content: ui.cancel, onAction: onClose }]}
       large
     >
       <Modal.Section>
@@ -376,32 +270,32 @@ function SuperUserModal({ user, onClose, onSaved }) {
           {err && <Banner tone="critical" onDismiss={() => setErr("")}><Text>{err}</Text></Banner>}
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {!isEdit && (
-              <TextField label="E-Mail *" type="email" value={form.email}
+              <TextField label={`${ui.colEmail} *`} type="email" value={form.email}
                 onChange={(v) => set("email", v)} autoComplete="off" />
             )}
-            <TextField label={isEdit ? "Neues Passwort (leer = nicht ändern)" : "Passwort *"}
+            <TextField label={isEdit ? copy.newPassword : copy.password}
               type="password" value={form.password}
               onChange={(v) => set("password", v)} autoComplete="new-password"
-              helpText={isEdit ? "Leer lassen um nicht zu ändern" : "Min. 8 Zeichen, ein Buchstabe & eine Zahl"} />
+              helpText={isEdit ? copy.passwordHelpEdit : copy.passwordHelpNew} />
           </div>
           <Checkbox
-            label="Superuser (voller Zugriff, keine Beschränkungen)"
+            label={copy.superuserLabel}
             checked={form.is_superuser}
             onChange={(v) => set("is_superuser", v)}
           />
           {!form.is_superuser && (
-            <TextField label="Shop-/Store-Name" value={form.store_name}
+            <TextField label={copy.storeName} value={form.store_name}
               onChange={(v) => set("store_name", v)} autoComplete="off"
-              helpText="Seller'ın mağaza adı (opsiyonel)" />
+              helpText={copy.storeNameHelp} />
           )}
           {!form.is_superuser && (
             <div>
-              <Text variant="headingSm" as="h3">Zugriffsrechte</Text>
+              <Text variant="headingSm" as="h3">{copy.accessRights}</Text>
               <Box paddingBlockStart="300">
                 <PermissionsSelectorFull
                   value={form.permissions}
                   onChange={(v) => set("permissions", v)}
-                  isSuperuserTarget={form.is_superuser}
+                  permissionsList={permissionsList}
                 />
               </Box>
             </div>
@@ -413,7 +307,7 @@ function SuperUserModal({ user, onClose, onSaved }) {
 }
 
 // ── KYB Review Modal ──────────────────────────────────────────────────────────
-function KybReviewModal({ user, onClose, onApproved }) {
+function KybReviewModal({ user, onClose, onApproved, copy, ui, locale }) {
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -421,7 +315,7 @@ function KybReviewModal({ user, onClose, onApproved }) {
 
   const handleAction = async (status) => {
     if (status === "rejected" && !rejectionReason.trim()) {
-      setErr("Bitte geben Sie einen Ablehnungsgrund ein."); return;
+      setErr(copy.rejectionReasonRequired); return;
     }
     setSaving(true); setErr("");
     try {
@@ -429,7 +323,7 @@ function KybReviewModal({ user, onClose, onApproved }) {
       onApproved(user.id, status);
       onClose();
     } catch (e) {
-      setErr(e?.message || "Fehler");
+      setErr(e?.message || copy.genericError);
       setSaving(false);
     }
   };
@@ -441,8 +335,8 @@ function KybReviewModal({ user, onClose, onApproved }) {
     <Modal
       open
       onClose={onClose}
-      title={`KYB Review — ${user.store_name || user.email}`}
-      secondaryActions={[{ content: "Schließen", onAction: onClose }]}
+      title={copy.kybTitle(user.store_name || user.email)}
+      secondaryActions={[{ content: ui.close, onAction: onClose }]}
       large
     >
       <Modal.Section>
@@ -451,24 +345,24 @@ function KybReviewModal({ user, onClose, onApproved }) {
 
           {/* Status */}
           <InlineStack gap="200" blockAlign="center">
-            <Text variant="bodyMd" fontWeight="semibold">Status:</Text>
-            <Badge tone={approvalStatusTone(user.approval_status)}>{approvalStatusLabel(user.approval_status)}</Badge>
+            <Text variant="bodyMd" fontWeight="semibold">{ui.status}:</Text>
+            <Badge tone={approvalStatusTone(user.approval_status)}>{approvalStatusLabel(locale, user.approval_status)}</Badge>
           </InlineStack>
 
           {/* Company info */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
             {[
-              ["Firmenname", user.company_name],
-              ["Bevollmächtigte Person", user.authorized_person_name],
-              ["E-Mail", user.email],
-              ["Telefon", user.phone],
-              ["Steuernummer", user.tax_id],
-              ["USt-IdNr.", user.vat_id],
+              [copy.companyName, user.company_name],
+              [copy.authorizedPerson, user.authorized_person_name],
+              [ui.colEmail, user.email],
+              [ui.phone, user.phone],
+              [copy.taxId, user.tax_id],
+              [copy.vatId, user.vat_id],
               ["IBAN", user.iban],
-              ["Straße", addr.street],
-              ["Stadt", addr.city],
-              ["PLZ", addr.postal_code],
-              ["Land", addr.country],
+              [copy.street, addr.street],
+              [ui.city, addr.city],
+              [ui.postalCode, addr.postal_code],
+              [ui.country, addr.country],
             ].map(([label, val]) => val ? (
               <div key={label}>
                 <Text variant="bodySm" tone="subdued">{label}</Text>
@@ -480,17 +374,17 @@ function KybReviewModal({ user, onClose, onApproved }) {
           {/* Documents */}
           {docs.length > 0 && (
             <div>
-              <Text variant="headingSm" as="h3">Dokumente ({docs.length})</Text>
+              <Text variant="headingSm" as="h3">{copy.documents(docs.length)}</Text>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
                 {docs.map((doc, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
                     <div style={{ flex: 1 }}>
-                      <Text variant="bodySm" fontWeight="semibold">{doc.doc_type ? { trade_register: "Handelsregister", id_passport: "Ausweis/Reisepass", tax_document: "Steuerdokument" }[doc.doc_type] || doc.doc_type : doc.name}</Text>
+                      <Text variant="bodySm" fontWeight="semibold">{doc.doc_type ? { trade_register: copy.docTradeRegister, id_passport: copy.docIdPassport, tax_document: copy.docTax }[doc.doc_type] || doc.doc_type : doc.name}</Text>
                       {doc.name && <Text variant="bodySm" tone="subdued">{doc.name}</Text>}
                     </div>
                     {doc.url && (
                       <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ color: "#0070f3", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-                        Öffnen ↗
+                        {copy.open}
                       </a>
                     )}
                   </div>
@@ -502,7 +396,7 @@ function KybReviewModal({ user, onClose, onApproved }) {
           {/* Rejection reason input */}
           {showRejectInput && (
             <TextField
-              label="Ablehnungsgrund"
+              label={copy.rejectionReason}
               value={rejectionReason}
               onChange={setRejectionReason}
               multiline={3}
@@ -514,25 +408,25 @@ function KybReviewModal({ user, onClose, onApproved }) {
           {(user.approval_status === "documents_submitted" || user.approval_status === "pending_approval" || user.approval_status === "pending") && (
             <InlineStack gap="200">
               <Button variant="primary" tone="success" onClick={() => handleAction("approved")} loading={saving && !showRejectInput}>
-                Genehmigen
+                {copy.approve}
               </Button>
               {!showRejectInput ? (
-                <Button tone="critical" onClick={() => setShowRejectInput(true)}>Ablehnen</Button>
+                <Button tone="critical" onClick={() => setShowRejectInput(true)}>{copy.reject}</Button>
               ) : (
                 <Button tone="critical" onClick={() => handleAction("rejected")} loading={saving && showRejectInput}>
-                  Ablehnung bestätigen
+                  {copy.confirmReject}
                 </Button>
               )}
             </InlineStack>
           )}
           {user.approval_status === "approved" && (
             <Button tone="critical" variant="secondary" onClick={() => handleAction("suspended")} loading={saving}>
-              Sperren
+              {copy.suspend}
             </Button>
           )}
           {(user.approval_status === "rejected" || user.approval_status === "suspended") && (
             <Button variant="primary" onClick={() => handleAction("approved")} loading={saving}>
-              Wieder genehmigen
+              {copy.reapprove}
             </Button>
           )}
         </BlockStack>
@@ -543,6 +437,13 @@ function KybReviewModal({ user, onClose, onApproved }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function UsersPermissionsPage() {
+  const locale = useLocale();
+  const ui = useUI();
+  const copy = getUsersCopy(locale);
+  const sellerPermissions = getPermissionsList(locale, false);
+  const superPermissions = getPermissionsList(locale, true);
+  const dateLoc = dateLocaleFor(locale);
+  const fmtCreated = (d) => d ? new Date(d).toLocaleDateString(dateLoc, { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [myEmail, setMyEmail] = useState("");
   const [myStoreName, setMyStoreName] = useState("");
@@ -598,13 +499,13 @@ export default function UsersPermissionsPage() {
 
   const handleDeleteUser = async (user) => {
     const myEmail = typeof window !== "undefined" ? localStorage.getItem("sellerEmail") : "";
-    if (user.email === myEmail) { alert("Sie können Ihr eigenes Konto nicht löschen."); return; }
-    if (!(await confirmDelete(`Benutzer "${user.email}" wirklich löschen?`))) return;
+    if (user.email === myEmail) { alert(copy.cannotDeleteSelf); return; }
+    if (!(await confirmDelete(copy.deleteUserConfirm(user.email)))) return;
     setDeleting(user.id);
     try {
       await getMedusaAdminClient().deleteSellerUser(user.id);
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
-    } catch (e) { alert(e?.message || "Fehler beim Löschen"); }
+    } catch (e) { alert(e?.message || copy.deleteError); }
     finally { setDeleting(null); }
   };
 
@@ -616,27 +517,27 @@ export default function UsersPermissionsPage() {
       setSubusers(data?.subusers || []);
       setPendingInvites(data?.pending_invites || []);
     } catch (err) {
-      setError(err?.message || "Fehler beim Laden");
+      setError(err?.message || copy.loadError);
     } finally { setLoading(false); }
   };
 
   const handleDeleteSubuser = async (user) => {
-    if (!(await confirmDelete(`Benutzer "${user.first_name} ${user.last_name}" (${user.email}) wirklich entfernen?`))) return;
+    if (!(await confirmDelete(copy.deleteSubuserConfirm(`${user.first_name} ${user.last_name}`.trim(), user.email)))) return;
     setDeletingSubuser(user.id);
     try {
       await getMedusaAdminClient().deleteSubuser(user.id);
       setSubusers((prev) => prev.filter((u) => u.id !== user.id));
-    } catch (e) { alert(e?.message || "Fehler beim Löschen"); }
+    } catch (e) { alert(e?.message || copy.deleteError); }
     finally { setDeletingSubuser(null); }
   };
 
   const handleCancelInvite = async (invite) => {
-    if (!(await confirmDelete(`Einladung für "${invite.email}" wirklich stornieren?`))) return;
+    if (!(await confirmDelete(copy.cancelInviteConfirm(invite.email)))) return;
     setDeletingInvite(invite.id);
     try {
       await getMedusaAdminClient().deletePendingInvite(invite.id);
       setPendingInvites((prev) => prev.filter((i) => i.id !== invite.id));
-    } catch (e) { alert(e?.message || "Fehler"); }
+    } catch (e) { alert(e?.message || copy.genericError); }
     finally { setDeletingInvite(null); }
   };
 
@@ -681,8 +582,8 @@ export default function UsersPermissionsPage() {
 
     return (
       <Page
-        title="Benutzer & Berechtigungen"
-        primaryAction={{ content: "Neuer Benutzer", onAction: () => setEditUser({}) }}
+        title={copy.pageTitleSuper}
+        primaryAction={{ content: copy.newUser, onAction: () => setEditUser({}) }}
       >
         <Layout>
           <Layout.Section>
@@ -693,7 +594,7 @@ export default function UsersPermissionsPage() {
                 {/* Search */}
                 <div style={{ flex: "1 1 220px", minWidth: 180 }}>
                   <TextField
-                    placeholder="Suchen (E-Mail, Store-Name…)"
+                    placeholder={copy.searchPlaceholder}
                     value={search}
                     onChange={setSearch}
                     autoComplete="off"
@@ -704,11 +605,11 @@ export default function UsersPermissionsPage() {
                 </div>
                 {/* Role filter tabs */}
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <button style={filterTabStyle("all")} onClick={() => setRoleFilter("all")}>Alle</button>
-                  <button style={filterTabStyle("seller")} onClick={() => setRoleFilter("seller")}>Seller</button>
-                  <button style={filterTabStyle("superuser")} onClick={() => setRoleFilter("superuser")}>Superuser</button>
+                  <button style={filterTabStyle("all")} onClick={() => setRoleFilter("all")}>{copy.filterAll}</button>
+                  <button style={filterTabStyle("seller")} onClick={() => setRoleFilter("seller")}>{copy.filterSeller}</button>
+                  <button style={filterTabStyle("superuser")} onClick={() => setRoleFilter("superuser")}>{copy.filterSuperuser}</button>
                   <button style={filterTabStyle("kyb_pending")} onClick={() => setRoleFilter("kyb_pending")}>
-                    KYB Ausstehend {users.filter((u) => !u.is_superuser && ["documents_submitted","pending_approval","pending"].includes(String(u.approval_status||""))).length > 0 ? `(${users.filter((u) => !u.is_superuser && ["documents_submitted","pending_approval","pending"].includes(String(u.approval_status||""))).length})` : ""}
+                    {copy.filterKyb} {users.filter((u) => !u.is_superuser && ["documents_submitted","pending_approval","pending"].includes(String(u.approval_status||""))).length > 0 ? `(${users.filter((u) => !u.is_superuser && ["documents_submitted","pending_approval","pending"].includes(String(u.approval_status||""))).length})` : ""}
                   </button>
                 </div>
                 {/* Sort */}
@@ -717,28 +618,28 @@ export default function UsersPermissionsPage() {
                   onChange={(e) => setSortBy(e.target.value)}
                   style={{ padding: "6px 10px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 13, background: "#fff", cursor: "pointer" }}
                 >
-                  <option value="date_desc">Datum ↓ (neueste)</option>
-                  <option value="date_asc">Datum ↑ (älteste)</option>
-                  <option value="name_asc">Name A → Z</option>
-                  <option value="name_desc">Name Z → A</option>
-                  <option value="role">Rolle (Superuser zuerst)</option>
+                  <option value="date_desc">{copy.sortDateDesc}</option>
+                  <option value="date_asc">{copy.sortDateAsc}</option>
+                  <option value="name_asc">{copy.sortNameAsc}</option>
+                  <option value="name_desc">{copy.sortNameDesc}</option>
+                  <option value="role">{copy.sortRole}</option>
                 </select>
-                <Button onClick={fetchSuperuserData} loading={loading} size="slim">Aktualisieren</Button>
+                <Button onClick={fetchSuperuserData} loading={loading} size="slim">{ui.refresh}</Button>
               </div>
 
               {/* Count line */}
               <div style={{ padding: "8px 20px", borderBottom: "1px solid #f9fafb", background: "#fafafa" }}>
                 <Text variant="bodySm" tone="subdued">
-                  {filtered.length} von {users.length} Benutzer{users.length !== 1 ? "n" : ""}
+                  {copy.userCount(filtered.length, users.length)}
                 </Text>
               </div>
 
               {loading ? (
-                <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
+                <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>
               ) : filtered.length === 0 ? (
                 <Box padding="400">
                   <Text tone="subdued">
-                    {users.length === 0 ? "Noch keine Benutzer registriert." : "Keine Benutzer gefunden."}
+                    {users.length === 0 ? copy.noUsers : copy.noUsersFound}
                   </Text>
                 </Box>
               ) : (
@@ -760,14 +661,14 @@ export default function UsersPermissionsPage() {
                         <Text variant="bodyMd" fontWeight="semibold">
                           {user.is_superuser ? user.email : (user.store_name || user.email)}
                         </Text>
-                        {user.email === myEmail && <Badge tone="success">Sie</Badge>}
+                        {user.email === myEmail && <Badge tone="success">{copy.you}</Badge>}
                         {user.is_superuser
-                          ? <Badge tone="attention">Superuser</Badge>
-                          : <Badge tone="info">Seller</Badge>
+                          ? <Badge tone="attention">{copy.filterSuperuser}</Badge>
+                          : <Badge tone="info">{copy.filterSeller}</Badge>
                         }
                         {!user.is_superuser && (
                           <Badge tone={approvalStatusTone(user.approval_status)}>
-                            {approvalStatusLabel(user.approval_status)}
+                            {approvalStatusLabel(locale, user.approval_status)}
                           </Badge>
                         )}
                       </InlineStack>
@@ -775,25 +676,25 @@ export default function UsersPermissionsPage() {
                         <Text variant="bodySm" tone="subdued">{user.email}</Text>
                       )}
                       {user.is_superuser && (
-                        <Text variant="bodySm" tone="subdued">Voller Zugriff</Text>
+                        <Text variant="bodySm" tone="subdued">{copy.fullAccess}</Text>
                       )}
                       {!user.is_superuser && (
                         <Text variant="bodySm" tone="subdued">
-                          {user.permissions ? `${user.permissions.length} Zugriffsrechte` : "Standard-Berechtigungen"}
+                          {user.permissions ? copy.permissionsCount(user.permissions.length) : copy.defaultPermissions}
                         </Text>
                       )}
                       <Text variant="bodySm" tone="subdued">
-                        Erstellt: {new Date(user.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                        {copy.created}: {fmtCreated(user.created_at)}
                       </Text>
                     </div>
                     <InlineStack gap="200">
                       {!user.is_superuser && (
                         <Button size="slim" variant="secondary" onClick={() => setKybUser(user)}>KYB</Button>
                       )}
-                      <Button size="slim" onClick={() => setEditUser(user)}>Bearbeiten</Button>
+                      <Button size="slim" onClick={() => setEditUser(user)}>{ui.edit}</Button>
                       <Button size="slim" tone="critical" variant="secondary"
                         onClick={() => handleDeleteUser(user)} loading={deleting === user.id}>
-                        Löschen
+                        {ui.delete}
                       </Button>
                     </InlineStack>
                   </div>
@@ -818,6 +719,9 @@ export default function UsersPermissionsPage() {
             user={editUser?.id ? editUser : null}
             onClose={() => setEditUser(null)}
             onSaved={() => { setEditUser(null); fetchSuperuserData(); }}
+            copy={copy}
+            ui={ui}
+            permissionsList={superPermissions}
           />
         )}
         {kybUser && (
@@ -825,6 +729,9 @@ export default function UsersPermissionsPage() {
             user={kybUser}
             onClose={() => setKybUser(null)}
             onApproved={handleApprovalUpdate}
+            copy={copy}
+            ui={ui}
+            locale={locale}
           />
         )}
       </Page>
@@ -834,8 +741,8 @@ export default function UsersPermissionsPage() {
   // ── Seller view ──
   return (
     <Page
-      title="Benutzer & Rechte"
-      primaryAction={{ content: "Benutzer einladen", onAction: () => setShowInviteModal(true) }}
+      title={copy.pageTitleSeller}
+      primaryAction={{ content: copy.inviteUser, onAction: () => setShowInviteModal(true) }}
     >
       <Layout>
         <Layout.Section>
@@ -844,8 +751,8 @@ export default function UsersPermissionsPage() {
           {/* Active sub-users */}
           <Card padding="0">
             <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Text variant="headingMd" as="h2">Aktive Benutzer ({subusers.length + 1})</Text>
-              <Button onClick={fetchSellerData} loading={loading} size="slim">Aktualisieren</Button>
+              <Text variant="headingMd" as="h2">{copy.activeUsers(subusers.length + 1)}</Text>
+              <Button onClick={fetchSellerData} loading={loading} size="slim">{ui.refresh}</Button>
             </div>
 
             {/* ── Current account row (always first) ── */}
@@ -860,21 +767,21 @@ export default function UsersPermissionsPage() {
                   <Text variant="bodyMd" fontWeight="semibold">
                     {myStoreName || myEmail}
                   </Text>
-                  <Badge tone="success">Sie</Badge>
-                  <Badge tone="attention">Kontoinhaber</Badge>
+                  <Badge tone="success">{copy.you}</Badge>
+                  <Badge tone="attention">{copy.owner}</Badge>
                 </InlineStack>
                 {myStoreName && <Text variant="bodySm" tone="subdued">{myEmail}</Text>}
-                <Text variant="bodySm" tone="subdued">Voller Zugriff · Eigentümerkonto</Text>
+                <Text variant="bodySm" tone="subdued">{copy.ownerSub}</Text>
               </div>
               <InlineStack gap="200">
-                <Button size="slim" disabled>Rechte</Button>
+                <Button size="slim" disabled>{copy.permissionsBtn}</Button>
               </InlineStack>
             </div>
 
             {loading ? (
-              <Box padding="400"><Text tone="subdued">Laden…</Text></Box>
+              <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>
             ) : subusers.length === 0 ? (
-              <Box padding="400"><Text tone="subdued">Noch keine weiteren Benutzer hinzugefügt.</Text></Box>
+              <Box padding="400"><Text tone="subdued">{copy.noSubusers}</Text></Box>
             ) : (
               subusers.map((user, i) => (
                 <div
@@ -891,14 +798,14 @@ export default function UsersPermissionsPage() {
                     </Text>
                     <Text variant="bodySm" tone="subdued">{user.email}</Text>
                     <Text variant="bodySm" tone="subdued">
-                      {user.permissions ? `${user.permissions.length} Zugriffsrechte` : "Standard-Berechtigungen"} · Hinzugefügt: {new Date(user.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                      {user.permissions ? copy.permissionsCount(user.permissions.length) : copy.defaultPermissions} · {copy.added}: {fmtCreated(user.created_at)}
                     </Text>
                   </div>
                   <InlineStack gap="200">
-                    <Button size="slim" onClick={() => setEditSubuser(user)}>Rechte</Button>
+                    <Button size="slim" onClick={() => setEditSubuser(user)}>{copy.permissionsBtn}</Button>
                     <Button size="slim" tone="critical" variant="secondary"
                       onClick={() => handleDeleteSubuser(user)} loading={deletingSubuser === user.id}>
-                      Entfernen
+                      {copy.remove}
                     </Button>
                   </InlineStack>
                 </div>
@@ -910,7 +817,7 @@ export default function UsersPermissionsPage() {
           {pendingInvites.length > 0 && (
             <Card padding="0">
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
-                <Text variant="headingMd" as="h2">Ausstehende Einladungen ({pendingInvites.length})</Text>
+                <Text variant="headingMd" as="h2">{copy.pendingInvites(pendingInvites.length)}</Text>
               </div>
               {pendingInvites.map((invite, i) => (
                 <div
@@ -926,15 +833,15 @@ export default function UsersPermissionsPage() {
                       <Text variant="bodyMd" fontWeight="semibold">
                         {[invite.first_name, invite.last_name].filter(Boolean).join(" ") || invite.email}
                       </Text>
-                      <Badge tone="warning">Ausstehend</Badge>
+                      <Badge tone="warning">{copy.pending}</Badge>
                     </InlineStack>
                     <Text variant="bodySm" tone="subdued">
-                      {invite.email} · Läuft ab: {new Date(invite.expires_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                      {invite.email} · {copy.expires}: {fmtCreated(invite.expires_at)}
                     </Text>
                   </div>
                   <Button size="slim" tone="critical" variant="secondary"
                     onClick={() => handleCancelInvite(invite)} loading={deletingInvite === invite.id}>
-                    Stornieren
+                    {copy.cancelInvite}
                   </Button>
                 </div>
               ))}
@@ -947,6 +854,9 @@ export default function UsersPermissionsPage() {
         <InviteModal
           onClose={() => setShowInviteModal(false)}
           onSaved={() => { setShowInviteModal(false); fetchSellerData(); }}
+          copy={copy}
+          ui={ui}
+          permissionsList={sellerPermissions}
         />
       )}
       {editSubuser && (
@@ -954,6 +864,9 @@ export default function UsersPermissionsPage() {
           user={editSubuser}
           onClose={() => setEditSubuser(null)}
           onSaved={() => { setEditSubuser(null); fetchSellerData(); }}
+          copy={copy}
+          ui={ui}
+          permissionsList={sellerPermissions}
         />
       )}
     </Page>

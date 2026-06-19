@@ -94,7 +94,7 @@ function ActionMenu({ customer, onEdit, onDelete, canManage, ui }) {
             onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
             onMouseLeave={e => e.currentTarget.style.background = "none"}
           >
-            {ui?.edit || "Bearbeiten"}
+            {ui.edit}
           </button>
           <button
             onClick={() => { setOpen(false); onDelete(customer); }}
@@ -102,7 +102,7 @@ function ActionMenu({ customer, onEdit, onDelete, canManage, ui }) {
             onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
             onMouseLeave={e => e.currentTarget.style.background = "none"}
           >
-            {ui?.delete || "Löschen"}
+            {ui.delete}
           </button>
         </div>
       )}
@@ -110,12 +110,7 @@ function ActionMenu({ customer, onEdit, onDelete, canManage, ui }) {
   );
 }
 
-/** Placeholder — overridden per-render inside component */
-const COLS_FALLBACK = ["#", "Name", "Email", "Typ", "Reg.", "Newsletter", "Land", "Bestellungen", "Umsatz", "Letzter Kauf", ""];
-
-/** Gruppenschlüssel für Kunden ohne main_seller_id / default */
 const PLATFORM_SELLER_KEY = "__platform__";
-const PLATFORM_GROUP_LABEL = "Plattform · direkt / nicht zugeordnet";
 
 function normalizeCustomerSellerKey(c) {
   const sid = c.main_seller_id;
@@ -247,7 +242,7 @@ export default function CustomersPage() {
     if (!q) return customerGroupsBySeller;
     return customerGroupsBySeller.filter(({ sellerId }) => {
       const display =
-        sellerId === PLATFORM_SELLER_KEY ? PLATFORM_GROUP_LABEL : sellerLabelById[sellerId] || sellerId || "";
+        sellerId === PLATFORM_SELLER_KEY ? (localeFromIntl === "en" ? "Platform · direct / unassigned" : localeFromIntl === "tr" ? "Platform · direkt / atanmamış" : localeFromIntl === "fr" ? "Plateforme · direct / non attribué" : localeFromIntl === "es" ? "Plataforma · directo / sin asignar" : localeFromIntl === "it" ? "Piattaforma · diretto / non assegnato" : "Plattform · direkt / nicht zugeordnet") : sellerLabelById[sellerId] || sellerId || "";
       return display.toLowerCase().includes(q) || sellerId.toLowerCase().includes(q);
     });
   }, [customerGroupsBySeller, sellerSearchFilter, sellerLabelById]);
@@ -402,7 +397,7 @@ export default function CustomersPage() {
                       ) : (
                         filteredCustomerGroups.flatMap(({ sellerId, items }) => {
                           const label =
-                            sellerId === PLATFORM_SELLER_KEY ? PLATFORM_GROUP_LABEL : sellerLabelById[sellerId] || sellerId;
+                            sellerId === PLATFORM_SELLER_KEY ? (localeFromIntl === "en" ? "Platform · direct / unassigned" : localeFromIntl === "tr" ? "Platform · direkt / atanmamış" : localeFromIntl === "fr" ? "Plateforme · direct / non attribué" : localeFromIntl === "es" ? "Plataforma · directo / sin asignar" : localeFromIntl === "it" ? "Piattaforma · diretto / non assegnato" : "Plattform · direkt / nicht zugeordnet") : sellerLabelById[sellerId] || sellerId;
                           const open = sellerSectionOpen[sellerId] !== false;
                           const headerBg =
                             sellerId === PLATFORM_SELLER_KEY ? "#eef2ff" : "#fafafa";

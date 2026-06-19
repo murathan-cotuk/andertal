@@ -1,3 +1,12 @@
+import {
+  getAdStatusLabel,
+  getCampaignStatusLabel,
+  fmtBudgetLocale,
+  fmtDateLocale,
+  getTargetOptions,
+  getShopGoalOptions,
+} from "@/lib/marketing-i18n";
+
 export const PLATFORM_OPTIONS = [
   { value: "meta", label: "Meta (Facebook / Instagram)" },
   { value: "google_ads", label: "Google Ads" },
@@ -11,18 +20,18 @@ export const BID_OPTIONS = [
   { value: "target_roas", label: "Target ROAS" },
 ];
 
-export const TARGET_OPTIONS = [
-  { value: "products", label: "Bestimmte Produkte" },
-  { value: "groups", label: "Produktgruppen" },
-  { value: "all", label: "Alle eigenen Produkte" },
-];
+export const TARGET_OPTIONS = getTargetOptions("de");
 
-/** Verkäufer: Ziele ohne Ads-Jargon (in settings gespeichert) */
-export const SHOP_GOAL_OPTIONS = [
-  { value: "visibility", label: "Maximale Sichtbarkeit im Shop", hint: "Produkte höher in Suchergebnissen & Kategorien" },
-  { value: "traffic", label: "Mehr Produktaufrufe", hint: "Mehr Klicks auf deine Produktseiten" },
-  { value: "conversion_focus", label: "Kaufabsicht stärken", hint: "Fokus auf überzeugende Platzierung zum Point of Sale" },
-];
+export function targetOptionsForLocale(locale) {
+  return getTargetOptions(locale);
+}
+
+/** @deprecated use getShopGoalOptions(locale) */
+export const SHOP_GOAL_OPTIONS = getShopGoalOptions("de");
+
+export function shopGoalOptionsForLocale(locale) {
+  return getShopGoalOptions(locale);
+}
 
 export const CAMPAIGN_LOCALES = [
   { code: "de", label: "Deutsch" },
@@ -83,13 +92,12 @@ export function parseSellerSettings(rawSettings) {
   };
 }
 
-export function fmtBudget(cents) {
-  if (!cents) return "—";
-  return `${(parseInt(cents, 10) / 100).toFixed(2)} €/Tag`;
+export function fmtBudget(cents, locale = "de") {
+  return fmtBudgetLocale(cents, locale);
 }
 
-export function fmtDate(v) {
-  return v ? new Date(v).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "—";
+export function fmtDate(v, locale = "de") {
+  return fmtDateLocale(v, locale);
 }
 
 export function toInputDate(iso) {
@@ -125,6 +133,10 @@ export const AD_STATUS_LABEL = {
   rejected: "Abgelehnt",
 };
 
+export function adStatusLabelForLocale(locale, status) {
+  return getAdStatusLabel(locale, status);
+}
+
 /** Customer-facing campaign status (visible to seller & superuser). */
 export const CAMPAIGN_STATUS_TONE = {
   draft: "info",
@@ -139,6 +151,10 @@ export const CAMPAIGN_STATUS_LABEL = {
   paused: "Pausiert",
   archived: "Archiviert",
 };
+
+export function campaignStatusLabelForLocale(locale, status) {
+  return getCampaignStatusLabel(locale, status);
+}
 
 const PLATFORM_KEY_SET = new Set(PLATFORM_OPTIONS.map((p) => p.value));
 

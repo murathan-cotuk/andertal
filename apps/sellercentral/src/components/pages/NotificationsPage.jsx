@@ -5,6 +5,7 @@ import { Page, Card, Button, Checkbox, BlockStack, InlineStack, Text, Box } from
 import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
+import { useLt, dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 
@@ -16,8 +17,7 @@ function formatDateDmy(value, locale) {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
-  return d.toLocaleDateString(loc, {
+  return d.toLocaleDateString(dateLocaleFor(locale), {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -77,6 +77,7 @@ function NotificationRow({ it, busy, selected, onToggle, onDeleteOne, locale }) 
 
 export default function NotificationsPage() {
   const locale = useLocale();
+  const lt = useLt();
   const ui = getUI(locale);
 
   const [groups, setGroups] = useState([]);
@@ -107,7 +108,7 @@ export default function NotificationsPage() {
         setGrandTotal(typeof data.grand_total === "number" ? data.grand_total : (data.groups || []).reduce((s, g) => s + (g.items?.length || 0), 0));
       } else {
         const legacy = data.items || [];
-        const nextGroups = [{ key: "all", label_de: "Alle", description_de: "", items: legacy, total: legacy.length }];
+        const nextGroups = [{ key: "all", label_en: "All", label_tr: "Tümü", label_de: "Alle", description_de: "", items: legacy, total: legacy.length }];
         setGroups(nextGroups);
         setActiveGroupKey("all");
         setGrandTotal(typeof data.total === "number" ? data.total : legacy.length);
@@ -261,16 +262,20 @@ export default function NotificationsPage() {
     return g.label_de || g.key;
   };
 
-  const footerText = () => {
+  const footerText = useMemo(() => {
     const hasVerif = groups.some((x) => x.key === "verification" || x.key === "change_suggestion");
-    if (locale === "en") {
-      return `${grandTotal} entries total — up to 500 per category (orders, returns${hasVerif ? ", verification, change suggestions" : ""}).`;
-    }
-    if (locale === "tr") {
-      return `Toplam ${grandTotal} kayıt — kategori başına en fazla 500 (siparişler, iadeler${hasVerif ? ", doğrulama, değişiklik önerileri" : ""}).`;
-    }
-    return `${grandTotal} Einträge gesamt — bis zu 500 je Kategorie (Bestellungen, Rücksendungen${hasVerif ? ", Verifizierung, Änderungsvorschläge" : ""}).`;
-  };
+    const extra = hasVerif
+      ? lt(", verification, change suggestions", ", doğrulama, değişiklik önerileri", ", vérification, suggestions de modification", ", verificación, sugerencias de cambio", ", verifica, suggerimenti di modifica", ", Verifizierung, Änderungsvorschläge")
+      : "";
+    return lt(
+      `${grandTotal} entries total — up to 500 per category (orders, returns${extra}).`,
+      `Toplam ${grandTotal} kayıt — kategori başına en fazla 500 (siparişler, iadeler${extra}).`,
+      `${grandTotal} entrées au total — jusqu'à 500 par catégorie (commandes, retours${extra}).`,
+      `${grandTotal} entradas en total — hasta 500 por categoría (pedidos, devoluciones${extra}).`,
+      `${grandTotal} voci totali — fino a 500 per categoria (ordini, resi${extra}).`,
+      `${grandTotal} Einträge gesamt — bis zu 500 je Kategorie (Bestellungen, Rücksendungen${extra}).`,
+    );
+  }, [groups, grandTotal, lt]);
 
   return (
     <Page title={pageTitle} subtitle={pageSubtitle}>
@@ -398,7 +403,7 @@ export default function NotificationsPage() {
           {!loading && flatItems.length > 0 && (
             <Box padding="300">
               <Text as="p" tone="subdued">
-                {footerText()}
+                {footerText}
               </Text>
             </Box>
           )}

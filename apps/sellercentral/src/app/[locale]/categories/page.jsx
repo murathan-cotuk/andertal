@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import DashboardLayout from "@/components/DashboardLayout";
 
@@ -80,6 +82,8 @@ function Node({ cat, depth }) {
 }
 
 export default function CategoriesPage() {
+  const locale = useLocale();
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   const [roots, setRoots] = useState(null); // null = loading
   const [flat, setFlat] = useState([]);
   const [error, setError] = useState(null);
@@ -102,27 +106,26 @@ export default function CategoriesPage() {
   return (
     <DashboardLayout>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 8, color: "#111827" }}>Kategoriler</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 8, color: "#111827" }}>{t("Categories", "Kategoriler", "Catégories", "Categorías", "Categorie", "Kategorien")}</h1>
 
         {error && <p style={{ color: "red" }}>{error}</p>}
 
-        {/* debug satırı — veriyi kontrol etmek için */}
         {roots !== null && (
           <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
-            Toplam: {flat.length} &nbsp;|&nbsp; Ana kategori: {roots.length} &nbsp;|&nbsp;
-            Alt kategorisi olan: {flat.filter(c => c.parent_id).length}
+            {t("Total", "Toplam", "Total", "Total", "Totale", "Gesamt")}: {flat.length} &nbsp;|&nbsp; {t("Root categories", "Ana kategori", "Catégories racines", "Categorías raíz", "Categorie radice", "Hauptkategorien")}: {roots.length} &nbsp;|&nbsp;
+            {t("With parent", "Alt kategorisi olan", "Avec parent", "Con padre", "Con genitore", "Mit übergeordneter Kategorie")}: {flat.filter(c => c.parent_id).length}
           </p>
         )}
 
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <button onClick={() => toggle(true)}  style={{ padding: "5px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 13 }}>Tümünü Aç</button>
-          <button onClick={() => toggle(false)} style={{ padding: "5px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 13 }}>Tümünü Kapat</button>
+          <button onClick={() => toggle(true)}  style={{ padding: "5px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 13 }}>{t("Expand all", "Tümünü aç", "Tout développer", "Expandir todo", "Espandi tutto", "Alle aufklappen")}</button>
+          <button onClick={() => toggle(false)} style={{ padding: "5px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 13 }}>{t("Collapse all", "Tümünü kapat", "Tout réduire", "Contraer todo", "Comprimi tutto", "Alle zuklappen")}</button>
         </div>
 
         {roots === null ? (
-          <p style={{ color: "#6b7280" }}>Yükleniyor…</p>
+          <p style={{ color: "#6b7280" }}>{t("Loading…", "Yükleniyor…", "Chargement…", "Cargando…", "Caricamento…", "Laden…")}</p>
         ) : roots.length === 0 ? (
-          <p style={{ color: "#6b7280" }}>Kategori bulunamadı.</p>
+          <p style={{ color: "#6b7280" }}>{t("No categories found.", "Kategori bulunamadı.", "Aucune catégorie trouvée.", "No se encontraron categorías.", "Nessuna categoria trovata.", "Keine Kategorien gefunden.")}</p>
         ) : (
           <div key={key}>
             {roots.map(r => <Node key={r.id} cat={r} depth={0} initialOpen={allOpen} />)}

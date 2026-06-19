@@ -23,8 +23,6 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import {
   PLATFORM_OPTIONS,
   BID_OPTIONS,
-  TARGET_OPTIONS,
-  SHOP_GOAL_OPTIONS,
   CAMPAIGN_LOCALES,
   GEO_TARGET_OPTIONS,
   LANGUAGE_TARGET_OPTIONS,
@@ -33,28 +31,13 @@ import {
   fmtBudget,
 } from "@/components/pages/marketing/ppcCampaignShared";
 import { resolveImageUrl } from "@/lib/image-url";
+import { useLocale } from "next-intl";
+import { getMarketingPpcEditorCopy, getAudienceOptions, shopGoalOptionsForLocale, targetOptionsForLocale } from "@/lib/marketing-i18n";
 
 const VIDEO_ACCEPT = "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov";
 const VIDEO_MAX_BYTES = 120 * 1024 * 1024;
 const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif";
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-
-const AUDIENCE_OPTIONS = [
-  "Sommer-Käufer",
-  "Winter-Fans",
-  "Frühlings-Shopper",
-  "Herbst-Käufer",
-  "Schnäppchenjäger",
-  "Geschenk-Shopper",
-  "Fitness-Begeisterte",
-  "Mode-Fans",
-  "Eltern & Familie",
-  "Beauty-Fans",
-  "Outdoor-Liebhaber",
-  "Heimwerker",
-  "Tech-Enthusiasten",
-  "Tierliebhaber",
-];
 
 const shell = {
   pageBg: "#f4f6fb",
@@ -103,7 +86,7 @@ function StepHeader({ step, title, subtitle }) {
   );
 }
 
-function ShopPreviewMock({ name, budgetEuro, goalLabel, targetType, productCount, highlightVideoUrl }) {
+function ShopPreviewMock({ mc, name, budgetEuro, goalLabel, targetType, productCount, highlightVideoUrl }) {
   const shopClip = highlightVideoUrl ? resolveImageUrl(highlightVideoUrl) : "";
   return (
     <div
@@ -117,7 +100,7 @@ function ShopPreviewMock({ name, budgetEuro, goalLabel, targetType, productCount
     >
       <div style={{ padding: "14px 16px", borderBottom: "1px solid #e2e8f0", background: "#fff" }}>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#64748b", textTransform: "uppercase" }}>
-          Live-Vorschau im Shop
+          {mc.liveShopPreview}
         </span>
       </div>
       <div style={{ padding: 18 }}>
@@ -157,7 +140,7 @@ function ShopPreviewMock({ name, budgetEuro, goalLabel, targetType, productCount
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 650, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {name || "Deine Kampagne"}
+              {name || mc.yourCampaign}
             </div>
             <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span
@@ -171,7 +154,7 @@ function ShopPreviewMock({ name, budgetEuro, goalLabel, targetType, productCount
                   border: "1px solid #fcd34d",
                 }}
               >
-                Sponsored
+                {mc.sponsored}
               </span>
               <span style={{ fontSize: 11, color: "#64748b" }}>{goalLabel}</span>
             </div>
@@ -179,19 +162,19 @@ function ShopPreviewMock({ name, budgetEuro, goalLabel, targetType, productCount
         </div>
         <div style={{ marginTop: 14, fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span>Tagesbudget</span>
+            <span>{mc.dailyBudget}</span>
             <strong style={{ color: "#0f172a" }}>{budgetEuro ? `${budgetEuro} €` : "—"}</strong>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>Zielgruppe</span>
+            <span>{mc.targetAudience}</span>
             <strong style={{ color: "#0f172a" }}>
-              {targetType === "all" ? "Alle Artikel" : targetType === "groups" ? "Gruppen" : `${productCount} Produkt(e)`}
+              {targetType === "all" ? mc.allItems : targetType === "groups" ? mc.groups : mc.productCount(productCount)}
             </strong>
           </div>
           <div style={{ marginTop: 12 }}>
             <ProgressBar progress={budgetEuro ? 72 : 24} tone="primary" size="small" />
             <span style={{ fontSize: 10, marginTop: 6, display: "block", color: "#94a3b8" }}>
-              Höhere Sichtbarkeit bei aktiver Kampagnenfreigabe
+              {mc.visibilityHint}
             </span>
           </div>
         </div>
@@ -201,6 +184,7 @@ function ShopPreviewMock({ name, budgetEuro, goalLabel, targetType, productCount
 }
 
 function CampaignVideoSlot({
+  mc,
   title,
   badge,
   roleLine,
@@ -282,7 +266,7 @@ function CampaignVideoSlot({
               padding: 16,
             }}
           >
-            {uploading ? "Wird hochgeladen …" : "+ Video hinzufügen"}
+            {uploading ? mc.uploading : mc.addVideo}
           </button>
         )}
       </div>
@@ -302,13 +286,13 @@ function CampaignVideoSlot({
       <InlineStack gap="300" wrap blockAlign="center">
         <div style={{ marginTop: 14 }}>
           <Button size="slim" disabled={uploading} onClick={() => inputRef.current?.click()}>
-            {resolved ? "Video ersetzen" : "Datei wählen"}
+            {resolved ? mc.replaceVideo : mc.chooseFile}
           </Button>
         </div>
         {resolved ? (
           <div style={{ marginTop: 14 }}>
             <Button size="slim" tone="critical" variant="plain" disabled={uploading} onClick={onClear}>
-              Entfernen
+              {mc.remove}
             </Button>
           </div>
         ) : null}
@@ -317,7 +301,7 @@ function CampaignVideoSlot({
   );
 }
 
-function CampaignImageSlot({ url, uploading, onSelectFile, onClear }) {
+function CampaignImageSlot({ mc, url, uploading, onSelectFile, onClear }) {
   const inputRef = useRef(null);
   const resolved = url ? resolveImageUrl(url) : "";
 
@@ -325,11 +309,11 @@ function CampaignImageSlot({ url, uploading, onSelectFile, onClear }) {
     <div style={{ borderRadius: 18, border: shell.border, padding: 20, background: "linear-gradient(165deg, #fafbff 0%, #ffffff 52%, #f8fafc 100%)", boxShadow: shell.cardShadow }}>
       <InlineStack align="space-between" blockAlign="start" wrap>
         <BlockStack gap="100">
-          <Text as="span" variant="headingSm">Kampagnenbild · Banner</Text>
-          <p style={{ margin: 0, fontSize: 13, color: "#475569", lineHeight: 1.5 }}>Wird als Thumbnail oder Banner im Shop und auf externen Kanälen eingesetzt.</p>
-          <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>JPG / PNG / WebP · min. 800 × 600 px · max. 10 MB</p>
+          <Text as="span" variant="headingSm">{mc.campaignImage}</Text>
+          <p style={{ margin: 0, fontSize: 13, color: "#475569", lineHeight: 1.5 }}>{mc.imageRoleLine}</p>
+          <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>{mc.imageSpecsLine}</p>
         </BlockStack>
-        <Badge tone="info">Bild</Badge>
+        <Badge tone="info">{mc.imageBadge}</Badge>
       </InlineStack>
 
       <div style={{ marginTop: 16, width: "100%", aspectRatio: "16/9", borderRadius: 14, overflow: "hidden", background: "linear-gradient(145deg, #0f172a 0%, #1e293b 55%, #312e81 120%)", border: "1px solid rgba(148,163,184,0.35)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 168 }}>
@@ -337,7 +321,7 @@ function CampaignImageSlot({ url, uploading, onSelectFile, onClear }) {
           <img src={resolved} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", maxHeight: 320 }} />
         ) : (
           <button type="button" disabled={uploading} onClick={() => inputRef.current?.click()} style={{ width: "100%", height: "100%", minHeight: 168, border: "none", background: "transparent", cursor: uploading ? "wait" : "pointer", color: "rgba(248,250,252,0.92)", fontSize: 14, fontWeight: 650, padding: 16 }}>
-            {uploading ? "Wird hochgeladen …" : "+ Bild hinzufügen"}
+            {uploading ? mc.uploading : mc.addImage}
           </button>
         )}
       </div>
@@ -347,12 +331,12 @@ function CampaignImageSlot({ url, uploading, onSelectFile, onClear }) {
       <InlineStack gap="300" wrap blockAlign="center">
         <div style={{ marginTop: 14 }}>
           <Button size="slim" disabled={uploading} onClick={() => inputRef.current?.click()}>
-            {resolved ? "Bild ersetzen" : "Datei wählen"}
+            {resolved ? mc.replaceImage : mc.chooseFile}
           </Button>
         </div>
         {resolved ? (
           <div style={{ marginTop: 14 }}>
-            <Button size="slim" tone="critical" variant="plain" disabled={uploading} onClick={onClear}>Entfernen</Button>
+            <Button size="slim" tone="critical" variant="plain" disabled={uploading} onClick={onClear}>{mc.remove}</Button>
           </div>
         ) : null}
       </InlineStack>
@@ -360,7 +344,7 @@ function CampaignImageSlot({ url, uploading, onSelectFile, onClear }) {
   );
 }
 
-function LocaleContentEditor({ localeContent, onChange }) {
+function LocaleContentEditor({ mc, localeContent, onChange }) {
   const [activeLocale, setActiveLocale] = useState("de");
   const current = localeContent[activeLocale] || { name: "", description: "" };
 
@@ -391,17 +375,17 @@ function LocaleContentEditor({ localeContent, onChange }) {
         })}
       </div>
       <TextField
-        label={`Kampagnenname (${CAMPAIGN_LOCALES.find(l => l.code === activeLocale)?.label})`}
+        label={mc.campaignNameLocale(CAMPAIGN_LOCALES.find(l => l.code === activeLocale)?.label)}
         value={current.name}
         onChange={(v) => setLocaleField("name", v)}
-        placeholder="Kampagnenname in dieser Sprache …"
+        placeholder={mc.campaignNamePlaceholder}
         autoComplete="off"
       />
       <TextField
-        label={`Beschreibung (${CAMPAIGN_LOCALES.find(l => l.code === activeLocale)?.label})`}
+        label={mc.descriptionLocale(CAMPAIGN_LOCALES.find(l => l.code === activeLocale)?.label)}
         value={current.description}
         onChange={(v) => setLocaleField("description", v)}
-        placeholder="Kurzbeschreibung für diese Sprache …"
+        placeholder={mc.descriptionPlaceholder}
         multiline={3}
         autoComplete="off"
       />
@@ -411,6 +395,11 @@ function LocaleContentEditor({ localeContent, onChange }) {
 
 export default function MarketingPpcCampaignEditorPage({ campaignId }) {
   const router = useRouter();
+  const locale = useLocale();
+  const mc = useMemo(() => getMarketingPpcEditorCopy(locale), [locale]);
+  const shopGoals = useMemo(() => shopGoalOptionsForLocale(locale), [locale]);
+  const targetOptions = useMemo(() => targetOptionsForLocale(locale), [locale]);
+  const audienceOptions = useMemo(() => getAudienceOptions(locale), [locale]);
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -437,11 +426,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
   useEffect(() => {
     const payment = searchParams?.get("payment");
     if (payment === "success") {
-      setMsg({ tone: "success", text: "Zahlung erfolgreich! Deine Kampagne wurde eingereicht und wird von uns geprüft." });
+      setMsg({ tone: "success", text: mc.paymentSuccess });
     } else if (payment === "cancelled") {
-      setMsg({ tone: "warning", text: "Zahlung abgebrochen. Du kannst es jederzeit erneut versuchen." });
+      setMsg({ tone: "warning", text: mc.paymentCancelled });
     }
-  }, [searchParams]);
+  }, [searchParams, mc.paymentSuccess, mc.paymentCancelled]);
 
   const loadConnectedPlatforms = useCallback(async () => {
     if (!isSuperuser) return;
@@ -468,20 +457,20 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
       ]);
       const c = campRes?.campaign;
       if (!c) {
-        setMsg({ tone: "critical", text: "Kampagne nicht gefunden." });
+        setMsg({ tone: "critical", text: mc.campaignNotFound });
         setLoadedCampaign(null);
         setForm(parseCampaignToForm({}));
         return;
       }
       if (String(c.campaign_type || "").toLowerCase() !== "ppc" && !(c.budget_daily_cents > 0)) {
-        setMsg({ tone: "warning", text: "Diese Kampagne ist keine Werbekampagne." });
+        setMsg({ tone: "warning", text: mc.notAdCampaign });
       }
       setLoadedCampaign(c);
       setForm(parseCampaignToForm(c));
       setGroups(Array.isArray(gRes?.groups) ? gRes.groups : []);
       setProducts(Array.isArray(pRes?.products) ? pRes.products : []);
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Daten konnten nicht geladen werden." });
+      setMsg({ tone: "critical", text: e?.message || mc.loadError });
     } finally {
       setLoading(false);
     }
@@ -530,9 +519,9 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
   };
 
   const goalLabel = useMemo(() => {
-    const g = SHOP_GOAL_OPTIONS.find((o) => o.value === form.seller_shop_goal);
-    return g?.label || SHOP_GOAL_OPTIONS[0].label;
-  }, [form.seller_shop_goal]);
+    const g = shopGoals.find((o) => o.value === form.seller_shop_goal);
+    return g?.label || shopGoals[0].label;
+  }, [form.seller_shop_goal, shopGoals]);
 
   const keywords = useMemo(
     () => (form.seller_creative_note ? form.seller_creative_note.split(",").map((k) => k.trim()).filter(Boolean) : []),
@@ -563,11 +552,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
     const okMime = ["video/mp4", "video/webm", "video/quicktime"].includes(file.type || "");
     const okExt = /\.(mp4|webm|mov)$/i.test(file.name || "");
     if (!okMime && !okExt) {
-      setMsg({ tone: "warning", text: "Bitte MP4, WebM oder MOV verwenden." });
+      setMsg({ tone: "warning", text: mc.videoFormatError });
       return;
     }
     if (file.size > VIDEO_MAX_BYTES) {
-      setMsg({ tone: "warning", text: "Video maximal 120 MB." });
+      setMsg({ tone: "warning", text: mc.videoSizeError });
       return;
     }
     setVideoUploadSlot(slot);
@@ -577,12 +566,12 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
       fd.append("file", file);
       const r = await getMedusaAdminClient().uploadMedia(fd, { purpose: "campaign_video" });
       const u = r?.url;
-      if (!u) throw new Error("Keine URL zurückgegeben.");
+      if (!u) throw new Error(mc.noUrlReturned);
       if (slot === "shop") setField("seller_video_shop_url", u);
       else setField("seller_video_reels_url", u);
-      setMsg({ tone: "success", text: "Video hochgeladen. Änderungen mit Speichern übernehmen." });
+      setMsg({ tone: "success", text: mc.videoUploaded });
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Upload fehlgeschlagen." });
+      setMsg({ tone: "critical", text: e?.message || mc.uploadFailed });
     } finally {
       setVideoUploadSlot(null);
     }
@@ -592,11 +581,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
     const okMime = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type || "");
     const okExt = /\.(jpg|jpeg|png|webp|gif)$/i.test(file.name || "");
     if (!okMime && !okExt) {
-      setMsg({ tone: "warning", text: "Bitte JPG, PNG oder WebP verwenden." });
+      setMsg({ tone: "warning", text: mc.imageFormatError });
       return;
     }
     if (file.size > IMAGE_MAX_BYTES) {
-      setMsg({ tone: "warning", text: "Bild maximal 10 MB." });
+      setMsg({ tone: "warning", text: mc.imageSizeError });
       return;
     }
     setImageUploading(true);
@@ -606,11 +595,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
       fd.append("file", file);
       const r = await getMedusaAdminClient().uploadMedia(fd, { purpose: "campaign_image" });
       const u = r?.url;
-      if (!u) throw new Error("Keine URL zurückgegeben.");
+      if (!u) throw new Error(mc.noUrlReturned);
       setField("seller_image_url", u);
-      setMsg({ tone: "success", text: "Bild hochgeladen. Änderungen mit Speichern übernehmen." });
+      setMsg({ tone: "success", text: mc.imageUploaded });
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Upload fehlgeschlagen." });
+      setMsg({ tone: "critical", text: e?.message || mc.uploadFailed });
     } finally {
       setImageUploading(false);
     }
@@ -618,12 +607,12 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
 
   const save = async () => {
     if (!form.name.trim()) {
-      setMsg({ tone: "warning", text: "Bitte einen Kampagnennamen eingeben." });
+      setMsg({ tone: "warning", text: mc.nameRequired });
       return;
     }
     const budgetEuro = parseFloat(form.budget_daily_cents);
     if (!form.budget_daily_cents || Number.isNaN(budgetEuro) || budgetEuro <= 0) {
-      setMsg({ tone: "warning", text: "Bitte ein gültiges Tagesbudget eingeben (z.B. 5 für 5 €/Tag)." });
+      setMsg({ tone: "warning", text: mc.budgetRequired });
       return;
     }
     setSaving(true);
@@ -673,10 +662,10 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
       }
 
       await client.updateCampaign(campaignId, payload);
-      setMsg({ tone: "success", text: "Kampagne gespeichert." });
+      setMsg({ tone: "success", text: mc.saved });
       await load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Fehler beim Speichern." });
+      setMsg({ tone: "critical", text: e?.message || mc.saveError });
     } finally {
       setSaving(false);
     }
@@ -686,7 +675,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
     if (!campaignId) return;
     const budgetEuro = parseFloat(form.budget_daily_cents);
     if (!form.budget_daily_cents || Number.isNaN(budgetEuro) || budgetEuro <= 0) {
-      setMsg({ tone: "warning", text: "Bitte zuerst ein gültiges Tagesbudget eingeben und speichern." });
+      setMsg({ tone: "warning", text: mc.budgetSaveFirst });
       return;
     }
     setCheckoutLoading(true);
@@ -711,11 +700,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
       if (res?.checkout_url) {
         window.location.href = res.checkout_url;
       } else {
-        setMsg({ tone: "critical", text: res?.message || "Checkout konnte nicht gestartet werden." });
+        setMsg({ tone: "critical", text: res?.message || mc.checkoutFailed });
         setCheckoutLoading(false);
       }
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || "Fehler beim Bezahlen." });
+      setMsg({ tone: "critical", text: e?.message || mc.payError });
       setCheckoutLoading(false);
     }
   };
@@ -729,11 +718,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
 
   if (loading) {
     return (
-      <Page title="Kampagne laden …" backAction={{ content: "Zurück", url: "/marketing/campaigns" }}>
+      <Page title={mc.loadingCampaign} backAction={{ content: mc.back, url: "/marketing/campaigns" }}>
         <Card>
           <div style={{ padding: 48, textAlign: "center" }}>
-            <Spinner size="large" accessibilityLabel="Laden" />
-            <p style={{ marginTop: 16, color: "#64748b", fontSize: 14 }}>Deine Werbekampagne wird geladen …</p>
+            <Spinner size="large" accessibilityLabel={mc.loadingCampaign} />
+            <p style={{ marginTop: 16, color: "#64748b", fontSize: 14 }}>{mc.loadingCampaign}</p>
           </div>
         </Card>
       </Page>
@@ -745,10 +734,10 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
   return (
     <Page
       fullWidth
-      title={sellerExperience ? "Shop-Werbung bearbeiten" : form.name.trim() || "Werbekampagne"}
+      title={sellerExperience ? mc.editShopAd : form.name.trim() || mc.adCampaign}
       subtitle={undefined}
-      backAction={{ content: "Zurück zur Übersicht", url: "/marketing/campaigns" }}
-      primaryAction={{ content: "Speichern", onAction: save, loading: saving }}
+      backAction={{ content: mc.backToOverview, url: "/marketing/campaigns" }}
+      primaryAction={{ content: mc.save, onAction: save, loading: saving }}
     >
       <div style={{ background: shell.pageBg, margin: "-16px -16px 0", paddingBottom: 48 }}>
         {sellerExperience && (
@@ -764,8 +753,8 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
             <div style={{ position: "absolute", inset: 0, background: shell.heroGlow, pointerEvents: "none" }} />
             <div style={{ position: "relative", maxWidth: 1180, margin: "0 auto" }}>
               <InlineStack gap="200" blockAlign="center" wrap>
-                <Badge tone="success">Shop-Promotion</Badge>
-                <Badge tone="info">Sichtbarkeit & Ranking</Badge>
+                <Badge tone="success">{mc.shopPromotionBadge}</Badge>
+                <Badge tone="info">{mc.visibilityRankingBadge}</Badge>
               </InlineStack>
               <h1
                 style={{
@@ -779,14 +768,14 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                   fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
                 }}
               >
-                {form.name.trim() || "Neue Shop-Kampagne"}
+                {form.name.trim() || mc.newShopCampaign}
               </h1>
               <p style={{ margin: "14px 0 0", fontSize: 15, color: "rgba(226, 232, 240, 0.88)", maxWidth: 620, lineHeight: 1.55 }}>
-                Steigere die Sichtbarkeit deiner Angebote im Marktplatz: Sponsored-Badge, bessere Platzierung und mehr Aufmerksamkeit.
+                {mc.heroSubtitle}
               </p>
               <div style={{ marginTop: 22, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
                 <span style={{ fontSize: 13, color: "rgba(248,250,252,0.9)" }}>
-                  Budget {form.budget_daily_cents ? `${form.budget_daily_cents} €/Tag` : fmtBudget(loadedCampaign?.budget_daily_cents)}
+                  {form.budget_daily_cents ? mc.budgetPerDay(form.budget_daily_cents) : fmtBudget(loadedCampaign?.budget_daily_cents)}
                 </span>
               </div>
             </div>
@@ -805,7 +794,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
           {isSuperuser && connectedPlatforms.length === 0 && (
             <div style={{ marginBottom: 20 }}>
               <Banner tone="warning">
-                Admin-Hinweis: Marketing-Konten unter <strong>Apps & Integrationen</strong> verbinden, um externe Ausspielung zu steuern.
+                {mc.adminMarketingHint}
               </Banner>
             </div>
           )}
@@ -832,32 +821,28 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
               >
                 <StepHeader
                   step={1}
-                  title="Grundlagen & Strategie"
-                  subtitle={
-                    sellerExperience
-                      ? "Benenne deine Kampagne und beschreibe intern, worum es geht — das hilft uns, sie konsistent zu platzieren."
-                      : "Interne Benennung und Beschreibung."
-                  }
+                  title={mc.basicsTitle}
+                  subtitle={sellerExperience ? mc.basicsSubtitleSeller : mc.basicsSubtitleAdmin}
                 />
                 <BlockStack gap="400">
-                  <TextField label="Kampagnenname *" value={form.name} onChange={(v) => setField("name", v)} autoComplete="off" />
+                  <TextField label={mc.campaignName} value={form.name} onChange={(v) => setField("name", v)} autoComplete="off" />
                   <TextField
-                    label="Interne Notiz"
+                    label={mc.internalNote}
                     value={form.description}
                     onChange={(v) => setField("description", v)}
                     multiline={3}
                     autoComplete="off"
-                    helpText={sellerExperience ? "Nur für dich und unser Team sichtbar." : undefined}
+                    helpText={sellerExperience ? mc.internalNoteHelp : undefined}
                   />
 
                   {sellerExperience && (
                     <>
                       <Divider />
                       <Text as="h3" variant="headingSm">
-                        Dein Ziel im Shop
+                        {mc.yourShopGoal}
                       </Text>
                       <div style={{ display: "grid", gap: 12 }}>
-                        {SHOP_GOAL_OPTIONS.map((opt) => {
+                        {shopGoals.map((opt) => {
                           const active = form.seller_shop_goal === opt.value;
                           return (
                             <button
@@ -882,9 +867,9 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                         })}
                       </div>
                       <div>
-                        <Text as="p" variant="bodySm" tone="subdued">Zielgruppe (optional)</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">{mc.audienceOptional}</Text>
                         <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                          {AUDIENCE_OPTIONS.map((aud) => {
+                          {audienceOptions.map((aud) => {
                             const active = selectedAudiences.includes(aud);
                             return (
                               <button
@@ -910,12 +895,12 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                         </div>
                         {selectedAudiences.length > 0 && (
                           <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b" }}>
-                            Ausgewählt: {selectedAudiences.join(", ")}
+                            {mc.selected}: {selectedAudiences.join(", ")}
                           </p>
                         )}
                       </div>
                       <div>
-                        <Text as="p" variant="bodySm" tone="subdued">Keywords & Botschaften (optional)</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">{mc.keywordsOptional}</Text>
                         {keywords.length > 0 && (
                           <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
                             {keywords.map((kw) => (
@@ -967,7 +952,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                                 setKeywordInput("");
                               }
                             }}
-                            placeholder="Keyword eingeben + Enter …"
+                            placeholder={mc.keywordPlaceholder}
                             style={{
                               flex: 1,
                               padding: "8px 12px",
@@ -992,7 +977,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                               cursor: "pointer",
                             }}
                           >
-                            Hinzufügen
+                            {mc.add}
                           </button>
                         </div>
                       </div>
@@ -1013,32 +998,28 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
               >
                 <StepHeader
                   step={2}
-                  title="Medien-Creative"
-                  subtitle={
-                    sellerExperience
-                      ? "Bild und Videos für die Kampagne — für maximale Sichtbarkeit im Shop und auf Social Media."
-                      : "Verkäufer-Assets: Bild, Shop-Highlight (16:9) und vertikales Reels-Format."
-                  }
+                  title={mc.mediaCreativeTitle}
+                  subtitle={sellerExperience ? mc.mediaCreativeSubtitleSeller : mc.mediaCreativeSubtitleAdmin}
                 />
                 {sellerExperience ? (
                   <div style={{ marginBottom: 20 }}>
                     <Banner tone="warning">
                       <p style={{ margin: 0, lineHeight: 1.55 }}>
-                        <strong>Gutes Creative wird zusätzlich ausgespielt:</strong> Wenn deine Medien überzeugen, können wir sie neben dem Shop
-                        auch in bezahlten <strong>Social-Media</strong>-Kampagnen einsetzen.
+                        <strong>{mc.creativeBannerStrong}</strong> {mc.creativeBannerText.replace(mc.creativeBannerStrong, "").trim()}
                       </p>
                     </Banner>
                   </div>
                 ) : (
                   <div style={{ marginBottom: 16 }}>
                     <Text tone="subdued" as="p" variant="bodySm">
-                      URLs werden in den Kampagneneinstellungen gespeichert; Ausspielung extern über Admin-Prozesse.
+                      {mc.adminUrlsNote}
                     </Text>
                   </div>
                 )}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 22 }}>
                   <div style={{ flex: "1 1 320px", minWidth: 0 }}>
                     <CampaignImageSlot
+                      mc={mc}
                       url={form.seller_image_url}
                       uploading={imageUploading}
                       onSelectFile={uploadCampaignImage}
@@ -1047,10 +1028,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                   </div>
                   <div style={{ flex: "1 1 320px", minWidth: 0 }}>
                     <CampaignVideoSlot
-                      title="Shop-Highlight · 16 : 9"
-                      badge="Im Shop prominent"
-                      roleLine="Dieses Format wird im Marktplatz groß ausgespielt — maximale Aufmerksamkeit für deine Kampagne."
-                      specsLine="Empfehlung: 1920 × 1080 px oder höher · MP4 (H.264) · max. 120 MB"
+                      mc={mc}
+                      title={mc.shopHighlightTitle}
+                      badge={mc.shopHighlightBadge}
+                      roleLine={mc.shopHighlightRole}
+                      specsLine={mc.shopHighlightSpecs}
                       aspectMode="169"
                       url={form.seller_video_shop_url}
                       uploading={videoUploadSlot === "shop"}
@@ -1060,10 +1042,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                   </div>
                   <div style={{ flex: "1 1 280px", minWidth: 0 }}>
                     <CampaignVideoSlot
-                      title="Reels / Stories · 9 : 16"
-                      badge="Social Media"
-                      roleLine="Vertikales Video für bezahlte Social-Media-Werbung (Reels / Stories)."
-                      specsLine="Empfehlung: 1080 × 1920 px · MP4 (H.264) · max. 120 MB"
+                      mc={mc}
+                      title={mc.reelsTitle}
+                      badge={mc.reelsBadge}
+                      roleLine={mc.reelsRole}
+                      specsLine={mc.reelsSpecs}
                       aspectMode="916"
                       url={form.seller_video_reels_url}
                       uploading={videoUploadSlot === "reels"}
@@ -1086,10 +1069,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
               >
                 <StepHeader
                   step={sellerExperience ? 3 : 3}
-                  title="Mehrsprachiger Inhalt"
-                  subtitle="Kampagnenname und Beschreibung je Sprache — wird je nach Kundensprache ausgespielt."
+                  title={mc.multilingualTitle}
+                  subtitle={mc.multilingualSubtitle}
                 />
                 <LocaleContentEditor
+                  mc={mc}
                   localeContent={form.locale_content || {}}
                   onChange={(v) => setField("locale_content", v)}
                 />
@@ -1107,38 +1091,30 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
               >
                 <StepHeader
                   step={4}
-                  title="Budget & Laufzeit"
-                  subtitle={
-                    sellerExperience
-                      ? "Dein Tagesbudget steuert die Intensität der Promotion im Shop. Wir nutzen es zusätzlich für die professionelle Ausspielung außerhalb — ohne dass du Kanäle einrichten musst."
-                      : "Tagesbudget und Zeitfenster."
-                  }
+                  title={mc.budgetRuntimeTitle}
+                  subtitle={sellerExperience ? mc.budgetRuntimeSubtitleSeller : mc.budgetRuntimeSubtitleAdmin}
                 />
                 <BlockStack gap="400">
                   <TextField
-                    label="Tagesbudget (€) *"
+                    label={mc.dailyBudgetEuro}
                     type="number"
                     min="1"
                     step="0.5"
                     value={form.budget_daily_cents}
                     onChange={(v) => setField("budget_daily_cents", v)}
-                    helpText={
-                      sellerExperience
-                        ? "Empfehlung: konsistentes Budget über mehrere Tage. Wenn du mit starkem Video zusätzlich außerhalb des Shops ausgespielt werden möchtest (Schritt 2), lieber etwas großzügiger planen."
-                        : "z.B. 5 für 5 €/Tag."
-                    }
+                    helpText={sellerExperience ? mc.budgetHelpSeller : mc.budgetHelpAdmin}
                     autoComplete="off"
                   />
                   <InlineStack gap="400" wrap={false}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <TextField label="Start" type="datetime-local" value={form.start_at} onChange={(v) => setField("start_at", v)} autoComplete="off" />
+                      <TextField label={mc.start} type="datetime-local" value={form.start_at} onChange={(v) => setField("start_at", v)} autoComplete="off" />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <TextField label="Ende (optional)" type="datetime-local" value={form.end_at} onChange={(v) => setField("end_at", v)} autoComplete="off" />
+                      <TextField label={mc.endOptional} type="datetime-local" value={form.end_at} onChange={(v) => setField("end_at", v)} autoComplete="off" />
                     </div>
                   </InlineStack>
                   {isSuperuser && (
-                    <Select label="Gebotsstrategie (technisch)" options={BID_OPTIONS} value={form.bid_strategy} onChange={(v) => setField("bid_strategy", v)} />
+                    <Select label={mc.bidStrategyTechnical} options={BID_OPTIONS} value={form.bid_strategy} onChange={(v) => setField("bid_strategy", v)} />
                   )}
                 </BlockStack>
               </div>
@@ -1154,10 +1130,13 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                     padding: "26px 26px 28px",
                   }}
                 >
-                  <StepHeader step={5} title="Externe Ausspielung (Admin)" subtitle="Plattform-Zuweisung nur für Team mit verbundenen Konten." />
+                  <StepHeader step={5} title={mc.externalAdminTitle} subtitle={mc.externalAdminSubtitle} />
                   <BlockStack gap="300">
                     <Text tone="subdued" as="p" variant="bodySm">
-                      Budget {form.budget_daily_cents ? `${form.budget_daily_cents} €/Tag` : "—"} auf {form.ad_platforms.length || "keine"} Kanäle.
+                      {mc.budgetOnChannels(
+                        form.budget_daily_cents ? `${form.budget_daily_cents} €/day` : "—",
+                        form.ad_platforms.length || mc.noChannels,
+                      )}
                     </Text>
                     <div style={{ border: "1px solid #fcd34d", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
                       {PLATFORM_OPTIONS.map((p) => {
@@ -1179,8 +1158,8 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                             <CustomCheckbox checked={checked} onChange={() => togglePlatform(p.value)} size={18} />
                             <div style={{ flex: 1 }}>
                               <span style={{ fontSize: 13, fontWeight: checked ? 600 : 400 }}>{p.label}</span>
-                              {!isConnected && <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 8 }}>Nicht verbunden</span>}
-                              {isConnected && <span style={{ fontSize: 11, color: "#22c55e", marginLeft: 8 }}>Verbunden</span>}
+                              {!isConnected && <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 8 }}>{mc.notConnected}</span>}
+                              {isConnected && <span style={{ fontSize: 11, color: "#22c55e", marginLeft: 8 }}>{mc.connected}</span>}
                             </div>
                           </label>
                         );
@@ -1202,16 +1181,15 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
               >
                 <StepHeader
                   step={isSuperuser ? 6 : 5}
-                  title="Google Ads Details"
-                  subtitle="Diese Informationen werden direkt für die automatische Google Ads Kampagnenerstellung verwendet. Ohne Keywords und Anzeigentexte werden keine Suchanzeigen ausgespielt."
+                  title={mc.gadsTitle}
+                  subtitle={mc.gadsSubtitle}
                 />
 
-                {/* Keywords */}
                 <BlockStack gap="400">
                   <div>
-                    <Text as="span" variant="bodyMd" fontWeight="semibold">Keywords (Suchwörter) *</Text>
+                    <Text as="span" variant="bodyMd" fontWeight="semibold">{mc.keywordsLabel}</Text>
                     <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#475569" }}>
-                      Wörter, nach denen potenzielle Kunden suchen. Empfehlung: 5–20 relevante Keywords. Trennung per Enter oder Komma.
+                      {mc.keywordsHelp}
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8, minHeight: 32 }}>
                       {(form.gads_keywords || []).map((kw, i) => (
@@ -1224,7 +1202,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                     <div style={{ display: "flex", gap: 8 }}>
                       <input
                         type="text"
-                        placeholder="Keyword eingeben, Enter drücken …"
+                        placeholder={mc.keywordGadsPlaceholder}
                         style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, outline: "none" }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === ",") {
@@ -1246,15 +1224,15 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                       />
                     </div>
                     {(form.gads_keywords || []).length === 0 && (
-                      <p style={{ margin: "6px 0 0", fontSize: 11, color: "#dc2626" }}>⚠ Ohne Keywords werden Suchanzeigen nicht ausgespielt.</p>
+                      <p style={{ margin: "6px 0 0", fontSize: 11, color: "#dc2626" }}>{mc.noKeywordsWarning}</p>
                     )}
                   </div>
 
                   {/* Headlines */}
                   <div>
-                    <Text as="span" variant="bodyMd" fontWeight="semibold">Anzeigentitel (Headlines) *</Text>
+                    <Text as="span" variant="bodyMd" fontWeight="semibold">{mc.headlinesLabel}</Text>
                     <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#475569" }}>
-                      Mindestens 3 Titel erforderlich, max. 15. Jeder max. <strong>30 Zeichen</strong>. Google wählt die beste Kombination.
+                      {mc.headlinesHelp}
                     </p>
                     <BlockStack gap="200">
                       {Array.from({ length: 7 }).map((_, i) => {
@@ -1268,7 +1246,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                               type="text"
                               maxLength={30}
                               value={val}
-                              placeholder={isRequired ? `Titel ${i + 1} (Pflichtfeld)` : `Titel ${i + 1} (optional)`}
+                              placeholder={isRequired ? mc.headlineRequired(i + 1) : mc.headlineOptional(i + 1)}
                               style={{ width: "100%", padding: "8px 52px 8px 12px", borderRadius: 8, border: `1px solid ${overLimit ? "#f87171" : (isRequired && !val ? "#fcd34d" : "#cbd5e1")}`, fontSize: 13, boxSizing: "border-box", outline: "none" }}
                               onChange={(e) => {
                                 const updated = [...(form.gads_headlines || [])];
@@ -1283,15 +1261,15 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                       })}
                     </BlockStack>
                     {(form.gads_headlines || []).filter(h => h?.trim()).length < 3 && (
-                      <p style={{ margin: "6px 0 0", fontSize: 11, color: "#dc2626" }}>⚠ Mindestens 3 Titel erforderlich.</p>
+                      <p style={{ margin: "6px 0 0", fontSize: 11, color: "#dc2626" }}>{mc.minHeadlinesWarning}</p>
                     )}
                   </div>
 
                   {/* Descriptions */}
                   <div>
-                    <Text as="span" variant="bodyMd" fontWeight="semibold">Anzeigenbeschreibungen *</Text>
+                    <Text as="span" variant="bodyMd" fontWeight="semibold">{mc.descriptionsLabel}</Text>
                     <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#475569" }}>
-                      Mindestens 2 Beschreibungen, max. 4. Jede max. <strong>90 Zeichen</strong>.
+                      {mc.descriptionsHelp}
                     </p>
                     <BlockStack gap="200">
                       {Array.from({ length: 4 }).map((_, i) => {
@@ -1305,7 +1283,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                               type="text"
                               maxLength={90}
                               value={val}
-                              placeholder={isRequired ? `Beschreibung ${i + 1} (Pflichtfeld)` : `Beschreibung ${i + 1} (optional)`}
+                              placeholder={isRequired ? mc.descriptionRequired(i + 1) : mc.descriptionOptional(i + 1)}
                               style={{ width: "100%", padding: "8px 56px 8px 12px", borderRadius: 8, border: `1px solid ${overLimit ? "#f87171" : (isRequired && !val ? "#fcd34d" : "#cbd5e1")}`, fontSize: 13, boxSizing: "border-box", outline: "none" }}
                               onChange={(e) => {
                                 const updated = [...(form.gads_descriptions || [])];
@@ -1323,19 +1301,19 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
 
                   {/* Final URL */}
                   <TextField
-                    label="Ziel-URL (Landing Page)"
+                    label={mc.landingUrl}
                     value={form.gads_final_url || ""}
                     onChange={(v) => setField("gads_final_url", v)}
                     placeholder="https://andertal.de/..."
-                    helpText="Leer lassen, um die Shop-Startseite zu verwenden."
+                    helpText={mc.landingUrlHelp}
                     autoComplete="off"
                   />
 
                   {/* Geo + Language */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                     <div>
-                      <Text as="span" variant="bodyMd" fontWeight="semibold">Zielregionen</Text>
-                      <p style={{ margin: "4px 0 8px", fontSize: 12, color: "#64748b" }}>Mehrfachauswahl möglich.</p>
+                      <Text as="span" variant="bodyMd" fontWeight="semibold">{mc.geoTargets}</Text>
+                      <p style={{ margin: "4px 0 8px", fontSize: 12, color: "#64748b" }}>{mc.multiSelect}</p>
                       <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
                         {GEO_TARGET_OPTIONS.map((g) => {
                           const checked = (form.gads_geo_targets || []).includes(g.value);
@@ -1354,20 +1332,20 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                     </div>
                     <div>
                       <Select
-                        label="Zielsprache"
+                        label={mc.targetLanguage}
                         options={LANGUAGE_TARGET_OPTIONS}
                         value={form.gads_target_language || "1001"}
                         onChange={(v) => setField("gads_target_language", v)}
                       />
                       <div style={{ marginTop: 16 }}>
                         <TextField
-                          label="Max. CPC Gebot (Cent)"
+                          label={mc.maxCpcBid}
                           type="number"
                           min="10"
                           step="5"
                           value={String(form.gads_cpc_bid_cents ?? 50)}
                           onChange={(v) => setField("gads_cpc_bid_cents", Number(v) || 50)}
-                          helpText="z.B. 50 = 0,50 € pro Klick. Empfehlung: 30–200 Cent."
+                          helpText={mc.cpcHelp}
                           autoComplete="off"
                         />
                       </div>
@@ -1388,14 +1366,10 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
               >
                 <StepHeader
                   step={isSuperuser ? 7 : 6}
-                  title="Produkte im Fokus"
-                  subtitle={
-                    sellerExperience
-                      ? "Wähle, welche Listings von dieser Promotion profitieren — oder alle deine aktiven Artikel."
-                      : "Targeting wie im Backend."
-                  }
+                  title={mc.productsFocusTitle}
+                  subtitle={sellerExperience ? mc.productsFocusSubtitleSeller : mc.productsFocusSubtitleAdmin}
                 />
-                <Select label="Zielauswahl" options={TARGET_OPTIONS} value={form.target_type} onChange={(v) => setField("target_type", v)} />
+                <Select label={mc.targetSelection} options={targetOptions} value={form.target_type} onChange={(v) => setField("target_type", v)} />
 
                 {form.target_type === "products" && (
                   <BlockStack gap="300">
@@ -1403,7 +1377,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                       <TextField
                         label=""
                         labelHidden
-                        placeholder="Produkte suchen …"
+                        placeholder={mc.searchProducts}
                         value={productSearch}
                         onChange={setProductSearch}
                         autoComplete="off"
@@ -1444,7 +1418,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                                   onClick={() => setExpandedProductId(isExpanded ? null : p.id)}
                                   style={{ fontSize: 11, color: "#6366f1", background: "none", border: "1px solid #e0e7ff", borderRadius: 6, padding: "3px 8px", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
                                 >
-                                  {isExpanded ? "▲" : "▼"} {variants.length} Var.
+                                  {isExpanded ? "▲" : "▼"} {mc.variants(variants.length)}
                                 </button>
                               )}
                             </div>
@@ -1480,7 +1454,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 {form.target_type === "groups" && (
                   <BlockStack gap="200">
                     {groups.length === 0 ? (
-                      <Banner tone="info">Noch keine Produktgruppen.</Banner>
+                      <Banner tone="info">{mc.noProductGroups}</Banner>
                     ) : (
                       <div style={{ marginTop: 12, border: "1px solid #e2e8f0", borderRadius: 14, overflow: "hidden" }}>
                         {groups.map((g) => {
@@ -1501,7 +1475,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                               <CustomCheckbox checked={checked} onChange={() => toggleGroup(g.id)} size={18} />
                               <div>
                                 <div style={{ fontSize: 13, fontWeight: checked ? 650 : 500 }}>{g.name}</div>
-                                <div style={{ fontSize: 11, color: "#64748b" }}>{(g.product_ids || []).length} Produkte</div>
+                                <div style={{ fontSize: 11, color: "#64748b" }}>{mc.productsCount((g.product_ids || []).length)}</div>
                               </div>
                             </label>
                           );
@@ -1514,7 +1488,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 {form.target_type === "all" && (
                   <div style={{ marginTop: 12 }}>
                     <Banner tone="success">
-                      Alle deine aktiven Angebote werden für diese Promotion berücksichtigt — ideal für Markenauftritte und Sortiments-Kampagnen.
+                      {mc.allProductsBanner}
                     </Banner>
                   </div>
                 )}
@@ -1522,7 +1496,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
 
               <InlineStack gap="300" wrap>
                 <Button variant="primary" size="large" onClick={save} loading={saving}>
-                  Speichern
+                  {mc.save}
                 </Button>
                 {!isSuperuser && (
                   <Button
@@ -1532,14 +1506,14 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                     loading={checkoutLoading}
                     disabled={saving}
                   >
-                    Bezahlen & einreichen
+                    {mc.payAndSubmit}
                   </Button>
                 )}
-                <Button onClick={() => router.push("/marketing/campaigns")}>Abbrechen</Button>
+                <Button onClick={() => router.push("/marketing/campaigns")}>{mc.cancel}</Button>
               </InlineStack>
               {!isSuperuser && (
                 <p style={{ margin: 0, fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
-                  Mit „Bezahlen & einreichen" wird ein 30-Tage-Budget ({form.budget_daily_cents ? `${(parseFloat(form.budget_daily_cents) * 30).toFixed(2)} €` : "—"}) via Stripe abgerechnet. Deine Kampagne wird danach zur Freigabe eingereicht.
+                  {mc.stripeNote(form.budget_daily_cents ? `${(parseFloat(form.budget_daily_cents) * 30).toFixed(2)} €` : "—")}
                 </p>
               )}
             </BlockStack>
@@ -1549,9 +1523,10 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
             <aside style={{ flex: "0 1 320px", width: "100%", maxWidth: 360, position: "sticky", top: 24, alignSelf: "flex-start" }}>
               <BlockStack gap="400">
                 <ShopPreviewMock
+                  mc={mc}
                   name={form.name}
                   budgetEuro={form.budget_daily_cents}
-                  goalLabel={sellerExperience ? goalLabel : "Promotion"}
+                  goalLabel={sellerExperience ? goalLabel : mc.promotion}
                   targetType={form.target_type}
                   productCount={form.product_ids.length}
                   highlightVideoUrl={form.seller_video_shop_url}
